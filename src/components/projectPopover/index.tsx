@@ -54,7 +54,8 @@ const ProjectItemButton = styled(NoPaddingButton)`
         width: 100%;
     }
 
-    &&:hover {
+    &&:hover,
+    &&:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.04));
     }
 `;

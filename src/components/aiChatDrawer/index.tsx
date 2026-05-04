@@ -872,7 +872,7 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                                 >
                                     <Button
                                         aria-label="Regenerate response"
-                                        icon={<ReloadOutlined />}
+                                        icon={<ReloadOutlined aria-hidden />}
                                         onClick={() => handleRegenerate(index)}
                                         size="small"
                                         type="text"
@@ -1099,7 +1099,7 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                     <Button
                         aria-label={microcopy.ai.stopResponse}
                         danger
-                        icon={<StopOutlined />}
+                        icon={<StopOutlined aria-hidden />}
                         onClick={() => abort()}
                         type="default"
                     >

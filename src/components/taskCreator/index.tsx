@@ -145,7 +145,7 @@ const TaskCreator: React.FC<{
                         <Button
                             aria-label={microcopy.actions.draftWithAi}
                             disabled={disabled}
-                            icon={<AiSparkleIcon />}
+                            icon={<AiSparkleIcon aria-hidden />}
                             onClick={() => columnId && openAiDraft(columnId)}
                             size="small"
                             type="link"
@@ -172,6 +172,7 @@ const TaskCreator: React.FC<{
             inputMode="text"
             onBlur={toggle}
             placeholder={microcopy.placeholders.whatNeedsToBeDone}
+            autoComplete="off"
             autoFocus
             onPressEnter={submit}
             onKeyDown={(event) => {

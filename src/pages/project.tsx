@@ -6,7 +6,7 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Alert, Button, Typography } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
@@ -25,6 +25,7 @@ import {
     radius,
     space
 } from "../theme/tokens";
+import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useDebounce from "../utils/hooks/useDebounce";
 import useProjectModal from "../utils/hooks/useProjectModal";
@@ -238,10 +239,12 @@ const ProjectPage = () => {
     useTitle("Projects", false);
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
-    const [chatOpen, setChatOpen] = useState(false);
-    const [chatInitialPrompt, setChatInitialPrompt] = useState<
-        string | undefined
-    >(undefined);
+    const {
+        open: chatOpen,
+        openDrawer: openChatDrawer,
+        closeDrawer: closeChatDrawer,
+        pendingPrompt: chatInitialPrompt
+    } = useAiChatDrawer();
     /**
      * Listen for `boardCopilot:openChat` from the command palette so the
      * project list (no board context) still surfaces AI mode submissions
@@ -251,13 +254,12 @@ const ProjectPage = () => {
         if (!aiEnabled) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;
-            setChatInitialPrompt(detail?.prompt);
-            setChatOpen(true);
+            openChatDrawer(detail?.prompt);
         };
         window.addEventListener("boardCopilot:openChat", onOpenChat);
         return () =>
             window.removeEventListener("boardCopilot:openChat", onOpenChat);
-    }, [aiEnabled]);
+    }, [aiEnabled, openChatDrawer]);
     const [param, setParam] = useUrl([
         "projectName",
         "managerId",
@@ -316,8 +318,8 @@ const ProjectPage = () => {
                     {aiEnabled && (
                         <Button
                             aria-label="Ask Board Copilot"
-                            icon={<AiSparkleIcon />}
-                            onClick={() => setChatOpen(true)}
+                            icon={<AiSparkleIcon aria-hidden />}
+                            onClick={() => openChatDrawer()}
                             type="default"
                         >
                             Ask
@@ -427,10 +429,7 @@ const ProjectPage = () => {
                     initialPrompt={chatInitialPrompt}
                     knownProjectIds={(projects ?? []).map((p) => p._id)}
                     members={members ?? []}
-                    onClose={() => {
-                        setChatOpen(false);
-                        setChatInitialPrompt(undefined);
-                    }}
+                    onClose={closeChatDrawer}
                     open={chatOpen}
                     project={null}
                     tasks={[]}

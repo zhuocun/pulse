@@ -388,6 +388,9 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             <Form.Item label={microcopy.placeholders.describeWork}>
                 <TextArea
                     aria-label={microcopy.a11y.taskPrompt}
+                    autoComplete="off"
+                    enterKeyHint="go"
+                    inputMode="text"
                     maxLength={1000}
                     onChange={(event) => setPrompt(event.target.value)}
                     onKeyDown={(event) => {
@@ -480,7 +483,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                             disabled={
                                 draftAi.isLoading || breakdownAi.isLoading
                             }
-                            icon={<ReloadOutlined />}
+                            icon={<ReloadOutlined aria-hidden />}
                             onClick={handleRegenerate}
                         />
                     </Tooltip>
@@ -557,7 +560,11 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         required
                         rules={[{ required: true }]}
                     >
-                        <Input enterKeyHint="next" inputMode="text" />
+                        <Input
+                            autoComplete="off"
+                            enterKeyHint="next"
+                            inputMode="text"
+                        />
                     </Form.Item>
                     <Form.Item
                         extra={
@@ -586,7 +593,11 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         label={microcopy.fields.epic}
                         name="epic"
                     >
-                        <Input enterKeyHint="next" inputMode="text" />
+                        <Input
+                            autoComplete="off"
+                            enterKeyHint="next"
+                            inputMode="text"
+                        />
                     </Form.Item>
                     <Form.Item
                         extra={
@@ -643,7 +654,12 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         label={microcopy.fields.notes}
                         name="note"
                     >
-                        <TextArea rows={4} />
+                        <TextArea
+                            autoComplete="off"
+                            enterKeyHint="done"
+                            inputMode="text"
+                            rows={4}
+                        />
                     </Form.Item>
                     <div
                         style={{

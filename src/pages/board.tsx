@@ -40,6 +40,7 @@ import {
     radius,
     space as themeSpace
 } from "../theme/tokens";
+import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
@@ -414,10 +415,12 @@ const BoardPage = () => {
         openDrawer: openBriefDrawer,
         closeDrawer: closeBriefDrawer
     } = useBoardBriefDrawer();
-    const [chatOpen, setChatOpen] = useState(false);
-    const [chatInitialPrompt, setChatInitialPrompt] = useState<
-        string | undefined
-    >(undefined);
+    const {
+        open: chatOpen,
+        openDrawer: openChatDrawer,
+        closeDrawer: closeChatDrawer,
+        pendingPrompt: chatInitialPrompt
+    } = useAiChatDrawer();
     /**
      * Wire the command palette → AI chat hand-off (PRD CP-R6). When the
      * user submits a prompt in palette AI mode, the palette dispatches
@@ -428,13 +431,12 @@ const BoardPage = () => {
         if (!boardAiOn) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;
-            setChatInitialPrompt(detail?.prompt);
-            setChatOpen(true);
+            openChatDrawer(detail?.prompt);
         };
         window.addEventListener("boardCopilot:openChat", onOpenChat);
         return () =>
             window.removeEventListener("boardCopilot:openChat", onOpenChat);
-    }, [boardAiOn]);
+    }, [boardAiOn, openChatDrawer]);
     const [swipeHintDismissed, setSwipeHintDismissed] = useState(() => {
         if (typeof window === "undefined") return false;
         try {
@@ -547,7 +549,7 @@ const BoardPage = () => {
                                             icon={
                                                 <MessageOutlined aria-hidden />
                                             }
-                                            onClick={() => setChatOpen(true)}
+                                            onClick={() => openChatDrawer()}
                                             type="default"
                                         >
                                             Ask
@@ -780,10 +782,7 @@ const BoardPage = () => {
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
                             members={members ?? []}
-                            onClose={() => {
-                                setChatOpen(false);
-                                setChatInitialPrompt(undefined);
-                            }}
+                            onClose={closeChatDrawer}
                             open={chatOpen}
                             project={currentProject ?? null}
                             tasks={visibleTasks}

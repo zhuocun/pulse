@@ -160,7 +160,8 @@ const PillTrigger = styled.button`
         background-color 120ms ease-out,
         color 120ms ease-out;
 
-    &:hover {
+    &:hover,
+    &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
     }
 
@@ -209,7 +210,8 @@ const IconButton = styled.button`
         color 120ms ease-out;
     width: 36px;
 
-    &:hover {
+    &:hover,
+    &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
         color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
     }
@@ -315,7 +317,7 @@ const Header: React.FC = () => {
             label: (
                 <SettingsRow>
                     <Space size={space.xs}>
-                        {scheme === "dark" ? <MoonOutlined /> : <SunOutlined />}
+                        {scheme === "dark" ? <MoonOutlined aria-hidden /> : <SunOutlined aria-hidden />}
                         <Typography.Text>
                             {microcopy.settings.darkMode}
                         </Typography.Text>
@@ -338,7 +340,7 @@ const Header: React.FC = () => {
                       label: (
                           <SettingsRow>
                               <Space size={space.xs}>
-                                  <BulbOutlined />
+                                  <BulbOutlined aria-hidden />
                                   <Typography.Text>
                                       {microcopy.settings.boardCopilot}
                                   </Typography.Text>
@@ -406,7 +408,7 @@ const Header: React.FC = () => {
                     }
                     type="button"
                 >
-                    {scheme === "dark" ? <SunOutlined /> : <MoonOutlined />}
+                    {scheme === "dark" ? <SunOutlined aria-hidden /> : <MoonOutlined aria-hidden />}
                 </IconButton>
                 <Dropdown menu={{ items }} trigger={["click", "hover"]}>
                     <PillTrigger

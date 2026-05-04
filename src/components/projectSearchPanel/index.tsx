@@ -140,6 +140,7 @@ const ProjectSearchPanel: React.FC<Props> = ({
                     <Input
                         aria-label={microcopy.a11y.searchProjectsByName}
                         allowClear
+                        autoComplete="off"
                         enterKeyHint="search"
                         inputMode="search"
                         onChange={(e) =>

@@ -126,6 +126,7 @@ const ColumnCreator: React.FC = () => {
         <Slot>
             <Input
                 aria-label={microcopy.a11y.newColumnName}
+                autoComplete="off"
                 disabled={isLoading}
                 enterKeyHint="done"
                 inputMode="text"

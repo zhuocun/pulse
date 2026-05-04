@@ -82,7 +82,9 @@ const WorkloadBar = styled.div<{ overloaded: boolean }>`
             ? "var(--ant-color-warning, #F59E0B)"
             : "var(--color-copilot-grad-mid, #EA580C)"};
     height: 100%;
-    transition: width 320ms ease-out;
+    transform-origin: left;
+    transition: transform 320ms ease-out;
+    width: 100%;
 `;
 
 interface BoardBriefDrawerProps {
@@ -741,7 +743,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                                             <WorkloadBar
                                                 overloaded={overloaded}
                                                 style={{
-                                                    width: `${Math.min(100, ratio * 80)}%`
+                                                    transform: `scaleX(${Math.min(100, ratio * 80) / 100})`
                                                 }}
                                             />
                                         </WorkloadBarWrap>
