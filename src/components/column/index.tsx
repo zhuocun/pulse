@@ -471,7 +471,13 @@ const Column = React.forwardRef<
         tasks: ITask[];
         column: IColumn;
         param: TaskSearchParam;
+        /** Disables inline task creation while a reorder mutation is in flight. */
         isDragDisabled: boolean;
+        /**
+         * When set, controls row drag only (e.g. filters active). Defaults to
+         * `isDragDisabled` so a single flag still disables both behaviors.
+         */
+        taskDragDisabled?: boolean;
         boardAiOn?: boolean;
         members?: IMember[];
         onResetFilters?: () => void;
@@ -483,6 +489,7 @@ const Column = React.forwardRef<
             param,
             tasks,
             isDragDisabled,
+            taskDragDisabled = isDragDisabled,
             boardAiOn = true,
             members = [],
             onResetFilters,
@@ -552,7 +559,7 @@ const Column = React.forwardRef<
                                     index={index}
                                     draggableId={`task${task._id}`}
                                     isDragDisabled={
-                                        isDragDisabled ||
+                                        taskDragDisabled ||
                                         isOptimisticPlaceholderId(task._id)
                                     }
                                     // TaskCard renders a <button>, which @hello-pangea/dnd

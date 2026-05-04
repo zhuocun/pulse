@@ -766,6 +766,9 @@ const BoardPage = () => {
                                                             })
                                                         }
                                                         isDragDisabled={
+                                                            isTaskDragDisabled
+                                                        }
+                                                        taskDragDisabled={
                                                             isTaskDragDisabled ||
                                                             hasActiveFilters
                                                         }

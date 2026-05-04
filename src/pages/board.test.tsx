@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -152,9 +158,10 @@ const defaultTasks = [
 
 const response = (body: unknown, ok = true) =>
     ({
-        json: jest.fn().mockResolvedValue(body),
         ok,
-        status: ok ? 200 : 400
+        status: ok ? 200 : 400,
+        json: jest.fn().mockResolvedValue(body),
+        text: jest.fn().mockResolvedValue(JSON.stringify(body))
     }) as unknown as Response;
 
 const silenceExpectedConsoleErrors = (expectedMessages: string[][]) => {
@@ -340,7 +347,13 @@ describe("BoardPage", () => {
     it("shows loading, then renders the project board, columns, tasks, and disabled mock drags", async () => {
         let resolveProject: (value: Response) => void = () => undefined;
         let resolveBoards: (value: Response) => void = () => undefined;
-        let resolveTasks: (value: Response) => void = () => undefined;
+        const pendingTaskResolves: Array<(value: Response) => void> = [];
+        const flushTasks = (value: Response) => {
+            while (pendingTaskResolves.length > 0) {
+                const resolve = pendingTaskResolves.shift();
+                resolve?.(value);
+            }
+        };
         fetchMock.mockImplementation((input) => {
             const url = String(input);
 
@@ -359,7 +372,7 @@ describe("BoardPage", () => {
             }
             if (url.includes("tasks")) {
                 return new Promise<Response>((resolve) => {
-                    resolveTasks = resolve;
+                    pendingTaskResolves.push(resolve);
                 });
             }
 
@@ -377,11 +390,23 @@ describe("BoardPage", () => {
         expect(container.querySelector(".ant-skeleton")).toBeInTheDocument();
 
         resolveProject(response(project()));
+        await act(async () => {
+            await Promise.resolve();
+        });
         resolveBoards(response(defaultColumns));
-        resolveTasks(response(defaultTasks));
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await waitFor(() => {
+            expect(pendingTaskResolves.length).toBeGreaterThan(0);
+        });
+        flushTasks(response(defaultTasks));
+        await act(async () => {
+            await Promise.resolve();
+        });
 
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
-        expect(screen.getByText("Build task")).toBeInTheDocument();
+        expect(await screen.findByText("Build task")).toBeInTheDocument();
         expect(screen.getByText("Fix bug")).toBeInTheDocument();
         expect(screen.getByText("Optimistic task")).toBeInTheDocument();
         expect(
