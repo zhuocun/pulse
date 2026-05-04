@@ -1,33 +1,33 @@
 ---
 name: subagent-orchestrator
-description: Orchestrates parallel subagents instead of running tasks single-threaded — decomposes the task, delegates independent research and development slices (exploration, analysis, implementation, fixes, tests, verification) to subagents with model and reasoning parameters set explicitly on every call, then reviews returned work as the quality gate before integrating. Use when the user authorizes subagents or asks to "parallelize", "orchestrate", "delegate", or "run agents in parallel"; when the task has 2+ independent workstreams or 3+ distinct subtasks; when it combines exploration with implementation, or implementation with verification; or when it is likely to take more than a few minutes. On Cursor, picks Composer for every subagent call. Do NOT use when no subagent launcher is available, when subagents are not authorized, or for tiny, fully serial, or tightly coupled tasks.
+description: Orchestrates parallel subagents as the primary performers of research and implementation work — the orchestrator decomposes the task, scopes and configures each subagent (explicitly setting model and reasoning parameters), keeps only the immediate blocking step local, and reviews returned work as the quality gate before integrating. Use when the user authorizes subagents or asks to "parallelize", "orchestrate", "delegate", or "run agents in parallel"; when the task has 2+ independent workstreams or 3+ distinct subtasks; when it combines exploration with implementation, or implementation with verification; or when it is likely to take more than a few minutes. On Cursor, picks Composer for every subagent call. Do NOT use when no subagent launcher is available, when subagents are not authorized, or for tiny, fully serial, or tightly coupled tasks.
 ---
 
 # Subagent Orchestrator
 
 ## Role
 
-Work as an orchestrator, not a single-threaded executor. Decompose the task, keep the critical path local, delegate every other independent slice — research or development — to parallel subagents, then review and integrate what they return.
+Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, codebase questions, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb research or implementation into itself unless the work is genuinely tiny or tightly coupled to the next local action.
 
 ## When to delegate
 
 Only delegate when the session or user authorizes subagents. If no subagent launcher exists, ignore this skill. If the platform exposes a faster-but-still-capable subagent option, prefer it when it does not hurt quality.
 
-When delegation is allowed, default to it. A task is worth delegating if any of these are true:
+When delegation is allowed, **subagents are the default executor**. Treat staying local as the exception. A task is worth delegating if any of these are true:
 
 - it spans more than one independent question or subsystem
 - it combines exploration with implementation, or implementation with verification
 - it is likely to take more than a few minutes
 - it has 2+ independent workstreams or 3+ distinct side subtasks
 
-Stay local for genuinely tiny or tightly coupled work, and for the immediate blocking step whose result the next local action depends on.
+Stay local only for genuinely tiny or tightly coupled work, and for the immediate blocking step whose result the next local action depends on.
 
 Prefer one subagent per distinct subtask. Bias toward spawning earlier rather than waiting for local exploration to finish. On clearly multi-part tasks, run 3+ subagents in parallel, up to the limit of independent slices and platform constraints.
 
 ## How to delegate
 
 1. Form a short plan and identify the immediate blocking step to keep local.
-2. Split the rest into bounded subtasks across both research strands (exploration, lookups, analysis) and development strands (implementation, fixes, tests, verification).
+2. Push the remaining work — research strands (exploration, lookups, analysis) and development strands (implementation, fixes, tests, verification) — into bounded subtasks owned by subagents.
 3. For each subtask, give the subagent: the exact goal, the expected output, the owned files or scope, and a note that it is not alone in the codebase — it must adapt to concurrent edits and never revert other agents' work.
 4. Launch in parallel. Continue non-overlapping local work while subagents run; only block on a subagent when its output is the next dependency.
 5. Reuse a still-relevant agent for follow-up work; otherwise start fresh.
