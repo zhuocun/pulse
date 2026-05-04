@@ -70,7 +70,15 @@ export const ColumnContainer = styled.div`
     @media (max-width: ${breakpoints.md - 1}px) {
         min-width: min(
             ${columnMinWidthRem - 1}rem,
+            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
+        );
+        min-width: min(
+            ${columnMinWidthRem - 1}rem,
             calc(100dvw - ${space.md * 2 + space.md + space.xl}px)
+        );
+        width: min(
+            ${columnMinWidthRem - 1}rem,
+            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
         );
         width: min(
             ${columnMinWidthRem - 1}rem,

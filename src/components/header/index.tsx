@@ -63,6 +63,7 @@ const PageHeader = styled.header`
     justify-content: space-between;
     gap: ${space.xs}px;
     padding: 2px ${space.sm}px;
+    padding-block-start: max(2px, env(safe-area-inset-top));
     padding-inline-start: max(${space.sm}px, env(safe-area-inset-left));
     padding-inline-end: max(${space.sm}px, env(safe-area-inset-right));
     position: sticky;

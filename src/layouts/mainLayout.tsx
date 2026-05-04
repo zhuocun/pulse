@@ -36,6 +36,7 @@ const Main = styled.main`
     flex-direction: column;
     min-height: 0;
     min-width: 0;
+    scroll-padding-top: 64px;
 `;
 
 /**

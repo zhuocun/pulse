@@ -229,7 +229,10 @@ video {
  */
 a,
 button,
-[role="button"] {
+[role="button"],
+input,
+textarea,
+select {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
 }
