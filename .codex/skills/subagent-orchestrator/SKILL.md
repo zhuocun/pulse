@@ -1,8 +1,8 @@
 ---
 name: subagent-orchestrator
-description: Operate as an aggressive orchestrator that delegates as many distinct non-trivial side subtasks as practical to parallel subagents with at least medium reasoning when delegation is permitted.
+description: Decompose work into bounded subtasks, delegate independent research and development slices to parallel subagents with explicitly set model and reasoning parameters, and act as the reviewer that gates and integrates returned work.
 metadata:
-  short-description: Aggressive parallel orchestration when allowed
+  short-description: Parallel research+development delegation with explicit model selection and orchestrator review
 ---
 
 # Subagent Orchestrator
