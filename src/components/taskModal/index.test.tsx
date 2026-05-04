@@ -290,6 +290,34 @@ describe("TaskModal", () => {
         confirmSpy.mockRestore();
     });
 
+    it("keeps the modal open when task deletion is cancelled", async () => {
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation(() => {
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        renderModal();
+
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
+
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
+        expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
+
+        confirmSpy.mockRestore();
+    });
+
     it("disables delete when there is no second task or the editing task is mock", async () => {
         const { unmount } = renderModal({ initialTasks: [task()] });
 

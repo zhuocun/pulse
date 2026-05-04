@@ -107,7 +107,6 @@ const TaskModal: React.FC<{
     const onDelete = () => {
         const taskName = editingTask?.taskName;
         const taskId = editingTaskId;
-        onClose();
         Modal.confirm({
             centered: true,
             okText: microcopy.confirm.deleteTask.confirmLabel,
@@ -119,8 +118,10 @@ const TaskModal: React.FC<{
                 remove(
                     { taskId },
                     {
-                        onSuccess: () =>
-                            message.success(microcopy.feedback.taskDeleted),
+                        onSuccess: () => {
+                            message.success(microcopy.feedback.taskDeleted);
+                            onClose();
+                        },
                         onError: () =>
                             message.error(
                                 taskName

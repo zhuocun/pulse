@@ -205,6 +205,28 @@ describe("useReactMutation", () => {
         });
     });
 
+    it("does not persist undefined when an optimistic callback declines an empty cache", async () => {
+        const queryClient = createQueryClient();
+        const target = { _id: "new" };
+        const callback = jest.fn(() => undefined);
+        apiMock.mockResolvedValue(target);
+
+        const { result } = renderHook(
+            () => useReactMutation("items", "POST", ["items"], callback),
+            {
+                wrapper: createWrapper(queryClient)
+            }
+        );
+
+        await act(async () => {
+            await result.current.mutateAsync(target);
+        });
+
+        expect(callback).toHaveBeenCalledWith(target, undefined);
+        expect(queryClient.getQueryData(["items"])).toBeUndefined();
+        expect(queryClient.getQueryState(["items"])).toBeUndefined();
+    });
+
     it("sends an empty object when mutateAsync is called without params", async () => {
         const queryClient = createQueryClient();
         apiMock.mockResolvedValue({ ok: true });

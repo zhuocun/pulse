@@ -43,7 +43,8 @@ const useReactMutation = <D>(
             ? async (target: unknown) => {
                   const previousItems = queryClient.getQueryData(cacheKey);
                   queryClient.setQueryData(cacheKey, (old?: unknown[]) => {
-                      return callback(target, old);
+                      const nextItems = callback(target, old);
+                      return nextItems === undefined ? old : nextItems;
                   });
                   return { previousItems };
               }

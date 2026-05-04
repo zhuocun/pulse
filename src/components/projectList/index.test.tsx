@@ -264,6 +264,18 @@ describe("ProjectList", () => {
         expect(startEditing).toHaveBeenCalledWith("project-1");
     });
 
+    it("uses the project-list prefix key for delete invalidation", () => {
+        renderList();
+
+        expect(mockedUseReactMutation).toHaveBeenCalledWith(
+            "projects",
+            "DELETE",
+            ["projects"],
+            expect.any(Function),
+            expect.any(Function)
+        );
+    });
+
     it("confirms project deletion before calling the delete mutation", () => {
         const confirmSpy = jest
             .spyOn(Modal, "confirm")
@@ -292,6 +304,13 @@ describe("ProjectList", () => {
                 onError: expect.any(Function),
                 onSuccess: expect.any(Function)
             })
+        );
+        expect(mockedUseReactMutation).toHaveBeenCalledWith(
+            "projects",
+            "DELETE",
+            ["projects"],
+            expect.any(Function),
+            expect.any(Function)
         );
 
         confirmSpy.mockRestore();

@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
         "https://jira-python-server.vercel.app";
     const aiBaseUrl = env.REACT_APP_AI_BASE_URL ?? env.VITE_AI_BASE_URL ?? "";
     const aiEnabledRaw =
-        env.REACT_APP_AI_ENABLED ?? env.VITE_AI_ENABLED ?? undefined;
+        env.REACT_APP_AI_ENABLED ?? env.VITE_AI_ENABLED ?? "true";
 
     return {
         build: {

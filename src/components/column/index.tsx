@@ -126,6 +126,10 @@ const FilteredEmptyButton = styled.button`
         outline: none;
     }
 
+    &:focus-visible {
+        box-shadow: ${shadow.focus};
+    }
+
     /* The "Reset filters" CTA is the recovery path out of an empty filtered
      * column — fingers must land it without zoom. Lift to the 44 px touch
      * floor (Apple HIG, WCAG 2.5.8) on coarse pointers without disturbing the
@@ -542,7 +546,7 @@ const Column = React.forwardRef<
                         <DropChild>
                             {filteredTasks.map((task, index) => (
                                 <Drag
-                                    key={task._id || task.taskName}
+                                    key={task._id}
                                     index={index}
                                     draggableId={`task${task._id}`}
                                     isDragDisabled={

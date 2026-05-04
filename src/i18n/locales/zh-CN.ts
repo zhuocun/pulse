@@ -74,6 +74,9 @@ const zhCN: Dictionary = {
         loadingBoard: "正在加载看板",
         accountMenu: "账户菜单",
         boardCopilot: "看板 Copilot",
+        boardCopilotProjectToggle: "此项目的看板 Copilot",
+        boardCopilotSettings: "看板 Copilot 设置",
+        dismissSwipeHint: "关闭滑动提示",
         aiSuggestion: "AI 建议",
         aiBadge: "AI · 使用前请审核",
         useDarkMode: "切换到深色模式",
@@ -176,6 +179,10 @@ const zhCN: Dictionary = {
             one: "{count} 个项目",
             other: "{count} 个项目"
         },
+        tasksMatchingActiveFilters: {
+            one: "{count} 个任务匹配当前筛选条件",
+            other: "{count} 个任务匹配当前筛选条件"
+        },
         results: {
             one: "{count} 项结果",
             other: "{count} 项结果"
@@ -255,6 +262,12 @@ const zhCN: Dictionary = {
         boardEmpty: "此看板暂无任务。"
     },
     greeting: "你好,{name}",
+    board: {
+        enableCopilotOnBoard: "在此看板启用",
+        swipeHint: "滑动查看更多列",
+        copilotProjectDisabledDescription:
+            "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
+    },
     empty: {
         projects: {
             title: "暂无项目",

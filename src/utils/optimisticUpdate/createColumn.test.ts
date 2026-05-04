@@ -9,13 +9,20 @@ const column = (overrides: Partial<IColumn> = {}): IColumn => ({
 });
 
 describe("newColumnCallback", () => {
-    it("returns undefined when there is no existing column cache", () => {
+    it("creates a first mock column when there is no existing column cache", () => {
         expect(
             newColumnCallback(
                 { columnName: "Doing", projectId: "project-1" },
                 undefined
             )
-        ).toBeUndefined();
+        ).toEqual([
+            {
+                _id: "mock",
+                columnName: "Doing",
+                projectId: "project-1",
+                index: 0
+            }
+        ]);
     });
 
     it("appends a mock column at the next index without mutating the old array", () => {

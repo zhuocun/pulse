@@ -486,9 +486,10 @@ const BoardPage = () => {
         param.taskName || param.coordinatorId || param.type || param.semanticIds
     );
     const filterStatusMessage = hasActiveFilters
-        ? `${visibleFilteredCount} ${
-              visibleFilteredCount === 1 ? "task" : "tasks"
-          } match the active filters`
+        ? (visibleFilteredCount === 1
+              ? microcopy.counts.tasksMatchingActiveFilters.one
+              : microcopy.counts.tasksMatchingActiveFilters.other
+          ).replace("{count}", String(visibleFilteredCount))
         : "";
 
     return (
@@ -576,10 +577,16 @@ const BoardPage = () => {
                                                 }}
                                             >
                                                 <span>
-                                                    Enable on this board
+                                                    {
+                                                        microcopy.board
+                                                            .enableCopilotOnBoard
+                                                    }
                                                 </span>
                                                 <Switch
-                                                    aria-label="Board Copilot for this project"
+                                                    aria-label={
+                                                        microcopy.a11y
+                                                            .boardCopilotProjectToggle
+                                                    }
                                                     checked={
                                                         !aiDisabledForProject
                                                     }
@@ -597,9 +604,10 @@ const BoardPage = () => {
                                                 }}
                                                 type="secondary"
                                             >
-                                                Hides Board Copilot on this
-                                                board and blocks AI requests for
-                                                this project.
+                                                {
+                                                    microcopy.board
+                                                        .copilotProjectDisabledDescription
+                                                }
                                             </Typography.Text>
                                         </Space>
                                     }
@@ -607,8 +615,11 @@ const BoardPage = () => {
                                     trigger={["click"]}
                                 >
                                     <Button
-                                        aria-label="Board Copilot settings"
-                                        icon={<SettingOutlined />}
+                                        aria-label={
+                                            microcopy.a11y
+                                                .boardCopilotSettings
+                                        }
+                                        icon={<SettingOutlined aria-hidden />}
                                         type="text"
                                     />
                                 </Popover>
@@ -695,10 +706,13 @@ const BoardPage = () => {
                                 !swipeHintDismissed && (
                                     <SwipeHint role="note">
                                         <span aria-hidden>←</span>
-                                        <span>Swipe to see more columns</span>
+                                        <span>{microcopy.board.swipeHint}</span>
                                         <span aria-hidden>→</span>
                                         <SwipeHintClose
-                                            aria-label="Dismiss swipe hint"
+                                            aria-label={
+                                                microcopy.a11y
+                                                    .dismissSwipeHint
+                                            }
                                             onClick={dismissSwipeHint}
                                             type="button"
                                         >
@@ -735,7 +749,6 @@ const BoardPage = () => {
                                                                 column._id
                                                             ) ?? []
                                                         }
-                                                        key={column._id}
                                                         column={column}
                                                         members={members ?? []}
                                                         param={param}

@@ -26,8 +26,10 @@ describe("newTaskCallback", () => {
         note: "No note yet"
     } as const;
 
-    it("returns undefined when there is no existing task cache", () => {
-        expect(newTaskCallback(target, undefined)).toBeUndefined();
+    it("creates an optimistic list when there is no existing task cache", () => {
+        expect(newTaskCallback(target, undefined)).toEqual([
+            { ...target, _id: "mock" }
+        ]);
     });
 
     it("appends a mock task with submitted fields without mutating the old array", () => {

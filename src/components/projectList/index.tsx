@@ -154,7 +154,7 @@ const ProjectList: React.FC<Props> = ({
     const { mutate: remove } = useReactMutation(
         "projects",
         "DELETE",
-        ["projects", {}],
+        ["projects"],
         deleteProjectCallback,
         // Suppress useReactMutation's auto-revert toast; we surface a
         // dedicated success/failure toast below so the user sees the
