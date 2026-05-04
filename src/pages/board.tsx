@@ -15,7 +15,7 @@ import {
     Typography
 } from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import AiChatDrawer from "../components/aiChatDrawer";
@@ -29,6 +29,7 @@ import EmptyState from "../components/emptyState";
 import Row from "../components/row";
 import TaskModal from "../components/taskModal";
 import TaskSearchPanel from "../components/taskSearchPanel";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import {
     breakpoints,
@@ -40,6 +41,7 @@ import {
     radius,
     space as themeSpace
 } from "../theme/tokens";
+import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
@@ -424,6 +426,50 @@ const BoardPage = () => {
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
     /**
+     * Background triage-agent mount (v2.1). Always call the hook
+     * unconditionally to respect React's hook ordering rules. The agent
+     * will only be started (via effect below) when all of the following
+     * are true:
+     *   - boardAiOn is true
+     *   - aiUseLocalEngine is false (remote backend is available)
+     *   - the chat drawer has just been opened for the first time for this
+     *     project in the current app session
+     */
+    const triageAgent = useAgent("triage-agent", {
+        projectId: currentProject?._id,
+        feToolContext: { projectId: currentProject?._id }
+    });
+    /**
+     * Track which project IDs have already triggered a triage run in
+     * this app session so we fire at most once per (project, session).
+     */
+    const triagedProjectsRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!chatOpen) return;
+        const pid = currentProject?._id;
+        if (!pid) return;
+        if (!boardAiOn) return;
+        if (environment.aiUseLocalEngine) return;
+        if (triagedProjectsRef.current.has(pid)) return;
+
+        triagedProjectsRef.current.add(pid);
+        try {
+            void triageAgent.start({
+                messages: [
+                    {
+                        role: "user",
+                        content: "Run a triage check on the current board."
+                    }
+                ]
+            });
+        } catch {
+            // AgentForbiddenError (per-project AI opt-out) — fail silently;
+            // the error will also surface via triageAgent.error if needed.
+        }
+    }, [boardAiOn, chatOpen, currentProject?._id, triageAgent]);
+
+    /**
      * Wire the command palette → AI chat hand-off (PRD CP-R6). When the
      * user submits a prompt in palette AI mode, the palette dispatches
      * a `boardCopilot:openChat` event with the prompt; we open the
@@ -803,6 +849,11 @@ const BoardPage = () => {
                             members={members ?? []}
                             onClose={closeChatDrawer}
                             open={chatOpen}
+                            pendingNudges={
+                                !environment.aiUseLocalEngine
+                                    ? triageAgent.nudges
+                                    : undefined
+                            }
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />

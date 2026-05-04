@@ -17,17 +17,25 @@ import type { TextAreaRef } from "antd/es/input/TextArea";
 import {
     startTransition,
     useCallback,
+    useContext,
     useEffect,
     useMemo,
     useRef,
     useState
 } from "react";
+import {
+    QueryClient,
+    QueryClientContext,
+    QueryClientProvider
+} from "@tanstack/react-query";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import useAiChat from "../../utils/hooks/useAiChat";
+import useAgentChat from "../../utils/hooks/useAgentChat";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiFeedbackPopover, {
     type AiFeedbackSubmission
@@ -259,7 +267,15 @@ const summarizeToolBody = (body: string): string => {
  */
 const CITATION_INLINE_LIMIT = 6;
 
-const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
+/**
+ * Fallback QueryClient used when the drawer is rendered outside a
+ * QueryClientProvider (e.g. in legacy tests or Storybook sandboxes).
+ * This avoids a hard crash from `useQueryClient()` inside `useAgentChat` →
+ * `useAgent` while keeping the remote path disabled (local engine only).
+ */
+const fallbackQueryClient = new QueryClient();
+
+const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     open,
     onClose,
     project,
@@ -310,68 +326,6 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
     const [locallyDismissedNudges, setLocallyDismissedNudges] = useState<
         Set<string>
     >(() => new Set());
-
-    useEffect(() => {
-        setLocalProposalHandled(false);
-    }, [pendingProposal?.proposal_id]);
-
-    useEffect(() => {
-        if (!open) {
-            setLocalProposalHandled(false);
-            setLocallyDismissedNudges(new Set());
-        }
-    }, [open]);
-
-    const handleAcceptProposal = useCallback(
-        (proposal: MutationProposal) => {
-            if (onAcceptProposal) {
-                onAcceptProposal(proposal);
-                return;
-            }
-            setLocalProposalHandled(true);
-        },
-        [onAcceptProposal]
-    );
-
-    const handleRejectProposal = useCallback(
-        (proposal: MutationProposal) => {
-            if (onRejectProposal) {
-                onRejectProposal(proposal);
-                return;
-            }
-            setLocalProposalHandled(true);
-        },
-        [onRejectProposal]
-    );
-
-    const handleNudgeAction = useCallback(
-        (nudge: TriageNudge) => {
-            onActionNudge?.(nudge);
-        },
-        [onActionNudge]
-    );
-
-    const handleNudgeDismiss = useCallback(
-        (nudge: TriageNudge) => {
-            if (onDismissNudge) {
-                onDismissNudge(nudge);
-                return;
-            }
-            setLocallyDismissedNudges((prev) => {
-                if (prev.has(nudge.nudge_id)) return prev;
-                const next = new Set(prev);
-                next.add(nudge.nudge_id);
-                return next;
-            });
-        },
-        [onDismissNudge]
-    );
-
-    const visibleProposal =
-        pendingProposal && !localProposalHandled ? pendingProposal : null;
-    const visibleNudges = (pendingNudges ?? []).filter(
-        (nudge) => !locallyDismissedNudges.has(nudge.nudge_id)
-    );
 
     const expandCitations = useCallback((turnIndex: number) => {
         setExpandedCitations((prev) => {
@@ -436,6 +390,16 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
         };
     }, [columns, knownProjectIds, members, project, tasks]);
 
+    // Mount BOTH hooks; only one drives the UI based on aiUseLocalEngine.
+    // The inactive hook receives null ctx so it doesn't fire any requests.
+    const localChat = useAiChat(
+        environment.aiUseLocalEngine && open ? chatCtx : null
+    );
+    const agentChat = useAgentChat(
+        !environment.aiUseLocalEngine && open ? chatCtx : null
+    );
+
+    // Pick the active result — one object so render code stays branch-free.
     const {
         abort,
         dismissError,
@@ -445,7 +409,100 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
         reset,
         send,
         streamingText
-    } = useAiChat(open ? chatCtx : null);
+    } = environment.aiUseLocalEngine ? localChat : agentChat;
+
+    useEffect(() => {
+        setLocalProposalHandled(false);
+    }, [pendingProposal?.proposal_id, agentChat.pendingProposal?.proposal_id]);
+
+    useEffect(() => {
+        if (!open) {
+            setLocalProposalHandled(false);
+            setLocallyDismissedNudges(new Set());
+        }
+    }, [open]);
+
+    // Resolve the effective proposal and nudges for the drawer.
+    // Parent-supplied props are authoritative; when absent and remote v2.1 is
+    // active, pull from the agent adapter.
+    const isRemote = !environment.aiUseLocalEngine;
+    const effectivePendingProposal =
+        pendingProposal !== undefined
+            ? pendingProposal
+            : isRemote
+              ? (agentChat.pendingProposal ?? undefined)
+              : undefined;
+    const effectivePendingNudges =
+        pendingNudges !== undefined
+            ? pendingNudges
+            : isRemote
+              ? agentChat.pendingNudges
+              : undefined;
+
+    const handleAcceptProposal = useCallback(
+        (proposal: MutationProposal) => {
+            if (onAcceptProposal) {
+                onAcceptProposal(proposal);
+                return;
+            }
+            if (isRemote) {
+                agentChat.resumeProposal(true);
+                return;
+            }
+            setLocalProposalHandled(true);
+        },
+        [agentChat, isRemote, onAcceptProposal]
+    );
+
+    const handleRejectProposal = useCallback(
+        (proposal: MutationProposal) => {
+            if (onRejectProposal) {
+                onRejectProposal(proposal);
+                return;
+            }
+            if (isRemote) {
+                agentChat.resumeProposal(false);
+                return;
+            }
+            setLocalProposalHandled(true);
+        },
+        [agentChat, isRemote, onRejectProposal]
+    );
+
+    const handleNudgeAction = useCallback(
+        (nudge: TriageNudge) => {
+            onActionNudge?.(nudge);
+        },
+        [onActionNudge]
+    );
+
+    const handleNudgeDismiss = useCallback(
+        (nudge: TriageNudge) => {
+            if (onDismissNudge) {
+                onDismissNudge(nudge);
+                return;
+            }
+            if (isRemote) {
+                agentChat.dismissNudge(nudge.nudge_id);
+                return;
+            }
+            setLocallyDismissedNudges((prev) => {
+                if (prev.has(nudge.nudge_id)) return prev;
+                const next = new Set(prev);
+                next.add(nudge.nudge_id);
+                return next;
+            });
+        },
+        [agentChat, isRemote, onDismissNudge]
+    );
+
+    const visibleProposal =
+        effectivePendingProposal && !localProposalHandled
+            ? effectivePendingProposal
+            : null;
+    const visibleNudges = (effectivePendingNudges ?? []).filter(
+        (nudge) => !locallyDismissedNudges.has(nudge.nudge_id)
+    );
 
     /** Reset the local UI state too (feedback, citations) on hard reset. */
     const resetAll = useCallback(() => {
@@ -1310,6 +1367,25 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                 </div>
             )}
         </Drawer>
+    );
+};
+
+/**
+ * Public export. Wraps `AiChatDrawerInner` in a `QueryClientProvider`
+ * fallback so the component does not crash when rendered in test sandboxes
+ * or Storybook stories that do not provide a parent `QueryClientProvider`.
+ * When a provider is already present in the tree the inner component sees
+ * that context directly — the fallback client is never used.
+ */
+const AiChatDrawer: React.FC<AiChatDrawerProps> = (props) => {
+    const existingClient = useContext(QueryClientContext);
+    if (existingClient) {
+        return <AiChatDrawerInner {...props} />;
+    }
+    return (
+        <QueryClientProvider client={fallbackQueryClient}>
+            <AiChatDrawerInner {...props} />
+        </QueryClientProvider>
     );
 };
 
