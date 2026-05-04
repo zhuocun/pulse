@@ -616,8 +616,7 @@ const BoardPage = () => {
                                 >
                                     <Button
                                         aria-label={
-                                            microcopy.a11y
-                                                .boardCopilotSettings
+                                            microcopy.a11y.boardCopilotSettings
                                         }
                                         icon={<SettingOutlined aria-hidden />}
                                         type="text"
@@ -710,8 +709,7 @@ const BoardPage = () => {
                                         <span aria-hidden>→</span>
                                         <SwipeHintClose
                                             aria-label={
-                                                microcopy.a11y
-                                                    .dismissSwipeHint
+                                                microcopy.a11y.dismissSwipeHint
                                             }
                                             onClick={dismissSwipeHint}
                                             type="button"

@@ -1,8 +1,4 @@
-import {
-    clearAuthToken,
-    readAuthToken,
-    writeAuthToken
-} from "./tokenStorage";
+import { clearAuthToken, readAuthToken, writeAuthToken } from "./tokenStorage";
 
 describe("tokenStorage", () => {
     afterEach(() => {

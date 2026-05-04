@@ -13,7 +13,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import useAuth from "./useAuth";
 
 const createThrowingStorage = (): Storage => ({
-    get length() {
+    get length(): number {
         throw new Error("storage blocked");
     },
     clear() {

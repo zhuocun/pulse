@@ -1,8 +1,5 @@
 module.exports = {
-    collectCoverageFrom: [
-        "src/**/*.{ts,tsx}",
-        "!src/**/*.d.ts"
-    ],
+    collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
     moduleNameMapper: {
         "^@rc-component/picker/(.*)$":
             "<rootDir>/node_modules/@rc-component/picker/lib/$1",

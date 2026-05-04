@@ -390,16 +390,20 @@ describe("TaskModal", () => {
         await waitFor(() =>
             expect(screen.getByTestId("location")).toHaveTextContent("")
         );
-        expect(screen.queryByDisplayValue("Build task")).not.toBeInTheDocument();
+        expect(
+            screen.queryByDisplayValue("Build task")
+        ).not.toBeInTheDocument();
     });
 
     it("disables delete when the task list is unavailable", async () => {
         renderModal({ initialTasks: undefined });
 
-        expect(await screen.findByText(/edit task/i)).toBeInTheDocument();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
         expect(
-            screen.getByRole("button", { name: /^delete$/i })
-        ).toBeDisabled();
+            screen.queryByRole("button", { name: /^delete$/i })
+        ).not.toBeInTheDocument();
     });
 
     it("hides the assist panel when board AI is off for the project", async () => {

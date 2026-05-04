@@ -169,8 +169,7 @@ const TaskModal: React.FC<{
     })();
     void formTick;
 
-    const deleteDisabled =
-        !editingTask || dLoading || editingTaskId === "mock";
+    const deleteDisabled = !editingTask || dLoading || editingTaskId === "mock";
 
     const titleText = editingTask?.taskName
         ? `${microcopy.actions.editTask} · ${editingTask.taskName}`

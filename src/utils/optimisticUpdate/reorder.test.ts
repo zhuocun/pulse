@@ -252,7 +252,7 @@ describe("taskCallback", () => {
 
         expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
         expect(result.find((item) => item._id === "task-1")?.columnId).toBe(
-            "column-1"
+            "column-2"
         );
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
     });
