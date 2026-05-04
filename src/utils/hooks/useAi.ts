@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import environment from "../../constants/env";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
 import { parseFetchBody } from "../parseFetchBody";
+import { rewriteNetworkFetchError } from "../networkFetchError";
 
 import { sanitizeRemotePayloadForRoute } from "../ai/aiDataScope";
 import {
@@ -219,15 +220,24 @@ const remoteResolve = async (
         route,
         payload as unknown as Record<string, unknown>
     );
-    const response = await fetch(`${environment.aiBaseUrl}/api/ai/${route}`, {
-        body: JSON.stringify(sanitized),
-        headers: {
-            "Content-Type": "application/json",
-            ...(authHeader ? { Authorization: authHeader } : {})
-        },
-        method: "POST",
-        signal
-    });
+    let response: Response;
+    try {
+        response = await fetch(`${environment.aiBaseUrl}/api/ai/${route}`, {
+            body: JSON.stringify(sanitized),
+            headers: {
+                "Content-Type": "application/json",
+                ...(authHeader ? { Authorization: authHeader } : {})
+            },
+            method: "POST",
+            signal
+        });
+    } catch (err) {
+        const rewritten = rewriteNetworkFetchError(err);
+        if (rewritten) {
+            throw rewritten;
+        }
+        throw err;
+    }
     if (!response.ok) {
         throw new Error(`AI request failed (${response.status})`);
     }
@@ -305,7 +315,7 @@ const useAi = <T>(options: UseAiOptions) => {
                 }
             }
         },
-        [route]
+        [route, environment.aiUseLocalEngine, environment.aiBaseUrl]
     );
 
     return {

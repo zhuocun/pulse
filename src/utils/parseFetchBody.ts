@@ -12,7 +12,11 @@ export const parseFetchBody = async (res: Response): Promise<unknown> => {
         }
     }
     if (typeof res.json === "function") {
-        return res.json();
+        try {
+            return await res.json();
+        } catch {
+            return undefined;
+        }
     }
     return undefined;
 };

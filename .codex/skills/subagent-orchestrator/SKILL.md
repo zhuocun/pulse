@@ -48,7 +48,7 @@ Tier guidance:
 
 Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-flash`, `*-haiku`-class) unless a higher-priority instruction requires them.
 
-The subagent must never run with the *exact same* model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
+The subagent must never run with the _exact same_ model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
 
 1. Step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT). Keep the reasoning budget appropriate for the subtask.
 2. On Cursor, choose Composer.

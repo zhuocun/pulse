@@ -1,3 +1,5 @@
+import { createOptimisticClientId } from "../optimisticClientId";
+
 interface INewTaskParams {
     taskName: string;
     projectId: string;
@@ -11,7 +13,10 @@ interface INewTaskParams {
 
 const newTaskCallback = (target: INewTaskParams, old: ITask[] | undefined) => {
     const tasks = old ?? [];
-    return tasks.concat({ ...target, _id: "mock" } as ITask);
+    return tasks.concat({
+        ...target,
+        _id: createOptimisticClientId()
+    } as ITask);
 };
 
 export default newTaskCallback;

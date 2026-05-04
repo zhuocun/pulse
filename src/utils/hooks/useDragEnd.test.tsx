@@ -1,9 +1,10 @@
 import { render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import useDragEnd from "./useDragEnd";
 import useReactMutation from "./useReactMutation";
-import useReactQuery from "./useReactQuery";
+import useReactQuery, { getReactQueryKey } from "./useReactQuery";
 
 jest.mock("./useReactMutation");
 jest.mock("./useReactQuery");
@@ -33,12 +34,23 @@ const task = (overrides: Partial<ITask> = {}): ITask => ({
     ...overrides
 });
 
+const createQueryClient = () =>
+    new QueryClient({
+        defaultOptions: {
+            mutations: { retry: false },
+            queries: { gcTime: Infinity, retry: false }
+        }
+    });
+
 let result: ReturnType<typeof useDragEnd>;
 const reorderColumn = jest.fn();
 const reorderTask = jest.fn();
 
+let queryClient: QueryClient;
+
+let tasksEnabledArg = true;
 const Probe = () => {
-    result = useDragEnd();
+    result = useDragEnd({ tasksEnabled: tasksEnabledArg });
 
     return (
         <div>
@@ -65,10 +77,16 @@ type RenderProbeOptions = {
     tasks?: ITask[] | undefined;
     columnLoading?: boolean;
     taskLoading?: boolean;
+    tasksEnabled?: boolean;
 };
 
 const renderProbe = (options: RenderProbeOptions = {}) => {
-    const { columnLoading = false, taskLoading = false } = options;
+    tasksEnabledArg = options.tasksEnabled ?? true;
+    const {
+        columnLoading = false,
+        taskLoading = false,
+        tasksEnabled = true
+    } = options;
     const boardData = Object.prototype.hasOwnProperty.call(options, "boards")
         ? options.boards
         : defaultBoards;
@@ -76,8 +94,14 @@ const renderProbe = (options: RenderProbeOptions = {}) => {
         ? options.tasks
         : defaultTasks;
 
-    mockedUseReactQuery.mockImplementation((endpoint: string) =>
-        endpoint === "boards" ? { data: boardData } : { data: taskData }
+    mockedUseReactQuery.mockImplementation(
+        (endpoint: string, ...rest: unknown[]) =>
+            endpoint === "boards"
+                ? { data: boardData }
+                : {
+                      data: taskData,
+                      tasksQueryEnabled: rest[4] as boolean | undefined
+                  }
     );
     mockedUseReactMutation.mockImplementation((endpoint: string) =>
         endpoint === "boards/orders"
@@ -85,12 +109,19 @@ const renderProbe = (options: RenderProbeOptions = {}) => {
             : { isLoading: taskLoading, mutate: reorderTask }
     );
 
+    queryClient = createQueryClient();
+
     return render(
-        <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-            <Routes>
-                <Route path="/projects/:projectId/board" element={<Probe />} />
-            </Routes>
-        </MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={<Probe />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        </QueryClientProvider>
     );
 };
 
@@ -249,6 +280,27 @@ describe("useDragEnd", () => {
         );
 
         expect(reorderTask).not.toHaveBeenCalled();
+    });
+
+    it("reads cached tasks when the tasks query is disabled but cache is warm", () => {
+        renderProbe({ tasksEnabled: false, tasks: undefined });
+        queryClient.setQueryData(
+            getReactQueryKey("tasks", { projectId: "project-1" }),
+            defaultTasks
+        );
+
+        drop(
+            { droppableId: "column-1", index: 0 },
+            { droppableId: "column-1", index: 1 }
+        );
+
+        expect(reorderTask).toHaveBeenCalledWith({
+            fromColumnId: "column-1",
+            fromId: "task-1",
+            referenceColumnId: "column-1",
+            referenceId: "task-2",
+            type: "after"
+        });
     });
 
     it("ignores dragging a task onto itself", () => {

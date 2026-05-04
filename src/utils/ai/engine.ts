@@ -1,4 +1,5 @@
 import { jaccard, tokenize, tokenSet } from "./keywords";
+import { isOptimisticPlaceholderId } from "../optimisticClientId";
 import { clampToFibonacci, FIBONACCI_POINTS } from "./storyPoints";
 import { describeExpansions, expandWithSynonyms } from "./synonyms";
 
@@ -259,7 +260,7 @@ export const estimate = (request: EstimateRequest): IEstimateSuggestion => {
     const candidates = request.tasks.filter(
         (task) =>
             task._id &&
-            task._id !== "mock" &&
+            !isOptimisticPlaceholderId(task._id) &&
             task._id !== request.excludeTaskId &&
             FIBONACCI_POINTS.includes(task.storyPoints as StoryPoints)
     );

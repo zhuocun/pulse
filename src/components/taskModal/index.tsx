@@ -20,6 +20,7 @@ import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import ErrorBox from "../errorBox";
@@ -48,7 +49,7 @@ const TaskModal: React.FC<{
     const { mutateAsync: update, isLoading: uLoading } = useReactMutation(
         "tasks",
         "PUT",
-        undefined,
+        ["tasks", { projectId }],
         undefined,
         (err) => setSaveError(err)
     );
@@ -142,7 +143,11 @@ const TaskModal: React.FC<{
     }, [form, editingTask]);
 
     useEffect(() => {
-        if (!editingTaskId || editingTaskId === "mock" || tasks === undefined) {
+        if (
+            !editingTaskId ||
+            isOptimisticPlaceholderId(editingTaskId) ||
+            tasks === undefined
+        ) {
             return;
         }
         if (!editingTask) {
@@ -169,7 +174,8 @@ const TaskModal: React.FC<{
     })();
     void formTick;
 
-    const deleteDisabled = !editingTask || dLoading || editingTaskId === "mock";
+    const deleteDisabled =
+        !editingTask || dLoading || isOptimisticPlaceholderId(editingTaskId);
 
     const titleText = editingTask?.taskName
         ? `${microcopy.actions.editTask} · ${editingTask.taskName}`
@@ -407,7 +413,7 @@ const TaskModal: React.FC<{
             {aiEnabled &&
                 boardAiOn &&
                 editingTaskId &&
-                editingTaskId !== "mock" && (
+                !isOptimisticPlaceholderId(editingTaskId) && (
                     <AiTaskAssistPanel
                         excludeTaskId={editingTaskId}
                         onApplyStoryPoints={(value) => {

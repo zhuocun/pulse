@@ -46,7 +46,7 @@ const useReactMutation = <D>(
             ? async (target: unknown) => {
                   const previousItems = queryClient.getQueryData(cacheKey);
                   let didApplyOptimistic = false;
-                  queryClient.setQueryData(cacheKey, (old?: unknown[]) => {
+                  queryClient.setQueryData(cacheKey, (old?: unknown) => {
                       const next = callback(target, old);
                       if (next === undefined || Object.is(next, old)) {
                           return old;

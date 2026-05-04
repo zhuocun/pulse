@@ -48,6 +48,7 @@ import useDragEnd from "../utils/hooks/useDragEnd";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
+import { isOptimisticPlaceholderId } from "../utils/optimisticClientId";
 
 /**
  * The board page deliberately opts out of `PageContainer`'s max-width because
@@ -374,8 +375,9 @@ const BoardPage = () => {
         Boolean(board)
     );
 
-    const { onDragEnd, isColumnDragDisabled, isTaskDragDisabled } =
-        useDragEnd();
+    const { onDragEnd, isColumnDragDisabled, isTaskDragDisabled } = useDragEnd({
+        tasksEnabled: Boolean(board)
+    });
     const visibleTasks = tasks ?? [];
     const tasksByColumn = useMemo(() => {
         const buckets = new Map<string, ITask[]>();
@@ -737,7 +739,9 @@ const BoardPage = () => {
                                                     isDragDisabled={
                                                         isColumnDragDisabled ||
                                                         isTaskDragDisabled ||
-                                                        column._id === "mock"
+                                                        isOptimisticPlaceholderId(
+                                                            column._id
+                                                        )
                                                     }
                                                 >
                                                     <Column
@@ -762,7 +766,8 @@ const BoardPage = () => {
                                                             })
                                                         }
                                                         isDragDisabled={
-                                                            isTaskDragDisabled
+                                                            isTaskDragDisabled ||
+                                                            hasActiveFilters
                                                         }
                                                     />
                                                 </Drag>

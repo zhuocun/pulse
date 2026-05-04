@@ -78,7 +78,13 @@ const reorder = <T extends { _id: string }>({
 const updateIndexes = <T extends { index: number }>(items: T[]) =>
     items.map((item, index) => ({ ...item, index }));
 
-export const taskCallback = (target: ITaskOrderParams, old: ITask[]) => {
+export const taskCallback = (
+    target: ITaskOrderParams,
+    old: ITask[] | undefined
+) => {
+    if (!old) {
+        return old;
+    }
     const orderedList = reorder({ objArray: old, ...target }) as ITask[];
 
     return updateIndexes(
@@ -90,5 +96,12 @@ export const taskCallback = (target: ITaskOrderParams, old: ITask[]) => {
     );
 };
 
-export const columnCallback = (target: IColumnOrderParams, old: IColumn[]) =>
-    updateIndexes(reorder({ objArray: old, ...target }) as IColumn[]);
+export const columnCallback = (
+    target: IColumnOrderParams,
+    old: IColumn[] | undefined
+) => {
+    if (!old) {
+        return old;
+    }
+    return updateIndexes(reorder({ objArray: old, ...target }) as IColumn[]);
+};

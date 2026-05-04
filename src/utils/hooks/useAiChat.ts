@@ -19,6 +19,7 @@ import {
 } from "../ai/chatTools";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
 import { parseFetchBody } from "../parseFetchBody";
+import { rewriteNetworkFetchError } from "../networkFetchError";
 
 import {
     isProjectAiDisabled,
@@ -55,15 +56,24 @@ const remoteChatStep = async (
         messages,
         context
     });
-    const response = await fetch(`${environment.aiBaseUrl}/api/ai/chat`, {
-        body: JSON.stringify(sanitized),
-        headers: {
-            "Content-Type": "application/json",
-            ...(authHeader ? { Authorization: authHeader } : {})
-        },
-        method: "POST",
-        signal
-    });
+    let response: Response;
+    try {
+        response = await fetch(`${environment.aiBaseUrl}/api/ai/chat`, {
+            body: JSON.stringify(sanitized),
+            headers: {
+                "Content-Type": "application/json",
+                ...(authHeader ? { Authorization: authHeader } : {})
+            },
+            method: "POST",
+            signal
+        });
+    } catch (err) {
+        const rewritten = rewriteNetworkFetchError(err);
+        if (rewritten) {
+            throw rewritten;
+        }
+        throw err;
+    }
     if (response.status === 429) {
         // i18n-aware copy (Optimization Plan §3 P2-3 follow-up). The
         // previous hard-coded English string surfaced via the chat error

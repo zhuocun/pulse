@@ -1,3 +1,5 @@
+import { createOptimisticClientId } from "../optimisticClientId";
+
 const newColumnCallback = (
     target: {
         columnName: string;
@@ -6,7 +8,11 @@ const newColumnCallback = (
     old: IColumn[] | undefined
 ) => {
     const columns = old ?? [];
-    return columns.concat({ ...target, index: columns.length, _id: "mock" });
+    return columns.concat({
+        ...target,
+        index: columns.length,
+        _id: createOptimisticClientId()
+    });
 };
 
 export default newColumnCallback;
