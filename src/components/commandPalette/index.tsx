@@ -525,6 +525,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                                 borderRadius: 999,
                                 cursor: "pointer",
                                 lineHeight: 0,
+                                minHeight: 44,
+                                minWidth: 44,
                                 padding: 4
                             }}
                             type="button"

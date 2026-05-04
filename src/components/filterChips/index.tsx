@@ -65,6 +65,8 @@ const ChipDismiss = styled.button`
     height: 18px;
     justify-content: center;
     margin-inline-start: ${space.xxs}px;
+    min-height: 18px;
+    min-width: 18px;
     opacity: 0.7;
     padding: 0;
     transition:
@@ -76,6 +78,13 @@ const ChipDismiss = styled.button`
     &:focus-visible {
         background: rgba(234, 88, 12, 0.18);
         opacity: 1;
+    }
+
+    @media (pointer: coarse) {
+        height: 44px;
+        min-height: 44px;
+        min-width: 44px;
+        width: 44px;
     }
 
     svg {

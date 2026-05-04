@@ -134,7 +134,8 @@ const TitleLink = styled(Link)`
         z-index: 0;
     }
 
-    &:hover {
+    &:hover,
+    &:focus-visible {
         color: var(--ant-color-primary, #ea580c);
     }
 `;
@@ -367,10 +368,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             icon={
                                 liked ? (
                                     <HeartFilled
+                                        aria-hidden
                                         style={{ color: semantic.favorite }}
                                     />
                                 ) : (
-                                    <HeartOutlined />
+                                    <HeartOutlined aria-hidden />
                                 )
                             }
                             onClick={(e) => {
@@ -388,7 +390,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         >
                             <Button
                                 aria-label={`More actions for ${project.projectName}`}
-                                icon={<MoreOutlined />}
+                                icon={<MoreOutlined aria-hidden />}
                                 onClick={(e) => e.stopPropagation()}
                                 size="small"
                                 style={{ position: "relative", zIndex: 2 }}

@@ -105,6 +105,7 @@ const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
             </Space>
             <Input.TextArea
                 aria-label={microcopy.ai.feedbackOptionalNote}
+                autoComplete="off"
                 autoSize={{ maxRows: 4, minRows: 2 }}
                 enterKeyHint="send"
                 inputMode="text"
