@@ -8,6 +8,7 @@ import { Button, Space, Typography } from "antd";
 import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import { microcopy } from "../../constants/microcopy";
 import type { TriageNudge } from "../../interfaces/agent";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 
@@ -146,12 +147,12 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
                     )}
                     {onDismiss && (
                         <Button
-                            aria-label="Dismiss nudge"
+                            aria-label={microcopy.ai.dismissNudge}
                             onClick={handleDismiss}
                             size="small"
                             type="link"
                         >
-                            Dismiss
+                            {microcopy.ai.dismissNudge}
                         </Button>
                     )}
                 </Space>

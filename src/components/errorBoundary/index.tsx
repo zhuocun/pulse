@@ -2,6 +2,7 @@ import { Button, Result, Space } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
+import { reportError } from "../../utils/observability/sinks";
 
 interface ErrorBoundaryProps {
     children: React.ReactNode;
@@ -30,10 +31,19 @@ class ErrorBoundary extends React.Component<
         return { error };
     }
 
-    componentDidCatch(_error: Error) {
-        // Intentionally silent. Production telemetry should be wired in
-        // via a context-injected logger, not via console (which the
-        // linter forbids and which floods test output).
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+        // Report to the production error sink (registered in index.tsx via
+        // VITE_ERROR_REPORT_ENDPOINT). `reportError` is a no-op when no sink
+        // is registered, so this never breaks the boundary or floods tests.
+        try {
+            reportError({
+                message: error.message,
+                stack: error.stack,
+                componentStack: info.componentStack ?? undefined
+            });
+        } catch {
+            // A failing sink must never break the boundary.
+        }
     }
 
     handleRetry = () => {

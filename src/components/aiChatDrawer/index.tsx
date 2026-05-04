@@ -499,6 +499,32 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
     };
 
     const errorView = error ? aiErrorView(error) : null;
+
+    /**
+     * Fix 9 — Rate-limit countdown. When the error template exposes a
+     * `disabledForSeconds` hint, count down to zero so the retry button
+     * re-enables itself automatically without a reload.
+     */
+    const [retryCountdown, setRetryCountdown] = useState(0);
+    useEffect(() => {
+        const secs = errorView?.disabledForSeconds ?? 0;
+        if (secs <= 0) {
+            setRetryCountdown(0);
+            return;
+        }
+        setRetryCountdown(secs);
+        const id = setInterval(() => {
+            setRetryCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(id);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(id);
+    }, [error]);
+
     const remainingChars = microcopy.ai.characterCounterMax - input.length;
     const showCounter = input.length >= microcopy.ai.characterCounterShowAfter;
     const counterIsWarning = remainingChars < 0;
@@ -551,10 +577,14 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                     .trim()
                     .split(/\s+/)
                     .filter(Boolean).length;
+                const template =
+                    wordCount === 1
+                        ? (microcopy.ai.completionAnnouncementOne as string)
+                        : (microcopy.ai.completionAnnouncementOther as string);
                 setCompletionAnnouncement(
-                    `${microcopy.ai.copilotLabel} responded with ${wordCount} word${
-                        wordCount === 1 ? "" : "s"
-                    }.`
+                    template
+                        .replace("{label}", String(microcopy.ai.copilotLabel))
+                        .replace("{count}", String(wordCount))
                 );
                 break;
             }
@@ -1052,6 +1082,7 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                     action={
                         errorView.retryable ? (
                             <Button
+                                disabled={retryCountdown > 0}
                                 onClick={() => {
                                     const lastUser = [...messages]
                                         .reverse()
@@ -1061,7 +1092,9 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                                 size="small"
                                 type="link"
                             >
-                                {microcopy.ai.retryLabel}
+                                {retryCountdown > 0
+                                    ? `${microcopy.ai.retryLabel} (${retryCountdown}s)`
+                                    : microcopy.ai.retryLabel}
                             </Button>
                         ) : null
                     }

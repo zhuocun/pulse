@@ -9,11 +9,11 @@ import type { FeTool } from "./types";
  * contract in `useReactQuery.ts`). Falls back to the single-project shape
  * if the only cached entry is `["projects", { projectId }]`.
  */
-export const getProjectTool: FeTool<{ projectId: string }, IProject | null> = {
+export const getProjectTool: FeTool<{ project_id: string }, IProject | null> = {
     name: "fe.getProject",
     description: "Return one project by id, or null if not in the cache.",
     run: (args, ctx) => {
-        const projectId = args?.projectId ?? ctx.projectId;
+        const projectId = args?.project_id ?? ctx.projectId;
         if (!projectId) return null;
         const projects = gatherCachedList<IProject>(ctx.queryClient, [
             "projects"
@@ -22,7 +22,7 @@ export const getProjectTool: FeTool<{ projectId: string }, IProject | null> = {
         if (match) return match;
         // Defensive fallback: try the exact single-project key shape used
         // by `pages/board.tsx` (`useReactQuery<IProject>("projects", {
-        // projectId })`). gatherCachedList already covers this case for
+        // project_id })`). gatherCachedList already covers this case for
         // typical entries, but a custom `specialQueryKey` could land
         // outside the `["projects", *]` prefix scan.
         const single = ctx.queryClient.getQueryData<IProject>([

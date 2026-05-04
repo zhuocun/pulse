@@ -2,11 +2,11 @@
 
 Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has shipped to `main`, what is still open, and the concrete file/test inventory so a new contributor can pick up cleanly. For a section-by-section design vs implementation audit (verdicts with file/line evidence, deltas, gaps), see [`docs/prd/board-copilot-review.md`](board-copilot-review.md).
 
-| Field        | Value                                                                                                          |
-| ------------ | -------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections are in-flight on `cursor/ai-ux-current-audit-da9f` |
-| Last updated | 2026-05-02                                                                                                     |
-| Owner        | TBD (frontend)                                                                                                 |
+| Field        | Value                                                                                                                                                                                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; production-readiness sweep landed 2026-05-04 (`claude/jira-ai-features-RO8hF`): protocol alignment, observability, i18n, security, a11y |
+| Last updated | 2026-05-04                                                                                                                                                                                                  |
+| Owner        | TBD (frontend)                                                                                                                                                                                              |
 
 ---
 
@@ -22,16 +22,17 @@ Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has sh
 
 ## At a glance
 
-| Phase    | Capability                                                 | PRD section | Status                                                                           |
-| -------- | ---------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- |
-| Phase 0  | Plumbing (env, hook, validators, runtime toggle)           | §7, §3.5    | ✅ Shipped                                                                       |
-| Phase 1  | Capability C — Board summary brief                         | §5.3        | ✅ Shipped                                                                       |
-| Phase 2A | Capability A — Smart task drafting                         | §5.1        | ✅ Shipped                                                                       |
-| Phase 2B | Capability B — AI estimation + readiness                   | §5.2        | ✅ Shipped                                                                       |
-| Phase 3  | Capability D — Conversational assistant                    | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) |
-| Phase 4  | Capability E — Semantic search                             | §5.5        | ✅ Shipped                                                                       |
-| AI UX P1 | Trust/privacy corrections from AI UX audit                 | v3 §2 P3/P7 | ✅ Implemented on `cursor/ai-ux-current-audit-da9f`; awaiting merge              |
-| Backend  | Vercel `api/ai/[route].ts` proxy with provider abstraction | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime) |
+| Phase      | Capability                                                 | PRD section | Status                                                                           |
+| ---------- | ---------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- |
+| Phase 0    | Plumbing (env, hook, validators, runtime toggle)           | §7, §3.5    | ✅ Shipped                                                                       |
+| Phase 1    | Capability C — Board summary brief                         | §5.3        | ✅ Shipped                                                                       |
+| Phase 2A   | Capability A — Smart task drafting                         | §5.1        | ✅ Shipped                                                                       |
+| Phase 2B   | Capability B — AI estimation + readiness                   | §5.2        | ✅ Shipped                                                                       |
+| Phase 3    | Capability D — Conversational assistant                    | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) |
+| Phase 4    | Capability E — Semantic search                             | §5.5        | ✅ Shipped                                                                       |
+| AI UX P1   | Trust/privacy corrections from AI UX audit                 | v3 §2 P3/P7 | ✅ Merged                                                                        |
+| Prod-ready | Protocol alignment, observability, i18n, security, a11y    | —           | ✅ Landed 2026-05-04 on `claude/jira-ai-features-RO8hF`                          |
+| Backend    | Vercel `api/ai/[route].ts` proxy with provider abstraction | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime) |
 
 ---
 
@@ -104,7 +105,7 @@ Remote proxy (optional): `POST ${REACT_APP_AI_BASE_URL}/api/ai/search` with JSON
 ### AI UX Phase 1 — trust and privacy corrections
 
 Tracked by [`AI_UX_OPTIMIZATION_PLAN.md`](../../AI_UX_OPTIMIZATION_PLAN.md).
-This work is in-flight on branch `cursor/ai-ux-current-audit-da9f`.
+Merged from `cursor/ai-ux-current-audit-da9f`.
 
 - `AI_UX_OPTIMIZATION_PLAN.md` — refreshed the audit to reflect the current
   implementation instead of stale pre-v3 gaps. The remaining roadmap is now
@@ -137,9 +138,50 @@ This work is in-flight on branch `cursor/ai-ux-current-audit-da9f`.
     - `src/pages/project.ai.test.tsx`
     - `src/utils/ai/chatEngine.test.ts`
 
+### Production-readiness sweep — 2026-05-04 (`claude/jira-ai-features-RO8hF`)
+
+Two commits on this branch land the following:
+
+**`a59539f` — protocol alignment, observability, i18n, security**
+
+- `src/utils/ai/feTools/{getTask,getProject,listBoard,listTasks,listMembers}.ts` — FE tool
+  args now use snake_case (`task_id`, `project_id`) to match BE schemas.
+- `src/utils/ai/feTools/{recentActivity,formDraft}.ts` — stub return shapes now match
+  schemas: `recentActivity` returns `{activity: []}`, `formDraft` returns `{draft: null}`.
+- `src/utils/ai/idempotencyKey.ts` — new `newIdempotencyKey()` exported; sent as
+  `Idempotency-Key` header on every AI request from `useAi`, `useAiChat`, and
+  `agentClient.{streamAgent,invokeAgent}`.
+- `src/utils/ai/mapErrorResponse.ts` — shared HTTP status → typed error mapper; all
+  v1 fetch sites now route through it for consistent `aiErrorView` handling.
+- `src/utils/observability/sinks.ts` — `httpAnalyticsSink`, `httpErrorSink`,
+  `devMemorySink` wired from `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT` and
+  `VITE_ERROR_REPORT_ENDPOINT`. `ErrorBoundary.componentDidCatch` reports to error sink.
+  Every analytics event includes `engineMode: 'local' | 'remote'`.
+- `src/constants/env.ts` — `REACT_APP_AI_BASE_URL` validated at module load; rejects
+  `javascript:`, `file:`, `data:`, malformed URLs; falls back to local engine with
+  `console.error`; trailing slash trimmed.
+- `src/utils/hooks/useAgent.ts` — `useAgent.start` now throws `AgentForbiddenError` if
+  `isProjectAiDisabled(projectId)` before opening the SSE stream.
+- `src/constants/microcopy.ai.*` — hardcoded English strings in `aiChatDrawer`,
+  `aiTaskAssistPanel`, `nudgeCard`, `citationChip`, `errorTemplate`, `useAgent` watchdog,
+  `useAiChat` exhaustion/unexpected-response moved into `microcopy.ai.*` with `en.ts` and
+  `zh-CN.ts` translations.
+- `aiErrorView` — explicit branches for budget, forbidden, not-found, server errors with
+  appropriate `retryable` flags; `disabledForSeconds` returned for rate-limit errors.
+- `aiChatDrawer` — `setInterval` countdown disables retry button during rate-limit wait.
+
+**`a2d1adc` — jest-axe coverage + WCAG fix**
+
+- `src/__tests__/aiAccessibility.strict.test.tsx` — 31 axe tests covering AiChatDrawer
+  (3 states), AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput,
+  NudgeCard (3 severities), MutationProposalCard, CommandPalette, EngineModeTag,
+  CitationChip (4 sources), AiMatchStrengthBadge.
+- `AiMatchStrengthBadge` compact mode — fixed real WCAG 4.1.2 violation: `<Tag>` now
+  has `role="img"` (was empty `<span>` with `aria-label` only).
+
 ### Test coverage
 
-- 76 suites, 340 tests.
+- 76 suites, 340 tests (prior to `a2d1adc`); `a2d1adc` adds 1 suite and 31 tests.
 - Coverage on the runtime AI scope: **97% statements / 92.37% branches / 97% functions / 97.84% lines**.
 - New test files:
     - `src/utils/ai/{engine,keywords,storyPoints,validate,chatEngine,chatTools}.test.ts`
@@ -200,7 +242,9 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 - ~~**Runtime toggle UI** (PRD §7.3)~~: shipped in `src/components/header` (`Switch` + `useAiEnabled`).
 - ~~**“Disable AI for this project”** (PRD §8)~~: shipped — `boardCopilot:disabledProjectIds` in `localStorage`, `useAiProjectDisabled` + **Project AI** switch on the board header, guards in `useAi` / `useAiChat`, `boardAiOn` passed to `Column` / `TaskCreator` / `TaskModal`.
 - ~~**AI UX Phase 1 trust/privacy corrections**~~: implemented on `cursor/ai-ux-current-audit-da9f`; see "AI UX Phase 1" above.
-- **Observability** (PRD §7.7, §9): client/server counters — lands with proxy.
+- **Observability** (PRD §7.7, §9): `httpAnalyticsSink` / `httpErrorSink` infrastructure
+  landed 2026-05-04. Individual `track()` call-site wiring and server-side counters
+  still open — full measurement lands with proxy.
 - **Chat write-tools** (PRD §5.4 follow-up): out of scope until a later version.
 
 ### Optional polish
@@ -219,7 +263,7 @@ CI=true npm test -- --watchAll=false --runInBand --coverage --coverageReporters=
 npx vite build
 ```
 
-Expected: lint clean, 76 suites / 340 tests pass, ≥97% statement coverage, build succeeds.
+Expected: lint clean, ≥97% statement coverage, build succeeds. As of 2026-05-04: 77+ suites / 371+ tests (includes 31 new axe tests from `a2d1adc`).
 
 To exercise Board Copilot in the browser:
 

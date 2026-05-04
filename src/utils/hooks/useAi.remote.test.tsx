@@ -107,9 +107,8 @@ describe("useAi remote transport", () => {
             }
         });
         expect(caught).toBeInstanceOf(Error);
-        expect((caught as unknown as Error).message).toMatch(
-            /AI request failed/
-        );
+        // Fix 4: 5xx responses now throw AgentServerError instead of generic Error.
+        expect((caught as unknown as Error).name).toBe("AgentServerError");
         await waitFor(() => {
             expect(result.current.error).not.toBeNull();
         });
@@ -218,5 +217,188 @@ describe("useAi remote transport", () => {
         );
         expect(result.current.data?.ids).toEqual(["t1"]);
         expect(result.current.data?.rationale).toBe("from server");
+    });
+
+    // Fix 2 — Idempotency-Key header
+    it("sends an Idempotency-Key header on every AI request", async () => {
+        fetchSpy.mockResolvedValue({
+            json: jest.fn().mockResolvedValue({
+                columnId: "col-1",
+                confidence: 0.8,
+                coordinatorId: "m1",
+                epic: "Auth",
+                note: "n",
+                rationale: "r",
+                storyPoints: 3,
+                taskName: "Idempotency test",
+                type: "Task"
+            }),
+            ok: true,
+            status: 200
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+
+        await act(async () => {
+            await result.current.run({
+                draft: { prompt: "key test", context: localContext() }
+            });
+        });
+
+        const headers = (
+            fetchSpy.mock.calls[0][1] as { headers?: Record<string, string> }
+        ).headers;
+        expect(headers).toBeDefined();
+        expect(headers!["Idempotency-Key"]).toBeTruthy();
+        // Should be a UUID-like string (contains hyphens).
+        expect(headers!["Idempotency-Key"]).toMatch(/-/);
+    });
+
+    // Fix 4 — typed errors from v1 non-OK responses
+    it("throws AgentAuthError for 401 responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 401,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught).not.toBeNull();
+        expect(caught!.name).toBe("AgentAuthError");
+    });
+
+    it("throws AgentBudgetError for 402 responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 402,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught!.name).toBe("AgentBudgetError");
+    });
+
+    it("throws AgentForbiddenError for 403 responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 403,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught!.name).toBe("AgentForbiddenError");
+    });
+
+    it("throws AgentNotFoundError for 404 responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 404,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught!.name).toBe("AgentNotFoundError");
+    });
+
+    it("throws AgentRateLimitError for 429 responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 429,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: (h: string) => (h === "Retry-After" ? "30" : null) }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught!.name).toBe("AgentRateLimitError");
+    });
+
+    it("throws AgentServerError for 5xx responses", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 503,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() =>
+            useAi<IDraftTaskSuggestion>({ route: "task-draft" })
+        );
+        let caught: Error | null = null;
+        await act(async () => {
+            try {
+                await result.current.run({
+                    draft: { prompt: "x", context: localContext() }
+                });
+            } catch (err) {
+                caught = err as Error;
+            }
+        });
+        expect(caught!.name).toBe("AgentServerError");
     });
 });

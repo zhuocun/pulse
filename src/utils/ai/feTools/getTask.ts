@@ -7,21 +7,21 @@ import type { FeTool } from "./types";
  * id is unknown.
  */
 export const getTaskTool: FeTool<
-    { taskId: string; projectId?: string },
+    { task_id: string; project_id?: string },
     ITask | null
 > = {
     name: "fe.getTask",
     description: "Return one task by id, or null if not in the cache.",
     run: (args, ctx) => {
-        const projectId = args?.projectId ?? ctx.projectId;
-        if (!args?.taskId) return null;
+        const projectId = args?.project_id ?? ctx.projectId;
+        if (!args?.task_id) return null;
         if (projectId) {
             const list =
                 ctx.queryClient.getQueryData<ITask[]>([
                     "tasks",
                     { projectId }
                 ]) ?? [];
-            const hit = list.find((t) => t._id === args.taskId);
+            const hit = list.find((t) => t._id === args.task_id);
             if (hit) return hit;
         }
         // Best-effort fallback — scan every cached `tasks*` query.
@@ -34,7 +34,7 @@ export const getTaskTool: FeTool<
                 key[0].startsWith("tasks")
             ) {
                 const list = entry.state.data as ITask[] | undefined;
-                const hit = list?.find((t) => t._id === args.taskId);
+                const hit = list?.find((t) => t._id === args.task_id);
                 if (hit) return hit;
             }
         }

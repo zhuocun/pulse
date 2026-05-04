@@ -57,14 +57,17 @@ interface CitationChipProps {
 }
 
 /**
- * Map source → human-readable label. Localized via the same approach the
- * rest of microcopy uses; for now English-only matches the agent output.
+ * Map source → human-readable label. Resolved through microcopy so every
+ * locale swap takes effect immediately without touching this component.
  */
-const sourceLabel: Record<CitationRef["source"], string> = {
-    task: "Task",
-    column: "Column",
-    member: "Member",
-    project: "Project"
+const getSourceLabel = (source: CitationRef["source"]): string => {
+    const labels: Record<CitationRef["source"], string> = {
+        task: microcopy.ai.citationSourceTask as string,
+        column: microcopy.ai.citationSourceColumn as string,
+        member: microcopy.ai.citationSourceMember as string,
+        project: microcopy.ai.citationSourceProject as string
+    };
+    return labels[source] ?? source;
 };
 
 const CitationChip: React.FC<CitationChipProps> = ({
@@ -104,7 +107,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
             title={
                 <TooltipBody>
                     <Typography.Text strong style={{ color: "inherit" }}>
-                        {sourceLabel[citation.source]} · {citation.id}
+                        {getSourceLabel(citation.source)} · {citation.id}
                     </Typography.Text>
                     <Typography.Text style={{ color: "inherit" }}>
                         “{citation.quote}”
@@ -129,7 +132,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
             }
         >
             <Chip
-                aria-label={`Citation ${index}: ${sourceLabel[citation.source]} ${citation.id}`}
+                aria-label={`Citation ${index}: ${getSourceLabel(citation.source)} ${citation.id}`}
                 onClick={handleActivate}
                 onKeyDown={onKeyDown}
                 role={onNavigate ? "button" : "note"}

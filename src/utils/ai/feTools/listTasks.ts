@@ -5,12 +5,12 @@ import type { FeTool } from "./types";
  * Mirrors the query key used by `useDragEnd`: `["tasks", { projectId }]`.
  * Returns an empty array if the project cache is not yet populated.
  */
-export const listTasksTool: FeTool<{ projectId?: string } | void, ITask[]> = {
+export const listTasksTool: FeTool<{ project_id?: string } | void, ITask[]> = {
     name: "fe.listTasks",
     description: "Return all tasks for a project, in stored order.",
     run: (args, ctx) => {
         const projectId =
-            (args && "projectId" in args ? args.projectId : undefined) ??
+            (args && "project_id" in args ? args.project_id : undefined) ??
             ctx.projectId;
         if (!projectId) return [];
         const data = ctx.queryClient.getQueryData<ITask[]>([
