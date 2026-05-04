@@ -105,6 +105,7 @@ const LoginForm: React.FC<{
                 <Input.Password
                     autoComplete="current-password"
                     enterKeyHint="go"
+                    inputMode="text"
                     iconRender={(visible) =>
                         visible ? (
                             <EyeOutlined

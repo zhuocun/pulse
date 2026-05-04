@@ -557,7 +557,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         required
                         rules={[{ required: true }]}
                     >
-                        <Input />
+                        <Input enterKeyHint="next" inputMode="text" />
                     </Form.Item>
                     <Form.Item
                         extra={
@@ -586,7 +586,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         label={microcopy.fields.epic}
                         name="epic"
                     >
-                        <Input />
+                        <Input enterKeyHint="next" inputMode="text" />
                     </Form.Item>
                     <Form.Item
                         extra={
