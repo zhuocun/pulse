@@ -1,6 +1,8 @@
 ---
 name: subagent-orchestrator
 description: Orchestrates parallel subagents as the primary performers of research and implementation work — the orchestrator decomposes the task, scopes and configures each subagent (explicitly setting model and reasoning parameters), keeps only the immediate blocking step local, and reviews returned work as the quality gate before integrating. Use when the user authorizes subagents or asks to "parallelize", "orchestrate", "delegate", or "run agents in parallel"; when the task has 2+ independent workstreams or 3+ distinct subtasks; when it combines exploration with implementation, or implementation with verification; or when it is likely to take more than a few minutes. On Cursor, picks Composer for every subagent call. Do NOT use when no subagent launcher is available, when subagents are not authorized, or for tiny, fully serial, or tightly coupled tasks.
+metadata:
+    short-description: Aggressive parallel orchestration when allowed
 ---
 
 # Subagent Orchestrator
@@ -48,7 +50,7 @@ Tier guidance:
 
 Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-flash`, `*-haiku`-class) unless a higher-priority instruction requires them.
 
-The subagent must never run with the *exact same* model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
+The subagent must never run with the _exact same_ model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
 
 1. Step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT). Keep the reasoning budget appropriate for the subtask.
 2. On Cursor, choose Composer.

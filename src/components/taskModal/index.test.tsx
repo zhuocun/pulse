@@ -286,11 +286,72 @@ describe("TaskModal", () => {
         expect(fetchMock.mock.calls[0][1]).toEqual(
             expect.objectContaining({ method: "DELETE" })
         );
+        await waitFor(() =>
+            expect(screen.getByTestId("location")).toHaveTextContent("")
+        );
 
         confirmSpy.mockRestore();
     });
 
-    it("disables delete when there is no second task or the editing task is mock", async () => {
+    it("keeps the modal open when task deletion is cancelled", async () => {
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation(() => {
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        renderModal();
+
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
+
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
+        expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
+
+        confirmSpy.mockRestore();
+    });
+
+    it("keeps the modal open if deleting the task fails", async () => {
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                config.onOk?.();
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        fetchMock.mockResolvedValue(
+            response({ error: "Delete failed on server" }, false)
+        );
+        renderModal();
+
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
+
+        confirmSpy.mockRestore();
+    });
+
+    it("allows deleting the last saved task but still disables delete for optimistic tasks", async () => {
         const { unmount } = renderModal({ initialTasks: [task()] });
 
         expect(
@@ -298,7 +359,7 @@ describe("TaskModal", () => {
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: /^delete build task$/i })
-        ).toBeDisabled();
+        ).toBeEnabled();
 
         unmount();
         renderModal({
@@ -320,13 +381,29 @@ describe("TaskModal", () => {
         ).toBeDisabled();
     });
 
+    it("clears a stale editingTaskId after tasks finish loading without a match", async () => {
+        renderModal({
+            initialTasks: [],
+            route: "/projects/project-1/board?editingTaskId=missing-task"
+        });
+
+        await waitFor(() =>
+            expect(screen.getByTestId("location")).toHaveTextContent("")
+        );
+        expect(
+            screen.queryByDisplayValue("Build task")
+        ).not.toBeInTheDocument();
+    });
+
     it("disables delete when the task list is unavailable", async () => {
         renderModal({ initialTasks: undefined });
 
-        expect(await screen.findByText(/edit task/i)).toBeInTheDocument();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
         expect(
-            screen.getByRole("button", { name: /^delete$/i })
-        ).toBeDisabled();
+            screen.queryByRole("button", { name: /^delete$/i })
+        ).not.toBeInTheDocument();
     });
 
     it("hides the assist panel when board AI is off for the project", async () => {

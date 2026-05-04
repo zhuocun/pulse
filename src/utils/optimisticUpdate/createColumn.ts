@@ -5,8 +5,8 @@ const newColumnCallback = (
     },
     old: IColumn[] | undefined
 ) => {
-    if (!old) return undefined;
-    return old.concat({ ...target, index: old.length, _id: "mock" });
+    const columns = old ?? [];
+    return columns.concat({ ...target, index: columns.length, _id: "mock" });
 };
 
 export default newColumnCallback;

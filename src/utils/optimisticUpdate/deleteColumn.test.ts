@@ -9,7 +9,7 @@ const column = (overrides: Partial<IColumn> = {}): IColumn => ({
 });
 
 describe("deleteColumnCallback", () => {
-    it("returns undefined when there is no existing column cache", () => {
+    it("preserves the missing cache when there is no existing column cache", () => {
         expect(
             deleteColumnCallback({ columnId: "column-1" }, undefined)
         ).toBeUndefined();

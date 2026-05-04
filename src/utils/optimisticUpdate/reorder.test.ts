@@ -202,6 +202,25 @@ describe("taskCallback", () => {
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
     });
 
+    it("keeps the moved task aligned to the destination column even when the order is unchanged", () => {
+        const result = taskCallback(
+            {
+                fromId: "task-3",
+                referenceId: "missing",
+                fromColumnId: "column-2",
+                referenceColumnId: "column-1",
+                type: "before"
+            },
+            tasks
+        );
+
+        expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
+        expect(result.find((item) => item._id === "task-3")?.columnId).toBe(
+            "column-1"
+        );
+        expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
+    });
+
     it("preserves order when the moving task cannot be found", () => {
         const result = taskCallback(
             {
@@ -233,7 +252,7 @@ describe("taskCallback", () => {
 
         expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
         expect(result.find((item) => item._id === "task-1")?.columnId).toBe(
-            "column-1"
+            "column-2"
         );
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
     });

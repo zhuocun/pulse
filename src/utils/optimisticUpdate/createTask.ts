@@ -10,8 +10,8 @@ interface INewTaskParams {
 }
 
 const newTaskCallback = (target: INewTaskParams, old: ITask[] | undefined) => {
-    if (!old) return undefined;
-    return old.concat({ ...target, _id: "mock" } as ITask);
+    const tasks = old ?? [];
+    return tasks.concat({ ...target, _id: "mock" } as ITask);
 };
 
 export default newTaskCallback;

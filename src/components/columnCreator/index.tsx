@@ -72,7 +72,8 @@ const AddColumnButton = styled.button`
  * like an empty column) with a collapsed-button affordance: the canvas is
  * only "polluted" once the user opts in. Pressing Esc, blurring, or
  * submitting an empty value collapses the input back to the button
- * without firing the mutation.
+ * without firing the mutation. Blur only collapses empty drafts; Enter is
+ * the explicit commit gesture so tabbing away does not create a column.
  */
 const ColumnCreator: React.FC = () => {
     const [columnName, setColumnName] = useState("");
@@ -131,7 +132,9 @@ const ColumnCreator: React.FC = () => {
                 disabled={isLoading}
                 enterKeyHint="done"
                 inputMode="text"
-                onBlur={submit}
+                onBlur={() => {
+                    if (!columnName.trim()) collapse();
+                }}
                 onChange={(e) => setColumnName(e.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === "Escape") {

@@ -15,10 +15,10 @@ const task = (overrides: Partial<ITask> = {}): ITask => ({
 });
 
 describe("deleteTaskCallback", () => {
-    it("returns undefined when there is no existing task cache", () => {
-        expect(
-            deleteTaskCallback({ taskId: "task-1" }, undefined)
-        ).toBeUndefined();
+    it("preserves a missing task cache without creating optimistic data", () => {
+        expect(deleteTaskCallback({ taskId: "task-1" }, undefined)).toBe(
+            undefined
+        );
     });
 
     it("removes the matching task from the existing cache", () => {

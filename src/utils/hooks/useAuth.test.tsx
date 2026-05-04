@@ -12,6 +12,27 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 
 import useAuth from "./useAuth";
 
+const createThrowingStorage = (): Storage => ({
+    get length(): number {
+        throw new Error("storage blocked");
+    },
+    clear() {
+        throw new Error("storage blocked");
+    },
+    getItem() {
+        throw new Error("storage blocked");
+    },
+    key() {
+        throw new Error("storage blocked");
+    },
+    removeItem() {
+        throw new Error("storage blocked");
+    },
+    setItem() {
+        throw new Error("storage blocked");
+    }
+});
+
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "u1",
     email: "alice@example.com",
@@ -89,6 +110,27 @@ describe("useAuth", () => {
 
         expect(screen.getByTestId("user")).toHaveTextContent("Alice");
         expect(screen.getByTestId("token")).toHaveTextContent("stored-token");
+    });
+
+    it("falls back to no token when storage access throws during render", () => {
+        const original = window.localStorage;
+        Object.defineProperty(window, "localStorage", {
+            configurable: true,
+            value: createThrowingStorage()
+        });
+        const queryClient = createQueryClient();
+        queryClient.setQueryData(["users"], user());
+
+        try {
+            renderAuthProbe(queryClient);
+            expect(screen.getByTestId("user")).toHaveTextContent("Alice");
+            expect(screen.getByTestId("token")).toHaveTextContent("none");
+        } finally {
+            Object.defineProperty(window, "localStorage", {
+                configurable: true,
+                value: original
+            });
+        }
     });
 
     it("clears cached auth state and navigates to login on logout", async () => {

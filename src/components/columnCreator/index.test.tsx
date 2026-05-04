@@ -137,4 +137,15 @@ describe("ColumnCreator", () => {
         );
         expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it("does not submit a named column just because the input blurs", async () => {
+        renderCreator();
+        const input = await expandIntoInput();
+
+        fireEvent.change(input, { target: { value: "Later" } });
+        fireEvent.blur(input);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(screen.getByDisplayValue("Later")).toBeInTheDocument();
+    });
 });

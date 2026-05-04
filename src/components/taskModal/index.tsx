@@ -11,7 +11,7 @@ import {
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
 import isEqual from "lodash/isEqual";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
@@ -61,14 +61,14 @@ const TaskModal: React.FC<{
         // mutate(..., { onError }) below shows a task-specific message.
         () => {}
     );
-    const editingTask = tasks?.filter((task) => task._id === editingTaskId)[0];
+    const editingTask = tasks?.find((task) => task._id === editingTaskId);
     const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
 
-    const onClose = () => {
+    const onClose = useCallback(() => {
         form.resetFields();
         setSaveError(null);
         closeModal();
-    };
+    }, [closeModal, form]);
 
     const onOk = async () => {
         try {
@@ -107,7 +107,6 @@ const TaskModal: React.FC<{
     const onDelete = () => {
         const taskName = editingTask?.taskName;
         const taskId = editingTaskId;
-        onClose();
         Modal.confirm({
             centered: true,
             okText: microcopy.confirm.deleteTask.confirmLabel,
@@ -119,8 +118,10 @@ const TaskModal: React.FC<{
                 remove(
                     { taskId },
                     {
-                        onSuccess: () =>
-                            message.success(microcopy.feedback.taskDeleted),
+                        onSuccess: () => {
+                            message.success(microcopy.feedback.taskDeleted);
+                            onClose();
+                        },
                         onError: () =>
                             message.error(
                                 taskName
@@ -139,6 +140,15 @@ const TaskModal: React.FC<{
     useEffect(() => {
         form.setFieldsValue(editingTask);
     }, [form, editingTask]);
+
+    useEffect(() => {
+        if (!editingTaskId || editingTaskId === "mock" || tasks === undefined) {
+            return;
+        }
+        if (!editingTask) {
+            onClose();
+        }
+    }, [editingTask, editingTaskId, onClose, tasks]);
 
     // Clear stale save errors when the user opens a different task; the
     // previous error referred to the prior payload and would mislead.
@@ -159,9 +169,7 @@ const TaskModal: React.FC<{
     })();
     void formTick;
 
-    const deleteDisabled = tasks
-        ? tasks.length < 2 || dLoading || editingTaskId === "mock"
-        : true;
+    const deleteDisabled = !editingTask || dLoading || editingTaskId === "mock";
 
     const titleText = editingTask?.taskName
         ? `${microcopy.actions.editTask} · ${editingTask.taskName}`
@@ -283,7 +291,7 @@ const TaskModal: React.FC<{
                 );
             }}
             title={titleNode}
-            open={Boolean(editingTaskId)}
+            open={Boolean(editingTaskId && editingTask)}
             styles={{
                 body: {
                     /*

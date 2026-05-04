@@ -71,6 +71,9 @@ export const enSource = {
         loadingBoard: "Loading board",
         accountMenu: "Account menu",
         boardCopilot: "Board Copilot",
+        boardCopilotProjectToggle: "Board Copilot for this project",
+        boardCopilotSettings: "Board Copilot settings",
+        dismissSwipeHint: "Dismiss swipe hint",
         aiSuggestion: "AI suggestion",
         aiBadge: "AI · review before using",
         useDarkMode: "Switch to dark mode",
@@ -182,6 +185,10 @@ export const enSource = {
             one: "{count} target",
             other: "{count} targets"
         },
+        tasksMatchingActiveFilters: {
+            one: "{count} task matches the active filters",
+            other: "{count} tasks match the active filters"
+        },
         subtasksCreated: {
             one: "{count} subtask created.",
             other: "{count} subtasks created."
@@ -264,6 +271,12 @@ export const enSource = {
      * lets translators reorder the noun and the verb per locale.
      */
     greeting: "Hi, {name}",
+    board: {
+        swipeHint: "Swipe to see more columns",
+        enableCopilotOnBoard: "Enable on this board",
+        copilotProjectDisabledDescription:
+            "Hides Board Copilot on this board and blocks AI requests for this project."
+    },
     empty: {
         projects: {
             title: "No projects yet",
