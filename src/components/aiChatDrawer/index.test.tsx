@@ -73,6 +73,10 @@ const renderDrawer = (
     extraProps: {
         pendingProposal?: MutationProposal;
         pendingNudges?: TriageNudge[];
+        onAcceptProposal?: (proposal: MutationProposal) => void;
+        onRejectProposal?: (proposal: MutationProposal) => void;
+        onActionNudge?: (nudge: TriageNudge) => void;
+        onDismissNudge?: (nudge: TriageNudge) => void;
     } = {}
 ) => {
     const queryClient = new QueryClient({
@@ -298,5 +302,113 @@ describe("AiChatDrawer", () => {
 
         // NudgeCard renders with role="alert" and the nudge summary text
         expect(screen.getByText("3 bugs have no assignee")).toBeInTheDocument();
+    });
+
+    it("invokes onAcceptProposal / onRejectProposal when the proposal card buttons are clicked", () => {
+        const proposal: MutationProposal = {
+            proposal_id: "prop-accept",
+            description: "Reassign overdue tasks to Alice",
+            diff: {
+                task_updates: [
+                    {
+                        task_id: "t1",
+                        field: "coordinatorId",
+                        from: "m2",
+                        to: "m1"
+                    }
+                ]
+            },
+            risk: "low",
+            undoable: true
+        };
+        const onAcceptProposal = jest.fn();
+        const onRejectProposal = jest.fn();
+
+        renderDrawer(true, {
+            pendingProposal: proposal,
+            onAcceptProposal,
+            onRejectProposal
+        });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /accept proposal/i })
+        );
+        expect(onAcceptProposal).toHaveBeenCalledTimes(1);
+        expect(onAcceptProposal).toHaveBeenCalledWith(proposal);
+        expect(onRejectProposal).not.toHaveBeenCalled();
+    });
+
+    it("hides the proposal card locally when no onAcceptProposal handler is supplied", () => {
+        const proposal: MutationProposal = {
+            proposal_id: "prop-local",
+            description: "Reassign overdue tasks to Alice",
+            diff: {},
+            risk: "low",
+            undoable: true
+        };
+        renderDrawer(true, { pendingProposal: proposal });
+
+        expect(
+            screen.getByRole("alertdialog", {
+                name: /Reassign overdue tasks to Alice/i
+            })
+        ).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /accept proposal/i })
+        );
+
+        expect(
+            screen.queryByRole("alertdialog", {
+                name: /Reassign overdue tasks to Alice/i
+            })
+        ).not.toBeInTheDocument();
+    });
+
+    it("invokes onActionNudge / onDismissNudge from NudgeCard buttons", () => {
+        const nudge: TriageNudge = {
+            nudge_id: "nudge-action",
+            kind: "unowned_bug",
+            project_id: "p1",
+            summary: "3 bugs have no assignee",
+            target_ids: ["t1"],
+            severity: "warn"
+        };
+        const onActionNudge = jest.fn();
+        const onDismissNudge = jest.fn();
+
+        renderDrawer(true, {
+            pendingNudges: [nudge],
+            onActionNudge,
+            onDismissNudge
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /assign owner/i }));
+        expect(onActionNudge).toHaveBeenCalledWith(nudge);
+
+        fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+        expect(onDismissNudge).toHaveBeenCalledWith(nudge);
+    });
+
+    it("locally dismisses a nudge when no onDismissNudge handler is supplied", () => {
+        const nudge: TriageNudge = {
+            nudge_id: "nudge-local",
+            kind: "stale_task",
+            project_id: "p1",
+            summary: "Stale task hanging around",
+            target_ids: ["t1"],
+            severity: "info"
+        };
+        renderDrawer(true, { pendingNudges: [nudge] });
+
+        expect(
+            screen.getByText("Stale task hanging around")
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+        expect(
+            screen.queryByText("Stale task hanging around")
+        ).not.toBeInTheDocument();
     });
 });
