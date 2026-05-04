@@ -256,7 +256,7 @@ describe("Column", () => {
         expect(startEditing).toHaveBeenCalledWith("task-1");
     });
 
-    it("uses the task name as the drag key fallback when a task id is empty", () => {
+    it("disables drag and open behavior when a task id is empty", () => {
         renderColumn({
             tasks: [
                 task({
@@ -267,10 +267,12 @@ describe("Column", () => {
         });
 
         expect(screen.getByText("Unsaved task")).toBeInTheDocument();
-        expect(screen.getByTestId("task")).toHaveAttribute(
-            "data-disabled",
-            "false"
-        );
+        expect(
+            screen.getByTestId("task-unsaved-0-Unsaved-task")
+        ).toHaveAttribute("data-disabled", "true");
+        expect(
+            screen.getByRole("button", { name: "Open task Unsaved task" })
+        ).toBeDisabled();
     });
 
     it("confirms column deletion before calling the delete mutation", () => {

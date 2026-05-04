@@ -233,6 +233,23 @@ describe("useDragEnd", () => {
         });
     });
 
+    it("uses before for a same-column upward task move", () => {
+        renderProbe();
+
+        drop(
+            { droppableId: "column-1", index: 1 },
+            { droppableId: "column-1", index: 0 }
+        );
+
+        expect(reorderTask).toHaveBeenCalledWith({
+            fromColumnId: "column-1",
+            fromId: "task-2",
+            referenceColumnId: "column-1",
+            referenceId: "task-1",
+            type: "before"
+        });
+    });
+
     it("uses before for a cross-column task move", () => {
         renderProbe();
 

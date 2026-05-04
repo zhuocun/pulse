@@ -553,33 +553,41 @@ const Column = React.forwardRef<
                         droppableId={String(column._id)}
                     >
                         <DropChild>
-                            {filteredTasks.map((task, index) => (
-                                <Drag
-                                    key={task._id}
-                                    index={index}
-                                    draggableId={`task${task._id}`}
-                                    isDragDisabled={
-                                        taskDragDisabled ||
-                                        isOptimisticPlaceholderId(task._id)
-                                    }
-                                    // TaskCard renders a <button>, which @hello-pangea/dnd
-                                    // refuses to drag from by default; opt out of that block.
-                                    disableInteractiveElementBlocking
-                                >
-                                    <TaskCard
-                                        isMock={isOptimisticPlaceholderId(
-                                            task._id
-                                        )}
-                                        members={members}
-                                        onOpen={
-                                            !isOptimisticPlaceholderId(task._id)
-                                                ? () => startEditing(task._id)
-                                                : undefined
+                            {filteredTasks.map((task, index) => {
+                                const hasPersistedTaskId =
+                                    Boolean(task._id) &&
+                                    !isOptimisticPlaceholderId(task._id);
+                                const taskDragId = task._id
+                                    ? `task${task._id}`
+                                    : `task-unsaved-${index}`;
+
+                                return (
+                                    <Drag
+                                        key={task._id || taskDragId}
+                                        index={index}
+                                        draggableId={taskDragId}
+                                        isDragDisabled={
+                                            taskDragDisabled ||
+                                            !hasPersistedTaskId
                                         }
-                                        task={task}
-                                    />
-                                </Drag>
-                            ))}
+                                        // TaskCard renders a <button>, which @hello-pangea/dnd
+                                        // refuses to drag from by default; opt out of that block.
+                                        disableInteractiveElementBlocking
+                                    >
+                                        <TaskCard
+                                            isMock={!hasPersistedTaskId}
+                                            members={members}
+                                            onOpen={
+                                                hasPersistedTaskId
+                                                    ? () =>
+                                                          startEditing(task._id)
+                                                    : undefined
+                                            }
+                                            task={task}
+                                        />
+                                    </Drag>
+                                );
+                            })}
                             <TaskCreator
                                 boardAiOn={boardAiOn}
                                 columnId={column._id}

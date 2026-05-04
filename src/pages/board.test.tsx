@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import BoardPage from "./board";
 
@@ -79,6 +79,12 @@ jest.mock("@hello-pangea/dnd", () => {
             })
     };
 });
+
+const LocationProbe = () => {
+    const location = useLocation();
+
+    return <div data-testid="current-search">{location.search}</div>;
+};
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "member-1",
@@ -226,7 +232,12 @@ const renderBoard = (route = "/projects/project-1/board") => {
                 <Routes>
                     <Route
                         path="/projects/:projectId/board"
-                        element={<BoardPage />}
+                        element={
+                            <>
+                                <BoardPage />
+                                <LocationProbe />
+                            </>
+                        }
                     />
                 </Routes>
             </MemoryRouter>
@@ -313,6 +324,9 @@ describe("BoardPage", () => {
 
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
         await waitFor(() => {
+            expect(screen.getByTestId("current-search")).not.toHaveTextContent(
+                "semanticIds"
+            );
             expect(screen.getByText("Fix bug")).toBeInTheDocument();
         });
     });
