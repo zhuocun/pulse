@@ -48,6 +48,17 @@ const AiMatchStrengthBadge: React.FC<AiMatchStrengthBadgeProps> = ({
         <Tag
             aria-label={ariaLabel}
             color={TAG_COLOR[strength]}
+            /*
+             * Compact mode renders an empty visible tag (a coloured dot).
+             * Without an explicit role the element is a generic span and
+             * aria-label is prohibited on it (axe rule aria-prohibited-attr,
+             * WCAG 4.1.2). Adding role="img" makes it a named image-like
+             * widget so screen readers announce the label instead of
+             * ignoring it. Non-compact mode inherits the same role for
+             * consistency, but the label is redundant there (the visible
+             * text already conveys it).
+             */
+            role="img"
             style={{
                 marginInlineEnd: 0,
                 ...(compact
