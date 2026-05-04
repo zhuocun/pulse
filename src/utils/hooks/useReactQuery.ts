@@ -6,7 +6,7 @@ import getError from "../getError";
 
 import useApi from "./useApi";
 
-const getQueryKey = (
+export const getReactQueryKey = (
     endPoint: string,
     queryParam?: { [key: string]: unknown },
     specialQueryKey?: string
@@ -28,7 +28,7 @@ const useReactQuery = <D>(
     const errorUpdatedAt = useRef(0);
 
     const query = useQuery<D>({
-        queryKey: getQueryKey(endPoint, queryParam, specialQueryKey),
+        queryKey: getReactQueryKey(endPoint, queryParam, specialQueryKey),
         queryFn: async () =>
             (await api(endPoint, {
                 data: filterRequest(queryParam || {}),

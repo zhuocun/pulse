@@ -27,9 +27,9 @@ describe("newTaskCallback", () => {
     } as const;
 
     it("creates an optimistic list when there is no existing task cache", () => {
-        expect(newTaskCallback(target, undefined)).toEqual([
-            { ...target, _id: "mock" }
-        ]);
+        const [created] = newTaskCallback(target, undefined) as ITask[];
+        expect(created).toMatchObject(target);
+        expect(created._id.startsWith("tmp-")).toBe(true);
     });
 
     it("appends a mock task with submitted fields without mutating the old array", () => {
@@ -37,7 +37,9 @@ describe("newTaskCallback", () => {
 
         const result = newTaskCallback(target, oldTasks);
 
-        expect(result).toEqual([task(), { ...target, _id: "mock" }]);
+        expect(result[0]).toEqual(task());
+        expect(result[1]).toMatchObject(target);
+        expect(result[1]._id.startsWith("tmp-")).toBe(true);
         expect(result).not.toBe(oldTasks);
         expect(oldTasks).toEqual([task()]);
     });

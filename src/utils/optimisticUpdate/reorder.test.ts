@@ -32,6 +32,19 @@ describe("columnCallback", () => {
         column({ _id: "column-3", columnName: "Done", index: 2 })
     ];
 
+    it("returns undefined when the column cache is missing", () => {
+        expect(
+            columnCallback(
+                {
+                    fromId: "column-1",
+                    referenceId: "column-2",
+                    type: "before"
+                },
+                undefined
+            )
+        ).toBeUndefined();
+    });
+
     it("moves a column before the reference column", () => {
         const result = columnCallback(
             {
@@ -40,7 +53,7 @@ describe("columnCallback", () => {
                 type: "before"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(ids(result)).toEqual(["column-3", "column-1", "column-2"]);
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
@@ -55,7 +68,7 @@ describe("columnCallback", () => {
                 type: "after"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(ids(result)).toEqual(["column-2", "column-3", "column-1"]);
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
@@ -69,7 +82,7 @@ describe("columnCallback", () => {
                 type: "after"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(ids(result)).toEqual(["column-2", "column-3", "column-1"]);
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
@@ -83,7 +96,7 @@ describe("columnCallback", () => {
                 type: "after"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(ids(result)).toEqual(["column-1", "column-2", "column-3"]);
         expect(result).not.toBe(columns);
@@ -97,7 +110,7 @@ describe("columnCallback", () => {
                 type: "before"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(result).toEqual(columns);
         expect(result).not.toBe(columns);
@@ -111,7 +124,7 @@ describe("columnCallback", () => {
                 type: "before"
             },
             columns
-        );
+        ) as IColumn[];
 
         expect(result).toEqual(columns);
         expect(result).not.toBe(columns);
@@ -119,6 +132,21 @@ describe("columnCallback", () => {
 });
 
 describe("taskCallback", () => {
+    it("returns undefined when the task cache is missing", () => {
+        expect(
+            taskCallback(
+                {
+                    fromId: "task-1",
+                    referenceId: "task-2",
+                    fromColumnId: "column-1",
+                    referenceColumnId: "column-1",
+                    type: "before"
+                },
+                undefined
+            )
+        ).toBeUndefined();
+    });
+
     const tasks = [
         task({ _id: "task-1", taskName: "Todo one", columnId: "column-1" }),
         task({ _id: "task-2", taskName: "Todo two", columnId: "column-1" }),
@@ -135,7 +163,7 @@ describe("taskCallback", () => {
                 type: "before"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-2", "task-1", "task-3"]);
         expect(result.find((item) => item._id === "task-2")?.columnId).toBe(
@@ -155,7 +183,7 @@ describe("taskCallback", () => {
                 type: "after"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-2", "task-3", "task-1"]);
         expect(result.find((item) => item._id === "task-1")?.columnId).toBe(
@@ -174,7 +202,7 @@ describe("taskCallback", () => {
                 type: "after"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-2", "task-3", "task-1"]);
         expect(result.find((item) => item._id === "task-1")?.columnId).toBe(
@@ -193,7 +221,7 @@ describe("taskCallback", () => {
                 type: "after"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
         expect(result.find((item) => item._id === "task-3")?.columnId).toBe(
@@ -212,7 +240,7 @@ describe("taskCallback", () => {
                 type: "before"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
         expect(result.find((item) => item._id === "task-3")?.columnId).toBe(
@@ -231,7 +259,7 @@ describe("taskCallback", () => {
                 type: "before"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(ids(tasks));
         expect(result.map((item) => item.index)).toEqual([0, 1, 2]);
@@ -248,7 +276,7 @@ describe("taskCallback", () => {
                 type: "before"
             },
             tasks
-        );
+        ) as ITask[];
 
         expect(ids(result)).toEqual(["task-1", "task-2", "task-3"]);
         expect(result.find((item) => item._id === "task-1")?.columnId).toBe(

@@ -28,6 +28,7 @@ import {
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
 import { Drag, Drop, DropChild } from "../dragAndDrop";
@@ -120,14 +121,15 @@ const FilteredEmptyButton = styled.button`
     font-weight: ${fontWeight.medium};
     padding: ${space.xxs}px ${space.xs}px;
 
-    &:hover,
-    &:focus-visible {
+    &:hover {
         background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.1));
-        outline: none;
     }
 
     &:focus-visible {
+        background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.1));
         box-shadow: ${shadow.focus};
+        outline: 2px solid transparent;
+        outline-offset: 2px;
     }
 
     /* The "Reset filters" CTA is the recovery path out of an empty filtered
@@ -354,7 +356,7 @@ const DeleteDropDown: React.FC<{ columnId: string; columnName: string }> = ({
                 <NoPaddingButton
                     aria-label={`Delete column ${columnName}`}
                     danger
-                    disabled={columnId === "mock"}
+                    disabled={isOptimisticPlaceholderId(columnId)}
                     onClick={() => onDelete(columnId)}
                     size="small"
                     type="text"
@@ -469,7 +471,13 @@ const Column = React.forwardRef<
         tasks: ITask[];
         column: IColumn;
         param: TaskSearchParam;
+        /** Disables inline task creation while a reorder mutation is in flight. */
         isDragDisabled: boolean;
+        /**
+         * When set, controls row drag only (e.g. filters active). Defaults to
+         * `isDragDisabled` so a single flag still disables both behaviors.
+         */
+        taskDragDisabled?: boolean;
         boardAiOn?: boolean;
         members?: IMember[];
         onResetFilters?: () => void;
@@ -481,6 +489,7 @@ const Column = React.forwardRef<
             param,
             tasks,
             isDragDisabled,
+            taskDragDisabled = isDragDisabled,
             boardAiOn = true,
             members = [],
             onResetFilters,
@@ -544,30 +553,46 @@ const Column = React.forwardRef<
                         droppableId={String(column._id)}
                     >
                         <DropChild>
-                            {filteredTasks.map((task, index) => (
-                                <Drag
-                                    key={task._id}
-                                    index={index}
-                                    draggableId={`task${task._id}`}
-                                    isDragDisabled={
-                                        isDragDisabled || task._id === "mock"
-                                    }
-                                    // TaskCard renders a <button>, which @hello-pangea/dnd
-                                    // refuses to drag from by default; opt out of that block.
-                                    disableInteractiveElementBlocking
-                                >
-                                    <TaskCard
-                                        isMock={task._id === "mock"}
-                                        members={members}
-                                        onOpen={
-                                            task._id !== "mock"
-                                                ? () => startEditing(task._id)
-                                                : undefined
+                            {filteredTasks.map((task, index) => {
+                                const hasPersistedTaskId =
+                                    Boolean(task._id) &&
+                                    !isOptimisticPlaceholderId(task._id);
+                                const taskDragId = task._id
+                                    ? `task${task._id}`
+                                    : `task-unsaved-${index}`;
+
+                                return (
+                                    <Drag
+                                        key={task._id || taskDragId}
+                                        index={index}
+                                        draggableId={taskDragId}
+                                        isDragDisabled={
+                                            taskDragDisabled ||
+                                            !hasPersistedTaskId
                                         }
-                                        task={task}
-                                    />
-                                </Drag>
-                            ))}
+                                        // TaskCard renders a <button>, which @hello-pangea/dnd
+                                        // refuses to drag from by default; opt out of that block.
+                                        disableInteractiveElementBlocking
+                                    >
+                                        <TaskCard
+                                            isMock={!hasPersistedTaskId}
+                                            members={members}
+                                            onOpen={
+                                                hasPersistedTaskId
+                                                    ? () =>
+                                                          startEditing(task._id)
+                                                    : undefined
+                                            }
+                                            task={task}
+                                        />
+                                    </Drag>
+                                );
+                            })}
+                            <TaskCreator
+                                boardAiOn={boardAiOn}
+                                columnId={column._id}
+                                disabled={isDragDisabled}
+                            />
                             {hasTasksHiddenByFilter ? (
                                 <FilteredEmpty aria-live="polite" role="status">
                                     <span>
@@ -583,11 +608,6 @@ const Column = React.forwardRef<
                                     ) : null}
                                 </FilteredEmpty>
                             ) : null}
-                            <TaskCreator
-                                boardAiOn={boardAiOn}
-                                columnId={column._id}
-                                disabled={isDragDisabled}
-                            />
                         </DropChild>
                     </Drop>
                 </TaskContainer>

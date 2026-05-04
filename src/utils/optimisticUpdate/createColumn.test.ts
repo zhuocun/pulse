@@ -10,19 +10,16 @@ const column = (overrides: Partial<IColumn> = {}): IColumn => ({
 
 describe("newColumnCallback", () => {
     it("creates a first mock column when there is no existing column cache", () => {
-        expect(
-            newColumnCallback(
-                { columnName: "Doing", projectId: "project-1" },
-                undefined
-            )
-        ).toEqual([
-            {
-                _id: "mock",
-                columnName: "Doing",
-                projectId: "project-1",
-                index: 0
-            }
-        ]);
+        const [created] = newColumnCallback(
+            { columnName: "Doing", projectId: "project-1" },
+            undefined
+        );
+        expect(created).toMatchObject({
+            columnName: "Doing",
+            projectId: "project-1",
+            index: 0
+        });
+        expect(created._id.startsWith("tmp-")).toBe(true);
     });
 
     it("appends a mock column at the next index without mutating the old array", () => {
@@ -36,16 +33,16 @@ describe("newColumnCallback", () => {
             oldColumns
         );
 
-        expect(result).toEqual([
+        expect(result.slice(0, 2)).toEqual([
             column({ _id: "column-1", columnName: "Todo", index: 0 }),
-            column({ _id: "column-2", columnName: "Doing", index: 1 }),
-            {
-                _id: "mock",
-                columnName: "Done",
-                projectId: "project-1",
-                index: 2
-            }
+            column({ _id: "column-2", columnName: "Doing", index: 1 })
         ]);
+        expect(result[2]).toMatchObject({
+            columnName: "Done",
+            projectId: "project-1",
+            index: 2
+        });
+        expect(result[2]._id.startsWith("tmp-")).toBe(true);
         expect(result).not.toBe(oldColumns);
         expect(oldColumns).toEqual([
             column({ _id: "column-1", columnName: "Todo", index: 0 }),

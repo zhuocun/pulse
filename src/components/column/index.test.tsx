@@ -128,6 +128,7 @@ const startEditing = jest.fn();
 const renderColumn = ({
     boardColumn = column(),
     isDragDisabled = false,
+    taskDragDisabled,
     boardAiOn = true,
     param = defaultParam,
     tasks = [
@@ -146,6 +147,7 @@ const renderColumn = ({
 }: {
     boardColumn?: IColumn;
     isDragDisabled?: boolean;
+    taskDragDisabled?: boolean;
     param?: TaskSearchParam;
     tasks?: ITask[];
     boardAiOn?: boolean;
@@ -164,6 +166,7 @@ const renderColumn = ({
                             column={boardColumn}
                             isDragDisabled={isDragDisabled}
                             param={param}
+                            taskDragDisabled={taskDragDisabled}
                             tasks={tasks}
                         />
                     }
@@ -200,12 +203,37 @@ describe("Column", () => {
             "data-disabled",
             "true"
         );
+        expect(screen.getByTestId("tasktask-2")).toHaveAttribute(
+            "data-disabled",
+            "true"
+        );
         expect(screen.getByTestId("task-creator")).toHaveAttribute(
             "data-column-id",
             "column-1"
         );
         expect(screen.getByTestId("task-creator")).toHaveAttribute(
             "data-board-ai",
+            "true"
+        );
+    });
+
+    it("disables only row drag when filters are active but keeps TaskCreator enabled", () => {
+        renderColumn({
+            isDragDisabled: false,
+            taskDragDisabled: true,
+            param: {
+                coordinatorId: "member-2",
+                taskName: "Fix",
+                type: "Bug"
+            }
+        });
+
+        expect(screen.getByTestId("task-creator")).toHaveAttribute(
+            "data-disabled",
+            "false"
+        );
+        expect(screen.getByTestId("tasktask-2")).toHaveAttribute(
+            "data-disabled",
             "true"
         );
     });
@@ -228,7 +256,7 @@ describe("Column", () => {
         expect(startEditing).toHaveBeenCalledWith("task-1");
     });
 
-    it("uses the task name as the drag key fallback when a task id is empty", () => {
+    it("disables drag and open behavior when a task id is empty", () => {
         renderColumn({
             tasks: [
                 task({
@@ -239,10 +267,13 @@ describe("Column", () => {
         });
 
         expect(screen.getByText("Unsaved task")).toBeInTheDocument();
-        expect(screen.getByTestId("task")).toHaveAttribute(
+        expect(screen.getByTestId("task-unsaved-0")).toHaveAttribute(
             "data-disabled",
-            "false"
+            "true"
         );
+        expect(
+            screen.getByRole("button", { name: "Open task Unsaved task" })
+        ).toBeDisabled();
     });
 
     it("confirms column deletion before calling the delete mutation", () => {
