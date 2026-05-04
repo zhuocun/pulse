@@ -172,6 +172,7 @@ describe("useReactMutation", () => {
         expect(
             queryClient.getMutationCache().getAll()[0].state.context
         ).toEqual({
+            didApplyOptimistic: true,
             previousItems
         });
     });
@@ -201,6 +202,7 @@ describe("useReactMutation", () => {
         expect(
             queryClient.getMutationCache().getAll()[0].state.context
         ).toEqual({
+            didApplyOptimistic: true,
             previousItems: undefined
         });
     });
@@ -305,6 +307,58 @@ describe("useReactMutation", () => {
         expect(queryClient.getQueryData(["items"])).toEqual(previousItems);
     });
 
+    it("keeps the cache untouched when an optimistic callback returns undefined", async () => {
+        const queryClient = createQueryClient();
+        const callback = jest.fn(() => undefined);
+        apiMock.mockResolvedValue({ _id: "new" });
+
+        const { result } = renderHook(
+            () => useReactMutation("items", "POST", ["items"], callback),
+            {
+                wrapper: createWrapper(queryClient)
+            }
+        );
+
+        await act(async () => {
+            await result.current.mutateAsync({ _id: "new" });
+        });
+
+        expect(queryClient.getQueryData(["items"])).toBeUndefined();
+        expect(
+            queryClient.getMutationCache().getAll()[0].state.context
+        ).toEqual({
+            didApplyOptimistic: false,
+            previousItems: undefined
+        });
+    });
+
+    it("treats an unchanged cache reference as no optimistic update", async () => {
+        const queryClient = createQueryClient();
+        const previousItems = [{ _id: "old" }];
+        const callback = jest.fn((_item, old?: unknown[]) => old);
+        queryClient.setQueryData(["items"], previousItems);
+        apiMock.mockResolvedValue({ _id: "new" });
+
+        const { result } = renderHook(
+            () => useReactMutation("items", "POST", ["items"], callback),
+            {
+                wrapper: createWrapper(queryClient)
+            }
+        );
+
+        await act(async () => {
+            await result.current.mutateAsync({ _id: "new" });
+        });
+
+        expect(queryClient.getQueryData(["items"])).toBe(previousItems);
+        expect(
+            queryClient.getMutationCache().getAll()[0].state.context
+        ).toEqual({
+            didApplyOptimistic: false,
+            previousItems
+        });
+    });
+
     it("toasts a revert notice when an optimistic mutation rolls back without a custom onError", async () => {
         const queryClient = createQueryClient();
         const callback = jest.fn((item, old?: unknown[]) => [
@@ -376,6 +430,32 @@ describe("useReactMutation", () => {
 
         const { result } = renderHook(
             () => useReactMutation("items", "POST", ["items"]),
+            {
+                wrapper: createWrapper(queryClient)
+            }
+        );
+
+        await act(async () => {
+            await expect(
+                result.current.mutateAsync({ _id: "new" })
+            ).rejects.toThrow("oops");
+        });
+
+        expect(errorSpy).not.toHaveBeenCalled();
+
+        errorSpy.mockRestore();
+    });
+
+    it("does not toast a revert notice when an optimistic callback made no cache change", async () => {
+        const queryClient = createQueryClient();
+        const callback = jest.fn(() => undefined);
+        const errorSpy = jest
+            .spyOn(message, "error")
+            .mockImplementation(() => "" as never);
+        apiMock.mockRejectedValue(new Error("oops"));
+
+        const { result } = renderHook(
+            () => useReactMutation("items", "POST", ["items"], callback),
             {
                 wrapper: createWrapper(queryClient)
             }

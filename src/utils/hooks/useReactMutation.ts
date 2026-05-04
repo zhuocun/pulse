@@ -19,7 +19,10 @@ const getQueryKey = (
 };
 
 type MutationParam = { [key: string]: unknown } | undefined;
-type MutationContext = { previousItems: unknown };
+type MutationContext = {
+    previousItems: unknown;
+    didApplyOptimistic: boolean;
+};
 
 const useReactMutation = <D>(
     endPoint: string,
@@ -42,14 +45,20 @@ const useReactMutation = <D>(
         onMutate: callback
             ? async (target: unknown) => {
                   const previousItems = queryClient.getQueryData(cacheKey);
+                  let didApplyOptimistic = false;
                   queryClient.setQueryData(cacheKey, (old?: unknown[]) => {
-                      return callback(target, old);
+                      const next = callback(target, old);
+                      if (next === undefined || Object.is(next, old)) {
+                          return old;
+                      }
+                      didApplyOptimistic = true;
+                      return next;
                   });
-                  return { previousItems };
+                  return { previousItems, didApplyOptimistic };
               }
             : undefined,
         onError: (err, _vars, context) => {
-            if (callback && context) {
+            if (callback && context?.didApplyOptimistic) {
                 queryClient.setQueryData(cacheKey, context.previousItems);
             }
             // Precedence: a caller-supplied `onError` owns the user-visible
@@ -57,7 +66,7 @@ const useReactMutation = <D>(
             // optimistic update silently rolled back without anyone watching.
             if (onError) {
                 onError(err instanceof Error ? err : getError(err));
-            } else if (callback) {
+            } else if (callback && context?.didApplyOptimistic) {
                 message.error(microcopy.feedback.optimisticReverted);
             }
         },

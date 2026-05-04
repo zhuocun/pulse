@@ -16,6 +16,13 @@ when a fix is non-obvious from the code alone.
   `useDragEnd` (`src/utils/hooks/useDragEnd.ts`). Reorder mutations are
   optimistic — see `src/utils/optimisticUpdate/reorder.ts`.
 
+## Task modal / URL state
+
+- `TaskModal` treats `tasks === undefined` as "still loading" and only clears a
+  stale `editingTaskId` from the URL after tasks resolve to a concrete array.
+  Do not coerce the board page's tasks query to `[]` before passing it into
+  `TaskModal`, or deep-linked edits will close immediately during load.
+
 ## Cursor Cloud specific instructions
 
 - This is a Vite React SPA. Standard scripts live in `package.json`; `npm start`

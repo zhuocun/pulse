@@ -9,6 +9,7 @@ import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import { readAuthToken } from "../../utils/tokenStorage";
 
 import LoginForm from ".";
 
@@ -162,7 +163,7 @@ describe("LoginForm", () => {
         await waitFor(() => {
             expect(window.location.pathname).toBe("/projects");
         });
-        expect(localStorage.getItem("Token")).toBe("jwt-login");
+        expect(readAuthToken()).toBe("jwt-login");
     });
 
     it("shows a welcome-back toast on successful login", async () => {
@@ -197,7 +198,7 @@ describe("LoginForm", () => {
             });
         });
         expect(window.location.pathname).toBe("/login");
-        expect(localStorage.getItem("Token")).toBeNull();
+        expect(readAuthToken()).toBeNull();
     });
 
     it("shows the submitting state from the mutation", () => {

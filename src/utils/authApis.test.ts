@@ -1,6 +1,7 @@
 import environment from "../constants/env";
 
 import { login, register } from "./authApis";
+import { readAuthToken } from "./tokenStorage";
 
 const originalFetch = global.fetch;
 
@@ -65,7 +66,7 @@ describe("auth API helpers", () => {
                 method: "POST"
             }
         );
-        expect(localStorage.getItem("Token")).toBe("jwt-1");
+        expect(readAuthToken()).toBe("jwt-1");
     });
 
     it("maps a login 404 to a connection failure", async () => {
@@ -75,7 +76,7 @@ describe("auth API helpers", () => {
             login({ email: "alice@example.com", password: "secret" })
         ).rejects.toThrow("Failed to connect");
 
-        expect(localStorage.getItem("Token")).toBeNull();
+        expect(readAuthToken()).toBeNull();
     });
 
     it("rejects other login failures with the response JSON message", async () => {
@@ -166,7 +167,7 @@ describe("auth API helpers", () => {
         await expect(
             login({ email: "alice@example.com", password: "secret" })
         ).rejects.toThrow(/unable to connect/i);
-        expect(localStorage.getItem("Token")).toBeNull();
+        expect(readAuthToken()).toBeNull();
     });
 
     it("converts a register network failure into a friendly error message", async () => {

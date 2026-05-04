@@ -9,7 +9,7 @@ const initialState: State = {
 };
 
 export const projectModalSlice = createSlice({
-    name: "projectSlice",
+    name: "projectModal",
     initialState,
     reducers: {
         openModal(state) {

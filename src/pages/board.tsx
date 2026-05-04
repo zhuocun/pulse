@@ -693,7 +693,7 @@ const BoardPage = () => {
                         <>
                             {(board?.length ?? 0) > 1 &&
                                 !swipeHintDismissed && (
-                                    <SwipeHint role="note">
+                                    <SwipeHint role="status">
                                         <span aria-hidden>←</span>
                                         <span>Swipe to see more columns</span>
                                         <span aria-hidden>→</span>
@@ -766,7 +766,7 @@ const BoardPage = () => {
                 ) : (
                     <BoardLoadingSkeleton />
                 )}
-                <TaskModal boardAiOn={boardAiOn} tasks={visibleTasks} />
+                <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 {boardAiOn && (
                     <>
                         <BoardBriefDrawer

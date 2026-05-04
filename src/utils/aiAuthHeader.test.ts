@@ -21,4 +21,15 @@ describe("getStoredBearerAuthHeader", () => {
         expect(getStoredBearerAuthHeader()).toBe("");
         global.localStorage = original;
     });
+
+    it("returns an empty string when reading localStorage throws", () => {
+        const originalGetItem = Storage.prototype.getItem;
+        jest.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+            throw new Error("denied");
+        });
+
+        expect(getStoredBearerAuthHeader()).toBe("");
+
+        Storage.prototype.getItem = originalGetItem;
+    });
 });

@@ -2,7 +2,7 @@ const deleteProjectCallback = (
     target: { projectId: string },
     old: IProject[] | undefined
 ) => {
-    if (!old) return undefined;
+    if (!old) return old;
     const index = old.findIndex((project) => project._id === target.projectId);
     if (index === -1) {
         return old;

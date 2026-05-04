@@ -5,7 +5,7 @@ const newColumnCallback = (
     },
     old: IColumn[] | undefined
 ) => {
-    if (!old) return undefined;
+    if (!old) return old;
     return old.concat({ ...target, index: old.length, _id: "mock" });
 };
 

@@ -10,10 +10,10 @@ const project = (overrides: Partial<IProject> = {}): IProject => ({
 });
 
 describe("deleteProjectCallback", () => {
-    it("returns undefined when there is no existing project cache", () => {
-        expect(
-            deleteProjectCallback({ projectId: "project-1" }, undefined)
-        ).toBeUndefined();
+    it("preserves an empty project cache", () => {
+        expect(deleteProjectCallback({ projectId: "project-1" }, undefined)).toBe(
+            undefined
+        );
     });
 
     it("removes the matching project from the existing cache without mutating the input", () => {

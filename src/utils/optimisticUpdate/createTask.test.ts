@@ -26,7 +26,7 @@ describe("newTaskCallback", () => {
         note: "No note yet"
     } as const;
 
-    it("returns undefined when there is no existing task cache", () => {
+    it("preserves the empty cache when there is no existing task cache", () => {
         expect(newTaskCallback(target, undefined)).toBeUndefined();
     });
 

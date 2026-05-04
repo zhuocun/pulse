@@ -9,7 +9,7 @@ const column = (overrides: Partial<IColumn> = {}): IColumn => ({
 });
 
 describe("newColumnCallback", () => {
-    it("returns undefined when there is no existing column cache", () => {
+    it("preserves an empty optimistic state when there is no existing column cache", () => {
         expect(
             newColumnCallback(
                 { columnName: "Doing", projectId: "project-1" },
