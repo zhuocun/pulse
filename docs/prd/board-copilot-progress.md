@@ -2,11 +2,11 @@
 
 Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has shipped to `main`, what is still open, and the concrete file/test inventory so a new contributor can pick up cleanly. For a section-by-section design vs implementation audit (verdicts with file/line evidence, deltas, gaps), see [`docs/prd/board-copilot-review.md`](board-copilot-review.md).
 
-| Field        | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; production-readiness sweep landed 2026-05-04 (`claude/jira-ai-features-RO8hF`): protocol alignment, observability, i18n, security, a11y; v2.1 surface follow-up landed 2026-05-04 (`claude/audit-jira-ai-features-2kNrU`): agent health badge in header, `MutationProposalCard`/`NudgeCard` call sites in chat drawer, `aiBaseUrl` default-to-apiOrigin; v2.1 Phase B card wiring landed 2026-05-04 (`claude/audit-jira-ai-features-Zo97c`): `MutationProposalCard` and `NudgeCard` accept/reject/action/dismiss handlers wired through optional `AiChatDrawer` props with safe local-dismiss fallback |
-| Last updated | 2026-05-04                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Owner        | TBD (frontend)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Field        | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; production-readiness sweep landed 2026-05-04 (`claude/jira-ai-features-RO8hF`): protocol alignment, observability, i18n, security, a11y; v2.1 surface follow-up landed 2026-05-04 (`claude/audit-jira-ai-features-2kNrU`): agent health badge in header, `MutationProposalCard`/`NudgeCard` call sites in chat drawer, `aiBaseUrl` default-to-apiOrigin; v2.1 Phase B card wiring landed 2026-05-04 (`claude/audit-jira-ai-features-Zo97c`): `MutationProposalCard` and `NudgeCard` accept/reject/action/dismiss handlers wired through optional `AiChatDrawer` props with safe local-dismiss fallback; v2.1 chat migration + triage nudges landed 2026-05-04 (`claude/audit-jira-ai-features-Zo97c`): chat path migrated to SSE streaming agent, triage-agent mounted in `board.tsx` for background nudges |
+| Last updated | 2026-05-04                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Owner        | TBD (frontend)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -22,25 +22,27 @@ Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has sh
 
 ## At a glance
 
-| Phase                    | Capability                                                                                                                                                                                                                                 | PRD section | Status                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- |
-| Phase 0                  | Plumbing (env, hook, validators, runtime toggle)                                                                                                                                                                                           | §7, §3.5    | ✅ Shipped                                                                                     |
-| Phase 1                  | Capability C — Board summary brief                                                                                                                                                                                                         | §5.3        | ✅ Shipped                                                                                     |
-| Phase 2A                 | Capability A — Smart task drafting                                                                                                                                                                                                         | §5.1        | ✅ Shipped                                                                                     |
-| Phase 2B                 | Capability B — AI estimation + readiness                                                                                                                                                                                                   | §5.2        | ✅ Shipped                                                                                     |
-| Phase 3                  | Capability D — Conversational assistant                                                                                                                                                                                                    | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3))               |
-| Phase 4                  | Capability E — Semantic search                                                                                                                                                                                                             | §5.5        | ✅ Shipped                                                                                     |
-| AI UX P1                 | Trust/privacy corrections from AI UX audit                                                                                                                                                                                                 | v3 §2 P3/P7 | ✅ Merged                                                                                      |
-| Observability sinks      | `httpAnalyticsSink`, `httpErrorSink`, `devMemorySink` wired; `ErrorBoundary` reports to error sink                                                                                                                                         | —           | ✅ Landed 2026-05-04                                                                           |
-| Observability call sites | `track()` wired at `COPILOT_REWRITE_ACCEPT`, `AGENT_HEALTH_DEGRADED`, and other defined events                                                                                                                                             | —           | 🟡 Not yet wired                                                                               |
-| v2.1 streaming infra     | `useAgent`, `agentClient`, `MutationProposalCard`, `NudgeCard`, command-palette AI mode — protocol correct                                                                                                                                 | —           | ✅ Phase A scaffolding landed                                                                  |
-| v2.1 UI surface (health) | `useAgentHealth` mounted in `header/index.tsx` as a status dot (degraded/offline only, remote-mode only)                                                                                                                                   | —           | ✅ Landed 2026-05-04                                                                           |
-| v2.1 UI surface (cards)  | `MutationProposalCard` and `NudgeCard` accept/reject/action/dismiss wired through optional `AiChatDrawer` props (`onAcceptProposal`, `onRejectProposal`, `onActionNudge`, `onDismissNudge`); local-dismiss fallback when callbacks omitted | —           | ✅ Phase B card wiring landed 2026-05-04 — `useAgent` mount in a product surface still pending |
-| Protocol / i18n / a11y   | snake_case alignment, `Idempotency-Key`, typed errors, i18n strings, jest-axe coverage, WCAG fix                                                                                                                                           | —           | ✅ Landed 2026-05-04                                                                           |
-| Security (URL / opt-out) | `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out enforcement, snake_case arg alignment                                                                                                                                           | —           | ✅ Landed 2026-05-04                                                                           |
-| `aiBaseUrl` default      | Deployed builds now default `aiBaseUrl` to `apiOrigin`; `REACT_APP_AI_USE_LOCAL=true` opt-in preserves local dev path                                                                                                                      | —           | ✅ Landed 2026-05-04                                                                           |
-| Security (JWT)           | JWT in `localStorage` reused by AI proxy — XSS exfiltration target; migration to httpOnly cookie or proxy-scoped token                                                                                                                     | —           | ⏳ Not addressed                                                                               |
-| Backend                  | Vercel `api/ai/[route].ts` proxy with provider abstraction                                                                                                                                                                                 | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime)               |
+| Phase                    | Capability                                                                                                                                                                                                                                 | PRD section | Status                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | -------------------------------------------------------------------------------- |
+| Phase 0                  | Plumbing (env, hook, validators, runtime toggle)                                                                                                                                                                                           | §7, §3.5    | ✅ Shipped                                                                       |
+| Phase 1                  | Capability C — Board summary brief                                                                                                                                                                                                         | §5.3        | ✅ Shipped                                                                       |
+| Phase 2A                 | Capability A — Smart task drafting                                                                                                                                                                                                         | §5.1        | ✅ Shipped                                                                       |
+| Phase 2B                 | Capability B — AI estimation + readiness                                                                                                                                                                                                   | §5.2        | ✅ Shipped                                                                       |
+| Phase 3                  | Capability D — Conversational assistant                                                                                                                                                                                                    | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) |
+| Phase 4                  | Capability E — Semantic search                                                                                                                                                                                                             | §5.5        | ✅ Shipped                                                                       |
+| AI UX P1                 | Trust/privacy corrections from AI UX audit                                                                                                                                                                                                 | v3 §2 P3/P7 | ✅ Merged                                                                        |
+| Observability sinks      | `httpAnalyticsSink`, `httpErrorSink`, `devMemorySink` wired; `ErrorBoundary` reports to error sink                                                                                                                                         | —           | ✅ Landed 2026-05-04                                                             |
+| Observability call sites | `track()` wired at `COPILOT_REWRITE_ACCEPT`, `AGENT_HEALTH_DEGRADED`, and other defined events                                                                                                                                             | —           | 🟡 Not yet wired                                                                 |
+| v2.1 streaming infra     | `useAgent`, `agentClient`, `MutationProposalCard`, `NudgeCard`, command-palette AI mode — protocol correct                                                                                                                                 | —           | ✅ Phase A scaffolding landed                                                    |
+| v2.1 UI surface (health) | `useAgentHealth` mounted in `header/index.tsx` as a status dot (degraded/offline only, remote-mode only)                                                                                                                                   | —           | ✅ Landed 2026-05-04                                                             |
+| v2.1 UI surface (cards)  | `MutationProposalCard` and `NudgeCard` accept/reject/action/dismiss wired through optional `AiChatDrawer` props (`onAcceptProposal`, `onRejectProposal`, `onActionNudge`, `onDismissNudge`); local-dismiss fallback when callbacks omitted | —           | ✅ Wired end-to-end (chat-agent + triage-agent)                                  |
+| v2.1 chat path           | `AiChatDrawer` picks `useAgentChat` (SSE streaming) in remote builds, `useAiChat` when `aiUseLocalEngine === true`                                                                                                                         | —           | ✅ Migrated to SSE in remote builds                                              |
+| v2.1 triage nudges       | `useAgent("triage-agent", …)` mounted in `board.tsx`; fires once per `(projectId, app session)` when the chat drawer first opens; `agent.nudges` fed to `AiChatDrawer` via `pendingNudges` prop                                            | —           | ✅ Mounted in `board.tsx`, fires once per project per session                    |
+| Protocol / i18n / a11y   | snake_case alignment, `Idempotency-Key`, typed errors, i18n strings, jest-axe coverage, WCAG fix                                                                                                                                           | —           | ✅ Landed 2026-05-04                                                             |
+| Security (URL / opt-out) | `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out enforcement, snake_case arg alignment                                                                                                                                           | —           | ✅ Landed 2026-05-04                                                             |
+| `aiBaseUrl` default      | Deployed builds now default `aiBaseUrl` to `apiOrigin`; `REACT_APP_AI_USE_LOCAL=true` opt-in preserves local dev path                                                                                                                      | —           | ✅ Landed 2026-05-04                                                             |
+| Security (JWT)           | JWT in `localStorage` reused by AI proxy — XSS exfiltration target; migration to httpOnly cookie or proxy-scoped token                                                                                                                     | —           | ⏳ Not addressed                                                                 |
+| Backend                  | Vercel `api/ai/[route].ts` proxy with provider abstraction                                                                                                                                                                                 | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime) |
 
 ---
 
@@ -234,9 +236,65 @@ Two commits on this branch land the following (see also the follow-up note below
   removing the cards from the DOM when no callback is supplied. All 911 tests
   in the suite pass; `tsc --noEmit` is clean.
 
+### 2026-05-04 follow-up — v2.1 chat migration + triage nudges (`claude/audit-jira-ai-features-Zo97c`)
+
+**Chat path migrated to SSE streaming agent; triage-agent wired for background nudges**
+
+**File inventory**
+
+- `src/utils/hooks/useAgentChat.ts` _(new)_ — adapter hook that wraps
+  `useAgent("chat-agent")` and exposes a `useAiChat`-compatible interface
+  (`messages`, `streamingText`, `isLoading`, `error`, `send`, `abort`, `reset`,
+  `dismissError`) plus v2.1 additions (`pendingProposal`, `pendingNudges`,
+  `citations`, `resumeProposal`, `dismissNudge`). Tool-trace bubbles
+  ("Checked projects · …") are synthesized from `pendingInterrupt` events via a
+  `humanizeTool` map; the fallback for an unrecognized tool name is
+  "Looked up evidence" (acceptable simplification per the spec).
+- `src/utils/hooks/useAgentChat.test.tsx` _(new)_ — 15 tests covering the
+  adapter's message mapping, streaming extraction, proposal/nudge surfacing, and
+  error handling.
+- `src/components/aiChatDrawer/index.tsx` _(modified)_ — both hooks are mounted
+  unconditionally to satisfy React's hook ordering rules; only one drives the UI:
+    - `aiUseLocalEngine === true` → `useAiChat` (deterministic local engine,
+      unchanged behavior).
+    - `aiUseLocalEngine === false` (remote build) → `useAgentChat` (SSE streaming
+      via `streamAgent`).
+    - The agent's `pendingProposal`, `pendingNudges`, and `citations` are piped
+      directly into the existing card render path (no new props needed).
+    - Adds a defensive `QueryClientProvider` fallback wrapping the drawer body so
+      legacy test sandboxes that mount the drawer without a `QueryClient` context
+      do not crash.
+- `src/pages/board.tsx` _(modified)_ — mounts `useAgent("triage-agent", …)`
+  unconditionally (hook-ordering rule) but only starts the agent when all of the
+  following are true: `boardAiOn`, `!environment.aiUseLocalEngine`, and the chat
+  drawer has just been opened for the first time for this `projectId` in the
+  current app session (tracked via `triagedProjectsRef`). `agent.nudges` is fed
+  to `<AiChatDrawer pendingNudges={…} />` only in remote mode.
+
+**Routing rule**
+
+```
+aiUseLocalEngine === true  →  useAiChat   (local deterministic engine, JSON)
+aiUseLocalEngine === false →  useAgentChat (remote SSE via streamAgent)
+```
+
+**Triage trigger semantics**
+
+`useAgent("triage-agent")` is mounted in `BoardPage` regardless of mode. The
+effect that calls `triageAgent.start(…)` fires only when `chatOpen` becomes
+true, `boardAiOn` is true, `aiUseLocalEngine` is false, and the current
+`projectId` has not yet been added to `triagedProjectsRef`. The set persists for
+the lifetime of the app session (in-memory `useRef`), so the triage run fires at
+most once per `(projectId, browser session)`. An `AgentForbiddenError` (per-
+project AI opt-out) is caught and swallowed silently; it also surfaces via
+`triageAgent.error` for observability.
+
+**Test counts after both changes**: 138 suites / 926 tests (was 137 / 911).
+`tsc --noEmit` is clean.
+
 ### Test coverage
 
-- 76 suites, 340 tests (prior to `a2d1adc`); `a2d1adc` adds 1 suite and 31 tests.
+- 76 suites, 340 tests (prior to `a2d1adc`); `a2d1adc` adds 1 suite and 31 tests; the v2.1 chat migration + triage-nudge changes bring the total to **138 suites / 926 tests**.
 - Coverage on the runtime AI scope: **97% statements / 92.37% branches / 97% functions / 97.84% lines**.
 - New test files:
     - `src/utils/ai/{engine,keywords,storyPoints,validate,chatEngine,chatTools}.test.ts`
@@ -302,24 +360,12 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
   defined in `src/constants/analytics.ts` (`COPILOT_REWRITE_ACCEPT`, `AGENT_HEALTH_DEGRADED`,
   `nudge.*`, `palette.*`, etc.) are never fired. Wire each call site and add server-side
   counters; full measurement lands with the proxy.
-- **v2.1 UI surface — `useAgent` mount point**: `useAgentHealth` is mounted in
-  the header (status dot). `MutationProposalCard` and `NudgeCard` are fully wired
-  in `aiChatDrawer` via parent-controlled callbacks (`onAcceptProposal`,
-  `onRejectProposal`, `onActionNudge`, `onDismissNudge`) with a local-dismiss
-  fallback (landed 2026-05-04 on `claude/audit-jira-ai-features-Zo97c`). What is
-  still missing: a production driver that actually opens a v2.1 SSE stream.
-  `useAgent` and `agentClient.streamAgent`/`invokeAgent`/`listAgents` are
-  implemented and unit-tested but have **zero non-test callers**. To light the
-  path up end-to-end:
-    - Decide trigger surface and product timing (e.g., open `useAgent("triage-agent")`
-      when the chat drawer opens, or expose a "Run check" CTA in `BoardBriefDrawer`).
-      Mounting on every page load would burn LLM tokens; gate behind an env flag
-      or a user-initiated CTA.
-    - Wire the agent's `pendingProposal` / `pendingNudges` / `clearPendingProposal`
-      to the new `AiChatDrawer` props, and the four callbacks to `agent.resume(...)`.
-    - Optional: collapse `useAi`/`useAiChat` onto `streamAgent` (per the
-      `useAi.ts:206` `TODO(v2.x)` comment). This is a larger refactor — the v1
-      shim remains the supported chat path until that lands.
+- **`useAi` REST-route migration to streaming agents**: the chat path is now on
+  `useAgentChat` / SSE in remote builds (landed 2026-05-04). The remaining six
+  structured routes — `task-draft`, `task-breakdown`, `estimate`, `readiness`,
+  `board-brief`, and `search` — still use `useAi` / v1 JSON `fetch` (see the
+  `useAi.ts:206` `TODO(v2.x)` comment). Migrating these to `streamAgent` is a
+  substantial follow-up that touches every AI feature surface.
 - **JWT security**: the primary-bearer JWT is stored in `localStorage` and reused
   verbatim by the AI proxy (`src/utils/aiAuthHeader.ts`). This is an XSS exfiltration
   target. Migrate to an httpOnly cookie or scope the AI proxy to a short-lived
@@ -331,8 +377,8 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 
 ### Optional polish
 
-- **SSE / streaming** for chat and structured routes if you want parity with PRD §7.1 (today: synchronous local engine + JSON `fetch` for remote).
-- **`useAi.ts` type union:** PRD lists `chat` and `search` on `AiRoute`; implementation keeps chat in `useAiChat` and structured routes in `useAi` — fine, but document or consolidate if desired.
+- **SSE / streaming for structured routes**: the chat path uses SSE via `useAgentChat` in remote builds (landed 2026-05-04). The six structured routes (`task-draft`, `task-breakdown`, `estimate`, `readiness`, `board-brief`, `search`) still use synchronous local engine + JSON `fetch` for remote; streaming parity for these is tracked as a substantial follow-up above.
+- **`useAi.ts` type union:** PRD lists `chat` and `search` on `AiRoute`; implementation keeps chat in `useAgentChat`/`useAiChat` and structured routes in `useAi` — fine, but document or consolidate if desired.
 
 ---
 
@@ -345,7 +391,7 @@ CI=true npm test -- --watchAll=false --runInBand --coverage --coverageReporters=
 npx vite build
 ```
 
-Expected: lint clean, ≥97% statement coverage, build succeeds. As of 2026-05-04: 137 suites / 911 tests (includes the 31 axe tests from `a2d1adc` and the four new card-wiring tests from `28abca2`).
+Expected: lint clean, ≥97% statement coverage, build succeeds. As of 2026-05-04: 138 suites / 926 tests (includes the 31 axe tests from `a2d1adc`, the four new card-wiring tests from `28abca2`, and the 15 new `useAgentChat` adapter tests plus additional drawer tests from the chat-migration commit).
 
 To exercise Board Copilot in the browser:
 
