@@ -53,7 +53,7 @@ Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-flash`, 
 The subagent must never run with the *exact same* model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
 
 1. Step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT). Keep the reasoning budget appropriate for the subtask.
-2. If the platform offers only "same model" or one dedicated subagent model (e.g. Cursor's Composer), pick the dedicated subagent model.
+2. On Cursor, choose Composer.
 3. If no acceptable lower tier exists, keep the orchestrator's model but drop the reasoning budget by at least one level (e.g. high → medium).
 4. Escalation override: if the subtask itself is integration-sensitive and steps 1–2 would degrade quality unacceptably, fall back to step 3.
 
