@@ -195,6 +195,10 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             if (!issue.suggestion) return;
             const previous = values[issue.field];
             onApplySuggestion(issue.field, issue.suggestion);
+            track(ANALYTICS_EVENTS.COPILOT_REWRITE_ACCEPT, {
+                field: issue.field,
+                taskId: projectId
+            });
             undoToast.show({
                 description: `Updated ${issue.field}.`,
                 analyticsTag: "copilot.readiness.apply",
@@ -205,7 +209,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 }
             });
         },
-        [onApplySuggestion, undoToast, values]
+        [onApplySuggestion, projectId, undoToast, values]
     );
 
     const handleRegenerate = useCallback(() => {

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { pingAgent } from "../ai/agentHealth";
 
 export type AgentHealthStatus = "ok" | "degraded" | "offline";
@@ -27,15 +28,45 @@ const classify = (ok: boolean, latencyMs: number): AgentHealthStatus => {
  */
 const useAgentHealth = (
     baseUrl: string,
-    opts: { intervalMs?: number; enabled?: boolean } = {}
+    opts: { intervalMs?: number; enabled?: boolean; agentName?: string } = {}
 ): UseAgentHealthState => {
     const interval = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
     const enabled = opts.enabled !== false && baseUrl.length > 0;
+    const agentName = opts.agentName ?? "unknown";
     const [state, setState] = useState<UseAgentHealthState>({
         status: enabled ? "degraded" : "offline",
         latencyMs: -1,
         lastChecked: null
     });
+
+    /**
+     * Track the last status we fired AGENT_HEALTH_DEGRADED for so we only
+     * emit once per transition into a degraded/offline state (P2-5).
+     * Null until the first real probe completes so the pre-probe synthetic
+     * "degraded" initial state does not trigger the event.
+     */
+    const lastFiredStatusRef = useRef<AgentHealthStatus | null>(null);
+
+    // Fire AGENT_HEALTH_DEGRADED once per transition into degraded/offline,
+    // but only after a real probe has completed (lastChecked !== null).
+    useEffect(() => {
+        const { status, lastChecked } = state;
+        // Ignore the synthetic pre-probe state — wait for a real result.
+        if (lastChecked === null) return;
+        if (status === "degraded" || status === "offline") {
+            if (lastFiredStatusRef.current !== status) {
+                lastFiredStatusRef.current = status;
+                track(ANALYTICS_EVENTS.AGENT_HEALTH_DEGRADED, {
+                    status,
+                    agentName
+                });
+            }
+        } else {
+            // Reset dedup ref when back to healthy so a future degradation
+            // fires again.
+            lastFiredStatusRef.current = null;
+        }
+    }, [agentName, state]);
 
     useEffect(() => {
         if (!enabled) return;

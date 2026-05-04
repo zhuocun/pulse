@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useEffect } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import AiTaskAssistPanel from ".";
 
 const installAntdMocks = () => {
@@ -217,6 +218,30 @@ describe("AiTaskAssistPanel", () => {
     // `error`. The previous in-suite test relied on a fetch mock, but the
     // local engine bypasses fetch, so `error` was never set and the test could
     // not pass. Removed in favour of the dedicated mock-based test.
+
+    it("fires COPILOT_REWRITE_ACCEPT when a readiness Apply button is clicked", async () => {
+        const tracked: Array<[string, Record<string, unknown> | undefined]> =
+            [];
+        const previous = setAnalyticsSink((event, payload) => {
+            tracked.push([event, payload]);
+        });
+        try {
+            mountPanel({ values: { taskName: "Hi" } });
+            jest.advanceTimersByTime(1000);
+            const button = await screen.findByLabelText(
+                /Apply readiness suggestion for taskName/
+            );
+            fireEvent.click(button);
+        } finally {
+            setAnalyticsSink(previous);
+        }
+
+        const rewriteCalls = tracked.filter(
+            ([e]) => e === ANALYTICS_EVENTS.COPILOT_REWRITE_ACCEPT
+        );
+        expect(rewriteCalls).toHaveLength(1);
+        expect(rewriteCalls[0][1]).toMatchObject({ field: "taskName" });
+    });
 
     it("re-runs suggestions when board context arrives after the panel mounts", async () => {
         const queryClient = new QueryClient({

@@ -109,6 +109,8 @@ interface ApplyStreamPartHandlers {
     setPendingProposal: (proposal: MutationProposal | null) => void;
     setCitations: (refs: CitationRef[]) => void;
     setNudges: (nudge: TriageNudge) => void;
+    /** Write the latest token counts into a ref so AGENT_TURN_COMPLETED can read them. */
+    setLastUsageRef: (usage: { tokensIn: number; tokensOut: number }) => void;
     autoResume: boolean;
     ctx: FeToolContext;
 }
@@ -164,6 +166,10 @@ const applyStreamPart = async (
                             tokensOut: event.tokensOut
                         }
                     }));
+                    handlers.setLastUsageRef({
+                        tokensIn: event.tokensIn,
+                        tokensOut: event.tokensOut
+                    });
                     return undefined;
                 case "nudge":
                     handlers.setNudges(event.nudge);
@@ -251,6 +257,10 @@ const useAgent = (
     const ttftSeenRef = useRef(false);
     const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastChunkAtRef = useRef<number | null>(null);
+    /** Latest token counts from the "usage" custom event — read at AGENT_TURN_COMPLETED. */
+    const lastUsageRef = useRef<{ tokensIn: number; tokensOut: number } | null>(
+        null
+    );
 
     const clearWatchdog = useCallback(() => {
         if (watchdogRef.current !== null) {
@@ -340,6 +350,9 @@ const useAgent = (
                         setNudges: (n) =>
                             mountedRef.current &&
                             setNudges((prev) => [...prev, n]),
+                        setLastUsageRef: (usage) => {
+                            lastUsageRef.current = usage;
+                        },
                         autoResume: autoResumeRef.current,
                         ctx
                     });
@@ -370,6 +383,10 @@ const useAgent = (
             ttftSeenRef.current = false;
             if (mountedRef.current) setTtftMs(null);
 
+            // Observability P2-5: fire AGENT_TURN_STARTED when the stream opens.
+            lastUsageRef.current = null;
+            track(ANALYTICS_EVENTS.AGENT_TURN_STARTED, { agentName: name });
+
             const baseCtx: FeToolContext = {
                 queryClient,
                 projectId: options.projectId,
@@ -378,6 +395,7 @@ const useAgent = (
                 ...(options.feToolContext ?? {})
             };
 
+            let turnErrored = false;
             try {
                 let nextBody = body;
                 // Auto-resume loop: if the agent interrupts with a known FE
@@ -403,9 +421,39 @@ const useAgent = (
                 }
             } catch (err) {
                 // already surfaced
+                turnErrored = true;
                 void err;
             } finally {
                 clearWatchdog();
+                // Observability P2-5: fire AGENT_TURN_COMPLETED on natural
+                // completion or terminal error. Do NOT fire on aborts
+                // (user-initiated, not turn outcomes).
+                if (!controller.signal.aborted) {
+                    const durationMs =
+                        streamStartRef.current !== null
+                            ? Math.round(
+                                  performance.now() - streamStartRef.current
+                              )
+                            : 0;
+                    // Usage is captured via the "usage" custom event and
+                    // stored in lastUsageRef so it's readable here in the
+                    // finally block without closure-staleness issues.
+                    const usageSnap = lastUsageRef.current as {
+                        tokensIn: number;
+                        tokensOut: number;
+                    } | null;
+                    const tokensIn =
+                        usageSnap !== null ? usageSnap.tokensIn : 0;
+                    const tokensOut =
+                        usageSnap !== null ? usageSnap.tokensOut : 0;
+                    track(ANALYTICS_EVENTS.AGENT_TURN_COMPLETED, {
+                        agentName: name,
+                        durationMs,
+                        tokensIn,
+                        tokensOut,
+                        ...(turnErrored ? { error: true } : {})
+                    });
+                }
                 if (
                     mountedRef.current &&
                     controllerRef.current === controller
