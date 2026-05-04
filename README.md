@@ -49,10 +49,12 @@ Board Copilot has two backends:
 
 ### Environment variables
 
-| Variable                | Default | Effect                                                                                                                            |
-| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `REACT_APP_AI_ENABLED`  | `true`  | Set to `false` at build time to hide every AI surface and bypass the hook. Also supports `VITE_AI_ENABLED` (see Vite note below). |
-| `REACT_APP_AI_BASE_URL` | empty   | When non-empty, AI calls go to `${...}/api/ai/<route>`. Empty = local engine. Also supports `VITE_AI_BASE_URL`.                   |
+| Variable                     | Default | Effect                                                                                                                                                                                                                                                                      |
+| ---------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REACT_APP_AI_ENABLED`       | `true`  | Set to `false` at build time to hide every AI surface and bypass the hook. Also supports `VITE_AI_ENABLED` (see Vite note below).                                                                                                                                           |
+| `REACT_APP_AI_BASE_URL`      | empty   | When non-empty, AI calls go to `${...}/api/ai/<route>`. Empty = local engine. Also supports `VITE_AI_BASE_URL`. Validated at module load: `javascript:`, `file:`, `data:`, and malformed URLs are rejected and fall back to the local engine. Trailing slashes are trimmed. |
+| `VITE_ANALYTICS_ENDPOINT`    | empty   | Full URL for batched analytics POSTs. When set, the observability sink is wired automatically from `src/index.tsx`.                                                                                                                                                         |
+| `VITE_ERROR_REPORT_ENDPOINT` | empty   | Full URL for error event POSTs. When set, `ErrorBoundary` reports caught errors to this endpoint.                                                                                                                                                                           |
 
 Vite inlines `process.env.REACT_APP_*` at build time via `vite.config.ts`. You may use `VITE_AI_BASE_URL` / `VITE_AI_ENABLED` in `.env` files as aliases; they map to the same client bundle flags.
 
@@ -70,12 +72,12 @@ For the **v2.1 redesign** of the AI features — named LangGraph agents over the
 
 Phase A wires the FE plumbing for the v2.1 agent without changing the v1 surfaces:
 
-- **LangGraph v2 streaming client** at `src/utils/ai/agentClient.ts` parses Server-Sent `StreamPart` events (`updates`, `messages`, `custom`, `interrupt`, `error`) and maps non-OK responses to typed errors (`AgentTransportError`, `AgentAuthError`, `AgentRateLimitError`, `AgentBudgetError`, `AgentNotFoundError`, `AgentServerError`). The wire types are in `src/interfaces/agent.d.ts`.
-- **FE tool registry** at `src/utils/ai/feTools/` exposes 11 read-only tools (`fe.listProjects`, `fe.boardSnapshot`, `fe.viewerContext`, …) backed by the existing React Query cache. They are invoked when the agent emits an `interrupt` event whose tool is in the registry.
-- **`useAgent` hook** at `src/utils/hooks/useAgent.ts` drives a turn end-to-end, reduces stream parts into UI state, persists `thread_id` per `(name, project)`, and auto-resumes on FE-tool interrupts.
+- **LangGraph v2 streaming client** at `src/utils/ai/agentClient.ts` parses Server-Sent `StreamPart` events (`updates`, `messages`, `custom`, `interrupt`, `error`) and maps non-OK responses to typed errors (`AgentTransportError`, `AgentAuthError`, `AgentRateLimitError`, `AgentBudgetError`, `AgentNotFoundError`, `AgentServerError`). Sends `Idempotency-Key` on every request. The wire types are in `src/interfaces/agent.d.ts`.
+- **FE tool registry** at `src/utils/ai/feTools/` exposes 11 read-only tools (`fe.listProjects`, `fe.boardSnapshot`, `fe.viewerContext`, …) backed by the existing React Query cache. Tool args use snake_case (`task_id`, `project_id`) to match BE schemas. They are invoked when the agent emits an `interrupt` event whose tool is in the registry.
+- **`useAgent` hook** at `src/utils/hooks/useAgent.ts` drives a turn end-to-end, reduces stream parts into UI state, persists `thread_id` per `(name, project)`, and auto-resumes on FE-tool interrupts. `start()` enforces per-project AI opt-out before opening the SSE stream.
 - **Command palette** at `src/components/commandPalette/` opens with `Cmd/Ctrl+K`, indexes the cache for navigation, and renders an ARIA combobox + listbox. AI mode (`Tab` / `/` prefix) shows a Phase E placeholder.
 - **Autonomy level** persisted via `useAutonomyLevel` (in `src/utils/hooks/useAiEnabled.ts`) under `boardCopilot:autonomy` (`suggest` / `plan` / `auto`, default `plan`). The legacy `useAiEnabled` toggle is unchanged.
-- **Analytics constants** at `src/constants/analytics.ts` (events `agent.*`, `nudge.*`, `palette.*`, `agent.feedback.*`).
+- **Analytics constants** at `src/constants/analytics.ts` (events `agent.*`, `nudge.*`, `palette.*`, `agent.feedback.*`). Observability sinks at `src/utils/observability/sinks.ts` — configure `VITE_ANALYTICS_ENDPOINT` and `VITE_ERROR_REPORT_ENDPOINT` to enable production event collection.
 
 ### Environment
 

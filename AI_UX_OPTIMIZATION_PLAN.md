@@ -1,6 +1,6 @@
 # Board Copilot AI UX Audit and Optimization Plan
 
-Updated: 2026-05-02
+Updated: 2026-05-04
 
 This document audits the current `jira-react-app` Board Copilot implementation
 against current AI UI/UX best practices and red flags from Google PAIR,
@@ -92,8 +92,10 @@ governance, consistency, and agent-readiness**:
 5. Some AI writes have incomplete undo/revert semantics.
 6. Agentic infrastructure exists but is not integrated into product surfaces,
    which creates future risk if shipped partially.
-7. Analytics constants exist, but `track` is still a no-op, so trust and safety
-   UX cannot be measured.
+7. Analytics constants exist; observability sinks (`httpAnalyticsSink`, `httpErrorSink`,
+   `devMemorySink`) were added 2026-05-04 (`src/utils/observability/sinks.ts`) and wired
+   from `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`.
+   Individual `track()` call sites still need to be wired to these sinks.
 8. AI entry points remain fragmented across header, board header, filters,
    modals, drawers, and command palette.
 
@@ -427,7 +429,8 @@ synonyms, negation, or analytical questions.
 - Chat feedback is only thumbs up/down in
   `src/components/aiChatDrawer/index.tsx:385-397` and
   `src/components/aiChatDrawer/index.tsx:653-686`.
-- `track` is a no-op in `src/constants/analytics.ts:43-50`.
+- `track` call sites are not yet wired to the observability sinks added 2026-05-04
+  (`VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`; see `src/utils/observability/sinks.ts`).
 - Feedback toast says only "Thanks for your feedback" via
   `src/constants/microcopy.ts:189-190`.
 
@@ -773,33 +776,28 @@ chat response.
 
 ---
 
-### P2-5: Observability is not actionable yet
+### P2-5: Observability sinks added; call-site wiring remains open
+
+**Resolved (2026-05-04):** `src/utils/observability/sinks.ts` exports
+`httpAnalyticsSink`, `httpErrorSink`, and `devMemorySink`. Wired from
+`src/index.tsx` via `VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`.
+`ErrorBoundary.componentDidCatch` now reports to the error sink. Every analytics
+event includes `engineMode: "local" | "remote"`.
 
 **Best-practice violation:** no measurement of trust, error recovery, or safety.
 
-**Evidence**
+**Remaining evidence**
 
-- Analytics events are defined in `src/constants/analytics.ts:9-38`.
-- `track` is a no-op in `src/constants/analytics.ts:43-50`.
 - `AGENT_TTFT`, `CITATION_CLICKED`, `CITATION_FLAGGED`, and
-  `COPILOT_REWRITE_ACCEPT` are not meaningfully connected to a sink.
+  `COPILOT_REWRITE_ACCEPT` call sites in `src/constants/analytics.ts` still need
+  to be forwarded to the sink (the infrastructure is in place; the wiring at each
+  event emission point is not yet done).
 
-**Optimization plan**
+**Remaining optimization plan**
 
-1. Implement a privacy-preserving analytics adapter.
-2. Track:
-    - time to first visible status,
-    - time to final answer,
-    - retry rate,
-    - stop rate,
-    - regeneration rate,
-    - apply/undo rate,
-    - low-confidence apply-anyway rate,
-    - citation click rate,
-    - feedback categories,
-    - project/global AI disable rate.
-3. Do not send raw prompts, notes, task names, or generated answers.
-4. Add a local debug console sink in development for QA.
+1. Wire existing `track()` call sites to `httpAnalyticsSink`.
+2. Confirm: do not send raw prompts, notes, task names, or generated answers.
+3. Use `devMemorySink` for QA (inspect `window.__copilotEvents__` in the browser console).
 
 **Acceptance criteria**
 
@@ -955,7 +953,12 @@ Add tests for:
 
 ### Accessibility tests
 
-- `jest-axe` for every AI component.
+- `jest-axe` for every AI component — **resolved 2026-05-04**: 31 axe tests added in
+  `src/__tests__/aiAccessibility.strict.test.tsx` covering AiChatDrawer (3 states),
+  AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput, NudgeCard (3
+  severities), MutationProposalCard, CommandPalette, EngineModeTag, CitationChip (4
+  sources), AiMatchStrengthBadge. Real WCAG 4.1.2 violation in `AiMatchStrengthBadge`
+  compact mode fixed (`role="img"` added).
 - Keyboard-only flow:
     - open command palette,
     - switch to Copilot mode,
@@ -979,20 +982,20 @@ Add tests for:
 
 ## 8. Source mapping to AI UX best practices
 
-| Best practice / red flag          | Current status     | Plan sections     |
-| --------------------------------- | ------------------ | ----------------- |
-| Visible AI involvement            | Mostly strong      | Preserve; 3.1     |
-| User control / undo               | Good but uneven    | P1-4, P1-5        |
-| Privacy and data-use clarity      | Needs correction   | P0-1, P0-2        |
-| Claim-level verification          | Partial            | P0-3, P1-1        |
-| Confidence calibration            | Partial            | P2-1              |
-| Avoid misleading affordances      | Needs copy cleanup | P1-2, P2-4        |
-| Feedback loops                    | Too shallow        | P1-3, P2-5        |
-| Graceful failure                  | Mostly good        | Continue in tests |
-| Avoid anthropomorphism            | Mostly good        | P2-3              |
-| Avoid half-wired agentic features | Needs governance   | P1-7, Phase 5     |
-| Accessibility of dynamic AI UI    | Improving          | Test plan         |
-| Measurement and monitoring        | Not actionable     | P2-5              |
+| Best practice / red flag          | Current status                                  | Plan sections     |
+| --------------------------------- | ----------------------------------------------- | ----------------- |
+| Visible AI involvement            | Mostly strong                                   | Preserve; 3.1     |
+| User control / undo               | Good but uneven                                 | P1-4, P1-5        |
+| Privacy and data-use clarity      | Needs correction                                | P0-1, P0-2        |
+| Claim-level verification          | Partial                                         | P0-3, P1-1        |
+| Confidence calibration            | Partial                                         | P2-1              |
+| Avoid misleading affordances      | Needs copy cleanup                              | P1-2, P2-4        |
+| Feedback loops                    | Too shallow                                     | P1-3, P2-5        |
+| Graceful failure                  | Mostly good                                     | Continue in tests |
+| Avoid anthropomorphism            | Mostly good                                     | P2-3              |
+| Avoid half-wired agentic features | Needs governance                                | P1-7, Phase 5     |
+| Accessibility of dynamic AI UI    | jest-axe done (2026-05-04)                      | Test plan         |
+| Measurement and monitoring        | Sinks added (2026-05-04); call-site wiring open | P2-5              |
 
 ---
 
