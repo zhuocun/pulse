@@ -1,11 +1,11 @@
 /* eslint-disable global-require */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useColorScheme from "../../utils/hooks/useColorScheme";
-import resetRoute from "../../utils/resetRoute";
 
 import Header from ".";
 
@@ -24,7 +24,13 @@ jest.mock("../../assets/logo-software.svg?react", () => {
 jest.mock("../../utils/hooks/useAuth");
 jest.mock("../../utils/hooks/useAiEnabled");
 jest.mock("../../utils/hooks/useColorScheme");
-jest.mock("../../utils/resetRoute");
+jest.mock("react-router", () => {
+    const actual = jest.requireActual("react-router");
+    return {
+        ...actual,
+        useNavigate: jest.fn()
+    };
+});
 jest.mock("../memberPopover", () => {
     const React = require("react");
 
@@ -41,7 +47,9 @@ const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
 const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
     typeof useColorScheme
 >;
-const mockedResetRoute = resetRoute as jest.MockedFunction<typeof resetRoute>;
+const mockedUseNavigate = useNavigate as jest.MockedFunction<
+    typeof useNavigate
+>;
 
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
@@ -78,6 +86,8 @@ const renderHeader = (
     colorScheme?: Partial<ReturnType<typeof useColorScheme>>
 ) => {
     const logout = jest.fn();
+    const navigate = jest.fn();
+    mockedUseNavigate.mockReturnValue(navigate);
 
     mockedUseAuth.mockReturnValue({
         logout,
@@ -106,7 +116,7 @@ const renderHeader = (
         </BrowserRouter>
     );
 
-    return { logout };
+    return { logout, navigate };
 };
 
 describe("Header", () => {
@@ -132,24 +142,26 @@ describe("Header", () => {
         expect(screen.getByText(/hi, alice/i)).toBeInTheDocument();
     });
 
-    it("resets to projects when the logo is clicked outside the projects list", () => {
-        renderHeader("/projects/p1/board");
+    it("navigates to projects with viewTransition when the logo is clicked outside the projects list", () => {
+        const { navigate } = renderHeader("/projects/p1/board");
 
         fireEvent.click(
             screen.getByRole("button", { name: /go to projects/i })
         );
 
-        expect(mockedResetRoute).toHaveBeenCalledTimes(1);
+        expect(navigate).toHaveBeenCalledWith("/projects", {
+            viewTransition: true
+        });
     });
 
-    it("does not reset when already on the projects list", () => {
-        renderHeader("/projects");
+    it("does not navigate when already on the projects list", () => {
+        const { navigate } = renderHeader("/projects");
 
         fireEvent.click(
             screen.getByRole("button", { name: /go to projects/i })
         );
 
-        expect(mockedResetRoute).not.toHaveBeenCalled();
+        expect(navigate).not.toHaveBeenCalled();
     });
 
     it("prevents default navigation from the account trigger", () => {
@@ -161,7 +173,7 @@ describe("Header", () => {
     it("calls logout from the account dropdown", async () => {
         const { logout } = renderHeader();
 
-        fireEvent.mouseEnter(accountTrigger());
+        fireEvent.click(accountTrigger());
 
         fireEvent.click(
             await screen.findByRole("button", { name: /^log out$/i })
@@ -175,7 +187,7 @@ describe("Header", () => {
     it("renders the Board Copilot toggle inside the account menu when AI is available", async () => {
         renderHeader();
 
-        fireEvent.mouseEnter(accountTrigger());
+        fireEvent.click(accountTrigger());
 
         expect(
             await screen.findByRole("switch", {
@@ -191,7 +203,7 @@ describe("Header", () => {
             setEnabled: jest.fn()
         });
 
-        fireEvent.mouseEnter(accountTrigger());
+        fireEvent.click(accountTrigger());
         await screen.findByRole("switch", { name: /toggle dark mode/i });
 
         expect(
@@ -207,7 +219,7 @@ describe("Header", () => {
             setEnabled
         });
 
-        fireEvent.mouseEnter(accountTrigger());
+        fireEvent.click(accountTrigger());
         const switchEl = await screen.findByRole("switch", {
             name: /enable board copilot/i
         });
@@ -224,7 +236,7 @@ describe("Header", () => {
             setPreference
         });
 
-        fireEvent.mouseEnter(accountTrigger());
+        fireEvent.click(accountTrigger());
         fireEvent.click(
             await screen.findByRole("switch", { name: /toggle dark mode/i })
         );
