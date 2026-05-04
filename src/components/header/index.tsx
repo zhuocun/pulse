@@ -248,6 +248,12 @@ const BrandLink = styled(NoPaddingButton)`
         padding: 0;
     }
 
+    @media (pointer: coarse) {
+        && {
+            height: 44px;
+        }
+    }
+
     /* On the narrowest viewports there isn't room for the wordmark beside
      * the projects popover; the brand collapses to its glyph. */
     @media (max-width: ${breakpoints.sm - 1}px) {

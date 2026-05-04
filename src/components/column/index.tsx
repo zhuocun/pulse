@@ -265,8 +265,8 @@ const ColumnHeader = styled(Row)`
     @media (pointer: coarse) {
         > button:last-child,
         > div:last-child > button {
-            min-height: 32px;
-            min-width: 32px;
+            min-height: 44px;
+            min-width: 44px;
         }
     }
 `;

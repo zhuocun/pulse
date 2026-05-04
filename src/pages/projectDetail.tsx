@@ -208,7 +208,7 @@ const ProjectDetailPage = () => {
     useEffect(() => {
         if (pError || isNotFound) return;
         if (!pathname.endsWith("/board")) {
-            navigate("board");
+            navigate("board", { viewTransition: true });
         }
     }, [navigate, pathname, pError, isNotFound]);
 

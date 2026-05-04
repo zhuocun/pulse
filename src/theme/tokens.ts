@@ -258,7 +258,7 @@ export const pageMaxWidthRem = 88;
  */
 export const modalGutterPx = space.md * 2; // 16 px each side
 export const modalWidthCss = (max: number) =>
-    `min(${max}px, calc(100vw - ${modalGutterPx}px))`;
+    `min(${max}px, calc(100dvw - ${modalGutterPx}px))`;
 
 /**
  * Monochromatic gradient palette for user / project avatars — derived from
