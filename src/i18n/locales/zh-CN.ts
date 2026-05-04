@@ -486,7 +486,12 @@ const zhCN: Dictionary = {
         reviewAndEdit: "创建前请审核并编辑",
         pickSubtasks: "选择您要创建的子任务",
         breakdownAxisInfo: "维度:{label}",
-        bulkProgressFormat: "{current} / {total}"
+        bulkProgressFormat: "{current} / {total}",
+        autonomyLabel: "Copilot 模式",
+        autonomyLevelSuggest: "建议",
+        autonomyLevelPlan: "计划",
+        autonomyLevelAuto: "自动",
+        autonomySelectorAriaLabel: "选择 Copilot 自主模式"
     },
     auth: {
         loginTitle: "登录账号",

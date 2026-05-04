@@ -7,6 +7,7 @@ import {
     Drawer,
     Grid,
     Input,
+    Select,
     Skeleton,
     Space,
     Tag,
@@ -36,7 +37,12 @@ import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
-import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
+import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
+import type {
+    AutonomyLevel,
+    MutationProposal,
+    TriageNudge
+} from "../../interfaces/agent";
 import AiFeedbackPopover, {
     type AiFeedbackSubmission
 } from "../aiFeedbackPopover";
@@ -275,6 +281,12 @@ const CITATION_INLINE_LIMIT = 6;
  */
 const fallbackQueryClient = new QueryClient();
 
+const AUTONOMY_OPTIONS: Array<{ value: AutonomyLevel; labelKey: string }> = [
+    { value: "suggest", labelKey: "autonomyLevelSuggest" },
+    { value: "plan", labelKey: "autonomyLevelPlan" },
+    { value: "auto", labelKey: "autonomyLevelAuto" }
+];
+
 const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     open,
     onClose,
@@ -291,6 +303,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     onActionNudge,
     onDismissNudge
 }) => {
+    const { level: autonomyLevel, setLevel: setAutonomyLevel } =
+        useAutonomyLevel();
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
     /**
@@ -771,6 +785,23 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         <Drawer
             extra={
                 <Space size={space.xs}>
+                    <Select
+                        aria-label={
+                            microcopy.ai.autonomySelectorAriaLabel as string
+                        }
+                        onChange={(value: AutonomyLevel) =>
+                            setAutonomyLevel(value)
+                        }
+                        options={AUTONOMY_OPTIONS.map((opt) => ({
+                            value: opt.value,
+                            label: microcopy.ai[
+                                opt.labelKey as keyof typeof microcopy.ai
+                            ] as string
+                        }))}
+                        size="small"
+                        style={{ minWidth: 90 }}
+                        value={autonomyLevel}
+                    />
                     <CopilotPrivacyPopover route="chat" />
                     <Button
                         aria-label={microcopy.ai.newConversation}

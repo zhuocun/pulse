@@ -280,6 +280,92 @@ describe("useAgent", () => {
         });
     });
 
+    it("surfaces a suggestion event as lastSuggestion and clears it via clearSuggestion", async () => {
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "custom",
+                    ns: ["root"],
+                    data: {
+                        kind: "suggestion",
+                        surface: "brief",
+                        payload: { summary: "Sprint is at capacity." }
+                    }
+                }
+            ])
+        );
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("board-brief-agent", { projectId: "p1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start("generate brief");
+        });
+
+        await waitFor(() => {
+            expect(result.current.lastSuggestion).toEqual({
+                surface: "brief",
+                payload: { summary: "Sprint is at capacity." }
+            });
+        });
+
+        act(() => {
+            result.current.clearSuggestion();
+        });
+
+        expect(result.current.lastSuggestion).toBeNull();
+    });
+
+    it("resets lastSuggestion at the start of every new turn", async () => {
+        mockedStream
+            .mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "suggestion",
+                            surface: "estimate",
+                            payload: { points: 5 }
+                        }
+                    }
+                ])
+            )
+            .mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "Done." }, {}]
+                    }
+                ])
+            );
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("task-estimation-agent", { projectId: "p1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start("estimate task");
+        });
+
+        await waitFor(() => {
+            expect(result.current.lastSuggestion?.surface).toBe("estimate");
+        });
+
+        await act(async () => {
+            await result.current.start("second turn");
+        });
+
+        // Second start() must reset lastSuggestion before the new stream begins.
+        await waitFor(() => {
+            expect(result.current.lastSuggestion).toBeNull();
+        });
+    });
+
     it("resets citations and nudges at the start of every new turn", async () => {
         // First turn emits one citation and one nudge.
         mockedStream
