@@ -680,14 +680,15 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
         return (
             <Drawer
                 destroyOnClose
-                height="65dvh"
+                height="65vh"
                 onClose={onClose}
                 open={open}
                 placement="bottom"
                 styles={{
                     body: {
                         paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`
-                    }
+                    },
+                    wrapper: { height: "65dvh" }
                 }}
                 title={titleNode}
             >
