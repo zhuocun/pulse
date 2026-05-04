@@ -20,8 +20,8 @@ const ContentContainer = styled.div`
      * Safari URL bar collapses. The vh declaration stays as a fallback. */
     max-height: 60vh;
     max-height: 60dvh;
-    max-width: min(22rem, calc(100vw - ${modalGutterPx}px));
-    min-width: min(18rem, calc(100vw - ${modalGutterPx}px));
+    max-width: min(22rem, calc(100dvw - ${modalGutterPx}px));
+    min-width: min(18rem, calc(100dvw - ${modalGutterPx}px));
     overflow-y: auto;
 `;
 
@@ -95,6 +95,7 @@ const TriggerButton = styled.button`
     }
 
     @media (pointer: coarse) {
+        min-height: 44px;
         padding: ${space.xs}px ${space.sm}px;
     }
 `;

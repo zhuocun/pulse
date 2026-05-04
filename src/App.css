@@ -61,6 +61,11 @@
     }
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 html,
 body {
     margin: 0;
@@ -103,10 +108,7 @@ body {
     /* Suppress the default grey tap highlight on iOS; we render our own
      * hover/active states via AntD tokens. */
     -webkit-tap-highlight-color: transparent;
-    /* Disable iOS auto-zoom on Form inputs without forcing 16 px font on
-     * desktop; AntD tokens decide font-size per-control. */
-    text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%;
+    /* text-size-adjust is set on html; body inherits it. */
     color: var(--pulse-text-base);
     /*
      * Soft peach wash from the top of the page, fading to warm white by
@@ -215,6 +217,21 @@ img,
 svg,
 video {
     max-width: 100%;
+}
+
+/*
+ * Touch-action: manipulation suppresses the (now-legacy) 300 ms tap delay
+ * on browsers that still honour it, and signals to the compositor that only
+ * pan + pinch-zoom gestures are expected — no double-tap-to-zoom or
+ * long-press context menus triggered by the UA itself.  Combined with the
+ * tap-highlight suppression on `body` above, every interactive element now
+ * responds within the native ~100 ms window.
+ */
+a,
+button,
+[role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /*

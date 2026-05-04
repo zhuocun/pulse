@@ -214,6 +214,8 @@ const TaskSearchPanel: React.FC<Props> = ({
                     <Input
                         aria-label={microcopy.a11y.searchTasksByName}
                         allowClear
+                        enterKeyHint="search"
+                        inputMode="search"
                         onChange={(e) =>
                             setParam({
                                 ...param,

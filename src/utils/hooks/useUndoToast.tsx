@@ -91,7 +91,7 @@ const useUndoToast = (): {
                             font: "inherit",
                             fontWeight: 500,
                             marginInlineStart: 8,
-                            minHeight: 32,
+                            minHeight: 44,
                             padding: "4px 8px",
                             textDecoration: "underline"
                         }}
