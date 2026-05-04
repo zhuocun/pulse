@@ -22,17 +22,23 @@ Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has sh
 
 ## At a glance
 
-| Phase      | Capability                                                 | PRD section | Status                                                                           |
-| ---------- | ---------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- |
-| Phase 0    | Plumbing (env, hook, validators, runtime toggle)           | §7, §3.5    | ✅ Shipped                                                                       |
-| Phase 1    | Capability C — Board summary brief                         | §5.3        | ✅ Shipped                                                                       |
-| Phase 2A   | Capability A — Smart task drafting                         | §5.1        | ✅ Shipped                                                                       |
-| Phase 2B   | Capability B — AI estimation + readiness                   | §5.2        | ✅ Shipped                                                                       |
-| Phase 3    | Capability D — Conversational assistant                    | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) |
-| Phase 4    | Capability E — Semantic search                             | §5.5        | ✅ Shipped                                                                       |
-| AI UX P1   | Trust/privacy corrections from AI UX audit                 | v3 §2 P3/P7 | ✅ Merged                                                                        |
-| Prod-ready | Protocol alignment, observability, i18n, security, a11y    | —           | ✅ Landed 2026-05-04 on `claude/jira-ai-features-RO8hF`                          |
-| Backend    | Vercel `api/ai/[route].ts` proxy with provider abstraction | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime) |
+| Phase                    | Capability                                                                                                             | PRD section | Status                                                                           |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- |
+| Phase 0                  | Plumbing (env, hook, validators, runtime toggle)                                                                       | §7, §3.5    | ✅ Shipped                                                                       |
+| Phase 1                  | Capability C — Board summary brief                                                                                     | §5.3        | ✅ Shipped                                                                       |
+| Phase 2A                 | Capability A — Smart task drafting                                                                                     | §5.1        | ✅ Shipped                                                                       |
+| Phase 2B                 | Capability B — AI estimation + readiness                                                                               | §5.2        | ✅ Shipped                                                                       |
+| Phase 3                  | Capability D — Conversational assistant                                                                                | §5.4        | ✅ Shipped on `main` ([PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) |
+| Phase 4                  | Capability E — Semantic search                                                                                         | §5.5        | ✅ Shipped                                                                       |
+| AI UX P1                 | Trust/privacy corrections from AI UX audit                                                                             | v3 §2 P3/P7 | ✅ Merged                                                                        |
+| Observability sinks      | `httpAnalyticsSink`, `httpErrorSink`, `devMemorySink` wired; `ErrorBoundary` reports to error sink                     | —           | ✅ Landed 2026-05-04                                                             |
+| Observability call sites | `track()` wired at `COPILOT_REWRITE_ACCEPT`, `AGENT_HEALTH_DEGRADED`, and other defined events                         | —           | 🟡 Not yet wired                                                                 |
+| v2.1 streaming infra     | `useAgent`, `agentClient`, `MutationProposalCard`, `NudgeCard`, command-palette AI mode — protocol correct             | —           | ✅ Phase A scaffolding landed                                                    |
+| v2.1 UI surface          | No production component mounts `useAgent`; v2.1 streaming has zero user-visible features                               | —           | ⏳ Phase B — not started                                                         |
+| Protocol / i18n / a11y   | snake_case alignment, `Idempotency-Key`, typed errors, i18n strings, jest-axe coverage, WCAG fix                       | —           | ✅ Landed 2026-05-04                                                             |
+| Security (URL / opt-out) | `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out enforcement, snake_case arg alignment                       | —           | ✅ Landed 2026-05-04                                                             |
+| Security (JWT)           | JWT in `localStorage` reused by AI proxy — XSS exfiltration target; migration to httpOnly cookie or proxy-scoped token | —           | ⏳ Not addressed                                                                 |
+| Backend                  | Vercel `api/ai/[route].ts` proxy with provider abstraction                                                             | §7.2        | ⏳ Not started (FE works against the deterministic local engine in the meantime) |
 
 ---
 
@@ -242,10 +248,23 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 - ~~**Runtime toggle UI** (PRD §7.3)~~: shipped in `src/components/header` (`Switch` + `useAiEnabled`).
 - ~~**“Disable AI for this project”** (PRD §8)~~: shipped — `boardCopilot:disabledProjectIds` in `localStorage`, `useAiProjectDisabled` + **Project AI** switch on the board header, guards in `useAi` / `useAiChat`, `boardAiOn` passed to `Column` / `TaskCreator` / `TaskModal`.
 - ~~**AI UX Phase 1 trust/privacy corrections**~~: implemented on `cursor/ai-ux-current-audit-da9f`; see "AI UX Phase 1" above.
-- **Observability** (PRD §7.7, §9): `httpAnalyticsSink` / `httpErrorSink` infrastructure
-  landed 2026-05-04. Individual `track()` call-site wiring and server-side counters
-  still open — full measurement lands with proxy.
+- **Observability call sites** (PRD §7.7, §9): `httpAnalyticsSink` / `httpErrorSink`
+  infrastructure landed 2026-05-04. `track()` call sites are not yet wired — events
+  defined in `src/constants/analytics.ts` (`COPILOT_REWRITE_ACCEPT`, `AGENT_HEALTH_DEGRADED`,
+  `nudge.*`, `palette.*`, etc.) are never fired. Wire each call site and add server-side
+  counters; full measurement lands with the proxy.
+- **v2.1 UI surface — Phase B starting point**: `useAgent`, `agentClient`,
+  `MutationProposalCard`, and `NudgeCard` exist as infrastructure but no production
+  component mounts `useAgent`. Mount it in a product surface (e.g., `aiTaskAssistPanel`
+  or a chat drawer variant) to expose the first user-visible v2.1 feature.
+- **JWT security**: the primary-bearer JWT is stored in `localStorage` and reused
+  verbatim by the AI proxy (`src/utils/aiAuthHeader.ts`). This is an XSS exfiltration
+  target. Migrate to an httpOnly cookie or scope the AI proxy to a short-lived
+  proxy-scoped token that cannot access the REST API directly.
 - **Chat write-tools** (PRD §5.4 follow-up): out of scope until a later version.
+- **BE companion items**: the Python server has its own open work (Redis/Postgres
+  backends, multi-worker deployment, rate-limit counters). See
+  `../jira-python-server/docs/AI_REMAINING_WORK.md` for that list.
 
 ### Optional polish
 
