@@ -220,6 +220,19 @@ describe("ProjectModal", () => {
                 )
             ).toBe(true)
         );
+
+        // The server derives the manager from the JWT on create and
+        // ignores any `managerId` in the body. Pin that the FE does not
+        // send the field on `POST` so future refactors of `onFinish`
+        // can't regress to a payload that pretends the user can pick.
+        const postCall = fetchMock.mock.calls.find(
+            ([url, init]) =>
+                String(url).includes("/api/v1/projects") &&
+                init?.method === "POST"
+        );
+        expect(postCall).toBeDefined();
+        const postBody = JSON.parse(postCall![1]!.body as string);
+        expect(postBody).not.toHaveProperty("managerId");
     });
 
     it("closes and resets the modal from the cancel button", async () => {

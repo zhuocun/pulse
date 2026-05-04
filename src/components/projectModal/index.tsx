@@ -44,7 +44,17 @@ const ProjectModal: React.FC = () => {
         organization: string;
         managerId: string;
     }) => {
-        mutateAsync({ ...editingProject, ...input }).then(onClose);
+        // The server derives the manager from the JWT subject on create
+        // (`POST /api/v1/projects`) and ignores any `managerId` sent in
+        // the body — see `app/services/project_service.py` in
+        // jira-python-server. Drop the field from the create payload so
+        // the wire shape matches what the server actually consumes;
+        // ownership-transfer flows through `PUT` and still passes it.
+        const { managerId: _managerId, ...createOnly } = input;
+        const payload = isEditing
+            ? { ...editingProject, ...input }
+            : { ...editingProject, ...createOnly };
+        mutateAsync(payload).then(onClose);
     };
     const submit = () => {
         form.submit();
