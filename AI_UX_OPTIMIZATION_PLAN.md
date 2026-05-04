@@ -604,25 +604,35 @@ future overautomation risk.
 
 **Evidence**
 
-- `MutationProposalCard` exists in
-  `src/components/mutationProposalCard/index.tsx:10-17`.
-- `NudgeCard` exists in `src/components/nudgeCard/index.tsx:14-19`.
-- `useAgent` and `streamAgent` exist in `src/utils/hooks/useAgent.ts` and
-  `src/utils/ai/agentClient.ts`.
-- Search shows no page imports for `MutationProposalCard` / `NudgeCard`; they
-  appear to be scaffolding for a future surface.
+- `MutationProposalCard` and `NudgeCard` are wired into `AiChatDrawer` with
+  accept/reject/action/dismiss callbacks; local-dismiss fallback covers the
+  case where no owner callback is supplied.
+- `useAgent` and `streamAgent` are in production use: `AiChatDrawer` uses
+  `useAgentChat` (wrapping `useAgent("chat-agent")`) in remote builds, and the
+  triage agent runs in `board.tsx` once per project per session.
+- `custom/suggestion` SSE events are now surfaced via `lastSuggestion` /
+  `clearSuggestion` on `UseAgentResult` (was dark code; landed `5ce8d95`).
+- An Ant Design `Select` autonomy selector (Suggest / Plan / Auto) is now
+  rendered in the `AiChatDrawer` extra slot, wired to `useAutonomyLevel` setter
+  (landed `5ce8d95`). `autonomyRef` in `useAgent` now tracks the persisted
+  setting; it was previously hard-coded to `"plan"`.
+- Write tools remain disabled; the governance gap is that a proposal-undo
+  surface and an agent activity log do not yet exist.
 
 **Impact**
 
-The components themselves are useful, but if agentic capabilities ship without
-a unified surface, users may encounter proposals, nudges, or autonomy controls
-without a clear model of what the agent can do.
+The agentic surface is no longer pure scaffolding, but the absence of an
+activity log and proposal-undo path means users cannot audit or reverse agent
+actions taken in the current session. This remains an open risk if write tools
+are enabled in a future phase.
 
 **Optimization plan**
 
-1. Keep agentic components hidden until a complete "Copilot Activity" or
+1. Keep agent write tools disabled until a complete "Copilot Activity" or
    "Review proposals" surface exists.
-2. Define autonomy levels in UI before enabling write tools:
+2. ~~Define autonomy levels in UI before enabling write tools~~ — done: Suggest
+   / Plan / Auto selector is mounted and persisted (`5ce8d95`). Next step is
+   honoring `suggest` to suppress write proposals end-to-end.
     - Suggest only
     - Propose changes
     - Apply with confirmation
