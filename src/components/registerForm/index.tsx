@@ -91,6 +91,7 @@ const RegisterForm: React.FC<{
                 <Input
                     autoComplete="username"
                     enterKeyHint="next"
+                    inputMode="text"
                     onChange={() => onError(null)}
                     size={inputSize}
                     type="text"
@@ -123,6 +124,7 @@ const RegisterForm: React.FC<{
                 <Input.Password
                     autoComplete="new-password"
                     enterKeyHint="go"
+                    inputMode="text"
                     iconRender={(visible) =>
                         visible ? (
                             <EyeOutlined

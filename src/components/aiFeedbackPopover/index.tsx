@@ -106,6 +106,8 @@ const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
             <Input.TextArea
                 aria-label={microcopy.ai.feedbackOptionalNote}
                 autoSize={{ maxRows: 4, minRows: 2 }}
+                enterKeyHint="send"
+                inputMode="text"
                 maxLength={NOTE_MAX_LENGTH}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder={microcopy.ai.feedbackOptionalNote}

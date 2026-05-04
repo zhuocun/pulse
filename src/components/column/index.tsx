@@ -58,7 +58,7 @@ export const ColumnContainer = styled.div`
      * On phone-sized viewports a full desktop column overflows the screen.
      * BoardShell uses 16 px horizontal padding on mobile (16 + 16 = 32)
      * and the column carries its own 16 px margin-right. The previous
-     * formula calc(100vw - 48px) exactly filled that chrome, leaving the
+     * formula calc(100dvw - 48px) exactly filled that chrome, leaving the
      * next column with only the column's own margin (≈ 8 px after the
      * fade gradient) — readable text from the next column's header still
      * poked through, looking like a clipped layout. We now reserve an
@@ -70,11 +70,11 @@ export const ColumnContainer = styled.div`
     @media (max-width: ${breakpoints.md - 1}px) {
         min-width: min(
             ${columnMinWidthRem - 1}rem,
-            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
+            calc(100dvw - ${space.md * 2 + space.md + space.xl}px)
         );
         width: min(
             ${columnMinWidthRem - 1}rem,
-            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
+            calc(100dvw - ${space.md * 2 + space.md + space.xl}px)
         );
     }
 `;

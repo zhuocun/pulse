@@ -387,6 +387,7 @@ const TaskModal: React.FC<{
                 <Form.Item label={microcopy.fields.notes} name="note">
                     <Input.TextArea
                         autoComplete="off"
+                        enterKeyHint="done"
                         inputMode="text"
                         placeholder={
                             microcopy.placeholders.notesAcceptanceCriteria

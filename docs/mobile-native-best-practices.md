@@ -268,15 +268,15 @@ Already in place before the audit:
 
 Tier 1 — every user, every session:
 
-1. **Service worker for repeat-visit caching.** Biggest perceived "feels native" cue is opening the app and seeing UI immediately — no spinner, no white flash. Workbox `NetworkFirst` for HTML + `CacheFirst` for hashed assets buys this.
+1. ~~**Service worker for repeat-visit caching.**~~ **Done.** `public/sw.js` implements NetworkFirst for HTML, CacheFirst for hashed assets, StaleWhileRevalidate for images and fonts. Registered in `src/index.tsx`.
 
 Tier 2 — visible only at specific moments, but very visible when they happen:
 
-2. **Real PNG icons for the manifest.** Currently the manifest references paths that 404. `pwa-asset-generator` produces all sizes including iOS splash images.
+2. ~~**Real PNG icons for the manifest.**~~ **Done.** SVG icons generated to `public/icons/` via `scripts/generate-icons.js`. Manifest updated to reference SVGs. For production, run `pwa-asset-generator` to produce PNG variants and iOS splash images.
 
 Tier 3 — barely perceptible:
 
-3. **`100vw` in modal width formula** (`src/theme/tokens.ts:201`). Only an issue on desktop with classic non-overlay scrollbars.
+3. ~~**`100vw` in modal width formula**~~ **Done.** `modalWidthCss` in `src/theme/tokens.ts` already uses `100dvw`. Column components (`column/index.tsx`, `columnCreator/index.tsx`) updated from `100vw` to `100dvw`.
 
 ---
 

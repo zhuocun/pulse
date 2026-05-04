@@ -21,7 +21,7 @@ const Slot = styled.div`
     display: flex;
     flex: 0 0 auto;
     margin-right: ${space.md}px;
-    min-width: min(16rem, calc(100vw - ${space.md * 3}px));
+    min-width: min(16rem, calc(100dvw - ${space.md * 3}px));
     padding: ${space.xs}px 0;
 
     @media (min-width: ${breakpoints.md}px) {

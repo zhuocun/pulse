@@ -40,3 +40,9 @@ reportWebVitals(
     // eslint-disable-next-line no-console
     process.env.NODE_ENV !== "production" ? console.log : undefined
 );
+
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+}
