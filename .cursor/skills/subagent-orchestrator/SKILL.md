@@ -16,6 +16,8 @@ Work as an orchestrator instead of a single-threaded executor:
 - decompose work into concrete, bounded subtasks
 - keep the critical path moving locally
 - proactively delegate as many independent side subtasks as practical in parallel by default on non-trivial tasks
+- run subagents for both research tasks (exploration, codebase questions, analysis, design probes) and development tasks (implementation, refactors, bug fixes, test writing, verification)
+- act as the reviewer of all subagent output, holding the quality bar before integrating any returned work
 - integrate results, verify them, and present a combined outcome
 
 ## Limits
@@ -43,11 +45,12 @@ When delegation is allowed, bias toward using more subagents earlier rather than
 
 1. Before taking action, form a short high-level plan.
 2. Identify the immediate blocking step and keep it local.
-3. Split the remaining work into independent subtasks with clear scopes.
+3. Split the remaining work into independent subtasks with clear scopes — covering both research strands (exploration, lookups, analysis) and development strands (implementation, fixes, tests).
 4. Launch subagents early for exploration, codebase questions, verification, or disjoint implementation slices whenever those tracks can progress in parallel.
 5. Continue non-overlapping local work while delegated agents run.
 6. Avoid idle waiting; wait on agents only when blocked on their output.
-7. Review returned work, integrate it, and perform verification before presenting results.
+7. Act as the reviewer for every returned result: read diffs, validate correctness against the task scope, check for consistency with the rest of the codebase, and reject or send back work that does not meet the bar before integrating it.
+8. Integrate accepted work, perform end-to-end verification (typecheck, tests, manual checks as appropriate), and present a combined outcome.
 
 ## Model Routing
 
@@ -77,6 +80,7 @@ The intent: subagents should be cheaper or faster than the orchestrator, but nev
 
 ## Delegation Rules
 
+- Use subagents for both research and development workstreams. Research subagents map the codebase, gather context, and answer questions; development subagents implement, refactor, fix bugs, and add tests within owned scopes.
 - Prefer explorer-style agents for specific codebase questions.
 - Prefer worker-style agents for bounded implementation tasks with disjoint write scopes.
 - Give each delegated task an exact goal, expected output, and owned files or responsibility area when code changes are involved.
@@ -84,6 +88,17 @@ The intent: subagents should be cheaper or faster than the orchestrator, but nev
 - Avoid duplicate delegation or speculative delegation that does not materially advance the task.
 - Recommend 3 or more subagents on clearly multi-part tasks, and use as many subagents as there are genuinely independent side subtasks when local integration capacity and session or tool constraints allow.
 - Reuse an existing agent for follow-up work if its context is still relevant; otherwise start a fresh agent.
+
+## Review Responsibilities
+
+The orchestrator is the final reviewer and quality gate. Subagent output is a draft, not a finished result.
+
+- Read every diff, file change, or research summary a subagent returns. Do not accept work sight-unseen.
+- Verify correctness against the original task description: scope, expected output, file ownership, and explicit constraints.
+- Check for consistency with surrounding code, existing conventions, and other concurrent subagent edits — reconcile conflicts before integrating.
+- Run the relevant quality gates (typecheck, lint, targeted tests, full test suite, manual smoke checks) before declaring a task done.
+- If a subagent's output is incomplete, incorrect, or off-scope, send it back with a precise correction prompt or redo the work locally — do not paper over issues.
+- Surface unresolved risks, skipped checks, or known gaps explicitly in the final summary to the user.
 
 ## Communication Rules
 
