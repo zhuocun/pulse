@@ -92,23 +92,25 @@ See the server-side docs for request/response schemas: `../jira-python-server/do
 | Method | Path | Called by | Request body / query | Response type |
 |---|---|---|---|---|
 | `POST` | `/api/v1/auth/login` | `authApis.login`, `loginForm` | `{ email, password }` | `IUser` (includes `jwt`) |
-| `POST` | `/api/v1/auth/register` | `authApis.register`, `registerForm` | `{ username, email, password }` | `{ message: string }` |
+| `POST` | `/api/v1/auth/register` | `authApis.register`, `registerForm` | `{ username, email, password }` | `string` (`"User created"`) |
 | `GET` | `/api/v1/users` | `authProvider`, `useAuth.refreshUser` | — | `IUser` |
 | `PUT` | `/api/v1/users/likes` | `projectList` | `{ projectId }` | `IUser` |
 | `GET` | `/api/v1/users/members` | `projectModal`, `memberPopover`, `chatTools.listMembers`, `chatTools.getProject` | — | `IMember[]` |
 | `GET` | `/api/v1/projects` | `project.tsx`, `projectPopover`, `chatTools.listProjects`, `chatTools.getProject` | `?projectId=…` (optional) | `IProject[]` or `IProject` |
-| `POST` | `/api/v1/projects` | `projectModal` | `{ projectName, managerId, organization }` | `IProject` |
-| `PUT` | `/api/v1/projects` | `projectModal` | `{ _id, projectName, managerId, organization }` | `IProject` |
-| `DELETE` | `/api/v1/projects` | `projectList` | `?projectId=…` | acknowledgement string |
+| `POST` | `/api/v1/projects` | `projectModal` | `{ projectName, organization }` (1) | `string` (`"Project created"`) |
+| `PUT` | `/api/v1/projects` | `projectModal` | `{ _id, projectName, organization, managerId? }` | `string` (`"Project updated"`) |
+| `DELETE` | `/api/v1/projects` | `projectList` | `?projectId=…` | `string` (acknowledgement) |
 | `GET` | `/api/v1/boards` | `board.tsx`, `useDragEnd`, `chatTools.listBoard` | `?projectId=…` | `IColumn[]` |
-| `POST` | `/api/v1/boards` | `columnCreator` | `{ projectId, columnName }` | `IColumn` |
-| `DELETE` | `/api/v1/boards` | `column/index.tsx` | `?columnId=…` | acknowledgement |
-| `PUT` | `/api/v1/boards/orders` | `useDragEnd` | `{ fromId, referenceId, type }` | acknowledgement |
+| `POST` | `/api/v1/boards` | `columnCreator` | `{ projectId, columnName }` | `string` (`"Column created"`) |
+| `DELETE` | `/api/v1/boards` | `column/index.tsx` | `?columnId=…` | `string` (acknowledgement) |
+| `PUT` | `/api/v1/boards/orders` | `useDragEnd` | `{ fromId, referenceId, type }` | `string` (acknowledgement) |
 | `GET` | `/api/v1/tasks` | `board.tsx`, `useDragEnd`, `chatTools.listTasks`, `chatTools.getTask` | `?projectId=…` and optional filters | `ITask[]` |
-| `POST` | `/api/v1/tasks` | `taskCreator`, `aiTaskDraftModal` | task fields | `ITask` |
-| `PUT` | `/api/v1/tasks` | `taskModal` | task fields with `_id` | `ITask` |
-| `DELETE` | `/api/v1/tasks` | `taskModal` | `?taskId=…` | acknowledgement |
-| `PUT` | `/api/v1/tasks/orders` | `useDragEnd` | `{ fromId, referenceId, fromColumnId, referenceColumnId, type }` | acknowledgement |
+| `POST` | `/api/v1/tasks` | `taskCreator`, `aiTaskDraftModal` | task fields | `string` (`"Task created"`) |
+| `PUT` | `/api/v1/tasks` | `taskModal` | task fields with `_id` | `string` (`"Task updated"`) |
+| `DELETE` | `/api/v1/tasks` | `taskModal` | `?taskId=…` | `string` (acknowledgement) |
+| `PUT` | `/api/v1/tasks/orders` | `useDragEnd` | `{ fromId, referenceId, fromColumnId, referenceColumnId, type }` | `string` (acknowledgement) |
+
+(1) `projectModal` form state includes `managerId` and the FE sends it on both `POST` and `PUT`. The server silently ignores it on `POST` (the manager is derived from the JWT subject — see `app/services/project_service.py`) and only honours it on `PUT` for ownership transfer. Mutating endpoints on `projects`, `boards`, and `tasks` return a bare acknowledgement string (e.g. `"Project created"`, `"Task updated"`); they do NOT echo the resource. Callers that need the new document must re-`GET` it or invalidate the React Query cache.
 
 ### AI v1 (`/api/ai/`)
 
@@ -126,6 +128,8 @@ Route called from `useAi.ts` and `useAiChat.ts`.
 | `POST` | `/api/ai/chat` | `useAiChat` | `{ messages: AiChatMessage[], context: ChatEngineContext }` | `ChatTurnResult` |
 
 Note: `board-brief` payloads have task `note` fields stripped by `sanitizeRemotePayloadForRoute` before the request is sent.
+
+The FE always sends the wrapped envelope (e.g. `{ "draft": { ... } }`, `{ "estimate": { ... } }`) — that is `RunPayload` shape verbatim. The server also accepts the equivalent flat body (`{ "prompt": ..., "context": ... }`) for cURL callers and the existing test suite — see `_unwrap_envelope` in `app/routers/ai.py` and the matching note in `../jira-python-server/docs/API.md` — but FE callers do not use the flat form.
 
 ### Agents v2.1 (`/api/v1/agents/`)
 
@@ -475,8 +479,8 @@ interface UseAgentHealthState {
 
 - No-op when `baseUrl` is empty or `enabled === false`.
 - Polls `GET /api/v1/health` every `intervalMs` (default 30 000 ms).
-- `"ok"`: response is successful and latency is under 1500 ms.
-- `"degraded"`: response is successful but latency is >= 1500 ms.
+- `"ok"`: response is successful and round-trip latency is under 1500 ms.
+- `"degraded"`: response is successful but round-trip latency is >= 1500 ms. This is a client-side classification — the server's own `status` field can also be `"degraded"` independently (it reports DB-ping or persistence-backend health), but `useAgentHealth` derives `"degraded"` purely from the measured latency rather than the server status field.
 - `"offline"`: fetch failed or response is not ok.
 - Cleans up on unmount (cancels the interval and aborts the in-flight request).
 
@@ -772,10 +776,12 @@ strips exactly one leading space after `data:` per the SSE spec, and yields each
 | 402 | `AgentBudgetError` |
 | 403 | `AgentForbiddenError` |
 | 404 | `AgentNotFoundError` |
-| 429 with `X-Reason: budget` | `AgentBudgetError` |
+| 429 with `X-Reason: budget` | `AgentBudgetError` (defensive — see note) |
 | 429 | `AgentRateLimitError(retryAfterSeconds)` |
 | >= 500 | `AgentServerError(status)` |
 | other | `AgentTransportError` |
+
+The current `jira-python-server` only emits `X-Reason: budget` on 402 (see `app/routers/agents.py` and `app/routers/ai.py`). The `429 + X-Reason: budget` row is a defensive branch for forward compatibility with servers that surface budget exhaustion as a 429; against today's BE the branch is unreachable.
 
 #### `invokeAgent`
 
@@ -828,7 +834,7 @@ async function getAgentHealth(params: {
 
 GETs `${baseUrl}/api/v1/health`. Accepts both `{ status, agents_loaded }` (snake_case)
 and `{ ok, agentsLoaded }` (camelCase) body shapes for backwards compatibility.
-Measures round-trip latency client-side when the body omits `latencyMs`.
+Measures round-trip latency client-side when the body omits `latencyMs`. The server also exposes a legacy `GET /health` alias that returns the same body; the FE does not call it.
 
 **Exported error classes:** `AgentTransportError`, `AgentAuthError`, `AgentForbiddenError`, `AgentRateLimitError`, `AgentBudgetError`, `AgentNotFoundError`, `AgentServerError`.
 
@@ -1458,6 +1464,8 @@ Returned by `GET /api/v1/agents` and `GET /api/v1/agents/{name}`. `status: "shad
 means the agent is deployed but not yet user-visible. `allowed_autonomy` lists which
 `AutonomyLevel` values the server permits for this agent; the FE gates the autonomy
 selector to this set.
+
+The server response also carries `tags: string[]`, `recursion_limit: number`, and `context_schema: string | null` (see `../jira-python-server/docs/API.md` and `app/agents/base.py`). The FE interface above intentionally narrows the surface to the fields it consumes — the additional fields are accepted at runtime and ignored.
 
 ---
 
