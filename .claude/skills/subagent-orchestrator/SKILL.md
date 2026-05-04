@@ -56,6 +56,10 @@ When delegation is allowed, bias toward using more subagents earlier rather than
 
 Match the model tier and reasoning budget to task difficulty. Terms below map across providers — pick whatever the current platform exposes. "Reasoning budget" maps to `reasoning_effort` (OpenAI), extended thinking / thinking budget (Anthropic, Gemini), or equivalent; if the platform exposes no such control, rely on tier choice alone.
 
+**Always set the model parameter explicitly**
+
+Whenever the launcher exposes a model, reasoning-effort, or thinking-budget parameter (for example `model`, `subagent_type`, `reasoning_effort`, `thinking_budget`, or any equivalent dropdown/flag), the orchestrator must fill it in proactively for every subagent call. Never leave these fields blank and rely on the system default — defaults can route to a weaker, distilled, or forbidden-tier model, can quietly downgrade reasoning, or can pin the subagent to the orchestrator's own model and reasoning budget, all of which violate the routing rules below. If the platform exposes only one configurable model knob, still set it explicitly to the chosen value rather than accepting the implicit default.
+
 **Tier guidance**
 
 - **Lighter sidecar work** (bounded exploration, summarization, lookups): mid-tier model with a moderate reasoning budget.
@@ -88,6 +92,7 @@ The intent: subagents should be cheaper or faster than the orchestrator, but nev
 - Avoid duplicate delegation or speculative delegation that does not materially advance the task.
 - Recommend 3 or more subagents on clearly multi-part tasks, and use as many subagents as there are genuinely independent side subtasks when local integration capacity and session or tool constraints allow.
 - Reuse an existing agent for follow-up work if its context is still relevant; otherwise start a fresh agent.
+- For every subagent invocation, fill in the model and reasoning-budget parameters explicitly using the choice from Model Routing — do not omit them and let the platform pick a default.
 
 ## Review Responsibilities
 
