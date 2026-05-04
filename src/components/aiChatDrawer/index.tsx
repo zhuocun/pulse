@@ -28,6 +28,7 @@ import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import useAiChat from "../../utils/hooks/useAiChat";
+import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiFeedbackPopover, {
     type AiFeedbackSubmission
 } from "../aiFeedbackPopover";
@@ -36,6 +37,8 @@ import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
+import MutationProposalCard from "../mutationProposalCard";
+import NudgeCard from "../nudgeCard";
 
 const MessageRow = styled.div<{ $isUser: boolean }>`
     margin-bottom: ${space.sm}px;
@@ -171,6 +174,17 @@ export interface AiChatDrawerProps {
      * a non-empty value.
      */
     initialPrompt?: string;
+    /**
+     * v2.1 mount point: an active MutationProposal emitted by the agent
+     * stream. Rendered inline between messages when present.
+     * TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md
+     */
+    pendingProposal?: MutationProposal;
+    /**
+     * v2.1 mount point: active TriageNudges emitted by the agent stream.
+     * Rendered inline between messages when non-empty.
+     */
+    pendingNudges?: TriageNudge[];
 }
 
 /**
@@ -231,7 +245,9 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
     tasks,
     members,
     knownProjectIds,
-    initialPrompt
+    initialPrompt,
+    pendingProposal,
+    pendingNudges
 }) => {
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
@@ -987,6 +1003,33 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                         </MessageRow>
                     );
                 })}
+                {/* v2.1 inserts — MutationProposal and TriageNudge cards emitted
+                    by a future streaming agent path. Props default to undefined
+                    so this region is a no-op in the current v1 flow.
+                    TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md */}
+                {pendingProposal && (
+                    <MutationProposalCard
+                        onAccept={() => {
+                            /* TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md */
+                        }}
+                        onReject={() => {
+                            /* TODO(v2.1 phase B): wire onReject to agent.resume — see board-copilot-progress.md */
+                        }}
+                        proposal={pendingProposal}
+                    />
+                )}
+                {pendingNudges && pendingNudges.length > 0 && (
+                    <>
+                        {pendingNudges.map((nudge) => (
+                            <NudgeCard
+                                key={nudge.nudge_id}
+                                nudge={nudge}
+                                onAction={undefined}
+                                onDismiss={undefined}
+                            />
+                        ))}
+                    </>
+                )}
                 {/* C-R5: re-show contextual sample prompts after each turn so
                     the user always has a quick next-step. */}
                 {!isLoading && messages.length > 0 && (

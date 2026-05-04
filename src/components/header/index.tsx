@@ -10,9 +10,11 @@ import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { blur, breakpoints, radius, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
+import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import BrandMark from "../brandMark";
@@ -235,6 +237,51 @@ const HiddenOnTiny = styled.span`
 `;
 
 /**
+ * Small status dot that appears only when the AI backend is `degraded` or
+ * `offline`. Hidden when the local engine is active or AI is disabled — no
+ * point polling a server the FE doesn't use.
+ */
+const AgentStatusDot = styled.span<{ $status: "degraded" | "offline" }>`
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+    flex: 0 0 auto;
+    background: ${(props) =>
+        props.$status === "offline"
+            ? "var(--ant-color-error, #EF4444)"
+            : "var(--ant-color-warning, #F59E0B)"};
+`;
+
+/**
+ * Inner component that calls useAgentHealth so we can gate the hook behind a
+ * conditional render — hooks must not be called conditionally at the top
+ * level. Rendered only when aiEnabled is true and aiUseLocalEngine is false.
+ */
+const AgentHealthBadge: React.FC = () => {
+    const { status } = useAgentHealth(environment.aiBaseUrl, {
+        enabled: !environment.aiUseLocalEngine && environment.aiEnabled
+    });
+    if (status !== "degraded" && status !== "offline") return null;
+    return (
+        <AgentStatusDot
+            $status={status}
+            aria-label={
+                status === "offline"
+                    ? microcopy.ai.agentOffline
+                    : microcopy.ai.agentDegraded
+            }
+            role="img"
+            title={
+                status === "offline"
+                    ? microcopy.ai.agentOffline
+                    : microcopy.ai.agentDegraded
+            }
+        />
+    );
+};
+
+/**
  * Brand cluster — the shared `BrandMark` component (so a future brand
  * refresh is a single edit) wrapped in a `NoPaddingButton` so it stays
  * keyboard-focusable and announces "Pulse, link" to assistive tech.
@@ -405,6 +452,9 @@ const Header: React.FC = () => {
                 <MemberPopover />
             </LeftCluster>
             <RightCluster>
+                {environment.aiEnabled && !environment.aiUseLocalEngine && (
+                    <AgentHealthBadge />
+                )}
                 <IconButton
                     aria-label={
                         scheme === "dark"

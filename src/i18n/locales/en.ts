@@ -394,6 +394,8 @@ export const enSource = {
         runningReadiness: "Running readiness check",
         readinessReady: "Looks ready to work on.",
         dismissNudge: "Dismiss",
+        agentDegraded: "AI backend is slow (degraded)",
+        agentOffline: "AI backend is offline",
         completionAnnouncementOne: "{label} responded with {count} word.",
         completionAnnouncementOther: "{label} responded with {count} words.",
         citationSourceTask: "Task",

@@ -4,6 +4,7 @@ import { App as AntdApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
 
 import useAuth from "../../utils/hooks/useAuth";
+import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 
 import AiChatDrawer from ".";
 
@@ -67,7 +68,13 @@ const tasks: ITask[] = [
     }
 ];
 
-const renderDrawer = (open = true) => {
+const renderDrawer = (
+    open = true,
+    extraProps: {
+        pendingProposal?: MutationProposal;
+        pendingNudges?: TriageNudge[];
+    } = {}
+) => {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } }
     });
@@ -92,6 +99,7 @@ const renderDrawer = (open = true) => {
                         open={open}
                         project={project}
                         tasks={tasks}
+                        {...extraProps}
                     />
                 </AntdApp>
             </MemoryRouter>
@@ -246,5 +254,49 @@ describe("AiChatDrawer", () => {
             const text = bubble.textContent?.trim() ?? "";
             expect(text.length).toBeGreaterThan(0);
         }
+    });
+
+    it("renders a MutationProposalCard and NudgeCards when v2.1 props are supplied", () => {
+        const mockProposal: MutationProposal = {
+            proposal_id: "prop-1",
+            description: "Reassign overdue tasks to Alice",
+            diff: {
+                task_updates: [
+                    {
+                        task_id: "t1",
+                        field: "coordinatorId",
+                        from: "m2",
+                        to: "m1"
+                    }
+                ]
+            },
+            risk: "low",
+            undoable: true
+        };
+        const mockNudges: TriageNudge[] = [
+            {
+                nudge_id: "nudge-1",
+                kind: "unowned_bug",
+                project_id: "p1",
+                summary: "3 bugs have no assignee",
+                target_ids: ["t1"],
+                severity: "warn"
+            }
+        ];
+
+        renderDrawer(true, {
+            pendingProposal: mockProposal,
+            pendingNudges: mockNudges
+        });
+
+        // MutationProposalCard renders with role="alertdialog"
+        expect(
+            screen.getByRole("alertdialog", {
+                name: /Reassign overdue tasks to Alice/i
+            })
+        ).toBeInTheDocument();
+
+        // NudgeCard renders with role="alert" and the nudge summary text
+        expect(screen.getByText("3 bugs have no assignee")).toBeInTheDocument();
     });
 });

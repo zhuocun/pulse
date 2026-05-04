@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
+import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 
 import Header from ".";
@@ -23,6 +24,7 @@ jest.mock("../../assets/logo-software.svg?react", () => {
 });
 jest.mock("../../utils/hooks/useAuth");
 jest.mock("../../utils/hooks/useAiEnabled");
+jest.mock("../../utils/hooks/useAgentHealth");
 jest.mock("../../utils/hooks/useColorScheme");
 jest.mock("react-router", () => {
     const actual = jest.requireActual("react-router");
@@ -39,10 +41,24 @@ jest.mock("../memberPopover", () => {
         default: () => React.createElement("span", null, "Members")
     };
 });
+// Mock environment so tests control aiEnabled/aiUseLocalEngine independently
+// of whatever process.env happens to be set in CI/test.
+jest.mock("../../constants/env", () => ({
+    __esModule: true,
+    default: {
+        apiBaseUrl: "https://jira-python-server.vercel.app/api/v1",
+        aiBaseUrl: "",
+        aiEnabled: true,
+        aiUseLocalEngine: true
+    }
+}));
 
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
     typeof useAiEnabled
+>;
+const mockedUseAgentHealth = useAgentHealth as jest.MockedFunction<
+    typeof useAgentHealth
 >;
 const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
     typeof useColorScheme
@@ -83,7 +99,8 @@ const renderHeader = (
         enabled: boolean;
         setEnabled: (next: boolean) => void;
     }>,
-    colorScheme?: Partial<ReturnType<typeof useColorScheme>>
+    colorScheme?: Partial<ReturnType<typeof useColorScheme>>,
+    agentHealth: Partial<ReturnType<typeof useAgentHealth>> = {}
 ) => {
     const logout = jest.fn();
     const navigate = jest.fn();
@@ -106,6 +123,12 @@ const renderHeader = (
         scheme: "light",
         setPreference: jest.fn(),
         ...colorScheme
+    });
+    mockedUseAgentHealth.mockReturnValue({
+        status: "ok",
+        latencyMs: 120,
+        lastChecked: Date.now(),
+        ...agentHealth
     });
 
     window.history.pushState({}, "Header", path);
@@ -242,5 +265,54 @@ describe("Header", () => {
         );
 
         expect(setPreference).toHaveBeenCalledWith("dark");
+    });
+
+    describe("AgentHealthBadge", () => {
+        // Re-require the module after mutating the mock so we get the
+        // new environment shape. Restore after each test.
+        const envMod = jest.requireMock("../../constants/env") as {
+            default: {
+                apiBaseUrl: string;
+                aiBaseUrl: string;
+                aiEnabled: boolean;
+                aiUseLocalEngine: boolean;
+            };
+        };
+
+        afterEach(() => {
+            // Restore to the local-engine defaults used by all other tests.
+            envMod.default.aiEnabled = true;
+            envMod.default.aiUseLocalEngine = true;
+            envMod.default.aiBaseUrl = "";
+        });
+
+        it("does not render the health badge when the local engine is active", () => {
+            // environment mock already has aiUseLocalEngine: true
+            renderHeader();
+
+            expect(
+                screen.queryByRole("img", {
+                    name: /AI backend is slow|AI backend is offline/i
+                })
+            ).not.toBeInTheDocument();
+        });
+
+        it("renders the degraded badge with the correct aria-label when status is degraded", () => {
+            // Switch to remote mode for this test.
+            envMod.default.aiUseLocalEngine = false;
+            envMod.default.aiBaseUrl = "https://agents.example";
+
+            renderHeader("/projects/p1/board", undefined, undefined, {
+                status: "degraded",
+                latencyMs: 2000,
+                lastChecked: Date.now()
+            });
+
+            expect(
+                screen.getByRole("img", {
+                    name: /AI backend is slow \(degraded\)/i
+                })
+            ).toBeInTheDocument();
+        });
     });
 });
