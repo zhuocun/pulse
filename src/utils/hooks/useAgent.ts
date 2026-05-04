@@ -20,6 +20,7 @@ import {
     PROJECT_AI_DISABLED_MESSAGE
 } from "../ai/projectAiStorage";
 import type { FeToolContext } from "../ai/feTools";
+import { useAutonomyLevel } from "./useAiEnabled";
 
 export interface AgentMessage {
     role: "user" | "assistant" | "tool" | "system";
@@ -31,6 +32,16 @@ export interface UseAgentState {
     messages: AgentMessage[];
     lastUpdate?: Record<string, unknown>;
     lastUsage?: { tokensIn: number; tokensOut: number };
+}
+
+/**
+ * A suggestion emitted by server-side agents (board-brief-agent,
+ * task-drafting-agent, task-estimation-agent, search-agent) via
+ * the `custom/suggestion` stream event.
+ */
+export interface AgentSuggestion {
+    surface: "brief" | "draft" | "estimate" | "readiness" | "search";
+    payload: unknown;
 }
 
 interface StartOptions {
@@ -50,6 +61,13 @@ export interface UseAgentResult {
     pendingProposal: MutationProposal | null;
     citations: CitationRef[];
     nudges: TriageNudge[];
+    /**
+     * The most recent `custom/suggestion` event emitted by the agent.
+     * Null until the first suggestion arrives; reset to null at the start
+     * of each new `start()` call. Callers use `clearSuggestion()` once
+     * they have consumed the value (e.g. applied it to a form field).
+     */
+    lastSuggestion: AgentSuggestion | null;
     error: Error | null;
     reset: () => void;
     /**
@@ -70,6 +88,11 @@ export interface UseAgentResult {
      * already wired the resume call). PRD v3 UA-R3.
      */
     clearPendingProposal: () => void;
+    /**
+     * Clears `lastSuggestion` once the caller has consumed or dismissed it.
+     * Mirrors `clearPendingProposal` pattern.
+     */
+    clearSuggestion: () => void;
 }
 
 export interface UseAgentOptions {
@@ -109,6 +132,7 @@ interface ApplyStreamPartHandlers {
     setPendingProposal: (proposal: MutationProposal | null) => void;
     setCitations: (refs: CitationRef[]) => void;
     setNudges: (nudge: TriageNudge) => void;
+    setLastSuggestion: (suggestion: AgentSuggestion) => void;
     /** Write the latest token counts into a ref so AGENT_TURN_COMPLETED can read them. */
     setLastUsageRef: (usage: { tokensIn: number; tokensOut: number }) => void;
     autoResume: boolean;
@@ -175,6 +199,11 @@ const applyStreamPart = async (
                     handlers.setNudges(event.nudge);
                     return undefined;
                 case "suggestion":
+                    handlers.setLastSuggestion({
+                        surface: event.surface,
+                        payload: event.payload
+                    });
+                    return undefined;
                 default:
                     return undefined;
             }
@@ -238,6 +267,8 @@ const useAgent = (
         useState<MutationProposal | null>(null);
     const [citations, setCitations] = useState<CitationRef[]>([]);
     const [nudges, setNudges] = useState<TriageNudge[]>([]);
+    const [lastSuggestion, setLastSuggestion] =
+        useState<AgentSuggestion | null>(null);
     const [threadId, setThreadId] = useState<string>(
         options.initialThreadId ?? generateThreadId()
     );
@@ -247,6 +278,13 @@ const useAgent = (
     const lastInputRef = useRef<unknown>(null);
     const autonomyRef = useRef<AutonomyLevel>("plan");
     const autoResumeRef = useRef<boolean>(true);
+
+    // Gap B: sync autonomyRef with the user's persisted autonomy level so
+    // start() calls without an explicit `autonomy` option honor the setting.
+    const { level: autonomyLevel } = useAutonomyLevel();
+    useEffect(() => {
+        autonomyRef.current = autonomyLevel;
+    }, [autonomyLevel]);
     const mountedRef = useRef(true);
     /**
      * TTFT bookkeeping. `streamStartRef` records the `performance.now()`
@@ -350,6 +388,8 @@ const useAgent = (
                         setNudges: (n) =>
                             mountedRef.current &&
                             setNudges((prev) => [...prev, n]),
+                        setLastSuggestion: (s) =>
+                            mountedRef.current && setLastSuggestion(s),
                         setLastUsageRef: (usage) => {
                             lastUsageRef.current = usage;
                         },
@@ -495,14 +535,15 @@ const useAgent = (
             lastInputRef.current = input;
             setPendingInterrupt(null);
             setPendingProposal(null);
-            // Per-turn reset (review follow-up #10): citations and nudges
-            // are scoped to a single user turn, so each new `start()` call
-            // discards the previous turn's surfaces. Multi-turn within one
-            // `start()` (auto-resume loop) continues to accumulate inside
-            // `consumeStream` so the agent can stream multiple citations
+            // Per-turn reset (review follow-up #10): citations, nudges, and
+            // lastSuggestion are scoped to a single user turn, so each new
+            // `start()` call discards the previous turn's surfaces. Multi-turn
+            // within one `start()` (auto-resume loop) continues to accumulate
+            // inside `consumeStream` so the agent can stream multiple citations
             // for a single answer.
             setCitations([]);
             setNudges([]);
+            setLastSuggestion(null);
             const messages =
                 typeof input === "string"
                     ? [{ role: "user" as const, content: input }]
@@ -574,6 +615,7 @@ const useAgent = (
         setPendingProposal(null);
         setCitations([]);
         setNudges([]);
+        setLastSuggestion(null);
         setError(null);
         setIsStreaming(false);
         setTtftMs(null);
@@ -588,6 +630,10 @@ const useAgent = (
         if (mountedRef.current) setPendingProposal(null);
     }, []);
 
+    const clearSuggestion = useCallback(() => {
+        if (mountedRef.current) setLastSuggestion(null);
+    }, []);
+
     return useMemo(
         () => ({
             start,
@@ -599,18 +645,22 @@ const useAgent = (
             pendingProposal,
             citations,
             nudges,
+            lastSuggestion,
             error,
             reset,
             threadId,
             ttftMs,
-            clearPendingProposal
+            clearPendingProposal,
+            clearSuggestion
         }),
         [
             abort,
             citations,
             clearPendingProposal,
+            clearSuggestion,
             error,
             isStreaming,
+            lastSuggestion,
             nudges,
             pendingInterrupt,
             pendingProposal,

@@ -516,7 +516,12 @@ export const enSource = {
         reviewAndEdit: "review and edit before creating",
         pickSubtasks: "pick the subtasks you want to create",
         breakdownAxisInfo: "Axis: {label}",
-        bulkProgressFormat: "{current} of {total}"
+        bulkProgressFormat: "{current} of {total}",
+        autonomyLabel: "Copilot mode",
+        autonomyLevelSuggest: "Suggest",
+        autonomyLevelPlan: "Plan",
+        autonomyLevelAuto: "Auto",
+        autonomySelectorAriaLabel: "Select Copilot autonomy mode"
     },
     auth: {
         loginTitle: "Log in to your account",

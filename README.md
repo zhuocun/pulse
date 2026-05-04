@@ -75,10 +75,10 @@ For the **v2.1 redesign** of the AI features — named LangGraph agents over the
 Phase A wires the FE plumbing for the v2.1 agent without changing the v1 surfaces:
 
 - **LangGraph v2 streaming client** at `src/utils/ai/agentClient.ts` parses Server-Sent `StreamPart` events (`updates`, `messages`, `custom`, `interrupt`, `error`) and maps non-OK responses to typed errors (`AgentTransportError`, `AgentAuthError`, `AgentRateLimitError`, `AgentBudgetError`, `AgentNotFoundError`, `AgentServerError`). Sends `Idempotency-Key` on every request. The wire types are in `src/interfaces/agent.d.ts`.
-- **FE tool registry** at `src/utils/ai/feTools/` exposes 11 read-only tools (`fe.listProjects`, `fe.boardSnapshot`, `fe.viewerContext`, …) backed by the existing React Query cache. Tool args use snake_case (`task_id`, `project_id`) to match BE schemas. They are invoked when the agent emits an `interrupt` event whose tool is in the registry.
+- **FE tool registry** at `src/utils/ai/feTools/` exposes 11 read-only tools (`fe.listProjects`, `fe.boardSnapshot`, `fe.viewerContext`, …) backed by the existing React Query cache. Tool args use snake_case (`task_id`, `project_id`) to match BE schemas. They are invoked when the agent emits an `interrupt` event whose tool is in the registry. Of these 11, six (`listProjects`, `listMembers`, `getProject`, `listBoard`, `listTasks`, `getTask`) are wire-bound to the chat-agent via `chatTools.ts`; the other five (`boardSnapshot`, `viewerContext`, `recentActivity`, `formDraft`, `similarTasks`) are FE-only helpers available for future agent use.
 - **`useAgent` hook** at `src/utils/hooks/useAgent.ts` drives a turn end-to-end, reduces stream parts into UI state, persists `thread_id` per `(name, project)`, and auto-resumes on FE-tool interrupts. `start()` enforces per-project AI opt-out before opening the SSE stream.
 - **Command palette** at `src/components/commandPalette/` opens with `Cmd/Ctrl+K`, indexes the cache for navigation, and renders an ARIA combobox + listbox. AI mode (`Tab` / `/` prefix) shows a Phase E placeholder.
-- **Autonomy level** persisted via `useAutonomyLevel` (in `src/utils/hooks/useAiEnabled.ts`) under `boardCopilot:autonomy` (`suggest` / `plan` / `auto`, default `plan`). The legacy `useAiEnabled` toggle is unchanged.
+- **Autonomy level** persisted via `useAutonomyLevel` (in `src/utils/hooks/useAiEnabled.ts`) under `boardCopilot:autonomy` (`suggest` / `plan` / `auto`, default `plan`). `useAgent` subscribes to this value so `autonomyRef` tracks the live setting — it is no longer hard-coded to `"plan"`. An Ant Design `Select` selector in the `AiChatDrawer` extra slot lets users change the level in-app; the choice is persisted immediately. The legacy `useAiEnabled` toggle is unchanged.
 - **Analytics constants** at `src/constants/analytics.ts` (events `agent.*`, `nudge.*`, `palette.*`, `agent.feedback.*`). Observability sinks at `src/utils/observability/sinks.ts` — configure `VITE_ANALYTICS_ENDPOINT` and `VITE_ERROR_REPORT_ENDPOINT` to enable production event collection.
 
 ### Environment
@@ -88,7 +88,7 @@ Phase A wires the FE plumbing for the v2.1 agent without changing the v1 surface
 ### Developing with Board Copilot
 
 - Run the app with `REACT_APP_AI_BASE_URL` unset to drive every AI surface from the deterministic local engine.
-- Set `REACT_APP_AI_BASE_URL=http://localhost:8000` (or your agent server) to switch the v1 surfaces to the remote proxy. Phase B will start using `useAgent` for the chat surface.
+- Set `REACT_APP_AI_BASE_URL=http://localhost:8000` (or your agent server) to use the remote agent. In remote mode `AiChatDrawer` uses `useAgentChat` (backed by `useAgent("chat-agent")`) for SSE streaming; the v1 `useAiChat` path remains active in local mode.
 - Toggle Board Copilot for the current browser via `localStorage.setItem("boardCopilot:enabled", "false")`. Toggle the autonomy with `localStorage.setItem("boardCopilot:autonomy", "auto" | "plan" | "suggest")`.
 - Open the command palette in Storybook-less dev with `Cmd/Ctrl+K`. The `commandPalette:open` window event is dispatched on the shortcut so any future host shell can mount the palette lazily.
 - All new components have `jest-axe` accessibility coverage; `npm test` runs the suite alongside the v1 tests.

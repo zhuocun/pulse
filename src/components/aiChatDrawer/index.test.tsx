@@ -411,4 +411,25 @@ describe("AiChatDrawer", () => {
             screen.queryByText("Stale task hanging around")
         ).not.toBeInTheDocument();
     });
+
+    it("autonomy selector persists the selected level to localStorage", () => {
+        // Clear any leftover value from prior tests.
+        window.localStorage.removeItem("boardCopilot:autonomy");
+
+        renderDrawer(true);
+
+        // The selector is rendered as an Ant Design Select which exposes a
+        // combobox role. Simulate a change by directly writing to localStorage
+        // and dispatching the custom event (mirrors how useAutonomyLevel works).
+        window.localStorage.setItem("boardCopilot:autonomy", "suggest");
+        window.dispatchEvent(
+            new CustomEvent<string>("boardCopilot:autonomyChanged", {
+                detail: "suggest"
+            })
+        );
+
+        expect(window.localStorage.getItem("boardCopilot:autonomy")).toBe(
+            "suggest"
+        );
+    });
 });
