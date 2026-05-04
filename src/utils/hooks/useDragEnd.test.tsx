@@ -82,11 +82,7 @@ type RenderProbeOptions = {
 
 const renderProbe = (options: RenderProbeOptions = {}) => {
     tasksEnabledArg = options.tasksEnabled ?? true;
-    const {
-        columnLoading = false,
-        taskLoading = false,
-        tasksEnabled = true
-    } = options;
+    const { columnLoading = false, taskLoading = false } = options;
     const boardData = Object.prototype.hasOwnProperty.call(options, "boards")
         ? options.boards
         : defaultBoards;

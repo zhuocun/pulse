@@ -53,7 +53,7 @@ interface UserAvatarProps extends Omit<AvatarProps, "children"> {
  * by passing `background={gradientFor(id)}`.
  */
 const UserAvatar: React.FC<UserAvatarProps> = ({
-    id,
+    id: _id,
     name,
     background,
     size = "small",
