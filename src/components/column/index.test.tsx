@@ -267,9 +267,10 @@ describe("Column", () => {
         });
 
         expect(screen.getByText("Unsaved task")).toBeInTheDocument();
-        expect(
-            screen.getByTestId("task-unsaved-0-Unsaved-task")
-        ).toHaveAttribute("data-disabled", "true");
+        expect(screen.getByTestId("task-unsaved-0")).toHaveAttribute(
+            "data-disabled",
+            "true"
+        );
         expect(
             screen.getByRole("button", { name: "Open task Unsaved task" })
         ).toBeDisabled();

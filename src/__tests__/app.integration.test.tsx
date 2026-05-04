@@ -94,7 +94,8 @@ const mockJsonResponse = (body: unknown, ok = true, status = ok ? 200 : 400) =>
     Promise.resolve({
         ok,
         status,
-        json: () => Promise.resolve(body)
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body))
     } as Response);
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
@@ -299,7 +300,9 @@ describe("App integration (full providers + routes)", () => {
             )
         ).toBeInTheDocument();
 
-        expect(screen.getByText("First task")).toBeInTheDocument();
+        expect(
+            await screen.findByText("First task", {}, { timeout: 5000 })
+        ).toBeInTheDocument();
     }, 20000);
 
     it("logs out from the header and returns to login", async () => {
