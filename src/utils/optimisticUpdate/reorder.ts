@@ -80,13 +80,10 @@ const updateIndexes = <T extends { index: number }>(items: T[]) =>
 
 export const taskCallback = (target: ITaskOrderParams, old: ITask[]) => {
     const orderedList = reorder({ objArray: old, ...target }) as ITask[];
-    const didReorder = orderedList.some(
-        (item, index) => item._id !== old[index]?._id
-    );
 
     return updateIndexes(
         orderedList.map((item) =>
-            item._id === target.fromId && (!target.referenceId || didReorder)
+            item._id === target.fromId
                 ? { ...item, columnId: target.referenceColumnId }
                 : { ...item }
         )

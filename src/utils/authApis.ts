@@ -3,6 +3,7 @@ import { microcopy } from "../constants/microcopy";
 
 import getAuthErrorMessage from "./getAuthErrorMessage";
 import { parseFetchBody } from "./parseFetchBody";
+import { writeAuthToken } from "./tokenStorage";
 
 /**
  * Mirrors the network-error narrowing in `useApi.ts` so offline / DNS / CORS
@@ -45,7 +46,7 @@ const login = async (param: { email: string; password: string }) => {
         if (typeof user?.jwt !== "string" || user.jwt.length === 0) {
             return Promise.reject(new Error("Login response missing token"));
         }
-        localStorage.setItem("Token", user.jwt);
+        writeAuthToken(user.jwt);
         return user;
     }
     const errMsg =

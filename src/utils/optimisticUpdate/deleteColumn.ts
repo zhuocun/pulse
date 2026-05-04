@@ -2,7 +2,7 @@ const deleteColumnCallback = (
     target: { columnId: string },
     old: IColumn[] | undefined
 ) => {
-    if (!old) return undefined;
+    if (!old) return old;
     const deletedColumn = old.find((column) => column._id === target.columnId);
     if (!deletedColumn) {
         return old;

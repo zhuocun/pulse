@@ -2,15 +2,17 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
+import { clearAuthToken, readAuthToken } from "../tokenStorage";
+
 const useAuth = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const userQueryKey = ["users"];
     const user = queryClient.getQueryData<IUser>(userQueryKey);
-    const token = localStorage.getItem("Token");
+    const token = readAuthToken();
     const clear = useCallback(async () => {
         queryClient.clear();
-        localStorage.removeItem("Token");
+        clearAuthToken();
     }, [queryClient]);
     const logout = useCallback(() => {
         clear().then(() => navigate("/login", { viewTransition: true }));
