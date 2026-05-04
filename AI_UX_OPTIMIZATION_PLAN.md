@@ -95,7 +95,11 @@ governance, consistency, and agent-readiness**:
 7. Analytics constants exist; observability sinks (`httpAnalyticsSink`, `httpErrorSink`,
    `devMemorySink`) were added 2026-05-04 (`src/utils/observability/sinks.ts`) and wired
    from `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`.
-   Individual `track()` call sites still need to be wired to these sinks.
+   Individual `track()` call sites are wired (2026-05-04, follow-up commit): the
+   v2.1 events `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED`, `AGENT_HEALTH_DEGRADED`,
+   and `COPILOT_REWRITE_ACCEPT` now fire from `useAgent.ts`, `useAgentHealth.ts`, and
+   `aiTaskAssistPanel/index.tsx` respectively. `AGENT_PROPOSAL_UNDONE` is the only
+   remaining unfired event — it has no UI undo path on accepted proposals yet.
 8. AI entry points remain fragmented across header, board header, filters,
    modals, drawers, and command palette.
 
@@ -429,8 +433,13 @@ synonyms, negation, or analytical questions.
 - Chat feedback is only thumbs up/down in
   `src/components/aiChatDrawer/index.tsx:385-397` and
   `src/components/aiChatDrawer/index.tsx:653-686`.
-- `track` call sites are not yet wired to the observability sinks added 2026-05-04
-  (`VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`; see `src/utils/observability/sinks.ts`).
+- The remaining v2.1 `track` call sites were wired 2026-05-04: `AGENT_TURN_STARTED` /
+  `AGENT_TURN_COMPLETED` in `src/utils/hooks/useAgent.ts`, `AGENT_HEALTH_DEGRADED`
+  in `src/utils/hooks/useAgentHealth.ts` (deduped per transition), and
+  `COPILOT_REWRITE_ACCEPT` in `src/components/aiTaskAssistPanel/index.tsx`
+  (readiness Apply). `AGENT_PROPOSAL_UNDONE` is still unfired because there is
+  no FE undo path on accepted proposals. The structured chat-feedback sheet
+  described below remains open.
 - Feedback toast says only "Thanks for your feedback" via
   `src/constants/microcopy.ts:189-190`.
 
@@ -776,33 +785,47 @@ chat response.
 
 ---
 
-### P2-5: Observability sinks added; call-site wiring remains open
+### P2-5: Observability sinks + call sites wired
 
-**Resolved (2026-05-04):** `src/utils/observability/sinks.ts` exports
+**Resolved (2026-05-04, two-phase):**
+
+Phase 1 — sinks landed: `src/utils/observability/sinks.ts` exports
 `httpAnalyticsSink`, `httpErrorSink`, and `devMemorySink`. Wired from
 `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT` / `VITE_ERROR_REPORT_ENDPOINT`.
 `ErrorBoundary.componentDidCatch` now reports to the error sink. Every analytics
 event includes `engineMode: "local" | "remote"`.
 
-**Best-practice violation:** no measurement of trust, error recovery, or safety.
+Phase 2 — call sites wired: every event in `ANALYTICS_EVENTS` now has at least
+one production fire site, with the single exception called out below.
+`AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` (with `agentName`, `durationMs`,
+`tokensIn`, `tokensOut`) fire from `src/utils/hooks/useAgent.ts` on stream open
+and natural completion / terminal error (aborts skip `COMPLETED`).
+`AGENT_HEALTH_DEGRADED` fires once per transition into `degraded` / `offline`
+from `src/utils/hooks/useAgentHealth.ts`, deduped via a ref so a sustained
+degraded status does not spam the sink. `COPILOT_REWRITE_ACCEPT` fires from
+`src/components/aiTaskAssistPanel/index.tsx` when the user clicks Apply on a
+readiness suggestion (the "rewrite" surface; estimate Apply continues to fire
+its own `COPILOT_ESTIMATE_APPLY`). `AGENT_TTFT`, `CITATION_CLICKED`, and
+`CITATION_FLAGGED` were already firing pre-2026-05-04; they continue unchanged.
 
-**Remaining evidence**
+**Still open**
 
-- `AGENT_TTFT`, `CITATION_CLICKED`, `CITATION_FLAGGED`, and
-  `COPILOT_REWRITE_ACCEPT` call sites in `src/constants/analytics.ts` still need
-  to be forwarded to the sink (the infrastructure is in place; the wiring at each
-  event emission point is not yet done).
+- `AGENT_PROPOSAL_UNDONE` is defined but unfired: there is no UI path that
+  undoes a previously accepted `MutationProposal`. `MutationProposalCard` has
+  Accept / Reject only. When a proposal-undo surface is built (Phase B
+  follow-up), the call site lands alongside it.
+- The sinks need an upstream consumer (Segment, PostHog, in-house). Until
+  `VITE_ANALYTICS_ENDPOINT` is set in production builds the events fall through
+  to `devMemorySink` (inspect via `window.__copilotEvents__` in the console).
 
-**Remaining optimization plan**
+**Verification**
 
-1. Wire existing `track()` call sites to `httpAnalyticsSink`.
-2. Confirm: do not send raw prompts, notes, task names, or generated answers.
-3. Use `devMemorySink` for QA (inspect `window.__copilotEvents__` in the browser console).
-
-**Acceptance criteria**
-
-- Product can measure whether AI UX changes improve trust calibration.
-- Analytics payload review confirms no raw user content is emitted.
+1. `track()` call sites are forwarded to the active sink via `setAnalyticsSink`
+   in `src/index.tsx`.
+2. Analytics payload review (`src/constants/analytics.ts` + each call site)
+   confirms no raw prompts, notes, task names, or generated answers are emitted —
+   only ids, counts, durations, and enum status values.
+3. `devMemorySink` is the default in development (`window.__copilotEvents__`).
 
 ---
 
@@ -982,20 +1005,20 @@ Add tests for:
 
 ## 8. Source mapping to AI UX best practices
 
-| Best practice / red flag          | Current status                                  | Plan sections     |
-| --------------------------------- | ----------------------------------------------- | ----------------- |
-| Visible AI involvement            | Mostly strong                                   | Preserve; 3.1     |
-| User control / undo               | Good but uneven                                 | P1-4, P1-5        |
-| Privacy and data-use clarity      | Needs correction                                | P0-1, P0-2        |
-| Claim-level verification          | Partial                                         | P0-3, P1-1        |
-| Confidence calibration            | Partial                                         | P2-1              |
-| Avoid misleading affordances      | Needs copy cleanup                              | P1-2, P2-4        |
-| Feedback loops                    | Too shallow                                     | P1-3, P2-5        |
-| Graceful failure                  | Mostly good                                     | Continue in tests |
-| Avoid anthropomorphism            | Mostly good                                     | P2-3              |
-| Avoid half-wired agentic features | Needs governance                                | P1-7, Phase 5     |
-| Accessibility of dynamic AI UI    | jest-axe done (2026-05-04)                      | Test plan         |
-| Measurement and monitoring        | Sinks added (2026-05-04); call-site wiring open | P2-5              |
+| Best practice / red flag          | Current status                             | Plan sections     |
+| --------------------------------- | ------------------------------------------ | ----------------- |
+| Visible AI involvement            | Mostly strong                              | Preserve; 3.1     |
+| User control / undo               | Good but uneven                            | P1-4, P1-5        |
+| Privacy and data-use clarity      | Needs correction                           | P0-1, P0-2        |
+| Claim-level verification          | Partial                                    | P0-3, P1-1        |
+| Confidence calibration            | Partial                                    | P2-1              |
+| Avoid misleading affordances      | Needs copy cleanup                         | P1-2, P2-4        |
+| Feedback loops                    | Too shallow                                | P1-3, P2-5        |
+| Graceful failure                  | Mostly good                                | Continue in tests |
+| Avoid anthropomorphism            | Mostly good                                | P2-3              |
+| Avoid half-wired agentic features | Needs governance                           | P1-7, Phase 5     |
+| Accessibility of dynamic AI UI    | jest-axe done (2026-05-04)                 | Test plan         |
+| Measurement and monitoring        | Sinks + v2.1 call sites wired (2026-05-04) | P2-5              |
 
 ---
 
