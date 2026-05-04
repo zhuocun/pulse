@@ -177,7 +177,6 @@ export interface AiChatDrawerProps {
     /**
      * v2.1 mount point: an active MutationProposal emitted by the agent
      * stream. Rendered inline between messages when present.
-     * TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md
      */
     pendingProposal?: MutationProposal;
     /**
@@ -185,6 +184,29 @@ export interface AiChatDrawerProps {
      * Rendered inline between messages when non-empty.
      */
     pendingNudges?: TriageNudge[];
+    /**
+     * Called when the user clicks Apply on a MutationProposalCard. Owners
+     * typically call `agent.resume({ accepted: true })` and clear the
+     * pending proposal. When omitted the drawer hides the card locally so
+     * the user always has a way out.
+     */
+    onAcceptProposal?: (proposal: MutationProposal) => void;
+    /**
+     * Called when the user rejects a MutationProposalCard. Mirror of
+     * `onAcceptProposal`; owners typically call `agent.resume({ accepted:
+     * false })`.
+     */
+    onRejectProposal?: (proposal: MutationProposal) => void;
+    /**
+     * Called when the user clicks the primary CTA on a NudgeCard. Owners
+     * navigate or kick off a follow-up agent run.
+     */
+    onActionNudge?: (nudge: TriageNudge) => void;
+    /**
+     * Called when the user dismisses a NudgeCard. When omitted the drawer
+     * hides the card locally for the lifetime of the open drawer.
+     */
+    onDismissNudge?: (nudge: TriageNudge) => void;
 }
 
 /**
@@ -247,7 +269,11 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
     knownProjectIds,
     initialPrompt,
     pendingProposal,
-    pendingNudges
+    pendingNudges,
+    onAcceptProposal,
+    onRejectProposal,
+    onActionNudge,
+    onDismissNudge
 }) => {
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
@@ -269,6 +295,82 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
      */
     const [expandedCitations, setExpandedCitations] = useState<Set<number>>(
         () => new Set()
+    );
+
+    /**
+     * Local dismissal tracking for v2.1 cards. Owners that pass
+     * `onAcceptProposal` / `onDismissNudge` are expected to clear the
+     * `pendingProposal` / `pendingNudges` props themselves. When no
+     * callback is supplied the drawer still needs to give the user a way
+     * out, so we hide the card locally for the lifetime of the open
+     * drawer. State resets when the proposal id changes or the drawer
+     * closes so a fresh proposal is never silently suppressed.
+     */
+    const [localProposalHandled, setLocalProposalHandled] = useState(false);
+    const [locallyDismissedNudges, setLocallyDismissedNudges] = useState<
+        Set<string>
+    >(() => new Set());
+
+    useEffect(() => {
+        setLocalProposalHandled(false);
+    }, [pendingProposal?.proposal_id]);
+
+    useEffect(() => {
+        if (!open) {
+            setLocalProposalHandled(false);
+            setLocallyDismissedNudges(new Set());
+        }
+    }, [open]);
+
+    const handleAcceptProposal = useCallback(
+        (proposal: MutationProposal) => {
+            if (onAcceptProposal) {
+                onAcceptProposal(proposal);
+                return;
+            }
+            setLocalProposalHandled(true);
+        },
+        [onAcceptProposal]
+    );
+
+    const handleRejectProposal = useCallback(
+        (proposal: MutationProposal) => {
+            if (onRejectProposal) {
+                onRejectProposal(proposal);
+                return;
+            }
+            setLocalProposalHandled(true);
+        },
+        [onRejectProposal]
+    );
+
+    const handleNudgeAction = useCallback(
+        (nudge: TriageNudge) => {
+            onActionNudge?.(nudge);
+        },
+        [onActionNudge]
+    );
+
+    const handleNudgeDismiss = useCallback(
+        (nudge: TriageNudge) => {
+            if (onDismissNudge) {
+                onDismissNudge(nudge);
+                return;
+            }
+            setLocallyDismissedNudges((prev) => {
+                if (prev.has(nudge.nudge_id)) return prev;
+                const next = new Set(prev);
+                next.add(nudge.nudge_id);
+                return next;
+            });
+        },
+        [onDismissNudge]
+    );
+
+    const visibleProposal =
+        pendingProposal && !localProposalHandled ? pendingProposal : null;
+    const visibleNudges = (pendingNudges ?? []).filter(
+        (nudge) => !locallyDismissedNudges.has(nudge.nudge_id)
     );
 
     const expandCitations = useCallback((turnIndex: number) => {
@@ -1003,29 +1105,30 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                         </MessageRow>
                     );
                 })}
-                {/* v2.1 inserts — MutationProposal and TriageNudge cards emitted
-                    by a future streaming agent path. Props default to undefined
-                    so this region is a no-op in the current v1 flow.
-                    TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md */}
-                {pendingProposal && (
+                {/* v2.1 inserts — MutationProposal and TriageNudge cards
+                    emitted by an agent stream. Owners pass `onAcceptProposal`
+                    / `onDismissNudge` to drive `agent.resume(...)`; when
+                    omitted the drawer hides cards locally so the user can
+                    always dismiss. */}
+                {visibleProposal && (
                     <MutationProposalCard
-                        onAccept={() => {
-                            /* TODO(v2.1 phase B): wire onAccept to agent.resume — see board-copilot-progress.md */
-                        }}
-                        onReject={() => {
-                            /* TODO(v2.1 phase B): wire onReject to agent.resume — see board-copilot-progress.md */
-                        }}
-                        proposal={pendingProposal}
+                        onAccept={() => handleAcceptProposal(visibleProposal)}
+                        onReject={() => handleRejectProposal(visibleProposal)}
+                        proposal={visibleProposal}
                     />
                 )}
-                {pendingNudges && pendingNudges.length > 0 && (
+                {visibleNudges.length > 0 && (
                     <>
-                        {pendingNudges.map((nudge) => (
+                        {visibleNudges.map((nudge) => (
                             <NudgeCard
                                 key={nudge.nudge_id}
                                 nudge={nudge}
-                                onAction={undefined}
-                                onDismiss={undefined}
+                                onAction={
+                                    onActionNudge
+                                        ? handleNudgeAction
+                                        : undefined
+                                }
+                                onDismiss={handleNudgeDismiss}
                             />
                         ))}
                     </>
