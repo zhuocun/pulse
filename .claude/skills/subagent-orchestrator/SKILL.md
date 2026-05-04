@@ -1,8 +1,6 @@
 ---
 name: subagent-orchestrator
-description: Decompose work into bounded subtasks, delegate independent research and development slices to parallel subagents with explicitly set model and reasoning parameters, and act as the reviewer that gates and integrates returned work.
-metadata:
-  short-description: Parallel research+development delegation with explicit model selection and orchestrator review
+description: Orchestrates parallel subagents instead of running tasks single-threaded — decomposes the task, delegates independent research and development slices (exploration, analysis, implementation, fixes, tests, verification) to subagents with model and reasoning parameters set explicitly on every call, then reviews returned work as the quality gate before integrating. Use when the user authorizes subagents or asks to "parallelize", "orchestrate", "delegate", or "run agents in parallel"; when the task has 2+ independent workstreams or 3+ distinct subtasks; when it combines exploration with implementation, or implementation with verification; or when it is likely to take more than a few minutes. On Cursor, picks Composer for every subagent call. Do NOT use when no subagent launcher is available, when subagents are not authorized, or for tiny, fully serial, or tightly coupled tasks.
 ---
 
 # Subagent Orchestrator
