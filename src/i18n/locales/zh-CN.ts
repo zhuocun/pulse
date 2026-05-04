@@ -371,6 +371,8 @@ const zhCN: Dictionary = {
         runningReadiness: "正在运行就绪检查",
         readinessReady: "看起来已准备就绪。",
         dismissNudge: "关闭",
+        agentDegraded: "AI 后端响应缓慢（降级）",
+        agentOffline: "AI 后端离线",
         completionAnnouncementOne: "{label} 回复了 {count} 个词。",
         completionAnnouncementOther: "{label} 回复了 {count} 个词。",
         citationSourceTask: "任务",
