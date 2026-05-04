@@ -28,6 +28,7 @@ jest.mock("../../constants/env", () => ({
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../ai/agentClient";
+import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import useAgent from "./useAgent";
 
 const mockedStream = streamAgent as unknown as jest.Mock;
@@ -399,6 +400,152 @@ describe("useAgent", () => {
         expect(result.current.state.messages).toEqual([]);
         expect(result.current.error).toBeNull();
         expect(result.current.isStreaming).toBe(false);
+    });
+
+    describe("analytics — AGENT_TURN_STARTED / AGENT_TURN_COMPLETED", () => {
+        it("fires AGENT_TURN_STARTED when the stream opens and AGENT_TURN_COMPLETED when it finishes", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "hi" }, {}]
+                    }
+                ])
+            );
+            const tracked: Array<
+                [string, Record<string, unknown> | undefined]
+            > = [];
+            const previous = setAnalyticsSink((event, payload) => {
+                tracked.push([event, payload]);
+            });
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            try {
+                await act(async () => {
+                    await result.current.start("hello");
+                });
+                await waitFor(() => {
+                    expect(result.current.isStreaming).toBe(false);
+                });
+            } finally {
+                setAnalyticsSink(previous);
+            }
+
+            const startedCall = tracked.find(
+                ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_STARTED
+            );
+            const completedCall = tracked.find(
+                ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_COMPLETED
+            );
+
+            expect(startedCall).toBeDefined();
+            expect(startedCall?.[1]).toMatchObject({
+                agentName: "board-coach"
+            });
+
+            expect(completedCall).toBeDefined();
+            expect(completedCall?.[1]).toMatchObject({
+                agentName: "board-coach",
+                durationMs: expect.any(Number)
+            });
+            // Should not be on the error path
+            expect(completedCall?.[1]).not.toHaveProperty("error");
+        });
+
+        it("fires AGENT_TURN_COMPLETED with error:true on a terminal stream error", async () => {
+            // Plain async-iterable whose first .next() rejects -- avoids the
+            // require-yield lint trap that an empty async generator would hit.
+            mockedStream.mockReturnValueOnce({
+                [Symbol.asyncIterator]() {
+                    return this;
+                },
+                async next() {
+                    throw new Error("server exploded");
+                }
+            } as unknown as AsyncIterable<never>);
+            const tracked: Array<
+                [string, Record<string, unknown> | undefined]
+            > = [];
+            const previous = setAnalyticsSink((event, payload) => {
+                tracked.push([event, payload]);
+            });
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            try {
+                await act(async () => {
+                    await result.current.start("hello");
+                });
+                await waitFor(() => {
+                    expect(result.current.isStreaming).toBe(false);
+                });
+            } finally {
+                setAnalyticsSink(previous);
+            }
+
+            const completedCall = tracked.find(
+                ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_COMPLETED
+            );
+            expect(completedCall).toBeDefined();
+            expect(completedCall?.[1]).toMatchObject({ error: true });
+        });
+
+        it("does NOT fire AGENT_TURN_COMPLETED when the stream is aborted", async () => {
+            // Hold a reference to the Promise resolver so we can unblock the
+            // generator after abort, keeping the test deterministic.
+            const releaseRef: { fn: (() => void) | null } = { fn: null };
+            mockedStream.mockReturnValueOnce(
+                (async function* () {
+                    await new Promise<void>((resolve) => {
+                        releaseRef.fn = resolve;
+                    });
+                    yield {
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "hi" }, {}]
+                    } as StreamPart;
+                })()
+            );
+            const tracked: Array<
+                [string, Record<string, unknown> | undefined]
+            > = [];
+            const previous = setAnalyticsSink((event, payload) => {
+                tracked.push([event, payload]);
+            });
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            try {
+                // Start but don't await — abort immediately.
+                const startPromise = act(async () => {
+                    result.current.start("hello").catch(() => undefined);
+                });
+                act(() => {
+                    result.current.abort();
+                });
+                // Unblock the generator so the promise resolves.
+                if (releaseRef.fn !== null) releaseRef.fn();
+                await startPromise;
+                await waitFor(() => {
+                    expect(result.current.isStreaming).toBe(false);
+                });
+            } finally {
+                setAnalyticsSink(previous);
+            }
+
+            const completedCalls = tracked.filter(
+                ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_COMPLETED
+            );
+            expect(completedCalls).toHaveLength(0);
+        });
     });
 
     // Fix 7 — project-AI opt-out check
