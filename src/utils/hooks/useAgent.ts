@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
+import { microcopy } from "../../constants/microcopy";
 import type {
     AutonomyLevel,
     CitationRef,
@@ -12,8 +13,12 @@ import type {
     TriageNudge
 } from "../../interfaces/agent";
 import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
-import { streamAgent } from "../ai/agentClient";
+import { AgentForbiddenError, streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
+import {
+    isProjectAiDisabled,
+    PROJECT_AI_DISABLED_MESSAGE
+} from "../ai/projectAiStorage";
 import type { FeToolContext } from "../ai/feTools";
 
 export interface AgentMessage {
@@ -290,9 +295,7 @@ const useAgent = (
                 watchdogRef.current = setTimeout(() => {
                     controller.abort();
                     if (mountedRef.current) {
-                        setError(
-                            new Error("Board Copilot took too long. Try again.")
-                        );
+                        setError(new Error(microcopy.ai.watchdogTimeout));
                     }
                 }, STREAM_WATCHDOG_MS);
             };
@@ -433,6 +436,13 @@ const useAgent = (
             if (startOptions.autoResume === false)
                 autoResumeRef.current = false;
             else autoResumeRef.current = true;
+
+            // Guard: refuse to start if the project has AI disabled via the
+            // per-project toggle (mirrors `assertRunPayloadProjectsAiAllowed`
+            // in `useAi.ts`). Throws synchronously so no fetch is initiated.
+            if (isProjectAiDisabled(options.projectId)) {
+                throw new AgentForbiddenError(PROJECT_AI_DISABLED_MESSAGE);
+            }
 
             lastInputRef.current = input;
             setPendingInterrupt(null);

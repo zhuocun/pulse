@@ -366,6 +366,40 @@ export const enSource = {
         feedbackThumbsDownTooltip:
             "Not helpful? Tell us why. Categories are saved for product review only — your message text is not sent.",
         chatBusyError: "Board Copilot is busy. Try again in a moment.",
+        errorBudgetHeading: "Out of AI credits",
+        errorBudgetBody:
+            "This project has hit its AI budget for the period. Contact your admin to raise the cap.",
+        errorForbiddenHeading: "Permission denied",
+        errorForbiddenBody:
+            "You don't have access to this AI feature for this project.",
+        errorNotFoundHeading: "Agent unavailable",
+        errorNotFoundBody:
+            "This AI feature isn't deployed on the connected server.",
+        errorServerHeading: "AI service is having trouble",
+        errorServerBody: "Please retry in a moment.",
+        errorDefaultHeading: "Board Copilot hit an error",
+        errorDefaultBody:
+            "Try again, or reload the page if the problem persists.",
+        watchdogTimeout: "Board Copilot took too long. Try again.",
+        unexpectedResponse: "Got an unexpected response from Board Copilot.",
+        toolRoundExhausted:
+            "Could not finish the answer (too many steps). Try a narrower question.",
+        suggestedStoryPoints: "Suggested story points",
+        estimateTaskNameHint: "Type a task name above to get an estimate.",
+        estimatingPoints: "Estimating story points",
+        suggestedPointsAria: "Suggested story points: {points}",
+        applyPointsAria: "Apply suggested story points",
+        similarTasks: "Similar tasks:",
+        readinessCheck: "Readiness check",
+        runningReadiness: "Running readiness check",
+        readinessReady: "Looks ready to work on.",
+        dismissNudge: "Dismiss",
+        completionAnnouncementOne: "{label} responded with {count} word.",
+        completionAnnouncementOther: "{label} responded with {count} words.",
+        citationSourceTask: "Task",
+        citationSourceColumn: "Column",
+        citationSourceMember: "Member",
+        citationSourceProject: "Project",
         feedbackPromptDownTitle: "What went wrong?",
         feedbackPromptDownHelper:
             "Pick at least one — it helps us prioritize fixes without sending your message text.",

@@ -6,6 +6,7 @@ import type {
     StreamPart
 } from "../../interfaces/agent";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
+import { newIdempotencyKey } from "./idempotencyKey";
 
 /**
  * Typed transport over the LangGraph v2 `agents/{name}/stream` endpoint
@@ -245,6 +246,7 @@ export async function* streamAgent({
     headers
 }: AgentEnvelopeRequest): AsyncGenerator<StreamPart, void, void> {
     checkAlreadyAborted(signal);
+    const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
         response = await fetch(
@@ -253,6 +255,7 @@ export async function* streamAgent({
                 body: JSON.stringify(body),
                 headers: buildHeaders({
                     Accept: "text/event-stream",
+                    "Idempotency-Key": idempotencyKey,
                     ...(headers ?? {})
                 }),
                 method: "POST",
@@ -311,13 +314,17 @@ export const invokeAgent = async <T = unknown>({
     headers
 }: AgentEnvelopeRequest): Promise<T> => {
     checkAlreadyAborted(signal);
+    const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
         response = await fetch(
             `${trimSlash(baseUrl)}/api/v1/agents/${encodeURIComponent(name)}/invoke`,
             {
                 body: JSON.stringify(body),
-                headers: buildHeaders(headers),
+                headers: buildHeaders({
+                    "Idempotency-Key": idempotencyKey,
+                    ...(headers ?? {})
+                }),
                 method: "POST",
                 signal
             }

@@ -474,4 +474,83 @@ describe("agentClient", () => {
             expect(typeof out.latencyMs).toBe("number");
         });
     });
+
+    // Fix 2 — Idempotency-Key header on agent requests.
+    describe("Idempotency-Key header", () => {
+        it("streamAgent sends an Idempotency-Key header", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                buildStreamResponse([
+                    sseChunk({
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "hi" }]
+                    })
+                ])
+            );
+            // Drain the async generator so fetch is actually called.
+            const gen1 = streamAgent({ ...baseRequest });
+            await gen1.next(); // consume at least one chunk
+            const callHeaders = (
+                fetchSpy.mock.calls[0][1] as {
+                    headers?: Record<string, string>;
+                }
+            ).headers;
+            expect(callHeaders?.["Idempotency-Key"]).toBeTruthy();
+            expect(callHeaders?.["Idempotency-Key"]).toMatch(/-/);
+        });
+
+        it("invokeAgent sends an Idempotency-Key header", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                okJsonResponse({ output: { result: "done" } })
+            );
+            await invokeAgent({ ...baseRequest });
+            const callHeaders = (
+                fetchSpy.mock.calls[0][1] as {
+                    headers?: Record<string, string>;
+                }
+            ).headers;
+            expect(callHeaders?.["Idempotency-Key"]).toBeTruthy();
+            expect(callHeaders?.["Idempotency-Key"]).toMatch(/-/);
+        });
+
+        it("each streamAgent invocation generates a distinct key", async () => {
+            fetchSpy
+                .mockResolvedValueOnce(
+                    buildStreamResponse([
+                        sseChunk({
+                            type: "messages",
+                            ns: ["root"],
+                            data: [{ content: "a" }]
+                        })
+                    ])
+                )
+                .mockResolvedValueOnce(
+                    buildStreamResponse([
+                        sseChunk({
+                            type: "messages",
+                            ns: ["root"],
+                            data: [{ content: "b" }]
+                        })
+                    ])
+                );
+            // Drain each generator with .next() so fetch is called once per invocation.
+            const genA = streamAgent({ ...baseRequest });
+            await genA.next();
+            const genB = streamAgent({ ...baseRequest });
+            await genB.next();
+            const key1 = (
+                fetchSpy.mock.calls[0][1] as {
+                    headers?: Record<string, string>;
+                }
+            ).headers?.["Idempotency-Key"];
+            const key2 = (
+                fetchSpy.mock.calls[1][1] as {
+                    headers?: Record<string, string>;
+                }
+            ).headers?.["Idempotency-Key"];
+            expect(key1).toBeTruthy();
+            expect(key2).toBeTruthy();
+            expect(key1).not.toBe(key2);
+        });
+    });
 });

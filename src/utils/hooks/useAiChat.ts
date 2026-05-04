@@ -21,6 +21,8 @@ import { getStoredBearerAuthHeader } from "../aiAuthHeader";
 import { parseFetchBody } from "../parseFetchBody";
 import { rewriteNetworkFetchError } from "../networkFetchError";
 
+import { newIdempotencyKey } from "../ai/idempotencyKey";
+import { mapErrorResponse } from "../ai/mapErrorResponse";
 import {
     isProjectAiDisabled,
     PROJECT_AI_DISABLED_MESSAGE
@@ -56,12 +58,14 @@ const remoteChatStep = async (
         messages,
         context
     });
+    const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
         response = await fetch(`${environment.aiBaseUrl}/api/ai/chat`, {
             body: JSON.stringify(sanitized),
             headers: {
                 "Content-Type": "application/json",
+                "Idempotency-Key": idempotencyKey,
                 ...(authHeader ? { Authorization: authHeader } : {})
             },
             method: "POST",
@@ -74,15 +78,8 @@ const remoteChatStep = async (
         }
         throw err;
     }
-    if (response.status === 429) {
-        // i18n-aware copy (Optimization Plan §3 P2-3 follow-up). The
-        // previous hard-coded English string surfaced via the chat error
-        // alert and bypassed the central microcopy bundle, so a translator
-        // had no way to localize it.
-        throw new Error(microcopy.ai.chatBusyError);
-    }
     if (!response.ok) {
-        throw new Error(`AI request failed (${response.status})`);
+        throw await mapErrorResponse(response);
     }
     return (await parseFetchBody(response)) as ChatTurnResult;
 };
@@ -204,8 +201,7 @@ const useAiChat = (ctx: UseAiChatContext | null) => {
                     if (!turn.toolCalls?.length) {
                         const fallback: AiChatMessage = {
                             role: "assistant",
-                            content:
-                                "Got an unexpected response from Board Copilot.",
+                            content: microcopy.ai.unexpectedResponse,
                             citations: turnCitations.slice()
                         };
                         thread = [...thread, fallback];
@@ -272,8 +268,7 @@ const useAiChat = (ctx: UseAiChatContext | null) => {
                 ) {
                     const assistant: AiChatMessage = {
                         role: "assistant",
-                        content:
-                            "Could not finish the answer (too many steps). Try a narrower question.",
+                        content: microcopy.ai.toolRoundExhausted,
                         citations: turnCitations.slice()
                     };
                     thread = [...thread, assistant];

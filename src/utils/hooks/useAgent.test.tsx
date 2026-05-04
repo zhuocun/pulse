@@ -4,10 +4,17 @@ import React from "react";
 
 import type { StreamPart } from "../../interfaces/agent";
 
-jest.mock("../ai/agentClient", () => ({
-    __esModule: true,
-    streamAgent: jest.fn()
-}));
+jest.mock("../ai/agentClient", () => {
+    const actual =
+        jest.requireActual<typeof import("../ai/agentClient")>(
+            "../ai/agentClient"
+        );
+    return {
+        __esModule: true,
+        ...actual,
+        streamAgent: jest.fn()
+    };
+});
 
 jest.mock("../../constants/env", () => ({
     __esModule: true,
@@ -392,5 +399,72 @@ describe("useAgent", () => {
         expect(result.current.state.messages).toEqual([]);
         expect(result.current.error).toBeNull();
         expect(result.current.isStreaming).toBe(false);
+    });
+
+    // Fix 7 — project-AI opt-out check
+    describe("project AI disabled guard", () => {
+        const { setProjectAiDisabledInStorage } = jest.requireActual<
+            typeof import("../ai/projectAiStorage")
+        >("../ai/projectAiStorage");
+
+        afterEach(() => {
+            // Re-enable the project after each test.
+            setProjectAiDisabledInStorage("p-disabled", false);
+        });
+
+        it("throws AgentForbiddenError and does not call streamAgent when project AI is disabled", async () => {
+            setProjectAiDisabledInStorage("p-disabled", true);
+
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () =>
+                    useAgent("board-coach", {
+                        projectId: "p-disabled"
+                    }),
+                { wrapper: wrapper(queryClient) }
+            );
+
+            let caught: Error | null = null;
+            await act(async () => {
+                try {
+                    await result.current.start("hi");
+                } catch (err) {
+                    caught = err as Error;
+                }
+            });
+
+            expect(caught).not.toBeNull();
+            expect(caught!.name).toBe("AgentForbiddenError");
+            // No fetch should have been initiated.
+            expect(mockedStream).not.toHaveBeenCalled();
+        });
+
+        it("starts normally when the project AI is enabled", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "ok" }, {}]
+                    }
+                ])
+            );
+
+            setProjectAiDisabledInStorage("p-disabled", false);
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () =>
+                    useAgent("board-coach", {
+                        projectId: "p-disabled"
+                    }),
+                { wrapper: wrapper(queryClient) }
+            );
+
+            await act(async () => {
+                await result.current.start("hello");
+            });
+
+            expect(mockedStream).toHaveBeenCalledTimes(1);
+        });
     });
 });

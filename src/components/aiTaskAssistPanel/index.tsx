@@ -313,7 +313,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                     ) : null
                 }
             >
-                Suggested story points
+                {microcopy.ai.suggestedStoryPoints as string}
             </SectionHeading>
             <div aria-atomic="false" aria-live="polite">
                 {!trimmedName && !estimateAi.isLoading && (
@@ -321,13 +321,13 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         style={{ margin: 0 }}
                         type="secondary"
                     >
-                        Type a task name above to get an estimate.
+                        {microcopy.ai.estimateTaskNameHint as string}
                     </Typography.Paragraph>
                 )}
                 {showEstimateSpinner && (
                     <Skeleton
                         active
-                        aria-label="Estimating story points"
+                        aria-label={microcopy.ai.estimatingPoints as string}
                         paragraph={{ rows: 2 }}
                         title={false}
                     />
@@ -362,7 +362,12 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                             }}
                         >
                             <span
-                                aria-label={`Suggested story points: ${estimateData.storyPoints}`}
+                                aria-label={(
+                                    microcopy.ai.suggestedPointsAria as string
+                                ).replace(
+                                    "{points}",
+                                    String(estimateData.storyPoints)
+                                )}
                                 style={{
                                     fontSize: fontSize.xxl,
                                     fontWeight: 600
@@ -375,7 +380,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                 tooltip="Based on similar tasks on this board."
                             />
                             <Button
-                                aria-label="Apply suggested story points"
+                                aria-label={
+                                    microcopy.ai.applyPointsAria as string
+                                }
                                 onClick={handleApplyPoints}
                                 size="small"
                                 type={lowConfidence ? "default" : "primary"}
@@ -440,7 +447,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                             )}
                         {estimateData.similar.length > 0 && (
                             <div>
-                                <strong>Similar tasks:</strong>
+                                <strong>
+                                    {microcopy.ai.similarTasks as string}
+                                </strong>
                                 <ul style={{ paddingLeft: space.lg }}>
                                     {estimateData.similar.map((entry) => {
                                         const task = taskById(entry._id);
@@ -476,13 +485,15 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             </div>
 
             <div style={{ marginTop: space.md }}>
-                <SectionHeading>Readiness check</SectionHeading>
+                <SectionHeading>
+                    {microcopy.ai.readinessCheck as string}
+                </SectionHeading>
             </div>
             <div aria-atomic="false" aria-live="polite">
                 {showReadinessSpinner && (
                     <Skeleton
                         active
-                        aria-label="Running readiness check"
+                        aria-label={microcopy.ai.runningReadiness as string}
                         paragraph={{ rows: 1 }}
                         title={false}
                     />
@@ -497,7 +508,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 )}
                 {readinessAi.data && readinessAi.data.issues.length === 0 && (
                     <Alert
-                        title="Looks ready to work on."
+                        title={microcopy.ai.readinessReady as string}
                         showIcon
                         type="success"
                     />

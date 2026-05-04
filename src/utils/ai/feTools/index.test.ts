@@ -46,8 +46,8 @@ describe("FE_TOOL_REGISTRY", () => {
         for (const tool of Object.values(FE_TOOL_REGISTRY)) {
             const result = await tool.run(
                 {
-                    projectId: "p-missing",
-                    taskId: "t1",
+                    project_id: "p-missing",
+                    task_id: "t1",
                     query: "x",
                     formId: "form-1"
                 } as unknown as never,
@@ -283,7 +283,7 @@ describe("FE_TOOL_REGISTRY", () => {
             projectName: "Singleton"
         });
         const result = await getProjectTool.run(
-            { projectId: "p9" },
+            { project_id: "p9" },
             buildCtx(qc)
         );
         expect(result?._id).toBe("p9");
@@ -305,9 +305,126 @@ describe("FE_TOOL_REGISTRY", () => {
             ]
         );
         const result = await getProjectTool.run(
-            { projectId: "missing" },
+            { project_id: "missing" },
             buildCtx(qc)
         );
         expect(result).toBeNull();
+    });
+
+    it("getTask finds a task by snake_case task_id", async () => {
+        const { getTaskTool } = await import("./getTask");
+        const qc = new QueryClient();
+        qc.setQueryData<ITask[]>(
+            ["tasks", { projectId: "p1" }],
+            [
+                {
+                    _id: "t42",
+                    columnId: "c1",
+                    coordinatorId: "m1",
+                    epic: "auth",
+                    index: 0,
+                    note: "",
+                    projectId: "p1",
+                    storyPoints: 3,
+                    taskName: "Fix login",
+                    type: "Bug"
+                }
+            ]
+        );
+        const result = await getTaskTool.run(
+            { task_id: "t42", project_id: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result?._id).toBe("t42");
+        expect(result?.taskName).toBe("Fix login");
+    });
+
+    it("getTask returns null when task_id is not in cache", async () => {
+        const { getTaskTool } = await import("./getTask");
+        const qc = new QueryClient();
+        const result = await getTaskTool.run(
+            { task_id: "t-missing", project_id: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result).toBeNull();
+    });
+
+    it("listBoard returns sorted columns using snake_case project_id", async () => {
+        const { listBoardTool } = await import("./listBoard");
+        const qc = new QueryClient();
+        qc.setQueryData<IColumn[]>(
+            ["boards", { projectId: "p1" }],
+            [
+                { _id: "c2", columnName: "Done", index: 1, projectId: "p1" },
+                { _id: "c1", columnName: "Todo", index: 0, projectId: "p1" }
+            ]
+        );
+        const result = await listBoardTool.run(
+            { project_id: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result).toHaveLength(2);
+        expect(result[0]._id).toBe("c1");
+        expect(result[1]._id).toBe("c2");
+    });
+
+    it("listTasks returns tasks using snake_case project_id", async () => {
+        const { listTasksTool } = await import("./listTasks");
+        const qc = new QueryClient();
+        qc.setQueryData<ITask[]>(
+            ["tasks", { projectId: "p5" }],
+            [
+                {
+                    _id: "t1",
+                    columnId: "c1",
+                    coordinatorId: "m1",
+                    epic: "x",
+                    index: 0,
+                    note: "",
+                    projectId: "p5",
+                    storyPoints: 1,
+                    taskName: "T1",
+                    type: "Task"
+                }
+            ]
+        );
+        const result = await listTasksTool.run(
+            { project_id: "p5" },
+            buildCtx(qc, "p5")
+        );
+        expect(result).toHaveLength(1);
+        expect(result[0]._id).toBe("t1");
+    });
+
+    it("listMembers returns members using snake_case project_id arg (ignored)", async () => {
+        const { listMembersTool } = await import("./listMembers");
+        const qc = new QueryClient();
+        qc.setQueryData<IMember[]>(
+            ["users/members"],
+            [{ _id: "m1", email: "a@b.c", username: "Alice" }]
+        );
+        const result = await listMembersTool.run(
+            { project_id: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result).toHaveLength(1);
+        expect(result[0]._id).toBe("m1");
+    });
+
+    it("recentActivity returns {activity: []} shape", async () => {
+        const { recentActivityTool } = await import("./recentActivity");
+        const qc = new QueryClient();
+        const result = await recentActivityTool.run(undefined, buildCtx(qc));
+        expect(result).toEqual({ activity: [] });
+    });
+
+    it("formDraft returns {draft: null} shape", async () => {
+        const { formDraftTool } = await import("./formDraft");
+        const qc = new QueryClient();
+        const result = await formDraftTool.run(
+            { formId: "create-task" },
+            buildCtx(qc)
+        );
+        expect(result).toEqual({ draft: null });
     });
 });

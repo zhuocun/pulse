@@ -6,6 +6,8 @@ import { parseFetchBody } from "../parseFetchBody";
 import { rewriteNetworkFetchError } from "../networkFetchError";
 
 import { sanitizeRemotePayloadForRoute } from "../ai/aiDataScope";
+import { newIdempotencyKey } from "../ai/idempotencyKey";
+import { mapErrorResponse } from "../ai/mapErrorResponse";
 import {
     AiContextProject,
     AiSearchProjectsContext,
@@ -220,12 +222,14 @@ const remoteResolve = async (
         route,
         payload as unknown as Record<string, unknown>
     );
+    const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
         response = await fetch(`${environment.aiBaseUrl}/api/ai/${route}`, {
             body: JSON.stringify(sanitized),
             headers: {
                 "Content-Type": "application/json",
+                "Idempotency-Key": idempotencyKey,
                 ...(authHeader ? { Authorization: authHeader } : {})
             },
             method: "POST",
@@ -239,7 +243,7 @@ const remoteResolve = async (
         throw err;
     }
     if (!response.ok) {
-        throw new Error(`AI request failed (${response.status})`);
+        throw await mapErrorResponse(response);
     }
     return parseFetchBody(response);
 };

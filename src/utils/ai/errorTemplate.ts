@@ -9,9 +9,14 @@
  * payload so individual surfaces don't reinvent the messaging each time.
  */
 
+import { microcopy } from "../../constants/microcopy";
 import {
     AgentAuthError,
+    AgentBudgetError,
+    AgentForbiddenError,
+    AgentNotFoundError,
     AgentRateLimitError,
+    AgentServerError,
     AgentTransportError
 } from "./agentClient";
 
@@ -24,14 +29,13 @@ export interface AiErrorView {
     retryable: boolean;
     /** Hint surfaces use to pick an icon / tone. */
     severity: "error" | "warning" | "info";
+    /**
+     * For rate-limit errors: number of seconds the retry button should be
+     * disabled. Zero means no countdown is needed. Surfaces that render a
+     * countdown timer read this field; surfaces that don't can ignore it.
+     */
+    disabledForSeconds?: number;
 }
-
-const DEFAULT_VIEW: AiErrorView = {
-    heading: "Board Copilot hit an error",
-    body: "Try again, or reload the page if the problem persists.",
-    retryable: true,
-    severity: "warning"
-};
 
 /**
  * Map an error (or unknown thrown value) to the UI shape the PRD requires.
@@ -47,8 +51,10 @@ export const aiErrorView = (
 ): AiErrorView => {
     if (!error)
         return {
-            ...DEFAULT_VIEW,
-            heading: fallbackHeading ?? DEFAULT_VIEW.heading
+            heading: fallbackHeading ?? microcopy.ai.errorDefaultHeading,
+            body: microcopy.ai.errorDefaultBody,
+            retryable: true,
+            severity: "warning"
         };
 
     if (error instanceof AgentRateLimitError) {
@@ -57,7 +63,8 @@ export const aiErrorView = (
             heading: "Board Copilot is at capacity",
             body: `Please try again in ${seconds} seconds.`,
             retryable: false,
-            severity: "info"
+            severity: "info",
+            disabledForSeconds: seconds
         };
     }
     if (error instanceof AgentAuthError) {
@@ -65,6 +72,38 @@ export const aiErrorView = (
             heading: "You're signed out",
             body: "Sign in again, then retry.",
             retryable: false,
+            severity: "warning"
+        };
+    }
+    if (error instanceof AgentBudgetError) {
+        return {
+            heading: microcopy.ai.errorBudgetHeading,
+            body: microcopy.ai.errorBudgetBody,
+            retryable: false,
+            severity: "warning"
+        };
+    }
+    if (error instanceof AgentForbiddenError) {
+        return {
+            heading: microcopy.ai.errorForbiddenHeading,
+            body: microcopy.ai.errorForbiddenBody,
+            retryable: false,
+            severity: "error"
+        };
+    }
+    if (error instanceof AgentNotFoundError) {
+        return {
+            heading: microcopy.ai.errorNotFoundHeading,
+            body: microcopy.ai.errorNotFoundBody,
+            retryable: false,
+            severity: "warning"
+        };
+    }
+    if (error instanceof AgentServerError) {
+        return {
+            heading: microcopy.ai.errorServerHeading,
+            body: microcopy.ai.errorServerBody,
+            retryable: true,
             severity: "warning"
         };
     }
@@ -86,7 +125,9 @@ export const aiErrorView = (
         };
     }
     return {
-        ...DEFAULT_VIEW,
-        heading: fallbackHeading ?? DEFAULT_VIEW.heading
+        heading: fallbackHeading ?? microcopy.ai.errorDefaultHeading,
+        body: microcopy.ai.errorDefaultBody,
+        retryable: true,
+        severity: "warning"
     };
 };

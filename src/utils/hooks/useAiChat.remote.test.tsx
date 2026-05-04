@@ -100,7 +100,9 @@ describe("useAiChat remote transport", () => {
             "https://copilot.example/api/ai/chat",
             expect.objectContaining({
                 method: "POST",
-                headers: { "Content-Type": "application/json" }
+                headers: expect.objectContaining({
+                    "Content-Type": "application/json"
+                })
             })
         );
         const assistant = result.current.messages.filter(
@@ -111,11 +113,16 @@ describe("useAiChat remote transport", () => {
         );
     });
 
-    it("surfaces 429 as the busy message", async () => {
+    // Fix 4: 429 is now routed through mapErrorResponse → AgentRateLimitError.
+    it("surfaces 429 as AgentRateLimitError (typed error)", async () => {
         fetchSpy.mockResolvedValue({
             json: jest.fn(),
             ok: false,
-            status: 429
+            status: 429,
+            text: jest.fn().mockResolvedValue(""),
+            headers: {
+                get: (h: string) => (h === "Retry-After" ? "60" : null)
+            }
         } as unknown as Response);
 
         const { result } = renderHook(() => useAiChat(chatCtx()), {
@@ -127,15 +134,18 @@ describe("useAiChat remote transport", () => {
         });
 
         await waitFor(() => {
-            expect(result.current.error?.message).toMatch(/busy/i);
+            expect(result.current.error?.name).toBe("AgentRateLimitError");
         });
     });
 
-    it("surfaces generic HTTP failures from the remote chat endpoint", async () => {
+    // Fix 4: 5xx responses are now typed AgentServerError.
+    it("surfaces 5xx as AgentServerError (typed error)", async () => {
         fetchSpy.mockResolvedValue({
             json: jest.fn(),
             ok: false,
-            status: 503
+            status: 503,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
         } as unknown as Response);
 
         const { result } = renderHook(() => useAiChat(chatCtx()), {
@@ -147,7 +157,51 @@ describe("useAiChat remote transport", () => {
         });
 
         await waitFor(() => {
-            expect(result.current.error?.message).toMatch(/AI request failed/i);
+            expect(result.current.error?.name).toBe("AgentServerError");
+        });
+    });
+
+    // Fix 2: Idempotency-Key header sent on every chat request.
+    it("sends an Idempotency-Key header on chat requests", async () => {
+        fetchSpy.mockResolvedValue({
+            json: jest.fn().mockResolvedValue({ kind: "text", text: "hi" }),
+            ok: true,
+            status: 200
+        } as unknown as Response);
+
+        const { result } = renderHook(() => useAiChat(chatCtx()), {
+            wrapper: wrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.send("test idempotency");
+        });
+
+        const headers = (
+            fetchSpy.mock.calls[0][1] as { headers?: Record<string, string> }
+        ).headers;
+        expect(headers).toBeDefined();
+        expect(headers!["Idempotency-Key"]).toBeTruthy();
+        expect(headers!["Idempotency-Key"]).toMatch(/-/);
+    });
+
+    // Fix 4: Typed error for 401.
+    it("surfaces 401 as AgentAuthError", async () => {
+        fetchSpy.mockResolvedValue({
+            ok: false,
+            status: 401,
+            text: jest.fn().mockResolvedValue(""),
+            headers: { get: () => null }
+        } as unknown as Response);
+
+        const { result } = renderHook(() => useAiChat(chatCtx()), {
+            wrapper: wrapper(queryClient)
+        });
+        await act(async () => {
+            await result.current.send("Hi");
+        });
+        await waitFor(() => {
+            expect(result.current.error?.name).toBe("AgentAuthError");
         });
     });
 });
