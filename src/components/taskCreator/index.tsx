@@ -1,7 +1,8 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Button, Input } from "antd";
-import { useEffect, useState } from "react";
+import type { InputRef } from "antd";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
@@ -81,6 +82,7 @@ const TaskCreator: React.FC<{
     const { user } = useAuth();
     const [taskName, setTaskName] = useState("");
     const [inputMode, setInputMode] = useState(false);
+    const inputRef = useRef<InputRef>(null);
     // The AI draft modal opens via a URL query param so the system back
     // button dismisses it. The query value is the column id so multiple
     // per-column triggers on the same board don't cross-talk.
@@ -126,6 +128,8 @@ const TaskCreator: React.FC<{
     useEffect(() => {
         if (!inputMode) {
             setTaskName("");
+        } else {
+            inputRef.current?.focus();
         }
     }, [inputMode]);
 
@@ -173,7 +177,7 @@ const TaskCreator: React.FC<{
             onBlur={toggle}
             placeholder={microcopy.placeholders.whatNeedsToBeDone}
             autoComplete="off"
-            autoFocus
+            ref={inputRef}
             onPressEnter={submit}
             onKeyDown={(event) => {
                 if (event.key === "Escape") {

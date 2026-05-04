@@ -8,14 +8,13 @@ import {
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { blur, breakpoints, radius, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
-import resetRoute from "../../utils/resetRoute";
 import BrandMark from "../brandMark";
 import LanguageSwitcher from "../languageSwitcher";
 import MemberPopover from "../memberPopover";
@@ -283,6 +282,7 @@ const Header: React.FC = () => {
     } = useAiEnabled();
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
+    const navigate = useNavigate();
     /*
      * Publish the rendered header height to a global CSS custom property
      * so secondary sticky chrome (e.g. the project detail page's
@@ -317,7 +317,11 @@ const Header: React.FC = () => {
             label: (
                 <SettingsRow>
                     <Space size={space.xs}>
-                        {scheme === "dark" ? <MoonOutlined aria-hidden /> : <SunOutlined aria-hidden />}
+                        {scheme === "dark" ? (
+                            <MoonOutlined aria-hidden />
+                        ) : (
+                            <SunOutlined aria-hidden />
+                        )}
                         <Typography.Text>
                             {microcopy.settings.darkMode}
                         </Typography.Text>
@@ -388,7 +392,10 @@ const Header: React.FC = () => {
                     type="link"
                     onClick={
                         path !== "/projects"
-                            ? () => resetRoute(window.location)
+                            ? () =>
+                                  navigate("/projects", {
+                                      viewTransition: true
+                                  })
                             : undefined
                     }
                 >
@@ -408,9 +415,13 @@ const Header: React.FC = () => {
                     }
                     type="button"
                 >
-                    {scheme === "dark" ? <SunOutlined aria-hidden /> : <MoonOutlined aria-hidden />}
+                    {scheme === "dark" ? (
+                        <SunOutlined aria-hidden />
+                    ) : (
+                        <MoonOutlined aria-hidden />
+                    )}
                 </IconButton>
-                <Dropdown menu={{ items }} trigger={["click", "hover"]}>
+                <Dropdown menu={{ items }} trigger={["click"]}>
                     <PillTrigger
                         aria-label={`${microcopy.a11y.accountMenu} for ${user?.username ?? "user"}`}
                         onClick={(event) => event.preventDefault()}
