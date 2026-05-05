@@ -459,4 +459,70 @@ describe("UI quality :: AiSearchInput guards", () => {
             expect(matched).toBe(true);
         }
     });
+
+    it("tasks variant: undefined `tasks` on projectContext does not throw on mount", () => {
+        mockedUseAiEnabled.mockReturnValue({
+            available: true,
+            enabled: true,
+            setEnabled: jest.fn()
+        });
+        mockedUseAi.mockReturnValue({
+            data: undefined,
+            error: null,
+            isLoading: false,
+            reset: jest.fn(),
+            run: jest.fn()
+        } as unknown as ReturnType<typeof useAi<unknown>>);
+
+        expect(() =>
+            render(
+                <BrowserRouter>
+                    <AiSearchInput
+                        kind="tasks"
+                        projectContext={
+                            {
+                                ...projectContext,
+                                tasks: undefined
+                            } as typeof projectContext
+                        }
+                        semanticIds={null}
+                        setSemanticIds={jest.fn()}
+                    />
+                </BrowserRouter>
+            )
+        ).not.toThrow();
+    });
+
+    it("projects variant: undefined `projects` on projectsContext does not throw on mount", () => {
+        mockedUseAiEnabled.mockReturnValue({
+            available: true,
+            enabled: true,
+            setEnabled: jest.fn()
+        });
+        mockedUseAi.mockReturnValue({
+            data: undefined,
+            error: null,
+            isLoading: false,
+            reset: jest.fn(),
+            run: jest.fn()
+        } as unknown as ReturnType<typeof useAi<unknown>>);
+
+        expect(() =>
+            render(
+                <BrowserRouter>
+                    <AiSearchInput
+                        kind="projects"
+                        projectsContext={
+                            {
+                                members: [],
+                                projects: undefined
+                            } as never
+                        }
+                        semanticIds={null}
+                        setSemanticIds={jest.fn()}
+                    />
+                </BrowserRouter>
+            )
+        ).not.toThrow();
+    });
 });

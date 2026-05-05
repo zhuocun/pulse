@@ -210,15 +210,19 @@ const AiSearchInput: React.FC<Props> = (props) => {
      */
     useEffect(() => {
         if (props.kind === "tasks") {
-            setBoardHasItems(props.projectContext.tasks.length > 0);
+            setBoardHasItems(
+                (props.projectContext.tasks?.length ?? 0) > 0
+            );
         } else {
-            setBoardHasItems(props.projectsContext.projects.length > 0);
+            setBoardHasItems(
+                (props.projectsContext.projects?.length ?? 0) > 0
+            );
         }
     }, [props]);
 
     const applyResult = useCallback(
         (result: ISearchResult, query: string) => {
-            if (result.ids.length === 0) {
+            if ((result.ids?.length ?? 0) === 0) {
                 props.setSemanticIds(undefined);
                 setMatchRationale(null);
                 setMatchSummary(null);
@@ -244,7 +248,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
             // Stash per-result bands so the card layer can render a small
             // strength chip on each filtered task/project (P1-2 per-result).
             setAiSearchStrengths(props.kind, result.matches);
-            props.setSemanticIds(result.ids.join(","));
+            props.setSemanticIds((result.ids ?? []).join(","));
         },
         [boardHasItems, props]
     );
@@ -252,15 +256,16 @@ const AiSearchInput: React.FC<Props> = (props) => {
     // Consume the agent's suggestion once applyResult is stable.
     useEffect(() => {
         if (!isRemote || !agentSearchPayload) return;
+        const ids = agentSearchPayload.ids ?? [];
         // matches may be absent — fall back to synthetic entries with moderate strength
         const matches: IAiSearchMatch[] = agentSearchPayload.matches?.length
             ? agentSearchPayload.matches
-            : agentSearchPayload.ids.map((id) => ({
+            : ids.map((id) => ({
                   id,
                   strength: "moderate" as const
               }));
         const result: ISearchResult = {
-            ids: agentSearchPayload.ids,
+            ids,
             matches,
             rationale: agentSearchPayload.rationale,
             expandedTerms: agentSearchPayload.expandedTerms ?? []
@@ -294,7 +299,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                               .projectsContext;
                           const filtered: AiSearchProjectsContext = {
                               ...ctx,
-                              projects: ctx.projects.filter(
+                              projects: (ctx.projects ?? []).filter(
                                   (p) => !isProjectAiDisabled(p._id)
                               )
                           };
@@ -323,7 +328,9 @@ const AiSearchInput: React.FC<Props> = (props) => {
             if (props.kind === "tasks") {
                 const ctx = (props as TaskSearchProps).projectContext;
                 raw = semanticSearch("tasks", query, ctx);
-                const valid = new Set(ctx.tasks.map((t) => t._id));
+                const valid = new Set(
+                    (ctx.tasks ?? []).map((t) => t._id)
+                );
                 applyResult(validateSearch(raw, valid), query);
             } else {
                 const projectsCtx =
@@ -331,7 +338,9 @@ const AiSearchInput: React.FC<Props> = (props) => {
                         ? searchPayload.search.projectsContext!
                         : (props as ProjectSearchProps).projectsContext;
                 raw = semanticSearch("projects", query, projectsCtx);
-                const valid = new Set(projectsCtx.projects.map((p) => p._id));
+                const valid = new Set(
+                    (projectsCtx.projects ?? []).map((p) => p._id)
+                );
                 applyResult(validateSearch(raw, valid), query);
             }
         },
