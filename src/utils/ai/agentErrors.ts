@@ -27,9 +27,17 @@ export class AgentAuthError extends Error {
  * Splitting the error class lets the UI route 403 to a "request access"
  * flow instead of nudging the user back to login (which is what 401
  * triggers).
+ *
+ * The optional `code` field carries the structured error code from the
+ * server's `{"code": "...", "message": "..."}` envelope (e.g. `"forbidden"`).
+ * Downstream consumers can branch on it; omitting it preserves backwards
+ * compatibility with single-string construction sites.
  */
 export class AgentForbiddenError extends Error {
-    constructor(message = "Agent server forbade this request") {
+    constructor(
+        message = "Agent server forbade this request",
+        public code?: string
+    ) {
         super(message);
         this.name = "AgentForbiddenError";
     }
@@ -48,8 +56,16 @@ export class AgentRateLimitError extends Error {
     }
 }
 
+/**
+ * The optional `code` field carries the structured error code from the
+ * server's `{"code": "...", "message": "..."}` envelope (e.g. `"quota_exceeded"`).
+ * Omitting it preserves backwards compatibility with single-string construction sites.
+ */
 export class AgentBudgetError extends Error {
-    constructor(message = "Agent budget exhausted for this user/project") {
+    constructor(
+        message = "Agent budget exhausted for this user/project",
+        public code?: string
+    ) {
         super(message);
         this.name = "AgentBudgetError";
     }

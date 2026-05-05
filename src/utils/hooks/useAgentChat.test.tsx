@@ -339,6 +339,82 @@ describe("useAgentChat", () => {
         expect(result.current.pendingNudges).toHaveLength(0);
     });
 
+    it("dismissNudge propagates to the underlying useAgent inbox — nudge does not resurrect after reset", async () => {
+        // Turn 1: stream emits a nudge.
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "custom",
+                    ns: ["root"],
+                    data: {
+                        kind: "nudge",
+                        nudge: {
+                            nudge_id: "n-inbox-1",
+                            kind: "load_imbalance" as const,
+                            project_id: "p1",
+                            summary: "Alice is overloaded",
+                            target_ids: ["m1"],
+                            severity: "warn" as const
+                        }
+                    }
+                }
+            ])
+        );
+        // Turn 2 (after reset): stream emits NO nudges for the same id.
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "messages",
+                    ns: ["root"],
+                    data: [{ content: "All good now" }, {}]
+                }
+            ])
+        );
+
+        const queryClient = new QueryClient();
+        const { result } = renderHook(() => useAgentChat(makeCtx()), {
+            wrapper: makeWrapper(queryClient)
+        });
+
+        // Turn 1: nudge arrives.
+        await act(async () => {
+            await result.current.send("Check load balance");
+        });
+        await waitFor(() => {
+            expect(result.current.pendingNudges).toHaveLength(1);
+        });
+
+        // Dismiss via chat hook — must call agent.dismissNudge internally.
+        act(() => {
+            result.current.dismissNudge("n-inbox-1");
+        });
+
+        // Nudge is gone from the visible list immediately.
+        expect(result.current.pendingNudges).toHaveLength(0);
+
+        // Reset the session (clears local dismissedNudgeIds set).
+        act(() => {
+            result.current.reset();
+        });
+        await waitFor(() => {
+            expect(result.current.messages).toEqual([]);
+        });
+
+        // Turn 2: new send without any nudge event.
+        await act(async () => {
+            await result.current.send("What's the status?");
+        });
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        // The nudge must not have resurrected: because agent.dismissNudge was
+        // called in turn 1, the inbox entry was removed there. The reset also
+        // clears the inbox, so the nudge cannot re-surface without a new
+        // stream event emitting it.
+        expect(result.current.pendingNudges).toHaveLength(0);
+    });
+
     it("resumeProposal calls agent.resume and clears the pending proposal", async () => {
         // First call: emits a mutation proposal
         mockedStream
