@@ -38,6 +38,10 @@ const Wrap = styled.div`
         0 6px 20px -10px var(--aurora-blob-strong),
         var(--glass-shine);
     display: flex;
+    /* Prevent flex-column parents (BoardShell has min-height: 0) from
+     * squishing this banner — without this, overflow: hidden above
+     * clips the body text and CTA buttons on short viewports. */
+    flex-shrink: 0;
     gap: ${space.sm}px;
     margin-bottom: ${space.md}px;
     padding: ${space.sm}px ${space.md}px;
