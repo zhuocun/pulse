@@ -303,4 +303,33 @@ describe("ProjectPage", () => {
             ).toBe(true)
         );
     });
+
+    it("opens AI chat drawer on non-board route when boardCopilot:openChat fires (Defect 2 fix)", async () => {
+        renderPage();
+
+        // Wait for the page to be ready (projects loaded)
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+
+        // The "Ask Board Copilot" button should be visible because aiEnabled
+        // defaults to true — confirming the drawer mount point is active.
+        expect(
+            screen.getByRole("button", { name: "Ask Board Copilot" })
+        ).toBeInTheDocument();
+
+        // Simulate the command palette dispatching the event from a non-board route
+        await act(async () => {
+            window.dispatchEvent(
+                new CustomEvent("boardCopilot:openChat", {
+                    detail: { prompt: "What is at risk?" }
+                })
+            );
+        });
+
+        // After the event fires, the project page's handler sets the URL param
+        // `chat=1:...` via useAiChatDrawer, which makes `chatOpen` true and
+        // opens the AI drawer. Verify the URL reflects the open state.
+        await waitFor(() => {
+            expect(screen.getByTestId("location")).toHaveTextContent("chat=");
+        });
+    });
 });

@@ -70,7 +70,10 @@ export default [
             "no-underscore-dangle": [
                 "error",
                 {
-                    allow: ["_id"]
+                    allow: [
+                        "_id",
+                        "__copilotObservabilityWarnings__"
+                    ]
                 }
             ],
             "no-unused-vars": "off",

@@ -225,4 +225,75 @@ describe("AiTaskDraftModal", () => {
 
         expect(screen.getByLabelText("Task prompt")).toHaveValue("");
     });
+
+    it("shows a warning notification when one of two undo deletes fails (Defect 3 fix)", async () => {
+        // Create two subtasks via the breakdown flow, then simulate the undo
+        // where one DELETE fails. The component must show a warning telling
+        // the user how many tasks could not be removed.
+        const onClose = jest.fn();
+
+        // Calls: first returns task IDs for the two created subtasks,
+        // then the undo calls one succeeds and one fails.
+        let callCount = 0;
+        fetchMock.mockImplementation(() => {
+            callCount += 1;
+            // First two POST calls create tasks (return distinct IDs)
+            if (callCount === 1)
+                return Promise.resolve(response({ _id: "task-undo-1" }));
+            if (callCount === 2)
+                return Promise.resolve(response({ _id: "task-undo-2" }));
+            // Third call (first undo DELETE) succeeds
+            if (callCount === 3) return Promise.resolve(response({}, true));
+            // Fourth call (second undo DELETE) fails
+            return Promise.reject(new Error("Network error"));
+        });
+
+        mountModal(onClose);
+
+        // Trigger breakdown
+        fireEvent.change(screen.getByLabelText("Task prompt"), {
+            target: { value: "Build end-to-end feature" }
+        });
+        fireEvent.click(
+            screen.getByLabelText("Break the prompt into subtasks")
+        );
+
+        // Wait for breakdown items
+        const checkboxes = await screen.findAllByRole("checkbox");
+        expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+
+        // Keep exactly two items checked
+        // Uncheck all beyond the second
+        for (let i = 2; i < checkboxes.length; i++) {
+            if ((checkboxes[i] as HTMLInputElement).checked) {
+                fireEvent.click(checkboxes[i]);
+            }
+        }
+        // Ensure first two are checked
+        if (!(checkboxes[0] as HTMLInputElement).checked) {
+            fireEvent.click(checkboxes[0]);
+        }
+        if (!(checkboxes[1] as HTMLInputElement).checked) {
+            fireEvent.click(checkboxes[1]);
+        }
+
+        // Submit the breakdown
+        const create = screen.getByRole("button", {
+            name: /create \d+ subtasks?/i
+        });
+        fireEvent.click(create);
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+        // The undo toast should be in the document — click "Undo"
+        const undoButton = await screen.findByRole("button", { name: /undo/i });
+        fireEvent.click(undoButton);
+
+        // The component should show a partial-failure warning:
+        // "{removed} removed, {failed} could not be removed."
+        await waitFor(() => {
+            expect(
+                screen.getByText(/1 removed, 1 could not be removed/i)
+            ).toBeInTheDocument();
+        });
+    });
 });

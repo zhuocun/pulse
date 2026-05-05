@@ -8,6 +8,26 @@ import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 
 import AiChatDrawer from ".";
 
+// Helpers to flip the mutation-proposals feature flag on/off in tests.
+// The factory function returns the same object reference so individual tests
+// can mutate `mockEnv.*` fields between runs. The object must be declared
+// inside the factory (not as a module-level `const`) so Jest's hoisting of
+// `jest.mock` does not evaluate it before the variable is initialized.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockEnv: Record<string, any> = {};
+jest.mock("../../constants/env", () => {
+    // Re-import mockEnv via the module-level reference.
+    // Jest hoists jest.mock() to the top of the file, so we use a getter
+    // that lazily reads from the outer `mockEnv` object at call time.
+    const mod = {
+        __esModule: true,
+        get default() {
+            return mockEnv;
+        }
+    };
+    return mod;
+});
+
 jest.mock("../../utils/hooks/useAuth");
 
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
@@ -120,6 +140,12 @@ describe("AiChatDrawer", () => {
     beforeEach(() => {
         mockApi.mockReset();
         mockApi.mockResolvedValue([]);
+        // Default flag to off; individual tests that need it on set it explicitly.
+        mockEnv.aiMutationProposalsEnabled = false;
+        // Reset other env fields to safe defaults for these tests.
+        mockEnv.aiEnabled = true;
+        mockEnv.aiUseLocalEngine = true;
+        mockEnv.aiBaseUrl = "";
     });
 
     it("shows the empty hint and sends a message that yields an assistant reply", async () => {
@@ -260,7 +286,37 @@ describe("AiChatDrawer", () => {
         }
     });
 
-    it("renders a MutationProposalCard and NudgeCards when v2.1 props are supplied", () => {
+    it("does NOT render MutationProposalCard when aiMutationProposalsEnabled flag is off (flag-off: proposal in state does not render card)", () => {
+        mockEnv.aiMutationProposalsEnabled = false;
+        const mockProposal: MutationProposal = {
+            proposal_id: "prop-1",
+            description: "Reassign overdue tasks to Alice",
+            diff: {
+                task_updates: [
+                    {
+                        task_id: "t1",
+                        field: "coordinatorId",
+                        from: "m2",
+                        to: "m1"
+                    }
+                ]
+            },
+            risk: "low",
+            undoable: true
+        };
+
+        renderDrawer(true, { pendingProposal: mockProposal });
+
+        // Card must NOT appear when flag is off
+        expect(
+            screen.queryByRole("alertdialog", {
+                name: /Reassign overdue tasks to Alice/i
+            })
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders MutationProposalCard and NudgeCards when aiMutationProposalsEnabled flag is on (flag-on: proposal renders)", () => {
+        mockEnv.aiMutationProposalsEnabled = true;
         const mockProposal: MutationProposal = {
             proposal_id: "prop-1",
             description: "Reassign overdue tasks to Alice",
@@ -305,6 +361,7 @@ describe("AiChatDrawer", () => {
     });
 
     it("invokes onAcceptProposal / onRejectProposal when the proposal card buttons are clicked", () => {
+        mockEnv.aiMutationProposalsEnabled = true;
         const proposal: MutationProposal = {
             proposal_id: "prop-accept",
             description: "Reassign overdue tasks to Alice",
@@ -339,6 +396,7 @@ describe("AiChatDrawer", () => {
     });
 
     it("hides the proposal card locally when no onAcceptProposal handler is supplied", () => {
+        mockEnv.aiMutationProposalsEnabled = true;
         const proposal: MutationProposal = {
             proposal_id: "prop-local",
             description: "Reassign overdue tasks to Alice",
