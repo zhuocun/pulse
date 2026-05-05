@@ -47,3 +47,31 @@ export const subscribeProjectAiDisabled = (
     window.addEventListener(EVENT_NAME, listener);
     return () => window.removeEventListener(EVENT_NAME, listener);
 };
+
+// ---------------------------------------------------------------------------
+// Chat history persistence (Phase B save; restore is TODO)
+// ---------------------------------------------------------------------------
+
+import type { AiChatMessage } from "../hooks/useAiChat";
+
+export const saveChatHistory = (
+    projectId: string,
+    messages: AiChatMessage[]
+): void => {
+    try {
+        const key = `copilot_history_${projectId}`;
+        localStorage.setItem(key, JSON.stringify(messages.slice(-50)));
+    } catch {
+        /* storage quota */
+    }
+};
+
+export const loadChatHistory = (projectId: string): AiChatMessage[] => {
+    try {
+        const key = `copilot_history_${projectId}`;
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as AiChatMessage[]) : [];
+    } catch {
+        return [];
+    }
+};

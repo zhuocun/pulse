@@ -1000,6 +1000,20 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             }
         >
             <CopilotRemoteConsentNotice route="chat" />
+            {/* P2-G: Inline health status alert */}
+            {(healthStatus === "degraded" || healthStatus === "offline") && (
+                <Alert
+                    closable={healthStatus === "degraded"}
+                    message={
+                        healthStatus === "offline"
+                            ? "Board Copilot is currently unavailable. Try again later."
+                            : "Board Copilot is experiencing delays. Responses may be slow or unavailable."
+                    }
+                    showIcon
+                    style={{ marginBottom: space.sm }}
+                    type={healthStatus === "offline" ? "error" : "warning"}
+                />
+            )}
             {/*
              * Off-screen aria-live region (AI UX best practices §2.10).
              * Streaming text updates are silenced inside the visible
@@ -1041,16 +1055,66 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             >
                 {streamingAnnouncement}
             </div>
+            {/* P2-D: relative wrapper for the scroll-to-bottom FAB */}
+            <div style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}>
             <div
                 aria-busy={isLoading}
+                onKeyDown={(e) => {
+                    /* P2-B: Escape from message area refocuses input */
+                    if (e.key === "Escape") {
+                        inputRef.current?.focus({ cursor: "end" });
+                    }
+                }}
+                onScroll={() => {
+                    /* P2-D: show FAB when user scrolls up during streaming */
+                    const el = messagesContainerRef.current;
+                    if (!el) return;
+                    const atBottom =
+                        el.scrollTop >=
+                        el.scrollHeight - el.clientHeight - 100;
+                    if (isLoading && !atBottom) {
+                        setShowScrollFab(true);
+                    } else {
+                        setShowScrollFab(false);
+                    }
+                }}
+                ref={messagesContainerRef}
                 style={{
-                    flex: "1 1 auto",
+                    height: "100%",
                     marginBottom: space.sm,
-                    minHeight: 0,
                     overflowY: "auto",
                     overscrollBehavior: "contain"
                 }}
             >
+                {/* P1-C: context-window budget warnings */}
+                {approxTokenCount >= BUDGET_CRITICAL_THRESHOLD ? (
+                    <Alert
+                        action={
+                            <Button
+                                onClick={resetAll}
+                                size="small"
+                                type="link"
+                            >
+                                Start new
+                            </Button>
+                        }
+                        closable={false}
+                        message="Conversation too long. Start a new session or try a shorter message."
+                        showIcon
+                        style={{ marginBottom: space.sm }}
+                        type="error"
+                    />
+                ) : approxTokenCount >= BUDGET_WARN_THRESHOLD &&
+                  !budgetWarnDismissed ? (
+                    <Alert
+                        closable
+                        message="This conversation is getting long. Consider starting a new session to maintain response quality."
+                        onClose={() => setBudgetWarnDismissed(true)}
+                        showIcon
+                        style={{ marginBottom: space.sm }}
+                        type="warning"
+                    />
+                ) : null}
                 {messages.length === 0 && !isLoading && (
                     <Space
                         size={space.sm}
@@ -1073,7 +1137,16 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         </Space>
                     </Space>
                 )}
-                {messages.map((m, index) => {
+                {/* P2-B: find the index of the last visible assistant message for focus management */}
+                {(() => {
+                    const lastAssistantIndex = messages.reduceRight(
+                        (found, m, i) =>
+                            found === -1 && m.role === "assistant" && m.content.trim()
+                                ? i
+                                : found,
+                        -1
+                    );
+                    return messages.map((m, index) => {
                     if (
                         m.role === "assistant" &&
                         !m.content.trim() &&
@@ -1122,12 +1195,168 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             ? `${microcopy.ai.copilotLabel} · ${microcopy.ai.regeneratedBadge}`
                             : microcopy.ai.copilotLabel
                         : undefined;
+                    // P2-E: progressive disclosure for long prose responses
+                    const wordCount = m.content
+                        .split(/\s+/)
+                        .filter(Boolean).length;
+                    const isProseLong =
+                        isAssistant &&
+                        wordCount > 300 &&
+                        !/^[#\-*]/.test(m.content.trim());
+                    const isExpanded = expandedMessages.has(index);
+                    // P3-B: simple inline markdown renderer for assistant messages
+                    const renderMarkdown = (text: string): React.ReactNode => {
+                        const lines = text.split("\n");
+                        return lines.map((line, li) => {
+                            // Heading
+                            if (/^### /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^### /, "")}
+                                    </h3>
+                                );
+                            }
+                            if (/^## /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^## /, "")}
+                                    </h3>
+                                );
+                            }
+                            if (/^# /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^# /, "")}
+                                    </h3>
+                                );
+                            }
+                            // Parse inline formatting (bold, italic, code)
+                            const parts: React.ReactNode[] = [];
+                            let remaining = line;
+                            let key = 0;
+                            while (remaining.length > 0) {
+                                const boldMatch = remaining.match(
+                                    /^(.*?)\*\*(.*?)\*\*/
+                                );
+                                const italicMatch = remaining.match(
+                                    /^(.*?)\*(.*?)\*/
+                                );
+                                const codeMatch = remaining.match(
+                                    /^(.*?)`([^`]+)`/
+                                );
+                                const firstBold = boldMatch
+                                    ? boldMatch.index! +
+                                      boldMatch[1].length
+                                    : Infinity;
+                                const firstItalic = italicMatch
+                                    ? italicMatch.index! +
+                                      italicMatch[1].length
+                                    : Infinity;
+                                const firstCode = codeMatch
+                                    ? codeMatch.index! +
+                                      codeMatch[1].length
+                                    : Infinity;
+                                if (
+                                    boldMatch &&
+                                    firstBold <= firstItalic &&
+                                    firstBold <= firstCode
+                                ) {
+                                    if (boldMatch[1])
+                                        parts.push(boldMatch[1]);
+                                    parts.push(
+                                        <strong key={key++}>
+                                            {boldMatch[2]}
+                                        </strong>
+                                    );
+                                    remaining = remaining.slice(
+                                        boldMatch[0].length
+                                    );
+                                } else if (
+                                    italicMatch &&
+                                    firstItalic <= firstCode
+                                ) {
+                                    if (italicMatch[1])
+                                        parts.push(italicMatch[1]);
+                                    parts.push(
+                                        <em key={key++}>
+                                            {italicMatch[2]}
+                                        </em>
+                                    );
+                                    remaining = remaining.slice(
+                                        italicMatch[0].length
+                                    );
+                                } else if (codeMatch) {
+                                    if (codeMatch[1])
+                                        parts.push(codeMatch[1]);
+                                    parts.push(
+                                        <code
+                                            key={key++}
+                                            style={{
+                                                background:
+                                                    "var(--ant-color-fill-secondary)",
+                                                borderRadius: radius.sm,
+                                                fontSize: "0.9em",
+                                                padding: "1px 4px"
+                                            }}
+                                        >
+                                            {codeMatch[2]}
+                                        </code>
+                                    );
+                                    remaining = remaining.slice(
+                                        codeMatch[0].length
+                                    );
+                                } else {
+                                    parts.push(remaining);
+                                    remaining = "";
+                                }
+                            }
+                            return (
+                                <span key={li}>
+                                    {parts}
+                                    {li < lines.length - 1 && <br />}
+                                </span>
+                            );
+                        });
+                    };
                     return (
                         <MessageRow
                             $isUser={isUser}
                             key={`msg-${index}`}
                             aria-label={groupAriaLabel}
+                            ref={
+                                isAssistant &&
+                                index === lastAssistantIndex
+                                    ? lastAssistantRef
+                                    : undefined
+                            }
                             role={isAssistant ? "group" : undefined}
+                            tabIndex={
+                                isAssistant &&
+                                index === lastAssistantIndex
+                                    ? -1
+                                    : undefined
+                            }
                         >
                             {isAssistant && (
                                 <AssistantAttribution>
@@ -1160,8 +1389,55 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     )}
                                 </AssistantAttribution>
                             )}
+                            {/* P3-D: Edit button for user messages */}
+                            {isUser && !isLoading && (
+                                <Button
+                                    aria-label="Edit message"
+                                    icon={<EditOutlined aria-hidden />}
+                                    onClick={() => {
+                                        setInput(m.content);
+                                        inputRef.current?.focus({
+                                            cursor: "end"
+                                        });
+                                    }}
+                                    size="small"
+                                    type="text"
+                                />
+                            )}
                             <MessageBubble $isUser={isUser}>
-                                {m.content}
+                                {isAssistant ? (
+                                    isProseLong && !isExpanded ? (
+                                        <>
+                                            {renderMarkdown(
+                                                m.content
+                                                    .split(/\s+/)
+                                                    .slice(0, 150)
+                                                    .join(" ")
+                                            )}
+                                            <Button
+                                                onClick={() =>
+                                                    setExpandedMessages(
+                                                        (prev) => {
+                                                            const next =
+                                                                new Set(prev);
+                                                            next.add(index);
+                                                            return next;
+                                                        }
+                                                    )
+                                                }
+                                                size="small"
+                                                style={{ display: "block", marginTop: space.xxs }}
+                                                type="link"
+                                            >
+                                                Show full response
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        renderMarkdown(m.content)
+                                    )
+                                ) : (
+                                    m.content
+                                )}
                                 {isAssistant &&
                                     m.citations &&
                                     m.citations.length > 0 &&
@@ -1500,6 +1776,30 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     </MessageRow>
                 )}
             </div>
+            {/* P2-D: scroll-to-bottom FAB shown when user scrolls up during streaming */}
+            {showScrollFab && isLoading && (
+                <Button
+                    onClick={() => {
+                        messagesContainerRef.current?.scrollTo({
+                            top: messagesContainerRef.current.scrollHeight,
+                            behavior: "smooth"
+                        });
+                        setShowScrollFab(false);
+                    }}
+                    size="small"
+                    style={{
+                        bottom: 72,
+                        left: "50%",
+                        position: "absolute",
+                        transform: "translateX(-50%)",
+                        zIndex: 10
+                    }}
+                    type="default"
+                >
+                    ↓ Jump to latest
+                </Button>
+            )}
+            </div>
 
             {errorView && (
                 <Alert
@@ -1523,8 +1823,21 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         ) : null
                     }
                     closable
-                    description={errorView.body || undefined}
-                    onClose={dismissError}
+                    description={
+                        error instanceof AgentBudgetError
+                            ? "Conversation too long. Start a new session or try a shorter message."
+                            : errorView.body || undefined
+                    }
+                    onClose={() => {
+                        // P1-C: preserve last user message in input on budget error
+                        if (error instanceof AgentBudgetError) {
+                            const lastUser = [...messages]
+                                .reverse()
+                                .find((m) => m.role === "user");
+                            if (lastUser) setInput(lastUser.content);
+                        }
+                        dismissError();
+                    }}
                     showIcon
                     style={{ marginBottom: space.xs }}
                     title={errorView.heading}
@@ -1565,7 +1878,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 ) : (
                     <Button
                         aria-label={microcopy.a11y.sendMessage}
-                        disabled={!input.trim()}
+                        disabled={!input.trim() || healthStatus === "offline"}
                         onClick={handleSend}
                         type="primary"
                     >

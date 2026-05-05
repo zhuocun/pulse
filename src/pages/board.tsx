@@ -8,19 +8,23 @@ import styled from "@emotion/styled";
 import {
     Alert,
     Button,
+    Dropdown,
     Popover,
     Skeleton,
     Space,
     Switch,
     Typography
 } from "antd";
+import type { MenuProps } from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
+import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
+import CopilotShell from "../components/copilotShell";
 import Column from "../components/column";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
@@ -435,6 +439,8 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
+    // P1-A: Unified Copilot shell state
+    const [copilotShellOpen, setCopilotShellOpen] = useState(false);
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -618,28 +624,69 @@ const BoardPage = () => {
                         {aiEnabled && (
                             <BoardActions>
                                 {boardAiOn && (
-                                    <Space.Compact block>
-                                        <Button
-                                            aria-label="Open Board Copilot brief"
-                                            icon={
-                                                <FileTextOutlined aria-hidden />
-                                            }
-                                            onClick={openBriefDrawer}
-                                            type="default"
+                                    <>
+                                        {/* P1-A: CopilotMenu — consolidated AI entry point */}
+                                        <Dropdown
+                                            menu={{
+                                                items: [
+                                                    {
+                                                        key: "ask",
+                                                        label: "Ask Copilot",
+                                                        icon: <MessageOutlined aria-hidden />,
+                                                        onClick: () => openChatDrawer()
+                                                    },
+                                                    {
+                                                        key: "brief",
+                                                        label: "Board Brief",
+                                                        icon: <FileTextOutlined aria-hidden />,
+                                                        onClick: () => openBriefDrawer()
+                                                    },
+                                                    {
+                                                        type: "divider"
+                                                    },
+                                                    {
+                                                        key: "shell",
+                                                        label: "Open Copilot Panel",
+                                                        icon: <AiSparkleIcon aria-hidden />,
+                                                        onClick: () => setCopilotShellOpen(true)
+                                                    }
+                                                ] satisfies MenuProps["items"]
+                                            }}
+                                            placement="bottomRight"
+                                            trigger={["click"]}
                                         >
-                                            Brief
-                                        </Button>
-                                        <Button
-                                            aria-label="Ask Board Copilot"
-                                            icon={
-                                                <MessageOutlined aria-hidden />
-                                            }
-                                            onClick={() => openChatDrawer()}
-                                            type="default"
-                                        >
-                                            Ask
-                                        </Button>
-                                    </Space.Compact>
+                                            <Button
+                                                aria-label="Board Copilot menu"
+                                                icon={<AiSparkleIcon aria-hidden />}
+                                                type="default"
+                                            >
+                                                Copilot
+                                            </Button>
+                                        </Dropdown>
+                                        {/* P1-A: Consolidate into CopilotMenu in next phase */}
+                                        <Space.Compact block>
+                                            <Button
+                                                aria-label="Open Board Copilot brief"
+                                                icon={
+                                                    <FileTextOutlined aria-hidden />
+                                                }
+                                                onClick={openBriefDrawer}
+                                                type="default"
+                                            >
+                                                Brief
+                                            </Button>
+                                            <Button
+                                                aria-label="Ask Board Copilot"
+                                                icon={
+                                                    <MessageOutlined aria-hidden />
+                                                }
+                                                onClick={() => openChatDrawer()}
+                                                type="default"
+                                            >
+                                                Ask
+                                            </Button>
+                                        </Space.Compact>
+                                    </>
                                 )}
                                 <Popover
                                     content={
@@ -892,6 +939,18 @@ const BoardPage = () => {
                                     ? triageAgent.nudges
                                     : undefined
                             }
+                            project={currentProject ?? null}
+                            tasks={visibleTasks}
+                        />
+                        {/* P1-A: Unified Copilot shell */}
+                        <CopilotShell
+                            columns={board ?? []}
+                            knownProjectIds={projectId ? [projectId] : []}
+                            members={members ?? []}
+                            onClose={() => setCopilotShellOpen(false)}
+                            onOpenBrief={openBriefDrawer}
+                            onOpenChat={() => openChatDrawer()}
+                            open={copilotShellOpen}
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />
