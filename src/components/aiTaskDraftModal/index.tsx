@@ -21,9 +21,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useApi from "../../utils/hooks/useApi";
 import useAuth from "../../utils/hooks/useAuth";
@@ -95,13 +97,22 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     } | null>(null);
     /** Track which fields are still AI-suggested vs. user-edited (D-R2). */
     const [aiFields, setAiFields] = useState<Set<string>>(new Set());
+    /** Remote-agent path: stores the last applied single draft for confidence/rationale display. */
+    const [remoteDraft, setRemoteDraft] = useState<IDraftTaskSuggestion | null>(
+        null
+    );
     const [form] = useForm();
     const undoToast = useUndoToast();
 
+    // Mount ALL hooks unconditionally (React hook ordering rule).
+    // Only one engine path drives the UI based on environment.aiUseLocalEngine.
     const draftAi = useAi<IDraftTaskSuggestion>({ route: "task-draft" });
     const breakdownAi = useAi<ITaskBreakdownSuggestion>({
         route: "task-breakdown"
     });
+    const remoteAgent = useAgent("task-drafting-agent", { projectId });
+
+    const isRemote = !environment.aiUseLocalEngine;
 
     const queryClient = useQueryClient();
     const apiCall = useApi();
@@ -114,6 +125,8 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const resetDraftAi = draftAi.reset;
     const resetBreakdownAi = breakdownAi.reset;
+    const agentAbort = remoteAgent.abort;
+    const agentClearSuggestion = remoteAgent.clearSuggestion;
     const reset = useCallback(() => {
         setPrompt("");
         setBreakdownMode(false);
@@ -122,10 +135,19 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         setBreakdownChecked([]);
         setBulkProgress(null);
         setAiFields(new Set());
+        setRemoteDraft(null);
         form.resetFields();
         resetDraftAi();
         resetBreakdownAi();
-    }, [form, resetBreakdownAi, resetDraftAi]);
+        agentAbort();
+        agentClearSuggestion();
+    }, [
+        form,
+        resetBreakdownAi,
+        resetDraftAi,
+        agentAbort,
+        agentClearSuggestion
+    ]);
 
     /**
      * Modal state reset (D-R7). Clearing on close is correct, but the
@@ -144,6 +166,27 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             reset();
         }
     }, [open, reset]);
+
+    // React to incoming agent suggestions after streaming completes.
+    // Using a useEffect on lastSuggestion ensures state flush before we read.
+    useEffect(() => {
+        const suggestion = remoteAgent.lastSuggestion;
+        if (!suggestion || suggestion.surface !== "draft") return;
+        const payload = suggestion.payload as
+            | IDraftTaskSuggestion
+            | { axis: string; items: IDraftTaskSuggestion[] };
+        if ("items" in payload && Array.isArray(payload.items)) {
+            setBreakdownMode(true);
+            setBreakdownItems(payload.items);
+            setBreakdownChecked(payload.items.map(() => true));
+        } else {
+            const draft = payload as IDraftTaskSuggestion;
+            form.setFieldsValue(draft);
+            setAiFields(new Set(AI_FIELDS as string[]));
+            setRemoteDraft(draft);
+        }
+        remoteAgent.clearSuggestion();
+    }, [remoteAgent.lastSuggestion, form, remoteAgent]);
 
     const aiContext = useMemo(
         () => ({
@@ -178,16 +221,23 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             mode: "single",
             length: prompt.length
         });
-        const suggestion = await draftAi.run({
-            draft: {
-                prompt,
-                columnId,
-                coordinatorId: user?._id,
-                context: aiContext
-            }
-        });
-        form.setFieldsValue(suggestion);
-        setAiFields(new Set(AI_FIELDS as string[]));
+        if (isRemote) {
+            setRemoteDraft(null);
+            await remoteAgent.start(`Draft a task for: ${prompt}`, {
+                autonomy: "plan"
+            });
+        } else {
+            const suggestion = await draftAi.run({
+                draft: {
+                    prompt,
+                    columnId,
+                    coordinatorId: user?._id,
+                    context: aiContext
+                }
+            });
+            form.setFieldsValue(suggestion);
+            setAiFields(new Set(AI_FIELDS as string[]));
+        }
     };
 
     const onBreakdown = async (axis: BreakdownAxis = breakdownAxis) => {
@@ -197,19 +247,26 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             axis,
             length: prompt.length
         });
-        const result = await breakdownAi.run({
-            draft: {
-                prompt,
-                columnId,
-                coordinatorId: user?._id,
-                context: aiContext,
-                count: 3,
-                axis
-            }
-        });
-        setBreakdownMode(true);
-        setBreakdownItems(result.items);
-        setBreakdownChecked(result.items.map(() => true));
+        if (isRemote) {
+            await remoteAgent.start(
+                `Break down the following prompt into subtasks using axis "${axis}" with count 3: ${prompt}`,
+                { autonomy: "plan" }
+            );
+        } else {
+            const result = await breakdownAi.run({
+                draft: {
+                    prompt,
+                    columnId,
+                    coordinatorId: user?._id,
+                    context: aiContext,
+                    count: 3,
+                    axis
+                }
+            });
+            setBreakdownMode(true);
+            setBreakdownItems(result.items);
+            setBreakdownChecked(result.items.map(() => true));
+        }
     };
 
     const onBreakdownAxisChange = (next: BreakdownAxis) => {
@@ -347,8 +404,13 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     };
 
     const suggestion = draftAi.data;
-    const showForm = Boolean(suggestion) && !breakdownMode;
-    const draftErrorView = aiErrorView(draftAi.error ?? breakdownAi.error);
+    const activeSuggestion = isRemote ? remoteDraft : suggestion;
+    const showForm = Boolean(activeSuggestion) && !breakdownMode;
+    const activeError = isRemote
+        ? remoteAgent.error
+        : (draftAi.error ?? breakdownAi.error);
+    const draftErrorView = aiErrorView(activeError);
+    const activeIsLoading = isRemote ? remoteAgent.isStreaming : false;
 
     const breakdownProgressPercent = bulkProgress
         ? Math.round(
@@ -439,11 +501,14 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             >
                 <Button
                     aria-label={microcopy.a11y.draftTaskWithCopilot}
-                    disabled={!prompt.trim() || draftAi.isLoading}
+                    disabled={
+                        !prompt.trim() ||
+                        (isRemote ? activeIsLoading : draftAi.isLoading)
+                    }
                     onClick={onDraft}
                     type="primary"
                 >
-                    {draftAi.isLoading ? (
+                    {(isRemote ? activeIsLoading : draftAi.isLoading) ? (
                         <Spin size="small" />
                     ) : (
                         microcopy.actions.draftTask
@@ -467,21 +532,26 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                 />
                 <Button
                     aria-label={microcopy.a11y.breakPromptIntoSubtasks}
-                    disabled={!prompt.trim() || breakdownAi.isLoading}
+                    disabled={
+                        !prompt.trim() ||
+                        (isRemote ? activeIsLoading : breakdownAi.isLoading)
+                    }
                     onClick={() => onBreakdown()}
                 >
-                    {breakdownAi.isLoading ? (
+                    {(isRemote ? activeIsLoading : breakdownAi.isLoading) ? (
                         <Spin size="small" />
                     ) : (
                         microcopy.actions.breakDown
                     )}
                 </Button>
-                {(suggestion || breakdownMode) && (
+                {(Boolean(activeSuggestion) || breakdownMode) && (
                     <Tooltip title={microcopy.ai.regenerateLabel}>
                         <Button
                             aria-label={microcopy.ai.regenerateLabel}
                             disabled={
-                                draftAi.isLoading || breakdownAi.isLoading
+                                isRemote
+                                    ? activeIsLoading
+                                    : draftAi.isLoading || breakdownAi.isLoading
                             }
                             icon={<ReloadOutlined aria-hidden />}
                             onClick={handleRegenerate}
@@ -490,7 +560,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                 )}
             </div>
 
-            {(draftAi.error || breakdownAi.error) && (
+            {activeError && (
                 <Alert
                     action={
                         draftErrorView.retryable ? (
@@ -525,10 +595,10 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                 />
             )}
 
-            {showForm && suggestion && (
+            {showForm && activeSuggestion && (
                 <Form
                     form={form}
-                    initialValues={suggestion}
+                    initialValues={activeSuggestion}
                     layout="vertical"
                     onFinish={onSubmitSingle}
                     onValuesChange={(changed) => {
@@ -542,11 +612,11 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                             <span>
                                 {`${microcopy.a11y.aiSuggestion} · ${microcopy.ai.reviewAndEdit}`}{" "}
                                 <AiConfidenceIndicator
-                                    confidence={suggestion.confidence}
+                                    confidence={activeSuggestion.confidence}
                                 />
                             </span>
                         }
-                        description={suggestion.rationale}
+                        description={activeSuggestion.rationale}
                         type="info"
                     />
                     <Form.Item
