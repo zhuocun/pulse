@@ -639,7 +639,7 @@ const useAgent = (
             // The agent server derives identity from the JWT in
             // `Authorization` and rejects any client-supplied `user_id` in
             // `configurable` with HTTP 400 to prevent identity spoofing
-            // (see jira-python-server `app/routers/agents.py::_normalize_payload`).
+            // (see `backend/app/routers/agents.py::_normalize_payload`).
             // `options.userId` is still consumed above for FE-internal
             // bookkeeping (e.g. `feToolContext.userId`).
             await runStream({

@@ -483,7 +483,7 @@ describe("UI quality :: AiSearchInput guards", () => {
                             {
                                 ...projectContext,
                                 tasks: undefined
-                            } as typeof projectContext
+                            } as unknown as typeof projectContext
                         }
                         semanticIds={null}
                         setSemanticIds={jest.fn()}

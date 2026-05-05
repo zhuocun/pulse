@@ -622,12 +622,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                                         }}
                                     >
                                         <Button
-                                            icon={
-                                                <AiSparkleIcon aria-hidden />
-                                            }
+                                            icon={<AiSparkleIcon aria-hidden />}
                                             onClick={() => {
-                                                const trimmed =
-                                                    query.trim();
+                                                const trimmed = query.trim();
                                                 onClose();
                                                 onOpenCopilot(trimmed);
                                             }}

@@ -1,0 +1,124 @@
+from datetime import datetime, timedelta, timezone
+from hashlib import md5, pbkdf2_hmac
+import hmac
+import secrets
+from typing import Any, Dict
+
+import jwt
+from fastapi import Header, HTTPException, status
+
+from app.config import settings
+
+PASSWORD_HASH_PREFIX = "pbkdf2_sha256"
+# OWASP 2023+ guidance for PBKDF2-HMAC-SHA256.
+PASSWORD_HASH_ITERATIONS = 600_000
+JWT_SECRET_MIN_LENGTH = 32
+
+# Stable hash a constant-time login compares against when the email
+# does not exist. Computed once at import so every code path performs
+# the same amount of work regardless of whether the user is real.
+_DUMMY_PASSWORD_HASH = (
+    f"{PASSWORD_HASH_PREFIX}${PASSWORD_HASH_ITERATIONS}$"
+    + "0" * 32
+    + "$"
+    + "0" * 64
+)
+
+
+def encrypt_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        bytes.fromhex(salt),
+        PASSWORD_HASH_ITERATIONS,
+    ).hex()
+    return f"{PASSWORD_HASH_PREFIX}${PASSWORD_HASH_ITERATIONS}${salt}${digest}"
+
+
+def legacy_password_hash(password: str) -> str:
+    return md5(("zhuocun" + password).encode("utf-8")).hexdigest()
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    if stored_hash.startswith(f"{PASSWORD_HASH_PREFIX}$"):
+        try:
+            _, iterations, salt, digest = stored_hash.split("$", 3)
+            candidate = pbkdf2_hmac(
+                "sha256",
+                password.encode("utf-8"),
+                bytes.fromhex(salt),
+                int(iterations),
+            ).hex()
+        except (TypeError, ValueError):
+            return False
+        return hmac.compare_digest(candidate, digest)
+
+    return hmac.compare_digest(legacy_password_hash(password), stored_hash)
+
+
+def dummy_password_hash() -> str:
+    """Return a constant-time-comparable PBKDF2 hash that no password matches.
+
+    Used during login when the email is unknown so the response time
+    stays close to the path that runs a real password verification —
+    an attacker cannot enumerate valid emails by timing requests.
+    """
+
+    return _DUMMY_PASSWORD_HASH
+
+
+def jwt_secret() -> str:
+    if len(settings.jwt_secret) < JWT_SECRET_MIN_LENGTH:
+        raise RuntimeError(
+            f"JWT secret must be set to at least {JWT_SECRET_MIN_LENGTH} characters"
+        )
+    return settings.jwt_secret
+
+
+def create_token(user_id: str) -> str:
+    issued_at = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "iat": issued_at,
+        "exp": issued_at + timedelta(seconds=settings.jwt_expires_seconds),
+    }
+    return jwt.encode(payload, jwt_secret(), algorithm="HS256")
+
+
+def decode_token(token: str) -> Dict[str, Any]:
+    return jwt.decode(
+        token,
+        jwt_secret(),
+        algorithms=["HS256"],
+        options={"require": ["exp", "iat", "sub"]},
+    )
+
+
+def current_user_payload(authorization: str = Header(default="")) -> Dict[str, Any]:
+    prefix = "Bearer "
+    if not authorization or not authorization.startswith(prefix):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "empty JWT"},
+        )
+
+    token = authorization[len(prefix) :]
+    try:
+        payload = decode_token(token)
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "invalid JWT"},
+        ) from exc
+    return payload
+
+
+def current_user_id(payload: Dict[str, Any]) -> str:
+    user_id = payload.get("sub")
+    if not isinstance(user_id, str) or not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "invalid JWT"},
+        )
+    return user_id

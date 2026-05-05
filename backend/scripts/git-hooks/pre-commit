@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+# Repo is a monorepo (FE at root, Python BE under backend/); pyproject.toml
+# and the .venv that pytest needs both live in backend/.
+cd "$(git rev-parse --show-toplevel)/backend"
+
+if [ -x ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+else
+    PYTHON="python3"
+fi
+
+echo "Running tests with 100% coverage gate..."
+"$PYTHON" -m pytest

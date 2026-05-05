@@ -28,3 +28,14 @@ yarn-error.log*
 
 # env
 .env
+
+# Python (backend/)
+.venv/
+__pycache__/
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+*.py[cod]
+*.egg-info/
+.vercel

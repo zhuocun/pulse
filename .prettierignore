@@ -3,3 +3,6 @@
 .codex/skills/
 .cursor/skills/
 .agents/skills/
+
+# Python backend has its own formatter (ruff); skip from FE Prettier sweep.
+backend/

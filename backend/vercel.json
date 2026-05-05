@@ -1,0 +1,15 @@
+{
+    "version": 2,
+    "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+    "functions": {
+        "api/index.py": {
+            "maxDuration": 300
+        }
+    },
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "/api/index.py"
+        }
+    ]
+}

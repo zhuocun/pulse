@@ -48,6 +48,7 @@ const baseAgent = (
     reset: jest.fn(),
     threadId: "t_test",
     ttftMs: null,
+    isSlowTtft: false,
     clearPendingProposal: jest.fn(),
     clearSuggestion: jest.fn(),
     dismissNudge: jest.fn(),

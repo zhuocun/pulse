@@ -1,6 +1,6 @@
 # Production Readiness — Board Copilot Frontend
 
-Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `jira-python-server/docs/PRODUCTION_READINESS.md`.
+Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/PRODUCTION_READINESS.md`.
 
 Last updated: 2026-05-05.
 
@@ -34,7 +34,7 @@ The Recommended ship sequence at the bottom of this doc is the contract: interna
 `AiChatDrawer` renders `MutationProposalCard` and wires `onAccept` to `agentChat.resumeProposal(true)` which calls `agent.resume({accepted: true})` on the SSE stream. The BE then has nothing to do — no agent emits `custom/mutation_proposal` and no `fe.applyMutation` interrupt is registered. The user sees the card vanish but no mutation is applied.
 
 - File: `src/components/aiChatDrawer/index.tsx` accept handler; `src/components/mutationProposalCard/index.tsx`.
-- BE counterpart: `jira-python-server/docs/AI_REMAINING_WORK.md` §12.
+- BE counterpart: `../backend/docs/AI_REMAINING_WORK.md` §12.
 - **FE-side work needed once BE ships:** register `fe.applyMutation` in `FE_TOOL_REGISTRY`. ~~Add `onUndo` prop and wire `AGENT_PROPOSAL_UNDONE` to the undo callback; confirm AC-V4 10-second undo toast~~ — **done (2026-05-05)**: `MutationProposalCard` now implements the 10-second countdown undo path with field-change disclosure and fires `AGENT_PROPOSAL_UNDONE`. Only the `fe.applyMutation` FE tool registration remains, which requires the BE mutation endpoint.
 - **Mitigation (v2.1, `5d96e16`):** `MutationProposalCard` is now **gated off by default** behind `environment.aiMutationProposalsEnabled` (env var `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, defaults `false`). The card does not render at all even when an agent emits a `pendingProposal`, so the customer-visible "Accept does nothing" path is closed in v2.1 unless the flag is explicitly opted in. **This is a mitigation, not a fix.** The full `MutationProposal` lifecycle (BE emission, `fe.applyMutation` interrupt, undo endpoint) remains unimplemented and continues to gate public GA. Set `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=true` only in internal environments where the dead-end UX is acceptable.
 - **Previous mitigation for internal beta:** do not pass `pendingProposal` into `AiChatDrawer`. Still valid; the flag gate makes this defense-in-depth.
@@ -52,7 +52,7 @@ The Recommended ship sequence at the bottom of this doc is the contract: interna
 
 `useAgent("search-agent")` and `useAgent("task-estimation-agent")` work end-to-end, but the BE's embedding dimensions are pinned to 16 and there is no vector store. The FE `fe.searchCandidates` tool tops out at 50 candidates per kind. Quality ceiling is set on the BE.
 
-- Detail: `jira-python-server/docs/AI_REMAINING_WORK.md` §8.
+- Detail: `../backend/docs/AI_REMAINING_WORK.md` §8.
 - **No FE-side fix.** Disclose in product copy that semantic search is suggestion-grade.
 
 ### ✅ 4. AC-V5 preapproved-tools auto-autonomy not implemented (Resolved 2026-05-05)

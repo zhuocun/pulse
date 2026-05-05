@@ -632,14 +632,24 @@ const BoardPage = () => {
                                                     {
                                                         key: "ask",
                                                         label: "Ask Copilot",
-                                                        icon: <MessageOutlined aria-hidden />,
-                                                        onClick: () => openChatDrawer()
+                                                        icon: (
+                                                            <MessageOutlined
+                                                                aria-hidden
+                                                            />
+                                                        ),
+                                                        onClick: () =>
+                                                            openChatDrawer()
                                                     },
                                                     {
                                                         key: "brief",
                                                         label: "Board Brief",
-                                                        icon: <FileTextOutlined aria-hidden />,
-                                                        onClick: () => openBriefDrawer()
+                                                        icon: (
+                                                            <FileTextOutlined
+                                                                aria-hidden
+                                                            />
+                                                        ),
+                                                        onClick: () =>
+                                                            openBriefDrawer()
                                                     },
                                                     {
                                                         type: "divider"
@@ -647,8 +657,15 @@ const BoardPage = () => {
                                                     {
                                                         key: "shell",
                                                         label: "Open Copilot Panel",
-                                                        icon: <AiSparkleIcon aria-hidden />,
-                                                        onClick: () => setCopilotShellOpen(true)
+                                                        icon: (
+                                                            <AiSparkleIcon
+                                                                aria-hidden
+                                                            />
+                                                        ),
+                                                        onClick: () =>
+                                                            setCopilotShellOpen(
+                                                                true
+                                                            )
                                                     }
                                                 ] satisfies MenuProps["items"]
                                             }}
@@ -657,7 +674,11 @@ const BoardPage = () => {
                                         >
                                             <Button
                                                 aria-label="Board Copilot menu"
-                                                icon={<AiSparkleIcon aria-hidden />}
+                                                icon={
+                                                    <AiSparkleIcon
+                                                        aria-hidden
+                                                    />
+                                                }
                                                 type="default"
                                             >
                                                 Copilot
@@ -668,7 +689,9 @@ const BoardPage = () => {
                                             <Button
                                                 aria-label="Open Board Copilot brief"
                                                 icon={
-                                                    <FileTextOutlined aria-hidden />
+                                                    <FileTextOutlined
+                                                        aria-hidden
+                                                    />
                                                 }
                                                 onClick={openBriefDrawer}
                                                 type="default"
@@ -678,7 +701,9 @@ const BoardPage = () => {
                                             <Button
                                                 aria-label="Ask Board Copilot"
                                                 icon={
-                                                    <MessageOutlined aria-hidden />
+                                                    <MessageOutlined
+                                                        aria-hidden
+                                                    />
                                                 }
                                                 onClick={() => openChatDrawer()}
                                                 type="default"

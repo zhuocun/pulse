@@ -1,0 +1,17 @@
+# Mirror of pyproject.toml's [project.dependencies] plus
+# [project.optional-dependencies.ai]. pyproject.toml is the canonical
+# source for editable installs; this file is the install manifest for
+# runtimes (Vercel, Docker images) consuming a flat ``pip install -r``.
+# Keep both in sync when changing dependencies.
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pymongo>=4.8.0
+dnspython>=2.6.1
+python-dotenv>=1.0.1
+PyJWT>=2.9.0
+langgraph>=1.1,<2
+langchain-anthropic>=0.3.0
+langchain-openai>=0.3.0
+langgraph-checkpoint-postgres>=3.0,<4
+psycopg[binary]>=3.2.0
+redis>=5.0,<7

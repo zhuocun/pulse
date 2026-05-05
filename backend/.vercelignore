@@ -1,0 +1,12 @@
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.vercel/
+__pycache__/
+build/
+dist/
+*.egg-info/
+pyproject.toml
+tests/
