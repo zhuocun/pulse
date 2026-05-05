@@ -191,9 +191,9 @@ export const validateResponse = (
 
 /**
  * Remote v1 AI route. POSTs to `${aiBaseUrl}/api/ai/{route}` -- the
- * Python `jira-python-server` mounts this prefix as a deterministic-
- * with-LLM-polish shim (see `app/routers/ai.py` in jira-python-server)
- * alongside the v2.1 `/api/v1/agents/...` agent surface, and exposes
+ * Python backend (`backend/`) mounts this prefix as a deterministic-
+ * with-LLM-polish shim (see `backend/app/routers/ai.py`) alongside the
+ * v2.1 `/api/v1/agents/...` agent surface, and exposes
  * the same routes under `/api/v1/ai/` for new clients. With
  * `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`) set on the server, the
  * structured routes (Brief, Draft, Breakdown, Estimate, Readiness)

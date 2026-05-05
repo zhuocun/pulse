@@ -10,44 +10,44 @@
 
 The following best-practice areas are **implemented and should not be regressed**:
 
-| Area | Evidence in codebase |
-|---|---|
-| Stop / Regenerate controls in chat | `aiChatDrawer/index.tsx:646-686`, `818-836` |
-| Sample prompt chips in empty chat | `aiChatDrawer/index.tsx:514-534` |
-| Follow-up prompt chips after turns | `aiChatDrawer/index.tsx:692-715` |
-| Draft modal sample prompts | `aiTaskDraftModal/index.tsx:377-389` |
-| Token-by-token SSE streaming with blinking cursor | `agentClient.ts`, `StreamingCursor` |
-| `aria-live="off"` during streaming + word-count announcement on completion | `aiChatDrawer` live-region wiring |
-| Thumbs-up/down + 7-category negative feedback + thanks toast | `aiFeedbackPopover/index.tsx` |
-| Typed AI error hierarchy with user-facing copy | `agentErrors.ts` + `microcopy.ai` |
-| Rate-limit countdown timer | `aiChatDrawer`, `disabledForSeconds` |
-| Optimistic updates + 10-second undo toast | `useUndoToast`, `optimisticUpdate/*` |
-| MutationProposalCard accept/reject (gated) | `mutationProposalCard/index.tsx` |
-| Autonomy selector (Suggest / Plan / Auto) | `aiChatDrawer` extra slot, `useAutonomyLevel` |
-| AI attribution + "AI · review before using" disclaimer | `aiChatDrawer/index.tsx:632-635` |
-| Privacy copy aligned to payloads (local vs remote) | Phase 1 complete |
-| Readiness Undo actually reverts field | Phase 1 complete |
-| Observability sinks wired | `observability/sinks.ts`, Phase 3 complete |
-| Board loading skeleton matching real column layout | `board.tsx:230-247` |
-| Full accessibility stack (skip link, focus rings, ARIA live regions, jest-axe) | Multiple components |
-| Responsive design (mobile scroll-snap, bottom-sheet palette, touch targets 44px) | `board.tsx`, `commandPalette`, `appProviders` |
-| **Unified Copilot surface (P1-A)** | `copilotShell/`, `board.tsx` CopilotMenu, `commandPalette` routing — 2026-05-05 |
-| **Proposal-undo + activity tab (P1-B)** | `mutationProposalCard` 10s countdown + `AGENT_PROPOSAL_UNDONE` — 2026-05-05 |
-| **Context-window warning + new conversation (P1-C)** | `aiChatDrawer` budget banners + `Modal.confirm` — 2026-05-05 |
-| **Screen-reader streaming announcement (P2-A)** | `aiChatDrawer` interim `aria-live` status region — 2026-05-05 |
-| **Focus management after response (P2-B)** | `lastAssistantRef` focus after stream end — 2026-05-05 |
-| **Conversation history persistence (P2-C)** | `projectAiStorage` `saveChatHistory` + "sessions not saved" notice — 2026-05-05 |
-| **Scroll-to-bottom FAB during streaming (P2-D)** | `aiChatDrawer` floating "↓ Jump to latest" button — 2026-05-05 |
-| **Progressive disclosure for long responses (P2-E)** | `aiChatDrawer` 300-word prose collapse — 2026-05-05 |
-| **CopilotAboutPopover capabilities disclosure (P2-F)** | `copilotAboutPopover/index.tsx` — 2026-05-05 |
-| **Service-degradation inline alert (P2-G)** | `aiChatDrawer` health alert + submit disable on offline — 2026-05-05 |
-| **Mobile keyboard viewport fix (P2-H)** | `aiChatDrawer` `env(keyboard-inset-height)` padding — 2026-05-05 |
-| **TTFT SLO + "Still thinking…" at 3s (P2-I)** | `useAgent` `AGENT_TTFT_SLOW` + `loadingMs` banner — 2026-05-05 |
-| **Command palette no-results Copilot CTA (P3-A)** | `commandPalette` "Try asking Board Copilot →" — 2026-05-05 |
-| **Streaming markdown rendering verified (P3-B)** | `aiChatDrawer` `renderMarkdown()` on every chunk — 2026-05-05 |
-| **Copy button on assistant messages (P3-C)** | `aiChatDrawer` `CopyOutlined` action + clipboard — 2026-05-05 |
-| **Edit prior message minimal (P3-D)** | `aiChatDrawer` `EditOutlined` re-fills input — 2026-05-05 |
-| **`maxLineLengthCh` on aiSearchInput rationale (P3-E)** | `aiSearchInput` `max-width: 75ch` on prose containers — 2026-05-05 |
+| Area                                                                             | Evidence in codebase                                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Stop / Regenerate controls in chat                                               | `aiChatDrawer/index.tsx:646-686`, `818-836`                                     |
+| Sample prompt chips in empty chat                                                | `aiChatDrawer/index.tsx:514-534`                                                |
+| Follow-up prompt chips after turns                                               | `aiChatDrawer/index.tsx:692-715`                                                |
+| Draft modal sample prompts                                                       | `aiTaskDraftModal/index.tsx:377-389`                                            |
+| Token-by-token SSE streaming with blinking cursor                                | `agentClient.ts`, `StreamingCursor`                                             |
+| `aria-live="off"` during streaming + word-count announcement on completion       | `aiChatDrawer` live-region wiring                                               |
+| Thumbs-up/down + 7-category negative feedback + thanks toast                     | `aiFeedbackPopover/index.tsx`                                                   |
+| Typed AI error hierarchy with user-facing copy                                   | `agentErrors.ts` + `microcopy.ai`                                               |
+| Rate-limit countdown timer                                                       | `aiChatDrawer`, `disabledForSeconds`                                            |
+| Optimistic updates + 10-second undo toast                                        | `useUndoToast`, `optimisticUpdate/*`                                            |
+| MutationProposalCard accept/reject (gated)                                       | `mutationProposalCard/index.tsx`                                                |
+| Autonomy selector (Suggest / Plan / Auto)                                        | `aiChatDrawer` extra slot, `useAutonomyLevel`                                   |
+| AI attribution + "AI · review before using" disclaimer                           | `aiChatDrawer/index.tsx:632-635`                                                |
+| Privacy copy aligned to payloads (local vs remote)                               | Phase 1 complete                                                                |
+| Readiness Undo actually reverts field                                            | Phase 1 complete                                                                |
+| Observability sinks wired                                                        | `observability/sinks.ts`, Phase 3 complete                                      |
+| Board loading skeleton matching real column layout                               | `board.tsx:230-247`                                                             |
+| Full accessibility stack (skip link, focus rings, ARIA live regions, jest-axe)   | Multiple components                                                             |
+| Responsive design (mobile scroll-snap, bottom-sheet palette, touch targets 44px) | `board.tsx`, `commandPalette`, `appProviders`                                   |
+| **Unified Copilot surface (P1-A)**                                               | `copilotShell/`, `board.tsx` CopilotMenu, `commandPalette` routing — 2026-05-05 |
+| **Proposal-undo + activity tab (P1-B)**                                          | `mutationProposalCard` 10s countdown + `AGENT_PROPOSAL_UNDONE` — 2026-05-05     |
+| **Context-window warning + new conversation (P1-C)**                             | `aiChatDrawer` budget banners + `Modal.confirm` — 2026-05-05                    |
+| **Screen-reader streaming announcement (P2-A)**                                  | `aiChatDrawer` interim `aria-live` status region — 2026-05-05                   |
+| **Focus management after response (P2-B)**                                       | `lastAssistantRef` focus after stream end — 2026-05-05                          |
+| **Conversation history persistence (P2-C)**                                      | `projectAiStorage` `saveChatHistory` + "sessions not saved" notice — 2026-05-05 |
+| **Scroll-to-bottom FAB during streaming (P2-D)**                                 | `aiChatDrawer` floating "↓ Jump to latest" button — 2026-05-05                  |
+| **Progressive disclosure for long responses (P2-E)**                             | `aiChatDrawer` 300-word prose collapse — 2026-05-05                             |
+| **CopilotAboutPopover capabilities disclosure (P2-F)**                           | `copilotAboutPopover/index.tsx` — 2026-05-05                                    |
+| **Service-degradation inline alert (P2-G)**                                      | `aiChatDrawer` health alert + submit disable on offline — 2026-05-05            |
+| **Mobile keyboard viewport fix (P2-H)**                                          | `aiChatDrawer` `env(keyboard-inset-height)` padding — 2026-05-05                |
+| **TTFT SLO + "Still thinking…" at 3s (P2-I)**                                    | `useAgent` `AGENT_TTFT_SLOW` + `loadingMs` banner — 2026-05-05                  |
+| **Command palette no-results Copilot CTA (P3-A)**                                | `commandPalette` "Try asking Board Copilot →" — 2026-05-05                      |
+| **Streaming markdown rendering verified (P3-B)**                                 | `aiChatDrawer` `renderMarkdown()` on every chunk — 2026-05-05                   |
+| **Copy button on assistant messages (P3-C)**                                     | `aiChatDrawer` `CopyOutlined` action + clipboard — 2026-05-05                   |
+| **Edit prior message minimal (P3-D)**                                            | `aiChatDrawer` `EditOutlined` re-fills input — 2026-05-05                       |
+| **`maxLineLengthCh` on aiSearchInput rationale (P3-E)**                          | `aiSearchInput` `max-width: 75ch` on prose containers — 2026-05-05              |
 
 ---
 
@@ -70,10 +70,11 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Nielsen Heuristic 4 (Consistency & Standards), NN/G fragmented-AI discoverability research.
 
 **Solution**:
+
 1. Consolidate board-level controls into one `<CopilotMenu>` dropdown off the board header — entries: Ask, Brief, Find related tasks, Draft task, Settings.
 2. Build a right-rail Copilot shell (`src/components/copilotShell/`) with tabs: **Chat** · **Brief** · **Activity** · **Settings**.
 3. Route command palette AI mode (`/` trigger) to open the same shell's Chat tab, not a separate mental model.
-4. Keep *inline* AI where it reduces work: task estimate/readiness inside task modal, draft from task creator.
+4. Keep _inline_ AI where it reduces work: task estimate/readiness inside task modal, draft from task creator.
 
 **Files**: `src/pages/board.tsx:521-599`, `src/components/commandPalette/index.tsx:571-578`, `docs/prd/board-copilot-v3.md:26-34`
 
@@ -86,6 +87,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Anthropic agent-safety framework; NIST AI RMF — users must be able to audit and reverse agentic actions.
 
 **Solution**:
+
 1. Build a **Copilot Activity** tab inside the Copilot shell (see P1-A): list of agent turns → proposals shown → accepted/rejected → undo available.
 2. Add undo to `MutationProposalCard`: capture pre-acceptance field values, expose "Undo" within the 10-second window, fire `AGENT_PROPOSAL_UNDONE`.
 3. Each proposal card must show: what changed, what data was used, risk level, undo availability.
@@ -100,9 +102,10 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 
 **Gap**: Users receive no warning as the conversation approaches the token limit. The `AgentBudgetError` error fires after the limit is hit, at which point the user's message is lost and recovery options are unclear.
 
-**Why it matters**: Conversation & context management best practice — warn users *before* the limit, not after; preserve user input on error.
+**Why it matters**: Conversation & context management best practice — warn users _before_ the limit, not after; preserve user input on error.
 
 **Solution**:
+
 1. Track approximate token count in `useAiChat` or `useAgentChat` (count characters × ~0.25 as a conservative estimate, or receive a `usage` field in SSE chunks).
 2. At ≥ 75% of estimated budget: show a dismissible inline banner in the chat drawer — "This conversation is getting long. Consider starting a new session to maintain response quality."
 3. At ≥ 95%: show a persistent warning with a "Start new conversation" CTA.
@@ -120,6 +123,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: WCAG 4.1.3 Status Messages; ARIA best practices for AI interfaces — "AI is responding…" is a status message that must be reachable without focus.
 
 **Solution**:
+
 1. When streaming begins (first SSE chunk received), announce via a `role="status" aria-live="polite"` region: "Board Copilot is responding."
 2. Keep the streaming container `aria-live="off"` (unchanged).
 3. On stream completion, replace the interim announcement with the word-count summary: "Board Copilot responded. 142 words."
@@ -136,6 +140,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: WCAG 2.4.3 Focus Order; NN/G keyboard accessibility for AI interfaces.
 
 **Solution**:
+
 1. After the streaming cursor disappears (stream complete), programmatically move focus to a visually hidden "skip to response" link anchored just above the new assistant message.
 2. The link reads "New Copilot response — press Enter to read" and moves focus to the response container on activation.
 3. Alternatively: add a `tabIndex={-1}` ref on the assistant message container and focus it after stream end.
@@ -152,6 +157,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Conversation & context management best practice — history must be persisted or the product must clearly communicate that it is not.
 
 **Solution (phased)**:
+
 - **Phase A (fast)**: Add a visible "Sessions are not saved — history clears on reload" notice inside the empty chat state or drawer footer. This sets accurate expectations without new infrastructure.
 - **Phase B**: Persist conversation history to `localStorage` keyed by `projectId + userId`. Cap at 50 turns per project to avoid unbounded storage. Load on drawer open.
 - **Phase C (future)**: Persist to the backend alongside other project data so history is cross-device and searchable.
@@ -167,8 +173,9 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Streaming-UX best practice; especially critical on mobile where one-thumb scrolling and small viewports make this a common state.
 
 **Solution**:
+
 1. Track scroll position in the chat messages container with a `scroll` event listener.
-2. When the user has scrolled more than 100px above the bottom *and* streaming is active, show a `position: absolute; bottom: 72px` FAB: "↓ Jump to latest".
+2. When the user has scrolled more than 100px above the bottom _and_ streaming is active, show a `position: absolute; bottom: 72px` FAB: "↓ Jump to latest".
 3. On click: `scrollIntoView({ behavior: "smooth" })` on the streaming message, then hide the FAB.
 4. Auto-hide the FAB when the user is within 50px of the bottom.
 
@@ -183,6 +190,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: NN/G — "Design responses that are direct, scannable, and easy to expand"; progressive disclosure best practice for AI outputs.
 
 **Solution**:
+
 1. After streaming completes, detect response length. If > 300 words and the response contains markdown headers or bullet points: render normally (markdown structure itself provides hierarchy).
 2. If > 300 words and the response is continuous prose: add a "Show full response" collapse, keeping the first 150 words visible by default.
 3. Alternatively: prompt the AI (system prompt or post-processing) to use bullet points or a TL;DR line for long answers — this is higher-leverage than a UI collapse.
@@ -199,11 +207,12 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Anthropic Transparency Hub guidance; NN/G "site chatbots clearly state their purpose"; EU AI Act transparency requirement.
 
 **Solution**:
+
 1. Add a `CopilotAboutPopover` component (or extend `CopilotPrivacyPopover`) with:
-   - "What can Board Copilot help with?" — bullet list of primary tasks.
-   - "What it cannot do" — explicit scope limits.
-   - In remote mode: model provider name (from `REACT_APP_AI_BASE_URL` origin or a config field).
-   - Knowledge cutoff date (hardcoded or config-driven).
+    - "What can Board Copilot help with?" — bullet list of primary tasks.
+    - "What it cannot do" — explicit scope limits.
+    - In remote mode: model provider name (from `REACT_APP_AI_BASE_URL` origin or a config field).
+    - Knowledge cutoff date (hardcoded or config-driven).
 2. Surface the "?" info icon in the Copilot drawer header, linking to this popover.
 3. When AI declines a request (content policy, out-of-scope): the decline message should name the reason in plain language and point to the About popover.
 
@@ -218,6 +227,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Error handling best practice — circuit-breaker state should be communicated via a banner, not just a status dot in a non-central location.
 
 **Solution**:
+
 1. Keep `AgentHealthBadge` in the header as a persistent indicator.
 2. When status transitions to `degraded` or `offline`: show a dismissible `<Alert type="warning">` at the top of the `AiChatDrawer` — "Board Copilot is experiencing delays. Responses may be slow or unavailable."
 3. For `offline`: change alert to `type="error"` with "Board Copilot is currently unavailable. Try again later." Disable the submit button while offline.
@@ -234,6 +244,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Mobile AI UX best practice — the input area must stay visible above the keyboard at all times.
 
 **Solution**:
+
 1. Add `padding-bottom: env(keyboard-inset-height, 0px)` to the chat drawer's inner scroll container.
 2. On iOS Safari: listen to `window.visualViewport.resize` events to adjust the drawer's bottom offset dynamically.
 3. Add a manual smoke test on Chrome for Android and Safari iOS for: open drawer → tap input → verify input is above keyboard.
@@ -249,6 +260,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Performance UX — TTFT under 1 second is the target for chat interfaces; latency regressions silently hurt user trust.
 
 **Solution**:
+
 1. Define an internal SLO: `TTFT_SLO_MS = 1500` (1.5s; generous for remote AI).
 2. In `useAgent.ts`: after receiving the first chunk, if `ttft > TTFT_SLO_MS`, emit `AGENT_TTFT_SLOW` event to the analytics sink.
 3. In `useAgentHealth.ts`: incorporate TTFT percentile into the `degraded` threshold (currently only latency of `/health` endpoint is used).
@@ -275,6 +287,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 **Why it matters**: Raw markdown mid-stream is a jarring experience that undermines trust in the UI's quality.
 
 **Solution**:
+
 1. Verify in `aiChatDrawer/index.tsx` that the message content is passed through the markdown renderer on every state update, not only on stream completion.
 2. If markdown is batched: move the renderer call inside the streaming state update so it runs on every chunk.
 3. Add a snapshot test that verifies a mid-stream response containing `**bold**` renders `<strong>bold</strong>`, not raw asterisks.
@@ -315,42 +328,45 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 
 ## 3. Summary table — all open items ranked
 
-| Rank | ID | Title | Severity | Category |
-|---|---|---|---|---|
-| 1 | P1-A | Unified Copilot surface / eliminate entry-point fragmentation | P1 | IA & Discoverability |
-| 2 | P1-B | Proposal-undo + agent activity log (prerequisite for write tools) | P1 | Agentic safety & User Control |
-| 3 | P1-C | Context-window limit warning + New Conversation button | P1 | Conversation Management |
-| 4 | P2-A | Screen-reader interim "AI is responding…" announcement | P2 | Accessibility |
-| 5 | P2-B | Focus management after AI response renders | P2 | Accessibility |
-| 6 | P2-C | Conversation history persistence across sessions | P2 | Conversation Management |
-| 7 | P2-D | Scroll-to-bottom FAB during streaming | P2 | Streaming UX |
-| 8 | P2-E | Progressive disclosure / summary-first for long responses | P2 | Response Quality |
-| 9 | P2-F | Copilot capabilities / knowledge-cutoff disclosure ("About") | P2 | Transparency |
-| 10 | P2-G | Service-degradation banner (promote health dot to inline alert) | P2 | Error Handling |
-| 11 | P2-H | Mobile: AI chat input obscured by soft keyboard | P2 | Mobile UX |
-| 12 | P2-I | TTFT SLO + "Still thinking…" fallback at 3 s | P2 | Performance UX |
-| 13 | P3-A | Command palette no-results → "Ask Board Copilot" CTA | P3 | Discoverability |
-| 14 | P3-B | Verify markdown renders progressively during streaming | P3 | Streaming UX |
-| 15 | P3-C | Copy button on assistant messages | P3 | Feedback Mechanisms |
-| 16 | P3-D | Edit prior message (minimal: re-fill input) | P3 | Conversation Management |
-| 17 | P3-E | Confirm `maxLineLengthCh` applied to chat + search rationale | P3 | Typography / Mobile |
+| Rank | ID   | Title                                                             | Severity | Category                      |
+| ---- | ---- | ----------------------------------------------------------------- | -------- | ----------------------------- |
+| 1    | P1-A | Unified Copilot surface / eliminate entry-point fragmentation     | P1       | IA & Discoverability          |
+| 2    | P1-B | Proposal-undo + agent activity log (prerequisite for write tools) | P1       | Agentic safety & User Control |
+| 3    | P1-C | Context-window limit warning + New Conversation button            | P1       | Conversation Management       |
+| 4    | P2-A | Screen-reader interim "AI is responding…" announcement            | P2       | Accessibility                 |
+| 5    | P2-B | Focus management after AI response renders                        | P2       | Accessibility                 |
+| 6    | P2-C | Conversation history persistence across sessions                  | P2       | Conversation Management       |
+| 7    | P2-D | Scroll-to-bottom FAB during streaming                             | P2       | Streaming UX                  |
+| 8    | P2-E | Progressive disclosure / summary-first for long responses         | P2       | Response Quality              |
+| 9    | P2-F | Copilot capabilities / knowledge-cutoff disclosure ("About")      | P2       | Transparency                  |
+| 10   | P2-G | Service-degradation banner (promote health dot to inline alert)   | P2       | Error Handling                |
+| 11   | P2-H | Mobile: AI chat input obscured by soft keyboard                   | P2       | Mobile UX                     |
+| 12   | P2-I | TTFT SLO + "Still thinking…" fallback at 3 s                      | P2       | Performance UX                |
+| 13   | P3-A | Command palette no-results → "Ask Board Copilot" CTA              | P3       | Discoverability               |
+| 14   | P3-B | Verify markdown renders progressively during streaming            | P3       | Streaming UX                  |
+| 15   | P3-C | Copy button on assistant messages                                 | P3       | Feedback Mechanisms           |
+| 16   | P3-D | Edit prior message (minimal: re-fill input)                       | P3       | Conversation Management       |
+| 17   | P3-E | Confirm `maxLineLengthCh` applied to chat + search rationale      | P3       | Typography / Mobile           |
 
 ---
 
 ## 4. Implementation order
 
 ### Sprint 1 — P1 items (block write-tool roadmap)
+
 - P1-C: Context window warning + New Conversation button (self-contained, low risk)
 - P1-A: Begin Copilot shell scaffolding (`copilotShell/` component, tabs stub, route `AiChatDrawer` into Chat tab)
 - P1-B: Proposal-undo surface inside Activity tab (prerequisite for re-enabling `aiMutationProposalsEnabled`)
 
 ### Sprint 2 — Accessibility & Streaming (P2-A through P2-D)
+
 - P2-A: Interim screen-reader announcement (< 1 day)
 - P2-B: Focus management after response (< 1 day)
 - P2-D: Scroll-to-bottom FAB (< 1 day)
 - P2-G: Health badge → inline alert in drawer (< 1 day)
 
 ### Sprint 3 — Transparency & Mobile (P2-E through P2-I)
+
 - P2-F: `CopilotAboutPopover` (new component)
 - P2-C: Phase A of history persistence (localStorage + "sessions not saved" notice)
 - P2-H: Mobile keyboard viewport fix
@@ -358,6 +374,7 @@ Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = p
 - P2-I: TTFT SLO event + "Still thinking…" UX
 
 ### Sprint 4 — Polish (P3 items)
+
 - P3-A: Command palette no-results CTA
 - P3-B: Streaming markdown rendering verification + snapshot test
 - P3-C: Copy button on messages

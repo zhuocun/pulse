@@ -56,9 +56,7 @@ describe("CopilotAboutPopover", () => {
             screen.getByText("Access the internet or external data")
         ).toBeInTheDocument();
         expect(
-            screen.getByText(
-                "Modify tasks without your review (in Plan mode)"
-            )
+            screen.getByText("Modify tasks without your review (in Plan mode)")
         ).toBeInTheDocument();
         expect(
             screen.getByText("Remember conversations from previous sessions")

@@ -100,7 +100,7 @@ describe("useAgent", () => {
 
     // The agent server derives identity from the JWT and rejects any
     // client-supplied `user_id` in `config.configurable` with HTTP 400
-    // (see jira-python-server `app/routers/agents.py::_normalize_payload`).
+    // (see `backend/app/routers/agents.py::_normalize_payload`).
     // Even when the caller passes `userId` as a hook option (it's still
     // used for FE-internal bookkeeping like `feToolContext.userId`), it
     // must NOT appear on the wire body.

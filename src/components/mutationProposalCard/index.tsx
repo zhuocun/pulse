@@ -224,10 +224,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
             onAccept();
             return;
         }
-        const id = window.setTimeout(
-            () => setCountdown((c) => c - 1),
-            1000
-        );
+        const id = window.setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => window.clearTimeout(id);
     }, [phase, countdown, onAccept, proposal]);
 
@@ -399,9 +396,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                             {microcopy.actions.apply}
                         </Button>
                     </Space>
-                    <FooterHint>
-                        10s undo available after accepting
-                    </FooterHint>
+                    <FooterHint>10s undo available after accepting</FooterHint>
                 </>
             )}
         </Wrap>

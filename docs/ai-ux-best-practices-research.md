@@ -68,13 +68,13 @@ Users must be told — before they act — what data is sent where, and in what 
 
 Not all AI output belongs in a chat bubble. Use the right container for the output type:
 
-| Output type | Preferred container |
-|---|---|
-| Open-ended Q&A, explanations | Chat bubble with Markdown |
-| Structured data (task drafts, estimates) | Form or card with editable fields |
-| Board-level insights | Drawer/panel with source chips |
-| Inline suggestions (field values) | Ghost text or suggestion badge below field |
-| Search filter results | Filtered list with match rationale |
+| Output type                              | Preferred container                        |
+| ---------------------------------------- | ------------------------------------------ |
+| Open-ended Q&A, explanations             | Chat bubble with Markdown                  |
+| Structured data (task drafts, estimates) | Form or card with editable fields          |
+| Board-level insights                     | Drawer/panel with source chips             |
+| Inline suggestions (field values)        | Ghost text or suggestion badge below field |
+| Search filter results                    | Filtered list with match rationale         |
 
 Mixing these reduces scannability and erodes confidence in each output type.
 
@@ -85,6 +85,7 @@ Mixing these reduces scannability and erodes confidence in each output type.
 ### 3.1 AI attribution
 
 Every AI-generated piece of content must carry a visible origin label:
+
 - A distinct visual treatment (icon + label, e.g., "Board Copilot" with a sparkle icon).
 - The label must be legible at a glance — not hidden in a tooltip or collapsed by default.
 - Attribution must persist after the user edits an AI-generated field. Use an "AI-suggested" badge that clears on first deliberate edit.
@@ -96,9 +97,9 @@ Every AI-generated piece of content must carry a visible origin label:
 - Use a **three-tier confidence system**: high / moderate / low — or equivalent plain-language labels ("Strong signal / Review recommended / Low confidence — verify manually").
 - Do not show raw percentages without a plain-language band — percentages invite false precision.
 - Match CTAs to confidence:
-  - High → primary "Apply" button.
-  - Moderate → primary "Apply" + secondary "Review sources."
-  - Low → secondary "Apply anyway" + explanation of why confidence is low.
+    - High → primary "Apply" button.
+    - Moderate → primary "Apply" + secondary "Review sources."
+    - Low → secondary "Apply anyway" + explanation of why confidence is low.
 - Never omit a confidence indicator for structured recommendations (estimates, drafts, readiness assessments). Omission implies high confidence.
 
 ### 3.3 Citations and source provenance
@@ -126,13 +127,13 @@ AI inference is slow relative to standard API calls. Every AI surface must treat
 
 ### 4.1 Response time thresholds
 
-| Latency | Recommended treatment |
-|---|---|
-| < 300ms | No indicator needed |
-| 300ms – 1s | Spinner or inline "thinking…" |
-| 1s – 3s | Skeleton UI (placeholder content shape) |
-| > 3s | Skeleton + contextual message ("Reviewing 42 tasks…") |
-| > 10s | Skeleton + progress context + explicit cancel option |
+| Latency    | Recommended treatment                                 |
+| ---------- | ----------------------------------------------------- |
+| < 300ms    | No indicator needed                                   |
+| 300ms – 1s | Spinner or inline "thinking…"                         |
+| 1s – 3s    | Skeleton UI (placeholder content shape)               |
+| > 3s       | Skeleton + contextual message ("Reviewing 42 tasks…") |
+| > 10s      | Skeleton + progress context + explicit cancel option  |
 
 ### 4.2 Skeleton design
 
@@ -152,16 +153,16 @@ For surfaces where the AI response often arrives in < 500ms (e.g., short estimat
 
 Define distinct error types with distinct UX treatment:
 
-| Error type | Cause | User action |
-|---|---|---|
-| `network` | Connection lost | Retry with exponential backoff |
-| `timeout` | Inference exceeded limit | Retry; offer to simplify prompt |
-| `rateLimit` (429) | Quota exceeded | Show countdown; disable retry until reset |
-| `budget` (402) | Billing limit reached | Show upgrade prompt; no retry |
-| `forbidden` (403) | Auth/permission failure | Do not retry; prompt to re-authenticate |
-| `server` (5xx) | Backend error | Retry; log error with request ID |
-| `validation` | AI returned invalid structure | Silent retry once; fallback to empty state |
-| `noResults` | AI found no matching data | Suggest alternatives; do not report as error |
+| Error type        | Cause                         | User action                                  |
+| ----------------- | ----------------------------- | -------------------------------------------- |
+| `network`         | Connection lost               | Retry with exponential backoff               |
+| `timeout`         | Inference exceeded limit      | Retry; offer to simplify prompt              |
+| `rateLimit` (429) | Quota exceeded                | Show countdown; disable retry until reset    |
+| `budget` (402)    | Billing limit reached         | Show upgrade prompt; no retry                |
+| `forbidden` (403) | Auth/permission failure       | Do not retry; prompt to re-authenticate      |
+| `server` (5xx)    | Backend error                 | Retry; log error with request ID             |
+| `validation`      | AI returned invalid structure | Silent retry once; fallback to empty state   |
+| `noResults`       | AI found no matching data     | Suggest alternatives; do not report as error |
 
 ### 5.2 Error copy guidelines
 
@@ -173,6 +174,7 @@ Define distinct error types with distinct UX treatment:
 ### 5.3 Graceful degradation
 
 When the AI feature is unavailable, the underlying non-AI workflow must still function:
+
 - AI search failing → standard text search continues to work.
 - AI draft unavailable → manual task creation is unblocked.
 - AI estimate fails → user can enter story points manually.
@@ -188,6 +190,7 @@ Do not gate the core feature on AI availability.
 Thumbs up / thumbs down captures sentiment, not actionable signal. Replace or supplement with:
 
 **Negative feedback categories:**
+
 - Incorrect / wrong answer
 - Missing source or evidence
 - Outdated data
@@ -198,11 +201,13 @@ Thumbs up / thumbs down captures sentiment, not actionable signal. Replace or su
 - Other (free text, optional)
 
 **Positive follow-up (for repeated positive use):**
+
 - "What worked?" (optional, triggered after 3+ positive signals)
 
 ### 6.2 Feedback transparency
 
 Tell users what their feedback changes:
+
 - "Feedback is saved for product review. It does not train the AI model in real time."
 - Or, if personalization exists: "This will improve future suggestions for your workspace."
 
@@ -211,6 +216,7 @@ Silence on feedback impact implies the feedback does nothing, which trains users
 ### 6.3 Analytics design
 
 Collect signals that improve AI quality without leaking user content:
+
 - Interaction events: stop, retry, regenerate, apply, apply-anyway, undo, reject, feedback category.
 - Quality signals: confidence band at apply-time, citation presence, latency to first token (TTFT).
 - **Never log**: raw prompt text, raw AI output, task names, task notes, or any user-authored content.
@@ -237,6 +243,7 @@ An empty AI input with no context produces anxiety, not curiosity. Solutions:
 ### 7.3 AI mental model consistency
 
 Maintain one consistent mental model per AI interaction type:
+
 - "Ask" → opens chat (conversational, no direct mutation).
 - "Find" → filters the current list (search, no chat).
 - "Draft" → creates a pre-filled form for review (structured, requires confirmation).
@@ -251,6 +258,7 @@ The same verb must never trigger different interaction models in different parts
 ### 8.1 Live regions for streamed content
 
 Streaming AI output arrives in a DOM node that changes continuously. Screen readers must be notified:
+
 - Use `aria-live="polite"` on the AI response container.
 - Use `aria-live="assertive"` only for errors or critical state changes (e.g., stop-generation confirmation).
 - Throttle live-region updates during fast streaming (announce every ~500ms or at natural phrase boundaries) to avoid overwhelming screen readers.
@@ -258,6 +266,7 @@ Streaming AI output arrives in a DOM node that changes continuously. Screen read
 ### 8.2 Keyboard navigation
 
 Every AI affordance must be reachable and operable without a mouse:
+
 - Open/close AI drawer: keyboard shortcut (documented in UI).
 - Stop generation: focusable Stop button with `Escape` as fallback.
 - Submit prompt: `Enter`.
@@ -274,6 +283,7 @@ Every AI affordance must be reachable and operable without a mouse:
 ### 8.4 Icon-only AI controls
 
 Any AI control that uses only an icon (sparkle, send, stop) must have:
+
 - A visible label or tooltip.
 - An `aria-label` for screen readers.
 - Sufficient touch target size (minimum 44×44px per WCAG 2.5.8).
@@ -285,6 +295,7 @@ Any AI control that uses only an icon (sparkle, send, stop) must have:
 ### 9.1 Data minimization in payloads
 
 Build a payload contract per AI route. Each route declares:
+
 - **Included fields**: e.g., task name, type, column, story points.
 - **Conditionally included**: e.g., task notes (only if user has opted in).
 - **Never included**: e.g., comments, attachments, email addresses.
@@ -294,6 +305,7 @@ Enforce minimization in a shared payload builder function, not per-component. Th
 ### 9.2 Consent for sensitive data
 
 If an AI route can include notes, comments, or user-authored free text:
+
 1. Disclose it in the privacy popover for that specific route.
 2. Offer an opt-out (e.g., "Exclude my notes from AI analysis").
 3. For remote mode: require first-use consent before the first request that includes sensitive fields.
@@ -301,6 +313,7 @@ If an AI route can include notes, comments, or user-authored free text:
 ### 9.3 Content safety and refusal states
 
 Design a deliberate UI for when the AI refuses or cannot help:
+
 - Do not show a raw model refusal message ("I can't help with that").
 - Show a product-voice refusal: "Board Copilot can't help with this request. Try asking about tasks, columns, or team workload."
 - For sensitive content (e.g., PII detected in a prompt): "This prompt may include personal information. Board Copilot did not process it. [What to do instead]."
@@ -308,6 +321,7 @@ Design a deliberate UI for when the AI refuses or cannot help:
 ### 9.4 Agentic write actions
 
 When an AI can modify data (not just read it):
+
 1. Require explicit autonomy setting before enabling: Suggest only / Propose with confirmation / Apply automatically.
 2. Show a **proposal card** before any mutation: what changes, to which records, why, what the risk is, and what happens on undo.
 3. Maintain an **activity log** of every AI-applied change, accessible in the session.
@@ -330,12 +344,12 @@ Context-specific inline AI (e.g., estimate inside a task modal, draft from a tas
 
 For AI-heavy applications, a persistent right-rail panel with tabs outperforms separate drawers per feature:
 
-| Tab | Purpose |
-|---|---|
-| Chat | Conversational Q&A with sources |
-| Brief | Board summary and recommendations |
+| Tab      | Purpose                                                  |
+| -------- | -------------------------------------------------------- |
+| Chat     | Conversational Q&A with sources                          |
+| Brief    | Board summary and recommendations                        |
 | Activity | AI-applied changes, accepted proposals, undoable actions |
-| Settings | Data scope, mode, project enablement, privacy |
+| Settings | Data scope, mode, project enablement, privacy            |
 
 This structure gives users a single destination to review, question, and control all AI activity.
 
@@ -353,6 +367,7 @@ This structure gives users a single destination to review, question, and control
 ### 11.1 AI vs. human content differentiation
 
 Visually distinguish AI-generated content from user-authored content at a glance:
+
 - Use a consistent AI attribution color (e.g., a purple or blue accent not used elsewhere).
 - AI attribution icon (sparkle, robot, wand) must appear consistently — do not vary per surface.
 - AI content backgrounds: a subtle tint is sufficient; avoid heavy borders that add visual noise.
@@ -374,6 +389,7 @@ Visually distinguish AI-generated content from user-authored content at a glance
 ### 11.4 Density and visual weight
 
 AI UI tends toward information density. Apply visual hierarchy deliberately:
+
 - The AI answer is primary; citations, confidence, and actions are secondary.
 - Use size, weight, and spacing — not color alone — to establish hierarchy.
 - Collapsed state (e.g., tool details, expandable evidence) should be clearly interactive, not static.
@@ -386,19 +402,20 @@ AI UI tends toward information density. Apply visual hierarchy deliberately:
 
 Track signals that indicate whether users trust AI outputs appropriately (neither blindly nor punitively):
 
-| Signal | What it measures |
-|---|---|
+| Signal                        | What it measures                                           |
+| ----------------------------- | ---------------------------------------------------------- |
 | Apply rate by confidence band | Whether users act on high-confidence outputs more than low |
-| Apply-anyway rate | Whether users override low-confidence warnings |
-| Undo rate after apply | Whether AI-applied changes are regretted |
-| Stop rate | Whether AI generation is running too long |
-| Regenerate rate | Whether first responses are unsatisfactory |
-| Feedback negative categories | Which failure modes are most common |
-| Citation click rate | Whether users are verifying AI claims |
+| Apply-anyway rate             | Whether users override low-confidence warnings             |
+| Undo rate after apply         | Whether AI-applied changes are regretted                   |
+| Stop rate                     | Whether AI generation is running too long                  |
+| Regenerate rate               | Whether first responses are unsatisfactory                 |
+| Feedback negative categories  | Which failure modes are most common                        |
+| Citation click rate           | Whether users are verifying AI claims                      |
 
 ### 12.2 Privacy-safe event design
 
 Analytics events must never include:
+
 - Raw prompt text
 - Raw AI-generated output
 - Task names, notes, or descriptions
@@ -409,6 +426,7 @@ Events may include: event type, surface name, confidence band (enum), duration (
 ### 12.3 Observability for agentic features
 
 For agent-based surfaces, log:
+
 - `AGENT_TURN_STARTED` (agentName, timestampMs)
 - `AGENT_TURN_COMPLETED` (durationMs, tokensIn, tokensOut, toolsCalled)
 - `AGENT_HEALTH_DEGRADED` (once per transition, not per request)
@@ -425,37 +443,37 @@ Never log tool output content or the data payloads sent to the AI.
 
 This table maps the principles above to the current implementation state and the `AI_UX_OPTIMIZATION_PLAN.md` items for traceability.
 
-| Principle area | Implementation state | See also |
-|---|---|---|
-| AI attribution | Strong — sparkle icon + "Board Copilot" label present | `AI_UX_OPTIMIZATION_PLAN.md` §3.1 |
-| Streaming UI | Present in chat | §2.2 above |
-| Confidence indicators | Partial — draft and estimate only | P2-1 in optimization plan |
-| Citations | Partial — chat only, not claim-level | P0-3 in optimization plan |
-| Local vs. remote disclosure | Shipped (Phase 1) | §3.4 above; P0-2 resolved |
-| Privacy payload accuracy | Phase 1 partial fix landed | P0-1 in optimization plan |
-| Feedback depth | Shallow — thumbs only | P1-3 in optimization plan |
-| Undo correctness | Readiness Undo fixed (Phase 1); bulk undo partial | P1-4, P1-5 in optimization plan |
-| Capability framing | AI search renamed (Phase 1) | P1-2 resolved; §7.3 above |
-| Error copy neutrality | Fixed (Phase 1) | P2-3 resolved; §5.2 above |
-| Agentic write safety | MutationProposalCard gated off by default | P1-7, §9.4 above |
-| Accessibility | jest-axe suite added (2026-05-04) | §8 above; test plan in opt plan |
-| Observability | Sinks + call sites wired (Phase 3) | §12 above; P2-5 resolved |
-| Entry point consolidation | Fragmented — Phase 4 target | P1-6, §10.1 above |
-| Right-rail Copilot shell | Planned (Phase 4) | §10.2 above |
+| Principle area              | Implementation state                                  | See also                          |
+| --------------------------- | ----------------------------------------------------- | --------------------------------- |
+| AI attribution              | Strong — sparkle icon + "Board Copilot" label present | `AI_UX_OPTIMIZATION_PLAN.md` §3.1 |
+| Streaming UI                | Present in chat                                       | §2.2 above                        |
+| Confidence indicators       | Partial — draft and estimate only                     | P2-1 in optimization plan         |
+| Citations                   | Partial — chat only, not claim-level                  | P0-3 in optimization plan         |
+| Local vs. remote disclosure | Shipped (Phase 1)                                     | §3.4 above; P0-2 resolved         |
+| Privacy payload accuracy    | Phase 1 partial fix landed                            | P0-1 in optimization plan         |
+| Feedback depth              | Shallow — thumbs only                                 | P1-3 in optimization plan         |
+| Undo correctness            | Readiness Undo fixed (Phase 1); bulk undo partial     | P1-4, P1-5 in optimization plan   |
+| Capability framing          | AI search renamed (Phase 1)                           | P1-2 resolved; §7.3 above         |
+| Error copy neutrality       | Fixed (Phase 1)                                       | P2-3 resolved; §5.2 above         |
+| Agentic write safety        | MutationProposalCard gated off by default             | P1-7, §9.4 above                  |
+| Accessibility               | jest-axe suite added (2026-05-04)                     | §8 above; test plan in opt plan   |
+| Observability               | Sinks + call sites wired (Phase 3)                    | §12 above; P2-5 resolved          |
+| Entry point consolidation   | Fragmented — Phase 4 target                           | P1-6, §10.1 above                 |
+| Right-rail Copilot shell    | Planned (Phase 4)                                     | §10.2 above                       |
 
 ---
 
 ## 14. Key Sources
 
-| Source | Key contribution |
-|---|---|
-| [Google PAIR Guidebook](https://pair.withgoogle.com/guidebook/) | Transparency, mental models, capability framing, feedback |
-| [Microsoft HAX Toolkit](https://www.microsoft.com/en-us/haxtoolkit/) | 18 design guidelines; dismissal, correction, efficient handoff |
-| [Nielsen Norman Group — AI UX](https://www.nngroup.com/topic/ai/) | Trust calibration, mental models, disclosure patterns |
-| [NIST AI RMF](https://www.nist.gov/system/files/documents/2023/01/26/AI%20RMF%201.0.pdf) | Govern/Map/Measure/Manage risk framework |
-| [IBM Design for AI](https://www.ibm.com/design/ai/) | Explainability, confidence, human-AI teaming |
-| [Anthropic Model Card & Safety](https://www.anthropic.com/model-card) | Agent safety, human oversight, scope limitations |
-| [OpenAI Product UX Principles](https://openai.com/product) | Capability framing, streaming, error handling |
-| [Apple ML + Privacy Design](https://developer.apple.com/machine-learning/privacy/) | On-device vs. server disclosure, data minimization |
-| [W3C ARIA for Live Regions](https://www.w3.org/TR/wai-aria/#aria-live) | Accessible streaming content patterns |
-| [WCAG 2.2](https://www.w3.org/TR/WCAG22/) | Target size, focus appearance, motion, authentication |
+| Source                                                                                   | Key contribution                                               |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [Google PAIR Guidebook](https://pair.withgoogle.com/guidebook/)                          | Transparency, mental models, capability framing, feedback      |
+| [Microsoft HAX Toolkit](https://www.microsoft.com/en-us/haxtoolkit/)                     | 18 design guidelines; dismissal, correction, efficient handoff |
+| [Nielsen Norman Group — AI UX](https://www.nngroup.com/topic/ai/)                        | Trust calibration, mental models, disclosure patterns          |
+| [NIST AI RMF](https://www.nist.gov/system/files/documents/2023/01/26/AI%20RMF%201.0.pdf) | Govern/Map/Measure/Manage risk framework                       |
+| [IBM Design for AI](https://www.ibm.com/design/ai/)                                      | Explainability, confidence, human-AI teaming                   |
+| [Anthropic Model Card & Safety](https://www.anthropic.com/model-card)                    | Agent safety, human oversight, scope limitations               |
+| [OpenAI Product UX Principles](https://openai.com/product)                               | Capability framing, streaming, error handling                  |
+| [Apple ML + Privacy Design](https://developer.apple.com/machine-learning/privacy/)       | On-device vs. server disclosure, data minimization             |
+| [W3C ARIA for Live Regions](https://www.w3.org/TR/wai-aria/#aria-live)                   | Accessible streaming content patterns                          |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                                | Target size, focus appearance, motion, authentication          |
