@@ -1,10 +1,10 @@
-# Monorepo migration — remaining manual tasks
+# Monorepo migration — external follow-up tasks
 
-Everything that can ship in code is in this branch. The items below need
-a human on the Vercel / Fly.io / GitHub dashboards (or local CLI auth)
-that the in-repo tooling cannot reach.
+The repository-side migration work is complete in-tree. The remaining
+items below need a human on the Vercel / Fly.io / GitHub dashboards (or
+local CLI auth) that the in-repo tooling cannot reach.
 
-Delete this file once every task is checked off.
+Delete this file once every external task is checked off.
 
 ---
 
@@ -35,9 +35,10 @@ curl -sS -X PATCH "https://api.vercel.com/v9/projects/$PROJECT" \
 
 ## 2. Enable Fly.io auto-deploy on push 🟡 optional
 
-Until this is done, `npm run deploy:backend` from a developer machine
-or the **Actions → Deploy Backend (Fly.io) → Run workflow** button is
-the only path to a Fly deploy.
+The workflow file is already configured to deploy on pushes to `main`
+when `backend/**` (or the workflow itself) changes. The only remaining
+step is adding the GitHub secret that lets GitHub Actions authenticate
+to Fly.io.
 
 - [ ] On a machine logged in to both `fly` and `gh`:
 
@@ -46,8 +47,6 @@ the only path to a Fly deploy.
       | gh secret set FLY_API_TOKEN -R zhuocun/jira-react-app
     ```
 
-- [ ] Edit `.github/workflows/deploy-backend.yml` — uncomment the four
-      commented `push:` lines under `on:`. Commit and push.
 - [ ] Open a small PR that touches `backend/**`, merge it, and confirm
       the **Deploy Backend (Fly.io)** workflow runs and succeeds.
 

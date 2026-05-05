@@ -1,23 +1,21 @@
 name: Deploy Backend (Fly.io)
 
-# Default trigger is manual via the Actions tab so this workflow stays
-# inert until the operator opts in. To enable push-on-merge deploys:
+# Supports both manual deploys from the Actions tab and push-on-merge
+# deploys for backend changes on `main`.
 #
-#   1. Add `FLY_API_TOKEN` to repository secrets
-#      (Settings → Secrets and variables → Actions).
-#   2. Uncomment the `push` block below.
-#
-# Without `FLY_API_TOKEN` the manual run still fails fast at the
-# `flyctl deploy` step rather than producing a half-deployed app.
+# Repository operators still need to add `FLY_API_TOKEN` under
+# Settings → Secrets and variables → Actions. Without the secret,
+# the workflow fails fast at the `flyctl deploy` step rather than
+# producing a half-deployed app.
 
 on:
     workflow_dispatch:
-    # push:
-    #     branches:
-    #         - main
-    #     paths:
-    #         - "backend/**"
-    #         - ".github/workflows/deploy-backend.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "backend/**"
+            - ".github/workflows/deploy-backend.yml"
 
 concurrency:
     group: deploy-backend

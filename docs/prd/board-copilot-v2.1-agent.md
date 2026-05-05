@@ -247,7 +247,7 @@ v2 deferred this to "once Phase F lands." In 2026 with a LangGraph backend, this
 
 ## 5A. Backend and API design (Python server)
 
-This section specifies the server-side architecture. The server lives in the `jira-python-server` repository and is built on **FastAPI + LangGraph 1.x**. It is the binding contract for anyone implementing or extending the agent server.
+This section specifies the server-side architecture. The server now lives in this monorepo under `backend/` (it previously lived in the standalone `jira-python-server` repository) and is built on **FastAPI + LangGraph 1.x**. It is the binding contract for anyone implementing or extending the agent server.
 
 ### 5A.1 Server stack and dependencies
 
@@ -266,7 +266,7 @@ This section specifies the server-side architecture. The server lives in the `ji
 ### 5A.2 Server directory layout
 
 ```
-jira-python-server/
+backend/
 ├── app/
 │   ├── main.py                     # FastAPI app, CORS, middleware, lifespan
 │   ├── config.py                   # Settings: DB URI, LLM keys, rate limits
