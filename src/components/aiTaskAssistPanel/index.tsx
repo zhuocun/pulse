@@ -100,6 +100,12 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const readinessAi = useAi<IReadinessReport>({ route: "readiness" });
     const remoteAgent = useAgent("task-estimation-agent", { projectId });
     const isRemote = !environment.aiUseLocalEngine;
+    const startRemoteEstimate = remoteAgent.start;
+    const abortRemoteEstimate = remoteAgent.abort;
+    const clearRemoteSuggestion = remoteAgent.clearSuggestion;
+    const remoteLastSuggestion = remoteAgent.lastSuggestion;
+    const remoteError = remoteAgent.error;
+    const remoteIsStreaming = remoteAgent.isStreaming;
 
     const runEstimate = estimateAi.run;
     const runReadiness = readinessAi.run;
@@ -108,7 +114,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
 
     // Extract both estimate + readiness from the single agent suggestion event.
     const agentEstimateData = useMemo((): IEstimateSuggestion | undefined => {
-        const s = remoteAgent.lastSuggestion;
+        const s = remoteLastSuggestion;
         if (!s || s.surface !== "estimate") return undefined;
         const p = s.payload as {
             estimate?: IEstimateSuggestion;
@@ -116,27 +122,27 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         return p.estimate
             ? { ...p.estimate, similar: p.estimate.similar ?? [] }
             : undefined;
-    }, [remoteAgent.lastSuggestion]);
+    }, [remoteLastSuggestion]);
 
     const agentReadinessData = useMemo((): IReadinessReport | undefined => {
-        const s = remoteAgent.lastSuggestion;
+        const s = remoteLastSuggestion;
         if (!s || s.surface !== "estimate") return undefined;
         const p = s.payload as {
             readiness?: V21ReadinessPayload;
         };
         return p.readiness ? adaptV21Readiness(p.readiness) : undefined;
-    }, [remoteAgent.lastSuggestion]);
+    }, [remoteLastSuggestion]);
 
     // Active data/error/loading derived from the selected engine.
     const estimateData = isRemote ? agentEstimateData : estimateAi.data;
     const readinessData = isRemote ? agentReadinessData : readinessAi.data;
-    const estimateError = isRemote ? remoteAgent.error : estimateAi.error;
+    const estimateError = isRemote ? remoteError : estimateAi.error;
     const readinessError = isRemote ? null : readinessAi.error;
     const estimateIsLoading = isRemote
-        ? remoteAgent.isStreaming
+        ? remoteIsStreaming
         : estimateAi.isLoading;
     const readinessIsLoading = isRemote
-        ? remoteAgent.isStreaming
+        ? remoteIsStreaming
         : readinessAi.isLoading;
 
     const showEstimateSpinner = useDelayedFlag(
@@ -171,32 +177,34 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
      * don't strand the panel.
      */
     const trimmedName = taskName.trim();
+    const remotePrompt = useMemo(() => {
+        if (!trimmedName) return "";
+        return (
+            `Estimate task: name="${trimmedName}"` +
+            (debouncedValues.type ? ` type="${debouncedValues.type}"` : "") +
+            (debouncedValues.epic ? ` epic="${debouncedValues.epic}"` : "") +
+            (debouncedValues.note ? ` note="${debouncedValues.note}"` : "")
+        );
+    }, [
+        trimmedName,
+        debouncedValues.type,
+        debouncedValues.epic,
+        debouncedValues.note
+    ]);
     useEffect(() => {
         if (!trimmedName) {
             resetEstimate();
             resetReadiness();
             setDismissedKeys(new Set());
             if (isRemote) {
-                remoteAgent.abort();
-                remoteAgent.clearSuggestion();
+                abortRemoteEstimate();
+                clearRemoteSuggestion();
             }
             return;
         }
         setDismissedKeys(new Set());
         if (isRemote) {
-            void remoteAgent.start(
-                `Estimate task: name="${trimmedName}"` +
-                    (debouncedValues.type
-                        ? ` type="${debouncedValues.type}"`
-                        : "") +
-                    (debouncedValues.epic
-                        ? ` epic="${debouncedValues.epic}"`
-                        : "") +
-                    (debouncedValues.note
-                        ? ` note="${debouncedValues.note}"`
-                        : ""),
-                { autonomy: "plan" }
-            );
+            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -242,7 +250,10 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remoteAgent,
+        remotePrompt,
+        startRemoteEstimate,
+        abortRemoteEstimate,
+        clearRemoteSuggestion,
         runEstimate,
         runReadiness,
         resetEstimate,
@@ -253,10 +264,10 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     useEffect(() => {
         if (!isRemote) return;
         return () => {
-            remoteAgent.abort();
-            remoteAgent.clearSuggestion();
+            abortRemoteEstimate();
+            clearRemoteSuggestion();
         };
-    }, [isRemote, remoteAgent]);
+    }, [isRemote, abortRemoteEstimate, clearRemoteSuggestion]);
 
     const taskById = (id: string) => tasks.find((task) => task._id === id);
 
@@ -309,20 +320,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             surface: "estimate"
         });
         if (isRemote) {
-            remoteAgent.clearSuggestion();
-            void remoteAgent.start(
-                `Estimate task: name="${trimmedName}"` +
-                    (debouncedValues.type
-                        ? ` type="${debouncedValues.type}"`
-                        : "") +
-                    (debouncedValues.epic
-                        ? ` epic="${debouncedValues.epic}"`
-                        : "") +
-                    (debouncedValues.note
-                        ? ` note="${debouncedValues.note}"`
-                        : ""),
-                { autonomy: "plan" }
-            );
+            clearRemoteSuggestion();
+            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -352,7 +351,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remoteAgent,
+        remotePrompt,
+        startRemoteEstimate,
+        clearRemoteSuggestion,
         runEstimate
     ]);
 
