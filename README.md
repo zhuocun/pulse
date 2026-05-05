@@ -68,7 +68,7 @@ Every model-supplied identifier (`columnId`, `coordinatorId`, similar `taskId`s)
 
 For the full design, see [docs/prd/board-copilot.md](docs/prd/board-copilot.md). For what has shipped vs what is still open, see [docs/prd/board-copilot-progress.md](docs/prd/board-copilot-progress.md). For a section-by-section design vs implementation review with file/line evidence, see [docs/prd/board-copilot-review.md](docs/prd/board-copilot-review.md).
 
-For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility, and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The prior v2 draft is retained at [docs/prd/board-copilot-v2-agent.md](docs/prd/board-copilot-v2-agent.md) for historical context. The v1 local engine remains the read-only fallback when the agent server is unreachable.
+For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility, and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The v1 local engine remains the read-only fallback when the agent server is unreachable.
 
 ## Board Copilot v2.1 (Phase A scaffolding)
 
