@@ -17,7 +17,7 @@
  *   VITE_ANALYTICS_ENDPOINT    — Full URL for analytics event batches (POST).
  *   VITE_ERROR_REPORT_ENDPOINT — Full URL for error event reports (POST).
  */
-const DEFAULT_API_ORIGIN = "https://jira-python-server.vercel.app";
+const DEFAULT_API_ORIGIN = "https://pulse-python-server.vercel.app";
 
 const readEnv = (key: string): string | undefined => {
     if (typeof process !== "undefined" && process.env && key in process.env) {
