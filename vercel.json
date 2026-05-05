@@ -1,5 +1,14 @@
 {
+    "functions": {
+        "api/index.py": {
+            "maxDuration": 300
+        }
+    },
     "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/index.py"
+        },
         {
             "source": "/(.*)",
             "destination": "/index.html"

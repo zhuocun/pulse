@@ -1,0 +1,66 @@
+# Fly.io launch config for jira-python-server.
+#
+# `app` and `primary_region` are placeholders -- operators should
+# rename to match their Fly org and pick a region close to the
+# Postgres/Mongo cluster they front.
+#
+# Why min_machines_running >= 1 and a single worker:
+#   The agent surface keeps state in-process -- the per-agent rate
+#   limiter (app/middleware/rate_limit.py), the per-project monthly
+#   budget tracker (app/middleware/budget.py), and the default
+#   in-memory LangGraph checkpointer/store all live on the heap.
+#   Letting Fly stop the only machine drops every paused agent
+#   thread on the floor, and running multi-worker uvicorn breaks the
+#   same invariants. Scale by adding more machines (each with one
+#   uvicorn worker) and switching the agent backends to postgres.
+
+app = "jira-python-server"
+
+# Change before deploying. Pick the region nearest your Postgres/Mongo
+# cluster -- Fly egress between regions is metered.
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  # Hard cap per agent invocation. SSE streams that exceed this raise
+  # a typed `error` envelope mid-stream rather than hanging the client.
+  AGENT_REQUEST_TIMEOUT_SECONDS = "120"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # Do not auto-stop -- see header comment about in-process state.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  # SSE response idle timeout. Fly proxies HTTP/2 by default and the
+  # idle window between bytes on a streaming response is governed by
+  # the platform's documented 60-second proxy idle timeout. Each
+  # `data:` frame from app/agents/sse.py (including the periodic
+  # `messages` chunks) resets it, so the wall-clock duration of an
+  # agent run is bounded by AGENT_REQUEST_TIMEOUT_SECONDS rather than
+  # by Fly. If you ship a slow tool that goes silent for >60s,
+  # interleave a heartbeat custom event from the agent.
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "get"
+    path = "/health"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"

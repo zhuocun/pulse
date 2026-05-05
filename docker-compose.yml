@@ -1,0 +1,96 @@
+# Local-dev convenience stack.
+#
+# Brings up the FastAPI server (built from the production Dockerfile)
+# alongside a Postgres 16 instance for the LangGraph checkpointer /
+# store, a Mongo 7 instance for the application repository, and a
+# Redis 7 instance for the rate-limit + budget backends. The defaults
+# match what a Tier-1 production deploy looks like -- real persistence
+# everywhere -- so interrupt-using agents (board-brief, task-drafting,
+# task-estimation, triage) plus the shared rate-limit / budget caps
+# work end-to-end without spinning up managed clusters.
+#
+# Usage:
+#   docker compose up --build
+#   curl http://localhost:8000/health
+#
+# Override the AI provider key by exporting ANTHROPIC_API_KEY (or
+# OPENAI_API_KEY) before `docker compose up`; the variable is
+# forwarded to the server container automatically.
+
+services:
+  server:
+    build: .
+    image: jira-python-server:dev
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE: mongoDB
+      MONGO_URI: mongodb://mongo:27017/jira
+      MONGO_DB: jira
+      AGENT_CHECKPOINT_BACKEND: postgres
+      AGENT_STORE_BACKEND: postgres
+      AGENT_POSTGRES_URI: postgresql://jira:jira@postgres:5432/jira
+      RATE_LIMIT_BACKEND: redis
+      BUDGET_BACKEND: redis
+      REDIS_URI: redis://redis:6379/0
+      UUID: dev-only-jwt-secret-change-me-32-bytes-long
+      CORS_ORIGINS: http://localhost:3000
+      # Forward provider keys from the host shell when present.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jira
+      POSTGRES_PASSWORD: jira
+      POSTGRES_DB: jira
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jira -d jira"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
