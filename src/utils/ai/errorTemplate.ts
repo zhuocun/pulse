@@ -18,7 +18,7 @@ import {
     AgentRateLimitError,
     AgentServerError,
     AgentTransportError
-} from "./agentClient";
+} from "./agentErrors";
 
 export interface AiErrorView {
     /** Heading shown as the alert title. */

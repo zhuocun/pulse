@@ -6,7 +6,7 @@ import {
     AgentRateLimitError,
     AgentServerError,
     AgentTransportError
-} from "./agentClient";
+} from "./agentErrors";
 import { aiErrorView } from "./errorTemplate";
 
 describe("aiErrorView", () => {

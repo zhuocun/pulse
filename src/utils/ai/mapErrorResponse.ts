@@ -19,7 +19,7 @@ import {
     AgentRateLimitError,
     AgentServerError,
     AgentTransportError
-} from "./agentClient";
+} from "./agentErrors";
 
 const parseRetryAfter = (raw: string | null): number => {
     if (!raw) return 0;
@@ -33,12 +33,22 @@ const safeReadBudgetReason = (response: Response): boolean => {
     return reason.toLowerCase() === "budget";
 };
 
+type ErrorSurface = "ai" | "agent";
+
+const transportFallback = (surface: ErrorSurface, status: number) =>
+    surface === "ai"
+        ? `AI request failed (${status})`
+        : `Agent request failed (${status})`;
+
 /**
  * Convert a non-OK `Response` into the appropriate typed Error subclass.
  * Body parsing is best-effort: if the server returns JSON we surface its
  * `message`, but we never throw a secondary error from inside this helper.
  */
-export const mapErrorResponse = async (response: Response): Promise<Error> => {
+const mapErrorResponseForSurface = async (
+    response: Response,
+    surface: ErrorSurface
+): Promise<Error> => {
     let body: unknown = null;
     try {
         const text = await response.text();
@@ -83,6 +93,14 @@ export const mapErrorResponse = async (response: Response): Promise<Error> => {
         return new AgentServerError(status, messageFromBody);
     }
     return new AgentTransportError(
-        messageFromBody ?? `AI request failed (${status})`
+        messageFromBody ?? transportFallback(surface, status)
     );
 };
+
+/** v1 AI JSON routes (`useAi`, `useAiChat`). */
+export const mapErrorResponse = (response: Response) =>
+    mapErrorResponseForSurface(response, "ai");
+
+/** v2 agent HTTP client (`agentClient`). */
+export const mapAgentErrorResponse = (response: Response) =>
+    mapErrorResponseForSurface(response, "agent");

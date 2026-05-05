@@ -14,9 +14,9 @@ import type { AgentMessage } from "./useAgent";
  * Map an agent role to an AiChatMessage role. AgentMessage uses "system" for
  * internal error messages but AiChatMessage only has "user" | "assistant" |
  * "tool". We map "system" → "assistant" so it's at least visible in the
- * transcript rather than silently dropped.
+ * transcript rather than silently dropped (lossy mapping).
  */
-const mapRole = (role: AgentMessage["role"]): AiChatMessage["role"] => {
+const agentRoleToChatRole = (role: AgentMessage["role"]): AiChatMessage["role"] => {
     if (role === "system") return "assistant";
     return role as AiChatMessage["role"];
 };
@@ -66,7 +66,7 @@ const deriveMessagesAndStreaming = (
     // prepended before the assistant messages that follow them.
     const mapped: AiChatMessage[] = agentMessages.map((m) => {
         const msg: AiChatMessage = {
-            role: mapRole(m.role),
+            role: agentRoleToChatRole(m.role),
             content: m.content
         };
         if (m.toolCallId) msg.toolCallId = m.toolCallId;
@@ -167,16 +167,6 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
 
     // Error dismissal: track whether the current error has been dismissed.
     const [errorDismissed, setErrorDismissed] = useState(false);
-    const lastErrorRef = useRef<Error | null>(null);
-    // Reset dismissed flag when a new error arrives.
-    if (agent.error !== lastErrorRef.current) {
-        lastErrorRef.current = agent.error;
-        if (agent.error !== null) {
-            // New error — show it.
-            // We can't call setState here synchronously during render in a
-            // clean way, so we use a ref-based gate instead.
-        }
-    }
 
     // Tool-trace messages synthesized from interrupt events. Cleared on reset.
     const [toolTraceMessages, setToolTraceMessages] = useState<AiChatMessage[]>(
@@ -206,22 +196,6 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         };
         setToolTraceMessages((prev) => [...prev, traceMsg]);
     }, [pendingInterrupt]);
-
-    // Reset tool traces and dismissed nudges when the agent resets.
-    // We detect reset via the agent's messages being empty and no streaming.
-    const agentMessagesLengthRef = useRef(agent.state.messages.length);
-    if (
-        agent.state.messages.length === 0 &&
-        agentMessagesLengthRef.current > 0 &&
-        !agent.isStreaming
-    ) {
-        // The agent was reset — clear our local state synchronously.
-        // (This is safe in render because it only triggers when condition
-        // changes from non-zero → zero, which happens at most once per
-        // reset cycle.)
-        agentMessagesLengthRef.current = 0;
-    }
-    agentMessagesLengthRef.current = agent.state.messages.length;
 
     // Derive displayed messages and streamingText from agent state.
     const { messages, streamingText } = deriveMessagesAndStreaming(

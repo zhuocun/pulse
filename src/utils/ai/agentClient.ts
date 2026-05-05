@@ -6,7 +6,27 @@ import type {
     StreamPart
 } from "../../interfaces/agent";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
+import {
+    AgentAuthError,
+    AgentBudgetError,
+    AgentForbiddenError,
+    AgentNotFoundError,
+    AgentRateLimitError,
+    AgentServerError,
+    AgentTransportError
+} from "./agentErrors";
 import { newIdempotencyKey } from "./idempotencyKey";
+import { mapAgentErrorResponse } from "./mapErrorResponse";
+
+export {
+    AgentAuthError,
+    AgentBudgetError,
+    AgentForbiddenError,
+    AgentNotFoundError,
+    AgentRateLimitError,
+    AgentServerError,
+    AgentTransportError
+} from "./agentErrors";
 
 /**
  * Typed transport over the LangGraph v2 `agents/{name}/stream` endpoint
@@ -18,74 +38,6 @@ import { newIdempotencyKey } from "./idempotencyKey";
  * The v1 fallback in `useAi.ts` / `useAiChat.ts` stays untouched: when
  * `REACT_APP_AI_BASE_URL` is empty the agent client is never reached.
  */
-
-export class AgentTransportError extends Error {
-    constructor(
-        message: string,
-        public cause?: unknown
-    ) {
-        super(message);
-        this.name = "AgentTransportError";
-    }
-}
-
-export class AgentAuthError extends Error {
-    constructor(message = "Agent server rejected the auth token") {
-        super(message);
-        this.name = "AgentAuthError";
-    }
-}
-
-/**
- * Distinguishes 403 from 401: the request was authenticated but the
- * caller does not have permission for this agent / autonomy level / org.
- * Splitting the error class lets the UI route 403 to a "request access"
- * flow instead of nudging the user back to login (which is what 401
- * triggers).
- */
-export class AgentForbiddenError extends Error {
-    constructor(message = "Agent server forbade this request") {
-        super(message);
-        this.name = "AgentForbiddenError";
-    }
-}
-
-export class AgentRateLimitError extends Error {
-    constructor(
-        public retryAfterSeconds: number,
-        message?: string
-    ) {
-        super(
-            message ??
-                `Agent server rate-limited (retry in ${retryAfterSeconds}s)`
-        );
-        this.name = "AgentRateLimitError";
-    }
-}
-
-export class AgentBudgetError extends Error {
-    constructor(message = "Agent budget exhausted for this user/project") {
-        super(message);
-        this.name = "AgentBudgetError";
-    }
-}
-
-export class AgentNotFoundError extends Error {
-    constructor(message = "Agent not found") {
-        super(message);
-        this.name = "AgentNotFoundError";
-    }
-}
-
-export class AgentServerError extends Error {
-    constructor(
-        public status: number,
-        message?: string
-    ) {
-        super(message ?? `Agent server error (${status})`);
-        this.name = "AgentServerError";
-    }
-}
 
 interface BaseRequest {
     baseUrl: string;
@@ -113,72 +65,6 @@ const buildHeaders = (
     };
     if (auth) base.Authorization = auth;
     return { ...base, ...(extra ?? {}) };
-};
-
-const parseRetryAfter = (raw: string | null): number => {
-    if (!raw) return 0;
-    const seconds = Number(raw);
-    if (Number.isFinite(seconds) && seconds >= 0) return Math.floor(seconds);
-    return 0;
-};
-
-const safeReadBudgetReason = (response: Response): boolean => {
-    const reason = response.headers.get("X-Reason") ?? "";
-    return reason.toLowerCase() === "budget";
-};
-
-/**
- * Convert a non-OK Response into the appropriate typed error. Body parsing
- * is best-effort: if the server returns JSON we surface its `message`, but
- * we never throw a different error from inside this branch.
- */
-const mapErrorResponse = async (response: Response): Promise<Error> => {
-    let body: unknown = null;
-    try {
-        const text = await response.text();
-        if (text.trim()) {
-            try {
-                body = JSON.parse(text);
-            } catch {
-                body = text;
-            }
-        }
-    } catch {
-        body = null;
-    }
-    const messageFromBody =
-        typeof body === "object" && body !== null
-            ? ((body as { message?: unknown }).message as string | undefined)
-            : typeof body === "string"
-              ? body
-              : undefined;
-
-    const status = response.status;
-    if (status === 401) {
-        return new AgentAuthError(messageFromBody);
-    }
-    if (status === 403) {
-        return new AgentForbiddenError(messageFromBody);
-    }
-    if (status === 402) {
-        return new AgentBudgetError(messageFromBody);
-    }
-    if (status === 429) {
-        if (safeReadBudgetReason(response)) {
-            return new AgentBudgetError(messageFromBody);
-        }
-        const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
-        return new AgentRateLimitError(retryAfter, messageFromBody);
-    }
-    if (status === 404) {
-        return new AgentNotFoundError(messageFromBody);
-    }
-    if (status >= 500) {
-        return new AgentServerError(status, messageFromBody);
-    }
-    return new AgentTransportError(
-        messageFromBody ?? `Agent request failed (${status})`
-    );
 };
 
 const wrapNetworkError = (err: unknown): Error => {
@@ -266,7 +152,7 @@ export async function* streamAgent({
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
-        throw await mapErrorResponse(response);
+        throw await mapAgentErrorResponse(response);
     }
     const reader = response.body?.getReader();
     if (!reader) {
@@ -333,7 +219,7 @@ export const invokeAgent = async <T = unknown>({
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
-        throw await mapErrorResponse(response);
+        throw await mapAgentErrorResponse(response);
     }
     return (await response.json()) as T;
 };
@@ -355,7 +241,7 @@ export const listAgents = async ({
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
-        throw await mapErrorResponse(response);
+        throw await mapAgentErrorResponse(response);
     }
     return (await response.json()) as AgentListResponse;
 };
@@ -381,7 +267,7 @@ export const getAgentMetadata = async ({
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
-        throw await mapErrorResponse(response);
+        throw await mapAgentErrorResponse(response);
     }
     return (await response.json()) as AgentMetadata;
 };
@@ -432,7 +318,7 @@ export const getAgentHealth = async ({
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
-        throw await mapErrorResponse(response);
+        throw await mapAgentErrorResponse(response);
     }
     const json = (await response.json()) as RawAgentHealthResponse;
     const latencyMs = Date.now() - started;

@@ -395,6 +395,14 @@ const BoardPage = () => {
         }
         return buckets;
     }, [visibleTasks]);
+    const resetBoardFilters = useCallback(() => {
+        setParam({
+            taskName: undefined,
+            coordinatorId: undefined,
+            type: undefined,
+            semanticIds: undefined
+        });
+    }, [setParam]);
     const { enabled: aiEnabled } = useAiEnabled();
     const {
         disabled: aiDisabledForProject,
@@ -828,16 +836,8 @@ const BoardPage = () => {
                                                         column={column}
                                                         members={members ?? []}
                                                         param={param}
-                                                        onResetFilters={() =>
-                                                            setParam({
-                                                                taskName:
-                                                                    undefined,
-                                                                coordinatorId:
-                                                                    undefined,
-                                                                type: undefined,
-                                                                semanticIds:
-                                                                    undefined
-                                                            })
+                                                        onResetFilters={
+                                                            resetBoardFilters
                                                         }
                                                         isDragDisabled={
                                                             isTaskDragDisabled
