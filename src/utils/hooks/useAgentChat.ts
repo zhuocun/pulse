@@ -69,7 +69,12 @@ const deriveMessagesAndStreaming = (
     const mapped: AiChatMessage[] = agentMessages.map((m) => {
         const msg: AiChatMessage = {
             role: agentRoleToChatRole(m.role),
-            content: m.content
+            content:
+                typeof m.content === "string"
+                    ? m.content
+                    : m.content == null
+                      ? ""
+                      : String(m.content)
         };
         if (m.toolCallId) msg.toolCallId = m.toolCallId;
         return msg;

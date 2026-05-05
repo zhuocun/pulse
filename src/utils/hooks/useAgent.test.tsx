@@ -32,7 +32,8 @@ import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import useAgent, {
     NUDGE_EXPIRY_MS,
     NUDGE_INBOX_MAX,
-    reduceNudgeInbox
+    reduceNudgeInbox,
+    type AgentMessage
 } from "./useAgent";
 
 const mockedStream = streamAgent as unknown as jest.Mock;
@@ -96,6 +97,43 @@ describe("useAgent", () => {
         );
         expect(result.current.state.lastUpdate).toEqual({ step: 1 });
         expect(mockedStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("normalizes undefined user message content on start so wire payload and state stay string-safe", async () => {
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "messages",
+                    ns: ["root"],
+                    data: [{ content: "ok" }, {}]
+                }
+            ])
+        );
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("board-coach", { projectId: "p1", userId: "u1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start({
+                messages: [
+                    { role: "user", content: undefined as unknown as string }
+                ]
+            });
+        });
+
+        await waitFor(() => {
+            expect(result.current.isStreaming).toBe(false);
+        });
+
+        const userMsgs = result.current.state.messages.filter(
+            (m) => m.role === "user"
+        );
+        expect(userMsgs[userMsgs.length - 1]?.content).toBe("");
+        const wireMessages = mockedStream.mock.calls[0][0].body.input
+            .messages as AgentMessage[];
+        expect(wireMessages[wireMessages.length - 1]?.content).toBe("");
     });
 
     // The agent server derives identity from the JWT and rejects any

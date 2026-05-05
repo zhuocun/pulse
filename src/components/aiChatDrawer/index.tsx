@@ -742,7 +742,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 
     // P1-C: approximate token count for context-window budget warnings.
     const approxTokenCount = messages.reduce(
-        (acc, m) => acc + Math.ceil(m.content.length / 4),
+        (acc, m) => acc + Math.ceil((m.content ?? "").length / 4),
         0
     );
 
@@ -891,7 +891,11 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 
     const lastAssistantIndex = messages.reduceRight(
         (found, m, i) =>
-            found === -1 && m.role === "assistant" && m.content.trim() ? i : found,
+            found === -1 &&
+            m.role === "assistant" &&
+            (m.content ?? "").trim()
+                ? i
+                : found,
         -1
     );
 

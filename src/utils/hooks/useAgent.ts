@@ -231,7 +231,7 @@ const applyStreamPart = async (
                     const next = [...prev.messages];
                     next[next.length - 1] = {
                         ...last,
-                        content: last.content + content
+                        content: (last.content ?? "") + content
                     };
                     return { ...prev, messages: next };
                 }
@@ -624,10 +624,19 @@ const useAgent = (
             setCitations([]);
             setNudgeEntries([]);
             setLastSuggestion(null);
-            const messages =
+            const rawMessages =
                 typeof input === "string"
                     ? [{ role: "user" as const, content: input }]
                     : ((input as { messages?: AgentMessage[] }).messages ?? []);
+            const messages: AgentMessage[] = rawMessages.map((m) => ({
+                ...m,
+                content:
+                    typeof m.content === "string"
+                        ? m.content
+                        : m.content == null
+                          ? ""
+                          : String(m.content)
+            }));
 
             // Reflect the user message immediately so chat UIs feel instant.
             safeSetState((prev) => ({
