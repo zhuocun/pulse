@@ -100,7 +100,7 @@ here.
 - This is a Vite React SPA. Standard scripts live in `package.json`; `npm start`
   serves the app on port 3000.
 - Browser E2E in Cursor Cloud should not depend on the default remote API:
-  `https://jira-python-server.vercel.app` can return 403 from this environment,
+  `https://pulse-python-server.vercel.app` can return 403 from this environment,
   and the checked-in `__json_server_mock__` data is stale relative to the
   current `/api/v1` frontend contract. Use Playwright route mocks or an
   API-compatible local mock when exercising authenticated project and board

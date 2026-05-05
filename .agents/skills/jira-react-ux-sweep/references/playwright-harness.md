@@ -15,7 +15,7 @@ documented.
     ```
 - Chromium binaries are pre-installed under `/opt/pw-browsers/`. No
   download step needed.
-- The remote API at `https://jira-python-server.vercel.app` returns
+- The remote API at `https://pulse-python-server.vercel.app` returns
   403 from this environment, so mock everything inside Playwright.
 
 ## Mock contract

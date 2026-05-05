@@ -20,7 +20,7 @@ no CI workflow involved.
 - [ ] Vercel dashboard → `jira-python-server` project → **Settings → Git** → disconnect from `zhuocun/jira-python-server`, connect to `zhuocun/jira-react-app`.
 - [ ] Vercel dashboard → same project → **Settings → General → Root Directory** → `backend/`. Save.
 - [ ] **Deployments → Redeploy** the latest production deployment.
-- [ ] Smoke-check: `curl https://jira-python-server.vercel.app/api/v1/health` returns 200.
+- [ ] Smoke-check: `curl https://pulse-python-server.vercel.app/api/v1/health` returns 200.
 
 CLI alternative (needs a `VERCEL_TOKEN` with access to the project):
 

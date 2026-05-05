@@ -35,7 +35,7 @@ describe("environment", () => {
         const environment = require("./env").default;
 
         expect(environment.apiBaseUrl).toBe(
-            "https://jira-python-server.vercel.app/api/v1"
+            "https://pulse-python-server.vercel.app/api/v1"
         );
     });
 

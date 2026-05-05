@@ -88,7 +88,7 @@ class Settings:
     jwt_expires_seconds: int = env_int("JWT_EXPIRES_SECONDS", "86400")
     cors_origins: tuple[str, ...] = env_csv(
         "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,https://jira-react-app.vercel.app",
+        "http://localhost:3000,http://127.0.0.1:3000,https://pulse-react-app.vercel.app",
     )
     cors_origin_regex: str = os.getenv(
         "CORS_ORIGIN_REGEX",

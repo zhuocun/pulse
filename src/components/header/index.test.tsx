@@ -46,7 +46,7 @@ jest.mock("../memberPopover", () => {
 jest.mock("../../constants/env", () => ({
     __esModule: true,
     default: {
-        apiBaseUrl: "https://jira-python-server.vercel.app/api/v1",
+        apiBaseUrl: "https://pulse-python-server.vercel.app/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
         aiUseLocalEngine: true
