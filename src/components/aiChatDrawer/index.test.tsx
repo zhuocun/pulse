@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
@@ -176,6 +176,14 @@ describe("AiChatDrawer", () => {
         const clearBtn = screen.getByLabelText("New conversation");
         expect(clearBtn).not.toBeDisabled();
         fireEvent.click(clearBtn);
+        await waitFor(() => {
+            expect(
+                screen.getByText(
+                    /starting a new conversation will clear all current history/i
+                )
+            ).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^ok$/i }));
 
         await waitFor(() => {
             expect(
@@ -360,7 +368,8 @@ describe("AiChatDrawer", () => {
         expect(screen.getByText("3 bugs have no assignee")).toBeInTheDocument();
     });
 
-    it("invokes onAcceptProposal / onRejectProposal when the proposal card buttons are clicked", () => {
+    it("invokes onAcceptProposal / onRejectProposal when the proposal card countdown commits", async () => {
+        jest.useFakeTimers();
         mockEnv.aiMutationProposalsEnabled = true;
         const proposal: MutationProposal = {
             proposal_id: "prop-accept",
@@ -381,21 +390,36 @@ describe("AiChatDrawer", () => {
         const onAcceptProposal = jest.fn();
         const onRejectProposal = jest.fn();
 
-        renderDrawer(true, {
-            pendingProposal: proposal,
-            onAcceptProposal,
-            onRejectProposal
-        });
+        try {
+            renderDrawer(true, {
+                pendingProposal: proposal,
+                onAcceptProposal,
+                onRejectProposal
+            });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /accept proposal/i })
-        );
-        expect(onAcceptProposal).toHaveBeenCalledTimes(1);
-        expect(onAcceptProposal).toHaveBeenCalledWith(proposal);
-        expect(onRejectProposal).not.toHaveBeenCalled();
+            fireEvent.click(
+                screen.getByRole("button", { name: /accept proposal/i })
+            );
+            expect(onAcceptProposal).not.toHaveBeenCalled();
+
+            for (let i = 0; i < 11; i += 1) {
+                act(() => {
+                    jest.advanceTimersByTime(1_000);
+                });
+            }
+
+            await waitFor(() => {
+                expect(onAcceptProposal).toHaveBeenCalledTimes(1);
+            });
+            expect(onAcceptProposal).toHaveBeenCalledWith(proposal);
+            expect(onRejectProposal).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
-    it("hides the proposal card locally when no onAcceptProposal handler is supplied", () => {
+    it("hides the proposal card locally after the accept countdown commits when no handler is supplied", async () => {
+        jest.useFakeTimers();
         mockEnv.aiMutationProposalsEnabled = true;
         const proposal: MutationProposal = {
             proposal_id: "prop-local",
@@ -404,23 +428,36 @@ describe("AiChatDrawer", () => {
             risk: "low",
             undoable: true
         };
-        renderDrawer(true, { pendingProposal: proposal });
+        try {
+            renderDrawer(true, { pendingProposal: proposal });
 
-        expect(
-            screen.getByRole("alertdialog", {
-                name: /Reassign overdue tasks to Alice/i
-            })
-        ).toBeInTheDocument();
+            expect(
+                screen.getByRole("alertdialog", {
+                    name: /Reassign overdue tasks to Alice/i
+                })
+            ).toBeInTheDocument();
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /accept proposal/i })
-        );
+            fireEvent.click(
+                screen.getByRole("button", { name: /accept proposal/i })
+            );
+            expect(screen.getByText(/undo \(10s\)/i)).toBeInTheDocument();
 
-        expect(
-            screen.queryByRole("alertdialog", {
-                name: /Reassign overdue tasks to Alice/i
-            })
-        ).not.toBeInTheDocument();
+            for (let i = 0; i < 11; i += 1) {
+                act(() => {
+                    jest.advanceTimersByTime(1_000);
+                });
+            }
+
+            await waitFor(() => {
+                expect(
+                    screen.queryByRole("alertdialog", {
+                        name: /Reassign overdue tasks to Alice/i
+                    })
+                ).not.toBeInTheDocument();
+            });
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("invokes onActionNudge / onDismissNudge from NudgeCard buttons", () => {

@@ -24,6 +24,12 @@ describe("useAgentHealth", () => {
         jest.useRealTimers();
     });
 
+    it("reports offline when baseUrl is omitted (does not fetch)", () => {
+        const { result } = renderHook(() => useAgentHealth());
+        expect(result.current.status).toBe("offline");
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("reports offline when baseUrl is empty (does not fetch)", () => {
         const { result } = renderHook(() => useAgentHealth(""));
         expect(result.current.status).toBe("offline");

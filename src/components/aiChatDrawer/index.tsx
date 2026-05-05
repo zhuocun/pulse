@@ -340,7 +340,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 }) => {
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
         useAutonomyLevel();
-    const { status: healthStatus } = useAgentHealth();
+    const remoteHealthEnabled =
+        environment.aiEnabled && !environment.aiUseLocalEngine;
+    const { status: healthStatus } = useAgentHealth(environment.aiBaseUrl ?? "", {
+        agentName: "chat-agent",
+        enabled: remoteHealthEnabled
+    });
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
     /** P2-E: tracks which assistant messages are expanded (prose > 300 words). */
@@ -1009,7 +1014,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         >
             <CopilotRemoteConsentNotice route="chat" />
             {/* P2-G: Inline health status alert */}
-            {(healthStatus === "degraded" || healthStatus === "offline") && (
+            {remoteHealthEnabled &&
+                (healthStatus === "degraded" || healthStatus === "offline") && (
                 <Alert
                     closable={healthStatus === "degraded"}
                     message={
@@ -1021,7 +1027,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     style={{ marginBottom: space.sm }}
                     type={healthStatus === "offline" ? "error" : "warning"}
                 />
-            )}
+                )}
             {/*
              * Off-screen aria-live region (AI UX best practices §2.10).
              * Streaming text updates are silenced inside the visible
@@ -1900,7 +1906,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 ) : (
                     <Button
                         aria-label={microcopy.a11y.sendMessage}
-                        disabled={!input.trim() || healthStatus === "offline"}
+                        disabled={
+                            !input.trim() ||
+                            (remoteHealthEnabled && healthStatus === "offline")
+                        }
                         onClick={handleSend}
                         type="primary"
                     >
