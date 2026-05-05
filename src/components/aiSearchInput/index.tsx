@@ -1,7 +1,14 @@
 import { CloseCircleFilled, InfoCircleOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Alert, Button, Input, Space, Tag, Tooltip, Typography } from "antd";
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
@@ -22,6 +29,7 @@ import { validateSearch } from "../../utils/ai/validate";
 import useAi, {
     assertRunPayloadProjectsAiAllowed
 } from "../../utils/hooks/useAi";
+import useAgent from "../../utils/hooks/useAgent";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import AiSparkleIcon from "../aiSparkleIcon";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
@@ -143,6 +151,10 @@ const summarizeMatches = (
 const AiSearchInput: React.FC<Props> = (props) => {
     const { enabled: aiEnabled } = useAiEnabled();
     const searchAi = useAi<ISearchResult>({ route: "search" });
+    const projectId =
+        props.kind === "tasks" ? props.projectContext.project._id : undefined;
+    const remoteAgent = useAgent("search-agent", { projectId });
+    const isRemote = !environment.aiUseLocalEngine;
     const [draft, setDraft] = useState("");
     const [noMatchHint, setNoMatchHint] = useState<string | null>(null);
     const [reformulations, setReformulations] = useState<string[]>([]);
@@ -173,9 +185,23 @@ const AiSearchInput: React.FC<Props> = (props) => {
     useEffect(
         () => () => {
             abortRef.current?.abort();
+            remoteAgent.abort();
+            remoteAgent.clearSuggestion();
         },
-        []
+        [remoteAgent]
     );
+
+    // Compute agent suggestion payload; effect is placed after applyResult.
+    const agentSearchPayload = useMemo(() => {
+        const s = remoteAgent.lastSuggestion;
+        if (!s || s.surface !== "search") return null;
+        return s.payload as {
+            ids: string[];
+            matches?: IAiSearchMatch[];
+            rationale: string;
+            expandedTerms?: string[];
+        };
+    }, [remoteAgent.lastSuggestion]);
 
     /**
      * Track whether the underlying scope has any data at all so the
@@ -223,6 +249,26 @@ const AiSearchInput: React.FC<Props> = (props) => {
         [boardHasItems, props]
     );
 
+    // Consume the agent's suggestion once applyResult is stable.
+    useEffect(() => {
+        if (!isRemote || !agentSearchPayload) return;
+        // matches may be absent — fall back to synthetic entries with moderate strength
+        const matches: IAiSearchMatch[] = agentSearchPayload.matches?.length
+            ? agentSearchPayload.matches
+            : agentSearchPayload.ids.map((id) => ({
+                  id,
+                  strength: "moderate" as const
+              }));
+        const result: ISearchResult = {
+            ids: agentSearchPayload.ids,
+            matches,
+            rationale: agentSearchPayload.rationale,
+            expandedTerms: agentSearchPayload.expandedTerms ?? []
+        };
+        applyResult(result, draft);
+        remoteAgent.clearSuggestion();
+    }, [agentSearchPayload, applyResult, draft, isRemote, remoteAgent]);
+
     const performSearch = useCallback(
         async (rawQuery: string) => {
             const query = rawQuery.trim();
@@ -266,15 +312,11 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 setNoMatchHint(microcopy.ai.projectDisabled);
                 return;
             }
-            if (!environment.aiUseLocalEngine) {
-                try {
-                    const result = await searchAi.run(searchPayload);
-                    if (controller.signal.aborted) return;
-                    applyResult(result, query);
-                } catch {
-                    if (controller.signal.aborted) return;
-                    setNoMatchHint(microcopy.feedback.searchFailed);
-                }
+            if (isRemote) {
+                const kindLabel = props.kind === "tasks" ? "tasks" : "projects";
+                void remoteAgent.start(`Find ${kindLabel} matching: ${query}`, {
+                    autonomy: "suggest"
+                });
                 return;
             }
             let raw: ISearchResult;
@@ -306,14 +348,17 @@ const AiSearchInput: React.FC<Props> = (props) => {
         clearAiSearchStrengths(props.kind);
         searchAi.reset();
         abortRef.current?.abort();
+        remoteAgent.abort();
+        remoteAgent.clearSuggestion();
         props.setSemanticIds(undefined);
     };
 
     if (!aiEnabled) return null;
 
-    const busy = searchAi.isLoading;
-    const errorView = searchAi.error
-        ? aiErrorView(searchAi.error, microcopy.feedback.searchFailedTitle)
+    const busy = isRemote ? remoteAgent.isStreaming : searchAi.isLoading;
+    const activeError = isRemote ? remoteAgent.error : searchAi.error;
+    const errorView = activeError
+        ? aiErrorView(activeError, microcopy.feedback.searchFailedTitle)
         : null;
     const labels =
         props.kind === "tasks"
@@ -595,7 +640,14 @@ const AiSearchInput: React.FC<Props> = (props) => {
                         ) : null
                     }
                     closable
-                    onClose={() => searchAi.reset()}
+                    onClose={() => {
+                        if (isRemote) {
+                            remoteAgent.abort();
+                            remoteAgent.clearSuggestion();
+                        } else {
+                            searchAi.reset();
+                        }
+                    }}
                     style={{
                         marginTop: themeSpace.sm,
                         maxWidth: "40rem"

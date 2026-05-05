@@ -9,6 +9,28 @@ jest.mock("../../utils/hooks/useAi", () => ({
     __esModule: true,
     default: jest.fn()
 }));
+jest.mock("../../utils/hooks/useAgent", () => ({
+    __esModule: true,
+    default: () => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        resume: jest.fn().mockResolvedValue(undefined),
+        abort: jest.fn(),
+        isStreaming: false,
+        state: { messages: [] },
+        pendingInterrupt: null,
+        pendingProposal: null,
+        citations: [],
+        nudges: [],
+        lastSuggestion: null,
+        error: null,
+        reset: jest.fn(),
+        threadId: "t_test",
+        ttftMs: null,
+        clearPendingProposal: jest.fn(),
+        clearSuggestion: jest.fn(),
+        dismissNudge: jest.fn()
+    })
+}));
 
 // eslint-disable-next-line simple-import-sort/imports
 import useAi from "../../utils/hooks/useAi";

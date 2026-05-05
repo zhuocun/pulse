@@ -20,7 +20,8 @@ const expectedNames = [
     "fe.similarTasks",
     "fe.viewerContext",
     "fe.recentActivity",
-    "fe.formDraft"
+    "fe.formDraft",
+    "fe.searchCandidates"
 ];
 
 const buildCtx = (
@@ -34,10 +35,10 @@ const buildCtx = (
 });
 
 describe("FE_TOOL_REGISTRY", () => {
-    it("contains the expected 11 tool names", () => {
+    it("contains the expected 12 tool names", () => {
         const actual = Object.keys(FE_TOOL_REGISTRY).sort();
         expect(actual).toEqual([...expectedNames].sort());
-        expect(actual).toHaveLength(11);
+        expect(actual).toHaveLength(12);
     });
 
     it("each tool's run handles a missing-cache fallback without throwing", async () => {
@@ -426,5 +427,120 @@ describe("FE_TOOL_REGISTRY", () => {
             buildCtx(qc)
         );
         expect(result).toEqual({ draft: null });
+    });
+
+    it("searchCandidates returns task candidates from the cache for kind=tasks", async () => {
+        const { searchCandidatesTool } = await import("./searchCandidates");
+        const qc = new QueryClient();
+        qc.setQueryData<ITask[]>(
+            ["tasks", { projectId: "p1" }],
+            [
+                {
+                    _id: "t1",
+                    columnId: "c1",
+                    coordinatorId: "m1",
+                    epic: "x",
+                    index: 0,
+                    note: "some note",
+                    projectId: "p1",
+                    storyPoints: 3,
+                    taskName: "Fix login",
+                    type: "Bug"
+                },
+                {
+                    _id: "t2",
+                    columnId: "c1",
+                    coordinatorId: "m1",
+                    epic: "x",
+                    index: 1,
+                    note: "",
+                    projectId: "p1",
+                    storyPoints: 1,
+                    taskName: "Deploy",
+                    type: "Task"
+                }
+            ]
+        );
+        const result = await searchCandidatesTool.run(
+            { kind: "tasks", query: "login", projectId: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result.candidates).toHaveLength(2);
+        expect(result.candidates[0]).toEqual({
+            id: "t1",
+            text: "Fix login some note"
+        });
+        expect(result.candidates[1]).toEqual({ id: "t2", text: "Deploy " });
+    });
+
+    it("searchCandidates returns project candidates from the cache for kind=projects", async () => {
+        const { searchCandidatesTool } = await import("./searchCandidates");
+        const qc = new QueryClient();
+        qc.setQueryData<IProject[]>(
+            ["projects"],
+            [
+                {
+                    _id: "p1",
+                    createdAt: "0",
+                    managerId: "m1",
+                    organization: "Acme",
+                    projectName: "Roadmap"
+                },
+                {
+                    _id: "p2",
+                    createdAt: "0",
+                    managerId: "m1",
+                    organization: "Acme",
+                    projectName: "Marketing"
+                }
+            ]
+        );
+        const result = await searchCandidatesTool.run(
+            { kind: "projects", query: "roadmap" },
+            buildCtx(qc)
+        );
+        expect(result.candidates).toHaveLength(2);
+        expect(result.candidates[0].id).toBe("p1");
+        expect(result.candidates[0].text).toContain("Roadmap");
+        expect(result.candidates[1].id).toBe("p2");
+    });
+
+    it("searchCandidates returns {candidates: []} when cache is empty", async () => {
+        const { searchCandidatesTool } = await import("./searchCandidates");
+        const qc = new QueryClient();
+        const taskResult = await searchCandidatesTool.run(
+            { kind: "tasks", query: "x", projectId: "p-missing" },
+            buildCtx(qc, "p-missing")
+        );
+        expect(taskResult).toEqual({ candidates: [] });
+
+        const projectResult = await searchCandidatesTool.run(
+            { kind: "projects", query: "x" },
+            buildCtx(qc)
+        );
+        expect(projectResult).toEqual({ candidates: [] });
+    });
+
+    it("searchCandidates caps results at 50 tasks", async () => {
+        const { searchCandidatesTool } = await import("./searchCandidates");
+        const qc = new QueryClient();
+        const tasks: ITask[] = Array.from({ length: 60 }, (_, i) => ({
+            _id: `t${i}`,
+            columnId: "c1",
+            coordinatorId: "m1",
+            epic: "x",
+            index: i,
+            note: "",
+            projectId: "p1",
+            storyPoints: 1,
+            taskName: `Task ${i}`,
+            type: "Task" as const
+        }));
+        qc.setQueryData<ITask[]>(["tasks", { projectId: "p1" }], tasks);
+        const result = await searchCandidatesTool.run(
+            { kind: "tasks", query: "task", projectId: "p1" },
+            buildCtx(qc, "p1")
+        );
+        expect(result.candidates).toHaveLength(50);
     });
 });

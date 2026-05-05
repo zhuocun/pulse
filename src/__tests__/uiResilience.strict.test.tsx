@@ -37,6 +37,32 @@ jest.mock("../utils/hooks/useAiEnabled");
 jest.mock("../utils/hooks/useAuth");
 jest.mock("../utils/hooks/useProjectModal");
 jest.mock("../utils/hooks/useReactMutation");
+// AiSearchInput mounts useAgent unconditionally (v2.1 dual-engine pattern);
+// stub it so these tests don't require a QueryClientProvider or agent server.
+// The stub MUST return a stable reference so consumer effects with
+// `remoteAgent` in their deps don't re-run on every render.
+jest.mock("../utils/hooks/useAgent", () => {
+    const stub = {
+        start: jest.fn().mockResolvedValue(undefined),
+        resume: jest.fn().mockResolvedValue(undefined),
+        abort: jest.fn(),
+        isStreaming: false,
+        state: { messages: [] },
+        pendingInterrupt: null,
+        pendingProposal: null,
+        citations: [],
+        nudges: [],
+        lastSuggestion: null,
+        error: null,
+        reset: jest.fn(),
+        threadId: "t_test",
+        ttftMs: null,
+        clearPendingProposal: jest.fn(),
+        clearSuggestion: jest.fn(),
+        dismissNudge: jest.fn()
+    };
+    return { __esModule: true, default: () => stub };
+});
 
 type DropdownMenuItem = {
     key?: string | number;

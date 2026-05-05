@@ -51,6 +51,33 @@ jest.mock("../utils/hooks/useColorScheme");
 jest.mock("../utils/hooks/useReactMutation");
 jest.mock("../utils/hooks/useReactQuery");
 jest.mock("../utils/hooks/useTaskModal");
+// AiTaskDraftModal + AiTaskAssistPanel mount useAgent unconditionally (v2.1
+// dual-engine pattern); stub it so the i18n surface tests don't need an
+// agent server or `useAutonomyLevel` named-export wiring. The stub MUST
+// return a stable reference so consumer effects with `remoteAgent` in
+// their deps don't re-run on every render.
+jest.mock("../utils/hooks/useAgent", () => {
+    const stub = {
+        start: jest.fn().mockResolvedValue(undefined),
+        resume: jest.fn().mockResolvedValue(undefined),
+        abort: jest.fn(),
+        isStreaming: false,
+        state: { messages: [] },
+        pendingInterrupt: null,
+        pendingProposal: null,
+        citations: [],
+        nudges: [],
+        lastSuggestion: null,
+        error: null,
+        reset: jest.fn(),
+        threadId: "t_test",
+        ttftMs: null,
+        clearPendingProposal: jest.fn(),
+        clearSuggestion: jest.fn(),
+        dismissNudge: jest.fn()
+    };
+    return { __esModule: true, default: () => stub };
+});
 jest.mock("../assets/logo-software.svg?react", () => {
     const React = require("react");
 

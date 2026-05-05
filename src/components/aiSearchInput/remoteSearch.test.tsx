@@ -10,9 +10,13 @@ jest.mock("../../constants/env", () => ({
     }
 }));
 
-import { microcopy } from "../../constants/microcopy";
+jest.mock("../../utils/hooks/useAgent", () => ({
+    __esModule: true,
+    default: jest.fn()
+}));
 
-import AiSearchInput from ".";
+import useAgent from "../../utils/hooks/useAgent";
+import type { UseAgentResult } from "../../utils/hooks/useAgent";
 
 jest.mock("../../utils/hooks/useAiEnabled", () => ({
     __esModule: true,
@@ -22,6 +26,33 @@ jest.mock("../../utils/hooks/useAiEnabled", () => ({
         setEnabled: jest.fn()
     })
 }));
+
+import AiSearchInput from ".";
+
+const mockedUseAgent = useAgent as jest.MockedFunction<typeof useAgent>;
+
+const baseAgent = (
+    overrides: Partial<UseAgentResult> = {}
+): UseAgentResult => ({
+    start: jest.fn().mockResolvedValue(undefined),
+    resume: jest.fn().mockResolvedValue(undefined),
+    abort: jest.fn(),
+    isStreaming: false,
+    state: { messages: [] },
+    pendingInterrupt: null,
+    pendingProposal: null,
+    citations: [],
+    nudges: [],
+    lastSuggestion: null,
+    error: null,
+    reset: jest.fn(),
+    threadId: "t_test",
+    ttftMs: null,
+    clearPendingProposal: jest.fn(),
+    clearSuggestion: jest.fn(),
+    dismissNudge: jest.fn(),
+    ...overrides
+});
 
 const projectContext = {
     project: { _id: "p1", projectName: "Roadmap" },
@@ -44,40 +75,26 @@ const projectContext = {
 };
 
 describe("AiSearchInput remote search transport", () => {
-    let fetchSpy: jest.SpyInstance;
-
     beforeEach(() => {
-        fetchSpy = jest.spyOn(global, "fetch");
+        mockedUseAgent.mockReset();
     });
 
     afterEach(() => {
-        fetchSpy.mockRestore();
         jest.clearAllMocks();
     });
 
-    it("shows a failure hint when the remote search rejects", async () => {
-        fetchSpy.mockRejectedValue(new Error("network"));
+    it("shows a failure hint when the remote agent errors", async () => {
+        mockedUseAgent.mockReturnValue(
+            baseAgent({ error: new Error("Agent stream failed") })
+        );
 
-        const setSemanticIds = jest.fn();
         render(
             <AiSearchInput
                 kind="tasks"
                 projectContext={projectContext}
                 semanticIds={undefined}
-                setSemanticIds={setSemanticIds}
+                setSemanticIds={jest.fn()}
             />
-        );
-
-        fireEvent.change(
-            screen.getByRole("textbox", { name: /Find related tasks/i }),
-            {
-                target: { value: "login flaky" }
-            }
-        );
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: microcopy.ai.findRelatedTasks
-            })
         );
 
         await waitFor(() => {
@@ -88,27 +105,17 @@ describe("AiSearchInput remote search transport", () => {
     });
 
     it("dismisses the remote search failure alert", async () => {
-        fetchSpy.mockRejectedValue(new Error("network"));
-        const setSemanticIds = jest.fn();
+        mockedUseAgent.mockReturnValue(
+            baseAgent({ error: new Error("Agent stream failed") })
+        );
+
         render(
             <AiSearchInput
                 kind="tasks"
                 projectContext={projectContext}
                 semanticIds={undefined}
-                setSemanticIds={setSemanticIds}
+                setSemanticIds={jest.fn()}
             />
-        );
-
-        fireEvent.change(
-            screen.getByRole("textbox", { name: /Find related tasks/i }),
-            {
-                target: { value: "login" }
-            }
-        );
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: microcopy.ai.findRelatedTasks
-            })
         );
 
         await waitFor(() => {

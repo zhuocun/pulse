@@ -9,14 +9,16 @@ import {
     Tooltip,
     Typography
 } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react"; // useRef kept for previousPointsRef
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"; // useRef kept for previousPointsRef
 import { useParams } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useDebounce from "../../utils/hooks/useDebounce";
@@ -34,6 +36,25 @@ import EngineModeTag from "../engineModeTag";
 const EMPTY_TASKS: ITask[] = [];
 const EMPTY_MEMBERS: IMember[] = [];
 const EMPTY_COLUMNS: IColumn[] = [];
+
+// v2.1 readiness payload uses {ready, missing[], rationale}; the UI expects
+// IReadinessReport {issues[]} — adapt rather than reshape backend contract.
+interface V21ReadinessMissingItem {
+    field?: string;
+    message?: string;
+}
+interface V21ReadinessPayload {
+    ready?: boolean;
+    missing?: V21ReadinessMissingItem[];
+    rationale?: string;
+}
+const adaptV21Readiness = (r: V21ReadinessPayload): IReadinessReport => ({
+    issues: (r.missing ?? []).map((m) => ({
+        field: (m.field ?? "") as IReadinessIssue["field"],
+        severity: "warn" as const,
+        message: m.message ?? ""
+    }))
+});
 
 interface AiTaskAssistPanelProps {
     values: {
@@ -73,18 +94,55 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const debouncedValues = useDebounce(values, 1000);
     const taskName = debouncedValues.taskName ?? "";
 
+    // Mount BOTH hooks unconditionally (React hook ordering rule).
+    // Only one drives the UI based on environment.aiUseLocalEngine.
     const estimateAi = useAi<IEstimateSuggestion>({ route: "estimate" });
     const readinessAi = useAi<IReadinessReport>({ route: "readiness" });
+    const remoteAgent = useAgent("task-estimation-agent", { projectId });
+    const isRemote = !environment.aiUseLocalEngine;
+
     const runEstimate = estimateAi.run;
     const runReadiness = readinessAi.run;
     const resetEstimate = estimateAi.reset;
     const resetReadiness = readinessAi.reset;
+
+    // Extract both estimate + readiness from the single agent suggestion event.
+    const agentEstimateData = useMemo((): IEstimateSuggestion | undefined => {
+        const s = remoteAgent.lastSuggestion;
+        if (!s || s.surface !== "estimate") return undefined;
+        const p = s.payload as {
+            estimate?: IEstimateSuggestion;
+        };
+        return p.estimate;
+    }, [remoteAgent.lastSuggestion]);
+
+    const agentReadinessData = useMemo((): IReadinessReport | undefined => {
+        const s = remoteAgent.lastSuggestion;
+        if (!s || s.surface !== "estimate") return undefined;
+        const p = s.payload as {
+            readiness?: V21ReadinessPayload;
+        };
+        return p.readiness ? adaptV21Readiness(p.readiness) : undefined;
+    }, [remoteAgent.lastSuggestion]);
+
+    // Active data/error/loading derived from the selected engine.
+    const estimateData = isRemote ? agentEstimateData : estimateAi.data;
+    const readinessData = isRemote ? agentReadinessData : readinessAi.data;
+    const estimateError = isRemote ? remoteAgent.error : estimateAi.error;
+    const readinessError = isRemote ? null : readinessAi.error;
+    const estimateIsLoading = isRemote
+        ? remoteAgent.isStreaming
+        : estimateAi.isLoading;
+    const readinessIsLoading = isRemote
+        ? remoteAgent.isStreaming
+        : readinessAi.isLoading;
+
     const showEstimateSpinner = useDelayedFlag(
-        estimateAi.isLoading && !estimateAi.data,
+        estimateIsLoading && !estimateData,
         250
     );
     const showReadinessSpinner = useDelayedFlag(
-        readinessAi.isLoading && !readinessAi.data,
+        readinessIsLoading && !readinessData,
         250
     );
     /**
@@ -99,8 +157,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const previousPointsRef = useRef<number | undefined>(values.storyPoints);
     const [showAlternative, setShowAlternative] = useState(false);
     const undoToast = useUndoToast();
-    const errorView = aiErrorView(estimateAi.error);
-    const readinessErrorView = aiErrorView(readinessAi.error);
+    const errorView = aiErrorView(estimateError);
+    const readinessErrorView = aiErrorView(readinessError);
 
     /**
      * Stale-data guard (T-R7, T-R9). When the trimmed task name is empty,
@@ -116,40 +174,60 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             resetEstimate();
             resetReadiness();
             setDismissedKeys(new Set());
+            if (isRemote) {
+                remoteAgent.abort();
+                remoteAgent.clearSuggestion();
+            }
             return;
         }
         setDismissedKeys(new Set());
-        runEstimate({
-            estimate: {
-                taskName: trimmedName,
-                note: debouncedValues.note,
-                epic: debouncedValues.epic,
-                type: debouncedValues.type,
-                tasks,
-                excludeTaskId,
-                context: {
-                    project: { _id: projectId ?? "", projectName: "" },
-                    columns,
+        if (isRemote) {
+            void remoteAgent.start(
+                `Estimate task: name="${trimmedName}"` +
+                    (debouncedValues.type
+                        ? ` type="${debouncedValues.type}"`
+                        : "") +
+                    (debouncedValues.epic
+                        ? ` epic="${debouncedValues.epic}"`
+                        : "") +
+                    (debouncedValues.note
+                        ? ` note="${debouncedValues.note}"`
+                        : ""),
+                { autonomy: "plan" }
+            );
+        } else {
+            runEstimate({
+                estimate: {
+                    taskName: trimmedName,
+                    note: debouncedValues.note,
+                    epic: debouncedValues.epic,
+                    type: debouncedValues.type,
                     tasks,
-                    members
+                    excludeTaskId,
+                    context: {
+                        project: { _id: projectId ?? "", projectName: "" },
+                        columns,
+                        tasks,
+                        members
+                    }
                 }
-            }
-        }).catch(() => undefined);
-        runReadiness({
-            readiness: {
-                taskName: trimmedName,
-                note: debouncedValues.note,
-                epic: debouncedValues.epic,
-                type: debouncedValues.type,
-                coordinatorId: debouncedValues.coordinatorId,
-                context: {
-                    project: { _id: projectId ?? "", projectName: "" },
-                    columns,
-                    tasks,
-                    members
+            }).catch(() => undefined);
+            runReadiness({
+                readiness: {
+                    taskName: trimmedName,
+                    note: debouncedValues.note,
+                    epic: debouncedValues.epic,
+                    type: debouncedValues.type,
+                    coordinatorId: debouncedValues.coordinatorId,
+                    context: {
+                        project: { _id: projectId ?? "", projectName: "" },
+                        columns,
+                        tasks,
+                        members
+                    }
                 }
-            }
-        }).catch(() => undefined);
+            }).catch(() => undefined);
+        }
     }, [
         trimmedName,
         debouncedValues.note,
@@ -161,23 +239,34 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         columns,
         tasks,
         members,
+        isRemote,
+        remoteAgent,
         runEstimate,
         runReadiness,
         resetEstimate,
         resetReadiness
     ]);
 
+    // Abort the remote agent and clear its suggestion on unmount.
+    useEffect(() => {
+        if (!isRemote) return;
+        return () => {
+            remoteAgent.abort();
+            remoteAgent.clearSuggestion();
+        };
+    }, [isRemote, remoteAgent]);
+
     const taskById = (id: string) => tasks.find((task) => task._id === id);
 
     const handleApplyPoints = useCallback(() => {
-        if (!estimateAi.data) return;
+        if (!estimateData) return;
         const previous = previousPointsRef.current;
-        const next = estimateAi.data.storyPoints;
+        const next = estimateData.storyPoints;
         previousPointsRef.current = next;
         onApplyStoryPoints(next);
         track(ANALYTICS_EVENTS.COPILOT_ESTIMATE_APPLY, {
             storyPoints: next,
-            confidence: estimateAi.data.confidence
+            confidence: estimateData.confidence
         });
         undoToast.show({
             description: `Story points set to ${next}.`,
@@ -188,7 +277,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 previousPointsRef.current = previous;
             }
         });
-    }, [estimateAi.data, onApplyStoryPoints, undoToast]);
+    }, [estimateData, onApplyStoryPoints, undoToast]);
 
     const handleApplyReadiness = useCallback(
         (issue: IReadinessIssue) => {
@@ -217,22 +306,39 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         track(ANALYTICS_EVENTS.COPILOT_CHAT_REGENERATE, {
             surface: "estimate"
         });
-        runEstimate({
-            estimate: {
-                taskName: trimmedName,
-                note: debouncedValues.note,
-                epic: debouncedValues.epic,
-                type: debouncedValues.type,
-                tasks,
-                excludeTaskId,
-                context: {
-                    project: { _id: projectId ?? "", projectName: "" },
-                    columns,
+        if (isRemote) {
+            remoteAgent.clearSuggestion();
+            void remoteAgent.start(
+                `Estimate task: name="${trimmedName}"` +
+                    (debouncedValues.type
+                        ? ` type="${debouncedValues.type}"`
+                        : "") +
+                    (debouncedValues.epic
+                        ? ` epic="${debouncedValues.epic}"`
+                        : "") +
+                    (debouncedValues.note
+                        ? ` note="${debouncedValues.note}"`
+                        : ""),
+                { autonomy: "plan" }
+            );
+        } else {
+            runEstimate({
+                estimate: {
+                    taskName: trimmedName,
+                    note: debouncedValues.note,
+                    epic: debouncedValues.epic,
+                    type: debouncedValues.type,
                     tasks,
-                    members
+                    excludeTaskId,
+                    context: {
+                        project: { _id: projectId ?? "", projectName: "" },
+                        columns,
+                        tasks,
+                        members
+                    }
                 }
-            }
-        }).catch(() => undefined);
+            }).catch(() => undefined);
+        }
     }, [
         trimmedName,
         debouncedValues.note,
@@ -243,6 +349,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         columns,
         tasks,
         members,
+        isRemote,
+        remoteAgent,
         runEstimate
     ]);
 
@@ -271,7 +379,6 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         </div>
     );
 
-    const estimateData = estimateAi.data;
     const band = estimateData ? confidenceBand(estimateData.confidence) : "Low";
     const lowConfidence = estimateData && band === "Low";
 
@@ -307,7 +414,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         <Tooltip title={microcopy.ai.regenerateLabel}>
                             <Button
                                 aria-label={microcopy.ai.regenerateLabel}
-                                disabled={estimateAi.isLoading}
+                                disabled={estimateIsLoading}
                                 icon={<ReloadOutlined />}
                                 onClick={handleRegenerate}
                                 size="small"
@@ -320,7 +427,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 {microcopy.ai.suggestedStoryPoints as string}
             </SectionHeading>
             <div aria-atomic="false" aria-live="polite">
-                {!trimmedName && !estimateAi.isLoading && (
+                {!trimmedName && !estimateIsLoading && (
                     <Typography.Paragraph
                         style={{ margin: 0 }}
                         type="secondary"
@@ -336,7 +443,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         title={false}
                     />
                 )}
-                {estimateAi.error && (
+                {estimateError && (
                     <Alert
                         action={
                             errorView.retryable ? (
@@ -502,7 +609,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         title={false}
                     />
                 )}
-                {readinessAi.error && (
+                {readinessError && (
                     <Alert
                         title={readinessErrorView.heading}
                         showIcon
@@ -510,15 +617,15 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         type={readinessErrorView.severity}
                     />
                 )}
-                {readinessAi.data && readinessAi.data.issues.length === 0 && (
+                {readinessData && readinessData.issues.length === 0 && (
                     <Alert
                         title={microcopy.ai.readinessReady as string}
                         showIcon
                         type="success"
                     />
                 )}
-                {readinessAi.data &&
-                    readinessAi.data.issues
+                {readinessData &&
+                    readinessData.issues
                         .filter(
                             (issue) =>
                                 !dismissedKeys.has(

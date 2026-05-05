@@ -7,6 +7,7 @@ import { listMembersTool } from "./listMembers";
 import { listProjectsTool } from "./listProjects";
 import { listTasksTool } from "./listTasks";
 import { recentActivityTool } from "./recentActivity";
+import { searchCandidatesTool } from "./searchCandidates";
 import { similarTasksTool } from "./similarTasks";
 import { viewerContextTool } from "./viewerContext";
 import type { FeTool } from "./types";
@@ -22,7 +23,8 @@ const tools: Array<FeTool<never, unknown>> = [
     similarTasksTool,
     viewerContextTool,
     recentActivityTool,
-    formDraftTool
+    formDraftTool,
+    searchCandidatesTool
 ] as Array<FeTool<never, unknown>>;
 
 /**

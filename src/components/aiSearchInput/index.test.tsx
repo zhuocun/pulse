@@ -6,6 +6,28 @@ import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import AiSearchInput from ".";
 
 jest.mock("../../utils/hooks/useAiEnabled");
+jest.mock("../../utils/hooks/useAgent", () => ({
+    __esModule: true,
+    default: () => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        resume: jest.fn().mockResolvedValue(undefined),
+        abort: jest.fn(),
+        isStreaming: false,
+        state: { messages: [] },
+        pendingInterrupt: null,
+        pendingProposal: null,
+        citations: [],
+        nudges: [],
+        lastSuggestion: null,
+        error: null,
+        reset: jest.fn(),
+        threadId: "t_test",
+        ttftMs: null,
+        clearPendingProposal: jest.fn(),
+        clearSuggestion: jest.fn(),
+        dismissNudge: jest.fn()
+    })
+}));
 
 const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
     typeof useAiEnabled
