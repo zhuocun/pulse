@@ -491,7 +491,9 @@ const zhCN: Dictionary = {
         autonomyLevelSuggest: "建议",
         autonomyLevelPlan: "计划",
         autonomyLevelAuto: "自动",
-        autonomySelectorAriaLabel: "选择 Copilot 自主模式"
+        autonomySelectorAriaLabel: "选择 Copilot 自主模式",
+        autonomyAutoDisabledTooltip:
+            "自动模式需要支持预批准工具的智能体,将在 v3 提供。"
     },
     auth: {
         loginTitle: "登录账号",
@@ -584,6 +586,8 @@ const zhCN: Dictionary = {
         riskMedium: "中等风险",
         riskLow: "低风险",
         undoable: "可撤销",
+        undoLabel: "撤销",
+        undoAriaLabel: "撤销此提议",
         copilotProposes: "Copilot 提议:{description}",
         fields: {
             coordinator: "协调人",

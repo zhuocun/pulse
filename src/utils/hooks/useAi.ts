@@ -202,9 +202,6 @@ export const validateResponse = (
  * When `REACT_APP_AI_BASE_URL` is unset (the default), `run`
  * short-circuits via `environment.aiUseLocalEngine` and the
  * deterministic engine in `utils/ai/engine.ts` answers locally instead.
- *
- * TODO(v2.x): collapse `useAi` onto `streamAgent` so all AI traffic
- * goes through the LangGraph agent surface and this fork disappears.
  */
 const remoteResolve = async (
     route: AiRoute,

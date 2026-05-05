@@ -35,6 +35,22 @@ interface MutationProposalCardProps {
     proposal: MutationProposal;
     onAccept: () => void;
     onReject: () => void;
+    /**
+     * Optional Undo CTA. Rendered only when `proposal.undoable === true`
+     * AND a callback is supplied — existing callers that don't yet pass
+     * `onUndo` (the BE doesn't emit a `MutationProposal` today, so all
+     * production callers fall into this branch) keep the previous
+     * read-only "Undoable" tag with no behavior change.
+     *
+     * Wiring `onUndo` to a backend reversal is intentionally out of
+     * scope for this branch — there is no FE undo endpoint yet (the BE
+     * undo lifecycle is a separate GA-blocker tracked in
+     * `docs/PRODUCTION_READINESS.md`). Surfaces that want to support
+     * optimistic local undo can pass a handler today; the analytics
+     * event fires either way so usage of the affordance is measurable
+     * before the BE half lands.
+     */
+    onUndo?: () => void;
     /** Disables the buttons while a previous click is in flight. */
     isLoading?: boolean;
     /**
@@ -135,6 +151,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     proposal,
     onAccept,
     onReject,
+    onUndo,
     isLoading,
     title
 }) => {
@@ -153,6 +170,18 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
         });
         onReject();
     };
+    const handleUndo = () => {
+        // Fires the analytics event regardless of whether the eventual
+        // BE undo endpoint exists — measuring undo intent is the FE
+        // surface's job; reversing the mutation is the BE's job (still
+        // a GA-blocker as of v2.1).
+        track(ANALYTICS_EVENTS.AGENT_PROPOSAL_UNDONE, {
+            id: proposal.proposal_id,
+            risk: proposal.risk
+        });
+        onUndo?.();
+    };
+    const showUndo = proposal.undoable === true && typeof onUndo === "function";
     const heading =
         title ??
         microcopy.mutation.copilotProposes.replace(
@@ -225,6 +254,15 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 style={{ justifyContent: "flex-end", marginTop: space.sm }}
                 wrap
             >
+                {showUndo && (
+                    <Button
+                        aria-label={microcopy.mutation.undoAriaLabel}
+                        disabled={isLoading}
+                        onClick={handleUndo}
+                    >
+                        {microcopy.mutation.undoLabel}
+                    </Button>
+                )}
                 <Button
                     aria-label={microcopy.a11y.rejectProposal}
                     disabled={isLoading}

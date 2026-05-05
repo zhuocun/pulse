@@ -521,7 +521,9 @@ export const enSource = {
         autonomyLevelSuggest: "Suggest",
         autonomyLevelPlan: "Plan",
         autonomyLevelAuto: "Auto",
-        autonomySelectorAriaLabel: "Select Copilot autonomy mode"
+        autonomySelectorAriaLabel: "Select Copilot autonomy mode",
+        autonomyAutoDisabledTooltip:
+            "Auto requires an agent that supports preapproved tools. Available in v3."
     },
     auth: {
         loginTitle: "Log in to your account",
@@ -617,6 +619,8 @@ export const enSource = {
         riskMedium: "Medium risk",
         riskLow: "Low risk",
         undoable: "Undoable",
+        undoLabel: "Undo",
+        undoAriaLabel: "Undo this proposal",
         copilotProposes: "Copilot proposes: {description}",
         fields: {
             coordinator: "Coordinator",
