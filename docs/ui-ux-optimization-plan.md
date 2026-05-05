@@ -1,5 +1,7 @@
 # UI / UX Optimization Plan
 
+**Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see `AI_UX_OPTIMIZATION_PLAN.md` in repo root.
+
 This document is a critical review of the current `jira-react-app` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
 
 The plan is intentionally pragmatic: Phase 1 ("Foundations") removes the worst structural debt that everything else inherits, Phase 2 ("Surfaces") rebuilds the high-traffic screens, Phase 3 ("Polish & Accessibility") hardens the experience, and Phase 4 ("Stretch") adds nice-to-have UX.
@@ -19,14 +21,14 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 ### 1.1 Foundational problems that radiate through every screen
 
-1. **The 62.5% rem hack collides with Ant Design v6 tokens.**
-   `src/App.css:1` sets `html { font-size: 62.5%; }` so `1rem = 10px`. The codebase then sprinkles values like `1.4rem`, `2rem`, `0.5rem`, `3.2rem` everywhere (`src/components/header/index.tsx:14`, `src/components/column/index.tsx:17`, `src/components/projectModal/index.tsx:11`), but Ant Design v6 components are designed against px-based design tokens and a 14px base font. The result is that AntD's own internal padding/typography is not aligned with the app's spacing scale, the default body text reads as 10 px until a component overrides it, and any future migration to AntD's theme tokens will have to undo this hack first. There is also no `<ConfigProvider theme={…}>` anywhere in `src/utils/appProviders.tsx:10–22`, so brand color (`rgb(38, 132, 255)` hard-coded in `src/components/header/index.tsx:62`) is never registered as a token.
+1. ~~**The 62.5% rem hack collides with Ant Design v6 tokens.**
+   `src/App.css:1` sets `html { font-size: 62.5%; }` so `1rem = 10px`. The codebase then sprinkles values like `1.4rem`, `2rem`, `0.5rem`, `3.2rem` everywhere (`src/components/header/index.tsx:14`, `src/components/column/index.tsx:17`, `src/components/projectModal/index.tsx:11`), but Ant Design v6 components are designed against px-based design tokens and a 14px base font. The result is that AntD's own internal padding/typography is not aligned with the app's spacing scale, the default body text reads as 10 px until a component overrides it, and any future migration to AntD's theme tokens will have to undo this hack first. There is also no `<ConfigProvider theme={…}>` anywhere in `src/utils/appProviders.tsx:10–22`, so brand color (`rgb(38, 132, 255)` hard-coded in `src/components/header/index.tsx:62`) is never registered as a token.~~ **[Complete: rem hack removed; `ConfigProvider` wired in `src/utils/appProviders.tsx` ~line 72.]**
 
 2. **No design system — magic numbers everywhere.**
    Spacing alternates between `rem`, raw `px`, and unitless numbers (`marginBottom: 16`, `gap: 8`, `style={{ fontSize: "0.85rem" }}`, `style={{ fontSize: "1.4rem" }}`). Colors are inline (`rgba(22, 119, 255, 0.08)` in `src/components/aiChatDrawer/index.tsx:179–181`, `rgba(0,0,0,0.5)` in `src/components/aiTaskAssistPanel/index.tsx:179`, `rgb(94, 108, 132)` in `src/layouts/authLayout.tsx:17`). There is no `tokens.ts` and no shared `theme` object. Every new component reinvents its own spacing.
 
-3. **Layout is desktop-only and not responsive.**
-   `src/layouts/mainLayout.tsx:7–18` declares `min-width: 1024px`, `max-height: 1440px`, and `overflow: scroll` on `<main>`. The first rule blocks mobile / tablet entirely; the third produces a double scrollbar (the page already scrolls inside `ColumnContainer`). `src/layouts/authLayout.tsx:35–37` sizes its background images off `calc((100vw - 40rem)/2)` — once the viewport drops below `40rem` the math goes negative and the SVGs disappear or overflow.
+3. ~~**Layout is desktop-only and not responsive.**
+   `src/layouts/mainLayout.tsx:7–18` declares `min-width: 1024px`, `max-height: 1440px`, and `overflow: scroll` on `<main>`. The first rule blocks mobile / tablet entirely; the third produces a double scrollbar (the page already scrolls inside `ColumnContainer`). `src/layouts/authLayout.tsx:35–37` sizes its background images off `calc((100vw - 40rem)/2)` — once the viewport drops below `40rem` the math goes negative and the SVGs disappear or overflow.~~ **[Complete: `min-width: 1024px` and `max-height: 1440px` removed from `mainLayout.tsx` (line 73 comment confirms removal).]**
 
 4. **The information architecture buries primary navigation.**
     - "Projects" navigation only exists as a `<Popover>` inside the project detail aside (`src/pages/projectDetail.tsx:39–42`, `src/components/projectPopover/index.tsx:49–53`). On the project list page there is no project switcher at all.
@@ -260,7 +262,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 
 ### Phase 4 — Stretch
 
-1. **Command palette (`Cmd/Ctrl+K`).**
+1. **Command palette (`Cmd/Ctrl+K`).** **[Shipped: `src/components/commandPalette/index.tsx`.]**
    A single search box that can: jump to a project, open a task by name, run any AI action (Brief, Ask, Draft), toggle Board Copilot. Reuses the existing `semanticSearch` engine.
 
 2. **Per-user preferences.**
@@ -436,7 +438,7 @@ To keep the design from drifting after these phases ship:
 
 - **Storybook** for every component in `src/components/**`. Each story documents `default`, `loading`, `empty`, `error`, `disabled`, and `with content overflow` states.
 - **Visual regression** via `@storybook/test-runner` + Playwright snapshots, run in CI on every PR.
-- **`jest-axe`** assertion in every page and modal test (`App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`, `aiTaskDraftModal/index.test.tsx`, etc.). The `jira-react-test-development` skill already targets 100 % coverage; the same gate enforces zero a11y violations.
+- **`jest-axe`** assertion in every page and modal test (`App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`, `aiTaskDraftModal/index.test.tsx`, etc.). The `jira-react-test-development` skill already targets 100 % coverage; the same gate enforces zero a11y violations. **[In place: 31 axe tests in `src/__tests__/aiAccessibility.strict.test.tsx` covering AiChatDrawer, AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput, NudgeCard, MutationProposalCard, CommandPalette, EngineModeTag, CitationChip, AiMatchStrengthBadge.]**
 - **`eslint-plugin-jsx-a11y`** added to `eslint.config.mjs`; failures block CI.
 - **Design tokens documented** at `docs/design-tokens.md` (single source for spacing, color, type, motion). Storybook reads from the same module.
 - **Component contribution checklist** in `CONTRIBUTING.md`: passes a11y, ships story, supports keyboard, supports `prefers-reduced-motion`, has loading/empty/error states, ships tests.
@@ -449,7 +451,7 @@ To keep the design from drifting after these phases ship:
 
 The order below batches changes that share files so we do not churn the same area twice. Cross-cutting rules (Section 2.A) and the heuristics map (Section 2.B) are applied within each Phase, not as a separate pass.
 
-1. **Tooling first.** Add `eslint-plugin-jsx-a11y`, `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one.
+1. **Tooling first.** Add `eslint-plugin-jsx-a11y`, `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one. **[Partially complete: `jest-axe` in place (31 tests in `src/__tests__/aiAccessibility.strict.test.tsx`); code splitting via `lazy()` shipped (`src/routes/index.tsx`); service worker shipped (`public/sw.js`). Storybook scaffolding and `rollup-plugin-visualizer` remain open.]**
 2. Phase 1.1, 1.2, 1.4, 1.5 — theme tokens + ConfigProvider + remove the rem hack + `prefers-color-scheme` wiring (2.A.3). Ship behind the existing visual tests; expect a thin pass of pixel adjustments.
 3. Phase 1.3, 1.6 — responsive layout + tasks-by-column grouping. Land 2.A.2 (touch targets, safe-area-inset) at the same time.
 4. Phase 2.1, 2.5 — header + project detail shell collapse (both touch the global chrome). Land 2.A.11 (breadcrumbs, `aria-current`, `ScrollRestoration`) here.

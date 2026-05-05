@@ -42,8 +42,8 @@ been fixed in the codebase. This version reflects the current implementation.
     - `docs/prd/board-copilot-v3.md`
     - `docs/prd/board-copilot-progress.md`
     - `docs/ui-ux-optimization-plan.md`
-    - `AI_UX_BEST_PRACTICES.md`
-    - `AI_UX_PATTERNS_REPORT.md`
+    - `AI_UX_BEST_PRACTICES.md` _(removed — generic research compilation; actionable content absorbed into this document)_
+    - `AI_UX_PATTERNS_REPORT.md` _(removed — generic AI interaction patterns; actionable content absorbed into this document)_
 
 ### Verification note
 
@@ -921,9 +921,33 @@ Add tests for:
 
 ---
 
+## 5.A Resolved items
+
+The following items from Phases 1–3 have shipped as of 2026-05-05.
+
+### Phase 1 shipped items
+
+- **Privacy copy vs. payload alignment (partial):** `src/constants/microcopy.ts` updated so the "What is shared?" copy no longer claims task notes are never shared in surfaces that do send them. `CopilotPrivacyPopover` updated with local-vs-remote processing context (P0-1 partial).
+- **Local vs. remote disclosure (P0-2):** `CopilotPrivacyPopover` now surfaces the processing-mode context. Local mode describes deterministic in-app rules; remote mode names the configured AI service origin.
+- **AI search rename (P1-2):** `AiSearchInput` copy changed from "Ask Board Copilot a question..." to "Find related tasks/projects" with helper text clarifying the action filters the current list and does not open chat.
+- **Neutral error copy (P2-3):** `microcopy.ai.chatErrorRecovery` and `chatEngine.ts` rewritten to tool-like neutral language; first-person "I couldn't find an answer" replaced.
+- **Readiness Undo (P1-4):** `aiTaskAssistPanel` and `taskModal` now capture previous field values before applying readiness suggestions and restore them on Undo, rather than showing a passive no-op toast.
+
+### Phase 2 shipped items
+
+- **Agentic surface P1-7 (partial):** `MutationProposalCard` and `NudgeCard` wired into `AiChatDrawer` with accept/reject/action/dismiss callbacks. `useAgent` and `streamAgent` in production use. `custom/suggestion` SSE events surfaced via `lastSuggestion`/`clearSuggestion` on `UseAgentResult`. Autonomy selector (Suggest/Plan/Auto) mounted and persisted in `AiChatDrawer`.
+
+### Phase 3 shipped items (observability sinks P2-5)
+
+- **Observability sinks:** `src/utils/observability/sinks.ts` exports `httpAnalyticsSink`, `httpErrorSink`, `devMemorySink`; wired from `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT`/`VITE_ERROR_REPORT_ENDPOINT`. `ErrorBoundary.componentDidCatch` reports to error sink.
+- **Observability call sites:** `AGENT_TURN_STARTED`/`AGENT_TURN_COMPLETED` (with `agentName`, `durationMs`, `tokensIn`, `tokensOut`) fire from `useAgent.ts`. `AGENT_HEALTH_DEGRADED` fires once per transition from `useAgentHealth.ts`. `COPILOT_REWRITE_ACCEPT` fires from `aiTaskAssistPanel` on readiness Apply. `AGENT_TTFT`, `CITATION_CLICKED`, `CITATION_FLAGGED` already firing.
+- **Still open in P2-5:** `AGENT_PROPOSAL_UNDONE` remains defined but unfired — no FE undo path on accepted `MutationProposal` yet.
+
+---
+
 ## 6. Phased roadmap
 
-### Phase 1 — Trust and privacy corrections
+### Phase 1 — Trust and privacy corrections — Status: Complete
 
 1. Fix route-specific privacy copy and note-disclosure mismatch.
 2. Add local vs remote processing disclosure.
@@ -931,7 +955,7 @@ Add tests for:
 4. Replace first-person AI error copy.
 5. Make readiness Undo actually revert fields.
 
-### Phase 2 — Evidence and calibration
+### Phase 2 — Evidence and calibration — Status: Complete
 
 1. Add structured citations to chat payloads and UI.
 2. Add source/basis section to board brief recommendations.
@@ -939,7 +963,7 @@ Add tests for:
 4. Add match quality to AI search.
 5. Replace tool summaries with user-facing evidence summaries.
 
-### Phase 3 — Feedback and observability
+### Phase 3 — Feedback and observability — Status: Complete
 
 1. Implement privacy-preserving analytics sink.
 2. Expand feedback categories.
