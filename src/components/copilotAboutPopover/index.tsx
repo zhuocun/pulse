@@ -4,6 +4,7 @@ import { Button, Popover, Tag, Typography } from "antd";
 import React from "react";
 
 import environment from "../../constants/env";
+import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 
 /**
@@ -39,13 +40,13 @@ const CopilotAboutPopover: React.FC = () => {
     const isRemote = !environment.aiUseLocalEngine;
 
     const modelInfo = isRemote
-        ? "Powered by a remote AI model. Your data is processed according to your privacy settings."
-        : "Running on a local AI engine. Your data stays on this device.";
+        ? microcopy.about.remoteModeDescription
+        : microcopy.about.localModeDescription;
 
     const content = (
         <div style={{ maxWidth: "22rem" }}>
             <Typography.Title level={5} style={{ marginTop: 0 }}>
-                About Board Copilot
+                {microcopy.about.title}
             </Typography.Title>
 
             <Section>
@@ -58,14 +59,12 @@ const CopilotAboutPopover: React.FC = () => {
                         marginTop: 0
                     }}
                 >
-                    What Board Copilot can help with
+                    {microcopy.about.canHelpTitle}
                 </Typography.Title>
                 <List>
-                    <li>Search and filter tasks</li>
-                    <li>Summarize board status</li>
-                    <li>Draft new tasks</li>
-                    <li>Estimate effort for tasks</li>
-                    <li>Answer questions about your project</li>
+                    {microcopy.about.canHelpItems.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
                 </List>
             </Section>
 
@@ -79,12 +78,12 @@ const CopilotAboutPopover: React.FC = () => {
                         marginTop: 0
                     }}
                 >
-                    What it cannot do
+                    {microcopy.about.limitationsTitle}
                 </Typography.Title>
                 <List>
-                    <li>Access the internet or external data</li>
-                    <li>Modify tasks without your review (in Plan mode)</li>
-                    <li>Remember conversations from previous sessions</li>
+                    {microcopy.about.limitationsItems.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
                 </List>
             </Section>
 
@@ -113,7 +112,7 @@ const CopilotAboutPopover: React.FC = () => {
                 type="secondary"
             >
                 {/* TODO: drive from config */}
-                Knowledge cutoff: January 2025
+                {microcopy.about.knowledgeCutoff}
             </Typography.Paragraph>
         </div>
     );
@@ -125,7 +124,7 @@ const CopilotAboutPopover: React.FC = () => {
             trigger={["click", "focus"]}
         >
             <TriggerButton
-                aria-label="About Board Copilot"
+                aria-label={microcopy.a11y.aboutBoardCopilot}
                 icon={<InfoCircleOutlined />}
                 size="small"
                 type="text"

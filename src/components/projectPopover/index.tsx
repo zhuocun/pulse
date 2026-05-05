@@ -108,7 +108,7 @@ const ProjectPopover: React.FC = () => {
 
     const content = (
         <ContentContainer>
-            <SectionLabel>Projects</SectionLabel>
+            <SectionLabel>{microcopy.projectsPage.title}</SectionLabel>
             <ProjectListWrapper>
                 {projects?.map((project) => (
                     <ProjectItemButton
@@ -135,11 +135,11 @@ const ProjectPopover: React.FC = () => {
         <Popover content={content} placement="bottomLeft">
             <TriggerButton
                 aria-haspopup="menu"
-                aria-label="Switch project"
+                aria-label={microcopy.a11y.switchProject}
                 type="button"
             >
                 <FolderOpenOutlined aria-hidden />
-                Projects
+                {microcopy.projectsPage.title}
                 <CaretDownOutlined
                     aria-hidden
                     style={{ fontSize: 10, opacity: 0.6 }}

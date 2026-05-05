@@ -451,7 +451,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     useEffect(() => {
         if (!isRemote) return;
         if (open && project) {
-            void startRemoteBrief("Generate the brief for this board.");
+            void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         } else if (!open) {
             abortRemoteBrief();
             clearRemoteBriefSuggestion();
@@ -553,7 +553,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         track(ANALYTICS_EVENTS.BRIEF_REFRESHED, { projectId });
         if (isRemote) {
             clearRemoteBriefSuggestion();
-            await startRemoteBrief("Generate the brief for this board.");
+            await startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         } else {
             await runBrief({ bypassCache: true });
         }

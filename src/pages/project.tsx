@@ -236,7 +236,7 @@ const StatValue = styled.span`
 `;
 
 const ProjectPage = () => {
-    useTitle("Projects", false);
+    useTitle(microcopy.projectsPage.title, false);
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
     const {
@@ -308,30 +308,31 @@ const ProjectPage = () => {
         <PageContainer>
             <PageHeader>
                 <PageHeadingGroup>
-                    <PageHeading level={1}>Projects</PageHeading>
+                    <PageHeading level={1}>
+                        {microcopy.projectsPage.title}
+                    </PageHeading>
                     <PageSubheading>
-                        Browse the boards your team is shipping. Filter, search,
-                        or create a new project to start tracking work.
+                        {microcopy.projectsPage.subtitle}
                     </PageSubheading>
                 </PageHeadingGroup>
                 <Toolbar>
                     {aiEnabled && (
                         <Button
-                            aria-label="Ask Board Copilot"
+                            aria-label={microcopy.ai.askCopilot}
                             icon={<AiSparkleIcon aria-hidden />}
                             onClick={() => openChatDrawer()}
                             type="default"
                         >
-                            Ask
+                            {microcopy.labels.askShort}
                         </Button>
                     )}
                     <Button
-                        aria-label="Create project"
+                        aria-label={microcopy.actions.createProject}
                         icon={<PlusOutlined aria-hidden />}
                         onClick={openModal}
                         type="primary"
                     >
-                        Create project
+                        {microcopy.actions.createProject}
                     </Button>
                 </Toolbar>
             </PageHeader>
@@ -341,7 +342,7 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <AppstoreOutlined />
                         </StatIcon>
-                        <StatLabel>Total projects</StatLabel>
+                        <StatLabel>{microcopy.projectsPage.totalProjects}</StatLabel>
                     </StatHeader>
                     <StatValue>{pLoading ? "—" : stats.total}</StatValue>
                 </StatCard>
@@ -350,7 +351,7 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <BankOutlined />
                         </StatIcon>
-                        <StatLabel>Organizations</StatLabel>
+                        <StatLabel>{microcopy.projectsPage.organizations}</StatLabel>
                     </StatHeader>
                     <StatValue>
                         {pLoading ? "—" : stats.organizations}
@@ -361,7 +362,7 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <TeamOutlined />
                         </StatIcon>
-                        <StatLabel>Team members</StatLabel>
+                        <StatLabel>{microcopy.projectsPage.teamMembers}</StatLabel>
                     </StatHeader>
                     <StatValue>
                         {mLoading ? "—" : (members?.length ?? 0)}

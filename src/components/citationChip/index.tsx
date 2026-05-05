@@ -132,7 +132,10 @@ const CitationChip: React.FC<CitationChipProps> = ({
             }
         >
             <Chip
-                aria-label={`Citation ${index}: ${getSourceLabel(citation.source)} ${citation.id}`}
+                aria-label={microcopy.ai.citationAriaLabel
+                    .replace("{index}", String(index))
+                    .replace("{source}", getSourceLabel(citation.source))
+                    .replace("{id}", citation.id)}
                 onClick={handleActivate}
                 onKeyDown={onKeyDown}
                 role={onNavigate ? "button" : "note"}

@@ -73,21 +73,30 @@ const zhCN: Dictionary = {
         loadingProjectName: "正在加载项目名称",
         loadingBoard: "正在加载看板",
         accountMenu: "账户菜单",
+        accountMenuFor: "{name} 的账户菜单",
         boardCopilot: "看板 Copilot",
         boardCopilotProjectToggle: "此项目的看板 Copilot",
         boardCopilotSettings: "看板 Copilot 设置",
+        boardCopilotMenu: "看板 Copilot 菜单",
+        boardCopilotWelcome: "看板 Copilot 欢迎信息",
+        aboutBoardCopilot: "关于看板 Copilot",
         dismissSwipeHint: "关闭滑动提示",
         aiSuggestion: "AI 建议",
         aiBadge: "AI · 使用前请审核",
         useDarkMode: "切换到深色模式",
         useLightMode: "切换到浅色模式",
         goToProjects: "前往项目列表",
+        skipToMainContent: "跳转到主要内容",
         members: "成员",
         viewTeamMembers: "查看团队成员",
+        switchProject: "切换项目",
         filterProjects: "筛选项目",
         filterTasks: "筛选任务",
+        activeFilters: "当前筛选条件",
+        removeFilter: "移除 {label} 筛选",
         sortProjects: "项目排序",
         loadingProjects: "正在加载项目",
+        loadingPage: "正在加载页面",
         projects: "项目",
         searchProjectsByName: "按名称搜索项目",
         searchTasksByName: "按名称搜索任务",
@@ -114,11 +123,35 @@ const zhCN: Dictionary = {
         samplePrompts: "示例提示词",
         exitBoardCopilotMode: "退出看板 Copilot 模式",
         switchToBoardCopilot: "切换到看板 Copilot",
-        boardCopilotModeAnnouncement: "看板 Copilot 模式。按回车键提问。"
+        boardCopilotModeAnnouncement: "看板 Copilot 模式。按回车键提问。",
+        openBoardCopilotBrief: "打开看板 Copilot 简报",
+        openCopilotPanel: "打开 Copilot 面板",
+        editMessage: "编辑消息",
+        copyResponse: "复制回答",
+        regenerateResponse: "重新生成回答",
+        helpfulAnswer: "有帮助的回答",
+        notHelpfulGiveFeedback: "没有帮助 — 提供反馈",
+        showAllSources: "显示全部 {count} 个来源",
+        trySamplePrompt: "尝试示例提示词：{prompt}",
+        tryFollowUp: "尝试追问：{prompt}",
+        openTask: "打开任务 {name}",
+        assignedTo: "已分配给 {name}",
+        deleteColumnNamed: "删除列 {name}",
+        moreActionsForColumn: "{name} 列的更多操作",
+        moreActionsForProject: "{name} 的更多操作",
+        likeProject: "收藏 {name}",
+        unlikeProject: "取消收藏 {name}",
+        applyReadinessSuggestion: "应用 {field} 的就绪建议"
     },
     labels: {
         members: "成员",
-        teamMembers: "团队成员"
+        teamMembers: "团队成员",
+        board: "看板",
+        project: "项目",
+        briefShort: "简报",
+        copilotShort: "Copilot",
+        askShort: "提问",
+        noOrganization: "暂无组织"
     },
     settings: {
         darkMode: "深色模式",
@@ -261,12 +294,25 @@ const zhCN: Dictionary = {
         noTasksMatched: "没有匹配的任务。请换一种说法,或清除以查看全部。",
         boardEmpty: "此看板暂无任务。"
     },
-    greeting: "你好,{name}",
+    greeting: "你好，{name}",
     board: {
+        title: "看板",
+        titleWithName: "{name} 看板",
         enableCopilotOnBoard: "在此看板启用",
         swipeHint: "滑动查看更多列",
+        copilotMenuAsk: "询问 Copilot",
+        copilotMenuBrief: "看板简报",
+        copilotMenuOpenPanel: "打开 Copilot 面板",
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
+    },
+    projectsPage: {
+        title: "项目",
+        subtitle:
+            "浏览您的团队正在推进的看板。筛选、搜索,或创建一个新项目来开始跟踪工作。",
+        totalProjects: "项目总数",
+        organizations: "组织数",
+        teamMembers: "团队成员"
     },
     empty: {
         projects: {
@@ -341,6 +387,8 @@ const zhCN: Dictionary = {
         retryLabel: "重试",
         regenerateLabel: "重新生成",
         undoLabel: "撤销",
+        storyPointsSetTo: "故事点已设为 {points}。",
+        readinessUpdated: "已更新 {field}。",
         copiedConfirm: "已复制到剪贴板",
         feedbackThanks: "感谢您的反馈",
         feedbackImpactNotice:
@@ -379,6 +427,7 @@ const zhCN: Dictionary = {
         citationSourceColumn: "列",
         citationSourceMember: "成员",
         citationSourceProject: "项目",
+        citationAriaLabel: "引用 {index}：{source} {id}",
         feedbackPromptDownTitle: "哪里出了问题?",
         feedbackPromptDownHelper:
             "请至少选一项 — 这能帮助我们排查并优先修复,且不会发送您的消息文本。",
@@ -453,7 +502,53 @@ const zhCN: Dictionary = {
         remoteConsentAccept: "我已知悉",
         remoteConsentLearnMore: "共享了哪些信息?",
         newConversation: "新对话",
+        newConversationConfirm: "开始新对话将清除当前全部历史记录。要继续吗？",
+        startNew: "开始新的对话",
         stopResponse: "停止响应",
+        chatResponding: "看板 Copilot 正在回复。",
+        healthOffline: "看板 Copilot 当前不可用。请稍后再试。",
+        healthDegraded: "看板 Copilot 正在延迟响应。回复可能较慢或暂时不可用。",
+        conversationTooLong: "对话过长。请开始新的会话，或尝试更短的消息。",
+        conversationLongWarning:
+            "当前对话已经较长。建议开始新的会话以保持回答质量。",
+        sessionNotSaved: "会话不会保存 — 刷新页面后历史记录将被清除。",
+        showFullResponse: "显示完整回答",
+        stillThinking: "仍在思考…",
+        jumpToLatest: "跳转到最新内容",
+        moreSources: "+{count} 个更多来源",
+        copiedShort: "已复制",
+        toolEmptyResult: "空结果",
+        toolVerbs: {
+            checkedProjects: "已检查项目",
+            checkedTeamMembers: "已检查团队成员",
+            checkedBoardColumns: "已检查看板列",
+            checkedTasks: "已检查任务",
+            openedProject: "已打开项目",
+            openedTask: "已打开任务",
+            lookedUpEvidence: "已查找依据"
+        },
+        requestedDataCouldNotBeLoaded: "无法加载请求的数据。",
+        noProjectsFound: "未找到项目。",
+        noTeamMembersFound: "没有团队成员。",
+        noColumnsFound: "此看板中没有列。",
+        noTasksFound: "没有匹配的任务。",
+        checkedProjectsSummaryOne: "已检查 {count} 个项目。",
+        checkedProjectsSummaryOther: "已检查 {count} 个项目。",
+        checkedMembersSummaryOne: "已检查 {count} 个成员。",
+        checkedMembersSummaryOther: "已检查 {count} 个成员。",
+        checkedColumnsSummaryOne: "已检查 {count} 列。",
+        checkedColumnsSummaryOther: "已检查 {count} 列。",
+        checkedTasksSummaryOne: "已检查 {count} 个任务。",
+        checkedTasksSummaryOther: "已检查 {count} 个任务。",
+        openedProjectSummary: "已打开项目 **{name}**（组织：{organization}）。",
+        openedTaskSummary: "已打开任务 **{name}**。",
+        taskMetaLine: "类型：{type} · 点数：{points} · 史诗：{epic}",
+        unownedSection: "未分配负责人：{names}",
+        workloadSection: "工作负载：{entries}",
+        generateBoardBriefPrompt: "为这个看板生成简报。",
+        runBoardTriagePrompt: "对当前看板运行一次分诊检查。",
+        storyPointsSet: "故事点已设置为 {value}。",
+        readinessFieldUpdated: "已更新 {field}。",
         characterCounterMax: 2000,
         characterCounterShowAfter: 500,
         breakdownAxes: {
@@ -536,6 +631,7 @@ const zhCN: Dictionary = {
     },
     brief: {
         title: "看板 Copilot 简报",
+        headline: "看板上共有 {total} 个任务，其中 {inProgress} 个正在进行中。",
         recommendedNextStep: "推荐的下一步",
         countsPerColumn: "各列任务数",
         largestUnstarted: "未启动的最大任务",
@@ -562,6 +658,19 @@ const zhCN: Dictionary = {
         relativeHours: "{count} 小时前",
         relativeOneDay: "1 天前",
         relativeDays: "{count} 天前",
+        balancedRecommendation:
+            "看板状态较均衡。请从待办列表顶部挑选下一个任务。",
+        noIssuesBasis: "未检测到失衡、超大任务或无人负责的任务。",
+        assignUnownedRecommendation:
+            "在开始新工作前,先为 {count} 个无人负责的任务指定协调人。",
+        unownedBasis: "此看板上共统计到 {count} 个没有协调人的任务。",
+        largeTaskRecommendation:
+            "“{name}” 体量较大（{points} 点）。建议先拆分。",
+        largeTaskBasis: "最大的未启动任务为 {points} 个故事点。",
+        rebalanceRecommendation:
+            "{top} 当前承担了 {points} 点工作；可考虑向 {bottom} 重新分配。",
+        rebalanceBasis:
+            "{top} 当前有 {topPoints} 个进行中的点数，而 {bottom} 为 {bottomPoints} —— 至少存在 2:1 的失衡。",
         strengthLabels: {
             strong: "强信号",
             moderate: "中等信号",
@@ -581,14 +690,44 @@ const zhCN: Dictionary = {
         markdownStoryPoints: "{count} 故事点",
         markdownWorkloadEntry: "{count} 项进行中 / {points} 故事点"
     },
+    about: {
+        title: "关于看板 Copilot",
+        canHelpTitle: "看板 Copilot 可以帮助您做什么",
+        canHelpItems: [
+            "搜索并筛选任务",
+            "总结看板状态",
+            "起草新任务",
+            "估算任务工作量",
+            "回答有关您项目的问题"
+        ],
+        limitationsTitle: "它无法做到什么",
+        limitationsItems: [
+            "访问互联网或外部数据",
+            "在未经您审核的情况下修改任务（计划模式下）",
+            "记住之前会话中的对话"
+        ],
+        remoteModeTag: "远程模型",
+        localModeTag: "本地引擎",
+        remoteModeDescription:
+            "由远程 AI 模型提供支持。您的数据会按照您的隐私设置进行处理。",
+        localModeDescription:
+            "运行在本地 AI 引擎上。您的数据保留在此设备上。",
+        knowledgeCutoff: "知识截止时间：2025 年 1 月"
+    },
     mutation: {
         riskHigh: "高风险",
         riskMedium: "中等风险",
         riskLow: "低风险",
         undoable: "可撤销",
         undoLabel: "撤销",
+        undoApplied: "已撤销",
         undoAriaLabel: "撤销此提议",
         copilotProposes: "Copilot 提议:{description}",
+        acceptingWillChange: "接受后将更改：{fields}",
+        acceptingProposal: "正在接受此提议…",
+        undoCountdownAria: "撤销 — 剩余 {seconds} 秒",
+        undoCountdown: "撤销（{seconds} 秒）",
+        undoAvailableAfterAccepting: "接受后有 10 秒可撤销",
         fields: {
             coordinator: "协调人",
             column: "列",

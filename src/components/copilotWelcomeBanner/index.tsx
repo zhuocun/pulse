@@ -86,7 +86,7 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
         onCta?.();
     };
     return (
-        <Wrap role="region" aria-label="Board Copilot welcome">
+        <Wrap role="region" aria-label={microcopy.a11y.boardCopilotWelcome}>
             <AiSparkleIcon size="lg" aria-hidden style={{ marginTop: 2 }} />
             <Body>
                 <Typography.Text

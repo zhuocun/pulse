@@ -474,7 +474,10 @@ const Header: React.FC = () => {
                 </IconButton>
                 <Dropdown menu={{ items }} trigger={["click"]}>
                     <PillTrigger
-                        aria-label={`${microcopy.a11y.accountMenu} for ${user?.username ?? "user"}`}
+                        aria-label={microcopy.a11y.accountMenuFor.replace(
+                            "{name}",
+                            user?.username ?? ""
+                        )}
                         onClick={(event) => event.preventDefault()}
                         type="button"
                     >

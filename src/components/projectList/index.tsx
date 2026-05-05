@@ -4,6 +4,7 @@ import { Button, message, Modal, Select } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
+import { getActiveLocaleCode } from "../../i18n";
 import {
     breakpoints,
     fontSize,
@@ -111,9 +112,12 @@ const buildSortOptions = (): { label: string; value: SortOrder }[] => [
 
 const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
     const out = [...projects];
+    const locale = getActiveLocaleCode();
     switch (order) {
         case "name-desc":
-            out.sort((a, b) => b.projectName.localeCompare(a.projectName));
+            out.sort((a, b) =>
+                b.projectName.localeCompare(a.projectName, locale)
+            );
             break;
         case "newest":
             out.sort(
@@ -131,7 +135,9 @@ const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
             break;
         case "name-asc":
         default:
-            out.sort((a, b) => a.projectName.localeCompare(b.projectName));
+            out.sort((a, b) =>
+                a.projectName.localeCompare(b.projectName, locale)
+            );
     }
     return out;
 };

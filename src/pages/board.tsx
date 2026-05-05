@@ -333,6 +333,11 @@ const BoardActions = styled.div`
 
 const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
 
+const boardTitle = (projectName?: string) =>
+    projectName
+        ? microcopy.board.titleWithName.replace("{name}", projectName)
+        : microcopy.board.title;
+
 const BoardPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const [param, setParam] = useUrl([
@@ -351,11 +356,7 @@ const BoardPage = () => {
      * orphan " board" with a leading space, and the title updates the
      * moment the project name resolves.
      */
-    useTitle(
-        currentProject?.projectName
-            ? `${currentProject.projectName} board`
-            : "Board"
-    );
+    useTitle(boardTitle(currentProject?.projectName));
     const {
         data: board,
         isLoading: bLoading,
@@ -475,7 +476,7 @@ const BoardPage = () => {
                 messages: [
                     {
                         role: "user",
-                        content: "Run a triage check on the current board."
+                        content: microcopy.ai.runBoardTriagePrompt
                     }
                 ]
             });
@@ -604,7 +605,7 @@ const BoardPage = () => {
                     >
                         {pLoading ? (
                             <span
-                                aria-label="Loading project name"
+                                aria-label={microcopy.a11y.loadingProjectName}
                                 role="status"
                                 style={{ flex: "1 1 auto", minWidth: 0 }}
                             >
@@ -616,9 +617,7 @@ const BoardPage = () => {
                             </span>
                         ) : (
                             <BoardTitle level={1}>
-                                {currentProject?.projectName
-                                    ? `${currentProject.projectName} board`
-                                    : "Board"}
+                                {boardTitle(currentProject?.projectName)}
                             </BoardTitle>
                         )}
                         {aiEnabled && (
@@ -631,7 +630,7 @@ const BoardPage = () => {
                                                 items: [
                                                     {
                                                         key: "ask",
-                                                        label: "Ask Copilot",
+                                                        label: microcopy.board.copilotMenuAsk,
                                                         icon: (
                                                             <MessageOutlined
                                                                 aria-hidden
@@ -642,7 +641,7 @@ const BoardPage = () => {
                                                     },
                                                     {
                                                         key: "brief",
-                                                        label: "Board Brief",
+                                                        label: microcopy.board.copilotMenuBrief,
                                                         icon: (
                                                             <FileTextOutlined
                                                                 aria-hidden
@@ -656,7 +655,7 @@ const BoardPage = () => {
                                                     },
                                                     {
                                                         key: "shell",
-                                                        label: "Open Copilot Panel",
+                                                        label: microcopy.board.copilotMenuOpenPanel,
                                                         icon: (
                                                             <AiSparkleIcon
                                                                 aria-hidden
@@ -673,7 +672,9 @@ const BoardPage = () => {
                                             trigger={["click"]}
                                         >
                                             <Button
-                                                aria-label="Board Copilot menu"
+                                                aria-label={
+                                                    microcopy.a11y.boardCopilotMenu
+                                                }
                                                 icon={
                                                     <AiSparkleIcon
                                                         aria-hidden
@@ -681,13 +682,16 @@ const BoardPage = () => {
                                                 }
                                                 type="default"
                                             >
-                                                Copilot
+                                                {microcopy.labels.copilotShort}
                                             </Button>
                                         </Dropdown>
                                         {/* P1-A: Consolidate into CopilotMenu in next phase */}
                                         <Space.Compact block>
                                             <Button
-                                                aria-label="Open Board Copilot brief"
+                                                aria-label={
+                                                    microcopy.a11y
+                                                        .openBoardCopilotBrief
+                                                }
                                                 icon={
                                                     <FileTextOutlined
                                                         aria-hidden
@@ -696,10 +700,12 @@ const BoardPage = () => {
                                                 onClick={openBriefDrawer}
                                                 type="default"
                                             >
-                                                Brief
+                                                {microcopy.labels.briefShort}
                                             </Button>
                                             <Button
-                                                aria-label="Ask Board Copilot"
+                                                aria-label={
+                                                    microcopy.ai.askCopilot
+                                                }
                                                 icon={
                                                     <MessageOutlined
                                                         aria-hidden
@@ -708,7 +714,7 @@ const BoardPage = () => {
                                                 onClick={() => openChatDrawer()}
                                                 type="default"
                                             >
-                                                Ask
+                                                {microcopy.labels.askShort}
                                             </Button>
                                         </Space.Compact>
                                     </>
@@ -721,7 +727,7 @@ const BoardPage = () => {
                                             style={{ maxWidth: 280 }}
                                         >
                                             <Typography.Text type="secondary">
-                                                Board Copilot
+                                                {microcopy.ai.copilotLabel}
                                             </Typography.Text>
                                             <div
                                                 style={{

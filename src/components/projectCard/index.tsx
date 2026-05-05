@@ -10,6 +10,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
+import { getActiveLocaleCode } from "../../i18n";
 import {
     fontSize,
     fontWeight,
@@ -225,7 +226,7 @@ const formatDate = (raw?: string): string => {
     if (!raw) return microcopy.feedback.noDate;
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return microcopy.feedback.noDate;
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(getActiveLocaleCode(), {
         year: "numeric",
         month: "short",
         day: "2-digit"
@@ -322,7 +323,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     />
                     <TitleStack>
                         <Organization>
-                            {project.organization || "No organization"}
+                            {
+                                project.organization ||
+                                microcopy.labels.noOrganization
+                            }
                         </Organization>
                         <TitleLink
                             to={`/projects/${project._id}`}
@@ -361,8 +365,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <Button
                             aria-label={
                                 liked
-                                    ? `Unlike ${project.projectName}`
-                                    : `Like ${project.projectName}`
+                                    ? microcopy.a11y.unlikeProject.replace(
+                                          "{name}",
+                                          project.projectName
+                                      )
+                                    : microcopy.a11y.likeProject.replace(
+                                          "{name}",
+                                          project.projectName
+                                      )
                             }
                             aria-pressed={liked}
                             icon={
@@ -389,7 +399,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             trigger={["click"]}
                         >
                             <Button
-                                aria-label={`More actions for ${project.projectName}`}
+                                aria-label={microcopy.a11y.moreActionsForProject.replace(
+                                    "{name}",
+                                    project.projectName
+                                )}
                                 icon={<MoreOutlined aria-hidden />}
                                 onClick={(e) => e.stopPropagation()}
                                 size="small"

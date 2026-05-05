@@ -3,6 +3,7 @@ import { Outlet } from "react-router";
 
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
+import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
 
 /*
@@ -79,7 +80,9 @@ const SkipLink = styled.a`
 const MainLayout = () => {
     return (
         <Container>
-            <SkipLink href="#main-content">Skip to main content</SkipLink>
+            <SkipLink href="#main-content">
+                {microcopy.a11y.skipToMainContent}
+            </SkipLink>
             <Header />
             <Main id="main-content" tabIndex={-1}>
                 <Outlet />

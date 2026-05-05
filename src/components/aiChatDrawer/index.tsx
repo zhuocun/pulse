@@ -245,16 +245,16 @@ export interface AiChatDrawerProps {
  * still produces sensible UI.
  */
 const TOOL_VERB: Record<string, string> = {
-    listProjects: "Checked projects",
-    listMembers: "Checked team members",
-    listBoard: "Checked board columns",
-    listTasks: "Checked tasks",
-    getProject: "Opened project",
-    getTask: "Opened task"
+    listProjects: microcopy.ai.toolVerbs.checkedProjects as string,
+    listMembers: microcopy.ai.toolVerbs.checkedTeamMembers as string,
+    listBoard: microcopy.ai.toolVerbs.checkedBoardColumns as string,
+    listTasks: microcopy.ai.toolVerbs.checkedTasks as string,
+    getProject: microcopy.ai.toolVerbs.openedProject as string,
+    getTask: microcopy.ai.toolVerbs.openedTask as string
 };
 
 const humanizeTool = (name?: string) => {
-    if (!name) return "Looked up evidence";
+    if (!name) return microcopy.ai.toolVerbs.lookedUpEvidence as string;
     if (TOOL_VERB[name]) return TOOL_VERB[name];
     return name
         .replace(/^.*:/, "")
@@ -270,7 +270,7 @@ const humanizeTool = (name?: string) => {
  */
 const summarizeToolBody = (body: string): string => {
     const trimmed = body.trim();
-    if (!trimmed) return "empty result";
+    if (!trimmed) return microcopy.ai.toolEmptyResult as string;
     const firstLine = trimmed.split("\n", 1)[0];
     return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
 };
@@ -876,7 +876,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      */
     useEffect(() => {
         if (isLoading) {
-            setStreamingAnnouncement("Board Copilot is responding.");
+            setStreamingAnnouncement(microcopy.ai.chatResponding as string);
         } else {
             setStreamingAnnouncement("");
         }
@@ -990,7 +990,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 if (messages.length > 0) {
                                     Modal.confirm({
                                         content:
-                                            "Starting a new conversation will clear all current history. Continue?",
+                                            microcopy.ai.newConversationConfirm,
                                         onOk: resetAll
                                     });
                                 } else {
@@ -1046,8 +1046,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         closable={healthStatus === "degraded"}
                         message={
                             healthStatus === "offline"
-                                ? "Board Copilot is currently unavailable. Try again later."
-                                : "Board Copilot is experiencing delays. Responses may be slow or unavailable."
+                                ? microcopy.ai.healthOffline
+                                : microcopy.ai.healthDegraded
                         }
                         showIcon
                         style={{ marginBottom: space.sm }}
@@ -1137,11 +1137,11 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     size="small"
                                     type="link"
                                 >
-                                    Start new
+                                    {microcopy.ai.startNew}
                                 </Button>
                             }
                             closable={false}
-                            message="Conversation too long. Start a new session or try a shorter message."
+                            message={microcopy.ai.conversationTooLong}
                             showIcon
                             style={{ marginBottom: space.sm }}
                             type="error"
@@ -1150,7 +1150,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                       !budgetWarnDismissed ? (
                         <Alert
                             closable
-                            message="This conversation is getting long. Consider starting a new session to maintain response quality."
+                            message={microcopy.ai.conversationLongWarning}
                             onClose={() => setBudgetWarnDismissed(true)}
                             showIcon
                             style={{ marginBottom: space.sm }}
@@ -1168,7 +1168,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             <Space size={space.xs} wrap>
                                 {microcopy.ai.chatSuggestions.map((prompt) => (
                                     <SamplePrompt
-                                        aria-label={`Try sample prompt: ${prompt}`}
+                                        aria-label={microcopy.a11y.trySamplePrompt.replace(
+                                            "{prompt}",
+                                            prompt
+                                        )}
                                         checked={false}
                                         key={prompt}
                                         onChange={() => dispatch(prompt)}
@@ -1182,8 +1185,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 type="secondary"
                                 style={{ fontSize: fontSize.xs }}
                             >
-                                Sessions are not saved — history clears on
-                                reload.
+                                {microcopy.ai.sessionNotSaved}
                             </Text>
                         </Space>
                     )}
@@ -1434,7 +1436,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 {/* P3-D: Edit button for user messages */}
                                 {isUser && !isLoading && (
                                     <Button
-                                        aria-label="Edit message"
+                                        aria-label={
+                                            microcopy.a11y.editMessage
+                                        }
                                         icon={<EditOutlined aria-hidden />}
                                         onClick={() => {
                                             setInput(m.content);
@@ -1476,7 +1480,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                     }}
                                                     type="link"
                                                 >
-                                                    Show full response
+                                                    {
+                                                        microcopy.ai
+                                                            .showFullResponse
+                                                    }
                                                 </Button>
                                             </>
                                         ) : (
@@ -1538,7 +1545,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                          * separate dialog.
                                                          */
                                                         <Button
-                                                            aria-label={`Show all ${all.length} sources`}
+                                                            aria-label={microcopy.a11y.showAllSources.replace(
+                                                                "{count}",
+                                                                String(
+                                                                    all.length
+                                                                )
+                                                            )}
                                                             onClick={(
                                                                 event
                                                             ) => {
@@ -1560,7 +1572,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                             }}
                                                             type="link"
                                                         >
-                                                            {`+${overflow} more`}
+                                                            {microcopy.ai.moreSources.replace(
+                                                                "{count}",
+                                                                String(
+                                                                    overflow
+                                                                )
+                                                            )}
                                                         </Button>
                                                     )}
                                                 </span>
@@ -1605,7 +1622,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         }}
                                     >
                                         <Button
-                                            aria-label="Copy response"
+                                            aria-label={
+                                                microcopy.a11y.copyResponse
+                                            }
                                             icon={<CopyOutlined aria-hidden />}
                                             onClick={() => {
                                                 const plainText =
@@ -1617,7 +1636,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                     .writeText(plainText)
                                                     .then(() =>
                                                         message.success(
-                                                            "Copied"
+                                                            microcopy.ai
+                                                                .copiedShort
                                                         )
                                                     );
                                             }}
@@ -1625,7 +1645,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                             type="text"
                                         />
                                         <Button
-                                            aria-label="Regenerate response"
+                                            aria-label={
+                                                microcopy.a11y
+                                                    .regenerateResponse
+                                            }
                                             icon={
                                                 <ReloadOutlined aria-hidden />
                                             }
@@ -1636,7 +1659,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                             type="text"
                                         />
                                         <Button
-                                            aria-label="Helpful answer"
+                                            aria-label={
+                                                microcopy.a11y.helpfulAnswer
+                                            }
                                             aria-pressed={
                                                 turnFeedback?.value === "up"
                                             }
@@ -1693,7 +1718,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                         index
                                                     }
                                                     aria-haspopup="dialog"
-                                                    aria-label="Not helpful — give feedback"
+                                                    aria-label={
+                                                        microcopy.a11y
+                                                            .notHelpfulGiveFeedback
+                                                    }
                                                     aria-pressed={
                                                         turnFeedback?.value ===
                                                         "down"
@@ -1772,7 +1800,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 .slice(0, 2)
                                 .map((prompt) => (
                                     <SamplePrompt
-                                        aria-label={`Try follow-up: ${prompt}`}
+                                        aria-label={microcopy.a11y.tryFollowUp.replace(
+                                            "{prompt}",
+                                            prompt
+                                        )}
                                         checked={false}
                                         key={prompt}
                                         onChange={() => dispatch(prompt)}
@@ -1849,7 +1880,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                 }}
                                                 type="secondary"
                                             >
-                                                Still thinking…
+                                                {microcopy.ai.stillThinking}
                                             </Text>
                                         )}
                                     </>
@@ -1881,7 +1912,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         }}
                         type="default"
                     >
-                        ↓ Jump to latest
+                        {`\u2193 ${microcopy.ai.jumpToLatest}`}
                     </Button>
                 )}
             </div>
@@ -1910,7 +1941,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     closable
                     description={
                         error instanceof AgentBudgetError
-                            ? "Conversation too long. Start a new session or try a shorter message."
+                            ? microcopy.ai.conversationTooLong
                             : errorView.body || undefined
                     }
                     onClose={() => {

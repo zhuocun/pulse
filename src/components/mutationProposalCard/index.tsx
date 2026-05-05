@@ -346,15 +346,22 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                             style={{ flex: 1, fontSize: fontSize.sm }}
                         >
                             {changingFields
-                                ? `Accepting will change: ${changingFields}`
-                                : "Accepting this proposal…"}
+                                ? microcopy.mutation.acceptingWillChange.replace(
+                                      "{fields}",
+                                      changingFields
+                                  )
+                                : microcopy.mutation.acceptingProposal}
                         </Typography.Text>
                         <Button
-                            aria-label={`Undo — ${countdown}s remaining`}
+                            aria-label={microcopy.mutation.undoCountdownAria
+                                .replace("{seconds}", String(countdown))}
                             onClick={handleCountdownUndo}
                             size="small"
                         >
-                            {`Undo (${countdown}s)`}
+                            {microcopy.mutation.undoCountdown.replace(
+                                "{seconds}",
+                                String(countdown)
+                            )}
                         </Button>
                     </UndoBarRow>
                 </UndoBar>
@@ -397,6 +404,9 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                         </Button>
                     </Space>
                     <FooterHint>10s undo available after accepting</FooterHint>
+                    <FooterHint>
+                        {microcopy.mutation.undoAvailableAfterAccepting}
+                    </FooterHint>
                 </>
             )}
         </Wrap>
