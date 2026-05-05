@@ -282,7 +282,10 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             confidence: estimateData.confidence
         });
         undoToast.show({
-            description: `Story points set to ${next}.`,
+            description: (microcopy.ai.storyPointsSet as string).replace(
+                "{points}",
+                String(next)
+            ),
             analyticsTag: "copilot.estimate.apply",
             undo: () => {
                 if (previous === undefined) return;
@@ -302,7 +305,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 taskId: projectId
             });
             undoToast.show({
-                description: `Updated ${issue.field}.`,
+                description: (microcopy.ai.readinessFieldUpdated as string)
+                    .replace("{field}", String(issue.field)),
                 analyticsTag: "copilot.readiness.apply",
                 undo: () => {
                     onApplySuggestion(issue.field, previous, {
@@ -640,7 +644,10 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                 action={
                                     issue.suggestion ? (
                                         <Button
-                                            aria-label={`Apply readiness suggestion for ${issue.field}`}
+                                            aria-label={microcopy.a11y.applyReadinessSuggestion.replace(
+                                                "{field}",
+                                                issue.field
+                                            )}
                                             onClick={() =>
                                                 handleApplyReadiness(issue)
                                             }

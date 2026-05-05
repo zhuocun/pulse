@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { microcopy } from "../../constants/microcopy";
 import type {
     CitationRef,
     MutationProposal,
@@ -28,18 +29,18 @@ const agentRoleToChatRole = (
  * identical tool-trace summaries for the v2.1 path as the v1 path does.
  */
 const TOOL_VERB: Record<string, string> = {
-    listProjects: "Checked projects",
-    "fe.listProjects": "Checked projects",
-    listMembers: "Checked team members",
-    "fe.listMembers": "Checked team members",
-    listBoard: "Checked board columns",
-    "fe.listBoard": "Checked board columns",
-    listTasks: "Checked tasks",
-    "fe.listTasks": "Checked tasks",
-    getProject: "Opened project",
-    "fe.getProject": "Opened project",
-    getTask: "Opened task",
-    "fe.getTask": "Opened task"
+    listProjects: microcopy.ai.toolVerbs.checkedProjects,
+    "fe.listProjects": microcopy.ai.toolVerbs.checkedProjects,
+    listMembers: microcopy.ai.toolVerbs.checkedTeamMembers,
+    "fe.listMembers": microcopy.ai.toolVerbs.checkedTeamMembers,
+    listBoard: microcopy.ai.toolVerbs.checkedBoardColumns,
+    "fe.listBoard": microcopy.ai.toolVerbs.checkedBoardColumns,
+    listTasks: microcopy.ai.toolVerbs.checkedTasks,
+    "fe.listTasks": microcopy.ai.toolVerbs.checkedTasks,
+    getProject: microcopy.ai.toolVerbs.openedProject,
+    "fe.getProject": microcopy.ai.toolVerbs.openedProject,
+    getTask: microcopy.ai.toolVerbs.openedTask,
+    "fe.getTask": microcopy.ai.toolVerbs.openedTask
 };
 
 const humanizeToolName = (name: string): string => {

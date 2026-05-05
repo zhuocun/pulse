@@ -21,8 +21,10 @@ const FullPage = styled.div`
 const PageSpin: React.FC = () => {
     return (
         <FullPage role="status" aria-live="polite">
-            <Spin size="large" aria-label="Loading page" />
-            <Typography.Text type="secondary">Loading…</Typography.Text>
+            <Spin size="large" aria-label={microcopy.a11y.loadingPage} />
+            <Typography.Text type="secondary">
+                {microcopy.empty.commandPalette.loading}
+            </Typography.Text>
         </FullPage>
     );
 };
@@ -41,7 +43,7 @@ const PageError: React.FC<{ error: Error | null; onRetry?: () => void }> = ({
                 type="danger"
             >
                 {error?.message ||
-                    "Page failed to load, please try again later."}
+                    microcopy.feedback.loadFailed}
             </Typography.Text>
             {onRetry ? (
                 <Button onClick={onRetry} type="primary">

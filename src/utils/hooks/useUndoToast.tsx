@@ -61,7 +61,7 @@ const useUndoToast = (): {
                 track(ANALYTICS_EVENTS.UNDO_APPLIED, {
                     surface: options.analyticsTag ?? "unknown"
                 });
-                message.success("Undone", 1.5);
+                message.success(microcopy.mutation.undoApplied, 1.5);
             } catch {
                 message.error(microcopy.feedback.operationFailed, 2);
             } finally {

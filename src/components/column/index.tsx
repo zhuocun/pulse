@@ -38,6 +38,15 @@ import TaskCreator from "../taskCreator";
 import { TaskSearchParam } from "../taskSearchPanel";
 import UserAvatar from "../userAvatar";
 
+const formatTemplate = (
+    template: string,
+    values: Record<string, string | number>
+) =>
+    Object.entries(values).reduce(
+        (acc, [key, value]) => acc.replace(`{${key}}`, String(value)),
+        template
+    );
+
 export const ColumnContainer = styled.div`
     background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
     border: 1px solid transparent;
@@ -354,7 +363,12 @@ const DeleteDropDown: React.FC<{ columnId: string; columnName: string }> = ({
             key: "delete",
             label: (
                 <NoPaddingButton
-                    aria-label={`Delete column ${columnName}`}
+                    aria-label={formatTemplate(
+                        microcopy.a11y.deleteColumnNamed as string,
+                        {
+                            name: columnName
+                        }
+                    )}
                     danger
                     disabled={isOptimisticPlaceholderId(columnId)}
                     onClick={() => onDelete(columnId)}
@@ -369,7 +383,12 @@ const DeleteDropDown: React.FC<{ columnId: string; columnName: string }> = ({
     return (
         <Dropdown menu={{ items }}>
             <NoPaddingButton
-                aria-label={`More actions for column ${columnName}`}
+                aria-label={formatTemplate(
+                    microcopy.a11y.moreActionsForColumn as string,
+                    {
+                        name: columnName
+                    }
+                )}
                 icon={<MoreOutlined />}
                 size="small"
                 type="text"
@@ -398,7 +417,12 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const strength = getAiSearchStrength("tasks", task._id);
         return (
             <TaskCardOuter
-                aria-label={ariaLabel ?? `Open task ${task.taskName}`}
+                aria-label={
+                    ariaLabel ??
+                    formatTemplate(microcopy.a11y.openTask as string, {
+                        name: task.taskName
+                    })
+                }
                 disabled={isMock}
                 onClick={onOpen}
                 ref={ref}
@@ -434,7 +458,11 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                             src={isBug ? bugIcon : taskIcon}
                             width={14}
                         />
-                        <span>{isBug ? "Bug" : "Task"}</span>
+                        <span>
+                            {isBug
+                                ? microcopy.options.taskTypes.bug
+                                : microcopy.options.taskTypes.task}
+                        </span>
                     </TaskTypeBadge>
                     <CardMeta>
                         {strength ? (
@@ -442,15 +470,28 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         ) : null}
                         {typeof task.storyPoints === "number" ? (
                             <StoryPointsTag variant="filled">
-                                {task.storyPoints} pts
+                                {microcopy.brief.markdownStoryPoints.replace(
+                                    "{count}",
+                                    String(task.storyPoints)
+                                )}
                             </StoryPointsTag>
                         ) : null}
                         {coordinator ? (
                             <Tooltip
-                                title={`Assigned to ${coordinator.username}`}
+                                title={formatTemplate(
+                                    microcopy.a11y.assignedTo as string,
+                                    {
+                                        name: coordinator.username
+                                    }
+                                )}
                             >
                                 <UserAvatar
-                                    aria-label={`Assigned to ${coordinator.username}`}
+                                    aria-label={formatTemplate(
+                                        microcopy.a11y.assignedTo as string,
+                                        {
+                                            name: coordinator.username
+                                        }
+                                    )}
                                     id={coordinator._id}
                                     name={coordinator.username}
                                 />

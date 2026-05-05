@@ -166,7 +166,7 @@ const tabItems = [
         key: "board",
         label: (
             <Link to="board" viewTransition>
-                Board
+                {microcopy.labels.board}
             </Link>
         )
     }
@@ -195,7 +195,7 @@ const ProjectDetailPage = () => {
      * we keep a generic "Project" so the previous page's title (likely
      * "Projects") is replaced with something accurate to this shell.
      */
-    useTitle(project?.projectName ?? "Project");
+    useTitle(project?.projectName ?? microcopy.labels.project);
 
     /*
      * A successful query that returns a falsy body is treated as not-found —
@@ -230,7 +230,8 @@ const ProjectDetailPage = () => {
                                             style={{ width: 160 }}
                                         />
                                     ) : (
-                                        (project?.projectName ?? "Project")
+                                        (project?.projectName ??
+                                            microcopy.labels.project)
                                     )
                             }
                         ]}

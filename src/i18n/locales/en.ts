@@ -70,21 +70,30 @@ export const enSource = {
         loadingProjectName: "Loading project name",
         loadingBoard: "Loading board",
         accountMenu: "Account menu",
+        accountMenuFor: "Account menu for {name}",
         boardCopilot: "Board Copilot",
         boardCopilotProjectToggle: "Board Copilot for this project",
         boardCopilotSettings: "Board Copilot settings",
+        boardCopilotMenu: "Board Copilot menu",
+        boardCopilotWelcome: "Board Copilot welcome",
+        aboutBoardCopilot: "About Board Copilot",
         dismissSwipeHint: "Dismiss swipe hint",
         aiSuggestion: "AI suggestion",
         aiBadge: "AI · review before using",
         useDarkMode: "Switch to dark mode",
         useLightMode: "Switch to light mode",
         goToProjects: "Go to projects",
+        skipToMainContent: "Skip to main content",
         members: "Members",
         viewTeamMembers: "View team members",
+        switchProject: "Switch project",
         filterProjects: "Filter projects",
         filterTasks: "Filter tasks",
+        activeFilters: "Active filters",
+        removeFilter: "Remove {label} filter",
         sortProjects: "Sort projects",
         loadingProjects: "Loading projects",
+        loadingPage: "Loading page",
         projects: "Projects",
         searchProjectsByName: "Search projects by name",
         searchTasksByName: "Search tasks by name",
@@ -111,7 +120,25 @@ export const enSource = {
         samplePrompts: "Sample prompts",
         exitBoardCopilotMode: "Exit Board Copilot mode",
         switchToBoardCopilot: "Switch to Board Copilot",
-        boardCopilotModeAnnouncement: "Board Copilot mode. Press Enter to ask."
+        boardCopilotModeAnnouncement: "Board Copilot mode. Press Enter to ask.",
+        openBoardCopilotBrief: "Open Board Copilot brief",
+        openCopilotPanel: "Open Copilot Panel",
+        editMessage: "Edit message",
+        copyResponse: "Copy response",
+        regenerateResponse: "Regenerate response",
+        helpfulAnswer: "Helpful answer",
+        notHelpfulGiveFeedback: "Not helpful — give feedback",
+        showAllSources: "Show all {count} sources",
+        trySamplePrompt: "Try sample prompt: {prompt}",
+        tryFollowUp: "Try follow-up: {prompt}",
+        openTask: "Open task {name}",
+        assignedTo: "Assigned to {name}",
+        deleteColumnNamed: "Delete column {name}",
+        moreActionsForColumn: "More actions for column {name}",
+        moreActionsForProject: "More actions for {name}",
+        likeProject: "Like {name}",
+        unlikeProject: "Unlike {name}",
+        applyReadinessSuggestion: "Apply readiness suggestion for {field}"
     },
     settings: {
         darkMode: "Dark mode",
@@ -123,7 +150,13 @@ export const enSource = {
     },
     labels: {
         members: "Members",
-        teamMembers: "Team Members"
+        teamMembers: "Team Members",
+        board: "Board",
+        project: "Project",
+        briefShort: "Brief",
+        copilotShort: "Copilot",
+        askShort: "Ask",
+        noOrganization: "No organization"
     },
     fields: {
         column: "Column",
@@ -272,10 +305,23 @@ export const enSource = {
      */
     greeting: "Hi, {name}",
     board: {
+        title: "Board",
+        titleWithName: "{name} board",
         swipeHint: "Swipe to see more columns",
         enableCopilotOnBoard: "Enable on this board",
+        copilotMenuAsk: "Ask Copilot",
+        copilotMenuBrief: "Board Brief",
+        copilotMenuOpenPanel: "Open Copilot Panel",
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project."
+    },
+    projectsPage: {
+        title: "Projects",
+        subtitle:
+            "Browse the boards your team is shipping. Filter, search, or create a new project to start tracking work.",
+        totalProjects: "Total projects",
+        organizations: "Organizations",
+        teamMembers: "Team members"
     },
     empty: {
         projects: {
@@ -389,6 +435,8 @@ export const enSource = {
         estimatingPoints: "Estimating story points",
         suggestedPointsAria: "Suggested story points: {points}",
         applyPointsAria: "Apply suggested story points",
+        storyPointsSet: "Story points set to {points}.",
+        readinessFieldUpdated: "Updated {field}.",
         similarTasks: "Similar tasks:",
         readinessCheck: "Readiness check",
         runningReadiness: "Running readiness check",
@@ -473,6 +521,7 @@ export const enSource = {
             "Match strength {strength} for the AI semantic search",
         searchSynonymExpanded:
             "Expanded {original} to include common synonyms ({expansions}).",
+        citationAriaLabel: "Citation {index}: {source} {id}",
         citationFlagAction: "Report wrong source",
         citationFlagConfirm: "Thanks — flagged for review",
         remoteConsentTitle: "Heads up: this build sends data to a remote AI",
@@ -483,7 +532,58 @@ export const enSource = {
         remoteConsentAccept: "I understand",
         remoteConsentLearnMore: "What is shared?",
         newConversation: "New conversation",
+        newConversationConfirm:
+            "Starting a new conversation will clear all current history. Continue?",
+        startNew: "Start new",
         stopResponse: "Stop response",
+        chatResponding: "Board Copilot is responding.",
+        healthOffline: "Board Copilot is currently unavailable. Try again later.",
+        healthDegraded:
+            "Board Copilot is experiencing delays. Responses may be slow or unavailable.",
+        conversationTooLong:
+            "Conversation too long. Start a new session or try a shorter message.",
+        conversationLongWarning:
+            "This conversation is getting long. Consider starting a new session to maintain response quality.",
+        sessionNotSaved: "Sessions are not saved — history clears on reload.",
+        showFullResponse: "Show full response",
+        stillThinking: "Still thinking…",
+        jumpToLatest: "Jump to latest",
+        moreSources: "+{count} more",
+        copiedShort: "Copied",
+        toolEmptyResult: "empty result",
+        toolVerbs: {
+            checkedProjects: "Checked projects",
+            checkedTeamMembers: "Checked team members",
+            checkedBoardColumns: "Checked board columns",
+            checkedTasks: "Checked tasks",
+            openedProject: "Opened project",
+            openedTask: "Opened task",
+            lookedUpEvidence: "Looked up evidence"
+        },
+        requestedDataCouldNotBeLoaded:
+            "The requested data could not be loaded.",
+        noProjectsFound: "No projects found.",
+        noTeamMembersFound: "No team members.",
+        noColumnsFound: "No columns on this board.",
+        noTasksFound: "No tasks match.",
+        checkedProjectsSummaryOne: "Checked {count} project.",
+        checkedProjectsSummaryOther: "Checked {count} projects.",
+        checkedMembersSummaryOne: "Checked {count} member.",
+        checkedMembersSummaryOther: "Checked {count} members.",
+        checkedColumnsSummaryOne: "Checked {count} column.",
+        checkedColumnsSummaryOther: "Checked {count} columns.",
+        checkedTasksSummaryOne: "Checked {count} task.",
+        checkedTasksSummaryOther: "Checked {count} tasks.",
+        openedProjectSummary:
+            "Opened project **{name}** (org: {organization}).",
+        openedTaskSummary: "Opened task **{name}**.",
+        taskMetaLine: "Type: {type} · Points: {points} · Epic: {epic}",
+        unownedSection: "Unowned: {names}",
+        workloadSection: "Workload: {entries}",
+        generateBoardBriefPrompt: "Generate the brief for this board.",
+        runBoardTriagePrompt: "Run a triage check on the current board.",
+        storyPointsSetTo: "Story points set to {value}.",
+        readinessUpdated: "Updated {field}.",
         characterCounterMax: 2000,
         characterCounterShowAfter: 500,
         breakdownAxes: {
@@ -567,6 +667,7 @@ export const enSource = {
     },
     brief: {
         title: "Board Copilot brief",
+        headline: "{total} tasks on the board, {inProgress} in progress.",
         recommendedNextStep: "Recommended next step",
         countsPerColumn: "Counts per column",
         largestUnstarted: "Largest unstarted",
@@ -594,6 +695,22 @@ export const enSource = {
         relativeHours: "{count} hours ago",
         relativeOneDay: "1 day ago",
         relativeDays: "{count} days ago",
+        balancedRecommendation:
+            "Board looks balanced. Pick the next item from the top of Backlog.",
+        noIssuesBasis:
+            "No imbalance, oversized work, or unowned tasks detected.",
+        assignUnownedRecommendation:
+            "Assign coordinators to {count} unowned tasks before starting new work.",
+        unownedBasis:
+            "Counted {count} tasks with no coordinator on this board.",
+        largeTaskRecommendation:
+            "\"{name}\" is large ({points} pts). Consider breaking it down.",
+        largeTaskBasis:
+            "Largest unstarted task is {points} story points.",
+        rebalanceRecommendation:
+            "{top} is carrying {points} pts; consider rebalancing toward {bottom}.",
+        rebalanceBasis:
+            "{top} holds {topPoints} open pts vs {bottomPoints} for {bottom} — at least a 2:1 imbalance.",
         strengthLabels: {
             strong: "Strong signal",
             moderate: "Moderate signal",
@@ -614,14 +731,44 @@ export const enSource = {
         markdownStoryPoints: "{count} pts",
         markdownWorkloadEntry: "{count} open / {points} pts"
     },
+    about: {
+        title: "About Board Copilot",
+        canHelpTitle: "What Board Copilot can help with",
+        canHelpItems: [
+            "Search and filter tasks",
+            "Summarize board status",
+            "Draft new tasks",
+            "Estimate effort for tasks",
+            "Answer questions about your project"
+        ] as readonly string[],
+        limitationsTitle: "What it cannot do",
+        limitationsItems: [
+            "Access the internet or external data",
+            "Modify tasks without your review (in Plan mode)",
+            "Remember conversations from previous sessions"
+        ] as readonly string[],
+        remoteModeTag: "Remote model",
+        localModeTag: "Local engine",
+        remoteModeDescription:
+            "Powered by a remote AI model. Your data is processed according to your privacy settings.",
+        localModeDescription:
+            "Running on a local AI engine. Your data stays on this device.",
+        knowledgeCutoff: "Knowledge cutoff: January 2025"
+    },
     mutation: {
         riskHigh: "High risk",
         riskMedium: "Medium risk",
         riskLow: "Low risk",
         undoable: "Undoable",
         undoLabel: "Undo",
+        undoApplied: "Undone",
         undoAriaLabel: "Undo this proposal",
+        undoCountdown: "Undo ({seconds}s)",
+        undoCountdownAria: "Undo — {seconds}s remaining",
+        undoAvailableAfterAccepting: "10s undo available after accepting",
         copilotProposes: "Copilot proposes: {description}",
+        acceptingWillChange: "Accepting will change: {fields}",
+        acceptingProposal: "Accepting this proposal…",
         fields: {
             coordinator: "Coordinator",
             column: "Column",

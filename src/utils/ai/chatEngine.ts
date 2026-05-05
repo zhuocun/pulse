@@ -1,3 +1,4 @@
+import { microcopy } from "../../constants/microcopy";
 import { boardBrief } from "./engine";
 import type { AiChatToolCall, ChatToolName } from "./chatTools";
 
@@ -69,7 +70,12 @@ const lastUserIndex = (messages: AiChatMessage[]): number => {
 const makeId = () => `tool_${Math.random().toString(36).slice(2, 10)}`;
 
 const openTasksLabel = (w: { openTasks: number; openPoints: number }): string =>
-    `${w.openTasks} task${w.openTasks === 1 ? "" : "s"}, ${w.openPoints} pts`;
+    `${(w.openTasks === 1
+        ? microcopy.counts.tasksMatchingActiveFilters.one
+        : microcopy.counts.tasksMatchingActiveFilters.other
+    )
+        .replace("{count}", String(w.openTasks))
+        .replace(" matches the active filters", "")}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(w.openPoints))}`;
 
 /**
  * After tool results are in the thread, produce a user-facing answer without issuing more tools.
@@ -85,7 +91,8 @@ export const chatAssistantFinalizeAfterTools = (
             chunks.push(messages[i].content.trim());
         }
     }
-    if (chunks.length === 0) return "The requested data could not be loaded.";
+    if (chunks.length === 0)
+        return microcopy.ai.requestedDataCouldNotBeLoaded as string;
     return chunks.join("\n\n---\n\n");
 };
 
@@ -203,14 +210,18 @@ export const chatAssistantTurn = (
 
     let answer = `${brief.headline}\n\n${brief.recommendation}`;
     if (/\b(unowned|owner|assign)\b/.test(text) && brief.unowned.length > 0) {
-        answer += `\n\nUnowned: ${brief.unowned
-            .map((u) => u.taskName)
-            .join(", ")}`;
+        answer += `\n\n${microcopy.ai.unownedSection.replace(
+            "{names}",
+            brief.unowned.map((u) => u.taskName).join(", ")
+        )}`;
     }
     if (/\b(workload|busy|points)\b/.test(text) && brief.workload.length > 0) {
-        answer += `\n\nWorkload: ${brief.workload
-            .map((w) => `${w.username}: ${openTasksLabel(w)}`)
-            .join("; ")}`;
+        answer += `\n\n${microcopy.ai.workloadSection.replace(
+            "{entries}",
+            brief.workload
+                .map((w) => `${w.username}: ${openTasksLabel(w)}`)
+                .join("; ")
+        )}`;
     }
 
     return { kind: "text", text: answer };
@@ -308,20 +319,30 @@ export const summarizeToolResultForUser = (
     switch (toolName) {
         case "listProjects":
             if (isProjectArray(payload)) {
-                if (payload.length === 0) return "No projects found.";
+                if (payload.length === 0)
+                    return microcopy.ai.noProjectsFound as string;
                 const lines = payload.map((p) => `• **${p.projectName}**`);
                 return [
-                    `Checked ${payload.length} project${payload.length === 1 ? "" : "s"}.`,
+                    (
+                        payload.length === 1
+                            ? microcopy.ai.checkedProjectsSummaryOne
+                            : microcopy.ai.checkedProjectsSummaryOther
+                    ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "listMembers":
             if (isMemberArray(payload)) {
-                if (payload.length === 0) return "No team members.";
+                if (payload.length === 0)
+                    return microcopy.ai.noTeamMembersFound as string;
                 const lines = payload.map((m) => `• **${m.username}**`);
                 return [
-                    `Checked ${payload.length} member${payload.length === 1 ? "" : "s"}.`,
+                    (
+                        payload.length === 1
+                            ? microcopy.ai.checkedMembersSummaryOne
+                            : microcopy.ai.checkedMembersSummaryOther
+                    ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
             }
@@ -329,30 +350,45 @@ export const summarizeToolResultForUser = (
         case "getProject":
             if (payload && typeof payload === "object" && "_id" in payload) {
                 const p = payload as IProject;
-                return `Opened project **${p.projectName}** (org: ${p.organization}).`;
+                return microcopy.ai.openedProjectSummary
+                    .replace("{name}", p.projectName)
+                    .replace(
+                        "{organization}",
+                        p.organization || microcopy.labels.noOrganization
+                    );
             }
             break;
         case "listBoard":
             if (isColumnArray(payload)) {
-                if (payload.length === 0) return "No columns on this board.";
+                if (payload.length === 0)
+                    return microcopy.ai.noColumnsFound as string;
                 const lines = [...payload]
                     .sort((a, b) => a.index - b.index)
                     .map((c) => `• ${c.columnName}`);
                 return [
-                    `Checked ${payload.length} column${payload.length === 1 ? "" : "s"}.`,
+                    (
+                        payload.length === 1
+                            ? microcopy.ai.checkedColumnsSummaryOne
+                            : microcopy.ai.checkedColumnsSummaryOther
+                    ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "listTasks":
             if (isTaskArray(payload)) {
-                if (payload.length === 0) return "No tasks match.";
+                if (payload.length === 0)
+                    return microcopy.ai.noTasksFound as string;
                 const lines = payload.map(
                     (t) =>
-                        `• **${t.taskName}** — ${t.type}, ${t.storyPoints} pts`
+                        `• **${t.taskName}** — ${t.type}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(t.storyPoints))}`
                 );
                 return [
-                    `Checked ${payload.length} task${payload.length === 1 ? "" : "s"}.`,
+                    (
+                        payload.length === 1
+                            ? microcopy.ai.checkedTasksSummaryOne
+                            : microcopy.ai.checkedTasksSummaryOther
+                    ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
             }
@@ -361,8 +397,14 @@ export const summarizeToolResultForUser = (
             if (payload && typeof payload === "object" && "_id" in payload) {
                 const t = payload as ITask;
                 return [
-                    `Opened task **${t.taskName}**.`,
-                    `Type: ${t.type} · Points: ${t.storyPoints} · Epic: ${t.epic}`,
+                    microcopy.ai.openedTaskSummary.replace(
+                        "{name}",
+                        t.taskName
+                    ),
+                    microcopy.ai.taskMetaLine
+                        .replace("{type}", t.type)
+                        .replace("{points}", String(t.storyPoints))
+                        .replace("{epic}", t.epic),
                     t.note ? `\n${t.note}` : ""
                 ]
                     .filter(Boolean)

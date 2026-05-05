@@ -2,6 +2,7 @@ import { CloseOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import React from "react";
 
+import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 
 export interface FilterChip {
@@ -125,17 +126,20 @@ const FilterChips: React.FC<FilterChipsProps> = ({
     chips,
     onDismiss,
     onClearAll,
-    clearAllLabel = "Clear all"
+    clearAllLabel = microcopy.actions.clear
 }) => {
     if (chips.length === 0) return null;
     return (
-        <ChipRow role="region" aria-label="Active filters">
+        <ChipRow role="region" aria-label={microcopy.a11y.activeFilters}>
             {chips.map((chip) => (
                 <Chip key={chip.key}>
                     <span>{chip.label}:</span>
                     <span>{chip.value}</span>
                     <ChipDismiss
-                        aria-label={`Remove ${chip.label} filter`}
+                        aria-label={microcopy.a11y.removeFilter.replace(
+                            "{label}",
+                            chip.label
+                        )}
                         onClick={() => onDismiss(chip.key)}
                         type="button"
                     >
