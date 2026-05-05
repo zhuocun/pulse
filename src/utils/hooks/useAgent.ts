@@ -13,7 +13,8 @@ import type {
     TriageNudge
 } from "../../interfaces/agent";
 import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
-import { AgentForbiddenError, streamAgent } from "../ai/agentClient";
+import { AgentForbiddenError } from "../ai/agentErrors";
+import { streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
 import {
     isProjectAiDisabled,
@@ -125,7 +126,7 @@ export interface UseAgentOptions {
  * shells / older runtimes that strip `crypto`. Exported so tests can
  * stub it without monkey-patching the global.
  */
-export const generateThreadId = (): string => {
+const generateThreadId = (): string => {
     const cryptoLike =
         typeof globalThis !== "undefined"
             ? (
@@ -353,7 +354,6 @@ const useAgent = (
     const streamStartRef = useRef<number | null>(null);
     const ttftSeenRef = useRef(false);
     const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const lastChunkAtRef = useRef<number | null>(null);
     /** Latest token counts from the "usage" custom event — read at AGENT_TURN_COMPLETED. */
     const lastUsageRef = useRef<{ tokensIn: number; tokensOut: number } | null>(
         null
@@ -390,17 +390,18 @@ const useAgent = (
         async (
             body: Parameters<typeof streamAgent>[0]["body"],
             signal: AbortSignal,
-            ctx: FeToolContext,
-            controller: AbortController
-        ): Promise<{ pendingResume: unknown | undefined }> => {
+            ctx: FeToolContext
+        ): Promise<{
+            pendingResume: unknown | undefined;
+            streamFailed: boolean;
+        }> => {
             let pendingResume: unknown | undefined;
             // Watchdog: if no stream chunk arrives for STREAM_WATCHDOG_MS,
             // abort the run and surface a "took too long" error (UA-R1).
             const armWatchdog = () => {
                 clearWatchdog();
-                lastChunkAtRef.current = performance.now();
                 watchdogRef.current = setTimeout(() => {
-                    controller.abort();
+                    controllerRef.current?.abort();
                     if (mountedRef.current) {
                         setError(new Error(microcopy.ai.watchdogTimeout));
                     }
@@ -462,12 +463,12 @@ const useAgent = (
             } catch (err) {
                 if (err instanceof Error && err.name !== "AbortError") {
                     if (mountedRef.current) setError(err);
-                    throw err;
+                    return { pendingResume: undefined, streamFailed: true };
                 }
             } finally {
                 clearWatchdog();
             }
-            return { pendingResume };
+            return { pendingResume, streamFailed: false };
         },
         [baseUrl, clearWatchdog, name, safeSetState]
     );
@@ -503,12 +504,15 @@ const useAgent = (
                 // tool, run the tool synchronously and POST a `resume` body.
                 for (let round = 0; round < 8; round += 1) {
                     if (controller.signal.aborted) break;
-                    const { pendingResume } = await consumeStream(
+                    const { pendingResume, streamFailed } = await consumeStream(
                         nextBody,
                         controller.signal,
-                        baseCtx,
-                        controller
+                        baseCtx
                     );
+                    if (streamFailed) {
+                        turnErrored = true;
+                        break;
+                    }
                     if (pendingResume === undefined) break;
                     nextBody = {
                         input: null,
