@@ -113,7 +113,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         const p = s.payload as {
             estimate?: IEstimateSuggestion;
         };
-        return p.estimate;
+        return p.estimate
+            ? { ...p.estimate, similar: p.estimate.similar ?? [] }
+            : undefined;
     }, [remoteAgent.lastSuggestion]);
 
     const agentReadinessData = useMemo((): IReadinessReport | undefined => {
