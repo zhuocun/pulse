@@ -37,7 +37,7 @@ import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
-import { saveChatHistory, loadChatHistory } from "../../utils/ai/projectAiStorage";
+import { saveChatHistory } from "../../utils/ai/projectAiStorage";
 import useAiChat from "../../utils/hooks/useAiChat";
 import type { AiChatMessage } from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
@@ -53,6 +53,7 @@ import AiFeedbackPopover, {
 } from "../aiFeedbackPopover";
 import AiSparkleIcon from "../aiSparkleIcon";
 import CitationChip from "../citationChip";
+import CopilotAboutPopover from "../copilotAboutPopover";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
@@ -946,6 +947,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         style={{ minWidth: 90 }}
                         value={autonomyLevel}
                     />
+                    <CopilotAboutPopover />
                     <CopilotPrivacyPopover route="chat" />
                     <Button
                         aria-label={microcopy.ai.newConversation}
@@ -1135,6 +1137,13 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 </SamplePrompt>
                             ))}
                         </Space>
+                        {/* P2-C Phase A: sessions not persisted notice */}
+                        <Text
+                            type="secondary"
+                            style={{ fontSize: fontSize.xs }}
+                        >
+                            Sessions are not saved — history clears on reload.
+                        </Text>
                     </Space>
                 )}
                 {/* P2-B: find the index of the last visible assistant message for focus management */}
@@ -1554,6 +1563,23 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     }}
                                 >
                                     <Button
+                                        aria-label="Copy response"
+                                        icon={<CopyOutlined aria-hidden />}
+                                        onClick={() => {
+                                            const plainText = m.content.replace(
+                                                /\*\*|__|~~|`{1,3}|\[|\]|\(|\)/g,
+                                                ""
+                                            );
+                                            void navigator.clipboard
+                                                .writeText(plainText)
+                                                .then(() =>
+                                                    message.success("Copied")
+                                                );
+                                        }}
+                                        size="small"
+                                        type="text"
+                                    />
+                                    <Button
                                         aria-label="Regenerate response"
                                         icon={<ReloadOutlined aria-hidden />}
                                         onClick={() => handleRegenerate(index)}
@@ -1639,7 +1665,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             )}
                         </MessageRow>
                     );
-                })}
+                    });
+                })()}
                 {/* v2.1 inserts — MutationProposal and TriageNudge cards
                     emitted by an agent stream. Owners pass `onAcceptProposal`
                     / `onDismissNudge` to drive `agent.resume(...)`; when
