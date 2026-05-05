@@ -10,6 +10,17 @@ Last updated: 2026-05-05.
 - **Internal beta only.** Anything that surfaces `MutationProposalCard` to the user — see Hard Blocker §1.
 - **Blocks public GA.** Two FE-owned hard blockers below; the rest is polish or out of FE scope.
 
+## ⚠️ GA blocker urgency — resolve ASAP
+
+**The product is NOT ready for public GA.** Each 🛑 hard blocker below is a release gate, not a backlog item. Until all hard blockers are closed, the only acceptable deployment posture is **internal beta with proposal cards gated off** (see Hard Blocker §1 mitigation).
+
+- **Every additional day a hard blocker remains open is risk.** Blocker §1 ships a customer-visible dead-end UX; blocker §2 is a security exposure that worsens with each new FE entry-point that touches `localStorage`.
+- **Owners must be assigned per blocker, not per polish item.** The polish queue can wait; the hard blockers cannot.
+- **No public marketing, no design-partner expansion, no removal of the proposal-card gate** until both 🛑 entries below show ✅ in this doc.
+- **Re-audit weekly** until ✅. If a blocker is reclassified, justify it in this file.
+
+The Recommended ship sequence at the bottom of this doc is the contract: internal beta → design-partner GA → public GA, gated on the explicit blocker closures listed there.
+
 ## Severity tags
 
 - **🛑 GA-blocker.** Customer-visible failure or material security risk. Must close before public ship.
