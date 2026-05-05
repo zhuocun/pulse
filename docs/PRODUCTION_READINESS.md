@@ -36,7 +36,8 @@ The Recommended ship sequence at the bottom of this doc is the contract: interna
 - File: `src/components/aiChatDrawer/index.tsx` accept handler; `src/components/mutationProposalCard/index.tsx`.
 - BE counterpart: `jira-python-server/docs/AI_REMAINING_WORK.md` §12.
 - **FE-side work needed once BE ships:** register `fe.applyMutation` in `FE_TOOL_REGISTRY`; add `onUndo` prop on `MutationProposalCard`; wire `AGENT_PROPOSAL_UNDONE` (currently defined but never fires) to the undo callback; confirm AC-V4 10-second undo toast.
-- **Mitigation for internal beta:** do not pass `pendingProposal` into `AiChatDrawer`. The drawer hides the card render path automatically.
+- **Mitigation (v2.1, `5d96e16`):** `MutationProposalCard` is now **gated off by default** behind `environment.aiMutationProposalsEnabled` (env var `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, defaults `false`). The card does not render at all even when an agent emits a `pendingProposal`, so the customer-visible "Accept does nothing" path is closed in v2.1 unless the flag is explicitly opted in. **This is a mitigation, not a fix.** The full `MutationProposal` lifecycle (BE emission, `fe.applyMutation` interrupt, undo endpoint) remains unimplemented and continues to gate public GA. Set `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=true` only in internal environments where the dead-end UX is acceptable.
+- **Previous mitigation for internal beta:** do not pass `pendingProposal` into `AiChatDrawer`. Still valid; the flag gate makes this defense-in-depth.
 
 ### 🛑 2. JWT-in-localStorage XSS exfiltration surface
 
@@ -157,6 +158,15 @@ disabled with an explanatory tooltip"` covers the conditional render.
   migration follows. Out of scope for this branch.
 - ⚠️ **Provider 5xx fallback.** Server-side concern; BE polish branch
   owns the resilience pattern.
+
+## Recently shipped — 2026-05-05 (`5d96e16`)
+
+Branch `claude/v2.1-ai-readiness-review-0w9BG`. Commit short SHA **`5d96e16`** ("fix(ai): gate dead MutationProposal surface, warn on missing observability").
+
+- **`MutationProposalCard` gated off (GA-blocker §1 mitigation):** card now renders only when `environment.aiMutationProposalsEnabled` is `true` (opt-in via `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=true`; default `false`). Stops the customer-visible "Accept does nothing" dead-end in v2.1 without implementing the lifecycle. Flag-on/flag-off coverage added in `aiChatDrawer/index.test.tsx`.
+- **Production observability startup warning:** `src/index.tsx` now emits a `console.warn` per missing var (`VITE_ANALYTICS_ENDPOINT`, `VITE_ERROR_REPORT_ENDPOINT`) when `import.meta.env.PROD` is true, explaining that events are falling through to `devMemorySink`. Warnings are also exposed at `window.__copilotObservabilityWarnings__` for smoke tests. Dev/test behavior unchanged.
+- **README aligned with reality:** capability count updated to six (adds `triage-agent`); "Auto" autonomy marked as v3-only/disabled; MCP compatibility marked as deferred; P0-1 privacy/`task.note` mismatch pointer added.
+- **Regression tests:** `boardCopilot:openChat` listener coverage on `/projects` (`project.test.tsx`); bulk-breakdown undo partial-failure warning (`aiTaskDraftModal/index.test.tsx`). 1015/1015 tests pass.
 
 ## Verification
 

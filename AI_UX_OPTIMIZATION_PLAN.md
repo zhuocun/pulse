@@ -604,6 +604,7 @@ future overautomation risk.
 
 **Evidence**
 
+- `MutationProposalCard` is **gated off by default** as of `5d96e16` behind `environment.aiMutationProposalsEnabled` (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, default `false`). The card does not render even when an agent emits a `pendingProposal`. This is a v2.1 mitigation that closes the customer-visible "Accept does nothing" path; the full lifecycle remains unimplemented (see `docs/PRODUCTION_READINESS.md` §1). `NudgeCard` is unaffected by the flag.
 - `MutationProposalCard` and `NudgeCard` are wired into `AiChatDrawer` with
   accept/reject/action/dismiss callbacks; local-dismiss fallback covers the
   case where no owner callback is supplied.
@@ -827,6 +828,10 @@ its own `COPILOT_ESTIMATE_APPLY`). `AGENT_TTFT`, `CITATION_CLICKED`, and
 - The sinks need an upstream consumer (Segment, PostHog, in-house). Until
   `VITE_ANALYTICS_ENDPOINT` is set in production builds the events fall through
   to `devMemorySink` (inspect via `window.__copilotEvents__` in the console).
+  **As of `5d96e16`:** production builds now emit a `console.warn` at startup for
+  each missing endpoint var (`VITE_ANALYTICS_ENDPOINT`, `VITE_ERROR_REPORT_ENDPOINT`),
+  surfacing the silent-drop risk visibly. Warnings are also available at
+  `window.__copilotObservabilityWarnings__` for smoke tests.
 
 **Verification**
 
@@ -981,7 +986,7 @@ The following items from Phases 1–3 have shipped as of 2026-05-05.
 ### Phase 5 — Agentic readiness
 
 1. Keep agent write tools disabled until proposal review exists.
-2. Integrate `MutationProposalCard` only inside the activity/review surface.
+2. Integrate `MutationProposalCard` only inside the activity/review surface (currently hidden by default behind `aiMutationProposalsEnabled` flag; re-enable only once the BE lifecycle ships).
 3. Integrate `NudgeCard` into an inbox/history surface.
 4. Add autonomy settings before any write-capable agent ships.
 5. Add prompt-injection and disallowed-action test cases.
@@ -1076,4 +1081,6 @@ The AI UX optimization work is complete when:
 9. Local and remote modes have separate, accurate privacy and capability
    disclosures.
 10. Analytics can measure trust-calibration signals without leaking task/user
-    content.
+    content. Production builds warn at startup when `VITE_ANALYTICS_ENDPOINT`
+    or `VITE_ERROR_REPORT_ENDPOINT` is unset so silent event-drop is never
+    invisible (as of `5d96e16`; see P2-5).
