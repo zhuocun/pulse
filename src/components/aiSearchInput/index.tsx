@@ -13,7 +13,7 @@ import React, {
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, space as themeSpace } from "../../theme/tokens";
+import { breakpoints, maxLineLengthCh, space as themeSpace } from "../../theme/tokens";
 import {
     clearAiSearchStrengths,
     setAiSearchStrengths
@@ -534,7 +534,8 @@ const AiSearchInput: React.FC<Props> = (props) => {
                     style={{
                         fontSize: 12,
                         marginBottom: 0,
-                        marginTop: themeSpace.xs
+                        marginTop: themeSpace.xs,
+                        maxWidth: `${maxLineLengthCh}ch` // P3-E: maxLineLengthCh applied to expanded-terms prose
                     }}
                     type="secondary"
                 >
@@ -556,7 +557,8 @@ const AiSearchInput: React.FC<Props> = (props) => {
                     <Typography.Paragraph
                         style={{
                             marginBottom: 0,
-                            marginTop: themeSpace.xs
+                            marginTop: themeSpace.xs,
+                            maxWidth: `${maxLineLengthCh}ch` // P3-E: maxLineLengthCh applied to rationale prose
                         }}
                         type="secondary"
                     >
