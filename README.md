@@ -9,12 +9,42 @@ This repository hosts both the React frontend and the Python (FastAPI) backend t
 - `/` — React + Vite frontend (this README, `package.json`, `src/`, `vite.config.ts`, root `vercel.json`).
 - `backend/` — FastAPI server (`backend/app`, `backend/api`, `backend/pyproject.toml`, `backend/Dockerfile`, `backend/fly.toml`, `backend/vercel.json`). See `backend/README.md` for backend-specific docs.
 
-Deployments are unchanged in shape:
+### Common tasks
 
-- **Frontend → Vercel**: project root stays at the repository root. Backend is excluded from the frontend build via `.vercelignore`.
-- **Backend → Vercel**: set the Vercel project's **Root Directory** to `backend/` so `backend/vercel.json` and `backend/api/index.py` are picked up exactly as before.
-- **Backend → Fly.io**: run `fly deploy` from the `backend/` directory (or pass `--config backend/fly.toml --dockerfile backend/Dockerfile`); the Dockerfile and `fly.toml` are unchanged.
-- **Backend CI**: `.github/workflows/backend-ci.yml` runs the Python test suite scoped to `backend/**` paths.
+Run from the repository root:
+
+| Command                            | What it does                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm start`                        | Vite dev server on `:3000`.                                                                                                          |
+| `npm run backend:dev`              | Uvicorn auto-reload on `:8000` (`cd`s into `backend/`).                                                                              |
+| `npm test`                         | FE Jest suite.                                                                                                                       |
+| `npm run backend:test`             | BE pytest suite (100% coverage gate).                                                                                                |
+| `npm run deploy:backend [-- args]` | Calls `backend/scripts/deploy.sh` which `cd`s into `backend/` and runs `fly deploy`; passes args through (`-- --remote-only`, etc.). |
+
+### Deployments
+
+| Target            | How it deploys                                                                                                                                                                                                                                                                         | Configured?         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Frontend → Vercel | Git push to the FE Vercel project's tracked branch. Root `.vercelignore` keeps `backend/` out of the build. Root `vercel.json` `ignoreCommand` skips the FE rebuild when only `backend/` changed.                                                                                      | ✅ in repo          |
+| Backend → Vercel  | Git push to the BE Vercel project's tracked branch. `backend/vercel.json` `ignoreCommand` skips the BE rebuild when nothing under `backend/` changed. Project must have **Root Directory = `backend/`**.                                                                               | ⚠️ see manual steps |
+| Backend → Fly.io  | `npm run deploy:backend` locally, or **Actions → Deploy Backend (Fly.io) → Run workflow** on GitHub once `FLY_API_TOKEN` is set. The workflow is `workflow_dispatch`-only by default; uncomment the `push:` block in `.github/workflows/deploy-backend.yml` for auto-deploy on `main`. | ⚠️ needs secret     |
+| Backend CI        | `.github/workflows/backend-ci.yml`, scoped to `backend/**`, runs from `backend/`.                                                                                                                                                                                                      | ✅ in repo          |
+
+### Manual steps after merging this branch
+
+These can't be done from the repository — they require the Vercel and Fly.io dashboards / CLI.
+
+1. **Repoint the existing `jira-python-server` Vercel project** to `zhuocun/jira-react-app` and set its **Root Directory = `backend/`**. Project URL, env vars, secrets, and custom domains are preserved.
+2. **(Optional) Enable auto-deploy to Fly.io.** Add a `FLY_API_TOKEN` secret on the GitHub repo (`fly tokens create deploy -x 8760h | gh secret set FLY_API_TOKEN`) and uncomment the `push:` block in `.github/workflows/deploy-backend.yml`. Until then, deploys are manual via `npm run deploy:backend` or the workflow's "Run workflow" button.
+3. **(Optional) Archive `zhuocun/jira-python-server`** once a production deploy from the monorepo has been verified.
+
+### Post-merge verification checklist
+
+- [ ] FE Vercel project still builds and serves the app at its existing URL.
+- [ ] BE Vercel project, after Root Directory change, builds and `GET /api/v1/health` returns 200.
+- [ ] `npm run deploy:backend` (or the Fly workflow) completes; `fly status -a jira-python-server` shows the new release.
+- [ ] `Backend CI` workflow runs green on a PR that touches `backend/**`.
+- [ ] FE-only and BE-only PRs trigger only the relevant Vercel project (verify in the Vercel deployments tab).
 
 ## Technologies
 
