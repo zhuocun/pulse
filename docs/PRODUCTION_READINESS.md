@@ -54,18 +54,19 @@ The Recommended ship sequence at the bottom of this doc is the contract: interna
 - Detail: `jira-python-server/docs/AI_REMAINING_WORK.md` §8.
 - **No FE-side fix.** Disclose in product copy that semantic search is suggestion-grade.
 
-### ⚠️ 4. AC-V5 preapproved-tools auto-autonomy not implemented
+### ✅ 4. AC-V5 preapproved-tools auto-autonomy not implemented (Resolved 2026-05-05)
 
-The autonomy selector exposes Suggest / Plan / Auto, but the "Auto" level does nothing different in remote mode — the FE doesn't read `AgentMetadata.allowed_autonomy` from `getAgentMetadata` and there are no preapproved tools wired (`assignTask`, in-column `moveTask`, `renameColumn` per PRD AC-V5).
+Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling the "Auto" option in `AiChatDrawer` with an explanatory i18n tooltip ("Auto requires an agent that supports preapproved tools. Available in v3."). The metadata-driven gating against `AgentMetadata.allowed_autonomy` remains V3 work — see `docs/prd/board-copilot-v3.md`.
 
-- Detail: `prd/board-copilot-progress.md` open items.
-- **Mitigation for now:** the selector still works; "Auto" silently behaves like "Plan." If shipping, either remove the "Auto" option from the selector or document the no-op.
+- Original symptom: the autonomy selector exposed "Auto" but it silently behaved like "Plan."
+- Mitigation now in place: selector renders Suggest ✅, Plan ✅, Auto disabled with tooltip.
 
-### ⚠️ 5. `AGENT_PROPOSAL_UNDONE` analytics defined but unfired
+### ✅ 5. `AGENT_PROPOSAL_UNDONE` analytics defined but unfired (FE-side resolved 2026-05-05)
 
-`src/utils/observability/analytics.ts` defines the event constant; no call site. Blocked on BE side §1.
+FE-side surface resolved on `claude/v2.1-ai-readiness-check-TbxeM`: `MutationProposalCard` now accepts an optional `onUndo` prop and fires `AGENT_PROPOSAL_UNDONE` from the click handler. The end-to-end Undo flow remains gated on Hard Blocker §1 — there is no BE undo endpoint yet, so callers can wire optimistic local undo today and the BE reversal will hook in when the lifecycle ships.
 
-- Effort: 1 line + a test once the undo CTA exists on the proposal card.
+- Original symptom: `src/constants/analytics.ts` defined the constant; no call site.
+- FE-side fix: optional CTA + analytics fire on click (see `mutationProposalCard/index.test.tsx`).
 
 ## Polish — no customer impact
 
@@ -73,13 +74,13 @@ The autonomy selector exposes Suggest / Plan / Auto, but the "Auto" level does n
 
 `AgentMetadata.allowed_autonomy`, `rate_limit`, `recursion_limit`, `context_schema`, `tags` are all on the BE wire but the FE consumer reads none of them. Zero impact on user-visible behaviour today; would let the autonomy selector self-gate and a future "limits" surface render rate / budget visibly.
 
-### 🟡 7. `MutationProposalCard` undo CTA missing
+### ✅ 7. `MutationProposalCard` undo CTA missing (Resolved 2026-05-05)
 
-`undoable: true` renders a `Tag` badge but there is no Undo button, just a label. Add `onUndo?: () => void` prop and conditional button. Trivially small; meaningful only after BE §1 closes.
+Resolved on `claude/v2.1-ai-readiness-check-TbxeM`: `MutationProposalCard` now accepts `onUndo?: () => void` and renders a conditional Undo button when `proposal.undoable === true`. See item #5 above for the analytics-fire side and the BE coupling note.
 
-### 🟡 8. `useAi.ts:206` `TODO(v2.x)` comment
+### ✅ 8. `useAi.ts:206` `TODO(v2.x)` comment (Resolved 2026-05-05)
 
-The TODO is stale — all six structured routes already migrated to `useAgent`. The comment can be removed; `useAi` is now exclusively the local-engine fallback path.
+Removed on `claude/v2.1-ai-readiness-check-TbxeM`. The surrounding docblock already documents `useAi`'s post-v2.1 role as the deterministic local-engine fallback only.
 
 ## What's GA-ready right now
 
@@ -109,6 +110,53 @@ The TODO is stale — all six structured routes already migrated to `useAgent`. 
 1. **Internal beta (today).** Deploy with `pendingProposal` always undefined on `AiChatDrawer` (or remove `MutationProposalCard` from the import). Use the v2.1 surface for read-only / suggestion flows. Document the "Auto" autonomy no-op and the search/estimation quality ceiling.
 2. **Design-partner GA (~3 weeks).** Close hard blocker §2 (proxy-scoped token migration). Either remove the "Auto" option from the autonomy selector or wire `allowed_autonomy` and the AC-V5 preapproved tools.
 3. **Public GA (~6–8 weeks).** Close hard blocker §1 once the BE `MutationProposal` lifecycle ships: register `fe.applyMutation`, add the `onUndo` CTA, wire `AGENT_PROPOSAL_UNDONE`. Surface proposal cards.
+
+## Audit follow-up — 2026-05-05 (`claude/v2.1-ai-readiness-check-TbxeM`)
+
+A focused polish pass against the audit findings above. Cross-repo sibling
+branch (BE polish) is `claude/v2.1-ai-readiness-check-TbxeM` on
+`jira-python-server`. This branch closes only the small-effort polish items;
+the three GA-blockers below are explicitly out of scope and remain open.
+
+**Resolved on this branch (FE):**
+
+- ✅ **#4 — Autonomy "Auto" no-op.** The "Auto" option in
+  `AiChatDrawer` is now hard-disabled with an i18n tooltip explaining
+  "Auto requires an agent that supports preapproved tools. Available
+  in v3." A `TODO(v3)` in `src/components/aiChatDrawer/index.tsx`
+  references the V3 PRD for the metadata-driven gating that follows
+  the BE preapproved-tool registry. Selector behaviour: Suggest ✅,
+  Plan ✅, Auto disabled with tooltip. Jest test
+  `aiChatDrawer/index.test.tsx → "renders the Auto autonomy option as
+disabled with an explanatory tooltip"` covers the conditional render.
+- ✅ **#5 — `AGENT_PROPOSAL_UNDONE` unfired.** The FE-side surface now
+  exists: `MutationProposalCard` accepts an optional `onUndo` prop,
+  renders an Undo button when `proposal.undoable === true` AND
+  `onUndo` is provided, and fires `AGENT_PROPOSAL_UNDONE` on click.
+  The prop is intentionally optional so existing call sites (which
+  don't supply `onUndo` because the BE doesn't emit a proposal yet)
+  keep their previous render unchanged. Behaviour and a11y covered
+  in `mutationProposalCard/index.test.tsx` (jest-axe + click +
+  conditional-render assertions).
+- ✅ **#8 — Stale `useAi.ts` `TODO(v2.x)`.** Removed. The surrounding
+  docblock already documents `useAi`'s post-v2.1 role as the
+  deterministic local-engine fallback only.
+
+**Still open after this branch (cross-team / multi-week):**
+
+- 🛑 **#1 — `MutationProposal` lifecycle.** No BE agent emits
+  `custom/mutation_proposal`; no `fe.applyMutation` interrupt is
+  registered (and intentionally not registered on this branch — without
+  BE emission it would be dead code). Needs product/UX agreement on
+  which mutations are allowed + the undo semantics, then a coordinated
+  end-to-end branch. The BE-side counterpart is tracked on
+  `jira-python-server` `claude/v2.1-ai-readiness-check-TbxeM` /
+  `docs/AI_REMAINING_WORK.md` §12.
+- 🛑 **#2 — JWT-in-localStorage XSS.** Requires BE token redesign
+  (proxy-scoped short-lived token or httpOnly cookie). FE-side
+  migration follows. Out of scope for this branch.
+- ⚠️ **Provider 5xx fallback.** Server-side concern; BE polish branch
+  owns the resilience pattern.
 
 ## Verification
 

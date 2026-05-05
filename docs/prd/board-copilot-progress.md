@@ -482,6 +482,10 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 - ~~**SSE / streaming for structured routes**~~: **complete 2026-05-05.** The chat path streams via `useAgentChat` (2026-05-04); all six structured routes (`task-draft`, `task-breakdown`, `estimate`, `readiness`, `board-brief`, `search`) now stream via `useAgent("<name>-agent")` in remote builds. `useAi` remains as the deterministic local-engine path only.
 - **`useAi.ts` type union:** PRD lists `chat` and `search` on `AiRoute`; implementation keeps chat in `useAgentChat`/`useAiChat` and structured routes in `useAi` — fine, but document or consolidate if desired.
 
+### Audit follow-up — 2026-05-05 (`claude/v2.1-ai-readiness-check-TbxeM`)
+
+A focused polish pass on this branch closed three small audit items: the autonomy "Auto" option in `AiChatDrawer` is now hard-disabled with an explanatory i18n tooltip (was a silent no-op that mirrored "Plan"); `MutationProposalCard` accepts an optional `onUndo` prop and fires the previously-orphan `AGENT_PROPOSAL_UNDONE` analytics event when its CTA is clicked; and the stale `TODO(v2.x)` at `src/utils/hooks/useAi.ts:206` is removed since all six product surfaces now drive off `useAgent`/`streamAgent`. The three remaining GA-blockers (BE-emitted `MutationProposal` lifecycle, JWT-in-localStorage XSS, provider 5xx fallback) are explicitly out of scope and continue to gate public ship — see `docs/PRODUCTION_READINESS.md` "Audit follow-up — 2026-05-05" for status, and the cross-repo BE polish branch with the same name on `jira-python-server`.
+
 ---
 
 ## How to verify what shipped
