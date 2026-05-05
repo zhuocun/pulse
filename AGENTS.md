@@ -100,6 +100,6 @@ here.
   flows.
 - If changing `REACT_APP_API_URL`, restart Vite because `vite.config.ts` inlines
   the value into `process.env.REACT_APP_API_URL`.
-- The full Jest suite may exceed the default Node heap or hang silently in this
-  VM. Targeted Jest runs work; use `NODE_OPTIONS=--max-old-space-size=8192` for
-  larger test selections while investigating full-suite behavior.
+- The full Jest suite (142 suites / ~980 tests) completes in ~90-100 s when run
+  with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`.
+  Without the heap bump and `--forceExit`, the suite may hang or OOM on this VM.
