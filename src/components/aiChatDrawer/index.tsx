@@ -1,6 +1,7 @@
 import {
     CopyOutlined,
     EditOutlined,
+    PlusOutlined,
     ReloadOutlined,
     StopOutlined
 } from "@ant-design/icons";
@@ -969,26 +970,39 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         value={autonomyLevel}
                     />
                     <CopilotAboutPopover />
-                    <CopilotPrivacyPopover route="chat" />
-                    <Button
-                        aria-label={microcopy.ai.newConversation}
-                        disabled={messages.length === 0 || isLoading}
-                        onClick={() => {
-                            if (messages.length > 0) {
-                                Modal.confirm({
-                                    content:
-                                        "Starting a new conversation will clear all current history. Continue?",
-                                    onOk: resetAll
-                                });
-                            } else {
-                                resetAll();
-                            }
-                        }}
-                        size="small"
-                        type="link"
+                    {screens.md && <CopilotPrivacyPopover route="chat" />}
+                    <Tooltip
+                        title={
+                            !screens.md
+                                ? microcopy.ai.newConversation
+                                : undefined
+                        }
                     >
-                        {microcopy.ai.newConversation}
-                    </Button>
+                        <Button
+                            aria-label={microcopy.ai.newConversation}
+                            disabled={messages.length === 0 || isLoading}
+                            icon={
+                                !screens.md ? (
+                                    <PlusOutlined aria-hidden />
+                                ) : undefined
+                            }
+                            onClick={() => {
+                                if (messages.length > 0) {
+                                    Modal.confirm({
+                                        content:
+                                            "Starting a new conversation will clear all current history. Continue?",
+                                        onOk: resetAll
+                                    });
+                                } else {
+                                    resetAll();
+                                }
+                            }}
+                            size="small"
+                            type="link"
+                        >
+                            {screens.md ? microcopy.ai.newConversation : null}
+                        </Button>
+                    </Tooltip>
                 </Space>
             }
             onClose={handleClose}
@@ -1012,13 +1026,15 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 }
             }}
             title={
-                <Space align="center" size={space.xs} wrap>
+                <Space align="center" size={space.xs}>
                     <AiSparkleIcon aria-hidden />
                     <span style={{ fontWeight: fontWeight.semibold }}>
                         {microcopy.ai.askCopilot}
                     </span>
-                    <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    <EngineModeTag />
+                    {screens.md && (
+                        <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
+                    )}
+                    {screens.md && <EngineModeTag />}
                 </Space>
             }
         >
