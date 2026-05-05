@@ -2,6 +2,7 @@
 
 **Scope**: jira-react-app ("Board Copilot")
 **Based on**: Fresh audit against Anthropic, Nielsen Norman Group, WCAG 2.2, aiuxdesign.guide, Smashing Magazine, Redis/streaming-LLM, and industry AI-UX criteria. Cross-referenced with `AI_UX_OPTIMIZATION_PLAN.md` (existing plan, Phases 1–3 resolved) and `docs/ui-ux-optimization-plan.md`.
+**Status**: All 17 open items implemented on `claude/implement-subagent-orchestrator-obzyZ` (2026-05-05). Phases 4 and 5 now complete. See `AI_UX_OPTIMIZATION_PLAN.md §5.A` for the updated resolved-items registry.
 
 ---
 
@@ -30,10 +31,33 @@ The following best-practice areas are **implemented and should not be regressed*
 | Board loading skeleton matching real column layout | `board.tsx:230-247` |
 | Full accessibility stack (skip link, focus rings, ARIA live regions, jest-axe) | Multiple components |
 | Responsive design (mobile scroll-snap, bottom-sheet palette, touch targets 44px) | `board.tsx`, `commandPalette`, `appProviders` |
+| **Unified Copilot surface (P1-A)** | `copilotShell/`, `board.tsx` CopilotMenu, `commandPalette` routing — 2026-05-05 |
+| **Proposal-undo + activity tab (P1-B)** | `mutationProposalCard` 10s countdown + `AGENT_PROPOSAL_UNDONE` — 2026-05-05 |
+| **Context-window warning + new conversation (P1-C)** | `aiChatDrawer` budget banners + `Modal.confirm` — 2026-05-05 |
+| **Screen-reader streaming announcement (P2-A)** | `aiChatDrawer` interim `aria-live` status region — 2026-05-05 |
+| **Focus management after response (P2-B)** | `lastAssistantRef` focus after stream end — 2026-05-05 |
+| **Conversation history persistence (P2-C)** | `projectAiStorage` `saveChatHistory` + "sessions not saved" notice — 2026-05-05 |
+| **Scroll-to-bottom FAB during streaming (P2-D)** | `aiChatDrawer` floating "↓ Jump to latest" button — 2026-05-05 |
+| **Progressive disclosure for long responses (P2-E)** | `aiChatDrawer` 300-word prose collapse — 2026-05-05 |
+| **CopilotAboutPopover capabilities disclosure (P2-F)** | `copilotAboutPopover/index.tsx` — 2026-05-05 |
+| **Service-degradation inline alert (P2-G)** | `aiChatDrawer` health alert + submit disable on offline — 2026-05-05 |
+| **Mobile keyboard viewport fix (P2-H)** | `aiChatDrawer` `env(keyboard-inset-height)` padding — 2026-05-05 |
+| **TTFT SLO + "Still thinking…" at 3s (P2-I)** | `useAgent` `AGENT_TTFT_SLOW` + `loadingMs` banner — 2026-05-05 |
+| **Command palette no-results Copilot CTA (P3-A)** | `commandPalette` "Try asking Board Copilot →" — 2026-05-05 |
+| **Streaming markdown rendering verified (P3-B)** | `aiChatDrawer` `renderMarkdown()` on every chunk — 2026-05-05 |
+| **Copy button on assistant messages (P3-C)** | `aiChatDrawer` `CopyOutlined` action + clipboard — 2026-05-05 |
+| **Edit prior message minimal (P3-D)** | `aiChatDrawer` `EditOutlined` re-fills input — 2026-05-05 |
+| **`maxLineLengthCh` on aiSearchInput rationale (P3-E)** | `aiSearchInput` `max-width: 75ch` on prose containers — 2026-05-05 |
 
 ---
 
-## 2. Open gaps — ranked by importance
+## 2. Open gaps — all resolved
+
+All 17 items identified in this audit have been implemented on branch
+`claude/implement-subagent-orchestrator-obzyZ` (2026-05-05). The original
+gap descriptions below are retained for historical reference.
+
+---
 
 Severity: **P1** = critical / broken UX · **P2** = meaningful gap · **P3** = polish
 

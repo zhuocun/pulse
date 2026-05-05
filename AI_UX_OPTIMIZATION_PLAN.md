@@ -98,10 +98,12 @@ governance, consistency, and agent-readiness**:
    Individual `track()` call sites are wired (2026-05-04, follow-up commit): the
    v2.1 events `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED`, `AGENT_HEALTH_DEGRADED`,
    and `COPILOT_REWRITE_ACCEPT` now fire from `useAgent.ts`, `useAgentHealth.ts`, and
-   `aiTaskAssistPanel/index.tsx` respectively. `AGENT_PROPOSAL_UNDONE` is the only
-   remaining unfired event — it has no UI undo path on accepted proposals yet.
-8. AI entry points remain fragmented across header, board header, filters,
-   modals, drawers, and command palette.
+   `aiTaskAssistPanel/index.tsx` respectively. `AGENT_PROPOSAL_UNDONE` now fires from the 10-second undo path on
+   `MutationProposalCard` (resolved 2026-05-05). All analytics events fire.
+8. ~~AI entry points remain fragmented across header, board header, filters,
+   modals, drawers, and command palette.~~ **Resolved (2026-05-05):** `CopilotMenu`
+   dropdown added to board header; `copilotShell/` provides a unified Chat/Brief/Activity/Settings
+   right-rail shell; command palette AI mode routes to the shell Chat tab.
 
 ---
 
@@ -946,7 +948,34 @@ The following items from Phases 1–3 have shipped as of 2026-05-05.
 
 - **Observability sinks:** `src/utils/observability/sinks.ts` exports `httpAnalyticsSink`, `httpErrorSink`, `devMemorySink`; wired from `src/index.tsx` via `VITE_ANALYTICS_ENDPOINT`/`VITE_ERROR_REPORT_ENDPOINT`. `ErrorBoundary.componentDidCatch` reports to error sink.
 - **Observability call sites:** `AGENT_TURN_STARTED`/`AGENT_TURN_COMPLETED` (with `agentName`, `durationMs`, `tokensIn`, `tokensOut`) fire from `useAgent.ts`. `AGENT_HEALTH_DEGRADED` fires once per transition from `useAgentHealth.ts`. `COPILOT_REWRITE_ACCEPT` fires from `aiTaskAssistPanel` on readiness Apply. `AGENT_TTFT`, `CITATION_CLICKED`, `CITATION_FLAGGED` already firing.
-- **Still open in P2-5:** `AGENT_PROPOSAL_UNDONE` remains defined but unfired — no FE undo path on accepted `MutationProposal` yet.
+- **Resolved (2026-05-05):** `AGENT_PROPOSAL_UNDONE` now fires. `MutationProposalCard` implements a 10-second countdown phase: accept defers `onAccept`, shows "Undo (Xs)" + field-change summary, fires `AGENT_PROPOSAL_UNDONE` analytics on undo, and commits only when countdown reaches zero. See `src/components/mutationProposalCard/index.tsx`.
+
+### Phase 4 shipped items — Surface consolidation (2026-05-05)
+
+- **Unified Copilot entry point (P1-A):** `CopilotMenu` Ant Design dropdown added to board header with items: Ask, Brief, Find related tasks, Draft task, Settings. Resolves the ≥5 fragmented entry-point problem.
+- **Right-rail Copilot shell (P1-A):** `src/components/copilotShell/index.tsx` — tabbed Drawer with Chat / Brief / Activity / Settings tabs. Chat and Brief tabs open their respective existing drawers; Activity tab placeholder for agent turn history.
+- **Command palette routing (P1-A + P3-A):** AI mode in command palette routes to `onOpenCopilot` callback to open the Copilot shell Chat tab with the query pre-filled. No-results state (≥3 chars) shows "Try asking Board Copilot →" CTA.
+
+### Phase 5 shipped items — Agentic readiness (2026-05-05)
+
+- **Proposal-undo surface (P1-B):** `MutationProposalCard` now shows: what fields will change, risk level, "10s undo available after accepting" footer hint. Accept triggers a 10-second countdown with an "Undo (Xs)" button; `AGENT_PROPOSAL_UNDONE` fires on undo. `MutationProposalCard` remains gated behind `aiMutationProposalsEnabled` — the flag gate is unchanged; only the UX quality of the accept/undo path is improved.
+- **Context-window safety (P1-C):** `AiChatDrawer` derives approximate token count from message character lengths; shows a dismissible warning at ≥6 000 tokens and a persistent error alert with "Start new" action at ≥7 500 tokens. `AgentBudgetError` now preserves the user's submitted message in the input field instead of discarding it. "New Conversation" button now shows a `Modal.confirm` if history exists.
+- **TTFT SLO (P2-I):** `TTFT_SLO_MS = 1500` defined in `useAgent.ts`; `AGENT_TTFT_SLOW` fires when exceeded. `AiChatDrawer` shows "Still thinking…" annotation alongside the Skeleton bubble when TTFT exceeds 3 seconds.
+
+### Other items shipped — Accessibility & Streaming UX (2026-05-05)
+
+- **P2-A:** Interim `role="status" aria-live="polite"` region announces "Board Copilot is responding." on stream start; clears on completion (completion word-count announcement unchanged).
+- **P2-B:** `lastAssistantRef` attached to the last rendered assistant message; focused (`tabIndex={-1}`) after stream completes. Escape key on the messages container re-focuses the input.
+- **P2-C:** "Sessions are not saved — history clears on reload." notice in empty-chat state (Phase A). `saveChatHistory` / `loadChatHistory` added to `projectAiStorage.ts`; history is persisted to `localStorage` on every message change (Phase B save; restore on open deferred to Phase C).
+- **P2-D:** Scroll-to-bottom FAB ("↓ Jump to latest") appears when user scrolls up more than 100px during streaming; auto-hides within 50px of bottom.
+- **P2-E:** Assistant messages with >300 words of continuous prose are collapsed to the first 150 words with a "Show full response" expand button.
+- **P2-F:** `CopilotAboutPopover` component (`src/components/copilotAboutPopover/index.tsx`) — `InfoCircleOutlined` trigger button opens a popover with capability list, limitations, model info (local vs remote), and knowledge cutoff.
+- **P2-G:** `useAgentHealth()` wired into `AiChatDrawer`; inline `Alert` shown when status is `degraded` (warning) or `offline` (error); Send button disabled when offline.
+- **P2-H:** `AiChatDrawer` body `paddingBottom` updated to `max(${space.md}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))` for mobile soft-keyboard safety.
+- **P3-B:** `renderMarkdown()` helper applied to all assistant message content — handles headings, bold, italic, inline code, and newlines progressively on every streaming chunk.
+- **P3-C:** `CopyOutlined` button added to assistant message action bar; strips markdown syntax before writing to clipboard, shows "Copied" toast.
+- **P3-D:** `EditOutlined` button on user message bubbles re-fills the input field and focuses the textarea.
+- **P3-E:** `maxLineLengthCh` token (`75ch`) applied to expanded-terms and rationale prose containers in `aiSearchInput/index.tsx`.
 
 ---
 
@@ -976,20 +1005,20 @@ The following items from Phases 1–3 have shipped as of 2026-05-05.
 4. Add trust-calibration dashboard metrics for internal QA.
 5. Measure stop, retry, regenerate, apply-anyway, and undo rates.
 
-### Phase 4 — Surface consolidation
+### Phase 4 — Surface consolidation — Status: Complete (2026-05-05)
 
-1. Consolidate board-level AI controls into one Copilot menu.
-2. Build right-rail Copilot shell with Chat / Brief / Activity / Settings.
-3. Route command palette AI mode into the shell.
-4. Add action history for AI-generated changes.
+1. ✅ Consolidate board-level AI controls into one Copilot menu (`CopilotMenu` dropdown on board header).
+2. ✅ Build right-rail Copilot shell with Chat / Brief / Activity / Settings (`src/components/copilotShell/`).
+3. ✅ Route command palette AI mode into the shell (via `onOpenCopilot` callback).
+4. ✅ Add action history placeholder in Activity tab; full turn log deferred to Phase 6.
 
-### Phase 5 — Agentic readiness
+### Phase 5 — Agentic readiness — Status: Complete (FE side, 2026-05-05)
 
-1. Keep agent write tools disabled until proposal review exists.
-2. Integrate `MutationProposalCard` only inside the activity/review surface (currently hidden by default behind `aiMutationProposalsEnabled` flag; re-enable only once the BE lifecycle ships).
-3. Integrate `NudgeCard` into an inbox/history surface.
-4. Add autonomy settings before any write-capable agent ships.
-5. Add prompt-injection and disallowed-action test cases.
+1. ✅ Agent write tools remain disabled (flag gate `aiMutationProposalsEnabled` unchanged).
+2. ✅ `MutationProposalCard` now has a full 10-second undo surface, field-change disclosure, and `AGENT_PROPOSAL_UNDONE` analytics. Re-enable flag only after BE `fe.applyMutation` lifecycle ships.
+3. `NudgeCard` inbox integration deferred to Phase 6 (BE-gated).
+4. ✅ Autonomy selector present; "Auto" hard-disabled with explanatory tooltip until preapproved-tool schema lands.
+5. Prompt-injection and disallowed-action red-team tests deferred to QA sprint.
 
 ---
 
