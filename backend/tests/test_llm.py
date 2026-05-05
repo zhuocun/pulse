@@ -1,0 +1,245 @@
+"""Tests for :mod:`app.agents.llm`."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+import pytest
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+
+from app.agents import llm as llm_module
+from app.agents.llm import (
+    DEFAULT_ANTHROPIC_MODEL,
+    DEFAULT_OPENAI_MODEL,
+    PROVIDER_ANTHROPIC,
+    PROVIDER_OPENAI,
+    PROVIDER_STUB,
+    ChatModelSpec,
+    estimate_text_tokens,
+    extract_token_usage,
+    is_stub_model,
+    make_chat_model,
+    make_stub_chat_model,
+    resolve_chat_model_spec,
+)
+from app.config import settings as default_settings
+
+
+def _settings(**overrides: object) -> object:
+    """Return a frozen :class:`Settings` clone with overrides applied."""
+
+    return replace(default_settings, **overrides)
+
+
+def test_make_stub_chat_model_returns_fake() -> None:
+    model = make_stub_chat_model(purpose="tests")
+    assert isinstance(model, GenericFakeChatModel)
+    response = model.invoke("hello")
+    assert isinstance(response, AIMessage)
+    assert is_stub_model(model)
+
+
+def test_resolve_spec_auto_picks_stub_when_no_keys() -> None:
+    spec = resolve_chat_model_spec(_settings(anthropic_api_key="", openai_api_key=""))
+    assert spec.provider == PROVIDER_STUB
+    assert spec.is_stub is True
+
+
+def test_resolve_spec_auto_picks_anthropic_when_key_set() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(anthropic_api_key="sk-test", openai_api_key="")
+    )
+    assert spec.provider == PROVIDER_ANTHROPIC
+    assert spec.model == DEFAULT_ANTHROPIC_MODEL
+    assert spec.api_key == "sk-test"
+
+
+def test_resolve_spec_auto_picks_openai_when_only_openai_key_set() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(anthropic_api_key="", openai_api_key="sk-openai")
+    )
+    assert spec.provider == PROVIDER_OPENAI
+    assert spec.model == DEFAULT_OPENAI_MODEL
+
+
+def test_resolve_spec_explicit_provider_overrides_auto() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(
+            agent_chat_model_provider="stub",
+            anthropic_api_key="sk-still-here",
+        )
+    )
+    assert spec.provider == PROVIDER_STUB
+
+
+def test_resolve_spec_uses_explicit_model_id() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(
+            agent_chat_model_provider="anthropic",
+            agent_chat_model_id="claude-test",
+            anthropic_api_key="sk-x",
+        )
+    )
+    assert spec.model == "claude-test"
+
+
+def test_resolve_spec_rejects_unknown_provider() -> None:
+    with pytest.raises(RuntimeError, match="Unsupported"):
+        resolve_chat_model_spec(_settings(agent_chat_model_provider="not-a-thing"))
+
+
+def test_make_chat_model_uses_stub_by_default() -> None:
+    spec = ChatModelSpec(provider=PROVIDER_STUB, model="stub")
+    model = make_chat_model(spec)
+    assert is_stub_model(model)
+
+
+def test_make_chat_model_resolves_default_when_spec_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When ``spec`` is None it falls back to the resolved global settings."""
+
+    monkeypatch.setattr(
+        llm_module,
+        "default_settings",
+        _settings(agent_chat_model_provider="stub"),
+    )
+    model = make_chat_model()
+    assert is_stub_model(model)
+
+
+def test_extract_token_usage_from_usage_metadata() -> None:
+    msg = AIMessage(
+        content="ok",
+        usage_metadata={"input_tokens": 11, "output_tokens": 22, "total_tokens": 33},
+    )
+    assert extract_token_usage(msg) == (11, 22)
+
+
+def test_extract_token_usage_from_anthropic_metadata() -> None:
+    msg = AIMessage(
+        content="ok",
+        response_metadata={"usage": {"input_tokens": 5, "output_tokens": 7}},
+    )
+    assert extract_token_usage(msg) == (5, 7)
+
+
+def test_extract_token_usage_from_openai_metadata() -> None:
+    msg = AIMessage(
+        content="ok",
+        response_metadata={
+            "token_usage": {"prompt_tokens": 9, "completion_tokens": 4},
+        },
+    )
+    assert extract_token_usage(msg) == (9, 4)
+
+
+def test_extract_token_usage_returns_zero_when_unknown() -> None:
+    assert extract_token_usage(None) == (0, 0)
+    assert extract_token_usage(AIMessage(content="ok")) == (0, 0)
+
+
+def test_estimate_text_tokens_handles_empty_input() -> None:
+    assert estimate_text_tokens("") == 0
+
+
+def test_estimate_text_tokens_floors_at_one() -> None:
+    assert estimate_text_tokens("hi") == 1
+
+
+def test_estimate_text_tokens_scales_with_length() -> None:
+    assert estimate_text_tokens("a" * 80) >= 20
+
+
+# ---------------------------------------------------------------------------
+# assert_provider_available -- explicit-provider-without-key guard
+# ---------------------------------------------------------------------------
+
+
+def _clear_production_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in llm_module._PROVIDER_PRODUCTION_SHAPED_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_assert_provider_available_passes_for_stub() -> None:
+    """Default ``auto`` resolving to stub should never raise."""
+
+    llm_module.assert_provider_available(
+        settings=_settings(
+            agent_chat_model_provider="auto",
+            anthropic_api_key="",
+            openai_api_key="",
+        )
+    )
+
+
+def test_assert_provider_available_passes_when_key_present_in_prod(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_production_env(monkeypatch)
+    monkeypatch.setenv("VERCEL", "1")
+    llm_module.assert_provider_available(
+        settings=_settings(
+            agent_chat_model_provider="anthropic",
+            anthropic_api_key="sk-real",
+        )
+    )
+
+
+def test_assert_provider_available_passes_in_local_dev_without_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local dev (no production-shaped env vars) keeps degrade-to-stub behaviour."""
+
+    _clear_production_env(monkeypatch)
+    llm_module.assert_provider_available(
+        settings=_settings(
+            agent_chat_model_provider="anthropic",
+            anthropic_api_key="",
+        )
+    )
+
+
+def test_assert_provider_available_raises_for_anthropic_without_key_in_prod(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_production_env(monkeypatch)
+    monkeypatch.setenv("VERCEL", "1")
+    with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        llm_module.assert_provider_available(
+            settings=_settings(
+                agent_chat_model_provider="anthropic",
+                anthropic_api_key="",
+            )
+        )
+
+
+def test_assert_provider_available_raises_for_openai_without_key_in_prod(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_production_env(monkeypatch)
+    monkeypatch.setenv("RENDER", "1")
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        llm_module.assert_provider_available(
+            settings=_settings(
+                agent_chat_model_provider="openai",
+                openai_api_key="",
+            )
+        )
+
+
+def test_assert_provider_available_default_auto_does_not_raise_in_prod(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``auto`` with no keys resolves to stub and must keep degrade behaviour."""
+
+    _clear_production_env(monkeypatch)
+    monkeypatch.setenv("FLY_APP_NAME", "demo")
+    llm_module.assert_provider_available(
+        settings=_settings(
+            agent_chat_model_provider="auto",
+            anthropic_api_key="",
+            openai_api_key="",
+        )
+    )

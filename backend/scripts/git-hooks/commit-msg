@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+commit_msg_file="$1"
+subject="$(sed -n '/^[[:space:]]*#/d; /^[[:space:]]*$/d; p; q' "$commit_msg_file")"
+
+allowed_types="build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test"
+pattern="^(${allowed_types})(\\([A-Za-z0-9._/-]+\\))?!?: .+"
+
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+    cat >&2 <<EOF
+Invalid commit message:
+  $subject
+
+Use Conventional Commits:
+  <type>: <subject>
+  <type>(scope): <subject>
+
+Allowed types:
+  build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
+
+Examples:
+  feat: add task creation endpoint
+  chore(hooks): enforce commit messages
+EOF
+    exit 1
+fi

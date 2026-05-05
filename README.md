@@ -2,6 +2,20 @@
 
 `jira-react-app` is a React-based front-end application for a Jira-like project management tool. This app provides a user-friendly interface for managing tasks, projects, and team collaborations.
 
+## Monorepo layout
+
+This repository hosts both the React frontend and the Python (FastAPI) backend that previously lived in `zhuocun/jira-python-server`:
+
+- `/` — React + Vite frontend (this README, `package.json`, `src/`, `vite.config.ts`, root `vercel.json`).
+- `backend/` — FastAPI server (`backend/app`, `backend/api`, `backend/pyproject.toml`, `backend/Dockerfile`, `backend/fly.toml`, `backend/vercel.json`). See `backend/README.md` for backend-specific docs.
+
+Deployments are unchanged in shape:
+
+- **Frontend → Vercel**: project root stays at the repository root. Backend is excluded from the frontend build via `.vercelignore`.
+- **Backend → Vercel**: set the Vercel project's **Root Directory** to `backend/` so `backend/vercel.json` and `backend/api/index.py` are picked up exactly as before.
+- **Backend → Fly.io**: run `fly deploy` from the `backend/` directory (or pass `--config backend/fly.toml --dockerfile backend/Dockerfile`); the Dockerfile and `fly.toml` are unchanged.
+- **Backend CI**: `.github/workflows/backend-ci.yml` runs the Python test suite scoped to `backend/**` paths.
+
 ## Technologies
 
 The project utilizes the following technologies:

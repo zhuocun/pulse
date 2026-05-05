@@ -1,0 +1,240 @@
+"""Tests for the ``polish_triage`` helper in ``triage-agent``.
+
+Polish-helper tests live in this module rather than in
+``tests/test_agents_catalog.py`` so they can focus on the LLM-polish path
+in isolation. The same ``structured_model`` / ``is_not_stub`` scaffold
+used by ``test_search_agent.py`` and ``test_ai_v1_router.py`` is reused
+here so the mocking idiom stays consistent across the catalog.
+"""
+
+from __future__ import annotations
+
+from langchain_core.messages import AIMessage
+
+from app.agents.catalog.triage import NudgePolish, TriagePolish, polish_triage
+from app.agents.llm import make_stub_chat_model
+from tests.conftest import structured_model
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+_BOARD_SNAPSHOT: dict = {
+    "columns": [
+        {"id": "col-1", "name": "In Progress", "wip_limit": 5},
+    ],
+    "tasks": [
+        {"id": "t-1", "column_id": "col-1", "status": "in_progress"},
+    ],
+}
+
+_DETERMINISTIC_NUDGES = [
+    {
+        "type": "wip_overflow",
+        "title": "WIP overflow",
+        "severity": "warn",
+        "details": {"column_id": "col-1", "count": 8, "limit": 5},
+        "actions": [{"label": "Acknowledge"}, {"label": "Snooze"}],
+    },
+    {
+        "type": "stale_task",
+        "title": "Stale task",
+        "severity": "info",
+        "details": {"task_id": "t-42", "days_stale": 14},
+        "actions": [{"label": "Acknowledge"}, {"label": "Snooze"}],
+    },
+]
+
+
+# ---------------------------------------------------------------------------
+# Stub-model path: deterministic result, zero tokens
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_returns_deterministic_on_stub() -> None:
+    result, tokens_in, tokens_out = polish_triage(
+        make_stub_chat_model(), _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    )
+    assert result == _DETERMINISTIC_NUDGES
+    assert (tokens_in, tokens_out) == (0, 0)
+
+
+def test_polish_triage_returns_deterministic_on_stub_empty_nudges() -> None:
+    """Stub model with empty nudge list also returns immediately."""
+    result, tokens_in, tokens_out = polish_triage(
+        make_stub_chat_model(), [], _BOARD_SNAPSHOT
+    )
+    assert result == []
+    assert (tokens_in, tokens_out) == (0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Real-model path: polished summary merged back by nudge_id
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_merges_polished_summary() -> None:
+    raw = AIMessage(
+        content="ignored",
+        usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+    )
+    parsed = TriagePolish(
+        nudges=[
+            NudgePolish(
+                nudge_id="wip_overflow:0",
+                summary="WIP overflow in 'In Progress' (8/5) — move 3 tasks out",
+            ),
+            NudgePolish(
+                nudge_id="stale_task:1",
+                summary="Task t-42 stale for 14 days — reassign or close",
+            ),
+        ]
+    )
+    model = structured_model(parsed=parsed, raw_message=raw)
+    result, tokens_in, tokens_out = polish_triage(
+        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    )
+
+    assert result[0]["title"] == "WIP overflow in 'In Progress' (8/5) — move 3 tasks out"
+    assert result[1]["title"] == "Task t-42 stale for 14 days — reassign or close"
+    # Non-polished fields are preserved unchanged.
+    assert result[0]["type"] == "wip_overflow"
+    assert result[1]["details"] == {"task_id": "t-42", "days_stale": 14}
+    assert (tokens_in, tokens_out) == (10, 5)
+
+
+# ---------------------------------------------------------------------------
+# Fallback: provider exception → deterministic, zero tokens
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_falls_back_on_provider_exception() -> None:
+    model = structured_model(raise_on_call=RuntimeError("provider down"))
+    result, tokens_in, tokens_out = polish_triage(
+        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    )
+    assert result == _DETERMINISTIC_NUDGES
+    assert (tokens_in, tokens_out) == (0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Fallback: parse error → deterministic, tokens still reported
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_falls_back_on_parsing_error() -> None:
+    raw = AIMessage(
+        content="bad",
+        usage_metadata={"input_tokens": 3, "output_tokens": 0, "total_tokens": 3},
+    )
+    model = structured_model(
+        parsing_error=ValueError("bad json"), parsed=None, raw_message=raw
+    )
+    result, tokens_in, tokens_out = polish_triage(
+        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    )
+    assert result == _DETERMINISTIC_NUDGES
+    # Tokens are still reported so a runaway provider can be billed.
+    assert (tokens_in, tokens_out) == (3, 0)
+
+
+# ---------------------------------------------------------------------------
+# Fallback: non-TriagePolish parsed type → deterministic
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_falls_back_when_parsed_is_not_schema() -> None:
+    """A model that returns a raw dict (not the typed Pydantic class) falls back."""
+    model = structured_model(
+        parsed={"nudges": [{"nudge_id": "wip_overflow:0", "summary": "bad type"}]}
+    )
+    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    assert result == _DETERMINISTIC_NUDGES
+
+
+# ---------------------------------------------------------------------------
+# Blank polished summary → preserve deterministic copy
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_preserves_deterministic_when_summary_blank() -> None:
+    parsed = TriagePolish(
+        nudges=[
+            NudgePolish(nudge_id="wip_overflow:0", summary="   \n  "),
+            NudgePolish(nudge_id="stale_task:1", summary=""),
+        ]
+    )
+    model = structured_model(parsed=parsed)
+    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    assert result[0]["title"] == "WIP overflow"
+    assert result[1]["title"] == "Stale task"
+
+
+# ---------------------------------------------------------------------------
+# Unknown nudge_id from model → ignored, no new nudges injected
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_ignores_unknown_nudge_id() -> None:
+    """An id not present in the deterministic list must not inject a new nudge."""
+    raw = AIMessage(
+        content="x",
+        usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+    )
+    parsed = TriagePolish(
+        nudges=[
+            # Valid id — should be applied.
+            NudgePolish(
+                nudge_id="wip_overflow:0",
+                summary="WIP overflow in 'In Progress' (8/5)",
+            ),
+            # Hallucinated id — must be silently dropped.
+            NudgePolish(
+                nudge_id="injected_nudge:99",
+                summary="Injected by model",
+            ),
+        ]
+    )
+    model = structured_model(parsed=parsed, raw_message=raw)
+    result, tokens_in, tokens_out = polish_triage(
+        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    )
+    # The list length must not grow.
+    assert len(result) == len(_DETERMINISTIC_NUDGES)
+    # Valid nudge was polished.
+    assert result[0]["title"] == "WIP overflow in 'In Progress' (8/5)"
+    # Second nudge keeps its deterministic title (no polish provided for it).
+    assert result[1]["title"] == "Stale task"
+    assert (tokens_in, tokens_out) == (1, 1)
+
+
+# ---------------------------------------------------------------------------
+# Summary cap at 120 chars
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_caps_summary_at_120_chars() -> None:
+    long_summary = "A" * 200
+    parsed = TriagePolish(
+        nudges=[
+            NudgePolish(nudge_id="wip_overflow:0", summary=long_summary[:120]),
+        ]
+    )
+    model = structured_model(parsed=parsed)
+    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    assert len(result[0]["title"]) <= 120
+
+
+# ---------------------------------------------------------------------------
+# Empty nudge list with real (non-stub) model → short-circuit, zero tokens
+# ---------------------------------------------------------------------------
+
+
+def test_polish_triage_empty_nudges_with_real_model_returns_early() -> None:
+    """Empty nudge list short-circuits before calling the model."""
+    parsed = TriagePolish(nudges=[NudgePolish(nudge_id="wip_overflow:0", summary="x")])
+    model = structured_model(parsed=parsed)
+    result, tokens_in, tokens_out = polish_triage(model, [], _BOARD_SNAPSHOT)
+    assert result == []
+    assert (tokens_in, tokens_out) == (0, 0)
