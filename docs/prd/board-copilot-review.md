@@ -1,5 +1,7 @@
 # Board Copilot — design vs implementation review
 
+**Note (2026-05-05):** This review covers v1 capabilities only (commits through #13, reviewed 2026-04-30). For v2.1 feature status, see `board-copilot-progress.md`. The test-failure observation in §7 is stale — all tests pass on current main.
+
 Companion to [`board-copilot.md`](board-copilot.md) (PRD) and [`board-copilot-progress.md`](board-copilot-progress.md) (progress log). This review reads the code currently on `main` and reports whether each PRD requirement is reflected, with file/line evidence and the deltas worth knowing.
 
 | Field            | Value                                                                                                                                  |

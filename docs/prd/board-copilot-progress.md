@@ -12,11 +12,7 @@ Companion to [`docs/prd/board-copilot.md`](board-copilot.md). Tracks what has sh
 
 ## Main vs in-flight
 
-| Location                                                                                | What it contains                                                                                                                                                                                                                   |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`main`** (through merge of [PR #3](https://github.com/zhuocun/jira-react-app/pull/3)) | Phases 0–3: everything through the conversational assistant (`AiChatDrawer`, `useAiChat`, `chatTools` / `chatEngine`, `Ask` on board + project list, optional remote `POST …/api/ai/chat`).                                        |
-| **Branch `cursor/board-copilot-semantic-search-1b36`** (this work)                      | Phase 4 — **Capability E**: `AiSearchInput`, `semanticSearch` in `engine.ts`, `search` route on `useAi`, URL param `semanticIds`, task + project panel integration, tests.                                                         |
-| **Branch `cursor/ai-ux-current-audit-da9f`**                                            | Current work — AI UX audit refresh plus Phase 1 trust/privacy corrections: accurate data-scope disclosure, local/remote processing copy, clearer AI search labels, neutral AI error copy, and real Undo for readiness suggestions. |
+All phases through v2.1 REST-route migration have shipped as of 2026-05-05; see Status table below for per-feature detail.
 
 ---
 
