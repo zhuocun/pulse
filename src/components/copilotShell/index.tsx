@@ -1,4 +1,4 @@
-import { ExternalLinkOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined } from "@ant-design/icons";
 import { Button, Drawer, Grid, Space, Tabs, Typography } from "antd";
 import type { FC } from "react";
 
@@ -69,7 +69,7 @@ const PlaceholderTab: FC<{
         <Typography.Text type="secondary">{description}</Typography.Text>
         {ctaLabel && onCta && (
             <Button
-                icon={<ExternalLinkOutlined aria-hidden />}
+                icon={<ArrowRightOutlined aria-hidden />}
                 onClick={onCta}
                 type="primary"
             >
