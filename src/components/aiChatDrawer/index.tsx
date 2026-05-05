@@ -889,6 +889,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         }
     }, [messages, project?._id]);
 
+    const lastAssistantIndex = messages.reduceRight(
+        (found, m, i) =>
+            found === -1 && m.role === "assistant" && m.content.trim() ? i : found,
+        -1
+    );
+
     return (
         <Drawer
             extra={
@@ -1146,16 +1152,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         </Text>
                     </Space>
                 )}
-                {/* P2-B: find the index of the last visible assistant message for focus management */}
-                {(() => {
-                    const lastAssistantIndex = messages.reduceRight(
-                        (found, m, i) =>
-                            found === -1 && m.role === "assistant" && m.content.trim()
-                                ? i
-                                : found,
-                        -1
-                    );
-                    return messages.map((m, index) => {
+                {messages.map((m, index) => {
                     if (
                         m.role === "assistant" &&
                         !m.content.trim() &&
@@ -1665,8 +1662,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             )}
                         </MessageRow>
                     );
-                    });
-                })()}
+                })}
                 {/* v2.1 inserts — MutationProposal and TriageNudge cards
                     emitted by an agent stream. Owners pass `onAcceptProposal`
                     / `onDismissNudge` to drive `agent.resume(...)`; when
