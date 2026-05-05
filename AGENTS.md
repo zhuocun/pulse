@@ -43,6 +43,10 @@ when a fix is non-obvious from the code alone.
   stale `editingTaskId` from the URL after tasks resolve to a concrete array.
   Do not coerce the board page's tasks query to `[]` before passing it into
   `TaskModal`, or deep-linked edits will close immediately during load.
+- `useTaskModal` has a short same-task reopen guard (`TASK_MODAL_REOPEN_GUARD_MS`)
+  to absorb mobile "ghost taps": closing the modal can leak the same gesture
+  through to the task-card `<button>` underneath and immediately reopen the same
+  task. Keep task opens flowing through the hook so that guard stays effective.
 
 ## Deployment
 
