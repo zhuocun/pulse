@@ -41,6 +41,7 @@ import {
     radius,
     space as themeSpace
 } from "../theme/tokens";
+import type { TriageNudge } from "../interfaces/agent";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
@@ -48,6 +49,7 @@ import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useReactQuery from "../utils/hooks/useReactQuery";
+import useTaskModal from "../utils/hooks/useTaskModal";
 import useTitle from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
 import { isOptimisticPlaceholderId } from "../utils/optimisticClientId";
@@ -469,6 +471,32 @@ const BoardPage = () => {
         }
     }, [boardAiOn, chatOpen, currentProject?._id, triageAgent]);
 
+    const { startEditing: openTaskModal } = useTaskModal();
+    /**
+     * Triage-nudge primary CTA. The nudge wire shape (`agent.d.ts`)
+     * exposes `target_ids` but does not type-distinguish between task,
+     * column, or member ids. Resolve the first id against the in-cache
+     * task list and only navigate when it matches — that avoids
+     * opening a phantom modal when the id is a column/member ref (e.g.
+     * `wip_overflow`, `load_imbalance`). When no target resolves the
+     * click is a graceful no-op; the user still has Dismiss.
+     */
+    const handleTriageNudgeAction = useCallback(
+        (nudge: TriageNudge) => {
+            const taskId = nudge.target_ids.find((id) =>
+                visibleTasks.some((t) => t._id === id)
+            );
+            if (taskId) openTaskModal(taskId);
+        },
+        [openTaskModal, visibleTasks]
+    );
+    const handleTriageNudgeDismiss = useCallback(
+        (nudge: TriageNudge) => {
+            triageAgent.dismissNudge(nudge.nudge_id);
+        },
+        [triageAgent]
+    );
+
     /**
      * Wire the command palette → AI chat hand-off (PRD CP-R6). When the
      * user submits a prompt in palette AI mode, the palette dispatches
@@ -847,7 +875,17 @@ const BoardPage = () => {
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
                             members={members ?? []}
+                            onActionNudge={
+                                !environment.aiUseLocalEngine
+                                    ? handleTriageNudgeAction
+                                    : undefined
+                            }
                             onClose={closeChatDrawer}
+                            onDismissNudge={
+                                !environment.aiUseLocalEngine
+                                    ? handleTriageNudgeDismiss
+                                    : undefined
+                            }
                             open={chatOpen}
                             pendingNudges={
                                 !environment.aiUseLocalEngine

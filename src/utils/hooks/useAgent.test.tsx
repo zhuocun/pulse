@@ -29,7 +29,11 @@ jest.mock("../../constants/env", () => ({
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../ai/agentClient";
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
-import useAgent from "./useAgent";
+import useAgent, {
+    NUDGE_EXPIRY_MS,
+    NUDGE_INBOX_MAX,
+    reduceNudgeInbox
+} from "./useAgent";
 
 const mockedStream = streamAgent as unknown as jest.Mock;
 
@@ -698,6 +702,260 @@ describe("useAgent", () => {
             });
 
             expect(mockedStream).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("nudge inbox rules (PRD AC-V14)", () => {
+        const baseNudge = {
+            project_id: "p1",
+            severity: "warn" as const,
+            target_ids: [],
+            summary: ""
+        };
+
+        describe("reduceNudgeInbox (pure)", () => {
+            it("prepends newest first and keeps prior entries", () => {
+                const t0 = 1_700_000_000_000;
+                const first = reduceNudgeInbox(
+                    [],
+                    {
+                        ...baseNudge,
+                        nudge_id: "n1",
+                        kind: "wip_overflow",
+                        summary: "first"
+                    },
+                    t0
+                );
+                const second = reduceNudgeInbox(
+                    first,
+                    {
+                        ...baseNudge,
+                        nudge_id: "n2",
+                        kind: "stale_task",
+                        summary: "second"
+                    },
+                    t0 + 1000
+                );
+                expect(second.map((e) => e.nudge.nudge_id)).toEqual([
+                    "n2",
+                    "n1"
+                ]);
+            });
+
+            it("dedups by (kind, project_id) so the newer entry wins", () => {
+                const t0 = 1_700_000_000_000;
+                const seeded = reduceNudgeInbox(
+                    [],
+                    {
+                        ...baseNudge,
+                        nudge_id: "old",
+                        kind: "wip_overflow",
+                        summary: "old"
+                    },
+                    t0
+                );
+                const next = reduceNudgeInbox(
+                    seeded,
+                    {
+                        ...baseNudge,
+                        nudge_id: "new",
+                        kind: "wip_overflow",
+                        summary: "new"
+                    },
+                    t0 + 5000
+                );
+                expect(next).toHaveLength(1);
+                expect(next[0].nudge.nudge_id).toBe("new");
+            });
+
+            it("preserves entries of the same kind from a different project", () => {
+                const t0 = 1_700_000_000_000;
+                const seeded = reduceNudgeInbox(
+                    [],
+                    {
+                        ...baseNudge,
+                        project_id: "p1",
+                        nudge_id: "n1",
+                        kind: "wip_overflow",
+                        summary: ""
+                    },
+                    t0
+                );
+                const next = reduceNudgeInbox(
+                    seeded,
+                    {
+                        ...baseNudge,
+                        project_id: "p2",
+                        nudge_id: "n2",
+                        kind: "wip_overflow",
+                        summary: ""
+                    },
+                    t0 + 1
+                );
+                expect(next).toHaveLength(2);
+            });
+
+            it(`caps the inbox at NUDGE_INBOX_MAX = ${NUDGE_INBOX_MAX}`, () => {
+                let entries: ReturnType<typeof reduceNudgeInbox> = [];
+                for (let i = 0; i < NUDGE_INBOX_MAX + 3; i += 1) {
+                    entries = reduceNudgeInbox(
+                        entries,
+                        {
+                            ...baseNudge,
+                            nudge_id: `n${i}`,
+                            // Use distinct kinds (cycle if needed) so dedup
+                            // doesn't collapse the entries before the cap.
+                            kind: (
+                                [
+                                    "wip_overflow",
+                                    "stale_task",
+                                    "unowned_bug",
+                                    "load_imbalance"
+                                ] as const
+                            )[i % 4],
+                            project_id: `p${i}`,
+                            summary: ""
+                        },
+                        1_700_000_000_000 + i
+                    );
+                }
+                expect(entries).toHaveLength(NUDGE_INBOX_MAX);
+            });
+
+            it("drops entries older than the 4-hour expiry on insert", () => {
+                const t0 = 1_700_000_000_000;
+                const seeded = reduceNudgeInbox(
+                    [],
+                    {
+                        ...baseNudge,
+                        nudge_id: "stale",
+                        kind: "wip_overflow",
+                        summary: ""
+                    },
+                    t0
+                );
+                const after = reduceNudgeInbox(
+                    seeded,
+                    {
+                        ...baseNudge,
+                        project_id: "p2",
+                        nudge_id: "fresh",
+                        kind: "stale_task",
+                        summary: ""
+                    },
+                    t0 + NUDGE_EXPIRY_MS + 1
+                );
+                expect(after.map((e) => e.nudge.nudge_id)).toEqual(["fresh"]);
+            });
+        });
+
+        it("dismissNudge removes a single nudge by id", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "nudge",
+                            nudge: {
+                                nudge_id: "n-keep",
+                                kind: "wip_overflow",
+                                project_id: "p1",
+                                summary: "keep me",
+                                target_ids: [],
+                                severity: "warn"
+                            }
+                        }
+                    },
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "nudge",
+                            nudge: {
+                                nudge_id: "n-drop",
+                                kind: "stale_task",
+                                project_id: "p1",
+                                summary: "drop me",
+                                target_ids: [],
+                                severity: "info"
+                            }
+                        }
+                    }
+                ])
+            );
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("triage-agent", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+
+            await act(async () => {
+                await result.current.start("triage");
+            });
+
+            await waitFor(() => {
+                expect(result.current.nudges).toHaveLength(2);
+            });
+
+            act(() => {
+                result.current.dismissNudge("n-drop");
+            });
+
+            expect(result.current.nudges.map((n) => n.nudge_id)).toEqual([
+                "n-keep"
+            ]);
+        });
+
+        it("dedups same (kind, project_id) when streamed in the same turn", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "nudge",
+                            nudge: {
+                                nudge_id: "old",
+                                kind: "wip_overflow",
+                                project_id: "p1",
+                                summary: "old summary",
+                                target_ids: [],
+                                severity: "info"
+                            }
+                        }
+                    },
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "nudge",
+                            nudge: {
+                                nudge_id: "new",
+                                kind: "wip_overflow",
+                                project_id: "p1",
+                                summary: "new summary",
+                                target_ids: [],
+                                severity: "warn"
+                            }
+                        }
+                    }
+                ])
+            );
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("triage-agent", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+
+            await act(async () => {
+                await result.current.start("triage");
+            });
+
+            await waitFor(() => {
+                expect(result.current.nudges).toHaveLength(1);
+            });
+            expect(result.current.nudges[0].nudge_id).toBe("new");
         });
     });
 });

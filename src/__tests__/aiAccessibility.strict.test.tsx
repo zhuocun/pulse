@@ -101,7 +101,11 @@ jest.mock("../constants/env", () => ({
 }));
 
 jest.mock("../utils/hooks/useAuth");
-jest.mock("../utils/hooks/useAiEnabled");
+jest.mock("../utils/hooks/useAiEnabled", () => ({
+    __esModule: true,
+    default: jest.fn(),
+    useAutonomyLevel: jest.fn(() => ({ level: "plan", setLevel: jest.fn() }))
+}));
 jest.mock("../utils/hooks/useColorScheme");
 jest.mock("../utils/hooks/useReactMutation", () => ({
     __esModule: true,

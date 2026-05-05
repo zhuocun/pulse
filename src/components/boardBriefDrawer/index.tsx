@@ -21,13 +21,16 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { BRIEF_CACHE_TTL_MS } from "../../theme/aiTokens";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import AiSparkleIcon from "../aiSparkleIcon";
+import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
@@ -337,12 +340,39 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     members
 }) => {
     const { startEditing } = useTaskModal();
-    const { run, data, error, isLoading, reset } = useAi<IBoardBrief>({
-        route: "board-brief"
-    });
+    const projectId = project?._id ?? "";
+
+    // Mount BOTH hooks unconditionally (React hook ordering rule).
+    // Only one drives the UI based on environment.aiUseLocalEngine.
+    const localAi = useAi<IBoardBrief>({ route: "board-brief" });
+    const remoteAgent = useAgent("board-brief-agent", { projectId });
+
+    // Pick the active result.
+    const isRemote = !environment.aiUseLocalEngine;
+
+    // Local-engine path fields.
+    const {
+        run,
+        data: localData,
+        error: localError,
+        isLoading,
+        reset: localReset
+    } = localAi;
+
+    // Remote-agent path fields.
+    const agentBriefData = useMemo((): IBoardBrief | undefined => {
+        const suggestion = remoteAgent.lastSuggestion;
+        if (!suggestion || suggestion.surface !== "brief") return undefined;
+        return suggestion.payload as IBoardBrief;
+    }, [remoteAgent.lastSuggestion]);
+
+    // Active data/error/loading derived from the selected engine.
+    const data = isRemote ? agentBriefData : localData;
+    const error = isRemote ? remoteAgent.error : localError;
+    const activeIsLoading = isRemote ? remoteAgent.isStreaming : isLoading;
+
     const screens = Grid.useBreakpoint();
     const drawerWidth = screens.md ? 420 : "100%";
-    const projectId = project?._id ?? "";
     const fingerprint = fingerprintBoard(columns, tasks, members);
     const cacheKey = projectId;
     const [cachedAt, setCachedAt] = useState<number | null>(null);
@@ -355,6 +385,8 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
      *   - the board fingerprint hasn't changed since we cached.
      * Otherwise re-run the agent. The cache survives drawer close so a
      * quick reopen no longer thrashes the network.
+     * Only used in local-engine mode; the remote agent path bypasses this
+     * cache and calls the agent directly.
      */
     const runBrief = useCallback(
         async (options: { bypassCache?: boolean } = {}) => {
@@ -398,14 +430,31 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         [project, cacheKey, fingerprint, run, columns, tasks, members]
     );
 
+    /**
+     * Remote-agent brief trigger: when the drawer opens in remote mode,
+     * start the board-brief-agent with a natural-language prompt.
+     * Aborts the agent on close via remoteAgent.abort().
+     */
+    useEffect(() => {
+        if (!isRemote) return;
+        if (open && project) {
+            void remoteAgent.start("Generate the brief for this board.");
+        } else if (!open) {
+            remoteAgent.abort();
+            remoteAgent.clearSuggestion();
+        }
+    }, [open, isRemote, project, remoteAgent]);
+
     useEffect(() => {
         if (!open) return;
         track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
         if (lastFingerprintRef.current !== fingerprint) {
             lastFingerprintRef.current = fingerprint;
         }
-        void runBrief();
-    }, [open, fingerprint, runBrief]);
+        if (!isRemote) {
+            void runBrief();
+        }
+    }, [open, fingerprint, runBrief, isRemote]);
 
     /**
      * Drawer close (B-R13): preserve the cached brief so reopening
@@ -414,9 +463,9 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
      */
     useEffect(() => {
         if (!open) {
-            reset();
+            localReset();
         }
-    }, [open, reset]);
+    }, [open, localReset]);
 
     /**
      * Live "Generated N minutes ago" timestamp. Tick every 30 s while
@@ -482,7 +531,12 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
 
     const handleRefresh = async () => {
         track(ANALYTICS_EVENTS.BRIEF_REFRESHED, { projectId });
-        await runBrief({ bypassCache: true });
+        if (isRemote) {
+            remoteAgent.clearSuggestion();
+            await remoteAgent.start("Generate the brief for this board.");
+        } else {
+            await runBrief({ bypassCache: true });
+        }
     };
 
     const teamAverage = useMemo(() => {
@@ -498,7 +552,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                     <Tooltip title={microcopy.ai.regenerateLabel}>
                         <Button
                             aria-label={microcopy.ai.regenerateLabel}
-                            disabled={isLoading}
+                            disabled={activeIsLoading}
                             icon={<ReloadOutlined />}
                             onClick={handleRefresh}
                             size="small"
@@ -508,7 +562,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                     <Tooltip title={microcopy.actions.copyAsMarkdown}>
                         <Button
                             aria-label={microcopy.a11y.copyBriefAsMarkdown}
-                            disabled={!briefData || isLoading}
+                            disabled={!briefData || activeIsLoading}
                             icon={<CopyOutlined />}
                             onClick={handleCopyMarkdown}
                             size="small"
@@ -549,7 +603,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
             size={drawerWidth}
         >
             <CopilotRemoteConsentNotice route="board-brief" />
-            {isLoading && !briefData && (
+            {activeIsLoading && !briefData && (
                 <div
                     aria-label={microcopy.a11y.generatingBrief}
                     aria-busy="true"
@@ -766,6 +820,17 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                                 formatRelative(generatedAt, now)
                             )}
                         </Typography.Text>
+                    )}
+                    {isRemote && remoteAgent.citations.length > 0 && (
+                        <Space size={4} style={{ marginTop: space.sm }} wrap>
+                            {remoteAgent.citations.map((c, i) => (
+                                <CitationChip
+                                    citation={c}
+                                    index={i + 1}
+                                    key={`${c.id}-${i}`}
+                                />
+                            ))}
+                        </Space>
                     )}
                 </div>
             )}
