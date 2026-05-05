@@ -1522,8 +1522,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     })()}
                             </MessageBubble>
                             {isAssistant &&
-                                m.citations !== undefined &&
-                                m.citations.length === 0 &&
+                                m.citations?.length === 0 &&
                                 !assistantHadToolStep(index) && (
                                     /*
                                      * No-source caveat (Optimization Plan

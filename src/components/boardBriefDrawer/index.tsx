@@ -363,7 +363,14 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     const agentBriefData = useMemo((): IBoardBrief | undefined => {
         const suggestion = remoteAgent.lastSuggestion;
         if (!suggestion || suggestion.surface !== "brief") return undefined;
-        return suggestion.payload as IBoardBrief;
+        const raw = suggestion.payload as IBoardBrief;
+        return {
+            ...raw,
+            counts: raw.counts ?? [],
+            largestUnstarted: raw.largestUnstarted ?? [],
+            unowned: raw.unowned ?? [],
+            workload: raw.workload ?? []
+        };
     }, [remoteAgent.lastSuggestion]);
 
     // Active data/error/loading derived from the selected engine.
