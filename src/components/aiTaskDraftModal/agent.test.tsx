@@ -108,6 +108,7 @@ const baseAgent = (
     reset: jest.fn(),
     threadId: "t_test",
     ttftMs: null,
+    isSlowTtft: false,
     clearPendingProposal: jest.fn(),
     clearSuggestion: jest.fn(),
     dismissNudge: jest.fn(),
@@ -205,6 +206,79 @@ describe("AiTaskDraftModal — remote agent path", () => {
                 screen.getByDisplayValue("Agent-drafted task")
             ).toBeInTheDocument()
         );
+    });
+
+    it("does not re-consume the same draft suggestion on rerenders caused by streaming state updates", async () => {
+        const clearSuggestion = jest.fn();
+        const onClose = jest.fn();
+        const queryClient = seedClient();
+        const stableSuggestion = {
+            surface: "draft" as const,
+            payload: draftPayload
+        };
+
+        mockedUseAgent.mockReturnValue(
+            baseAgent({
+                clearSuggestion,
+                isStreaming: false,
+                lastSuggestion: stableSuggestion
+            })
+        );
+
+        const { rerender } = render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskDraftModal
+                                    columnId="c1"
+                                    onClose={onClose}
+                                    open
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.getByDisplayValue("Agent-drafted task")
+            ).toBeInTheDocument()
+        );
+        await waitFor(() => expect(clearSuggestion).toHaveBeenCalledTimes(1));
+
+        mockedUseAgent.mockReturnValue(
+            baseAgent({
+                clearSuggestion,
+                isStreaming: true,
+                lastSuggestion: stableSuggestion
+            })
+        );
+
+        rerender(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskDraftModal
+                                    columnId="c1"
+                                    onClose={onClose}
+                                    open
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(clearSuggestion).toHaveBeenCalledTimes(1));
     });
 
     it("populates breakdown list after surface:draft breakdown suggestion", async () => {

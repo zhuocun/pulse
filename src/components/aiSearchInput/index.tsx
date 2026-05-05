@@ -13,7 +13,11 @@ import React, {
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, maxLineLengthCh, space as themeSpace } from "../../theme/tokens";
+import {
+    breakpoints,
+    maxLineLengthCh,
+    space as themeSpace
+} from "../../theme/tokens";
 import {
     clearAiSearchStrengths,
     setAiSearchStrengths
@@ -154,6 +158,12 @@ const AiSearchInput: React.FC<Props> = (props) => {
     const projectId =
         props.kind === "tasks" ? props.projectContext.project._id : undefined;
     const remoteAgent = useAgent("search-agent", { projectId });
+    const startRemoteSearch = remoteAgent.start;
+    const abortRemoteSearch = remoteAgent.abort;
+    const clearRemoteSuggestion = remoteAgent.clearSuggestion;
+    const remoteLastSuggestion = remoteAgent.lastSuggestion;
+    const remoteError = remoteAgent.error;
+    const remoteIsStreaming = remoteAgent.isStreaming;
     const isRemote = !environment.aiUseLocalEngine;
     const [draft, setDraft] = useState("");
     const [noMatchHint, setNoMatchHint] = useState<string | null>(null);
@@ -185,15 +195,15 @@ const AiSearchInput: React.FC<Props> = (props) => {
     useEffect(
         () => () => {
             abortRef.current?.abort();
-            remoteAgent.abort();
-            remoteAgent.clearSuggestion();
+            abortRemoteSearch();
+            clearRemoteSuggestion();
         },
-        [remoteAgent]
+        [abortRemoteSearch, clearRemoteSuggestion]
     );
 
     // Compute agent suggestion payload; effect is placed after applyResult.
     const agentSearchPayload = useMemo(() => {
-        const s = remoteAgent.lastSuggestion;
+        const s = remoteLastSuggestion;
         if (!s || s.surface !== "search") return null;
         return s.payload as {
             ids: string[];
@@ -201,7 +211,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
             rationale: string;
             expandedTerms?: string[];
         };
-    }, [remoteAgent.lastSuggestion]);
+    }, [remoteLastSuggestion]);
 
     /**
      * Track whether the underlying scope has any data at all so the
@@ -210,13 +220,9 @@ const AiSearchInput: React.FC<Props> = (props) => {
      */
     useEffect(() => {
         if (props.kind === "tasks") {
-            setBoardHasItems(
-                (props.projectContext.tasks?.length ?? 0) > 0
-            );
+            setBoardHasItems((props.projectContext.tasks?.length ?? 0) > 0);
         } else {
-            setBoardHasItems(
-                (props.projectsContext.projects?.length ?? 0) > 0
-            );
+            setBoardHasItems((props.projectsContext.projects?.length ?? 0) > 0);
         }
     }, [props]);
 
@@ -271,8 +277,14 @@ const AiSearchInput: React.FC<Props> = (props) => {
             expandedTerms: agentSearchPayload.expandedTerms ?? []
         };
         applyResult(result, draft);
-        remoteAgent.clearSuggestion();
-    }, [agentSearchPayload, applyResult, draft, isRemote, remoteAgent]);
+        clearRemoteSuggestion();
+    }, [
+        agentSearchPayload,
+        applyResult,
+        draft,
+        isRemote,
+        clearRemoteSuggestion
+    ]);
 
     const performSearch = useCallback(
         async (rawQuery: string) => {
@@ -319,7 +331,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
             }
             if (isRemote) {
                 const kindLabel = props.kind === "tasks" ? "tasks" : "projects";
-                void remoteAgent.start(`Find ${kindLabel} matching: ${query}`, {
+                void startRemoteSearch(`Find ${kindLabel} matching: ${query}`, {
                     autonomy: "suggest"
                 });
                 return;
@@ -328,9 +340,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
             if (props.kind === "tasks") {
                 const ctx = (props as TaskSearchProps).projectContext;
                 raw = semanticSearch("tasks", query, ctx);
-                const valid = new Set(
-                    (ctx.tasks ?? []).map((t) => t._id)
-                );
+                const valid = new Set((ctx.tasks ?? []).map((t) => t._id));
                 applyResult(validateSearch(raw, valid), query);
             } else {
                 const projectsCtx =
@@ -357,15 +367,15 @@ const AiSearchInput: React.FC<Props> = (props) => {
         clearAiSearchStrengths(props.kind);
         searchAi.reset();
         abortRef.current?.abort();
-        remoteAgent.abort();
-        remoteAgent.clearSuggestion();
+        abortRemoteSearch();
+        clearRemoteSuggestion();
         props.setSemanticIds(undefined);
     };
 
     if (!aiEnabled) return null;
 
-    const busy = isRemote ? remoteAgent.isStreaming : searchAi.isLoading;
-    const activeError = isRemote ? remoteAgent.error : searchAi.error;
+    const busy = isRemote ? remoteIsStreaming : searchAi.isLoading;
+    const activeError = isRemote ? remoteError : searchAi.error;
     const errorView = activeError
         ? aiErrorView(activeError, microcopy.feedback.searchFailedTitle)
         : null;

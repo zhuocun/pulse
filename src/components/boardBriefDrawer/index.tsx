@@ -346,6 +346,12 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     // Only one drives the UI based on environment.aiUseLocalEngine.
     const localAi = useAi<IBoardBrief>({ route: "board-brief" });
     const remoteAgent = useAgent("board-brief-agent", { projectId });
+    const startRemoteBrief = remoteAgent.start;
+    const abortRemoteBrief = remoteAgent.abort;
+    const clearRemoteBriefSuggestion = remoteAgent.clearSuggestion;
+    const remoteBriefSuggestion = remoteAgent.lastSuggestion;
+    const remoteBriefError = remoteAgent.error;
+    const remoteBriefIsStreaming = remoteAgent.isStreaming;
 
     // Pick the active result.
     const isRemote = !environment.aiUseLocalEngine;
@@ -361,7 +367,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
 
     // Remote-agent path fields.
     const agentBriefData = useMemo((): IBoardBrief | undefined => {
-        const suggestion = remoteAgent.lastSuggestion;
+        const suggestion = remoteBriefSuggestion;
         if (!suggestion || suggestion.surface !== "brief") return undefined;
         const raw = suggestion.payload as IBoardBrief;
         return {
@@ -371,12 +377,12 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
             unowned: raw.unowned ?? [],
             workload: raw.workload ?? []
         };
-    }, [remoteAgent.lastSuggestion]);
+    }, [remoteBriefSuggestion]);
 
     // Active data/error/loading derived from the selected engine.
     const data = isRemote ? agentBriefData : localData;
-    const error = isRemote ? remoteAgent.error : localError;
-    const activeIsLoading = isRemote ? remoteAgent.isStreaming : isLoading;
+    const error = isRemote ? remoteBriefError : localError;
+    const activeIsLoading = isRemote ? remoteBriefIsStreaming : isLoading;
 
     const screens = Grid.useBreakpoint();
     const drawerWidth = screens.md ? 420 : "100%";
@@ -445,12 +451,19 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     useEffect(() => {
         if (!isRemote) return;
         if (open && project) {
-            void remoteAgent.start("Generate the brief for this board.");
+            void startRemoteBrief("Generate the brief for this board.");
         } else if (!open) {
-            remoteAgent.abort();
-            remoteAgent.clearSuggestion();
+            abortRemoteBrief();
+            clearRemoteBriefSuggestion();
         }
-    }, [open, isRemote, project, remoteAgent]);
+    }, [
+        open,
+        isRemote,
+        project,
+        startRemoteBrief,
+        abortRemoteBrief,
+        clearRemoteBriefSuggestion
+    ]);
 
     useEffect(() => {
         if (!open) return;
@@ -539,8 +552,8 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     const handleRefresh = async () => {
         track(ANALYTICS_EVENTS.BRIEF_REFRESHED, { projectId });
         if (isRemote) {
-            remoteAgent.clearSuggestion();
-            await remoteAgent.start("Generate the brief for this board.");
+            clearRemoteBriefSuggestion();
+            await startRemoteBrief("Generate the brief for this board.");
         } else {
             await runBrief({ bypassCache: true });
         }
