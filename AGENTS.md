@@ -23,6 +23,12 @@ when a fix is non-obvious from the code alone.
 "plan", setLevel: jest.fn()})`. Otherwise `useAgent` crashes destructuring
   `{level}` from `undefined`. See the four `src/__tests__/*.strict.test.tsx`
   suites for examples.
+- Components that trigger `remoteAgent.start()` from an effect must not depend on
+  the whole `useAgent()` return object. `useAgent` returns a memoized object
+  whose identity still changes on streaming state updates (`isStreaming`,
+  `lastSuggestion`, `error`), which can restart the same agent request in a
+  loop. Destructure the specific stable methods/data you need and depend on
+  those instead. See `src/components/aiTaskAssistPanel/index.tsx`.
 
 ## Drag-and-drop (`@hello-pangea/dnd`)
 

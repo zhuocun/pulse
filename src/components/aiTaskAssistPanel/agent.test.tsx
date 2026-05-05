@@ -9,6 +9,7 @@
  * Mirrors the pattern from boardBriefDrawer/agent.test.tsx.
  */
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -67,6 +68,7 @@ const baseAgent = (
     reset: jest.fn(),
     threadId: "t_test",
     ttftMs: null,
+    isSlowTtft: false,
     clearPendingProposal: jest.fn(),
     clearSuggestion: jest.fn(),
     dismissNudge: jest.fn(),
@@ -241,6 +243,64 @@ describe("AiTaskAssistPanel — remote agent path", () => {
             expect.stringContaining("Implement OAuth login"),
             expect.objectContaining({ autonomy: "plan" })
         );
+    });
+
+    it("does not restart the remote agent on rerenders caused by streaming state updates", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const abort = jest.fn();
+        const clearSuggestion = jest.fn();
+
+        const queryClient = new QueryClient();
+
+        const Harness = () => {
+            const [streaming, setStreaming] = useState(false);
+
+            mockedUseAgent.mockImplementation(() =>
+                baseAgent({
+                    start,
+                    abort,
+                    clearSuggestion,
+                    isStreaming: streaming
+                })
+            );
+
+            return (
+                <>
+                    <button onClick={() => setStreaming(true)} type="button">
+                        Toggle streaming
+                    </button>
+                    <AiTaskAssistPanel
+                        onApplyStoryPoints={jest.fn()}
+                        onApplySuggestion={jest.fn()}
+                        onOpenSimilarTask={jest.fn()}
+                        values={{ taskName: "Implement OAuth login" }}
+                    />
+                </>
+            );
+        };
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<Harness />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+
+        act(() => {
+            screen.getByRole("button", { name: "Toggle streaming" }).click();
+        });
+
+        await waitFor(() => {
+            expect(start).toHaveBeenCalledTimes(1);
+        });
     });
 
     it("calls agent.abort and clearSuggestion on unmount", () => {
