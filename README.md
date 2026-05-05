@@ -30,13 +30,14 @@ For a full list of dependencies, please refer to the `package.json` file.
 
 ## Board Copilot (AI features)
 
-This app ships an AI assistant called **Board Copilot** with five capabilities:
+This app ships an AI assistant called **Board Copilot** with six capabilities:
 
 - **Smart task drafting** in the create-task flow (a "Draft with AI" button next to `+ Create task`).
 - **Story-point estimation and readiness check** inside the edit-task modal.
 - **Board summary / standup brief** opened from the `Brief` button in the board header.
 - **Ask Board Copilot** — conversational Q&A from the `Ask` button on the board or project list (read-only project data via tool calls locally; optional remote `/api/ai/chat` when `REACT_APP_AI_BASE_URL` is set).
 - **Semantic search** — natural-language search on the board and project list (local token ranking, or optional remote `POST …/api/ai/search` when `REACT_APP_AI_BASE_URL` is set). Results combine with existing text filters; use **Clear AI search** to drop only the semantic filter.
+- **Triage inbox** — drift-signal nudges (`unowned_bug`, `wip_overflow`, `stale_task`) surfaced via `triage-agent` with cap-5, dedup, 4-hour expiry, and dismiss propagation (v2.1).
 
 All AI features are **opt-out**: the existing flows are unchanged, and AI surfaces are gated by a single env flag and a runtime user toggle (persisted in `localStorage` under `boardCopilot:enabled`).
 
@@ -64,11 +65,11 @@ The runtime toggle (per browser) overrides nothing about availability — it onl
 
 ### Validation and safety
 
-Every model-supplied identifier (`columnId`, `coordinatorId`, similar `taskId`s) is cross-checked against the React Query cache before any UI action; unknown ids are dropped or replaced with safe defaults. Story points are clamped to `1/2/3/5/8/13`. AI suggestions are advisory only — every write to the board still goes through the user clicking Submit and the existing `useReactMutation` plumbing.
+Every model-supplied identifier (`columnId`, `coordinatorId`, similar `taskId`s) is cross-checked against the React Query cache before any UI action; unknown ids are dropped or replaced with safe defaults. Story points are clamped to `1/2/3/5/8/13`. AI suggestions are advisory only — every write to the board still goes through the user clicking Submit and the existing `useReactMutation` plumbing. Note: there is an open privacy-copy alignment item — several routes (estimate, search, chat) include `task.note` in their payloads while the UI currently displays "no notes shared"; see `AI_UX_OPTIMIZATION_PLAN.md §P0-1` for the remediation plan.
 
 For the full design, see [docs/prd/board-copilot.md](docs/prd/board-copilot.md). For what has shipped vs what is still open, see [docs/prd/board-copilot-progress.md](docs/prd/board-copilot-progress.md). For a section-by-section design vs implementation review with file/line evidence, see [docs/prd/board-copilot-review.md](docs/prd/board-copilot-review.md).
 
-For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility, and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The v1 local engine remains the read-only fallback when the agent server is unreachable.
+For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility (deferred — see `docs/AI_REMAINING_WORK.md`), and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The v1 local engine remains the read-only fallback when the agent server is unreachable.
 
 ## Board Copilot v2.1 (Phase A scaffolding)
 
@@ -78,7 +79,7 @@ Phase A wires the FE plumbing for the v2.1 agent without changing the v1 surface
 - **FE tool registry** at `src/utils/ai/feTools/` exposes 11 read-only tools (`fe.listProjects`, `fe.boardSnapshot`, `fe.viewerContext`, …) backed by the existing React Query cache. Tool args use snake_case (`task_id`, `project_id`) to match BE schemas. They are invoked when the agent emits an `interrupt` event whose tool is in the registry. Of these 11, six (`listProjects`, `listMembers`, `getProject`, `listBoard`, `listTasks`, `getTask`) are wire-bound to the chat-agent via `chatTools.ts`; the other five (`boardSnapshot`, `viewerContext`, `recentActivity`, `formDraft`, `similarTasks`) are FE-only helpers available for future agent use.
 - **`useAgent` hook** at `src/utils/hooks/useAgent.ts` drives a turn end-to-end, reduces stream parts into UI state, persists `thread_id` per `(name, project)`, and auto-resumes on FE-tool interrupts. `start()` enforces per-project AI opt-out before opening the SSE stream.
 - **Command palette** at `src/components/commandPalette/` opens with `Cmd/Ctrl+K`, indexes the cache for navigation, and renders an ARIA combobox + listbox. AI mode (`Tab` / `/` prefix) shows a Phase E placeholder.
-- **Autonomy level** persisted via `useAutonomyLevel` (in `src/utils/hooks/useAiEnabled.ts`) under `boardCopilot:autonomy` (`suggest` / `plan` / `auto`, default `plan`). `useAgent` subscribes to this value so `autonomyRef` tracks the live setting — it is no longer hard-coded to `"plan"`. An Ant Design `Select` selector in the `AiChatDrawer` extra slot lets users change the level in-app; the choice is persisted immediately. The legacy `useAiEnabled` toggle is unchanged.
+- **Autonomy level** persisted via `useAutonomyLevel` (in `src/utils/hooks/useAiEnabled.ts`) under `boardCopilot:autonomy` (`suggest` / `plan` / `auto`, default `plan`). `useAgent` subscribes to this value so `autonomyRef` tracks the live setting — it is no longer hard-coded to `"plan"`. An Ant Design `Select` selector in the `AiChatDrawer` extra slot lets users change the level in-app; the choice is persisted immediately. **Note: the "Auto" option is disabled in v2.1 and renders with an explanatory tooltip ("Auto requires an agent that supports preapproved tools. Available in v3."); it silently no-ops until v3 preapproved-tools work ships.** The legacy `useAiEnabled` toggle is unchanged.
 - **Analytics constants** at `src/constants/analytics.ts` (events `agent.*`, `nudge.*`, `palette.*`, `agent.feedback.*`). Observability sinks at `src/utils/observability/sinks.ts` — configure `VITE_ANALYTICS_ENDPOINT` and `VITE_ERROR_REPORT_ENDPOINT` to enable production event collection.
 - **Triage-nudge inbox rules** (PRD AC-V14) live in `useAgent` and apply to every `custom/nudge` event: cap-5 active per board, dedup by `(kind, project_id)` so the newer card supersedes the older, 4-hour expiry with a 60s prune sweep, and an explicit `dismissNudge(nudge_id)` API for user-initiated removals. `BoardPage` wires `onActionNudge` (resolves first task-shaped `target_id` against the in-cache task list and opens the task modal; non-task targets no-op gracefully) and `onDismissNudge` into `AiChatDrawer` for the `triage-agent` mount.
 - **Structured-route migration progress.** The chat path (`useAgentChat`) and `board-brief` (`useAgent("board-brief-agent")`) are on the v2.1 SSE surface in remote builds. The remaining five structured routes — `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search` — still use the v1 `useAi` JSON path; see the `TODO(v2.x)` comment at `src/utils/hooks/useAi.ts:206` and the migration row in `docs/prd/board-copilot-progress.md`.

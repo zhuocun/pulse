@@ -51,6 +51,67 @@ const errorEndpoint =
         process.env?.VITE_ERROR_REPORT_ENDPOINT) ||
     "";
 
+/**
+ * Emits one `console.warn` per missing observability env var when running in
+ * a production build. Silent in dev/test. Also appends each warning message
+ * to `window.__copilotObservabilityWarnings__` so smoke tests can assert on
+ * them without parsing console output.
+ *
+ * Pure function — does NOT change sink wiring.
+ */
+export function warnIfMissingObservabilityEndpoints(
+    analyticsEndpointValue: string,
+    errorEndpointValue: string,
+    isProd: boolean
+): void {
+    if (!isProd) return;
+
+    const warnings: string[] = [];
+
+    if (!analyticsEndpointValue) {
+        warnings.push(
+            "Board Copilot: VITE_ANALYTICS_ENDPOINT is not set; AI analytics events will be dropped (devMemorySink only)."
+        );
+    }
+    if (!errorEndpointValue) {
+        warnings.push(
+            "Board Copilot: VITE_ERROR_REPORT_ENDPOINT is not set; AI analytics events will be dropped (devMemorySink only)."
+        );
+    }
+
+    if (warnings.length === 0) return;
+
+    if (
+        typeof window !== "undefined" &&
+        !Array.isArray(
+            (window as Window & { __copilotObservabilityWarnings__?: string[] })
+                .__copilotObservabilityWarnings__
+        )
+    ) {
+        (
+            window as Window & { __copilotObservabilityWarnings__?: string[] }
+        ).__copilotObservabilityWarnings__ = [];
+    }
+
+    for (const msg of warnings) {
+        // eslint-disable-next-line no-console
+        console.warn(msg);
+        if (typeof window !== "undefined") {
+            (
+                window as Window & {
+                    __copilotObservabilityWarnings__?: string[];
+                }
+            ).__copilotObservabilityWarnings__!.push(msg);
+        }
+    }
+}
+
+warnIfMissingObservabilityEndpoints(
+    analyticsEndpoint,
+    errorEndpoint,
+    process.env.NODE_ENV === "production"
+);
+
 if (analyticsEndpoint) {
     setAnalyticsSink(
         httpAnalyticsSink({

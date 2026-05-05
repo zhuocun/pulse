@@ -1259,8 +1259,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     emitted by an agent stream. Owners pass `onAcceptProposal`
                     / `onDismissNudge` to drive `agent.resume(...)`; when
                     omitted the drawer hides cards locally so the user can
-                    always dismiss. */}
-                {visibleProposal && (
+                    always dismiss.
+                    MutationProposalCard is gated behind
+                    `environment.aiMutationProposalsEnabled` (defaults false)
+                    until the backend lifecycle and fe.applyMutation are
+                    ready. See REACT_APP_AI_MUTATION_PROPOSALS_ENABLED. */}
+                {environment.aiMutationProposalsEnabled && visibleProposal && (
                     <MutationProposalCard
                         onAccept={() => handleAcceptProposal(visibleProposal)}
                         onReject={() => handleRejectProposal(visibleProposal)}
