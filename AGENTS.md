@@ -110,3 +110,9 @@ here.
 - The full Jest suite (142 suites / ~980 tests) completes in ~90-100 s when run
   with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`.
   Without the heap bump and `--forceExit`, the suite may hang or OOM on this VM.
+- To run the backend locally against the frontend, start Vite with
+  `REACT_APP_API_URL=http://localhost:8000 npm start`. MongoDB must be running
+  first: `mongod --dbpath /data/db --bind_ip 127.0.0.1 --port 27017 --fork --logpath /var/log/mongod.log`.
+- The backend `.env` needs `MONGO_URI=mongodb://localhost:27017/jira` and
+  `UUID=dev-only-jwt-secret-change-me-32-bytes-long` (≥32 chars). See
+  `backend/AGENTS.md` for the full local-dev recipe.
