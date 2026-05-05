@@ -73,7 +73,3 @@ The orchestrator is the final reviewer and quality gate. Subagent output is a dr
 - Briefly tell the user what stays local on the critical path and what is being delegated.
 - Keep progress updates short and integration-focused.
 - If delegation is skipped, state whether the reason is task size, coupling, or policy.
-
-## Invocation
-
-This skill is a reusable working preference, not an unconditional override. Reference it explicitly when starting work.
