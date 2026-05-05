@@ -7,6 +7,7 @@
  * index.test.tsx.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import type { UseAgentResult } from "../../utils/hooks/useAgent";
@@ -85,6 +86,7 @@ const baseAgent = (
     reset: jest.fn(),
     threadId: "t_test",
     ttftMs: null,
+    isSlowTtft: false,
     clearPendingProposal: jest.fn(),
     clearSuggestion: jest.fn(),
     dismissNudge: jest.fn(),
@@ -258,6 +260,69 @@ describe("AiSearchInput — remote agent path", () => {
         unmount();
         expect(abort).toHaveBeenCalled();
         expect(clearSuggestion).toHaveBeenCalled();
+    });
+
+    it("does not abort an active remote search on rerenders caused by agent state updates", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const abort = jest.fn();
+        const clearSuggestion = jest.fn();
+
+        const queryClient = new QueryClient();
+        const setSemanticIds = jest.fn();
+
+        const Harness = () => {
+            const [streaming, setStreaming] = useState(false);
+
+            mockedUseAgent.mockImplementation(() =>
+                baseAgent({
+                    start,
+                    abort,
+                    clearSuggestion,
+                    isStreaming: streaming
+                })
+            );
+
+            return (
+                <>
+                    <button onClick={() => setStreaming(true)} type="button">
+                        Toggle streaming
+                    </button>
+                    <AiSearchInput
+                        kind="tasks"
+                        projectContext={projectContext}
+                        semanticIds={undefined}
+                        setSemanticIds={setSemanticIds}
+                    />
+                </>
+            );
+        };
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <Harness />
+            </QueryClientProvider>
+        );
+
+        fireEvent.change(
+            screen.getByRole("textbox", {
+                name: /Find related tasks with AI/i
+            }),
+            { target: { value: "login token" } }
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: /Find related tasks/i })
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(abort).not.toHaveBeenCalled();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Toggle streaming" })
+        );
+
+        await waitFor(() => {
+            expect(abort).not.toHaveBeenCalled();
+        });
     });
 
     it("surfaces agent error as an error alert", () => {

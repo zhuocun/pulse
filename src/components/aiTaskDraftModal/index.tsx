@@ -113,6 +113,10 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     const remoteAgent = useAgent("task-drafting-agent", { projectId });
 
     const isRemote = !environment.aiUseLocalEngine;
+    const remoteStart = remoteAgent.start;
+    const remoteAbort = remoteAgent.abort;
+    const remoteClearSuggestion = remoteAgent.clearSuggestion;
+    const remoteLastSuggestion = remoteAgent.lastSuggestion;
 
     const queryClient = useQueryClient();
     const apiCall = useApi();
@@ -125,8 +129,6 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const resetDraftAi = draftAi.reset;
     const resetBreakdownAi = breakdownAi.reset;
-    const agentAbort = remoteAgent.abort;
-    const agentClearSuggestion = remoteAgent.clearSuggestion;
     const reset = useCallback(() => {
         setPrompt("");
         setBreakdownMode(false);
@@ -139,14 +141,14 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         form.resetFields();
         resetDraftAi();
         resetBreakdownAi();
-        agentAbort();
-        agentClearSuggestion();
+        remoteAbort();
+        remoteClearSuggestion();
     }, [
         form,
         resetBreakdownAi,
         resetDraftAi,
-        agentAbort,
-        agentClearSuggestion
+        remoteAbort,
+        remoteClearSuggestion
     ]);
 
     /**
@@ -170,7 +172,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     // React to incoming agent suggestions after streaming completes.
     // Using a useEffect on lastSuggestion ensures state flush before we read.
     useEffect(() => {
-        const suggestion = remoteAgent.lastSuggestion;
+        const suggestion = remoteLastSuggestion;
         if (!suggestion || suggestion.surface !== "draft") return;
         const payload = suggestion.payload as
             | IDraftTaskSuggestion
@@ -185,8 +187,8 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             setAiFields(new Set(AI_FIELDS as string[]));
             setRemoteDraft(draft);
         }
-        remoteAgent.clearSuggestion();
-    }, [remoteAgent.lastSuggestion, form, remoteAgent]);
+        remoteClearSuggestion();
+    }, [remoteLastSuggestion, form, remoteClearSuggestion]);
 
     const aiContext = useMemo(
         () => ({
@@ -223,7 +225,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         });
         if (isRemote) {
             setRemoteDraft(null);
-            await remoteAgent.start(`Draft a task for: ${prompt}`, {
+            await remoteStart(`Draft a task for: ${prompt}`, {
                 autonomy: "plan"
             });
         } else {
@@ -248,7 +250,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             length: prompt.length
         });
         if (isRemote) {
-            await remoteAgent.start(
+            await remoteStart(
                 `Break down the following prompt into subtasks using axis "${axis}" with count 3: ${prompt}`,
                 { autonomy: "plan" }
             );

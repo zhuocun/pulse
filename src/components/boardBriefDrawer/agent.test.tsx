@@ -9,7 +9,8 @@
  * `streamAgent` is mocked at the agentClient layer following the pattern
  * established in `src/utils/hooks/useAgent.test.tsx`.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
@@ -131,6 +132,7 @@ const baseAgent = (
     reset: jest.fn(),
     threadId: "t_test",
     ttftMs: null,
+    isSlowTtft: false,
     clearPendingProposal: jest.fn(),
     clearSuggestion: jest.fn(),
     dismissNudge: jest.fn(),
@@ -228,6 +230,57 @@ describe("BoardBriefDrawer — remote agent path", () => {
         expect(start).toHaveBeenCalledWith(
             "Generate the brief for this board."
         );
+    });
+
+    it("does not restart the brief agent on rerenders caused by streaming state updates", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const abort = jest.fn();
+        const clearSuggestion = jest.fn();
+
+        const Harness = () => {
+            const [streaming, setStreaming] = useState(false);
+
+            mockedUseAgent.mockImplementation(() =>
+                baseAgent({
+                    start,
+                    abort,
+                    clearSuggestion,
+                    isStreaming: streaming
+                })
+            );
+
+            return (
+                <>
+                    <button onClick={() => setStreaming(true)} type="button">
+                        Toggle streaming
+                    </button>
+                    <BoardBriefDrawer
+                        columns={columns}
+                        members={members}
+                        onClose={jest.fn()}
+                        open
+                        project={project}
+                        tasks={tasks}
+                    />
+                </>
+            );
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <Harness />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+
+        act(() => {
+            screen.getByRole("button", { name: "Toggle streaming" }).click();
+        });
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
     });
 
     it("calls agent.abort and clearSuggestion when drawer closes", () => {
