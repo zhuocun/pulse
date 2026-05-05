@@ -30,7 +30,7 @@ const classify = (ok: boolean, latencyMs: number): AgentHealthStatus => {
  * cleans up on unmount and respects an optional polling interval.
  */
 const useAgentHealth = (
-    baseUrl: string,
+    baseUrl: string = "",
     opts: { intervalMs?: number; enabled?: boolean; agentName?: string } = {}
 ): UseAgentHealthState => {
     const interval = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
