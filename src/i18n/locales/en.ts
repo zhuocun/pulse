@@ -619,6 +619,8 @@ export const enSource = {
         riskMedium: "Medium risk",
         riskLow: "Low risk",
         undoable: "Undoable",
+        undoLabel: "Undo",
+        undoAriaLabel: "Undo this proposal",
         copilotProposes: "Copilot proposes: {description}",
         fields: {
             coordinator: "Coordinator",

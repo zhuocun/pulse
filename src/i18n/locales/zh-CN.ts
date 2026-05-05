@@ -586,6 +586,8 @@ const zhCN: Dictionary = {
         riskMedium: "中等风险",
         riskLow: "低风险",
         undoable: "可撤销",
+        undoLabel: "撤销",
+        undoAriaLabel: "撤销此提议",
         copilotProposes: "Copilot 提议:{description}",
         fields: {
             coordinator: "协调人",
