@@ -430,10 +430,21 @@ Two FE-only gaps from the v2.1 audit closed:
 **What's still open after this session**
 
 - BE has no `MutationProposal` lifecycle (no `proposal_id`, no diff emission, no `__interrupt__` for `fe.applyMutation`, no undo endpoint). The FE card / accept / reject paths exist but are unreachable in remote mode. Multi-week BE work; tracked separately.
-- Vercel SSE truncation (no `maxDuration` in `vercel.json`) — interrupt-using agents will be cut off by Vercel's default 10/60s ceiling. Infra fix in `jira-python-server`.
+- ~~Vercel SSE truncation (no `maxDuration` in `vercel.json`)~~ — **resolved 2026-05-05** in `jira-python-server` (`api/index.py` now sets `maxDuration: 300`).
 - Backend embedding dimensions pinned to 16 (`app/agents/embeddings.py:47`); search ranking quality is bottlenecked by this. Backend / infra work.
 - AC-V5 `auto` autonomy preapproved tools (`assignTask`, in-column `moveTask`, `renameColumn`) — neither side implements; deferred.
 - JWT-in-localStorage XSS (the AI proxy reuses the primary bearer token) — needs proxy-scoped token migration; out of scope for this work.
+
+---
+
+### 2026-05-05 follow-up — typed-error envelope + nudge dismissal propagation (`claude/v2.1-ai-features-vjZSA`)
+
+Two single-session gaps closed alongside the BE-side typed 403 envelope (`{code, message}`):
+
+- **`mapErrorResponse.ts` honors `body.code`** — `AgentForbiddenError` and `AgentBudgetError` gain an optional positional `code?: string` field. The shared mapper now extracts `code` from a structured JSON body and threads it onto the typed error so downstream consumers can branch on `err.code` (e.g. `"forbidden"`, `"quota_exceeded"`) without parsing the message string. Legacy plain-string bodies still produce a typed error with `code === undefined` (back-compat).
+- **`useAgentChat.dismissNudge` propagates to `useAgent`** — the chat-hook dismissal previously only updated a local `dismissedNudgeIds` Set, so dismissed nudges resurrected after `reset()` because the underlying `nudgeEntries` inbox still held them. The hook now also calls `agent.dismissNudge(nudgeId)` so the dismissal reaches the AC-V14 inbox reducer; the local Set is preserved as a same-render-cycle dedup.
+
+**File inventory** — `src/utils/ai/agentErrors.ts`, `src/utils/ai/mapErrorResponse.ts`, `src/utils/ai/mapErrorResponse.test.ts` (new, 13 cases), `src/utils/hooks/useAgentChat.ts`, `src/utils/hooks/useAgentChat.test.tsx` (+1 case for inbox propagation across reset).
 
 ---
 
