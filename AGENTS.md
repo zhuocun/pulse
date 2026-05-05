@@ -3,6 +3,27 @@
 Short, durable gotchas for anyone (human or AI) editing this repo. Add an entry
 when a fix is non-obvious from the code alone.
 
+## v2.1 agent surface (`useAgent`)
+
+- Both `useAi` (v1 JSON) and `useAgent` (v2.1 SSE) commonly mount unconditionally
+  in components that switch on `environment.aiUseLocalEngine`. This is required —
+  conditionally calling either hook breaks React's hook-ordering rule. See
+  `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
+- Migration progress for the six structured routes lives in
+  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, `chat-agent`,
+  `board-brief-agent`, and the background `triage-agent` are migrated; five
+  routes remain on `useAi` (`task-draft`, `task-breakdown`, `estimate`,
+  `readiness`, `search`).
+- Triage nudges are subject to PRD AC-V14 inbox rules in `useAgent.ts`:
+  `NUDGE_INBOX_MAX = 5`, dedup by `(kind, project_id)`, `NUDGE_EXPIRY_MS = 4h`,
+  60-second prune sweep, plus an explicit `dismissNudge(nudge_id)` API. The
+  pure `reduceNudgeInbox` reducer is exported for unit tests.
+- Tests that render `BoardPage` or `AiChatDrawer` and partial-mock
+  `../utils/hooks/useAiEnabled` MUST also mock `useAutonomyLevel: () => ({level:
+"plan", setLevel: jest.fn()})`. Otherwise `useAgent` crashes destructuring
+  `{level}` from `undefined`. See the four `src/__tests__/*.strict.test.tsx`
+  suites for examples.
+
 ## Drag-and-drop (`@hello-pangea/dnd`)
 
 - The library blocks drags whose event target is a native interactive element
