@@ -92,7 +92,7 @@ class Settings:
     )
     cors_origin_regex: str = os.getenv(
         "CORS_ORIGIN_REGEX",
-        r"^https://jira-react-app(-[a-z0-9-]+)?\.vercel\.app$",
+        r"^https://pulse-react-app(-[a-z0-9-]+)?\.vercel\.app$",
     )
     port: int = env_int("PORT", "8000")
     agent_checkpoint_backend: str = os.getenv("AGENT_CHECKPOINT_BACKEND", "memory")
