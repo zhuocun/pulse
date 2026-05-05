@@ -340,7 +340,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 }) => {
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
         useAutonomyLevel();
-    const { status: healthStatus } = useAgentHealth();
+    const { status: healthStatus } = useAgentHealth(environment.aiBaseUrl, {
+        enabled: !environment.aiUseLocalEngine && environment.aiEnabled
+    });
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
     /** P2-E: tracks which assistant messages are expanded (prose > 300 words). */

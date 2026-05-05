@@ -34,7 +34,7 @@ const useAgentHealth = (
     opts: { intervalMs?: number; enabled?: boolean; agentName?: string } = {}
 ): UseAgentHealthState => {
     const interval = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
-    const enabled = opts.enabled !== false && baseUrl.length > 0;
+    const enabled = opts.enabled !== false && (baseUrl?.length ?? 0) > 0;
     const agentName = opts.agentName ?? "unknown";
     const [state, setState] = useState<UseAgentHealthState>({
         status: enabled ? "degraded" : "offline",
