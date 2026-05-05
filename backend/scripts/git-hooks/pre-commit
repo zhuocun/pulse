@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+# Repo is a monorepo (FE at root, Python BE under backend/); pyproject.toml
+# and the .venv that pytest needs both live in backend/.
+cd "$(git rev-parse --show-toplevel)/backend"
 
 if [ -x ".venv/bin/python" ]; then
     PYTHON=".venv/bin/python"

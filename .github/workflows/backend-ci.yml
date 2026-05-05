@@ -1,42 +1,42 @@
 name: Backend CI
 
 on:
-  push:
-    branches:
-      - main
-      - "claude/**"
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-ci.yml"
-  pull_request:
-    branches:
-      - main
-      - "claude/**"
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-ci.yml"
+    push:
+        branches:
+            - main
+            - "claude/**"
+        paths:
+            - "backend/**"
+            - ".github/workflows/backend-ci.yml"
+    pull_request:
+        branches:
+            - main
+            - "claude/**"
+        paths:
+            - "backend/**"
+            - ".github/workflows/backend-ci.yml"
 
 defaults:
-  run:
-    working-directory: backend
+    run:
+        working-directory: backend
 
 jobs:
-  test-full:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev,ai]"
-      - run: pytest
+    test-full:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+            - run: pip install -e ".[dev,ai]"
+            - run: pytest
 
-  test-slim:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      - run: python -c "import app.main"
+    test-slim:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+            - run: pip install -e ".[dev]"
+            - run: python -c "import app.main"

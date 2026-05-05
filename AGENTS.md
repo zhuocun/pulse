@@ -88,9 +88,9 @@ After deploying, verify:
 
 ### Companion server prereqs
 
-The Python server (`jira-python-server`) requires Redis and Postgres backends plus
-its own multi-worker env-var configuration before it can serve agent traffic. See
-`../jira-python-server/docs/deployment.md` for that checklist. Do not duplicate it
+The Python server (now in this monorepo at `backend/`) requires Redis and Postgres
+backends plus its own multi-worker env-var configuration before it can serve agent
+traffic. See `backend/docs/deployment.md` for that checklist. Do not duplicate it
 here.
 
 ---

@@ -475,7 +475,7 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 - **Chat write-tools** (PRD §5.4 follow-up): out of scope until a later version.
 - **BE companion items**: the Python server has its own open work (Redis/Postgres
   backends, multi-worker deployment, rate-limit counters). See
-  `../jira-python-server/docs/AI_REMAINING_WORK.md` for that list.
+  `../backend/docs/AI_REMAINING_WORK.md` for that list.
 
 ### Optional polish
 
