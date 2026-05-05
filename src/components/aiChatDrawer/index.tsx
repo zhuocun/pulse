@@ -1,4 +1,4 @@
-import { ReloadOutlined, StopOutlined } from "@ant-design/icons";
+import { CopyOutlined, EditOutlined, ReloadOutlined, StopOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Alert,
@@ -7,6 +7,7 @@ import {
     Drawer,
     Grid,
     Input,
+    Modal,
     Select,
     Skeleton,
     Space,
@@ -35,8 +36,12 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { AgentBudgetError } from "../../utils/ai/agentErrors";
+import { saveChatHistory } from "../../utils/ai/projectAiStorage";
 import useAiChat from "../../utils/hooks/useAiChat";
+import type { AiChatMessage } from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
+import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
 import type {
     AutonomyLevel,
@@ -48,6 +53,7 @@ import AiFeedbackPopover, {
 } from "../aiFeedbackPopover";
 import AiSparkleIcon from "../aiSparkleIcon";
 import CitationChip from "../citationChip";
+import CopilotAboutPopover from "../copilotAboutPopover";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
@@ -273,6 +279,10 @@ const summarizeToolBody = (body: string): string => {
  */
 const CITATION_INLINE_LIMIT = 6;
 
+/** Approximate token thresholds for context-window warnings (P1-C). */
+const BUDGET_WARN_THRESHOLD = 6000;
+const BUDGET_CRITICAL_THRESHOLD = 7500;
+
 /**
  * Fallback QueryClient used when the drawer is rendered outside a
  * QueryClientProvider (e.g. in legacy tests or Storybook sandboxes).
@@ -330,8 +340,24 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 }) => {
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
         useAutonomyLevel();
+    const { status: healthStatus } = useAgentHealth();
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
+    /** P2-E: tracks which assistant messages are expanded (prose > 300 words). */
+    const [expandedMessages, setExpandedMessages] = useState<Set<number>>(
+        () => new Set()
+    );
+    /** P2-A: screen-reader announcement for streaming state. */
+    const [streamingAnnouncement, setStreamingAnnouncement] = useState("");
+    /** P2-D: whether to show the scroll-to-bottom FAB. */
+    const [showScrollFab, setShowScrollFab] = useState(false);
+    /** P2-D: ref for the messages scroll container. */
+    const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+    /** P2-B: ref for the last assistant message for focus management. */
+    const lastAssistantRef = useRef<HTMLDivElement | null>(null);
+    /** P1-C: whether the budget warn alert has been dismissed by user. */
+    const [budgetWarnDismissed, setBudgetWarnDismissed] = useState(false);
+
     /**
      * Set of message indices that arrived as the result of a Regenerate
      * click (P1-2). Tracked instead of derived so an out-of-band reset or
@@ -549,6 +575,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setFeedback([]);
         setRegeneratedIndices(new Set());
         setExpandedCitations(new Set());
+        setExpandedMessages(new Set());
+        setBudgetWarnDismissed(false);
         pendingRegenAfter.current = null;
     }, [reset]);
 
@@ -712,6 +740,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setFeedbackOpenFor(null);
     };
 
+    // P1-C: approximate token count for context-window budget warnings.
+    const approxTokenCount = messages.reduce(
+        (acc, m) => acc + Math.ceil(m.content.length / 4),
+        0
+    );
+
     const errorView = error ? aiErrorView(error) : null;
 
     /**
@@ -738,6 +772,22 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         }, 1000);
         return () => clearInterval(id);
     }, [error]);
+
+    /**
+     * P2-I: Track elapsed ms while in the pre-token loading phase so we can
+     * show "Still thinking…" after 3 s without a first token.
+     */
+    const [loadingMs, setLoadingMs] = useState(0);
+    useEffect(() => {
+        if (!isLoading) {
+            setLoadingMs(0);
+            return;
+        }
+        const id = setInterval(() => {
+            setLoadingMs((prev) => prev + 1000);
+        }, 1000);
+        return () => clearInterval(id);
+    }, [isLoading]);
 
     const remainingChars = microcopy.ai.characterCounterMax - input.length;
     const showCounter = input.length >= microcopy.ai.characterCounterShowAfter;
@@ -806,6 +856,45 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         wasLoadingRef.current = isLoading;
     }, [isLoading]);
 
+    /**
+     * P2-A: Announce "Board Copilot is responding." when streaming starts
+     * and clear it on completion (the completion region handles success).
+     */
+    useEffect(() => {
+        if (isLoading) {
+            setStreamingAnnouncement("Board Copilot is responding.");
+        } else {
+            setStreamingAnnouncement("");
+        }
+    }, [isLoading]);
+
+    /**
+     * P2-B: After streaming completes, focus the last assistant message so
+     * screen-reader and keyboard users are placed in context.
+     */
+    useEffect(() => {
+        if (!isLoading && lastAssistantRef.current) {
+            lastAssistantRef.current.focus();
+        }
+    }, [isLoading]);
+
+    /**
+     * P2-C (Phase B save): persist history to localStorage whenever messages
+     * change and we have a project ID.
+     * TODO: Phase B restore on open
+     */
+    useEffect(() => {
+        if (project?._id && messages.length > 0) {
+            saveChatHistory(project._id, messages);
+        }
+    }, [messages, project?._id]);
+
+    const lastAssistantIndex = messages.reduceRight(
+        (found, m, i) =>
+            found === -1 && m.role === "assistant" && m.content.trim() ? i : found,
+        -1
+    );
+
     return (
         <Drawer
             extra={
@@ -864,11 +953,22 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         style={{ minWidth: 90 }}
                         value={autonomyLevel}
                     />
+                    <CopilotAboutPopover />
                     <CopilotPrivacyPopover route="chat" />
                     <Button
                         aria-label={microcopy.ai.newConversation}
                         disabled={messages.length === 0 || isLoading}
-                        onClick={resetAll}
+                        onClick={() => {
+                            if (messages.length > 0) {
+                                Modal.confirm({
+                                    content:
+                                        "Starting a new conversation will clear all current history. Continue?",
+                                    onOk: resetAll
+                                });
+                            } else {
+                                resetAll();
+                            }
+                        }}
                         size="small"
                         type="link"
                     >
@@ -891,7 +991,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         "radial-gradient(60% 30% at 50% 0%, var(--aurora-blob-faint) 0%, transparent 70%), transparent",
                     display: "flex",
                     flexDirection: "column",
-                    paddingBottom: `max(${space.md}px, env(safe-area-inset-bottom))`,
+                    paddingBottom: `max(${space.md}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`,
                     paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
                     paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`
                 }
@@ -908,6 +1008,20 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             }
         >
             <CopilotRemoteConsentNotice route="chat" />
+            {/* P2-G: Inline health status alert */}
+            {(healthStatus === "degraded" || healthStatus === "offline") && (
+                <Alert
+                    closable={healthStatus === "degraded"}
+                    message={
+                        healthStatus === "offline"
+                            ? "Board Copilot is currently unavailable. Try again later."
+                            : "Board Copilot is experiencing delays. Responses may be slow or unavailable."
+                    }
+                    showIcon
+                    style={{ marginBottom: space.sm }}
+                    type={healthStatus === "offline" ? "error" : "warning"}
+                />
+            )}
             {/*
              * Off-screen aria-live region (AI UX best practices §2.10).
              * Streaming text updates are silenced inside the visible
@@ -932,16 +1046,83 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             >
                 {completionAnnouncement}
             </div>
+            {/* P2-A: Streaming state announcement for screen readers */}
+            <div
+                aria-live="polite"
+                role="status"
+                style={{
+                    border: 0,
+                    clip: "rect(0 0 0 0)",
+                    height: 1,
+                    margin: -1,
+                    overflow: "hidden",
+                    padding: 0,
+                    position: "absolute",
+                    width: 1
+                }}
+            >
+                {streamingAnnouncement}
+            </div>
+            {/* P2-D: relative wrapper for the scroll-to-bottom FAB */}
+            <div style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}>
             <div
                 aria-busy={isLoading}
+                onKeyDown={(e) => {
+                    /* P2-B: Escape from message area refocuses input */
+                    if (e.key === "Escape") {
+                        inputRef.current?.focus({ cursor: "end" });
+                    }
+                }}
+                onScroll={() => {
+                    /* P2-D: show FAB when user scrolls up during streaming */
+                    const el = messagesContainerRef.current;
+                    if (!el) return;
+                    const atBottom =
+                        el.scrollTop >=
+                        el.scrollHeight - el.clientHeight - 100;
+                    if (isLoading && !atBottom) {
+                        setShowScrollFab(true);
+                    } else {
+                        setShowScrollFab(false);
+                    }
+                }}
+                ref={messagesContainerRef}
                 style={{
-                    flex: "1 1 auto",
+                    height: "100%",
                     marginBottom: space.sm,
-                    minHeight: 0,
                     overflowY: "auto",
                     overscrollBehavior: "contain"
                 }}
             >
+                {/* P1-C: context-window budget warnings */}
+                {approxTokenCount >= BUDGET_CRITICAL_THRESHOLD ? (
+                    <Alert
+                        action={
+                            <Button
+                                onClick={resetAll}
+                                size="small"
+                                type="link"
+                            >
+                                Start new
+                            </Button>
+                        }
+                        closable={false}
+                        message="Conversation too long. Start a new session or try a shorter message."
+                        showIcon
+                        style={{ marginBottom: space.sm }}
+                        type="error"
+                    />
+                ) : approxTokenCount >= BUDGET_WARN_THRESHOLD &&
+                  !budgetWarnDismissed ? (
+                    <Alert
+                        closable
+                        message="This conversation is getting long. Consider starting a new session to maintain response quality."
+                        onClose={() => setBudgetWarnDismissed(true)}
+                        showIcon
+                        style={{ marginBottom: space.sm }}
+                        type="warning"
+                    />
+                ) : null}
                 {messages.length === 0 && !isLoading && (
                     <Space
                         size={space.sm}
@@ -962,6 +1143,13 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 </SamplePrompt>
                             ))}
                         </Space>
+                        {/* P2-C Phase A: sessions not persisted notice */}
+                        <Text
+                            type="secondary"
+                            style={{ fontSize: fontSize.xs }}
+                        >
+                            Sessions are not saved — history clears on reload.
+                        </Text>
                     </Space>
                 )}
                 {messages.map((m, index) => {
@@ -1013,12 +1201,168 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             ? `${microcopy.ai.copilotLabel} · ${microcopy.ai.regeneratedBadge}`
                             : microcopy.ai.copilotLabel
                         : undefined;
+                    // P2-E: progressive disclosure for long prose responses
+                    const wordCount = m.content
+                        .split(/\s+/)
+                        .filter(Boolean).length;
+                    const isProseLong =
+                        isAssistant &&
+                        wordCount > 300 &&
+                        !/^[#\-*]/.test(m.content.trim());
+                    const isExpanded = expandedMessages.has(index);
+                    // P3-B: simple inline markdown renderer for assistant messages
+                    const renderMarkdown = (text: string): React.ReactNode => {
+                        const lines = text.split("\n");
+                        return lines.map((line, li) => {
+                            // Heading
+                            if (/^### /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^### /, "")}
+                                    </h3>
+                                );
+                            }
+                            if (/^## /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^## /, "")}
+                                    </h3>
+                                );
+                            }
+                            if (/^# /.test(line)) {
+                                return (
+                                    <h3
+                                        key={li}
+                                        style={{
+                                            fontSize: fontSize.sm,
+                                            fontWeight: fontWeight.semibold,
+                                            margin: `${space.xs}px 0 ${space.xxs}px`
+                                        }}
+                                    >
+                                        {line.replace(/^# /, "")}
+                                    </h3>
+                                );
+                            }
+                            // Parse inline formatting (bold, italic, code)
+                            const parts: React.ReactNode[] = [];
+                            let remaining = line;
+                            let key = 0;
+                            while (remaining.length > 0) {
+                                const boldMatch = remaining.match(
+                                    /^(.*?)\*\*(.*?)\*\*/
+                                );
+                                const italicMatch = remaining.match(
+                                    /^(.*?)\*(.*?)\*/
+                                );
+                                const codeMatch = remaining.match(
+                                    /^(.*?)`([^`]+)`/
+                                );
+                                const firstBold = boldMatch
+                                    ? boldMatch.index! +
+                                      boldMatch[1].length
+                                    : Infinity;
+                                const firstItalic = italicMatch
+                                    ? italicMatch.index! +
+                                      italicMatch[1].length
+                                    : Infinity;
+                                const firstCode = codeMatch
+                                    ? codeMatch.index! +
+                                      codeMatch[1].length
+                                    : Infinity;
+                                if (
+                                    boldMatch &&
+                                    firstBold <= firstItalic &&
+                                    firstBold <= firstCode
+                                ) {
+                                    if (boldMatch[1])
+                                        parts.push(boldMatch[1]);
+                                    parts.push(
+                                        <strong key={key++}>
+                                            {boldMatch[2]}
+                                        </strong>
+                                    );
+                                    remaining = remaining.slice(
+                                        boldMatch[0].length
+                                    );
+                                } else if (
+                                    italicMatch &&
+                                    firstItalic <= firstCode
+                                ) {
+                                    if (italicMatch[1])
+                                        parts.push(italicMatch[1]);
+                                    parts.push(
+                                        <em key={key++}>
+                                            {italicMatch[2]}
+                                        </em>
+                                    );
+                                    remaining = remaining.slice(
+                                        italicMatch[0].length
+                                    );
+                                } else if (codeMatch) {
+                                    if (codeMatch[1])
+                                        parts.push(codeMatch[1]);
+                                    parts.push(
+                                        <code
+                                            key={key++}
+                                            style={{
+                                                background:
+                                                    "var(--ant-color-fill-secondary)",
+                                                borderRadius: radius.sm,
+                                                fontSize: "0.9em",
+                                                padding: "1px 4px"
+                                            }}
+                                        >
+                                            {codeMatch[2]}
+                                        </code>
+                                    );
+                                    remaining = remaining.slice(
+                                        codeMatch[0].length
+                                    );
+                                } else {
+                                    parts.push(remaining);
+                                    remaining = "";
+                                }
+                            }
+                            return (
+                                <span key={li}>
+                                    {parts}
+                                    {li < lines.length - 1 && <br />}
+                                </span>
+                            );
+                        });
+                    };
                     return (
                         <MessageRow
                             $isUser={isUser}
                             key={`msg-${index}`}
                             aria-label={groupAriaLabel}
+                            ref={
+                                isAssistant &&
+                                index === lastAssistantIndex
+                                    ? lastAssistantRef
+                                    : undefined
+                            }
                             role={isAssistant ? "group" : undefined}
+                            tabIndex={
+                                isAssistant &&
+                                index === lastAssistantIndex
+                                    ? -1
+                                    : undefined
+                            }
                         >
                             {isAssistant && (
                                 <AssistantAttribution>
@@ -1051,8 +1395,55 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     )}
                                 </AssistantAttribution>
                             )}
+                            {/* P3-D: Edit button for user messages */}
+                            {isUser && !isLoading && (
+                                <Button
+                                    aria-label="Edit message"
+                                    icon={<EditOutlined aria-hidden />}
+                                    onClick={() => {
+                                        setInput(m.content);
+                                        inputRef.current?.focus({
+                                            cursor: "end"
+                                        });
+                                    }}
+                                    size="small"
+                                    type="text"
+                                />
+                            )}
                             <MessageBubble $isUser={isUser}>
-                                {m.content}
+                                {isAssistant ? (
+                                    isProseLong && !isExpanded ? (
+                                        <>
+                                            {renderMarkdown(
+                                                m.content
+                                                    .split(/\s+/)
+                                                    .slice(0, 150)
+                                                    .join(" ")
+                                            )}
+                                            <Button
+                                                onClick={() =>
+                                                    setExpandedMessages(
+                                                        (prev) => {
+                                                            const next =
+                                                                new Set(prev);
+                                                            next.add(index);
+                                                            return next;
+                                                        }
+                                                    )
+                                                }
+                                                size="small"
+                                                style={{ display: "block", marginTop: space.xxs }}
+                                                type="link"
+                                            >
+                                                Show full response
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        renderMarkdown(m.content)
+                                    )
+                                ) : (
+                                    m.content
+                                )}
                                 {isAssistant &&
                                     m.citations &&
                                     m.citations.length > 0 &&
@@ -1168,6 +1559,23 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         textAlign: "left"
                                     }}
                                 >
+                                    <Button
+                                        aria-label="Copy response"
+                                        icon={<CopyOutlined aria-hidden />}
+                                        onClick={() => {
+                                            const plainText = m.content.replace(
+                                                /\*\*|__|~~|`{1,3}|\[|\]|\(|\)/g,
+                                                ""
+                                            );
+                                            void navigator.clipboard
+                                                .writeText(plainText)
+                                                .then(() =>
+                                                    message.success("Copied")
+                                                );
+                                        }}
+                                        size="small"
+                                        type="text"
+                                    />
                                     <Button
                                         aria-label="Regenerate response"
                                         icon={<ReloadOutlined aria-hidden />}
@@ -1359,15 +1767,30 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     </StreamingCursor>
                                 </>
                             ) : (
-                                <Skeleton
-                                    active
-                                    aria-label={microcopy.ai.streaming}
-                                    paragraph={{
-                                        rows: 2,
-                                        width: ["80%", "55%"]
-                                    }}
-                                    title={false}
-                                />
+                                <>
+                                    <Skeleton
+                                        active
+                                        aria-label={microcopy.ai.streaming}
+                                        paragraph={{
+                                            rows: 2,
+                                            width: ["80%", "55%"]
+                                        }}
+                                        title={false}
+                                    />
+                                    {/* P2-I: "Still thinking…" after 3 s in the pre-token phase */}
+                                    {loadingMs >= 3000 && (
+                                        <Text
+                                            style={{
+                                                display: "block",
+                                                fontSize: fontSize.xs,
+                                                marginTop: 4
+                                            }}
+                                            type="secondary"
+                                        >
+                                            Still thinking…
+                                        </Text>
+                                    )}
+                                </>
                             )}
                         </MessageBubble>
                         <AssistantDisclaimer>
@@ -1375,6 +1798,30 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         </AssistantDisclaimer>
                     </MessageRow>
                 )}
+            </div>
+            {/* P2-D: scroll-to-bottom FAB shown when user scrolls up during streaming */}
+            {showScrollFab && isLoading && (
+                <Button
+                    onClick={() => {
+                        messagesContainerRef.current?.scrollTo({
+                            top: messagesContainerRef.current.scrollHeight,
+                            behavior: "smooth"
+                        });
+                        setShowScrollFab(false);
+                    }}
+                    size="small"
+                    style={{
+                        bottom: 72,
+                        left: "50%",
+                        position: "absolute",
+                        transform: "translateX(-50%)",
+                        zIndex: 10
+                    }}
+                    type="default"
+                >
+                    ↓ Jump to latest
+                </Button>
+            )}
             </div>
 
             {errorView && (
@@ -1399,8 +1846,21 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         ) : null
                     }
                     closable
-                    description={errorView.body || undefined}
-                    onClose={dismissError}
+                    description={
+                        error instanceof AgentBudgetError
+                            ? "Conversation too long. Start a new session or try a shorter message."
+                            : errorView.body || undefined
+                    }
+                    onClose={() => {
+                        // P1-C: preserve last user message in input on budget error
+                        if (error instanceof AgentBudgetError) {
+                            const lastUser = [...messages]
+                                .reverse()
+                                .find((m) => m.role === "user");
+                            if (lastUser) setInput(lastUser.content);
+                        }
+                        dismissError();
+                    }}
                     showIcon
                     style={{ marginBottom: space.xs }}
                     title={errorView.heading}
@@ -1441,7 +1901,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 ) : (
                     <Button
                         aria-label={microcopy.a11y.sendMessage}
-                        disabled={!input.trim()}
+                        disabled={!input.trim() || healthStatus === "offline"}
                         onClick={handleSend}
                         type="primary"
                     >

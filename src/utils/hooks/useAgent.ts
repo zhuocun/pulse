@@ -92,6 +92,12 @@ export interface UseAgentResult {
      */
     ttftMs: number | null;
     /**
+     * True when the most recent TTFT exceeded {@link TTFT_SLO_MS} (P2-I).
+     * Null/false until TTFT is measured. Surfaces use this to show slow-
+     * response affordances like "Still thinking…".
+     */
+    isSlowTtft: boolean;
+    /**
      * Clears `pendingProposal` without leaving the agent run going (used
      * after a user accepts/rejects from a UI surface and the parent has
      * already wired the resume call). PRD v3 UA-R3.
@@ -163,6 +169,9 @@ interface NudgeEntry {
     nudge: TriageNudge;
     receivedAt: number;
 }
+
+/** TTFT SLO threshold in ms (P2-I). Turns exceeding this emit AGENT_TTFT_SLOW. */
+const TTFT_SLO_MS = 1500;
 
 /** Maximum active nudges per board (PRD AC-V14). */
 export const NUDGE_INBOX_MAX = 5;
@@ -435,6 +444,12 @@ const useAgent = (
                             agent: name,
                             elapsedMs: elapsed
                         });
+                        if (elapsed > TTFT_SLO_MS) {
+                            track(ANALYTICS_EVENTS.AGENT_TTFT_SLOW, {
+                                agent: name,
+                                ttftMs: elapsed
+                            });
+                        }
                     }
                     pendingResume = await applyStreamPart(part, {
                         setState: safeSetState,
@@ -750,6 +765,7 @@ const useAgent = (
             reset,
             threadId,
             ttftMs,
+            isSlowTtft: ttftMs !== null && ttftMs > TTFT_SLO_MS,
             clearPendingProposal,
             clearSuggestion,
             dismissNudge

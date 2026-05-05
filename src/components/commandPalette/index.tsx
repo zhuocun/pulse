@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { useIsFetching } from "@tanstack/react-query";
-import { Drawer, Grid, Input, Modal, Tag, Typography } from "antd";
+import { Button, Drawer, Grid, Input, Modal, Tag, Typography } from "antd";
 import {
     useCallback,
     useEffect,
@@ -22,6 +22,15 @@ import AiSparkleIcon from "../aiSparkleIcon";
 interface CommandPaletteProps {
     open: boolean;
     onClose: () => void;
+    /**
+     * P1-A / P3-A: optional callback invoked when the user wants to open
+     * Board Copilot with a pre-filled query. When provided:
+     *   - AI mode (Enter) calls this instead of dispatching the legacy
+     *     `boardCopilot:openChat` custom event (keeps backward compat).
+     *   - No-results state (query ≥ 3 chars) shows a "Try asking Board
+     *     Copilot" CTA that calls this with the current query.
+     */
+    onOpenCopilot?: (query: string) => void;
 }
 
 interface PaletteEntry {
@@ -279,7 +288,11 @@ const groupByKind = (entries: PaletteEntry[]): RenderedItem[] => {
  * Mobile (CP-R5): below the `md` breakpoint the palette renders as an
  * AntD bottom-sheet Drawer with the same search + results semantics.
  */
-const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
+const CommandPalette: React.FC<CommandPaletteProps> = ({
+    open,
+    onClose,
+    onOpenCopilot
+}) => {
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [query, setQuery] = useState("");
@@ -379,26 +392,34 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     /**
-     * AI invocation (CP-R6). Closes the palette and dispatches a
-     * `boardCopilot:openChat` custom event with the prompt payload. The
-     * board page listens for this and opens the AI drawer; if the user
-     * is on a non-board route, an open handler exists at the App shell.
+     * AI invocation (CP-R6 / P1-A). When `onOpenCopilot` is provided (P1-A),
+     * calls it directly so the parent can open the CopilotShell Chat tab with
+     * the prompt pre-filled. Falls back to dispatching the legacy
+     * `boardCopilot:openChat` custom event so non-board routes continue
+     * to work without changes.
      */
     const dispatchAiPrompt = useCallback(
         (prompt: string) => {
             track(ANALYTICS_EVENTS.COPILOT_PALETTE_INVOKE, {
                 length: prompt.length
             });
-            if (typeof window !== "undefined") {
-                window.dispatchEvent(
-                    new CustomEvent("boardCopilot:openChat", {
-                        detail: { prompt }
-                    })
-                );
+            if (onOpenCopilot) {
+                // P1-A: route through the Copilot shell prop when available
+                onClose();
+                onOpenCopilot(prompt);
+            } else {
+                // Legacy fallback: custom event for non-board routes
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("boardCopilot:openChat", {
+                            detail: { prompt }
+                        })
+                    );
+                }
+                onClose();
             }
-            onClose();
         },
-        [onClose]
+        [onClose, onOpenCopilot]
     );
 
     const toggleAiMode = useCallback((next?: boolean) => {
@@ -579,15 +600,45 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                     role="listbox"
                 >
                     {renderedItems.length === 0 ? (
-                        <Typography.Paragraph
-                            aria-busy={isColdCache || undefined}
-                            aria-live="polite"
-                            type="secondary"
-                        >
-                            {isColdCache
-                                ? microcopy.empty.commandPalette.loading
-                                : microcopy.empty.commandPalette.empty}
-                        </Typography.Paragraph>
+                        <>
+                            <Typography.Paragraph
+                                aria-busy={isColdCache || undefined}
+                                aria-live="polite"
+                                type="secondary"
+                            >
+                                {isColdCache
+                                    ? microcopy.empty.commandPalette.loading
+                                    : microcopy.empty.commandPalette.empty}
+                            </Typography.Paragraph>
+                            {/* P3-A: No-results → "Ask Board Copilot" CTA */}
+                            {!isColdCache &&
+                                onOpenCopilot &&
+                                query.trim().length >= 3 && (
+                                    <div
+                                        style={{
+                                            borderTop:
+                                                "1px solid var(--ant-color-border-secondary)",
+                                            padding: `${space.xs}px ${space.sm}px`
+                                        }}
+                                    >
+                                        <Button
+                                            icon={
+                                                <AiSparkleIcon aria-hidden />
+                                            }
+                                            onClick={() => {
+                                                const trimmed =
+                                                    query.trim();
+                                                onClose();
+                                                onOpenCopilot(trimmed);
+                                            }}
+                                            size="small"
+                                            type="link"
+                                        >
+                                            Try asking Board Copilot →
+                                        </Button>
+                                    </div>
+                                )}
+                        </>
                     ) : (
                         renderedItems.map((item, index) => {
                             if (item.type === "header") {

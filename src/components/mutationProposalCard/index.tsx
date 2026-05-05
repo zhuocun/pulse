@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { Button, Space, Table, Tag, Typography } from "antd";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
@@ -29,6 +29,31 @@ const Heading = styled.div`
     flex-wrap: wrap;
     gap: ${space.xs}px;
     margin-bottom: ${space.xs}px;
+`;
+
+const FooterHint = styled.div`
+    color: var(--ant-color-text-secondary, #6b7280);
+    font-size: ${fontSize.xs}px;
+    margin-top: ${space.xs}px;
+`;
+
+const UndoBar = styled.div`
+    align-items: flex-start;
+    background: var(--ant-color-warning-bg, #fffbe6);
+    border: 1px solid var(--ant-color-warning-border, #ffe58f);
+    border-radius: ${radius.sm}px;
+    display: flex;
+    flex-direction: column;
+    gap: ${space.xs}px;
+    margin-top: ${space.sm}px;
+    padding: ${space.xs}px ${space.sm}px;
+`;
+
+const UndoBarRow = styled.div`
+    align-items: center;
+    display: flex;
+    gap: ${space.xs}px;
+    width: 100%;
 `;
 
 interface MutationProposalCardProps {
@@ -147,6 +172,26 @@ const buildRows = (proposal: MutationProposal): DiffRow[] => {
     return rows;
 };
 
+/** Derive a human-readable list of field names that will change. */
+const buildChangingFields = (proposal: MutationProposal): string => {
+    const fields: string[] = [];
+    proposal.diff.task_updates?.forEach((u) => {
+        const label = taskFieldLabel(u.field);
+        if (!fields.includes(label)) fields.push(label);
+    });
+    proposal.diff.column_updates?.forEach((u) => {
+        const label = microcopy.mutation.columnFieldLabel.replace(
+            "{field}",
+            u.field
+        );
+        if (!fields.includes(label)) fields.push(label);
+    });
+    proposal.diff.bulk_apply?.forEach((b) => {
+        if (!fields.includes(b.operation)) fields.push(b.operation);
+    });
+    return fields.join(", ");
+};
+
 const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     proposal,
     onAccept,
@@ -156,13 +201,41 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     title
 }) => {
     const rows = buildRows(proposal);
+
+    /**
+     * Three-phase lifecycle for the 10-second undo window:
+     *   "idle"      — normal accept/reject UI
+     *   "countdown" — user clicked Accept; counting down before committing
+     *   "committed" — onAccept has been called; card is read-only
+     */
+    const [phase, setPhase] = useState<"idle" | "countdown" | "committed">(
+        "idle"
+    );
+    const [countdown, setCountdown] = useState(0);
+
+    useEffect(() => {
+        if (phase !== "countdown") return;
+        if (countdown <= 0) {
+            setPhase("committed");
+            track(ANALYTICS_EVENTS.AGENT_PROPOSAL_ACCEPTED, {
+                id: proposal.proposal_id,
+                risk: proposal.risk
+            });
+            onAccept();
+            return;
+        }
+        const id = window.setTimeout(
+            () => setCountdown((c) => c - 1),
+            1000
+        );
+        return () => window.clearTimeout(id);
+    }, [phase, countdown, onAccept, proposal]);
+
     const handleAccept = () => {
-        track(ANALYTICS_EVENTS.AGENT_PROPOSAL_ACCEPTED, {
-            id: proposal.proposal_id,
-            risk: proposal.risk
-        });
-        onAccept();
+        setPhase("countdown");
+        setCountdown(10);
     };
+
     const handleReject = () => {
         track(ANALYTICS_EVENTS.AGENT_PROPOSAL_REJECTED, {
             id: proposal.proposal_id,
@@ -170,24 +243,42 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
         });
         onReject();
     };
-    const handleUndo = () => {
-        // Fires the analytics event regardless of whether the eventual
-        // BE undo endpoint exists — measuring undo intent is the FE
-        // surface's job; reversing the mutation is the BE's job (still
-        // a GA-blocker as of v2.1).
+
+    /**
+     * Countdown undo — fires before onAccept is called. Analytics fires here
+     * so undo intent is measurable even before the BE undo endpoint lands.
+     */
+    const handleCountdownUndo = () => {
+        setPhase("idle");
+        setCountdown(0);
+        track(ANALYTICS_EVENTS.AGENT_PROPOSAL_UNDONE, {
+            id: proposal.proposal_id,
+            risk: proposal.risk
+        });
+    };
+
+    /**
+     * Post-commit undo — delegates to the optional `onUndo` prop, which
+     * wires to the BE reversal flow (still a GA-blocker as of v2.1).
+     */
+    const handleCommittedUndo = () => {
         track(ANALYTICS_EVENTS.AGENT_PROPOSAL_UNDONE, {
             id: proposal.proposal_id,
             risk: proposal.risk
         });
         onUndo?.();
     };
-    const showUndo = proposal.undoable === true && typeof onUndo === "function";
+
+    const showCommittedUndo =
+        proposal.undoable === true && typeof onUndo === "function";
+    const changingFields = buildChangingFields(proposal);
     const heading =
         title ??
         microcopy.mutation.copilotProposes.replace(
             "{description}",
             proposal.description
         );
+
     return (
         <Wrap role="alertdialog" aria-label={heading}>
             <Heading>
@@ -197,7 +288,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 <Tag color={riskColor(proposal.risk)}>
                     {riskLabel(proposal.risk)}
                 </Tag>
-                {proposal.undoable && (
+                {proposal.undoable && phase === "idle" && (
                     <Tag
                         color="default"
                         style={{ fontWeight: fontWeight.medium }}
@@ -249,36 +340,70 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                     size="small"
                 />
             )}
-            <Space
-                size={space.xs}
-                style={{ justifyContent: "flex-end", marginTop: space.sm }}
-                wrap
-            >
-                {showUndo && (
-                    <Button
-                        aria-label={microcopy.mutation.undoAriaLabel}
-                        disabled={isLoading}
-                        onClick={handleUndo}
+
+            {/* Countdown undo bar — shown while the 10-second window is open */}
+            {phase === "countdown" && (
+                <UndoBar role="status">
+                    <UndoBarRow>
+                        <Typography.Text
+                            style={{ flex: 1, fontSize: fontSize.sm }}
+                        >
+                            {changingFields
+                                ? `Accepting will change: ${changingFields}`
+                                : "Accepting this proposal…"}
+                        </Typography.Text>
+                        <Button
+                            aria-label={`Undo — ${countdown}s remaining`}
+                            onClick={handleCountdownUndo}
+                            size="small"
+                        >
+                            {`Undo (${countdown}s)`}
+                        </Button>
+                    </UndoBarRow>
+                </UndoBar>
+            )}
+
+            {/* Normal action row — hidden during countdown / after commit */}
+            {phase === "idle" && (
+                <>
+                    <Space
+                        size={space.xs}
+                        style={{
+                            justifyContent: "flex-end",
+                            marginTop: space.sm
+                        }}
+                        wrap
                     >
-                        {microcopy.mutation.undoLabel}
-                    </Button>
-                )}
-                <Button
-                    aria-label={microcopy.a11y.rejectProposal}
-                    disabled={isLoading}
-                    onClick={handleReject}
-                >
-                    {microcopy.actions.cancel}
-                </Button>
-                <Button
-                    aria-label={microcopy.a11y.acceptProposal}
-                    loading={isLoading}
-                    onClick={handleAccept}
-                    type="primary"
-                >
-                    {microcopy.actions.apply}
-                </Button>
-            </Space>
+                        {showCommittedUndo && (
+                            <Button
+                                aria-label={microcopy.mutation.undoAriaLabel}
+                                disabled={isLoading}
+                                onClick={handleCommittedUndo}
+                            >
+                                {microcopy.mutation.undoLabel}
+                            </Button>
+                        )}
+                        <Button
+                            aria-label={microcopy.a11y.rejectProposal}
+                            disabled={isLoading}
+                            onClick={handleReject}
+                        >
+                            {microcopy.actions.cancel}
+                        </Button>
+                        <Button
+                            aria-label={microcopy.a11y.acceptProposal}
+                            loading={isLoading}
+                            onClick={handleAccept}
+                            type="primary"
+                        >
+                            {microcopy.actions.apply}
+                        </Button>
+                    </Space>
+                    <FooterHint>
+                        10s undo available after accepting
+                    </FooterHint>
+                </>
+            )}
         </Wrap>
     );
 };

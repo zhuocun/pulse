@@ -14,6 +14,9 @@ export interface UseAgentHealthState {
 const DEFAULT_INTERVAL_MS = 30_000;
 /** Latency above this is "degraded" even when the response was OK. */
 const DEGRADED_THRESHOLD_MS = 1500;
+// P2-I: TTFT percentile integration deferred to backend. Slow TTFT observations
+// are tracked via AGENT_TTFT_SLOW analytics events; the health hook monitors
+// the /health endpoint latency separately.
 
 const classify = (ok: boolean, latencyMs: number): AgentHealthStatus => {
     if (!ok) return "offline";
