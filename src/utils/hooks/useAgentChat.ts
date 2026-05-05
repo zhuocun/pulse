@@ -16,7 +16,9 @@ import type { AgentMessage } from "./useAgent";
  * "tool". We map "system" → "assistant" so it's at least visible in the
  * transcript rather than silently dropped (lossy mapping).
  */
-const agentRoleToChatRole = (role: AgentMessage["role"]): AiChatMessage["role"] => {
+const agentRoleToChatRole = (
+    role: AgentMessage["role"]
+): AiChatMessage["role"] => {
     if (role === "system") return "assistant";
     return role as AiChatMessage["role"];
 };
@@ -255,14 +257,23 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         [agent]
     );
 
-    const dismissNudge = useCallback((nudgeId: string) => {
-        setDismissedNudgeIds((prev) => {
-            if (prev.has(nudgeId)) return prev;
-            const next = new Set(prev);
-            next.add(nudgeId);
-            return next;
-        });
-    }, []);
+    const dismissNudge = useCallback(
+        (nudgeId: string) => {
+            // Propagate to the underlying useAgent inbox so the entry is
+            // removed from nudgeEntries — prevents the nudge from
+            // resurrecting after reset() or a new turn.
+            agent.dismissNudge(nudgeId);
+            // Also update the local filter set to dedupe within a single
+            // render cycle (the inbox update is async-batched).
+            setDismissedNudgeIds((prev) => {
+                if (prev.has(nudgeId)) return prev;
+                const next = new Set(prev);
+                next.add(nudgeId);
+                return next;
+            });
+        },
+        [agent]
+    );
 
     const pendingNudges = agent.nudges.filter(
         (n) => !dismissedNudgeIds.has(n.nudge_id)
