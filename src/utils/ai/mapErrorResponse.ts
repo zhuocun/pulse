@@ -68,16 +68,20 @@ const mapErrorResponseForSurface = async (
             : typeof body === "string"
               ? body
               : undefined;
+    const codeFromBody: string | undefined =
+        typeof body === "object" && body !== null
+            ? ((body as { code?: unknown }).code as string | undefined)
+            : undefined;
 
     const status = response.status;
     if (status === 401) {
         return new AgentAuthError(messageFromBody);
     }
     if (status === 402) {
-        return new AgentBudgetError(messageFromBody);
+        return new AgentBudgetError(messageFromBody, codeFromBody);
     }
     if (status === 403) {
-        return new AgentForbiddenError(messageFromBody);
+        return new AgentForbiddenError(messageFromBody, codeFromBody);
     }
     if (status === 404) {
         return new AgentNotFoundError(messageFromBody);
