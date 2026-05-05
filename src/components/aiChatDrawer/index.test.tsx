@@ -432,4 +432,33 @@ describe("AiChatDrawer", () => {
             "suggest"
         );
     });
+
+    it("renders the Auto autonomy option as disabled with an explanatory tooltip", () => {
+        // No shipped agent advertises `auto` in `AgentMetadata.allowed_autonomy`
+        // and there is no preapproved-tool registry yet (see V3 PRD), so the
+        // selector hard-disables "Auto" and surfaces a tooltip explaining
+        // what's missing instead of silently falling back to "Plan" behavior.
+        renderDrawer(true);
+        const selector = screen.getByLabelText("Select Copilot autonomy mode");
+        // Open the dropdown so AntD mounts the option list.
+        fireEvent.mouseDown(selector);
+
+        // The disabled-option wrapper carries a stable test id; its closest
+        // AntD option container should be marked disabled.
+        const autoLabel = screen.getByTestId("autonomy-option-auto");
+        const optionEl = autoLabel.closest(".ant-select-item-option");
+        expect(optionEl).toBeTruthy();
+        expect(optionEl).toHaveClass("ant-select-item-option-disabled");
+
+        // The non-disabled options render plain strings — only "Auto" gets
+        // the wrapped tooltip span. Confirm "Plan" / "Suggest" do not
+        // produce the same testid so we know the disabled branch is
+        // exclusive to "Auto".
+        expect(
+            screen.queryByTestId("autonomy-option-plan")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId("autonomy-option-suggest")
+        ).not.toBeInTheDocument();
+    });
 });

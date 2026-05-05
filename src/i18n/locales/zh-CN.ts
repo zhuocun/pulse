@@ -491,7 +491,9 @@ const zhCN: Dictionary = {
         autonomyLevelSuggest: "建议",
         autonomyLevelPlan: "计划",
         autonomyLevelAuto: "自动",
-        autonomySelectorAriaLabel: "选择 Copilot 自主模式"
+        autonomySelectorAriaLabel: "选择 Copilot 自主模式",
+        autonomyAutoDisabledTooltip:
+            "自动模式需要支持预批准工具的智能体,将在 v3 提供。"
     },
     auth: {
         loginTitle: "登录账号",

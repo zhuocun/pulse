@@ -281,10 +281,35 @@ const CITATION_INLINE_LIMIT = 6;
  */
 const fallbackQueryClient = new QueryClient();
 
-const AUTONOMY_OPTIONS: Array<{ value: AutonomyLevel; labelKey: string }> = [
+/**
+ * Autonomy options shown in the drawer's mode selector.
+ *
+ * "Auto" is intentionally hard-disabled in v2.1: no shipped agent
+ * advertises `auto` in its `AgentMetadata.allowed_autonomy`, no
+ * preapproved-tool surface exists yet, and selecting it previously
+ * collapsed silently to "Plan" behavior — a no-op users couldn't
+ * tell apart from a working autonomous mode. Disabling the option
+ * with an explanatory tooltip surfaces the v3-blocker honestly.
+ *
+ * TODO(v3): when the mutation lifecycle and preapproved-tool schema
+ * land (see `docs/prd/board-copilot-v3.md`), drive the disabled
+ * state off `AgentMetadata.allowed_autonomy` instead of a hardcoded
+ * flag and remove this comment.
+ */
+const AUTONOMY_OPTIONS: Array<{
+    value: AutonomyLevel;
+    labelKey: string;
+    disabled?: boolean;
+    disabledTooltipKey?: string;
+}> = [
     { value: "suggest", labelKey: "autonomyLevelSuggest" },
     { value: "plan", labelKey: "autonomyLevelPlan" },
-    { value: "auto", labelKey: "autonomyLevelAuto" }
+    {
+        value: "auto",
+        labelKey: "autonomyLevelAuto",
+        disabled: true,
+        disabledTooltipKey: "autonomyAutoDisabledTooltip"
+    }
 ];
 
 const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
@@ -792,12 +817,49 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         onChange={(value: AutonomyLevel) =>
                             setAutonomyLevel(value)
                         }
-                        options={AUTONOMY_OPTIONS.map((opt) => ({
-                            value: opt.value,
-                            label: microcopy.ai[
+                        options={AUTONOMY_OPTIONS.map((opt) => {
+                            const labelText = microcopy.ai[
                                 opt.labelKey as keyof typeof microcopy.ai
-                            ] as string
-                        }))}
+                            ] as string;
+                            const tooltip = opt.disabledTooltipKey
+                                ? (microcopy.ai[
+                                      opt.disabledTooltipKey as keyof typeof microcopy.ai
+                                  ] as string)
+                                : undefined;
+                            return {
+                                value: opt.value,
+                                disabled: opt.disabled,
+                                /*
+                                 * `title` fallback gives the disabled row
+                                 * a native browser tooltip in addition to
+                                 * the AntD `Tooltip` below — assistive
+                                 * tech and keyboard users who can't hover
+                                 * still get the explanation.
+                                 */
+                                title: opt.disabled ? tooltip : undefined,
+                                /*
+                                 * AntD Select renders `label` as the
+                                 * dropdown row content. Wrapping the
+                                 * disabled "Auto" row in a Tooltip
+                                 * surfaces the "why disabled" copy on
+                                 * hover without changing the collapsed
+                                 * selector text. Non-disabled rows render
+                                 * a plain string so `value` (active
+                                 * selection display) is unaffected.
+                                 */
+                                label: opt.disabled ? (
+                                    <Tooltip placement="left" title={tooltip}>
+                                        <span
+                                            data-testid={`autonomy-option-${opt.value}`}
+                                        >
+                                            {labelText}
+                                        </span>
+                                    </Tooltip>
+                                ) : (
+                                    labelText
+                                )
+                            };
+                        })}
                         size="small"
                         style={{ minWidth: 90 }}
                         value={autonomyLevel}
