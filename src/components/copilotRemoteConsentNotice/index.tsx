@@ -61,21 +61,24 @@ const CopilotRemoteConsentNotice: React.FC<CopilotRemoteConsentNoticeProps> = ({
         acknowledgeRemoteAi(baseUrl);
         setAcknowledged(true);
     };
+    const description = (
+        <>
+            <p style={{ margin: 0 }}>{body}</p>
+            <Space size={themeSpace.xs} style={{ marginTop: themeSpace.xs }}>
+                <CopilotPrivacyPopover
+                    label={microcopy.ai.remoteConsentLearnMore}
+                    placement="bottomRight"
+                    route={route}
+                />
+                <Button onClick={onAccept} size="small" type="primary">
+                    {microcopy.ai.remoteConsentAccept}
+                </Button>
+            </Space>
+        </>
+    );
     return (
         <Alert
-            action={
-                <Space size={themeSpace.xs}>
-                    <CopilotPrivacyPopover
-                        label={microcopy.ai.remoteConsentLearnMore}
-                        placement="bottomRight"
-                        route={route}
-                    />
-                    <Button onClick={onAccept} size="small" type="primary">
-                        {microcopy.ai.remoteConsentAccept}
-                    </Button>
-                </Space>
-            }
-            description={body}
+            description={description}
             message={microcopy.ai.remoteConsentTitle}
             showIcon
             style={{ marginBottom: themeSpace.sm }}
