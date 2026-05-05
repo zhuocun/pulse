@@ -50,7 +50,11 @@ import useReactQuery from "../utils/hooks/useReactQuery";
 import useTaskModal from "../utils/hooks/useTaskModal";
 
 jest.mock("../utils/hooks/useAiChat");
-jest.mock("../utils/hooks/useAiEnabled");
+jest.mock("../utils/hooks/useAiEnabled", () => ({
+    __esModule: true,
+    default: jest.fn(),
+    useAutonomyLevel: jest.fn(() => ({ level: "plan", setLevel: jest.fn() }))
+}));
 jest.mock("../utils/hooks/useAuth");
 jest.mock("../utils/hooks/useColorScheme");
 jest.mock("../utils/hooks/useProjectModal");
@@ -538,14 +542,16 @@ describe("UI quality :: BoardBriefDrawer on mobile", () => {
      */
     it("BoardBriefDrawer fills the viewport on mobile (no fixed 420px width)", () => {
         const { baseElement } = render(
-            <BoardBriefDrawer
-                columns={[]}
-                members={[member()]}
-                onClose={jest.fn()}
-                open
-                project={project()}
-                tasks={[]}
-            />
+            <ProvidersWrap>
+                <BoardBriefDrawer
+                    columns={[]}
+                    members={[member()]}
+                    onClose={jest.fn()}
+                    open
+                    project={project()}
+                    tasks={[]}
+                />
+            </ProvidersWrap>
         );
 
         const wrapper = baseElement.querySelector<HTMLElement>(
