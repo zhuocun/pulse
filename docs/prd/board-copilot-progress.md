@@ -493,7 +493,7 @@ CI=true npm test -- --watchAll=false --runInBand --coverage --coverageReporters=
 npx vite build
 ```
 
-Expected: lint clean, ≥97% statement coverage, build succeeds. As of 2026-05-04: 138 suites / 926 tests (includes the 31 axe tests from `a2d1adc`, the four new card-wiring tests from `28abca2`, and the 15 new `useAgentChat` adapter tests plus additional drawer tests from the chat-migration commit). Branch `claude/v2.1-ai-features-TGYgN` (commit `5ce8d95`) adds further tests: "surfaces a suggestion event" and "resets lastSuggestion at start of every new turn" in `useAgent.test.tsx`, and "autonomy selector persists the selected level to localStorage" in `aiChatDrawer/index.test.tsx`. Branch `claude/v2.1-ai-features-hGKmE` (this session) adds 9 further tests in `src/components/boardBriefDrawer/agent.test.tsx` for the remote board-brief-agent path.
+Expected: lint clean, ≥97% statement coverage, build succeeds. As of 2026-05-05 (`claude/v2.1-ai-features-vjZSA`): **142 suites / 1000 tests, all green.** Test history: 138 suites / 926 tests after the v2.1 chat migration (2026-05-04); +3 on `claude/v2.1-ai-features-TGYgN` (suggestion event, autonomy selector); +9 on `claude/v2.1-ai-features-hGKmE` (`boardBriefDrawer/agent.test.tsx` remote path); +28 on `claude/v2.1-ai-features-NRHhz` (per-component `agent.test.tsx` files for task-draft / task-assist / search; `fe.searchCandidates` registry); +18 on `claude/v2.1-ai-features-vjZSA` (17 in new `mapErrorResponse.test.ts` for the typed `{code, message}` envelope; 1 in `useAgentChat.test.tsx` for nudge-dismissal propagation).
 
 To exercise Board Copilot in the browser:
 
