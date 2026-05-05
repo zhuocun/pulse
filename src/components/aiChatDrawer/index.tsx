@@ -1,4 +1,4 @@
-import { ReloadOutlined, StopOutlined } from "@ant-design/icons";
+import { CopyOutlined, EditOutlined, ReloadOutlined, StopOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Alert,
@@ -7,6 +7,7 @@ import {
     Drawer,
     Grid,
     Input,
+    Modal,
     Select,
     Skeleton,
     Space,
@@ -35,8 +36,12 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { AgentBudgetError } from "../../utils/ai/agentErrors";
+import { saveChatHistory, loadChatHistory } from "../../utils/ai/projectAiStorage";
 import useAiChat from "../../utils/hooks/useAiChat";
+import type { AiChatMessage } from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
+import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
 import type {
     AutonomyLevel,
@@ -273,6 +278,10 @@ const summarizeToolBody = (body: string): string => {
  */
 const CITATION_INLINE_LIMIT = 6;
 
+/** Approximate token thresholds for context-window warnings (P1-C). */
+const BUDGET_WARN_THRESHOLD = 6000;
+const BUDGET_CRITICAL_THRESHOLD = 7500;
+
 /**
  * Fallback QueryClient used when the drawer is rendered outside a
  * QueryClientProvider (e.g. in legacy tests or Storybook sandboxes).
@@ -330,8 +339,24 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
 }) => {
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
         useAutonomyLevel();
+    const { status: healthStatus } = useAgentHealth();
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
+    /** P2-E: tracks which assistant messages are expanded (prose > 300 words). */
+    const [expandedMessages, setExpandedMessages] = useState<Set<number>>(
+        () => new Set()
+    );
+    /** P2-A: screen-reader announcement for streaming state. */
+    const [streamingAnnouncement, setStreamingAnnouncement] = useState("");
+    /** P2-D: whether to show the scroll-to-bottom FAB. */
+    const [showScrollFab, setShowScrollFab] = useState(false);
+    /** P2-D: ref for the messages scroll container. */
+    const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+    /** P2-B: ref for the last assistant message for focus management. */
+    const lastAssistantRef = useRef<HTMLDivElement | null>(null);
+    /** P1-C: whether the budget warn alert has been dismissed by user. */
+    const [budgetWarnDismissed, setBudgetWarnDismissed] = useState(false);
+
     /**
      * Set of message indices that arrived as the result of a Regenerate
      * click (P1-2). Tracked instead of derived so an out-of-band reset or
@@ -549,6 +574,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setFeedback([]);
         setRegeneratedIndices(new Set());
         setExpandedCitations(new Set());
+        setExpandedMessages(new Set());
+        setBudgetWarnDismissed(false);
         pendingRegenAfter.current = null;
     }, [reset]);
 
@@ -712,6 +739,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setFeedbackOpenFor(null);
     };
 
+    // P1-C: approximate token count for context-window budget warnings.
+    const approxTokenCount = messages.reduce(
+        (acc, m) => acc + Math.ceil(m.content.length / 4),
+        0
+    );
+
     const errorView = error ? aiErrorView(error) : null;
 
     /**
@@ -738,6 +771,22 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         }, 1000);
         return () => clearInterval(id);
     }, [error]);
+
+    /**
+     * P2-I: Track elapsed ms while in the pre-token loading phase so we can
+     * show "Still thinking…" after 3 s without a first token.
+     */
+    const [loadingMs, setLoadingMs] = useState(0);
+    useEffect(() => {
+        if (!isLoading) {
+            setLoadingMs(0);
+            return;
+        }
+        const id = setInterval(() => {
+            setLoadingMs((prev) => prev + 1000);
+        }, 1000);
+        return () => clearInterval(id);
+    }, [isLoading]);
 
     const remainingChars = microcopy.ai.characterCounterMax - input.length;
     const showCounter = input.length >= microcopy.ai.characterCounterShowAfter;
@@ -806,6 +855,39 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         wasLoadingRef.current = isLoading;
     }, [isLoading]);
 
+    /**
+     * P2-A: Announce "Board Copilot is responding." when streaming starts
+     * and clear it on completion (the completion region handles success).
+     */
+    useEffect(() => {
+        if (isLoading) {
+            setStreamingAnnouncement("Board Copilot is responding.");
+        } else {
+            setStreamingAnnouncement("");
+        }
+    }, [isLoading]);
+
+    /**
+     * P2-B: After streaming completes, focus the last assistant message so
+     * screen-reader and keyboard users are placed in context.
+     */
+    useEffect(() => {
+        if (!isLoading && lastAssistantRef.current) {
+            lastAssistantRef.current.focus();
+        }
+    }, [isLoading]);
+
+    /**
+     * P2-C (Phase B save): persist history to localStorage whenever messages
+     * change and we have a project ID.
+     * TODO: Phase B restore on open
+     */
+    useEffect(() => {
+        if (project?._id && messages.length > 0) {
+            saveChatHistory(project._id, messages);
+        }
+    }, [messages, project?._id]);
+
     return (
         <Drawer
             extra={
@@ -868,7 +950,17 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     <Button
                         aria-label={microcopy.ai.newConversation}
                         disabled={messages.length === 0 || isLoading}
-                        onClick={resetAll}
+                        onClick={() => {
+                            if (messages.length > 0) {
+                                Modal.confirm({
+                                    content:
+                                        "Starting a new conversation will clear all current history. Continue?",
+                                    onOk: resetAll
+                                });
+                            } else {
+                                resetAll();
+                            }
+                        }}
                         size="small"
                         type="link"
                     >
@@ -891,7 +983,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         "radial-gradient(60% 30% at 50% 0%, var(--aurora-blob-faint) 0%, transparent 70%), transparent",
                     display: "flex",
                     flexDirection: "column",
-                    paddingBottom: `max(${space.md}px, env(safe-area-inset-bottom))`,
+                    paddingBottom: `max(${space.md}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`,
                     paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
                     paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`
                 }
@@ -931,6 +1023,23 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 }}
             >
                 {completionAnnouncement}
+            </div>
+            {/* P2-A: Streaming state announcement for screen readers */}
+            <div
+                aria-live="polite"
+                role="status"
+                style={{
+                    border: 0,
+                    clip: "rect(0 0 0 0)",
+                    height: 1,
+                    margin: -1,
+                    overflow: "hidden",
+                    padding: 0,
+                    position: "absolute",
+                    width: 1
+                }}
+            >
+                {streamingAnnouncement}
             </div>
             <div
                 aria-busy={isLoading}
@@ -1359,15 +1468,30 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     </StreamingCursor>
                                 </>
                             ) : (
-                                <Skeleton
-                                    active
-                                    aria-label={microcopy.ai.streaming}
-                                    paragraph={{
-                                        rows: 2,
-                                        width: ["80%", "55%"]
-                                    }}
-                                    title={false}
-                                />
+                                <>
+                                    <Skeleton
+                                        active
+                                        aria-label={microcopy.ai.streaming}
+                                        paragraph={{
+                                            rows: 2,
+                                            width: ["80%", "55%"]
+                                        }}
+                                        title={false}
+                                    />
+                                    {/* P2-I: "Still thinking…" after 3 s in the pre-token phase */}
+                                    {loadingMs >= 3000 && (
+                                        <Text
+                                            style={{
+                                                display: "block",
+                                                fontSize: fontSize.xs,
+                                                marginTop: 4
+                                            }}
+                                            type="secondary"
+                                        >
+                                            Still thinking…
+                                        </Text>
+                                    )}
+                                </>
                             )}
                         </MessageBubble>
                         <AssistantDisclaimer>

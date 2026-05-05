@@ -23,6 +23,7 @@ export const ANALYTICS_EVENTS = {
     CITATION_CLICKED: "agent.citation.clicked",
     /* PRD v3 §9.8 (X-R15) — UX surface analytics */
     AGENT_TTFT: "agent.ttft",
+    AGENT_TTFT_SLOW: "agent.ttft.slow",
     BRIEF_REFRESHED: "brief.refreshed",
     BREAKDOWN_AXIS_CHANGED: "breakdown.axis_changed",
     SEARCH_RESULT_RATIONALE_VIEWED: "search.result_rationale_viewed",
