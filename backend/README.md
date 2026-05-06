@@ -68,8 +68,10 @@ operators must address before flipping the AI surface live:
 
 - `AGENT_CHECKPOINT_BACKEND=postgres` + `AGENT_STORE_BACKEND=postgres`
   with a reachable `AGENT_POSTGRES_URI` (or `POSTGRES_URI`).
-- `CORS_ORIGINS` set to the deployed FE origin (the localhost defaults
-  block every browser request).
+- `CORS_ORIGINS` set to every deployed FE origin you serve. The default
+  covers `localhost:3000` and the production `pulse-react-app.vercel.app`
+  origin; any other host (custom domain, preview deployment, etc.) must
+  be added explicitly or matched via `CORS_ORIGIN_REGEX`.
 - `UUID` JWT secret of at least 32 bytes.
 - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; without one the catalog stays on
   the deterministic stub. `langchain-anthropic` and `langchain-openai` are
@@ -121,7 +123,7 @@ chore(hooks): enforce commit messages
 - `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_DATABASE`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`: PostgreSQL connection fields when `POSTGRES_URI` is not set.
 - `POSTGRES_SSL`: Set to `true` to require SSL for PostgreSQL.
 - `UUID`: JWT signing secret, matching the original Express app. Must be at least 32 characters; token-issuing endpoints (`POST /api/v1/auth/login`) will fail with HTTP 500 until this is set.
-- `CORS_ORIGINS`: Comma-separated allowed frontend origins. Defaults to `http://localhost:3000,http://127.0.0.1:3000`.
+- `CORS_ORIGINS`: Comma-separated allowed frontend origins. Defaults to `http://localhost:3000,http://127.0.0.1:3000,https://pulse-react-app.vercel.app`.
 - `CORS_ORIGIN_REGEX`: Optional regex for additional dynamic origins, such as Vercel preview deployments.
 - `PORT`: Runtime port for local scripts.
 - `AGENT_CHECKPOINT_BACKEND`: LangGraph short-term checkpointer backend. `none`, `memory`, or `postgres`. Defaults to `memory`. Production deployments should use `postgres` so interrupts and threads survive a worker restart; that path requires `python -m pip install ".[postgres-agents]"` and a reachable Postgres cluster.

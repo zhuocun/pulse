@@ -10,10 +10,10 @@ when a fix is non-obvious from the code alone.
   conditionally calling either hook breaks React's hook-ordering rule. See
   `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
 - Migration progress for the six structured routes lives in
-  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, `chat-agent`,
-  `board-brief-agent`, and the background `triage-agent` are migrated; five
-  routes remain on `useAi` (`task-draft`, `task-breakdown`, `estimate`,
-  `readiness`, `search`).
+  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, all six are on the
+  v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
+  alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
+  remains the local-engine fallback path.
 - Triage nudges are subject to PRD AC-V14 inbox rules in `useAgent.ts`:
   `NUDGE_INBOX_MAX = 5`, dedup by `(kind, project_id)`, `NUDGE_EXPIRY_MS = 4h`,
   60-second prune sweep, plus an explicit `dismissNudge(nudge_id)` API. The

@@ -9,7 +9,6 @@
 | Target release                  | Internal preview, then opt-in toggle for end users                                                                                                                                                                                                                                                |
 | Document scope                  | Product, UX, technical contract, rollout, testing                                                                                                                                                                                                                                                 |
 | Implementation progress         | See [`board-copilot-progress.md`](board-copilot-progress.md)                                                                                                                                                                                                                                      |
-| Design vs implementation review | See [`board-copilot-review.md`](board-copilot-review.md)                                                                                                                                                                                                                                          |
 
 ---
 

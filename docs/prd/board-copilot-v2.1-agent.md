@@ -7,7 +7,7 @@
 | Last updated      | 2026-05-01                                                                                                                                                                                                                        |
 | Target repository | `jira-react-app` (frontend) + a Python agent server at `${REACT_APP_AI_BASE_URL}` (out of repo), built on LangGraph 1.x with agents registered in `app/agents/catalog/`                                                           |
 | Document scope    | Product critique of v2, redesigned architecture aligned to LangGraph substrate, FE↔BE agent contract, governance & rollout. Server internals are referenced where they affect the wire contract.                                  |
-| Companion docs    | [`board-copilot.md`](board-copilot.md) (v1 design), [`board-copilot-progress.md`](board-copilot-progress.md), [`board-copilot-review.md`](board-copilot-review.md), [`ui-ux-optimization-plan.md`](../ui-ux-optimization-plan.md) |
+| Companion docs    | [`board-copilot.md`](board-copilot.md) (v1 design), [`board-copilot-progress.md`](board-copilot-progress.md), [`ui-ux-optimization-plan.md`](../ui-ux-optimization-plan.md) |
 
 ---
 

@@ -28,10 +28,10 @@ deployed elsewhere:
   every Vercel tier. The platform truncates the response when its
   duration cap fires, which the FE renders as "Board Copilot took too
   long".
-- The four interrupt-using agents (`board-brief-agent`,
-  `task-drafting-agent`, `task-estimation-agent`, `triage-agent`).
-  They pause on `langgraph.types.interrupt(...)` and resume on a
-  follow-up request. The default `AGENT_CHECKPOINT_BACKEND=memory`
+- The five interrupt-using agents (`board-brief-agent`,
+  `task-drafting-agent`, `task-estimation-agent`, `triage-agent`,
+  `search-agent`). They pause on `langgraph.types.interrupt(...)`
+  and resume on a follow-up request. The default `AGENT_CHECKPOINT_BACKEND=memory`
   cannot survive a Vercel cold start, and even with
   `AGENT_CHECKPOINT_BACKEND=postgres` the in-process budget tracker
   and rate limiter are still per-invocation — they reset to zero on
@@ -256,4 +256,4 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 
 - `docs/AI_ARCHITECTURE_REVIEW.md` — still-open structural concerns (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps); cross-references `AI_REMAINING_WORK.md` as the operational backlog.
 - `docs/AI_REMAINING_WORK.md` — prioritised operational backlog; items 7–12 are open.
-- `Dockerfile`, `fly.toml`, `docker-compose.yml` at the repo root.
+- `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.
