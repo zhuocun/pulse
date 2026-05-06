@@ -146,7 +146,7 @@ class Settings:
     # ``ConsoleSpanExporter`` -- useful for local dev without a
     # collector running.
     otel_tracing: bool = env_bool("OTEL_TRACING")
-    otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "pulse-backend")
+    otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "pulse-server")
     otel_exporter_otlp_endpoint: str = os.getenv(
         "OTEL_EXPORTER_OTLP_ENDPOINT", ""
     )

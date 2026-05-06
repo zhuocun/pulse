@@ -1,5 +1,5 @@
 [project]
-name = "pulse-backend"
+name = "pulse-server"
 version = "0.1.0"
 description = "FastAPI port of jira-express-server"
 readme = "README.md"

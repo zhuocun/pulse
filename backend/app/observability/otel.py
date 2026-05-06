@@ -138,7 +138,7 @@ def configure_otel(*, settings: Settings) -> None:
     try:
         from importlib.metadata import version as _pkg_version
 
-        service_version = _pkg_version("pulse-backend")
+        service_version = _pkg_version("pulse-server")
     except Exception:  # noqa: BLE001 - package metadata lookup is best-effort
         service_version = "0.0.0"
 
