@@ -110,3 +110,16 @@ here.
 - The full Jest suite (142 suites / ~980 tests) completes in ~90-100 s when run
   with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`.
   Without the heap bump and `--forceExit`, the suite may hang or OOM on this VM.
+- Node.js 24 is required (`.nvmrc`). Load nvm before running any npm/node
+  command: `export NVM_DIR="$HOME/.nvm"; source "$NVM_DIR/nvm.sh"`.
+- The backend uses MongoDB 7 which must be running before the FastAPI server
+  starts. Start it with: `mongod --dbpath /data/db --bind_ip 127.0.0.1 --port 27017 --fork --logpath /var/log/mongod.log`.
+- Backend `.env` needs `MONGO_URI=mongodb://localhost:27017/jira` and a `UUID`
+  of ≥32 characters. Copy from `.env.example` and update those values.
+- Backend tests (801 passing, `python -m pytest` from `backend/`) use in-memory
+  fakes and do NOT require MongoDB. Install with `pip install -e ".[dev,ai]"`.
+- The frontend's remote API (`https://pulse-python-server.vercel.app`) works from
+  this environment for basic CRUD (registration, login, projects, tasks). The
+  local backend at `:8000` is a full alternative; set
+  `REACT_APP_API_URL=http://localhost:8000` in `.env.development` to use it
+  (requires Vite restart).
