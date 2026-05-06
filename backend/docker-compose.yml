@@ -20,7 +20,7 @@
 services:
   server:
     build: .
-    image: jira-python-server:dev
+    image: pulse-server:dev
     ports:
       - "8000:8000"
     environment:

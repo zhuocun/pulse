@@ -1,4 +1,4 @@
-# jira-python-server
+# pulse — backend
 
 FastAPI port of `jira-express-server`.
 
@@ -68,8 +68,10 @@ operators must address before flipping the AI surface live:
 
 - `AGENT_CHECKPOINT_BACKEND=postgres` + `AGENT_STORE_BACKEND=postgres`
   with a reachable `AGENT_POSTGRES_URI` (or `POSTGRES_URI`).
-- `CORS_ORIGINS` set to the deployed FE origin (the localhost defaults
-  block every browser request).
+- `CORS_ORIGINS` set to every deployed FE origin you serve. The default
+  covers `localhost:3000` and the production `pulse-react-app.vercel.app`
+  origin; any other host (custom domain, preview deployment, etc.) must
+  be added explicitly or matched via `CORS_ORIGIN_REGEX`.
 - `UUID` JWT secret of at least 32 bytes.
 - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; without one the catalog stays on
   the deterministic stub. `langchain-anthropic` and `langchain-openai` are
@@ -109,7 +111,7 @@ chore(hooks): enforce commit messages
 > [`docs/AI_REMAINING_WORK.md`](docs/AI_REMAINING_WORK.md) for the
 > Priority 1 production gotchas (durable backends, idempotency,
 > provider-key guard) and the open GA-blockers
-> ([`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md)).
+> ([`docs/BACKEND_PRODUCTION_READINESS.md`](docs/BACKEND_PRODUCTION_READINESS.md)).
 
 - `DATABASE`: Storage backend. Supported values match the Express app: `mongoDB`, `dynamoDB`, `postgreSQL`. Defaults to `mongoDB`.
 - `MONGO_URI`: MongoDB connection string.
@@ -121,7 +123,7 @@ chore(hooks): enforce commit messages
 - `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_DATABASE`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`: PostgreSQL connection fields when `POSTGRES_URI` is not set.
 - `POSTGRES_SSL`: Set to `true` to require SSL for PostgreSQL.
 - `UUID`: JWT signing secret, matching the original Express app. Must be at least 32 characters; token-issuing endpoints (`POST /api/v1/auth/login`) will fail with HTTP 500 until this is set.
-- `CORS_ORIGINS`: Comma-separated allowed frontend origins. Defaults to `http://localhost:3000,http://127.0.0.1:3000`.
+- `CORS_ORIGINS`: Comma-separated allowed frontend origins. Defaults to `http://localhost:3000,http://127.0.0.1:3000,https://pulse-react-app.vercel.app`.
 - `CORS_ORIGIN_REGEX`: Optional regex for additional dynamic origins, such as Vercel preview deployments.
 - `PORT`: Runtime port for local scripts.
 - `AGENT_CHECKPOINT_BACKEND`: LangGraph short-term checkpointer backend. `none`, `memory`, or `postgres`. Defaults to `memory`. Production deployments should use `postgres` so interrupts and threads survive a worker restart; that path requires `python -m pip install ".[postgres-agents]"` and a reachable Postgres cluster.
@@ -148,7 +150,7 @@ chore(hooks): enforce commit messages
 - `LANGSMITH_TRACING`: Set to `true` to enable LangSmith tracing (also requires `LANGSMITH_API_KEY`).
 - `LANGSMITH_PROJECT`: Optional LangSmith project name.
 - `OTEL_TRACING`: Set to `true` to enable vendor-neutral OpenTelemetry GenAI spans on every agent invocation and FastAPI request. Defaults to `false`. Requires `python -m pip install ".[observability]"` (or `".[ai]"`); a `RuntimeError` at boot surfaces when the flag is on but the package is missing.
-- `OTEL_SERVICE_NAME`: `service.name` resource attribute on emitted spans. Defaults to `jira-python-server`.
+- `OTEL_SERVICE_NAME`: `service.name` resource attribute on emitted spans. Defaults to `pulse-server`.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: HTTP endpoint of the OTLP collector (e.g. `https://otlp.example.com/v1/traces`). Empty (the default) falls back to a console exporter that streams the trace JSON to stderr — useful for local dev without a collector.
 - `PROMETHEUS_METRICS`: Set to `true` to mount `GET /metrics` and populate the Tier 9 counters (`agent_invocations_total{agent, outcome}`, `agent_tokens_total{agent, direction}`, `agent_run_duration_seconds{agent, outcome}`, `idempotency_cache_total{route, outcome}`). Defaults to `false`. Same install requirement as `OTEL_TRACING`.
 
@@ -171,7 +173,7 @@ Without an API key, `AGENT_CHAT_MODEL_PROVIDER=auto` (the default) runs the dete
 
 ## Agents
 
-> **GA blockers — not yet production-ready for public ship.** Three hard blockers documented in [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) must close before the agent surface goes public: (1) the `MutationProposal` accept/undo lifecycle is a dead-end (no agent emits `custom/mutation_proposal`, no `fe.applyMutation` interrupt is registered); (2) there is no provider 5xx fallback — a single upstream Anthropic/OpenAI error is a full outage; (3) the AI proxy reuses the primary bearer JWT from `localStorage`, creating an XSS exfiltration surface. Until these are resolved, deploy with proposal cards gated off and treat the surface as internal beta only.
+> **GA blockers — not yet production-ready for public ship.** Three hard blockers documented in [`docs/BACKEND_PRODUCTION_READINESS.md`](docs/BACKEND_PRODUCTION_READINESS.md) must close before the agent surface goes public: (1) the `MutationProposal` accept/undo lifecycle is a dead-end (no agent emits `custom/mutation_proposal`, no `fe.applyMutation` interrupt is registered); (2) there is no provider 5xx fallback — a single upstream Anthropic/OpenAI error is a full outage; (3) the AI proxy reuses the primary bearer JWT from `localStorage`, creating an XSS exfiltration surface. Until these are resolved, deploy with proposal cards gated off and treat the surface as internal beta only.
 
 The application ships with an agent runtime built on [LangGraph](https://github.com/langchain-ai/langgraph) (`langgraph>=1.1,<2`, the v1.x API line). Six agents are registered automatically from `app/agents/catalog/` at startup — `board-brief-agent`, `task-drafting-agent`, `task-estimation-agent`, `chat-agent`, `triage-agent`, and `search-agent`; see the [Board Copilot v2.1 — Agent catalog](#board-copilot-v21--agent-catalog) section below for what each one does.
 
@@ -272,7 +274,7 @@ Supporting modules:
 - `app/store/namespaces.py` — tuple-based namespace conventions for the LangGraph long-term store.
 - `app/auth/project_access.py` — per-project AI-disable allow-list driven by `AGENT_DISABLED_PROJECT_IDS` (PRD §6.3 / AC-V10).
 
-The router wire format matches the FE `StreamPart` discriminator in jira-react-app `src/interfaces/agent.d.ts`:
+The router wire format matches the FE `StreamPart` discriminator in `src/interfaces/agent.d.ts`:
 
 ```json
 {"type": "updates"|"messages"|"custom"|"interrupt"|"error", "ns": ["..."], "data": ...}
@@ -284,7 +286,7 @@ MCP server wiring (`langchain-mcp-adapters`) is **deferred** to a follow-up comm
 
 ### Legacy `/api/ai/*` shim (v1 FE surfaces)
 
-The shipped Board Copilot UI in jira-react-app (Phases 0–4) posts JSON to `/api/ai/<route>`. Those endpoints live in `app/routers/ai.py` and call deterministic helpers in `app/services/v1_engine.py`; the chat route forwards to `chat-agent` so it shares the configured LLM. Every request goes through the same auth + redaction + project-disable + rate-limit + budget gates as the v2.1 endpoints. The v2.1 streaming surface remains the recommended path for new clients.
+The shipped Board Copilot UI (Phases 0–4) posts JSON to `/api/ai/<route>`. Those endpoints live in `app/routers/ai.py` and call deterministic helpers in `app/services/v1_engine.py`; the chat route forwards to `chat-agent` so it shares the configured LLM. Every request goes through the same auth + redaction + project-disable + rate-limit + budget gates as the v2.1 endpoints. The v2.1 streaming surface remains the recommended path for new clients.
 
 Every turn passes through four gates wired into the agents router:
 

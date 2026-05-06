@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Production image for jira-python-server.
+# Production image for the pulse backend.
 #
 # Two stages keep the runtime layer slim:
 #   1. ``builder`` installs the toolchain + libpq headers and builds a

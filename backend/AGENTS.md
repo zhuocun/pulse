@@ -30,7 +30,7 @@ ruff check .
 python -m pytest
 ```
 
-Tests use an in-memory `FakeStore` and `fakeredis`; **no external services needed**. Coverage must be 100% (configured in `pyproject.toml`). The full `[ai]` extra must be installed for all 722 tests to pass (observability tests need `opentelemetry-*` and `prometheus-client`).
+Tests use an in-memory `FakeStore` and `fakeredis`; **no external services needed**. Coverage must be 100% (configured in `pyproject.toml`). The full `[ai]` extra must be installed for the entire suite to pass (observability tests need `opentelemetry-*` and `prometheus-client`).
 
 ### AI-specific environment variables
 

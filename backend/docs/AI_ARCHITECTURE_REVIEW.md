@@ -32,17 +32,17 @@ Production agent platforms sit behind an AI gateway (LiteLLM, Portkey, Truefound
 
 ### F-10 — No structured output validation
 
-Catalog agents emit `AIMessage(content=json.dumps(...))` and clients do `json.loads`. Once an LLM replaces the deterministic stubs the schema will rot silently. The LangChain 1.0 pattern is `create_agent(..., response_format=Pydantic(ISchema))`, which uses provider-native JSON mode with a tool-call fallback.
+Catalog agents emit `AIMessage(content=json.dumps(...))` and clients do `json.loads`. Once an LLM replaces the deterministic stubs the schema will rot silently. The LangGraph 1.x pattern is `create_react_agent(..., response_format=Pydantic(ISchema))` (imported from `langgraph.prebuilt`), which uses provider-native JSON mode with a tool-call fallback. (LangChain 1.x does not export a top-level `create_agent` — see README.md for the import gotcha.)
 
-*Fix*: define Pydantic schemas (`IBoardBrief`, `ITaskDraft`, `IReadinessReport`, `ITriageNudge`) under `app/agents/schemas/`. Use them as `response_format` on `create_agent` and as the contract for the SSE `messages` stream.
+*Fix*: define Pydantic schemas (`IBoardBrief`, `ITaskDraft`, `IReadinessReport`, `ITriageNudge`) under `app/agents/schemas/`. Use them as `response_format` on `create_react_agent` and as the contract for the SSE `messages` stream.
 
 ---
 
-### F-12 — Catalog does not use `create_agent`
+### F-12 — Catalog does not use the prebuilt ReAct agent
 
-Five out of five catalog agents hand-build a `StateGraph` with linear `add_edge` chains. This is fine for fully deterministic work but misses tool binding, structured output, the prebuilt ReAct loop, and the message-history reducer that LangChain 1.0 ships.
+Five out of five catalog agents hand-build a `StateGraph` with linear `add_edge` chains. This is fine for fully deterministic work but misses tool binding, structured output, the prebuilt ReAct loop, and the message-history reducer that LangGraph 1.x ships.
 
-*Fix*: rewrite `chat-agent`, `task-drafting-agent`, `task-estimation-agent`, and `triage-agent` on top of `create_agent`. Keep `board-brief-agent` as a custom graph if its node-by-node shape matters, and document why.
+*Fix*: rewrite `chat-agent`, `task-drafting-agent`, `task-estimation-agent`, and `triage-agent` on top of `create_react_agent` (from `langgraph.prebuilt`). Keep `board-brief-agent` as a custom graph if its node-by-node shape matters, and document why.
 
 ---
 

@@ -55,7 +55,7 @@ A Claude or OpenAI 5xx bubbles straight to the user. There is no AI gateway (Lit
 
 The FE stores the primary bearer JWT in `localStorage` and the AI proxy reuses it verbatim. Any FE XSS exfiltrates the AI proxy token alongside the REST API token. Documented in [`AI_REMAINING_WORK.md` "Out of scope §Auth"](AI_REMAINING_WORK.md) but explicitly "not yet scheduled."
 
-- Mitigation path: proxy-scoped token with a narrow claim set, or httpOnly cookie. The FE side change is tracked in `jira-react-app/docs/PRODUCTION_READINESS.md`.
+- Mitigation path: proxy-scoped token with a narrow claim set, or httpOnly cookie. The FE side change is tracked in `../../docs/FRONTEND_PRODUCTION_READINESS.md`.
 - Effort: ~1 week (token issuance endpoint + FE migration + middleware update).
 
 ## Soft blockers — ship-able with documented caveats

@@ -1,6 +1,6 @@
 # Production Readiness — Board Copilot Frontend
 
-Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/PRODUCTION_READINESS.md`.
+Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/BACKEND_PRODUCTION_READINESS.md`.
 
 Last updated: 2026-05-05.
 
@@ -116,7 +116,7 @@ Removed on `claude/v2.1-ai-readiness-check-TbxeM`. The surrounding docblock alre
 
 A focused polish pass against the audit findings above. Cross-repo sibling
 branch (BE polish) is `claude/v2.1-ai-readiness-check-TbxeM` on
-`jira-python-server`. This branch closes only the small-effort polish items;
+the `pulse` backend. This branch closes only the small-effort polish items;
 the three GA-blockers below are explicitly out of scope and remain open.
 
 **Resolved on this branch (FE):**
@@ -151,7 +151,7 @@ disabled with an explanatory tooltip"` covers the conditional render.
   BE emission it would be dead code). Needs product/UX agreement on
   which mutations are allowed + the undo semantics, then a coordinated
   end-to-end branch. The BE-side counterpart is tracked on
-  `jira-python-server` `claude/v2.1-ai-readiness-check-TbxeM` /
+  `claude/v2.1-ai-readiness-check-TbxeM` /
   `docs/AI_REMAINING_WORK.md` §12.
 - 🛑 **#2 — JWT-in-localStorage XSS.** Requires BE token redesign
   (proxy-scoped short-lived token or httpOnly cookie). FE-side

@@ -10,10 +10,10 @@ when a fix is non-obvious from the code alone.
   conditionally calling either hook breaks React's hook-ordering rule. See
   `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
 - Migration progress for the six structured routes lives in
-  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, `chat-agent`,
-  `board-brief-agent`, and the background `triage-agent` are migrated; five
-  routes remain on `useAi` (`task-draft`, `task-breakdown`, `estimate`,
-  `readiness`, `search`).
+  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, all six are on the
+  v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
+  alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
+  remains the local-engine fallback path.
 - Triage nudges are subject to PRD AC-V14 inbox rules in `useAgent.ts`:
   `NUDGE_INBOX_MAX = 5`, dedup by `(kind, project_id)`, `NUDGE_EXPIRY_MS = 4h`,
   60-second prune sweep, plus an explicit `dismissNudge(nudge_id)` API. The
@@ -57,7 +57,7 @@ when a fix is non-obvious from the code alone.
 | Variable                                  | Notes                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REACT_APP_AI_BASE_URL`                   | Optional. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead.          |
-| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See `docs/PRODUCTION_READINESS.md` §1 for the GA-blocker status.                                        |
+| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See `docs/FRONTEND_PRODUCTION_READINESS.md` §1 for the GA-blocker status.                                        |
 | `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
 | `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
 

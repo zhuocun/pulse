@@ -1,4 +1,4 @@
-# HTTP API Reference — jira-python-server
+# HTTP API Reference — pulse (backend)
 
 **Target audience:** backend and frontend engineers integrating against this server.
 This document is sufficient to implement a client without reading source code.
@@ -1066,8 +1066,8 @@ Check the operational status of the server. Also available at the legacy path `G
   "status": "ok",
   "ok": true,
   "database": "ok",
-  "agents_loaded": 5,
-  "agentsLoaded": 5,
+  "agents_loaded": 6,
+  "agentsLoaded": 6,
   "latency_ms": 1.23,
   "latencyMs": 1.23,
   "checkpointer": "memory",
@@ -1871,7 +1871,7 @@ Run an agent and stream results as Server-Sent Events. This is the primary endpo
 
 **Auth:** Required. Rate limit, budget, and project-access gates applied.
 
-**Idempotency-Key:** Not honoured (streaming responses are not cacheable).
+**Idempotency-Key:** Honoured on the initial request (same semantics as `/invoke`); the cached body for a successful stream is a `{"status": "stream_completed"}` JSON marker, not a re-stream of the SSE body — replays return that marker as a 200 response with `Idempotent-Replay: true`. Resume requests (those carrying a `thread_id` from a prior interrupt) bypass the idempotency check. The slot is released if the stream errors so a real retry with the same key can proceed.
 
 **Path parameter:**
 

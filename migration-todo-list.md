@@ -8,30 +8,17 @@ Delete this file once every task is checked off.
 
 ---
 
-## 1. Repoint the backend Vercel project ⚠️ required
+## 1. Repoint the backend Vercel project ✅ done
 
-The existing `jira-python-server` Vercel project must be re-pointed at
-this monorepo and told that its source lives under `backend/`. Project
-URL, env vars, secrets, custom domains, and deployment history are all
-preserved on the same project. Once this is done, every push to the
-tracked branch deploys the backend automatically — no GitHub secret,
-no CI workflow involved.
+The `jira-python-server` Vercel project has been re-pointed at this
+monorepo with `backend/` as its root directory. Project URL, env vars,
+secrets, custom domains, and deployment history were preserved.
+Pushes to the tracked branch now deploy the backend automatically.
 
-- [ ] Vercel dashboard → `jira-python-server` project → **Settings → Git** → disconnect from `zhuocun/jira-python-server`, connect to `zhuocun/jira-react-app`.
-- [ ] Vercel dashboard → same project → **Settings → General → Root Directory** → `backend/`. Save.
-- [ ] **Deployments → Redeploy** the latest production deployment.
-- [ ] Smoke-check: `curl https://pulse-python-server.vercel.app/api/v1/health` returns 200.
-
-CLI alternative (needs a `VERCEL_TOKEN` with access to the project):
-
-```bash
-# replace <project-id> with the BE project ID from Vercel dashboard
-PROJECT=<project-id>
-curl -sS -X PATCH "https://api.vercel.com/v9/projects/$PROJECT" \
-  -H "Authorization: Bearer $VERCEL_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"rootDirectory":"backend","gitRepository":{"type":"github","repo":"zhuocun/jira-react-app"}}'
-```
+- [x] Vercel dashboard → `jira-python-server` project → **Settings → Git** → disconnect from `zhuocun/jira-python-server`, connect to `zhuocun/jira-react-app`.
+- [x] Vercel dashboard → same project → **Settings → General → Root Directory** → `backend/`. Save.
+- [x] **Deployments → Redeploy** the latest production deployment.
+- [x] Smoke-check: `curl https://pulse-python-server.vercel.app/api/v1/health` returns 200.
 
 ---
 
@@ -66,6 +53,6 @@ freezes issues, PRs, and pushes.
 ## Verification checklist (run after each item above)
 
 - [ ] FE Vercel project still builds and serves the app at its existing URL.
-- [ ] BE Vercel project, after the Root Directory change, builds and `GET /api/v1/health` returns 200.
+- [x] BE Vercel project, after the Root Directory change, builds and `GET /api/v1/health` returns 200.
 - [ ] `Backend CI` workflow runs green on a PR that touches `backend/**`.
 - [ ] FE-only and BE-only PRs trigger only the relevant Vercel project (verify in the Vercel deployments tab).

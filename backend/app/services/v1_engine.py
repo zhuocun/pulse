@@ -1,6 +1,6 @@
 """Deterministic Python port of the FE v1 ``utils/ai/engine.ts``.
 
-The v1 ``/api/ai/<route>`` surface in jira-react-app posts JSON, expects
+The v1 ``/api/ai/<route>`` surface in pulse posts JSON, expects
 JSON back, and never streams. This module ships small, dependency-free
 implementations of the routes the FE drives today (draft, breakdown,
 estimate, readiness, brief, search) so a deployment with

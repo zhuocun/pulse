@@ -2,7 +2,7 @@
 
 PRD v2.1 §5A.6 / Phase 3 of the Board Copilot rollout: when the chat
 agent has a real chat model it picks tools from this catalogue and the
-FE dispatcher in ``jira-react-app/src/utils/ai/chatTools.ts`` executes
+FE dispatcher in ``src/utils/ai/chatTools.ts`` executes
 them client-side. The FE owns the auth context + React Query cache the
 calls need, so executing them server-side would require duplicating
 that machinery.
@@ -31,7 +31,7 @@ class _ListTasksFilter(BaseModel):
     """Filter fields for the ``listTasks`` tool.
 
     Mirrors the FE dispatcher in
-    ``jira-react-app/src/utils/ai/chatTools.ts`` (the ``case "listTasks"``
+    ``src/utils/ai/chatTools.ts`` (the ``case "listTasks"``
     block): only these four fields are forwarded to the tasks API; any
     other keys the model emits are silently dropped client-side. Naming
     them in the schema steers the model to the right field names so a

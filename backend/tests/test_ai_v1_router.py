@@ -1997,10 +1997,10 @@ def test_v1_route_records_idempotency_in_flight_metric(
 
 
 # ---------------------------------------------------------------------------
-# Wire-shape parity with jira-react-app `useAi.ts`.
+# Wire-shape parity with pulse `useAi.ts`.
 #
 # The shipped React client posts the entire ``RunPayload`` (see
-# ``src/utils/hooks/useAi.ts`` in jira-react-app) for each v1 route, which
+# ``src/utils/hooks/useAi.ts`` in pulse) for each v1 route, which
 # wraps the request fields under a route-specific envelope key:
 #
 #   /task-draft     -> {"draft":     {"prompt": ..., "context": ...}}

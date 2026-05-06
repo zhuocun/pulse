@@ -2,7 +2,7 @@
 
 **Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see `AI_UX_OPTIMIZATION_PLAN.md` in repo root.
 
-This document is a critical review of the current `jira-react-app` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
+This document is a critical review of the current `pulse` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
 
 The plan is intentionally pragmatic: Phase 1 ("Foundations") removes the worst structural debt that everything else inherits, Phase 2 ("Surfaces") rebuilds the high-traffic screens, Phase 3 ("Polish & Accessibility") hardens the experience, and Phase 4 ("Stretch") adds nice-to-have UX.
 

@@ -1,6 +1,6 @@
 # AI Remaining Work
 
-Status as of the merge of `Accept FE envelope on v1 AI routes; add latencyMs to health` (PR #32), updated through branch `claude/v2.1-ai-features-vjZSA` (2026-05-05, audit follow-up — typed 403 envelope, vercel `maxDuration`, citation-helper alignment, slim/full CI matrix; see "Audit follow-up" below). The structured v1 routes and the v2.1 LangGraph agent surface match the React client (jira-react-app) wire shape. Six agents are registered (`board-brief`, `task-drafting`, `task-estimation`, `chat`, `triage`, `search`); setting `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`) flips five of them plus the v1 polish helpers from deterministic stubs to real LLM output — `langchain-anthropic` and `langchain-openai` are now base dependencies so no extra install step is required. The sixth (`triage-agent`) stays deterministic regardless of any key — see item 5. This document tracks what is **not** yet done.
+Status as of the merge of `Accept FE envelope on v1 AI routes; add latencyMs to health` (PR #32), updated through branch `claude/v2.1-ai-features-vjZSA` (2026-05-05, audit follow-up — typed 403 envelope, vercel `maxDuration`, citation-helper alignment, slim/full CI matrix; see "Audit follow-up" below). The structured v1 routes and the v2.1 LangGraph agent surface match the React client (pulse) wire shape. Six agents are registered (`board-brief`, `task-drafting`, `task-estimation`, `chat`, `triage`, `search`); setting `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`) flips five of them plus the v1 polish helpers from deterministic stubs to real LLM output — `langchain-anthropic` and `langchain-openai` are now base dependencies so no extra install step is required. The sixth (`triage-agent`) stays deterministic regardless of any key — see item 5. This document tracks what is **not** yet done.
 
 **FE consumer status (2026-05-05, updated).** The React client is now on the v2.1 SSE surface for **all six** structured agents:
 
@@ -11,7 +11,7 @@ Status as of the merge of `Accept FE envelope on v1 AI routes; add latencyMs to 
 - `task-estimation-agent` via `useAgent("task-estimation-agent")` in `AiTaskAssistPanel` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). Consumes the bundled `surface: "estimate"` payload `{estimate, readiness}` in a single suggestion event.
 - `search-agent` via `useAgent("search-agent")` in `AiSearchInput` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). The FE registers a new `fe.searchCandidates` tool in `FE_TOOL_REGISTRY` that resolves the search-agent interrupt from the React Query cache (up to 50 `{id, text}` candidates per kind).
 
-The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in `jira-react-app/docs/prd/board-copilot-progress.md`.
+The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in `docs/prd/board-copilot-progress.md`.
 
 For background on what already exists, see `AI_ARCHITECTURE_REVIEW.md`.
 
@@ -39,7 +39,7 @@ Three small surgical fixes landed on this branch:
 - **Boot-time provider-key guard** — `app/agents/llm.py` `assert_provider_available` now raises at startup when an explicit `AGENT_CHAT_MODEL_PROVIDER=anthropic|openai` is configured without the matching `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and the deploy looks production-shaped (Vercel / Render / Fly / Railway / K8s). Default `auto` keeps the degrade-to-stub behaviour.
 - **`AgentMetadata.as_dict()` trim (item 9, Resolved)** — `tags`, `recursion_limit`, `context_schema` are dropped from the wire shape; the FE never read them. Fields are kept on the dataclass so the runtime / router still use them internally.
 
-Companion FE polish runs on `jira-react-app/claude/v2.1-ai-readiness-check-TbxeM` (separate subagent). The two remaining BE-side GA-blockers (mutation lifecycle, provider fallback) and the cross-cutting JWT XSS concern are tracked under their own items below.
+Companion FE polish runs on `claude/v2.1-ai-readiness-check-TbxeM` (separate subagent). The two remaining BE-side GA-blockers (mutation lifecycle, provider fallback) and the cross-cutting JWT XSS concern are tracked under their own items below.
 
 ## Audit follow-up — 2026-05-05 (`claude/v2.1-ai-features-vjZSA`)
 
@@ -50,7 +50,7 @@ Cross-repo audit of the v2.1 AI surface against the docs. All six agents and the
 - **Citation schema drift** — `app/agents/catalog/task_estimation.py` `emit_citations` now uses `be_tools.validated_citation_ref(source="task", ...)` instead of a raw dict with the invalid `source="fe.similarTasks"`. Now consistent with `board-brief-agent` and the FE source allowlist.
 - **Slim/full CI matrix** (item 11) — `.github/workflows/ci.yml` adds `test-full` (`.[dev,ai]` + `pytest`) and `test-slim` (`.[dev]` + `python -c "import app.main"`) jobs so an optional-import regression fails CI instead of shipping silently.
 
-Companion FE fixes on the same branch (`jira-react-app/claude/v2.1-ai-features-vjZSA`):
+Companion FE fixes on the same branch (`claude/v2.1-ai-features-vjZSA`):
 
 - `mapErrorResponse.ts` honors `body.code` and threads it onto `AgentForbiddenError` / `AgentBudgetError`. Legacy plain-string bodies still produce a typed error (back-compat).
 - `useAgentChat.dismissNudge` now calls `agent.dismissNudge(nudgeId)` so chat-drawer dismissals propagate to the AC-V14 inbox reducer instead of resurrecting after `reset()`.

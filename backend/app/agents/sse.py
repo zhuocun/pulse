@@ -2,7 +2,7 @@
 
 The FE consumes events shaped like
 ``{"type": "updates"|"messages"|"custom"|"interrupt"|"error", "ns": [...], "data": ...}``
-(see ``src/interfaces/agent.d.ts`` ``StreamPart`` in jira-react-app).
+(see ``src/interfaces/agent.d.ts`` ``StreamPart`` in pulse ``src/``).
 LangGraph's ``astream(stream_mode=("updates","messages","custom"))`` yields
 ``(mode, chunk)`` tuples in a different shape, so the router needs a
 translation layer.
