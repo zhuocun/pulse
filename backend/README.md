@@ -150,7 +150,7 @@ chore(hooks): enforce commit messages
 - `LANGSMITH_TRACING`: Set to `true` to enable LangSmith tracing (also requires `LANGSMITH_API_KEY`).
 - `LANGSMITH_PROJECT`: Optional LangSmith project name.
 - `OTEL_TRACING`: Set to `true` to enable vendor-neutral OpenTelemetry GenAI spans on every agent invocation and FastAPI request. Defaults to `false`. Requires `python -m pip install ".[observability]"` (or `".[ai]"`); a `RuntimeError` at boot surfaces when the flag is on but the package is missing.
-- `OTEL_SERVICE_NAME`: `service.name` resource attribute on emitted spans. Defaults to `jira-python-server`.
+- `OTEL_SERVICE_NAME`: `service.name` resource attribute on emitted spans. Defaults to `pulse-backend`.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: HTTP endpoint of the OTLP collector (e.g. `https://otlp.example.com/v1/traces`). Empty (the default) falls back to a console exporter that streams the trace JSON to stderr — useful for local dev without a collector.
 - `PROMETHEUS_METRICS`: Set to `true` to mount `GET /metrics` and populate the Tier 9 counters (`agent_invocations_total{agent, outcome}`, `agent_tokens_total{agent, direction}`, `agent_run_duration_seconds{agent, outcome}`, `idempotency_cache_total{route, outcome}`). Defaults to `false`. Same install requirement as `OTEL_TRACING`.
 

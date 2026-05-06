@@ -511,7 +511,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         yield
 
 
-app = FastAPI(title="jira-python-server", lifespan=lifespan)
+app = FastAPI(title="pulse", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
