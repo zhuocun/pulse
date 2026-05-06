@@ -26,7 +26,7 @@ _INVOCATIONS: tuple[tuple[str, dict[str, object]], ...] = (
 def test_chat_tools_are_complete_and_named_for_the_fe_wire() -> None:
     """All six tools are registered and the names match ``chatTools.ts``.
 
-    The FE dispatcher in ``jira-react-app/src/utils/ai/chatTools.ts``
+    The FE dispatcher in ``src/utils/ai/chatTools.ts``
     routes by the wire name; a typo here breaks the round-trip without
     a clear error. The assertions below catch a rename / missing tool.
     """
@@ -39,7 +39,7 @@ def test_chat_tools_are_complete_and_named_for_the_fe_wire() -> None:
 def test_chat_tool_arg_shapes_match_fe_dispatcher() -> None:
     """Each tool's top-level arg keys match what the FE dispatcher reads.
 
-    The FE dispatcher in ``jira-react-app/src/utils/ai/chatTools.ts``
+    The FE dispatcher in ``src/utils/ai/chatTools.ts``
     pulls fields from ``call.arguments`` by name (e.g. ``args.filter``,
     ``args.projectId``). If the BE schema declares a flat
     ``{taskName, type, ...}`` while the FE reads ``args.filter.taskName``,

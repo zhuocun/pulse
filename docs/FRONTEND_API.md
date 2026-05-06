@@ -1,12 +1,12 @@
-# API & Integration Reference — jira-react-app
+# API & Integration Reference — pulse (frontend)
 
 ## Overview
 
-This document covers three integration layers of the `jira-react-app` React front-end:
+This document covers three integration layers of the `pulse` React front-end:
 
-**A. HTTP contract** — every REST and AI route the FE calls on `jira-python-server`.
+**A. HTTP contract** — every REST and AI route the FE calls on the `pulse` backend.
 Backend engineers use this table to verify the shape they must return.
-Server-side route documentation lives in the sibling repo: `../backend/docs/BACKEND_API.md`.
+Server-side route documentation lives in `backend/docs/BACKEND_API.md`.
 
 **B. Public hook and utility surface** — every hook in `src/utils/hooks/` and every
 utility in `src/utils/ai/` that component authors call directly.
@@ -802,7 +802,7 @@ strips exactly one leading space after `data:` per the SSE spec, and yields each
 | >= 500                      | `AgentServerError(status)`                |
 | other                       | `AgentTransportError`                     |
 
-The current `jira-python-server` only emits `X-Reason: budget` on 402 (see `app/routers/agents.py` and `app/routers/ai.py`). The `429 + X-Reason: budget` row is a defensive branch for forward compatibility with servers that surface budget exhaustion as a 429; against today's BE the branch is unreachable.
+The current `pulse` backend only emits `X-Reason: budget` on 402 (see `app/routers/agents.py` and `app/routers/ai.py`). The `429 + X-Reason: budget` row is a defensive branch for forward compatibility with servers that surface budget exhaustion as a 429; against today's BE the branch is unreachable.
 
 #### `invokeAgent`
 

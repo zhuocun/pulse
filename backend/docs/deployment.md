@@ -1,6 +1,6 @@
 # Deployment
 
-Production deployment guide for jira-python-server. Companion to the
+Production deployment guide for the pulse backend. Companion to the
 README's Configuration section.
 
 The agent surface streams long-lived Server-Sent Events and keeps

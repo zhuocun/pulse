@@ -23,7 +23,7 @@ field on the request body is also validated against
 :attr:`AgentMetadata.allowed_autonomy`.
 
 The SSE wire format matches the FE's ``StreamPart`` discriminator
-(``src/interfaces/agent.d.ts`` in jira-react-app); the LangGraph
+(``src/interfaces/agent.d.ts`` in pulse); the LangGraph
 ``(mode, chunk)`` tuples are translated into the FE shape via
 :mod:`app.agents.sse`.
 """

@@ -1,11 +1,11 @@
-# PRD: Board Copilot — AI assistance inside `jira-react-app`
+# PRD: Board Copilot — AI assistance inside `pulse`
 
 | Field                           | Value                                                                                                                                                                                                                                                                                             |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status                          | v1 — Phases 0–3 on `main`; Phase 4 (semantic search) implemented on `cursor/board-copilot-semantic-search-1b36`; Vercel proxy not started. **Superseded for AI features by [`board-copilot-v2.1-agent.md`](board-copilot-v2.1-agent.md)**; this document is retained as the v1 fallback contract. |
 | Owner                           | TBD (frontend)                                                                                                                                                                                                                                                                                    |
 | Last updated                    | 2026-04-29                                                                                                                                                                                                                                                                                        |
-| Target repository               | `jira-react-app` (this repo)                                                                                                                                                                                                                                                                      |
+| Target repository               | `pulse` (this repo)                                                                                                                                                                                                                                                                      |
 | Target release                  | Internal preview, then opt-in toggle for end users                                                                                                                                                                                                                                                |
 | Document scope                  | Product, UX, technical contract, rollout, testing                                                                                                                                                                                                                                                 |
 | Implementation progress         | See [`board-copilot-progress.md`](board-copilot-progress.md)                                                                                                                                                                                                                                      |
@@ -596,6 +596,6 @@ Tracked via the same web-vitals-style events emitted by the client and the serve
 
 - Agent-as-assignee paradigm (Rovo-style): an `IMember` whose `_id` is an agent, with its own queue. Requires a real backend.
 - Workflow Builder Agent (build natural-language automations): requires an automation engine first.
-- MCP-compatible server in front of `jira-python-server` to expose the Capability D tools to external assistants.
+- MCP-compatible server in front of the `pulse` backend to expose the Capability D tools to external assistants.
 - AI-generated cycle / sprint planning across projects.
 - Per-team fine-tuning on historical estimations.

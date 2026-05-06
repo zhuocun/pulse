@@ -430,7 +430,7 @@ Two FE-only gaps from the v2.1 audit closed:
 **What's still open after this session**
 
 - BE has no `MutationProposal` lifecycle (no `proposal_id`, no diff emission, no `__interrupt__` for `fe.applyMutation`, no undo endpoint). The FE card / accept / reject paths exist but are unreachable in remote mode. Multi-week BE work; tracked separately.
-- ~~Vercel SSE truncation (no `maxDuration` in `vercel.json`)~~ — **resolved 2026-05-05** in `jira-python-server` (`api/index.py` now sets `maxDuration: 300`).
+- ~~Vercel SSE truncation (no `maxDuration` in `vercel.json`)~~ — **resolved 2026-05-05** in the `pulse` backend (`backend/api/index.py` now sets `maxDuration: 300`).
 - Backend embedding dimensions pinned to 16 (`app/agents/embeddings.py:47`); search ranking quality is bottlenecked by this. Backend / infra work.
 - AC-V5 `auto` autonomy preapproved tools (`assignTask`, in-column `moveTask`, `renameColumn`) — neither side implements; deferred.
 - JWT-in-localStorage XSS (the AI proxy reuses the primary bearer token) — needs proxy-scoped token migration; out of scope for this work.
@@ -484,7 +484,7 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 
 ### Audit follow-up — 2026-05-05 (`claude/v2.1-ai-readiness-check-TbxeM`)
 
-A focused polish pass on this branch closed three small audit items: the autonomy "Auto" option in `AiChatDrawer` is now hard-disabled with an explanatory i18n tooltip (was a silent no-op that mirrored "Plan"); `MutationProposalCard` accepts an optional `onUndo` prop and fires the previously-orphan `AGENT_PROPOSAL_UNDONE` analytics event when its CTA is clicked; and the stale `TODO(v2.x)` at `src/utils/hooks/useAi.ts:206` is removed since all six product surfaces now drive off `useAgent`/`streamAgent`. The three remaining GA-blockers (BE-emitted `MutationProposal` lifecycle, JWT-in-localStorage XSS, provider 5xx fallback) are explicitly out of scope and continue to gate public ship — see `docs/FRONTEND_PRODUCTION_READINESS.md` "Audit follow-up — 2026-05-05" for status, and the cross-repo BE polish branch with the same name on `jira-python-server`.
+A focused polish pass on this branch closed three small audit items: the autonomy "Auto" option in `AiChatDrawer` is now hard-disabled with an explanatory i18n tooltip (was a silent no-op that mirrored "Plan"); `MutationProposalCard` accepts an optional `onUndo` prop and fires the previously-orphan `AGENT_PROPOSAL_UNDONE` analytics event when its CTA is clicked; and the stale `TODO(v2.x)` at `src/utils/hooks/useAi.ts:206` is removed since all six product surfaces now drive off `useAgent`/`streamAgent`. The three remaining GA-blockers (BE-emitted `MutationProposal` lifecycle, JWT-in-localStorage XSS, provider 5xx fallback) are explicitly out of scope and continue to gate public ship — see `docs/FRONTEND_PRODUCTION_READINESS.md` "Audit follow-up — 2026-05-05" for status, and the BE polish branch `claude/v2.1-ai-features-vjZSA` in `backend/`.
 
 ---
 

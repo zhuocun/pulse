@@ -1,7 +1,7 @@
 # AI Web App UX Best Practices — Research Reference
 
 **Created:** 2026-05-05  
-**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `jira-react-app`. Complements `AI_UX_OPTIMIZATION_PLAN.md` (implementation audit) and `docs/ui-ux-optimization-plan.md` (general UX plan).  
+**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements `AI_UX_OPTIMIZATION_PLAN.md` (implementation audit) and `docs/ui-ux-optimization-plan.md` (general UX plan).  
 **Primary sources:** Google PAIR Guidebook, Microsoft HAX Toolkit, Nielsen Norman Group AI UX research, NIST AI RMF, Anthropic model card & safety guidance, IBM Design for AI, OpenAI product design guidance, W3C accessibility, Apple ML/privacy design.
 
 ---

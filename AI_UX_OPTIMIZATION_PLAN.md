@@ -2,7 +2,7 @@
 
 Updated: 2026-05-04
 
-This document audits the current `jira-react-app` Board Copilot implementation
+This document audits the current `pulse` Board Copilot implementation
 against current AI UI/UX best practices and red flags from Google PAIR,
 Microsoft HAX, NN/g, NIST AI RMF, OpenAI app UX guidance, W3C accessibility
 guidance, IBM explainability guidance, Apple privacy guidance, and Anthropic

@@ -1,6 +1,6 @@
-# jira-react-app
+# pulse
 
-`jira-react-app` is a React-based front-end application for a Jira-like project management tool. This app provides a user-friendly interface for managing tasks, projects, and team collaborations.
+`pulse` is a React-based front-end application for a Jira-like project management tool. This app provides a user-friendly interface for managing tasks, projects, and team collaborations.
 
 ## Monorepo layout
 

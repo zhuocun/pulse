@@ -1,4 +1,4 @@
-# HTTP API Reference — jira-python-server
+# HTTP API Reference — pulse (backend)
 
 **Target audience:** backend and frontend engineers integrating against this server.
 This document is sufficient to implement a client without reading source code.

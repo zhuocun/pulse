@@ -1,11 +1,11 @@
-# PRD: Board Copilot v2.1 — Agentic AI for `jira-react-app`
+# PRD: Board Copilot v2.1 — Agentic AI for `pulse`
 
 | Field             | Value                                                                                                                                                                                                                             |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status            | Draft v2.1 — supersedes the earlier v2 agent draft. v1 capabilities ship as the fallback experience; v2.1 is the new default once the Python agent server is reachable.                                                           |
 | Author            | Product (this document is the design-reviewed revision of the v2 Board Copilot PRD)                                                                                                                                               |
 | Last updated      | 2026-05-01                                                                                                                                                                                                                        |
-| Target repository | `jira-react-app` (frontend) + a Python agent server at `${REACT_APP_AI_BASE_URL}` (out of repo), built on LangGraph 1.x with agents registered in `app/agents/catalog/`                                                           |
+| Target repository | `pulse` (frontend, `src/`) + Python agent server at `${REACT_APP_AI_BASE_URL}` (`backend/`), built on LangGraph 1.x with agents registered in `app/agents/catalog/`                                                           |
 | Document scope    | Product critique of v2, redesigned architecture aligned to LangGraph substrate, FE↔BE agent contract, governance & rollout. Server internals are referenced where they affect the wire contract.                                  |
 | Companion docs    | [`board-copilot.md`](board-copilot.md) (v1 design), [`board-copilot-progress.md`](board-copilot-progress.md), [`ui-ux-optimization-plan.md`](../ui-ux-optimization-plan.md) |
 
@@ -247,7 +247,7 @@ v2 deferred this to "once Phase F lands." In 2026 with a LangGraph backend, this
 
 ## 5A. Backend and API design (Python server)
 
-This section specifies the server-side architecture. The server lives in the `jira-python-server` repository and is built on **FastAPI + LangGraph 1.x**. It is the binding contract for anyone implementing or extending the agent server.
+This section specifies the server-side architecture. The server lives in `backend/` and is built on **FastAPI + LangGraph 1.x**. It is the binding contract for anyone implementing or extending the agent server.
 
 ### 5A.1 Server stack and dependencies
 
@@ -266,7 +266,7 @@ This section specifies the server-side architecture. The server lives in the `ji
 ### 5A.2 Server directory layout
 
 ```
-jira-python-server/
+backend/
 ├── app/
 │   ├── main.py                     # FastAPI app, CORS, middleware, lifespan
 │   ├── config.py                   # Settings: DB URI, LLM keys, rate limits
@@ -864,7 +864,7 @@ v2 proposed client-side redaction via `src/utils/ai/redact.ts`. v2.1 moves redac
 - The browser sends the full text under TLS to the server.
 - The server applies the redaction pass before passing content to the LLM provider. This avoids degrading model quality by reasoning over masks, and catches more than a client-side regex can (PII names, customer IDs, multi-line secrets).
 - Provider responses come back un-redacted to the user.
-- The unit-test corpus for redaction belongs in `jira-python-server`, not in the FE.
+- The unit-test corpus for redaction belongs in `backend/`, not in `src/`.
 - AC-V8 is rewritten: "The server's redaction pass masks emails, bearer tokens, and PII before forwarding to the LLM provider. Verified by server-side unit tests."
 
 ### 6.8 "What is shared with the agent?" panel

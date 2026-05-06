@@ -1,4 +1,4 @@
-# jira-python-server
+# pulse — backend
 
 FastAPI port of `jira-express-server`.
 
@@ -274,7 +274,7 @@ Supporting modules:
 - `app/store/namespaces.py` — tuple-based namespace conventions for the LangGraph long-term store.
 - `app/auth/project_access.py` — per-project AI-disable allow-list driven by `AGENT_DISABLED_PROJECT_IDS` (PRD §6.3 / AC-V10).
 
-The router wire format matches the FE `StreamPart` discriminator in jira-react-app `src/interfaces/agent.d.ts`:
+The router wire format matches the FE `StreamPart` discriminator in `src/interfaces/agent.d.ts`:
 
 ```json
 {"type": "updates"|"messages"|"custom"|"interrupt"|"error", "ns": ["..."], "data": ...}
@@ -286,7 +286,7 @@ MCP server wiring (`langchain-mcp-adapters`) is **deferred** to a follow-up comm
 
 ### Legacy `/api/ai/*` shim (v1 FE surfaces)
 
-The shipped Board Copilot UI in jira-react-app (Phases 0–4) posts JSON to `/api/ai/<route>`. Those endpoints live in `app/routers/ai.py` and call deterministic helpers in `app/services/v1_engine.py`; the chat route forwards to `chat-agent` so it shares the configured LLM. Every request goes through the same auth + redaction + project-disable + rate-limit + budget gates as the v2.1 endpoints. The v2.1 streaming surface remains the recommended path for new clients.
+The shipped Board Copilot UI (Phases 0–4) posts JSON to `/api/ai/<route>`. Those endpoints live in `app/routers/ai.py` and call deterministic helpers in `app/services/v1_engine.py`; the chat route forwards to `chat-agent` so it shares the configured LLM. Every request goes through the same auth + redaction + project-disable + rate-limit + budget gates as the v2.1 endpoints. The v2.1 streaming surface remains the recommended path for new clients.
 
 Every turn passes through four gates wired into the agents router:
 

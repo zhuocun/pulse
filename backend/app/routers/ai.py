@@ -1,6 +1,6 @@
 """Legacy ``/api/ai/<route>`` shim for the v1 FE surfaces.
 
-The shipped Board Copilot UI in jira-react-app (Phases 0--4 from
+The shipped Board Copilot UI in pulse (Phases 0–4 from
 ``docs/prd/board-copilot-progress.md``) posts JSON to
 ``/api/ai/{task-draft,task-breakdown,estimate,readiness,board-brief,search,chat}``
 and expects synchronous JSON back. The v2.1 streaming agent surface at
@@ -97,7 +97,7 @@ def _redact(text: str) -> str:
 def _unwrap_envelope(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
     """Accept the FE's ``{key: {...}}`` envelope shape.
 
-    The shipped React client (jira-react-app ``src/utils/hooks/useAi.ts``)
+    The shipped React client (pulse ``src/utils/hooks/useAi.ts``)
     posts the entire ``RunPayload`` -- e.g. ``{draft: {prompt, context}}``
     for ``/task-draft`` -- because a single hook handles every v1 route and
     the discriminating key is the route name. The earlier handlers were
