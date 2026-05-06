@@ -1,6 +1,6 @@
 # Production Readiness — Board Copilot Frontend
 
-Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/PRODUCTION_READINESS.md`.
+Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/BACKEND_PRODUCTION_READINESS.md`.
 
 Last updated: 2026-05-05.
 

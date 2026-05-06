@@ -111,7 +111,7 @@ chore(hooks): enforce commit messages
 > [`docs/AI_REMAINING_WORK.md`](docs/AI_REMAINING_WORK.md) for the
 > Priority 1 production gotchas (durable backends, idempotency,
 > provider-key guard) and the open GA-blockers
-> ([`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md)).
+> ([`docs/BACKEND_PRODUCTION_READINESS.md`](docs/BACKEND_PRODUCTION_READINESS.md)).
 
 - `DATABASE`: Storage backend. Supported values match the Express app: `mongoDB`, `dynamoDB`, `postgreSQL`. Defaults to `mongoDB`.
 - `MONGO_URI`: MongoDB connection string.
@@ -173,7 +173,7 @@ Without an API key, `AGENT_CHAT_MODEL_PROVIDER=auto` (the default) runs the dete
 
 ## Agents
 
-> **GA blockers — not yet production-ready for public ship.** Three hard blockers documented in [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) must close before the agent surface goes public: (1) the `MutationProposal` accept/undo lifecycle is a dead-end (no agent emits `custom/mutation_proposal`, no `fe.applyMutation` interrupt is registered); (2) there is no provider 5xx fallback — a single upstream Anthropic/OpenAI error is a full outage; (3) the AI proxy reuses the primary bearer JWT from `localStorage`, creating an XSS exfiltration surface. Until these are resolved, deploy with proposal cards gated off and treat the surface as internal beta only.
+> **GA blockers — not yet production-ready for public ship.** Three hard blockers documented in [`docs/BACKEND_PRODUCTION_READINESS.md`](docs/BACKEND_PRODUCTION_READINESS.md) must close before the agent surface goes public: (1) the `MutationProposal` accept/undo lifecycle is a dead-end (no agent emits `custom/mutation_proposal`, no `fe.applyMutation` interrupt is registered); (2) there is no provider 5xx fallback — a single upstream Anthropic/OpenAI error is a full outage; (3) the AI proxy reuses the primary bearer JWT from `localStorage`, creating an XSS exfiltration surface. Until these are resolved, deploy with proposal cards gated off and treat the surface as internal beta only.
 
 The application ships with an agent runtime built on [LangGraph](https://github.com/langchain-ai/langgraph) (`langgraph>=1.1,<2`, the v1.x API line). Six agents are registered automatically from `app/agents/catalog/` at startup — `board-brief-agent`, `task-drafting-agent`, `task-estimation-agent`, `chat-agent`, `triage-agent`, and `search-agent`; see the [Board Copilot v2.1 — Agent catalog](#board-copilot-v21--agent-catalog) section below for what each one does.
 
