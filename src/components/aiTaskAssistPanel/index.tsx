@@ -302,7 +302,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             onApplySuggestion(issue.field, issue.suggestion);
             track(ANALYTICS_EVENTS.COPILOT_REWRITE_ACCEPT, {
                 field: issue.field,
-                taskId: projectId
+                ...(projectId ? { projectId } : {}),
+                ...(excludeTaskId ? { taskId: excludeTaskId } : {})
             });
             undoToast.show({
                 description: (
@@ -316,7 +317,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 }
             });
         },
-        [onApplySuggestion, projectId, undoToast, values]
+        [excludeTaskId, onApplySuggestion, projectId, undoToast, values]
     );
 
     const handleRegenerate = useCallback(() => {

@@ -294,7 +294,7 @@ def _configure_middleware_backends(cfg: Settings) -> None:
             f"expected one of {', '.join(_SUPPORTED_IDEMPOTENCY_BACKENDS)}."
         )
 
-    # Hard-fail when any memory-backed middleware runs in a multi-worker /
+    # Warn when any memory-backed middleware runs in a multi-worker /
     # multi-instance environment: each worker maintains an independent
     # in-process counter, so rate limits and budget caps are multiplied by
     # the worker count and idempotency keys are invisible across processes.
@@ -434,9 +434,8 @@ def _validate_memory_agent_backends(cfg: Settings) -> None:
     The default is still ``memory`` so local dev and the test suite
     (which run on a single long-lived process) keep working without
     spinning up Postgres. When the deploy looks production-shaped or
-    multi-worker a ``RuntimeError`` is raised at startup so the
-    misconfiguration surfaces immediately in the deploy log rather than
-    silently corrupting the first user-facing agent run.
+    multi-worker, a warning is logged so operators can catch the
+    misconfiguration before interrupt-using agent runs dead-end.
     """
 
     checkpoint_is_memory = cfg.agent_checkpoint_backend == "memory"
@@ -464,8 +463,8 @@ def _validate_memory_agent_backends(cfg: Settings) -> None:
             ", ".join(offenders),
         )
 
-    # Single-worker local dev / test — log at debug to avoid noisy boots;
-    # multi-instance misuse still raises above.
+    # Single-worker local dev / test -- log at debug to avoid noisy boots;
+    # multi-instance misuse logs the warning above.
     logger.debug(
         "Agent persistence is using the in-process memory backend "
         "(checkpoint=%s, store=%s). Interrupt-using agents (board-brief, "

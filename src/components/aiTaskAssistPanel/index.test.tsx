@@ -240,7 +240,42 @@ describe("AiTaskAssistPanel", () => {
             ([e]) => e === ANALYTICS_EVENTS.COPILOT_REWRITE_ACCEPT
         );
         expect(rewriteCalls).toHaveLength(1);
-        expect(rewriteCalls[0][1]).toMatchObject({ field: "taskName" });
+        expect(rewriteCalls[0][1]).toMatchObject({
+            field: "taskName",
+            projectId: "p1"
+        });
+        expect(rewriteCalls[0][1]).not.toHaveProperty("taskId");
+    });
+
+    it("COPILOT_REWRITE_ACCEPT passes excludeTaskId as taskId separately from projectId", async () => {
+        const tracked: Array<[string, Record<string, unknown> | undefined]> =
+            [];
+        const previous = setAnalyticsSink((event, payload) => {
+            tracked.push([event, payload]);
+        });
+        try {
+            mountPanel({
+                values: { taskName: "Hi" },
+                excludeTaskId: "task-exclude-1"
+            });
+            jest.advanceTimersByTime(1000);
+            const button = await screen.findByLabelText(
+                /Apply readiness suggestion for taskName/
+            );
+            fireEvent.click(button);
+        } finally {
+            setAnalyticsSink(previous);
+        }
+
+        const rewriteCalls = tracked.filter(
+            ([e]) => e === ANALYTICS_EVENTS.COPILOT_REWRITE_ACCEPT
+        );
+        expect(rewriteCalls).toHaveLength(1);
+        expect(rewriteCalls[0][1]).toMatchObject({
+            field: "taskName",
+            projectId: "p1",
+            taskId: "task-exclude-1"
+        });
     });
 
     it("re-runs suggestions when board context arrives after the panel mounts", async () => {

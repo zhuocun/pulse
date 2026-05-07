@@ -76,8 +76,8 @@ This app ships an AI assistant called **Board Copilot** with six capabilities:
 - **Smart task drafting** in the create-task flow (a "Draft with AI" button next to `+ Create task`).
 - **Story-point estimation and readiness check** inside the edit-task modal.
 - **Board summary / standup brief** opened from the `Brief` button in the board header.
-- **Ask Board Copilot** — conversational Q&A from the `Ask` button on the board or project list (read-only project data via tool calls locally; optional remote `/api/ai/chat` when `REACT_APP_AI_BASE_URL` is set).
-- **Semantic search** — natural-language search on the board and project list (local token ranking, or optional remote `POST …/api/ai/search` when `REACT_APP_AI_BASE_URL` is set). Results combine with existing text filters; use **Clear AI search** to drop only the semantic filter.
+- **Ask Board Copilot** — conversational Q&A from the `Ask` button on the board or project list (read-only project data via local tools, or v2.1 SSE `chat-agent` in remote builds).
+- **Semantic search** — natural-language search on the board and project list (local token ranking, or v2.1 SSE `search-agent` in remote builds). Results combine with existing text filters; use **Clear AI search** to drop only the semantic filter.
 - **Triage inbox** — drift-signal nudges (`unowned_bug`, `wip_overflow`, `stale_task`) surfaced via `triage-agent` with cap-5, dedup, 4-hour expiry, and dismiss propagation (v2.1).
 
 All AI features are **opt-out**: the existing flows are unchanged, and AI surfaces are gated by a single env flag and a runtime user toggle (persisted in `localStorage` under `boardCopilot:enabled`).
@@ -86,8 +86,8 @@ All AI features are **opt-out**: the existing flows are unchanged, and AI surfac
 
 Board Copilot has two backends:
 
-1.  **Local engine (default).** A deterministic in-browser engine derives all suggestions from the React Query caches that already exist in the app (project tasks, columns, members). It works with **no backend, no API key, and no network call**, which is how the FE is shipped today.
-2.  **Remote proxy (optional).** If `REACT_APP_AI_BASE_URL` is set, the hook posts the same payload to `${REACT_APP_AI_BASE_URL}/api/ai/<route>` instead. The expected route handler should hold the LLM key, return a JSON response shaped according to `src/interfaces/ai.d.ts`, and follow the contract in `docs/prd/board-copilot.md`. **Never put the model key in the client bundle.**
+1.  **Local engine (dev/test default).** A deterministic in-browser engine derives suggestions from the React Query caches that already exist in the app (project tasks, columns, members). It works with **no backend, no API key, and no network call**.
+2.  **Remote agent server (deployed default).** In deployed builds with `REACT_APP_AI_USE_LOCAL` unset, `aiBaseUrl` defaults to the API origin and the frontend uses `/api/v1/agents/{name}/stream` for the v2.1 agents. `REACT_APP_AI_BASE_URL` can point at a separate agent origin. The v1 JSON routes remain as local-engine fallback compatibility paths. **Never put the model key in the client bundle.**
 
 ### Environment variables
 
@@ -127,7 +127,7 @@ Phase A wires the FE plumbing for the v2.1 agent without changing the v1 surface
 
 ### Environment
 
-`REACT_APP_AI_BASE_URL` keeps the same semantics: empty means the v1 local engine is the source of truth; non-empty points at a LangGraph server that exposes `/api/v1/agents/{name}/stream`, `/invoke`, `/api/v1/agents`, `/api/v1/agents/{name}`, and `/api/v1/health`. The v1 `useAi` / `useAiChat` hooks remain the fallback path when the v2.1 agent server is unreachable.
+`REACT_APP_AI_BASE_URL` points at a LangGraph server that exposes `/api/v1/agents/{name}/stream`, `/invoke`, `/api/v1/agents`, `/api/v1/agents/{name}`, and `/api/v1/health`. When it is unset, dev/test use the local engine while deployed builds default the agent base URL to the API origin unless `REACT_APP_AI_USE_LOCAL=true` is set. The v1 `useAi` / `useAiChat` hooks remain the local fallback path.
 
 ### Developing with Board Copilot
 

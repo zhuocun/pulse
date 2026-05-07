@@ -391,7 +391,12 @@ def _redact_resume(resume: Any) -> Any:
 
 
 def _record_real_usage(
-    project_id: Optional[str], tokens_in: int, tokens_out: int, *, prebooked: int = 0
+    project_id: Optional[str],
+    tokens_in: int,
+    tokens_out: int,
+    *,
+    prebooked: int = 0,
+    failure: bool = False,
 ) -> int:
     """True up ``prebooked`` reservation against actual provider usage.
 
@@ -401,11 +406,16 @@ def _record_real_usage(
     * topping up when the provider used more than was reserved
       (``actual > prebooked``);
     * refunding the unused reservation when the provider used less
-      (``actual < prebooked``).
+      (``actual < prebooked`` and ``actual > 0``).
 
-    A provider that does not report usage (``actual == 0``) keeps the
-    full pre-booked charge -- otherwise a misbehaving model could
-    bypass the cap by dropping the metadata.
+    When ``failure`` is false (successful completion), a provider that
+    does not report usage (``actual == 0``) keeps the full pre-booked
+    charge -- otherwise a misbehaving model could bypass the cap by
+    dropping the metadata.
+
+    When ``failure`` is true (timeout, disconnect, or other error paths
+    with no usable result), unused reservation is refunded, including the
+    full prebook when ``actual == 0``.
     """
 
     actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
@@ -415,7 +425,9 @@ def _record_real_usage(
         _budget.budget_tracker.record(project_id, tokens=actual - prebooked)
     elif actual and actual < prebooked:
         _budget.budget_tracker.refund(project_id, tokens=prebooked - actual)
-    # actual == prebooked or actual == 0 -- no adjustment needed.
+    elif failure and actual == 0 and prebooked:
+        _budget.budget_tracker.refund(project_id, tokens=prebooked)
+    # Success with actual == prebooked, or success with actual == 0 -- no further change.
     return actual
 
 
@@ -559,6 +571,9 @@ async def invoke_agent(
         )
 
     try:
+        reserved_budget = 0
+        budget_reconciled = False
+        project_id: Optional[str] = None
         metadata = runtime.get(name).metadata
         response_headers: dict[str, str] = {}
         _enforce_status(metadata, response_headers)
@@ -580,7 +595,7 @@ async def invoke_agent(
             raise
         prebooked = max(1, _input_token_estimate(inputs))
         try:
-            _enforce_budget(project_id, tokens=prebooked)
+            reserved_budget = _enforce_budget(project_id, tokens=prebooked)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_402_PAYMENT_REQUIRED:
                 record_invocation(name, "budget_exhausted")
@@ -606,7 +621,14 @@ async def invoke_agent(
             ) from exc
 
         tokens_in, tokens_out = result_token_usage_from_graph_result(result)
-        _record_real_usage(project_id, tokens_in, tokens_out, prebooked=prebooked)
+        _record_real_usage(
+            project_id,
+            tokens_in,
+            tokens_out,
+            prebooked=reserved_budget,
+            failure=False,
+        )
+        budget_reconciled = True
         body: Dict[str, Any] = {
             "result": result,
             "usage": {"tokensIn": tokens_in, "tokensOut": tokens_out},
@@ -617,6 +639,16 @@ async def invoke_agent(
             return JSONResponse(content=body, headers=response_headers)
         return body
     except BaseException:
+        # Release unused budget reservation when the run did not reconcile
+        # against recorded usage (timeout, crashes, cancellations, etc.).
+        if not budget_reconciled and reserved_budget:
+            _record_real_usage(
+                project_id,
+                0,
+                0,
+                prebooked=reserved_budget,
+                failure=True,
+            )
         # Release the in-flight reservation on any failure (gate
         # rejection, agent crash, asyncio cancellation) so a real
         # retry can proceed without waiting out the 24h TTL.
@@ -673,91 +705,122 @@ async def stream_agent(
                 headers={**cached.headers, "Idempotent-Replay": "true"},
             )
 
+    reserved_budget = 0
+    stream_response_returned = False
     try:
         _enforce_project_access(project_id)
         _require_project_manager(project_id, user_id)
         _enforce_rate_limit(name, user_id, metadata)
         prebooked = max(1, _input_token_estimate(inputs))
-        _enforce_budget(project_id, tokens=prebooked)
+        reserved_budget = _enforce_budget(project_id, tokens=prebooked)
+
+        options = _run_options(payload, user_id=user_id)
+        context = _request_context(name, payload, runtime)
+        timeout = settings.agent_request_timeout_seconds
+
+        async def event_generator() -> AsyncIterator[bytes]:
+            tokens_in_total = 0
+            tokens_out_total = 0
+            completed_ok = False
+            failure_budget_settled = False
+
+            def settle_failure_budget() -> None:
+                nonlocal failure_budget_settled
+                if failure_budget_settled or not reserved_budget:
+                    return
+                _record_real_usage(
+                    project_id,
+                    tokens_in_total,
+                    tokens_out_total,
+                    prebooked=reserved_budget,
+                    failure=True,
+                )
+                failure_budget_settled = True
+
+            try:
+                stream = runtime.astream(
+                    name,
+                    inputs,
+                    context=context,
+                    resume=resume,
+                    **options,
+                )
+                async for mode, chunk in _with_disconnect(request, stream, timeout):
+                    for envelope in translate_event(mode, chunk):
+                        yield encode_sse(envelope)
+                        if envelope.get("type") == "custom":
+                            usage = _maybe_capture_usage(envelope)
+                            if usage is not None:
+                                tokens_in_total += usage[0]
+                                tokens_out_total += usage[1]
+            except AgentError as exc:
+                yield encode_sse(error_envelope(str(exc), recoverable=False))
+            except asyncio.TimeoutError:
+                yield encode_sse(
+                    error_envelope(
+                        f"Agent run exceeded {timeout}s timeout", recoverable=False
+                    )
+                )
+            except _ClientDisconnected:
+                settle_failure_budget()
+                if idem is not None:
+                    idem.release()
+                return
+            except Exception:  # noqa: BLE001 -- intentional translation boundary
+                logger.exception("Agent %r failed mid-stream.", name)
+                yield encode_sse(
+                    error_envelope(
+                        "Agent run failed; see server logs for details.",
+                        recoverable=False,
+                    )
+                )
+            else:
+                if tokens_in_total or tokens_out_total:
+                    yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
+                _record_real_usage(
+                    project_id,
+                    tokens_in_total,
+                    tokens_out_total,
+                    prebooked=reserved_budget,
+                    failure=False,
+                )
+                completed_ok = True
+            if not completed_ok:
+                settle_failure_budget()
+            # On a clean stream completion we leave a sentinel in the cache
+            # so an immediate retry with the same key replays as a 200 JSON
+            # marker rather than restarting the run; on any error path we
+            # release the slot so a real retry can proceed.
+            if idem is not None:
+                if completed_ok:
+                    idem.store(
+                        status_code=status.HTTP_200_OK,
+                        body={"status": "stream_completed"},
+                    )
+                    record_idempotency(route_path, "miss")
+                else:
+                    idem.release()
+            yield DONE_FRAME
+
+        response = StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers=response_headers,
+        )
+        stream_response_returned = True
+        return response
     except BaseException:
+        if reserved_budget and not stream_response_returned:
+            _record_real_usage(
+                project_id,
+                0,
+                0,
+                prebooked=reserved_budget,
+                failure=True,
+            )
         if idem is not None:
             idem.release()
         raise
-
-    options = _run_options(payload, user_id=user_id)
-    context = _request_context(name, payload, runtime)
-    timeout = settings.agent_request_timeout_seconds
-
-    async def event_generator() -> AsyncIterator[bytes]:
-        tokens_in_total = 0
-        tokens_out_total = 0
-        completed_ok = False
-        try:
-            stream = runtime.astream(
-                name,
-                inputs,
-                context=context,
-                resume=resume,
-                **options,
-            )
-            async for mode, chunk in _with_disconnect(request, stream, timeout):
-                for envelope in translate_event(mode, chunk):
-                    yield encode_sse(envelope)
-                    if envelope.get("type") == "custom":
-                        usage = _maybe_capture_usage(envelope)
-                        if usage is not None:
-                            tokens_in_total += usage[0]
-                            tokens_out_total += usage[1]
-        except AgentError as exc:
-            yield encode_sse(error_envelope(str(exc), recoverable=False))
-        except asyncio.TimeoutError:
-            yield encode_sse(
-                error_envelope(
-                    f"Agent run exceeded {timeout}s timeout", recoverable=False
-                )
-            )
-        except _ClientDisconnected:
-            if idem is not None:
-                idem.release()
-            return
-        except Exception:  # noqa: BLE001 -- intentional translation boundary
-            logger.exception("Agent %r failed mid-stream.", name)
-            yield encode_sse(
-                error_envelope(
-                    "Agent run failed; see server logs for details.",
-                    recoverable=False,
-                )
-            )
-        else:
-            if tokens_in_total or tokens_out_total:
-                yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
-            _record_real_usage(
-                project_id,
-                tokens_in_total,
-                tokens_out_total,
-                prebooked=prebooked,
-            )
-            completed_ok = True
-        # On a clean stream completion we leave a sentinel in the cache
-        # so an immediate retry with the same key replays as a 200 JSON
-        # marker rather than restarting the run; on any error path we
-        # release the slot so a real retry can proceed.
-        if idem is not None:
-            if completed_ok:
-                idem.store(
-                    status_code=status.HTTP_200_OK,
-                    body={"status": "stream_completed"},
-                )
-                record_idempotency(route_path, "miss")
-            else:
-                idem.release()
-        yield DONE_FRAME
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers=response_headers,
-    )
 
 
 class _ClientDisconnected(Exception):

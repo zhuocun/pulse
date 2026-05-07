@@ -176,22 +176,36 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
     const [toolTraceMessages, setToolTraceMessages] = useState<AiChatMessage[]>(
         []
     );
-    // Track which interrupt we've already synthesized a trace for.
-    const lastInterruptToolRef = useRef<string | null>(null);
+    /** Deduplicates tool traces by tool + args, so changed FE args get distinct bubbles. */
+    const lastInterruptSignatureRef = useRef<string | null>(null);
+    /**
+     * After `resumeProposal`, clear the card only once the underlying run
+     * finishes without error; see effect below.
+     */
+    const proposalClearAfterResumeRef = useRef<{ proposal_id: string } | null>(
+        null
+    );
+    const pendingProposalIdRef = useRef<string | undefined>(undefined);
 
     // Locally dismissed nudges (nudgeId → true).
     const [dismissedNudgeIds, setDismissedNudgeIds] = useState<Set<string>>(
         () => new Set()
     );
 
-    // Synthesize a tool-trace bubble whenever pendingInterrupt changes to a
-    // new tool name. The auto-resume loop in useAgent clears the interrupt
-    // after execution, but we capture it here before it's cleared.
+    // Fresh id for resumeProposal closure (avoid deps on transient proposal objects).
+    pendingProposalIdRef.current = agent.pendingProposal?.proposal_id;
+
+    // Synthesize a tool-trace bubble for each distinct (tool + args)
+    // interrupt within a turn. useAgent clears the interrupt after FE-tool
+    // execution; we observe each payload before it's cleared.
     const { pendingInterrupt } = agent;
     useEffect(() => {
         if (!pendingInterrupt) return;
-        if (lastInterruptToolRef.current === pendingInterrupt.tool) return;
-        lastInterruptToolRef.current = pendingInterrupt.tool;
+        const interruptKey = `${pendingInterrupt.tool}:${JSON.stringify(
+            pendingInterrupt.args
+        )}`;
+        if (lastInterruptSignatureRef.current === interruptKey) return;
+        lastInterruptSignatureRef.current = interruptKey;
         const traceMsg: AiChatMessage = {
             role: "tool",
             content: `${humanizeToolName(pendingInterrupt.tool)}…`,
@@ -200,6 +214,28 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         };
         setToolTraceMessages((prev) => [...prev, traceMsg]);
     }, [pendingInterrupt]);
+
+    /** When a proposal resume settles the stream successfully, dismiss the proposal card. */
+    useEffect(() => {
+        const draft = proposalClearAfterResumeRef.current;
+        if (!draft) return;
+        if (agent.isStreaming) return;
+        if (agent.error) {
+            proposalClearAfterResumeRef.current = null;
+            return;
+        }
+        if (agent.pendingProposal?.proposal_id !== draft.proposal_id) {
+            proposalClearAfterResumeRef.current = null;
+            return;
+        }
+        proposalClearAfterResumeRef.current = null;
+        agent.clearPendingProposal();
+    }, [
+        agent.isStreaming,
+        agent.error,
+        agent.pendingProposal,
+        agent.clearPendingProposal
+    ]);
 
     // Derive displayed messages and streamingText from agent state.
     const { messages, streamingText } = deriveMessagesAndStreaming(
@@ -229,7 +265,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
             if (!trimmed || !ctx) return;
             // Clear tool traces for the new turn.
             setToolTraceMessages([]);
-            lastInterruptToolRef.current = null;
+            lastInterruptSignatureRef.current = null;
             try {
                 await agent.start({
                     messages: [{ role: "user", content: trimmed }]
@@ -244,19 +280,24 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
     );
 
     const reset = useCallback(() => {
+        proposalClearAfterResumeRef.current = null;
         agent.reset();
         setToolTraceMessages([]);
-        lastInterruptToolRef.current = null;
+        lastInterruptSignatureRef.current = null;
         setDismissedNudgeIds(new Set());
         setErrorDismissed(false);
     }, [agent]);
 
     const resumeProposal = useCallback(
         (accepted: boolean) => {
-            agent.clearPendingProposal();
-            void agent.resume({ accepted });
+            const pid = pendingProposalIdRef.current;
+            if (!pid) return;
+            proposalClearAfterResumeRef.current = { proposal_id: pid };
+            void agent.resume({ accepted }).catch(() => {
+                proposalClearAfterResumeRef.current = null;
+            });
         },
-        [agent]
+        [agent.resume]
     );
 
     const dismissNudge = useCallback(
