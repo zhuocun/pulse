@@ -57,14 +57,18 @@ export interface BoardSnapshotResult {
 }
 
 export const boardSnapshotTool: FeTool<
-    { projectId?: string } | void,
+    { project_id?: string; projectId?: string } | void,
     BoardSnapshotResult
 > = {
     name: "fe.boardSnapshot",
     description:
         "Compact board summary: counts per column, members, unowned tasks, workload.",
     run: (args, ctx) => {
+        // Accept both snake_case (the v2.1 BE convention, post-a59539f)
+        // and camelCase (legacy callers) so the contract is resilient
+        // even if either side lags the migration.
         const projectId =
+            (args && "project_id" in args ? args.project_id : undefined) ??
             (args && "projectId" in args ? args.projectId : undefined) ??
             ctx.projectId;
         const empty: BoardSnapshotResult = {

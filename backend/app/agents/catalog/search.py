@@ -295,7 +295,7 @@ class SearchAgent(BaseAgent):
                 candidates = candidates["candidates"]
             return {"candidates": candidates}
 
-        def rank(state: SearchState) -> dict[str, Any]:
+        async def rank(state: SearchState) -> dict[str, Any]:
             """Embed query + candidates; rank by cosine similarity.
 
             When the candidate list is empty we skip embedding (no work to do)
@@ -320,8 +320,11 @@ class SearchAgent(BaseAgent):
                 }
             # Embed query and all candidate texts in a single batch where
             # possible; the provider (or stub) normalises to unit vectors.
+            # ``embed_async`` offloads the (possibly blocking) provider
+            # call to a thread so the event loop stays responsive while
+            # ranking large candidate sets against a real OpenAI provider.
             texts = [query] + [c.get("text", "") for c in candidates]
-            vectors = be_tools.embed(texts)
+            vectors = await be_tools.embed_async(texts)
             query_vec = vectors[0]
             corpus = [
                 (c.get("id", str(idx)), vectors[idx + 1])

@@ -3,6 +3,7 @@ import type { FeTool } from "./types";
 type SearchCandidatesArgs = {
     kind: "tasks" | "projects";
     query: string;
+    project_id?: string;
     projectId?: string;
 };
 
@@ -12,6 +13,9 @@ type SearchCandidate = { id: string; text: string };
  * `fe.searchCandidates` — return raw candidate items from the React Query
  * cache so the search-agent can rank them server-side. Bounded at 50
  * entries to keep the agent prompt within reasonable token limits.
+ *
+ * Accepts both snake_case (`project_id`, the v2.1 BE convention
+ * post-a59539f) and camelCase (`projectId`, legacy) for resilience.
  */
 export const searchCandidatesTool: FeTool<
     SearchCandidatesArgs,
@@ -23,7 +27,8 @@ export const searchCandidatesTool: FeTool<
         if (!args) return { candidates: [] };
 
         if (args.kind === "tasks") {
-            const projectId = args.projectId ?? ctx.projectId;
+            const projectId =
+                args.project_id ?? args.projectId ?? ctx.projectId;
             if (!projectId) return { candidates: [] };
             const tasks =
                 ctx.queryClient.getQueryData<ITask[]>([
