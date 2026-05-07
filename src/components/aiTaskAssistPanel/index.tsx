@@ -305,8 +305,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 taskId: projectId
             });
             undoToast.show({
-                description: (microcopy.ai.readinessFieldUpdated as string)
-                    .replace("{field}", String(issue.field)),
+                description: (
+                    microcopy.ai.readinessFieldUpdated as string
+                ).replace("{field}", String(issue.field)),
                 analyticsTag: "copilot.readiness.apply",
                 undo: () => {
                     onApplySuggestion(issue.field, previous, {

@@ -75,7 +75,10 @@ const openTasksLabel = (w: { openTasks: number; openPoints: number }): string =>
         : microcopy.counts.tasksMatchingActiveFilters.other
     )
         .replace("{count}", String(w.openTasks))
-        .replace(" matches the active filters", "")}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(w.openPoints))}`;
+        .replace(
+            " matches the active filters",
+            ""
+        )}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(w.openPoints))}`;
 
 /**
  * After tool results are in the thread, produce a user-facing answer without issuing more tools.
@@ -323,10 +326,9 @@ export const summarizeToolResultForUser = (
                     return microcopy.ai.noProjectsFound as string;
                 const lines = payload.map((p) => `• **${p.projectName}**`);
                 return [
-                    (
-                        payload.length === 1
-                            ? microcopy.ai.checkedProjectsSummaryOne
-                            : microcopy.ai.checkedProjectsSummaryOther
+                    (payload.length === 1
+                        ? microcopy.ai.checkedProjectsSummaryOne
+                        : microcopy.ai.checkedProjectsSummaryOther
                     ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
@@ -338,10 +340,9 @@ export const summarizeToolResultForUser = (
                     return microcopy.ai.noTeamMembersFound as string;
                 const lines = payload.map((m) => `• **${m.username}**`);
                 return [
-                    (
-                        payload.length === 1
-                            ? microcopy.ai.checkedMembersSummaryOne
-                            : microcopy.ai.checkedMembersSummaryOther
+                    (payload.length === 1
+                        ? microcopy.ai.checkedMembersSummaryOne
+                        : microcopy.ai.checkedMembersSummaryOther
                     ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
@@ -366,10 +367,9 @@ export const summarizeToolResultForUser = (
                     .sort((a, b) => a.index - b.index)
                     .map((c) => `• ${c.columnName}`);
                 return [
-                    (
-                        payload.length === 1
-                            ? microcopy.ai.checkedColumnsSummaryOne
-                            : microcopy.ai.checkedColumnsSummaryOther
+                    (payload.length === 1
+                        ? microcopy.ai.checkedColumnsSummaryOne
+                        : microcopy.ai.checkedColumnsSummaryOther
                     ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");
@@ -384,10 +384,9 @@ export const summarizeToolResultForUser = (
                         `• **${t.taskName}** — ${t.type}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(t.storyPoints))}`
                 );
                 return [
-                    (
-                        payload.length === 1
-                            ? microcopy.ai.checkedTasksSummaryOne
-                            : microcopy.ai.checkedTasksSummaryOther
+                    (payload.length === 1
+                        ? microcopy.ai.checkedTasksSummaryOne
+                        : microcopy.ai.checkedTasksSummaryOther
                     ).replace("{count}", String(payload.length)),
                     ...lines
                 ].join("\n");

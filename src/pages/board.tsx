@@ -630,7 +630,8 @@ const BoardPage = () => {
                                                 items: [
                                                     {
                                                         key: "ask",
-                                                        label: microcopy.board.copilotMenuAsk,
+                                                        label: microcopy.board
+                                                            .copilotMenuAsk,
                                                         icon: (
                                                             <MessageOutlined
                                                                 aria-hidden
@@ -641,7 +642,8 @@ const BoardPage = () => {
                                                     },
                                                     {
                                                         key: "brief",
-                                                        label: microcopy.board.copilotMenuBrief,
+                                                        label: microcopy.board
+                                                            .copilotMenuBrief,
                                                         icon: (
                                                             <FileTextOutlined
                                                                 aria-hidden
@@ -655,7 +657,8 @@ const BoardPage = () => {
                                                     },
                                                     {
                                                         key: "shell",
-                                                        label: microcopy.board.copilotMenuOpenPanel,
+                                                        label: microcopy.board
+                                                            .copilotMenuOpenPanel,
                                                         icon: (
                                                             <AiSparkleIcon
                                                                 aria-hidden
@@ -673,7 +676,8 @@ const BoardPage = () => {
                                         >
                                             <Button
                                                 aria-label={
-                                                    microcopy.a11y.boardCopilotMenu
+                                                    microcopy.a11y
+                                                        .boardCopilotMenu
                                                 }
                                                 icon={
                                                     <AiSparkleIcon

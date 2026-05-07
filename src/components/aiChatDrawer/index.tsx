@@ -1436,9 +1436,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 {/* P3-D: Edit button for user messages */}
                                 {isUser && !isLoading && (
                                     <Button
-                                        aria-label={
-                                            microcopy.a11y.editMessage
-                                        }
+                                        aria-label={microcopy.a11y.editMessage}
                                         icon={<EditOutlined aria-hidden />}
                                         onClick={() => {
                                             setInput(m.content);
@@ -1574,9 +1572,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                         >
                                                             {microcopy.ai.moreSources.replace(
                                                                 "{count}",
-                                                                String(
-                                                                    overflow
-                                                                )
+                                                                String(overflow)
                                                             )}
                                                         </Button>
                                                     )}

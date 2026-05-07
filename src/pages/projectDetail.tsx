@@ -231,7 +231,7 @@ const ProjectDetailPage = () => {
                                         />
                                     ) : (
                                         (project?.projectName ??
-                                            microcopy.labels.project)
+                                        microcopy.labels.project)
                                     )
                             }
                         ]}

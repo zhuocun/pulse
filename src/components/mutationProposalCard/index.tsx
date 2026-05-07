@@ -353,8 +353,10 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                                 : microcopy.mutation.acceptingProposal}
                         </Typography.Text>
                         <Button
-                            aria-label={microcopy.mutation.undoCountdownAria
-                                .replace("{seconds}", String(countdown))}
+                            aria-label={microcopy.mutation.undoCountdownAria.replace(
+                                "{seconds}",
+                                String(countdown)
+                            )}
                             onClick={handleCountdownUndo}
                             size="small"
                         >

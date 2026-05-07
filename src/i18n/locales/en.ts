@@ -537,7 +537,8 @@ export const enSource = {
         startNew: "Start new",
         stopResponse: "Stop response",
         chatResponding: "Board Copilot is responding.",
-        healthOffline: "Board Copilot is currently unavailable. Try again later.",
+        healthOffline:
+            "Board Copilot is currently unavailable. Try again later.",
         healthDegraded:
             "Board Copilot is experiencing delays. Responses may be slow or unavailable.",
         conversationTooLong:
@@ -704,9 +705,8 @@ export const enSource = {
         unownedBasis:
             "Counted {count} tasks with no coordinator on this board.",
         largeTaskRecommendation:
-            "\"{name}\" is large ({points} pts). Consider breaking it down.",
-        largeTaskBasis:
-            "Largest unstarted task is {points} story points.",
+            '"{name}" is large ({points} pts). Consider breaking it down.',
+        largeTaskBasis: "Largest unstarted task is {points} story points.",
         rebalanceRecommendation:
             "{top} is carrying {points} pts; consider rebalancing toward {bottom}.",
         rebalanceBasis:
