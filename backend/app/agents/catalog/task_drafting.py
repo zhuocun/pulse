@@ -144,7 +144,7 @@ class TaskDraftingAgent(BaseAgent):
             return {"board_snapshot": snapshot}
 
         def fetch_similar(state: TaskDraftingState) -> dict[str, Any]:
-            similar = interrupt(
+            payload = interrupt(
                 interrupt_payload(
                     "fe.similarTasks",
                     {
@@ -153,7 +153,14 @@ class TaskDraftingAgent(BaseAgent):
                     },
                 )
             )
-            return {"similar_tasks": similar}
+            # FE may return either a raw list (legacy / test fixtures) or
+            # the schema-conformant {"similar": [...]} envelope. Normalise
+            # so downstream nodes always see a list of ``{id, text}`` items.
+            if isinstance(payload, dict) and "similar" in payload:
+                similar = payload["similar"]
+            else:
+                similar = payload
+            return {"similar_tasks": similar or []}
 
         async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
             prompt = state.get("prompt") or ""

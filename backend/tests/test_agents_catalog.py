@@ -237,6 +237,25 @@ def test_task_drafting_single_draft() -> None:
     assert draft["type"] == "feature"
 
 
+def test_task_drafting_unwraps_similar_envelope() -> None:
+    """FE may return the schema-conformant ``{"similar": [...]}`` envelope
+    instead of a raw list; the agent must unwrap it before downstream
+    nodes consume the items as ``{id, text}`` dicts."""
+    agent = global_registry.get("task-drafting-agent")
+    checkpointer, store = _persistence()
+    graph = agent.compile(checkpointer=checkpointer, store=store)
+    snapshot = {"project_id": "p1", "columns": [], "tasks": []}
+    similar_envelope = {"similar": [{"id": "t1", "text": "build auth"}]}
+    final = _drive(
+        graph,
+        {"project_id": "p1", "prompt": "build SSO"},
+        [snapshot, similar_envelope],
+        thread_id="draft-envelope-1",
+    )
+    assert final["similar_tasks"] == [{"id": "t1", "text": "build auth"}]
+    assert final["draft"]["taskName"] == "build SSO"
+
+
 def test_task_drafting_breakdown_axis_emits_items() -> None:
     agent = global_registry.get("task-drafting-agent")
     checkpointer, store = _persistence()
@@ -292,6 +311,30 @@ def test_task_estimation_runs_with_neighbours() -> None:
     assert any(i["field"] == "coordinatorId" for i in final["readiness"]["issues"])
     payload = json.loads(final["messages"][-1].content)
     assert "estimate" in payload and "readiness" in payload
+
+
+def test_task_estimation_unwraps_similar_envelope() -> None:
+    """Same envelope-unwrap contract as task-drafting: ``{"similar": [...]}``
+    from the FE must be flattened to a list of ``{id, text}`` items."""
+    agent = global_registry.get("task-estimation-agent")
+    checkpointer, store = _persistence()
+    graph = agent.compile(checkpointer=checkpointer, store=store)
+    similar_envelope = {
+        "similar": [{"id": "n1", "text": "implement login form"}]
+    }
+    final = _drive(
+        graph,
+        {
+            "project_id": "p1",
+            "task_draft": {"taskName": "implement signup", "note": "n"},
+        },
+        [similar_envelope],
+        thread_id="est-envelope-1",
+    )
+    assert final["similar_tasks"] == [
+        {"id": "n1", "text": "implement login form"}
+    ]
+    assert final["estimate"]["storyPoints"] in (1, 2, 3, 5, 8, 13)
 
 
 def test_task_estimation_runs_without_neighbours() -> None:

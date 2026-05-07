@@ -243,7 +243,7 @@ class TaskEstimationAgent(BaseAgent):
 
         def fetch_similar(state: TaskEstimationState) -> dict[str, Any]:
             draft = state.get("task_draft") or {}
-            similar = interrupt(
+            payload = interrupt(
                 interrupt_payload(
                     "fe.similarTasks",
                     {
@@ -252,7 +252,14 @@ class TaskEstimationAgent(BaseAgent):
                     },
                 )
             )
-            return {"similar_tasks": similar}
+            # FE may return either a raw list (legacy / test fixtures) or
+            # the schema-conformant {"similar": [...]} envelope. Normalise
+            # so downstream nodes always see a list of ``{id, text}`` items.
+            if isinstance(payload, dict) and "similar" in payload:
+                similar = payload["similar"]
+            else:
+                similar = payload
+            return {"similar_tasks": similar or []}
 
         async def fetch_embeddings(state: TaskEstimationState) -> dict[str, Any]:
             similar = state.get("similar_tasks") or []

@@ -3,23 +3,28 @@ import { semanticSearch } from "../engine";
 import type { FeTool } from "./types";
 
 /**
- * `fe.similarTasks` — reuses the v1 deterministic Jaccard ranker exposed by
- * `engine.semanticSearch`. The agent passes a free-text `query` and (when
- * available) a `projectId`; we hydrate the project's task/column/member
- * caches and ask the v1 engine for ids ranked by token overlap.
+ * `fe.similarTasks` — reuses the v1 deterministic Jaccard ranker exposed
+ * by `engine.semanticSearch`, then hydrates the resulting ids into the
+ * `{id, text}` shape the agent's embedding/ranking nodes consume (see
+ * `app/agents/catalog/task_estimation.py:fetch_embeddings`). The return
+ * shape matches `fe_tool_schemas.py:fe.similarTasks` (`{similar: [...]}`).
+ *
+ * The agent passes a free-text `query` and (when available) a
+ * `project_id`; older builds may pass `projectId` so both casings are
+ * accepted to keep the contract resilient.
  */
 export const similarTasksTool: FeTool<
-    { query: string; projectId?: string },
-    { ids: string[]; rationale: string }
+    { query: string; project_id?: string; projectId?: string },
+    { similar: Array<{ id: string; text: string }> }
 > = {
     name: "fe.similarTasks",
     description:
-        "Return task ids ranked by semantic similarity to a free-text query.",
+        "Return tasks ranked by semantic similarity to a free-text query.",
     run: (args, ctx) => {
         const query = args?.query ?? "";
-        const projectId = args?.projectId ?? ctx.projectId;
+        const projectId = args?.project_id ?? args?.projectId ?? ctx.projectId;
         if (!projectId || !query.trim()) {
-            return { ids: [], rationale: "Missing query or project id." };
+            return { similar: [] };
         }
         const tasks =
             ctx.queryClient.getQueryData<ITask[]>(["tasks", { projectId }]) ??
@@ -37,11 +42,20 @@ export const similarTasksTool: FeTool<
             _id: projectId,
             projectName: "Project"
         };
-        return semanticSearch("tasks", query, {
+        const ranked = semanticSearch("tasks", query, {
             project,
             tasks,
             columns,
             members
         });
+        const taskById = new Map(tasks.map((t) => [t._id, t]));
+        const similar = ranked.ids
+            .map((id) => taskById.get(id))
+            .filter((t): t is ITask => Boolean(t))
+            .map((t) => ({
+                id: t._id,
+                text: `${t.taskName} ${t.note ?? ""}`.trim()
+            }));
+        return { similar };
     }
 };
