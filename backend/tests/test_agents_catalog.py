@@ -641,3 +641,79 @@ def test_chat_agent_provider_error_falls_back_to_stub_reply() -> None:
     assert messages, "must have at least one message in final state"
     last = messages[-1]
     assert last.content, "fallback reply must be non-empty"
+
+
+def test_chat_agent_propagates_cancellation_through_provider_call() -> None:
+    """chat-agent must NOT swallow CancelledError from the provider call.
+
+    The defensive try/except around ``bound.ainvoke`` re-raises
+    ``asyncio.CancelledError`` and ``GeneratorExit`` so cooperative shutdown
+    still propagates correctly.
+    """
+    import app.agents.catalog.chat as chat_mod
+
+    agent = global_registry.get("chat-agent")
+    checkpointer, store = _persistence()
+
+    class _CancellingModel:
+        async def ainvoke(self, _messages: Any, **__: Any) -> Any:
+            raise asyncio.CancelledError("client disconnected")
+
+        def bind_tools(self, _tools: Any) -> "_CancellingModel":
+            return self
+
+    original_is_stub = chat_mod.is_stub_model
+    chat_mod.is_stub_model = lambda _m: False
+    agent.set_chat_model(_CancellingModel())
+
+    try:
+        graph = agent.compile(checkpointer=checkpointer, store=store)
+        cfg = {"configurable": {"thread_id": "chat-cancel-1"}}
+
+        async def run() -> Any:
+            return await graph.ainvoke(
+                {"project_id": "p1", "messages": [HumanMessage(content="hi")]},
+                config=cfg,
+            )
+
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(run())
+    finally:
+        chat_mod.is_stub_model = original_is_stub
+        global_registry.clear()
+        _ensure_catalog_registered()
+
+
+# ---------------------------------------------------------------------------
+# Defect 1 (defensive): _normalize_snapshot_for_v1_engine handles edge shapes
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_snapshot_skips_non_dict_items_and_preserves_existing_id() -> None:
+    """``_add_id`` returns the item unchanged when it is not a dict, and when
+    it already carries ``_id``. Covers both early-return branches in the
+    helper that the happy-path test does not exercise.
+    """
+    from app.agents.catalog.board_brief import _normalize_snapshot_for_v1_engine
+
+    snapshot = {
+        "project_id": "p1",
+        # Non-dict items in a list (defensive: helper must not crash)
+        "columns": [None, "string-not-a-dict", {"id": "col-1", "name": "Todo"}],
+        # Item that already has _id (helper must return it unchanged)
+        "tasks": [
+            {"_id": "t-pre", "taskName": "Pre-normalised"},
+            {"id": "t-new", "taskName": "Needs id"},
+        ],
+        # Member item with both id and _id (no overwrite expected)
+        "members": [{"id": "m-1", "_id": "m-1-existing", "name": "M"}],
+    }
+    out = _normalize_snapshot_for_v1_engine(snapshot)
+    assert out["columns"][0] is None
+    assert out["columns"][1] == "string-not-a-dict"
+    assert out["columns"][2]["_id"] == "col-1"
+    # Item that already had _id is unchanged (no double-add or overwrite).
+    assert out["tasks"][0] == {"_id": "t-pre", "taskName": "Pre-normalised"}
+    assert out["tasks"][1]["_id"] == "t-new"
+    # Member with both id and _id is unchanged: existing _id wins.
+    assert out["members"][0]["_id"] == "m-1-existing"

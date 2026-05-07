@@ -394,11 +394,11 @@ class AgentRuntime:
                 logger.exception("Agent %r failed during astream.", name)
                 raise AgentExecutionError(name, cause=exc) from exc
             else:
-                # After a successful stream, aggregate token usage from the
-                # final graph state so OTel and Prometheus see real token counts
-                # instead of 0. This requires a checkpointer to read back the
-                # final state; if none is configured we leave the 0-token
-                # behaviour unchanged rather than making an extra graph call.
+                # On a successful stream, aggregate token usage from the
+                # final graph state so OTel and Prometheus see real token
+                # counts instead of always 0. This requires a checkpointer
+                # to read back the final state; without one we leave the
+                # span at 0 rather than spend extra graph calls.
                 if self._checkpointer is not None:
                     try:
                         graph = agent.compile(
@@ -406,34 +406,14 @@ class AgentRuntime:
                             store=self._store,
                         )
                         final_state = await graph.aget_state(config)
-                        messages = (
-                            (final_state.values or {}).get("messages") or []
-                            if final_state is not None
-                            else []
-                        )
+                        messages = (final_state.values or {}).get("messages") or []
                         tokens_in = 0
                         tokens_out = 0
                         for msg in messages:
                             ti, to = extract_token_usage(msg)
                             tokens_in += ti
                             tokens_out += to
-                        if tokens_in or tokens_out:
-                            run_span.set_result(
-                                {
-                                    "messages": [
-                                        type(
-                                            "FakeMsg",
-                                            (),
-                                            {
-                                                "usage_metadata": {
-                                                    "input_tokens": tokens_in,
-                                                    "output_tokens": tokens_out,
-                                                }
-                                            },
-                                        )()
-                                    ]
-                                }
-                            )
+                        run_span.set_token_usage(tokens_in, tokens_out)
                     except Exception:  # noqa: BLE001 -- best-effort; never fail the stream
                         logger.debug(
                             "astream token aggregation failed; span will show 0 tokens.",
