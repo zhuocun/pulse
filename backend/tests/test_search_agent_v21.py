@@ -523,6 +523,7 @@ def test_final_message_json_includes_matches() -> None:
 def test_polish_search_rerank_preserves_matches_alignment() -> None:
     """When the LLM reranks, ``matches`` must still align 1:1 with new ``ids``."""
 
+    import asyncio as _asyncio
     from langchain_core.messages import AIMessage as _AIMessage
     from app.agents.catalog.search import SearchRanking, polish_search
     from tests.conftest import structured_model
@@ -551,11 +552,13 @@ def test_polish_search_rerank_preserves_matches_alignment() -> None:
         ids=["t-3", "t-2", "t-1"],
         rationale="custom rerank order",
     )
-    result, _, _ = polish_search(
-        structured_model(parsed=parsed, raw_message=raw),
-        deterministic,
-        "auth",
-        candidates,
+    result, _, _ = _asyncio.run(
+        polish_search(
+            structured_model(parsed=parsed, raw_message=raw),
+            deterministic,
+            "auth",
+            candidates,
+        )
     )
     assert result["ids"] == ["t-3", "t-2", "t-1"]
     # matches must align with the new ids order.

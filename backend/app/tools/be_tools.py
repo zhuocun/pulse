@@ -346,48 +346,6 @@ def detect_drift(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# budget check
-# ---------------------------------------------------------------------------
-
-
-_BUDGET_SPEND: dict[tuple[str, str], int] = {}
-
-
-def _month_key(now: datetime | None = None) -> str:
-    moment = now or datetime.now(timezone.utc)
-    return f"{moment.year:04d}-{moment.month:02d}"
-
-
-def budget_check(
-    project_id: str,
-    tokens_in: int,
-    tokens_out: int,
-    monthly_cap: int = 1_000_000,
-) -> dict[str, Any]:
-    """Pure budget check; mutates module-level spend dict.
-
-    Production deployments swap the in-process dict for Redis -- this stub
-    keeps the interface stable and makes the rule logic unit-testable.
-    """
-
-    if tokens_in < 0 or tokens_out < 0:
-        raise ValueError("token counts must be non-negative")
-    key = (project_id, _month_key())
-    current = _BUDGET_SPEND.get(key, 0)
-    requested = tokens_in + tokens_out
-    if current + requested > monthly_cap:
-        return {"allowed": False, "remaining": max(0, monthly_cap - current)}
-    _BUDGET_SPEND[key] = current + requested
-    return {"allowed": True, "remaining": monthly_cap - _BUDGET_SPEND[key]}
-
-
-def reset_budget() -> None:
-    """Clear the in-process spend ledger (test helper)."""
-
-    _BUDGET_SPEND.clear()
-
-
-# ---------------------------------------------------------------------------
 # citation helpers (PRD §FE wire contract)
 # ---------------------------------------------------------------------------
 

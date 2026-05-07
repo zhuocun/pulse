@@ -140,7 +140,7 @@ def _strength_to_score(strength: str) -> float:
     return 0.0
 
 
-def polish_search(
+async def polish_search(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     query: str,
@@ -176,7 +176,7 @@ def polish_search(
     )
     try:
         structured = model.with_structured_output(SearchRanking, include_raw=True)
-        response = structured.invoke([HumanMessage(content=prompt)])
+        response = await structured.ainvoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("search structured output failed; falling back.")
         return deterministic, 0, 0
@@ -340,12 +340,12 @@ class SearchAgent(BaseAgent):
                 }
             }
 
-        def polish(state: SearchState) -> dict[str, Any]:
+        async def polish(state: SearchState) -> dict[str, Any]:
             """LLM-polish the deterministic ranking; emit token usage."""
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}
-            polished, tokens_in, tokens_out = polish_search(
+            polished, tokens_in, tokens_out = await polish_search(
                 chat_model, deterministic, query, candidates
             )
             emit_custom(

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import secrets
 
@@ -126,6 +126,12 @@ class Settings:
     agent_chat_model_id: str = os.getenv("AGENT_CHAT_MODEL_ID", "")
     agent_chat_model_temperature: float = env_float(
         "AGENT_CHAT_MODEL_TEMPERATURE", "0.2"
+    )
+    agent_chat_model_max_retries: int = field(
+        default_factory=lambda: env_int("AGENT_CHAT_MODEL_MAX_RETRIES", "2")
+    )
+    agent_chat_model_timeout_seconds: float = field(
+        default_factory=lambda: env_float("AGENT_CHAT_MODEL_TIMEOUT_SECONDS", "30.0")
     )
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

@@ -261,3 +261,46 @@ def test_assert_provider_available_default_auto_does_not_raise_in_prod(
             openai_api_key="",
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# max_retries / timeout_seconds flow through spec
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_spec_uses_default_retry_and_timeout() -> None:
+    """Default settings produce spec with max_retries=2 and timeout_seconds=30.0."""
+
+    spec = resolve_chat_model_spec(
+        _settings(
+            agent_chat_model_provider="stub",
+            agent_chat_model_max_retries=2,
+            agent_chat_model_timeout_seconds=30.0,
+        )
+    )
+    assert spec.max_retries == 2
+    assert spec.timeout_seconds == 30.0
+
+
+def test_resolve_spec_propagates_custom_retry_and_timeout() -> None:
+    """Custom env values for retries and timeout flow into the spec."""
+
+    spec = resolve_chat_model_spec(
+        _settings(
+            agent_chat_model_provider="stub",
+            agent_chat_model_max_retries=5,
+            agent_chat_model_timeout_seconds=60.0,
+        )
+    )
+    assert spec.max_retries == 5
+    assert spec.timeout_seconds == 60.0
+
+
+def test_chat_model_spec_defaults_are_backward_compatible() -> None:
+    """Constructing ChatModelSpec without max_retries/timeout uses sensible defaults."""
+
+    from app.agents.llm import ChatModelSpec
+
+    spec = ChatModelSpec(provider=PROVIDER_STUB, model="stub")
+    assert spec.max_retries == 2
+    assert spec.timeout_seconds == 30.0

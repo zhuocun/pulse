@@ -44,6 +44,9 @@ class StructuredRunnable:
     def invoke(self, _messages: Any, **_: Any) -> Any:
         return self._payload
 
+    async def ainvoke(self, _messages: Any, **_: Any) -> Any:
+        return self._payload
+
 
 def structured_model(
     *,

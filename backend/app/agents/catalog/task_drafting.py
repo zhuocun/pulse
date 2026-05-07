@@ -63,7 +63,7 @@ def _draft_from_prompt(prompt: str) -> dict[str, Any]:
     }
 
 
-def polish_draft(
+async def polish_draft(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     prompt: str,
@@ -93,7 +93,7 @@ def polish_draft(
     )
     try:
         structured = model.with_structured_output(DraftPolish, include_raw=True)
-        response = structured.invoke([HumanMessage(content=instruction)])
+        response = await structured.ainvoke([HumanMessage(content=instruction)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("task-drafting structured output failed; falling back.")
         return deterministic, 0, 0
@@ -134,13 +134,16 @@ class TaskDraftingAgent(BaseAgent):
     ) -> Pregel:
         chat_model: BaseChatModel = self.chat_model
 
-        def fetch_context(state: TaskDraftingState) -> dict[str, Any]:
+        def fetch_snapshot(state: TaskDraftingState) -> dict[str, Any]:
             snapshot = interrupt(
                 interrupt_payload(
                     "fe.boardSnapshot",
                     {"project_id": state.get("project_id")},
                 )
             )
+            return {"board_snapshot": snapshot}
+
+        def fetch_similar(state: TaskDraftingState) -> dict[str, Any]:
             similar = interrupt(
                 interrupt_payload(
                     "fe.similarTasks",
@@ -150,16 +153,13 @@ class TaskDraftingAgent(BaseAgent):
                     },
                 )
             )
-            return {
-                "board_snapshot": snapshot,
-                "similar_tasks": similar,
-            }
+            return {"similar_tasks": similar}
 
-        def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
+        async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
             prompt = state.get("prompt") or ""
             similar = state.get("similar_tasks") or []
             base = _draft_from_prompt(prompt)
-            polished, tokens_in, tokens_out = polish_draft(
+            polished, tokens_in, tokens_out = await polish_draft(
                 chat_model, base, prompt, similar
             )
             axis = state.get("breakdown_axis")
@@ -185,10 +185,12 @@ class TaskDraftingAgent(BaseAgent):
             }
 
         graph: StateGraph = StateGraph(TaskDraftingState)
-        graph.add_node("fetch_context", fetch_context)
+        graph.add_node("fetch_snapshot", fetch_snapshot)
+        graph.add_node("fetch_similar", fetch_similar)
         graph.add_node("generate_draft", generate_draft)
-        graph.add_edge(START, "fetch_context")
-        graph.add_edge("fetch_context", "generate_draft")
+        graph.add_edge(START, "fetch_snapshot")
+        graph.add_edge("fetch_snapshot", "fetch_similar")
+        graph.add_edge("fetch_similar", "generate_draft")
         graph.add_edge("generate_draft", END)
         return graph.compile(checkpointer=checkpointer, store=store)
 

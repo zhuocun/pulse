@@ -210,7 +210,7 @@ def test_board_brief_polish_uses_structured_output(
         raw_message=raw,
     )
 
-    headline, tin, tout = polish_headline(model, "fallback", {"x": 1})
+    headline, tin, tout = asyncio.run(polish_headline(model, "fallback", {"x": 1}))
 
     # Schema cap + first-line trimming both apply.
     assert headline == "Standup headline"
@@ -225,7 +225,7 @@ def test_board_brief_polish_falls_back_on_provider_exception(
     monkeypatch.setattr(bb_module, "is_stub_model", is_not_stub)
     model = structured_model(raise_on_call=RuntimeError("provider down"))
 
-    headline, tin, tout = polish_headline(model, "fallback", {})
+    headline, tin, tout = asyncio.run(polish_headline(model, "fallback", {}))
 
     assert headline == "fallback"
     assert (tin, tout) == (0, 0)
@@ -247,7 +247,7 @@ def test_board_brief_polish_falls_back_when_parsing_error(
         parsing_error=ValueError("bad json"),
     )
 
-    headline, tin, tout = polish_headline(model, "fallback", {})
+    headline, tin, tout = asyncio.run(polish_headline(model, "fallback", {}))
 
     assert headline == "fallback"
     # Token usage is still trued up against the budget when the provider
@@ -263,7 +263,7 @@ def test_board_brief_polish_falls_back_on_blank_headline(
     monkeypatch.setattr(bb_module, "is_stub_model", is_not_stub)
     model = structured_model(parsed=BriefHeadline(headline="   "))
 
-    headline, _, _ = polish_headline(model, "fallback", {})
+    headline, _, _ = asyncio.run(polish_headline(model, "fallback", {}))
     assert headline == "fallback"
 
 
@@ -297,7 +297,7 @@ def test_task_drafting_polish_uses_structured_output(
         "coordinatorId": None,
         "confidence": "moderate",
     }
-    polished, tin, tout = polish_draft(model, base, "raw prompt", [])
+    polished, tin, tout = asyncio.run(polish_draft(model, base, "raw prompt", []))
     assert polished["taskName"] == "Polished name"
     assert polished["note"] == "polished body"
     assert polished["rationale"] == "Polished rationale"
@@ -315,7 +315,7 @@ def test_task_drafting_polish_falls_back_on_provider_exception(
     model = structured_model(raise_on_call=RuntimeError("provider down"))
 
     base = {"taskName": "x", "note": "y", "rationale": "z"}
-    polished, tin, tout = polish_draft(model, base, "p", [])
+    polished, tin, tout = asyncio.run(polish_draft(model, base, "p", []))
     assert polished == base
     assert (tin, tout) == (0, 0)
 
@@ -335,7 +335,7 @@ def test_task_drafting_polish_falls_back_on_parsing_error(
     )
 
     base = {"taskName": "x", "note": "y", "rationale": "z"}
-    polished, tin, tout = polish_draft(model, base, "p", [])
+    polished, tin, tout = asyncio.run(polish_draft(model, base, "p", []))
     assert polished == base
     assert (tin, tout) == (2, 3)
 
@@ -353,7 +353,7 @@ def test_task_drafting_polish_skips_blank_fields(
     )
 
     base = {"taskName": "kept", "note": "kept too", "rationale": "old"}
-    polished, _, _ = polish_draft(model, base, "p", [])
+    polished, _, _ = asyncio.run(polish_draft(model, base, "p", []))
     assert polished["taskName"] == "kept"
     assert polished["note"] == "kept too"
     assert polished["rationale"] == "Updated rationale"
@@ -377,7 +377,7 @@ def test_task_estimation_polish_uses_structured_output(
         raw_message=raw,
     )
 
-    line, tin, tout = polish_rationale(model, "fallback", {}, 5, [])
+    line, tin, tout = asyncio.run(polish_rationale(model, "fallback", {}, 5, []))
     assert line == "Polished rationale"
     assert (tin, tout) == (1, 2)
 
@@ -390,7 +390,7 @@ def test_task_estimation_polish_falls_back_on_provider_exception(
     monkeypatch.setattr(te_module, "is_stub_model", is_not_stub)
     model = structured_model(raise_on_call=RuntimeError("provider down"))
 
-    line, tin, tout = polish_rationale(model, "fallback", {}, 3, [])
+    line, tin, tout = asyncio.run(polish_rationale(model, "fallback", {}, 3, []))
     assert line == "fallback"
     assert (tin, tout) == (0, 0)
 
@@ -409,7 +409,7 @@ def test_task_estimation_polish_falls_back_on_parsing_error(
         parsed=None, raw_message=raw, parsing_error=ValueError("bad")
     )
 
-    line, tin, _ = polish_rationale(model, "fallback", {}, 3, [])
+    line, tin, _ = asyncio.run(polish_rationale(model, "fallback", {}, 3, []))
     assert line == "fallback"
     assert tin == 4
 
@@ -425,7 +425,7 @@ def test_task_estimation_polish_falls_back_on_blank_rationale(
     monkeypatch.setattr(te_module, "is_stub_model", is_not_stub)
     model = structured_model(parsed=EstimationRationale(rationale="   "))
 
-    line, _, _ = polish_rationale(model, "fallback", {}, 3, [])
+    line, _, _ = asyncio.run(polish_rationale(model, "fallback", {}, 3, []))
     assert line == "fallback"
 
 
@@ -455,7 +455,9 @@ def test_task_estimation_polish_readiness_short_circuits_for_stub() -> None:
     from app.agents.llm import make_stub_chat_model
 
     deterministic = _readiness_baseline()
-    polished, tin, tout = polish_readiness(make_stub_chat_model(), deterministic, {})
+    polished, tin, tout = asyncio.run(
+        polish_readiness(make_stub_chat_model(), deterministic, {})
+    )
     assert polished is deterministic
     assert (tin, tout) == (0, 0)
 
@@ -474,7 +476,7 @@ def test_task_estimation_polish_readiness_short_circuits_when_no_issues(
                 "polish_readiness must not call the model on empty issues"
             )
 
-    polished, tin, tout = polish_readiness(_NoModel(), deterministic, {})
+    polished, tin, tout = asyncio.run(polish_readiness(_NoModel(), deterministic, {}))
     assert polished is deterministic
     assert (tin, tout) == (0, 0)
 
@@ -508,8 +510,8 @@ def test_task_estimation_polish_readiness_overrides_message_and_suggestion(
     )
     model = structured_model(parsed=parsed, raw_message=raw)
 
-    polished, tin, tout = polish_readiness(
-        model, _readiness_baseline(), {"taskName": "x"}
+    polished, tin, tout = asyncio.run(
+        polish_readiness(model, _readiness_baseline(), {"taskName": "x"})
     )
 
     polished_by_field = {issue["field"]: issue for issue in polished["issues"]}
@@ -539,7 +541,7 @@ def test_task_estimation_polish_readiness_keeps_deterministic_on_blank_strings(
     )
     model = structured_model(parsed=parsed)
 
-    polished, _, _ = polish_readiness(model, _readiness_baseline(), {})
+    polished, _, _ = asyncio.run(polish_readiness(model, _readiness_baseline(), {}))
     issue = next(i for i in polished["issues"] if i["field"] == "taskName")
     assert issue["message"] == "Task name is required."
     assert issue["suggestion"] is None
@@ -553,7 +555,7 @@ def test_task_estimation_polish_readiness_falls_back_on_provider_exception(
     monkeypatch.setattr(te_module, "is_stub_model", is_not_stub)
     model = structured_model(raise_on_call=RuntimeError("provider down"))
 
-    polished, tin, tout = polish_readiness(model, _readiness_baseline(), {})
+    polished, tin, tout = asyncio.run(polish_readiness(model, _readiness_baseline(), {}))
     assert polished == _readiness_baseline()
     assert (tin, tout) == (0, 0)
 
@@ -572,7 +574,7 @@ def test_task_estimation_polish_readiness_falls_back_on_parsing_error(
         parsed=None, raw_message=raw, parsing_error=ValueError("bad json")
     )
 
-    polished, tin, _ = polish_readiness(model, _readiness_baseline(), {})
+    polished, tin, _ = asyncio.run(polish_readiness(model, _readiness_baseline(), {}))
     assert polished == _readiness_baseline()
     # Token usage is still accounted for so the budget tracker can true up.
     assert tin == 4
