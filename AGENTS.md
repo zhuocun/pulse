@@ -113,7 +113,23 @@ here.
 - Node.js 24 is required (`.nvmrc`). Load nvm before running any npm/node
   command: `export NVM_DIR="$HOME/.nvm"; source "$NVM_DIR/nvm.sh"`.
 - The backend uses MongoDB 7 which must be running before the FastAPI server
-  starts. Start it with: `mongod --dbpath /data/db --bind_ip 127.0.0.1 --port 27017 --fork --logpath /var/log/mongod.log`.
+  starts. The standard `--fork` command fails in Cursor Cloud due to a
+  `/tmp/mongodb-27017.sock` permission error. Use a config file that disables
+  the Unix socket:
+    ```bash
+    cat > /tmp/mongod.conf <<EOF
+    net:
+      bindIp: 127.0.0.1
+      port: 27017
+      unixDomainSocket:
+        enabled: false
+    storage:
+      dbPath: /data/db
+    EOF
+    mongod --config /tmp/mongod.conf &
+    ```
+    Run it in a background tmux session or with `&`; wait ~2 s before hitting
+    the port.
 - Backend `.env` needs `MONGO_URI=mongodb://localhost:27017/jira` and a `UUID`
   of ≥32 characters. Copy from `.env.example` and update those values.
 - Backend tests (801 passing, `python -m pytest` from `backend/`) use in-memory
