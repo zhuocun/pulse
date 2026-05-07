@@ -415,6 +415,60 @@ describe("useAgentChat", () => {
         expect(result.current.pendingNudges).toHaveLength(0);
     });
 
+    it("keeps pendingProposal when resume stream fails so the user can retry", async () => {
+        mockedStream
+            .mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "custom",
+                        ns: ["root"],
+                        data: {
+                            kind: "mutation_proposal",
+                            proposal: {
+                                proposal_id: "mp-resume-fail",
+                                description: "Risky change",
+                                diff: {},
+                                risk: "low" as const,
+                                undoable: true as const
+                            }
+                        }
+                    }
+                ])
+            )
+            .mockImplementationOnce(async function* () {
+                await Promise.reject(new Error("resume transport failed"));
+                yield {} as StreamPart; // pragma: no cover - keeps the mock an async generator
+            });
+
+        const queryClient = new QueryClient();
+        const { result } = renderHook(() => useAgentChat(makeCtx()), {
+            wrapper: makeWrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.send("Propose a change");
+        });
+
+        await waitFor(() => {
+            expect(result.current.pendingProposal?.proposal_id).toBe(
+                "mp-resume-fail"
+            );
+        });
+
+        await act(async () => {
+            result.current.resumeProposal(true);
+        });
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.pendingProposal?.proposal_id).toBe(
+            "mp-resume-fail"
+        );
+        expect(result.current.error).toBeTruthy();
+    });
+
     it("resumeProposal calls agent.resume and clears the pending proposal", async () => {
         // First call: emits a mutation proposal
         mockedStream

@@ -456,6 +456,8 @@ const BoardPage = () => {
         projectId: currentProject?._id,
         feToolContext: { projectId: currentProject?._id }
     });
+    const startTriageAgent = triageAgent.start;
+    const dismissTriageNudge = triageAgent.dismissNudge;
     /**
      * Track which project IDs have already triggered a triage run in
      * this app session so we fire at most once per (project, session).
@@ -472,7 +474,7 @@ const BoardPage = () => {
 
         triagedProjectsRef.current.add(pid);
         try {
-            void triageAgent.start({
+            void startTriageAgent({
                 messages: [
                     {
                         role: "user",
@@ -484,7 +486,7 @@ const BoardPage = () => {
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // the error will also surface via triageAgent.error if needed.
         }
-    }, [boardAiOn, chatOpen, currentProject?._id, triageAgent]);
+    }, [boardAiOn, chatOpen, currentProject?._id, startTriageAgent]);
 
     const { startEditing: openTaskModal } = useTaskModal();
     /**
@@ -507,9 +509,9 @@ const BoardPage = () => {
     );
     const handleTriageNudgeDismiss = useCallback(
         (nudge: TriageNudge) => {
-            triageAgent.dismissNudge(nudge.nudge_id);
+            dismissTriageNudge(nudge.nudge_id);
         },
-        [triageAgent]
+        [dismissTriageNudge]
     );
 
     /**

@@ -217,19 +217,19 @@ the deploy logs for these strings on every release:
 
 **Memory backends on a production host** (`_validate_memory_agent_backends`):
 
-On a single-worker dev / test process, the helper logs the original WARNING at startup so operators see the gotcha:
+On a single-worker dev / test process, the helper logs the memory-backend note at DEBUG to avoid noisy local boots:
 
 ```
 Agent persistence is using the in-process memory backend (checkpoint=%s, store=%s). Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes; production deployments should set AGENT_CHECKPOINT_BACKEND=postgres and AGENT_STORE_BACKEND=postgres with AGENT_POSTGRES_URI (or POSTGRES_URI) configured.
 ```
 
-On a production-shaped host (any of `VERCEL`, `VERCEL_URL`, `RENDER_EXTERNAL_HOSTNAME`, `RENDER`, `KUBERNETES_SERVICE_HOST`, `FLY_APP_NAME`, `RAILWAY_PROJECT_ID` is set, or `WEB_CONCURRENCY` / `UVICORN_WORKERS` parses to an integer > 1), the helper now raises `RuntimeError` and the deploy never finishes booting:
+On a production-shaped host (any of `VERCEL`, `VERCEL_URL`, `RENDER_EXTERNAL_HOSTNAME`, `RENDER`, `KUBERNETES_SERVICE_HOST`, `FLY_APP_NAME`, `RAILWAY_PROJECT_ID` is set, or `WEB_CONCURRENCY` / `UVICORN_WORKERS` parses to an integer > 1), the helper logs this WARNING:
 
 ```
 Unsafe memory backend(s) detected in a multi-worker / multi-instance environment (production-shaped env var <VAR> is set | WEB_CONCURRENCY=<N> indicates multiple workers): AGENT_CHECKPOINT_BACKEND=memory[, AGENT_STORE_BACKEND=memory]. Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes. Fix: set AGENT_CHECKPOINT_BACKEND=postgres, AGENT_STORE_BACKEND=postgres, and AGENT_POSTGRES_URI=<dsn>. Install the required extras: pip install ".[postgres-agents]" (or ".[ai]").
 ```
 
-A parallel guard in `_configure_middleware_backends` raises a single `RuntimeError` listing every memory-backed middleware (`RATE_LIMIT_BACKEND=memory`, `BUDGET_BACKEND=memory`, `IDEMPOTENCY_BACKEND=memory`) detected under the same multi-instance condition, with the matching Redis fix.
+A parallel guard in `_configure_middleware_backends` logs a single WARNING listing every memory-backed middleware (`RATE_LIMIT_BACKEND=memory`, `BUDGET_BACKEND=memory`, `IDEMPOTENCY_BACKEND=memory`) detected under the same multi-instance condition, with the matching Redis fix.
 
 **Postgres backend with no connection string** (`_validate_agent_postgres_backend`, raises `RuntimeError`, deploy never finishes booting):
 

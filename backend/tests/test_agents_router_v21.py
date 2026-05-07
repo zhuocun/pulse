@@ -456,6 +456,36 @@ def test_invoke_returns_504_on_timeout(
     assert response.status_code == HTTPStatus.GATEWAY_TIMEOUT
 
 
+def test_invoke_timeout_refunds_reserved_budget(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Budget pre-books before the run; timeouts must not strand the reservation."""
+
+    async def slow(*args: Any, **kwargs: Any) -> Any:
+        await asyncio.sleep(2)
+        return {"text": "never"}
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "ainvoke", slow, raising=False)
+    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(1))
+
+    project_id = "p-budget-track"
+    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    response = client.post(
+        "/api/v1/agents/noise/invoke",
+        json={
+            "inputs": {"text": "x", "project_id": project_id},
+            "autonomy": "plan",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.GATEWAY_TIMEOUT
+    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
+
+
 def _settings_with_timeout(seconds: int) -> Any:
     from app.config import settings as cfg
 
@@ -511,6 +541,66 @@ def test_stream_emits_error_envelope_on_runtime_failure(
         body = b"".join(response.iter_bytes()).decode("utf-8")
     frames = _frames(body)
     assert any(frame.get("type") == "error" for frame in frames)
+
+
+def test_stream_runtime_failure_refunds_reserved_budget(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Astream errors before emitting usage must revert the gate reservation."""
+
+    from app.agents.errors import AgentExecutionError
+
+    async def boom(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
+        raise AgentExecutionError("noise", cause=RuntimeError("nope"))
+        yield  # pragma: no cover
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "astream", boom, raising=False)
+
+    project_id = "p-budget-track"
+    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    with client.stream(
+        "POST",
+        "/api/v1/agents/noise/stream",
+        json={
+            "inputs": {"text": "x", "project_id": project_id},
+            "autonomy": "plan",
+        },
+        headers=auth_headers,
+    ) as response:
+        b"".join(response.iter_bytes())
+    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
+
+
+def test_stream_refunds_budget_when_setup_fails_after_reserve(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reserved tokens must be released if we error before returning StreamingResponse."""
+
+    class _BoomStreamingResponse:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("streaming response init failed")
+
+    monkeypatch.setattr("app.routers.agents.StreamingResponse", _BoomStreamingResponse)
+    project_id = "p-budget-track"
+    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    lax = TestClient(client.app, raise_server_exceptions=False)
+    response = lax.post(
+        "/api/v1/agents/noise/stream",
+        json={
+            "inputs": {"text": "x", "project_id": project_id},
+            "autonomy": "plan",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
 
 
 def test_stream_emits_error_envelope_on_unexpected_exception(
