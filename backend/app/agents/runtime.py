@@ -43,7 +43,7 @@ from app.agents.errors import (
     AgentRecursionError,
 )
 from app.agents.instrumentation import start_run_span
-from app.agents.llm import resolved_chat_model_id
+from app.agents.llm import extract_token_usage, resolved_chat_model_id
 from app.agents.registry import AgentRegistry
 from app.agents.registry import registry as default_registry
 from app.agents.stores import (
@@ -373,7 +373,7 @@ class AgentRuntime:
             model_id=model_id,
             project_id=_project_id(inputs),
             autonomy=_autonomy(inputs),
-        ):
+        ) as run_span:
             try:
                 async for event in agent.astream(
                     graph_input,
@@ -393,6 +393,52 @@ class AgentRuntime:
             except Exception as exc:  # noqa: BLE001 -- intentional translation boundary
                 logger.exception("Agent %r failed during astream.", name)
                 raise AgentExecutionError(name, cause=exc) from exc
+            else:
+                # After a successful stream, aggregate token usage from the
+                # final graph state so OTel and Prometheus see real token counts
+                # instead of 0. This requires a checkpointer to read back the
+                # final state; if none is configured we leave the 0-token
+                # behaviour unchanged rather than making an extra graph call.
+                if self._checkpointer is not None:
+                    try:
+                        graph = agent.compile(
+                            checkpointer=self._checkpointer,
+                            store=self._store,
+                        )
+                        final_state = await graph.aget_state(config)
+                        messages = (
+                            (final_state.values or {}).get("messages") or []
+                            if final_state is not None
+                            else []
+                        )
+                        tokens_in = 0
+                        tokens_out = 0
+                        for msg in messages:
+                            ti, to = extract_token_usage(msg)
+                            tokens_in += ti
+                            tokens_out += to
+                        if tokens_in or tokens_out:
+                            run_span.set_result(
+                                {
+                                    "messages": [
+                                        type(
+                                            "FakeMsg",
+                                            (),
+                                            {
+                                                "usage_metadata": {
+                                                    "input_tokens": tokens_in,
+                                                    "output_tokens": tokens_out,
+                                                }
+                                            },
+                                        )()
+                                    ]
+                                }
+                            )
+                    except Exception:  # noqa: BLE001 -- best-effort; never fail the stream
+                        logger.debug(
+                            "astream token aggregation failed; span will show 0 tokens.",
+                            exc_info=True,
+                        )
 
 
 def _project_id(inputs: Mapping[str, Any]) -> Optional[str]:

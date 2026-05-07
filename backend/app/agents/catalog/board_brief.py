@@ -38,6 +38,35 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Snapshot key normalisation (id → _id)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_snapshot_for_v1_engine(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of ``snapshot`` where each column/task/member carries ``_id``.
+
+    The FE sends snapshots with ``id`` keys (e.g. ``{"id": "c1"}``), but
+    :func:`app.services.v1_engine.board_brief` iterates with ``col.get("_id")``.
+    This helper adds ``_id`` from ``id`` so both callers are satisfied without
+    modifying the original dict.
+    """
+
+    def _add_id(item: Any) -> Any:
+        if not isinstance(item, dict):
+            return item
+        if "id" in item and "_id" not in item:
+            return {**item, "_id": item["id"]}
+        return item
+
+    result = dict(snapshot)
+    for list_key in ("columns", "tasks", "members"):
+        items = snapshot.get(list_key)
+        if isinstance(items, list):
+            result[list_key] = [_add_id(item) for item in items]
+    return result
+
+
+# ---------------------------------------------------------------------------
 # recommendationDetail strength bucketing
 # ---------------------------------------------------------------------------
 
@@ -47,8 +76,6 @@ logger = logging.getLogger(__name__)
 #              issues that need immediate action.
 # "moderate" — any wip_overflow or stale_task signals: real drift but not
 #              immediately blocking; important to surface but less urgent.
-# "low"      — warn severity without the above signal types (edge case,
-#              e.g. only stale hints): minor drift worth noting.
 # "none"     — no signals at all (severity "info"): board is steady-state.
 _RD_STRONG_UNOWNED_THRESHOLD: int = 3  # unowned count > this → "strong"
 
@@ -57,7 +84,10 @@ def _recommendation_strength(
     signals: list[dict[str, Any]],
     unowned_count: int,
 ) -> str:
-    """Derive recommendation strength from drift signals and unowned count."""
+    """Derive recommendation strength from drift signals and unowned count.
+
+    Returns one of ``"strong"``, ``"moderate"``, or ``"none"``.
+    """
     signal_types = {s.get("type") for s in signals if isinstance(s, dict)}
     if "unowned_bug" in signal_types or unowned_count > _RD_STRONG_UNOWNED_THRESHOLD:
         return "strong"
@@ -255,7 +285,9 @@ class BoardBriefAgent(BaseAgent):
             }
             # Build IBoardBrief-shaped payload via v1_engine; only the
             # headline is polished by the LLM (deterministic fallback on stub).
-            brief = v1_engine.board_brief(snapshot)
+            # Normalize id→_id so v1_engine (which uses _id keys) works
+            # correctly with the FE-supplied snapshot (which uses id keys).
+            brief = v1_engine.board_brief(_normalize_snapshot_for_v1_engine(snapshot))
             deterministic = brief["headline"]
             headline, tokens_in, tokens_out = polish_headline(
                 chat_model, deterministic, facts

@@ -152,6 +152,8 @@ describe("AiChatDrawer", () => {
         mockEnv.aiEnabled = true;
         mockEnv.aiUseLocalEngine = true;
         mockEnv.aiBaseUrl = "";
+        // Clear any chat history saved by prior tests so each test starts fresh.
+        window.localStorage.removeItem("copilot_history_p1");
     });
 
     it("shows the empty hint and sends a message that yields an assistant reply", async () => {
@@ -532,6 +534,29 @@ describe("AiChatDrawer", () => {
         expect(window.localStorage.getItem("boardCopilot:autonomy")).toBe(
             "suggest"
         );
+    });
+
+    it("restores saved chat history from localStorage when the drawer opens (F-1)", async () => {
+        // Seed localStorage with a prior conversation for project "p1".
+        const history = [
+            { role: "user", content: "Hello from a previous session" },
+            { role: "assistant", content: "Restored assistant reply" }
+        ];
+        window.localStorage.setItem(
+            "copilot_history_p1",
+            JSON.stringify(history)
+        );
+
+        renderDrawer(true);
+
+        await waitFor(() => {
+            expect(
+                screen.getByText("Hello from a previous session")
+            ).toBeInTheDocument();
+        });
+        expect(
+            screen.getByText("Restored assistant reply")
+        ).toBeInTheDocument();
     });
 
     it("renders the Auto autonomy option as disabled with an explanatory tooltip", () => {

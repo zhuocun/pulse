@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import importlib
+import itertools
 import json
 import logging
 import os
@@ -160,7 +161,10 @@ def make_stub_chat_model(purpose: str = "stub") -> GenericFakeChatModel:
     """
 
     sample = AIMessage(content=json.dumps({"purpose": purpose, "result": "ok"}))
-    return GenericFakeChatModel(messages=iter([sample]))
+    # Use itertools.cycle so repeated invoke() calls on the same stub model
+    # always return the same deterministic response rather than raising
+    # StopIteration after the first call.
+    return GenericFakeChatModel(messages=itertools.cycle([sample]))
 
 
 def make_chat_model(

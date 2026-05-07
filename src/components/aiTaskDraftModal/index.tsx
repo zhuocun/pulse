@@ -24,6 +24,7 @@ import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
+import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
@@ -82,6 +83,10 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         useCachedQueryData<IColumn[]>(["boards", { projectId }]) ?? [];
     const tasks = useCachedQueryData<ITask[]>(["tasks", { projectId }]) ?? [];
     const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
+    const cachedProject = useCachedQueryData<IProject>([
+        "projects",
+        { projectId }
+    ]);
 
     const [prompt, setPrompt] = useState("");
     const [breakdownMode, setBreakdownMode] = useState(false);
@@ -192,12 +197,15 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const aiContext = useMemo(
         () => ({
-            project: { _id: projectId ?? "", projectName: "" },
+            project: {
+                _id: projectId ?? "",
+                projectName: cachedProject?.projectName ?? ""
+            },
             columns,
             tasks,
             members
         }),
-        [projectId, columns, tasks, members]
+        [projectId, cachedProject, columns, tasks, members]
     );
 
     const samplePrompts = useMemo(() => {
@@ -476,7 +484,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                     style={{ display: "block", marginTop: 4 }}
                     type="secondary"
                 >
-                    Cmd+Enter to draft.
+                    {isMacLike() ? "⌘⏎" : "Ctrl+Enter"} to draft.
                 </Typography.Text>
             </Form.Item>
             {!prompt.trim() && (

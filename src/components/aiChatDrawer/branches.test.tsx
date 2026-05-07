@@ -29,6 +29,7 @@ const baseChat = () => ({
     isLoading: false,
     messages: [] as AiChatMessage[],
     reset: jest.fn(),
+    seedMessages: jest.fn(),
     send: jest.fn(),
     streamingText: ""
 });

@@ -40,6 +40,24 @@ def test_make_stub_chat_model_returns_fake() -> None:
     assert is_stub_model(model)
 
 
+def test_make_stub_chat_model_invoke_twice_does_not_raise() -> None:
+    """Calling invoke() twice on the same stub model must not raise StopIteration.
+
+    Defect 2: the original implementation used ``iter([sample])`` which is a
+    single-use iterator.  The fix uses ``itertools.cycle([sample])`` so the
+    same deterministic response is returned on every call.
+    """
+    from langchain_core.messages import HumanMessage
+
+    model = make_stub_chat_model(purpose="multi-call")
+    first = model.invoke([HumanMessage(content="hi")])
+    second = model.invoke([HumanMessage(content="hi again")])
+    assert isinstance(first, AIMessage), "first invoke must return AIMessage"
+    assert isinstance(second, AIMessage), "second invoke must return AIMessage"
+    assert first.content, "first response must be non-empty"
+    assert second.content, "second response must be non-empty"
+
+
 def test_resolve_spec_auto_picks_stub_when_no_keys() -> None:
     spec = resolve_chat_model_spec(_settings(anthropic_api_key="", openai_api_key=""))
     assert spec.provider == PROVIDER_STUB

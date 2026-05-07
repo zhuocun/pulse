@@ -110,7 +110,7 @@ def test_board_brief_metadata() -> None:
     assert agent.metadata.description
 
 
-_VALID_BRIEF_STRENGTHS = {"strong", "moderate", "low", "none"}
+_VALID_BRIEF_STRENGTHS = {"strong", "moderate", "none"}
 
 
 def test_board_brief_runs_end_to_end() -> None:
@@ -527,3 +527,117 @@ def test_make_stub_chat_model_default_purpose() -> None:
     response = model.invoke("anything")
     payload = json.loads(response.content)
     assert payload["purpose"] == "stub"
+
+
+# ---------------------------------------------------------------------------
+# Defect 1: board-brief agent with id-keyed snapshot populates counts/unstarted/unowned
+# ---------------------------------------------------------------------------
+
+
+def test_board_brief_id_keyed_snapshot_populates_brief_fields() -> None:
+    """board-brief agent must produce non-empty counts with FE-style id-keyed snapshots.
+
+    The v1_engine uses ``col.get("_id")``; without normalisation (Defect 1)
+    counts/largestUnstarted/unowned are always empty lists.  This test
+    supplies a snapshot with ``id`` keys only and asserts the brief includes
+    a non-empty ``counts`` array AND at least one of ``largestUnstarted`` or
+    ``unowned`` is populated.
+    """
+    agent = global_registry.get("board-brief-agent")
+    checkpointer, store = _persistence()
+    graph = agent.compile(checkpointer=checkpointer, store=store)
+    # ``id``-keyed snapshot (FE shape); no ``_id`` present.
+    snapshot = {
+        "project_id": "p1",
+        "columns": [
+            {"id": "col-todo", "name": "Todo"},
+            {"id": "col-done", "name": "Done"},
+        ],
+        "tasks": [
+            # Unstarted task in non-done column (no storyPoints = large proxy)
+            {
+                "id": "t-unstarted",
+                "taskName": "Unstarted big task",
+                "columnId": "col-todo",
+                "type": "feature",
+                "storyPoints": 13,
+            },
+            # Unowned task (no coordinatorId)
+            {
+                "id": "t-unowned",
+                "taskName": "Unowned task",
+                "columnId": "col-todo",
+                "type": "feature",
+            },
+        ],
+    }
+    final = _drive(graph, {"project_id": "p1"}, [snapshot], thread_id="brief-id-keyed-1")
+    brief = final["brief"]
+    # counts must be non-empty when columns and tasks are present
+    assert isinstance(brief["counts"], list), "counts must be a list"
+    assert len(brief["counts"]) > 0, (
+        "counts must be non-empty when id-keyed snapshot has columns; "
+        "empty means _normalize_snapshot_for_v1_engine is not called"
+    )
+    # At least one of largestUnstarted or unowned must be populated
+    has_unstarted = bool(brief.get("largestUnstarted"))
+    has_unowned = bool(brief.get("unowned"))
+    assert has_unstarted or has_unowned, (
+        f"largestUnstarted={brief.get('largestUnstarted')!r} and "
+        f"unowned={brief.get('unowned')!r} are both empty; "
+        "snapshot normalization may not be working"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Defect 4: chat agent falls back gracefully when provider raises
+# ---------------------------------------------------------------------------
+
+
+def test_chat_agent_provider_error_falls_back_to_stub_reply() -> None:
+    """chat-agent must complete with a non-empty assistant message when ainvoke raises.
+
+    Verifies Defect 4: the real-model branch wraps the provider call in
+    try/except and produces a safe AIMessage instead of propagating the
+    exception.
+    """
+    import app.agents.catalog.chat as chat_mod
+
+    agent = global_registry.get("chat-agent")
+    checkpointer, store = _persistence()
+
+    # Build a fake chat model whose ainvoke raises RuntimeError.
+    class _FailingModel:
+        async def ainvoke(self, _messages: Any, **__: Any) -> Any:
+            raise RuntimeError("provider down")
+
+        def bind_tools(self, _tools: Any) -> "_FailingModel":
+            return self
+
+    # Patch is_stub_model to return False so the real-model branch is entered.
+    original_is_stub = chat_mod.is_stub_model
+    chat_mod.is_stub_model = lambda _m: False
+    # Inject the failing model via the public set_chat_model API.
+    agent.set_chat_model(_FailingModel())
+
+    try:
+        graph = agent.compile(checkpointer=checkpointer, store=store)
+        cfg = {"configurable": {"thread_id": "chat-error-1"}}
+
+        async def run() -> dict[str, Any]:
+            return await graph.ainvoke(
+                {"project_id": "p1", "messages": [HumanMessage(content="hello")]},
+                config=cfg,
+            )
+
+        final = asyncio.run(run())
+    finally:
+        chat_mod.is_stub_model = original_is_stub
+        # Re-register a fresh agent instance so subsequent tests are not affected.
+        global_registry.clear()
+        _ensure_catalog_registered()
+
+    messages = final.get("messages") or []
+    assert messages, "must have at least one message in final state"
+    last = messages[-1]
+    assert last.content, "fallback reply must be non-empty"

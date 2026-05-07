@@ -42,7 +42,6 @@ from app.agents.base import AgentMetadata
 from app.agents.errors import AgentError
 from app.agents.limits import enforce_request_limits
 from app.agents.llm import estimate_text_tokens, result_token_usage_from_graph_result
-from app.agents import sse as _sse_module
 from app.agents.sse import (
     DONE_FRAME,
     encode_sse,
@@ -63,9 +62,6 @@ from app.tools.redaction import redact, redact_dict
 from app.validation import api_error
 
 logger = logging.getLogger(__name__)
-
-# Re-export for tests that import ``_to_jsonable`` from this module.
-_to_jsonable = _sse_module._to_jsonable
 
 router = APIRouter()
 
