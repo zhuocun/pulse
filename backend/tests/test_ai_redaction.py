@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -91,7 +92,7 @@ class _CapturingModel:
         model_self = self
 
         class _Runnable:
-            def invoke(self, messages: Any, **_: Any) -> dict[str, Any]:
+            def _build_response(self, messages: Any) -> dict[str, Any]:
                 for msg in messages:
                     if isinstance(msg, HumanMessage):
                         model_self.received_prompts.append(msg.content)
@@ -101,6 +102,12 @@ class _CapturingModel:
                     # ReadinessPolish: return empty issues so merge is a no-op
                     parsed = ReadinessPolish(issues=[])
                 return {"raw": None, "parsed": parsed, "parsing_error": None}
+
+            def invoke(self, messages: Any, **_: Any) -> dict[str, Any]:
+                return self._build_response(messages)
+
+            async def ainvoke(self, messages: Any, **_: Any) -> dict[str, Any]:
+                return self._build_response(messages)
 
         return _Runnable()
 
@@ -123,7 +130,9 @@ def test_polish_rationale_does_not_forward_pii_in_draft() -> None:
     # Redact before calling, as the ai.py handler now does
     redacted_draft = redact_task_fields(draft)
 
-    polish_rationale(model, "initial rationale", redacted_draft, 5, [])  # type: ignore[arg-type]
+    asyncio.run(
+        polish_rationale(model, "initial rationale", redacted_draft, 5, [])  # type: ignore[arg-type]
+    )
 
     assert model.received_prompts, "model was not called"
     prompt_text = "\n".join(model.received_prompts)
@@ -152,7 +161,9 @@ def test_polish_readiness_does_not_forward_pii_in_draft() -> None:
         ],
     }
 
-    polish_readiness(model, deterministic, redacted_draft)  # type: ignore[arg-type]
+    asyncio.run(
+        polish_readiness(model, deterministic, redacted_draft)  # type: ignore[arg-type]
+    )
 
     assert model.received_prompts, "model was not called"
     prompt_text = "\n".join(model.received_prompts)
@@ -164,8 +175,8 @@ def test_polish_readiness_does_not_forward_pii_in_draft() -> None:
 def test_polish_rationale_stub_model_returns_deterministic() -> None:
     """Stub model must short-circuit without calling any LLM."""
 
-    result, ti, to = polish_rationale(
-        make_stub_chat_model(), "det rationale", {"taskName": "T"}, 3, []
+    result, ti, to = asyncio.run(
+        polish_rationale(make_stub_chat_model(), "det rationale", {"taskName": "T"}, 3, [])
     )
     assert result == "det rationale"
     assert (ti, to) == (0, 0)
@@ -173,6 +184,8 @@ def test_polish_rationale_stub_model_returns_deterministic() -> None:
 
 def test_polish_readiness_stub_model_returns_deterministic() -> None:
     det: dict[str, Any] = {"ready": True, "issues": []}
-    result, ti, to = polish_readiness(make_stub_chat_model(), det, {"taskName": "T"})
+    result, ti, to = asyncio.run(
+        polish_readiness(make_stub_chat_model(), det, {"taskName": "T"})
+    )
     assert result == det
     assert (ti, to) == (0, 0)

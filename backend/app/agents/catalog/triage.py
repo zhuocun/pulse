@@ -104,7 +104,7 @@ class TriagePolish(BaseModel):
     nudges: list[NudgePolish] = Field(default_factory=list)
 
 
-def polish_triage(
+async def polish_triage(
     model: BaseChatModel,
     deterministic_nudges: list[dict[str, Any]],
     board_snapshot: dict[str, Any],
@@ -145,7 +145,7 @@ def polish_triage(
     )
     try:
         structured = model.with_structured_output(TriagePolish, include_raw=True)
-        response = structured.invoke([HumanMessage(content=prompt)])
+        response = await structured.ainvoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("triage structured output failed; falling back.")
         return deterministic_nudges, 0, 0
@@ -216,11 +216,11 @@ class TriageAgent(BaseAgent):
             snapshot = state.get("board_snapshot") or {}
             return {"drift_result": be_tools.detect_drift(snapshot)}
 
-        def generate_nudges(state: TriageState) -> dict[str, Any]:
+        async def generate_nudges(state: TriageState) -> dict[str, Any]:
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
-            polished_nudges, tokens_in, tokens_out = polish_triage(
+            polished_nudges, tokens_in, tokens_out = await polish_triage(
                 chat_model, nudges, board_snapshot
             )
             project_id = state.get("project_id") or ""

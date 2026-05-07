@@ -1056,6 +1056,10 @@ def test_readiness_prompt_excludes_unrelated_context_tasks(
                     captured["prompt"] = messages[0].content
                     return {"raw": None, "parsed": parsed, "parsing_error": None}
 
+                async def ainvoke(_self, messages: Any, **__: Any) -> Any:
+                    captured["prompt"] = messages[0].content
+                    return {"raw": None, "parsed": parsed, "parsing_error": None}
+
             return _Runnable()
 
     agent = client.app.state.agent_runtime.get("task-estimation-agent")

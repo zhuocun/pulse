@@ -189,7 +189,7 @@ class BriefHeadline(BaseModel):
     )
 
 
-def polish_headline(
+async def polish_headline(
     model: BaseChatModel,
     deterministic: str,
     facts: dict[str, Any],
@@ -214,7 +214,7 @@ def polish_headline(
     )
     try:
         structured = model.with_structured_output(BriefHeadline, include_raw=True)
-        response = structured.invoke([HumanMessage(content=prompt)])
+        response = await structured.ainvoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("board-brief structured output failed; falling back.")
         return deterministic, 0, 0
@@ -267,7 +267,7 @@ class BoardBriefAgent(BaseAgent):
             snapshot = state.get("board_snapshot") or {}
             return {"drift_result": be_tools.detect_drift(snapshot)}
 
-        def generate_brief(state: BoardBriefState) -> dict[str, Any]:
+        async def generate_brief(state: BoardBriefState) -> dict[str, Any]:
             snapshot = state.get("board_snapshot") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             tasks = snapshot.get("tasks") or []
@@ -289,7 +289,7 @@ class BoardBriefAgent(BaseAgent):
             # correctly with the FE-supplied snapshot (which uses id keys).
             brief = v1_engine.board_brief(_normalize_snapshot_for_v1_engine(snapshot))
             deterministic = brief["headline"]
-            headline, tokens_in, tokens_out = polish_headline(
+            headline, tokens_in, tokens_out = await polish_headline(
                 chat_model, deterministic, facts
             )
             brief = {**brief, "headline": headline}

@@ -10,6 +10,8 @@ agents use (e.g. ``polish_draft`` is exercised both directly and through
 
 from __future__ import annotations
 
+import asyncio
+
 from langchain_core.messages import AIMessage
 
 from app.agents.catalog.search import SearchAgent, SearchRanking, polish_search
@@ -29,8 +31,8 @@ _CANDIDATES = [
 
 
 def test_polish_search_returns_deterministic_on_stub() -> None:
-    result, tokens_in, tokens_out = polish_search(
-        make_stub_chat_model(), _DETERMINISTIC, "auth", _CANDIDATES
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(make_stub_chat_model(), _DETERMINISTIC, "auth", _CANDIDATES)
     )
     assert result == _DETERMINISTIC
     assert (tokens_in, tokens_out) == (0, 0)
@@ -40,8 +42,8 @@ def test_polish_search_returns_deterministic_when_no_candidates() -> None:
     """Empty candidate set -> nothing to rank, skip the LLM round-trip."""
 
     parsed = SearchRanking(ids=["t-x"], rationale="hallucinated")
-    result, tokens_in, tokens_out = polish_search(
-        structured_model(parsed=parsed), _DETERMINISTIC, "q", []
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(structured_model(parsed=parsed), _DETERMINISTIC, "q", [])
     )
     assert result == _DETERMINISTIC
     assert (tokens_in, tokens_out) == (0, 0)
@@ -57,8 +59,8 @@ def test_polish_search_reranks_when_model_succeeds() -> None:
         rationale="t-3 closest to 'auth'; t-1 mentions login",
     )
     model = structured_model(parsed=parsed, raw_message=raw)
-    result, tokens_in, tokens_out = polish_search(
-        model, _DETERMINISTIC, "auth", _CANDIDATES
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(model, _DETERMINISTIC, "auth", _CANDIDATES)
     )
     assert result["ids"] == ["t-3", "t-1"]
     assert result["rationale"].startswith("t-3 closest")
@@ -73,11 +75,13 @@ def test_polish_search_drops_hallucinated_ids() -> None:
         content="x",
         usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
     )
-    result, tokens_in, tokens_out = polish_search(
-        structured_model(parsed=parsed, raw_message=raw),
-        _DETERMINISTIC,
-        "q",
-        _CANDIDATES,
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(
+            structured_model(parsed=parsed, raw_message=raw),
+            _DETERMINISTIC,
+            "q",
+            _CANDIDATES,
+        )
     )
     # Empty intersection -> deterministic preserved (token usage still tracked).
     assert result == _DETERMINISTIC
@@ -86,11 +90,13 @@ def test_polish_search_drops_hallucinated_ids() -> None:
 
 def test_polish_search_keeps_deterministic_rationale_when_polished_blank() -> None:
     parsed = SearchRanking(ids=["t-1"], rationale="   \n  ")
-    result, *_ = polish_search(
-        structured_model(parsed=parsed),
-        _DETERMINISTIC,
-        "q",
-        _CANDIDATES,
+    result, *_ = asyncio.run(
+        polish_search(
+            structured_model(parsed=parsed),
+            _DETERMINISTIC,
+            "q",
+            _CANDIDATES,
+        )
     )
     # Polished ids accepted; rationale falls back to deterministic.
     assert result["ids"] == ["t-1"]
@@ -99,8 +105,8 @@ def test_polish_search_keeps_deterministic_rationale_when_polished_blank() -> No
 
 def test_polish_search_falls_back_on_provider_exception() -> None:
     model = structured_model(raise_on_call=RuntimeError("provider down"))
-    result, tokens_in, tokens_out = polish_search(
-        model, _DETERMINISTIC, "q", _CANDIDATES
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(model, _DETERMINISTIC, "q", _CANDIDATES)
     )
     assert result == _DETERMINISTIC
     assert (tokens_in, tokens_out) == (0, 0)
@@ -114,8 +120,8 @@ def test_polish_search_falls_back_on_parsing_error() -> None:
     model = structured_model(
         parsing_error=ValueError("bad json"), parsed=None, raw_message=raw
     )
-    result, tokens_in, tokens_out = polish_search(
-        model, _DETERMINISTIC, "q", _CANDIDATES
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_search(model, _DETERMINISTIC, "q", _CANDIDATES)
     )
     assert result == _DETERMINISTIC
     # Tokens still recorded so a runaway provider can be billed.
@@ -126,7 +132,7 @@ def test_polish_search_falls_back_when_parsed_is_not_schema() -> None:
     """A model that returns a raw dict (not the typed Pydantic class) falls back."""
 
     model = structured_model(parsed={"ids": ["t-1"], "rationale": "wrong type"})
-    result, *_ = polish_search(model, _DETERMINISTIC, "q", _CANDIDATES)
+    result, *_ = asyncio.run(polish_search(model, _DETERMINISTIC, "q", _CANDIDATES))
     assert result == _DETERMINISTIC
 
 
@@ -135,8 +141,8 @@ def test_polish_search_strips_multiline_rationale_to_first_line() -> None:
         ids=["t-1"],
         rationale="first line\nsecond line that should be dropped",
     )
-    result, *_ = polish_search(
-        structured_model(parsed=parsed), _DETERMINISTIC, "q", _CANDIDATES
+    result, *_ = asyncio.run(
+        polish_search(structured_model(parsed=parsed), _DETERMINISTIC, "q", _CANDIDATES)
     )
     assert result["rationale"] == "first line"
 
@@ -153,11 +159,13 @@ def test_polish_search_emits_expanded_terms_when_llm_provides_them() -> None:
         rationale="auth match",
         expanded_terms=["authentication", "login", "sso"],
     )
-    result, *_ = polish_search(
-        structured_model(parsed=parsed, raw_message=raw),
-        _DETERMINISTIC,
-        "auth",
-        _CANDIDATES,
+    result, *_ = asyncio.run(
+        polish_search(
+            structured_model(parsed=parsed, raw_message=raw),
+            _DETERMINISTIC,
+            "auth",
+            _CANDIDATES,
+        )
     )
     assert result.get("expandedTerms") == ["authentication", "login", "sso"]
 
@@ -166,8 +174,8 @@ def test_polish_search_omits_expanded_terms_when_empty() -> None:
     """No ``expandedTerms`` key if the LLM returns an empty list."""
 
     parsed = SearchRanking(ids=["t-1"], rationale="x", expanded_terms=[])
-    result, *_ = polish_search(
-        structured_model(parsed=parsed), _DETERMINISTIC, "q", _CANDIDATES
+    result, *_ = asyncio.run(
+        polish_search(structured_model(parsed=parsed), _DETERMINISTIC, "q", _CANDIDATES)
     )
     assert "expandedTerms" not in result
 
@@ -187,11 +195,13 @@ def test_polish_search_includes_matches_in_reranked_result() -> None:
             {"id": "t-2", "strength": "moderate"},
         ],
     }
-    result, *_ = polish_search(
-        structured_model(parsed=parsed, raw_message=raw),
-        deterministic_with_matches,
-        "auth",
-        _CANDIDATES,
+    result, *_ = asyncio.run(
+        polish_search(
+            structured_model(parsed=parsed, raw_message=raw),
+            deterministic_with_matches,
+            "auth",
+            _CANDIDATES,
+        )
     )
     assert result["ids"] == ["t-2", "t-1"]
     assert "matches" in result

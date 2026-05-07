@@ -9,6 +9,8 @@ here so the mocking idiom stays consistent across the catalog.
 
 from __future__ import annotations
 
+import asyncio
+
 from langchain_core.messages import AIMessage
 
 from app.agents.catalog.triage import NudgePolish, TriagePolish, polish_triage
@@ -53,8 +55,8 @@ _DETERMINISTIC_NUDGES = [
 
 
 def test_polish_triage_returns_deterministic_on_stub() -> None:
-    result, tokens_in, tokens_out = polish_triage(
-        make_stub_chat_model(), _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(make_stub_chat_model(), _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
     assert result == _DETERMINISTIC_NUDGES
     assert (tokens_in, tokens_out) == (0, 0)
@@ -62,8 +64,8 @@ def test_polish_triage_returns_deterministic_on_stub() -> None:
 
 def test_polish_triage_returns_deterministic_on_stub_empty_nudges() -> None:
     """Stub model with empty nudge list also returns immediately."""
-    result, tokens_in, tokens_out = polish_triage(
-        make_stub_chat_model(), [], _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(make_stub_chat_model(), [], _BOARD_SNAPSHOT)
     )
     assert result == []
     assert (tokens_in, tokens_out) == (0, 0)
@@ -92,8 +94,8 @@ def test_polish_triage_merges_polished_summary() -> None:
         ]
     )
     model = structured_model(parsed=parsed, raw_message=raw)
-    result, tokens_in, tokens_out = polish_triage(
-        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
 
     assert result[0]["title"] == "WIP overflow in 'In Progress' (8/5) — move 3 tasks out"
@@ -111,8 +113,8 @@ def test_polish_triage_merges_polished_summary() -> None:
 
 def test_polish_triage_falls_back_on_provider_exception() -> None:
     model = structured_model(raise_on_call=RuntimeError("provider down"))
-    result, tokens_in, tokens_out = polish_triage(
-        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
     assert result == _DETERMINISTIC_NUDGES
     assert (tokens_in, tokens_out) == (0, 0)
@@ -131,8 +133,8 @@ def test_polish_triage_falls_back_on_parsing_error() -> None:
     model = structured_model(
         parsing_error=ValueError("bad json"), parsed=None, raw_message=raw
     )
-    result, tokens_in, tokens_out = polish_triage(
-        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
     assert result == _DETERMINISTIC_NUDGES
     # Tokens are still reported so a runaway provider can be billed.
@@ -149,7 +151,7 @@ def test_polish_triage_falls_back_when_parsed_is_not_schema() -> None:
     model = structured_model(
         parsed={"nudges": [{"nudge_id": "wip_overflow:0", "summary": "bad type"}]}
     )
-    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    result, *_ = asyncio.run(polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT))
     assert result == _DETERMINISTIC_NUDGES
 
 
@@ -166,7 +168,7 @@ def test_polish_triage_preserves_deterministic_when_summary_blank() -> None:
         ]
     )
     model = structured_model(parsed=parsed)
-    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    result, *_ = asyncio.run(polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT))
     assert result[0]["title"] == "WIP overflow"
     assert result[1]["title"] == "Stale task"
 
@@ -197,8 +199,8 @@ def test_polish_triage_ignores_unknown_nudge_id() -> None:
         ]
     )
     model = structured_model(parsed=parsed, raw_message=raw)
-    result, tokens_in, tokens_out = polish_triage(
-        model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT
+    result, tokens_in, tokens_out = asyncio.run(
+        polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
     # The list length must not grow.
     assert len(result) == len(_DETERMINISTIC_NUDGES)
@@ -222,7 +224,7 @@ def test_polish_triage_caps_summary_at_120_chars() -> None:
         ]
     )
     model = structured_model(parsed=parsed)
-    result, *_ = polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
+    result, *_ = asyncio.run(polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT))
     assert len(result[0]["title"]) <= 120
 
 
@@ -235,6 +237,6 @@ def test_polish_triage_empty_nudges_with_real_model_returns_early() -> None:
     """Empty nudge list short-circuits before calling the model."""
     parsed = TriagePolish(nudges=[NudgePolish(nudge_id="wip_overflow:0", summary="x")])
     model = structured_model(parsed=parsed)
-    result, tokens_in, tokens_out = polish_triage(model, [], _BOARD_SNAPSHOT)
+    result, tokens_in, tokens_out = asyncio.run(polish_triage(model, [], _BOARD_SNAPSHOT))
     assert result == []
     assert (tokens_in, tokens_out) == (0, 0)

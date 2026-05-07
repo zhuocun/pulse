@@ -369,6 +369,9 @@ def test_readiness_issues_shape_flows_into_polish_readiness() -> None:
         def invoke(self, _messages: Any, **__: Any) -> Any:
             return {"raw": raw, "parsed": parsed, "parsing_error": None}
 
+        async def ainvoke(self, _messages: Any, **__: Any) -> Any:
+            return {"raw": raw, "parsed": parsed, "parsing_error": None}
+
     class _FakeModel:
         def with_structured_output(self, _schema: Any, **__: Any) -> Any:
             return _FakeRunnable()
@@ -379,7 +382,9 @@ def test_readiness_issues_shape_flows_into_polish_readiness() -> None:
     original = te_mod.is_stub_model
     te_mod.is_stub_model = lambda _m: False
     try:
-        polished, tin, tout = polish_readiness(_FakeModel(), deterministic, {"taskName": "fix-login"})
+        polished, tin, tout = asyncio.run(
+            polish_readiness(_FakeModel(), deterministic, {"taskName": "fix-login"})
+        )
     finally:
         te_mod.is_stub_model = original
 

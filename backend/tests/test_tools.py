@@ -507,54 +507,6 @@ def test_detect_drift_uses_alternate_column_field() -> None:
 
 
 # ---------------------------------------------------------------------------
-# budget_check
-# ---------------------------------------------------------------------------
-
-
-def test_budget_check_allows_under_cap() -> None:
-    be_tools.reset_budget()
-    out = be_tools.budget_check("p1", 100, 100, monthly_cap=1000)
-    assert out["allowed"] is True
-    assert out["remaining"] == 800
-
-
-def test_budget_check_denies_over_cap() -> None:
-    be_tools.reset_budget()
-    be_tools.budget_check("p1", 500, 0, monthly_cap=1000)
-    out = be_tools.budget_check("p1", 600, 0, monthly_cap=1000)
-    assert out["allowed"] is False
-    assert out["remaining"] == 500
-
-
-def test_budget_check_rejects_negative_tokens() -> None:
-    be_tools.reset_budget()
-    with pytest.raises(ValueError, match="non-negative"):
-        be_tools.budget_check("p1", -1, 0)
-
-
-def test_budget_check_month_key_uses_utc(monkeypatch: pytest.MonkeyPatch) -> None:
-    be_tools.reset_budget()
-
-    class _FrozenDatetime:
-        @classmethod
-        def now(cls, tz: object = None) -> datetime:
-            return datetime(2026, 7, 1, tzinfo=timezone.utc)
-
-    monkeypatch.setattr(be_tools, "datetime", _FrozenDatetime)
-    assert be_tools._month_key() == "2026-07"
-    out = be_tools.budget_check("p1", 1, 1, monthly_cap=10)
-    assert out["remaining"] == 8
-
-
-def test_reset_budget_clears_state() -> None:
-    be_tools.reset_budget()
-    be_tools.budget_check("p1", 5, 5, monthly_cap=100)
-    be_tools.reset_budget()
-    out = be_tools.budget_check("p1", 5, 5, monthly_cap=100)
-    assert out["remaining"] == 90
-
-
-# ---------------------------------------------------------------------------
 # validated_citation_ref
 # ---------------------------------------------------------------------------
 

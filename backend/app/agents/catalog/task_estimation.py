@@ -70,7 +70,7 @@ class ReadinessPolish(BaseModel):
     issues: list[ReadinessIssuePolish] = Field(default_factory=list)
 
 
-def polish_readiness(
+async def polish_readiness(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     draft: dict[str, Any],
@@ -100,7 +100,7 @@ def polish_readiness(
         structured = model.with_structured_output(
             ReadinessPolish, include_raw=True
         )
-        response = structured.invoke([HumanMessage(content=prompt)])
+        response = await structured.ainvoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("readiness structured output failed; falling back.")
         return deterministic, 0, 0
@@ -129,7 +129,7 @@ def polish_readiness(
     return {**deterministic, "issues": merged_issues}, tokens_in, tokens_out
 
 
-def polish_rationale(
+async def polish_rationale(
     model: BaseChatModel,
     deterministic: str,
     draft: dict[str, Any],
@@ -152,7 +152,7 @@ def polish_rationale(
         structured = model.with_structured_output(
             EstimationRationale, include_raw=True
         )
-        response = structured.invoke([HumanMessage(content=prompt)])
+        response = await structured.ainvoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("task-estimation structured output failed; falling back.")
         return deterministic, 0, 0
@@ -273,12 +273,12 @@ class TaskEstimationAgent(BaseAgent):
                 ]
             }
 
-        def estimate(state: TaskEstimationState) -> dict[str, Any]:
+        async def estimate(state: TaskEstimationState) -> dict[str, Any]:
             draft = state.get("task_draft") or {}
             neighbours = state.get("embedding_neighbors") or []
             points = _estimate_for(draft, neighbours)
             deterministic = "Derived from prompt length + grounded neighbours."
-            rationale, tokens_in, tokens_out = polish_rationale(
+            rationale, tokens_in, tokens_out = await polish_rationale(
                 chat_model, deterministic, draft, points, neighbours
             )
             emit_custom(

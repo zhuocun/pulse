@@ -26,19 +26,17 @@ by:
    whenever the model picks a tool and the FE drives the multi-round
    loop until the model returns text.
 
-Polish helpers are LangChain-style ``with_structured_output(...).invoke(...)``
-calls -- synchronous network I/O against Anthropic / OpenAI. The route
-handlers are ``async def``, so we hop the polish call onto a worker
-thread via :func:`asyncio.to_thread` to keep the event loop free for
-concurrent requests while a real provider is configured. With the
+Polish helpers are async (``with_structured_output(...).ainvoke(...)``),
+so the route handlers ``await`` them directly. The event loop suspends at
+the provider I/O boundary and yields control back to uvicorn while the
+LLM responds, keeping concurrent requests progressing. With the
 deterministic stub the helpers short-circuit before any I/O, so the
-thread hop is effectively free; with a real key set, throughput on a
+coroutine overhead is negligible; with a real key set, throughput on a
 single uvicorn worker no longer collapses to one request at a time.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -227,14 +225,13 @@ async def _polish_and_record(
     *args: Any,
     **kwargs: Any,
 ) -> Any:
-    """Invoke ``polish`` off the event loop and true-up the project budget.
+    """Invoke ``polish`` and true-up the project budget.
 
-    The polish helpers are synchronous (LangChain ``with_structured_output``
-    + ``.invoke``) and make a blocking HTTPS call to the LLM provider when
-    a real key is configured. Calling them directly from an ``async def``
-    handler would freeze the uvicorn worker's event loop for the full
-    provider latency; :func:`asyncio.to_thread` hops the call onto the
-    default executor so concurrent requests progress.
+    The polish helpers are async (LangChain ``with_structured_output``
+    + ``.ainvoke``) and are awaited directly here since the route handlers
+    are already ``async def``. This keeps the event loop free for concurrent
+    requests: the coroutine suspends at the provider I/O boundary and yields
+    control back to uvicorn while the LLM responds.
 
     The :func:`_gate` step already debited 1 token at entry to the route
     (so a runaway provider can't burst past the cap before we see usage).
@@ -245,7 +242,7 @@ async def _polish_and_record(
     top-up.
     """
 
-    polished, tokens_in, tokens_out = await asyncio.to_thread(polish, *args, **kwargs)
+    polished, tokens_in, tokens_out = await polish(*args, **kwargs)
     if project_id:
         actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
         delta = max(0, actual - 1)

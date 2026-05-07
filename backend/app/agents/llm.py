@@ -97,6 +97,8 @@ class ChatModelSpec:
     model: str
     temperature: float = 0.2
     api_key: str = ""
+    max_retries: int = 2
+    timeout_seconds: float = 30.0
 
     @property
     def is_stub(self) -> bool:
@@ -144,6 +146,8 @@ def resolve_chat_model_spec(
         model=model,
         temperature=cfg.agent_chat_model_temperature,
         api_key=api_key,
+        max_retries=cfg.agent_chat_model_max_retries,
+        timeout_seconds=cfg.agent_chat_model_timeout_seconds,
     )
 
 
@@ -192,6 +196,8 @@ def make_chat_model(
             model=resolved.model,
             temperature=resolved.temperature,
             api_key=resolved.api_key or None,
+            max_retries=resolved.max_retries,
+            timeout=resolved.timeout_seconds,
         )
     if resolved.provider == PROVIDER_OPENAI:
         from langchain_openai import ChatOpenAI
@@ -200,6 +206,8 @@ def make_chat_model(
             model=resolved.model,
             temperature=resolved.temperature,
             api_key=resolved.api_key or None,
+            max_retries=resolved.max_retries,
+            timeout=resolved.timeout_seconds,
         )
     logger.debug("Chat model factory returning deterministic stub.")
     return make_stub_chat_model()
