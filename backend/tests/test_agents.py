@@ -1110,6 +1110,121 @@ def test_agent_runtime_astream_passes_through_agent_error(
         asyncio.run(collect())
 
 
+def test_agent_runtime_astream_records_token_usage_on_success(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Defect 3: astream must aggregate tokens from the final state and
+    surface them on the run span (was 0 for every streamed run).
+    """
+    import app.agents.runtime as runtime_mod
+
+    token_calls: list[tuple[int, int]] = []
+
+    class _CapturingSpan:
+        def __enter__(self) -> "_CapturingSpan":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            token_calls.append((tokens_in, tokens_out))
+
+    def fake_start_run_span(**kwargs: Any) -> _CapturingSpan:
+        return _CapturingSpan()
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    original = runtime_mod.start_run_span
+    runtime_mod.start_run_span = fake_start_run_span  # type: ignore[assignment]
+    try:
+        async def collect() -> None:
+            async for _ in runtime.astream(
+                "echo", {"text": "x"}, context=EchoContext()
+            ):
+                pass
+
+        asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original
+
+    # EchoAgent emits messages without usage metadata, so the totals should
+    # be (0, 0) — but the call itself MUST happen, proving the post-loop
+    # aggregation branch ran.
+    assert token_calls == [(0, 0)]
+
+
+def test_agent_runtime_astream_swallows_aggregation_errors(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Defect 3 (exception path): if aget_state raises during the post-loop
+    token aggregation, the stream must complete cleanly (best-effort).
+    """
+    import app.agents.runtime as runtime_mod
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    captured: list[Any] = []
+
+    class _Span:
+        def __enter__(self) -> "_Span":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            captured.append((tokens_in, tokens_out))
+
+    def fake_start_run_span(**kwargs: Any) -> _Span:
+        return _Span()
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = fake_start_run_span  # type: ignore[assignment]
+
+    # Force the EchoAgent.compile() to return a graph whose aget_state raises.
+    agent = fresh_registry.get("echo")
+
+    class _BoomGraph:
+        def __init__(self, real: Any) -> None:
+            self._real = real
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._real, name)
+
+        async def aget_state(self, *args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("aget_state boom")
+
+        async def astream(self, *args: Any, **kwargs: Any) -> Any:
+            async for ev in self._real.astream(*args, **kwargs):
+                yield ev
+
+    real_compile = agent.compile
+
+    def boom_compile(**kwargs: Any) -> Any:
+        return _BoomGraph(real_compile(**kwargs))
+
+    agent.compile = boom_compile  # type: ignore[assignment]
+
+    try:
+        async def collect() -> None:
+            async for _ in runtime.astream(
+                "echo", {"text": "x"}, context=EchoContext()
+            ):
+                pass
+
+        asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start
+        agent.compile = real_compile  # type: ignore[assignment]
+
+    # set_token_usage must NOT have been called because aggregation raised
+    # and we suppressed the exception rather than failing the stream.
+    assert captured == []
+
+
 def test_lifespan_attaches_runtime(client: TestClient) -> None:
     runtime = main.app.state.agent_runtime
     assert isinstance(runtime, AgentRuntime)
@@ -1348,7 +1463,7 @@ def test_router_stream_emits_sse(
 
 
 def test_to_jsonable_falls_back_to_placeholder() -> None:
-    from app.routers.agents import _to_jsonable
+    from app.agents.sse import _to_jsonable
 
     class Unserializable:
         def __repr__(self) -> str:

@@ -139,6 +139,7 @@ export interface UseAgentChatResult {
     isLoading: boolean;
     messages: AiChatMessage[];
     reset: () => void;
+    seedMessages: (initial: AiChatMessage[]) => void;
     send: (text: string) => Promise<void>;
     streamingText: string;
     // v2.1 additions:
@@ -280,6 +281,24 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         (n) => !dismissedNudgeIds.has(n.nudge_id)
     );
 
+    const seedMessages = useCallback(
+        (initial: AiChatMessage[]) => {
+            // Map AiChatMessage roles to AgentMessage roles for the underlying store.
+            agent.seedMessages(
+                initial.map((m) => ({
+                    role:
+                        m.role === "tool"
+                            ? ("tool" as const)
+                            : m.role === "user"
+                              ? ("user" as const)
+                              : ("assistant" as const),
+                    content: m.content
+                }))
+            );
+        },
+        [agent]
+    );
+
     return {
         // useAiChat-compatible fields:
         abort: agent.abort,
@@ -288,6 +307,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         isLoading: agent.isStreaming,
         messages,
         reset,
+        seedMessages,
         send,
         streamingText,
         // v2.1 additions:

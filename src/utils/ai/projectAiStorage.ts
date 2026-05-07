@@ -49,7 +49,7 @@ export const subscribeProjectAiDisabled = (
 };
 
 // ---------------------------------------------------------------------------
-// Chat history persistence (Phase B save; restore is TODO)
+// Chat history persistence
 // ---------------------------------------------------------------------------
 
 import type { AiChatMessage } from "../hooks/useAiChat";

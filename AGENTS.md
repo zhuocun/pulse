@@ -84,7 +84,7 @@ After deploying, verify:
 - Force `5xx` → `server` typed error with retry available.
 - Open the board brief while connected to the agent server → SSE stream completes; citation chips show the correct source label (`task` or `column`).
 - Open network tab → every AI request carries an `Idempotency-Key` header.
-- Call `GET /api/v1/ai/readiness` → response JSON has no `null` value for the `suggestion` key.
+- Call `POST /api/v1/ai/readiness` with a minimal valid JSON body (e.g. `{"task": {"title": "test"}, "project_id": "proj_x"}`) → response JSON contains an `issues` array where no entry has a `null` value for its `suggestion` field.
 
 ### Companion server prereqs
 

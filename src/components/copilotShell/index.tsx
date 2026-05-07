@@ -1,9 +1,8 @@
 import { ArrowRightOutlined } from "@ant-design/icons";
 import { Button, Drawer, Grid, Space, Tabs, Typography } from "antd";
-import type { FC } from "react";
+import { type FC, useEffect, useState } from "react";
 
 import { fontSize, fontWeight, space } from "../../theme/tokens";
-import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiSparkleIcon from "../aiSparkleIcon";
 
 // ---------------------------------------------------------------------------
@@ -32,12 +31,6 @@ export interface CopilotShellProps {
     members: IMember[];
     knownProjectIds: string[];
     initialPrompt?: string;
-    pendingProposal?: MutationProposal;
-    pendingNudges?: TriageNudge[];
-    onAcceptProposal?: (proposal: MutationProposal) => void;
-    onRejectProposal?: (proposal: MutationProposal) => void;
-    onActionNudge?: (nudge: TriageNudge) => void;
-    onDismissNudge?: (nudge: TriageNudge) => void;
 
     // ── Callbacks: open existing drawers (phase 1 delegation) ──────────────
     onOpenChat?: () => void;
@@ -90,6 +83,14 @@ const CopilotShell: FC<CopilotShellProps> = ({
     onOpenChat,
     onOpenBrief
 }) => {
+    const [activeTab, setActiveTab] = useState<CopilotShellTab>(defaultTab);
+
+    // Sync the active tab whenever the caller changes defaultTab (e.g. on
+    // re-open with a different target tab).
+    useEffect(() => {
+        setActiveTab(defaultTab);
+    }, [defaultTab]);
+
     const screens = Grid.useBreakpoint();
     const drawerWidth = screens.md ? 520 : "100%";
 
@@ -164,8 +165,9 @@ const CopilotShell: FC<CopilotShellProps> = ({
             title={titleNode}
         >
             <Tabs
-                defaultActiveKey={defaultTab}
+                activeKey={activeTab}
                 items={tabItems}
+                onChange={(key) => setActiveTab(key as CopilotShellTab)}
                 style={{ height: "100%" }}
             />
         </Drawer>

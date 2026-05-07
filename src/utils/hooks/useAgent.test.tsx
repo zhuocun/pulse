@@ -638,6 +638,44 @@ describe("useAgent", () => {
         });
     });
 
+    it("sets error after 8 auto-resume rounds with no final assistant text (F-5)", async () => {
+        // Each of the 8 streamAgent calls yields an interrupt so the loop
+        // exhausts without ever producing a real assistant answer.
+        for (let i = 0; i < 8; i += 1) {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "interrupt",
+                        ns: ["root"],
+                        data: { tool: "fe.listProjects", args: {} }
+                    }
+                ])
+            );
+        }
+
+        const queryClient = new QueryClient();
+        // Provide minimal data so the FE tool doesn't throw.
+        queryClient.setQueryData(["projects"], []);
+
+        const { result } = renderHook(
+            () => useAgent("board-coach", { projectId: "p1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start("keep running");
+        });
+
+        await waitFor(() => {
+            expect(result.current.isStreaming).toBe(false);
+        });
+
+        expect(result.current.error).not.toBeNull();
+        expect(result.current.error?.message).toMatch(
+            /could not finish|too many steps|ran out of steps|exhausted/i
+        );
+    });
+
     // Fix 7 — project-AI opt-out check
     describe("project AI disabled guard", () => {
         const { setProjectAiDisabledInStorage } = jest.requireActual<

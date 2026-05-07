@@ -149,6 +149,13 @@ export interface AgentStreamRequest {
             [k: string]: unknown;
         };
     };
+    /**
+     * Modes to request from the LangGraph v2 streaming endpoint.
+     * Note: interrupt events arrive out-of-band from LangGraph's HITL
+     * mechanism and do not need to be requested via stream_mode. They are
+     * handled by the client (see `useAgent.ts`) separately from the
+     * stream_mode subscription.
+     */
     stream_mode: Array<"updates" | "messages" | "custom">;
     version: "v2";
 }

@@ -68,7 +68,7 @@ First-time user on a fresh project: no recent activity, no past tasks, no learne
 - **G4 — Smart, proactive surfaces.** Drift detection, triage inbox with aggregation/decay rules, command palette (Section 7).
 - **G5 — Observable trust.** Server-side redaction, admin-only spend dashboard, "What is shared" panel, shadow mode for safe tool promotion (Section 6).
 - **G6 — No regression on the v1 fallback.** With `REACT_APP_AI_BASE_URL` empty, the local engine powers Brief / Draft / Estimate / Readiness / Search exactly as today (Section 9).
-- **G7 — MCP compatibility from Phase A.** Named agents are MCP-compatible via `langchain-mcp-adapters`, serving both the FE and any external assistant (Section 5.6).
+- **G7 — MCP compatibility (deferred).** The original plan was to ship MCP compatibility from Phase A via `langchain-mcp-adapters`. As of v2.1, `langchain-mcp-adapters` is not installed and no `/mcp` mount exists. This goal is tracked for a later phase; see `backend/docs/AI_REMAINING_WORK.md §7` for current status.
 
 ### 4.2 Non-goals (v2.1)
 
@@ -89,13 +89,14 @@ First-time user on a fresh project: no recent activity, no past tasks, no learne
 
 The Python server hosts a **registry of named agents** in `app/agents/catalog/`. Each agent is a LangGraph `StateGraph` compiled with a `BaseCheckpointSaver` (thread-scoped) and a `BaseStore` (cross-thread, namespaced). Each agent has its own `recursion_limit`, `context_schema`, tool set, and version metadata.
 
-| Agent name              | v2 intent  | Purpose                                                 | Key tools                                  |
-| ----------------------- | ---------- | ------------------------------------------------------- | ------------------------------------------ |
-| `board-brief-agent`     | `brief`    | Structured board summary with drift-aware headline      | `fe.boardSnapshot`, `be.detectDrift`       |
-| `task-drafting-agent`   | `draft`    | Natural-language → fully populated task form            | `fe.boardSnapshot`, `fe.similarTasks`      |
-| `task-estimation-agent` | `estimate` | Story-point estimation + readiness check with citations | `fe.similarTasks`, `be.embeddingNeighbors` |
-| `chat-agent`            | `chat`     | Conversational Q&A grounded in project data             | All FE read tools, `be.summarize`          |
-| `triage-agent`          | `triage`   | Proactive drift detection → nudges                      | `fe.boardSnapshot`, `be.detectDrift`       |
+| Agent name              | v2 intent  | Purpose                                                 | Key tools                                                   |
+| ----------------------- | ---------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| `board-brief-agent`     | `brief`    | Structured board summary with drift-aware headline      | `fe.boardSnapshot`, `be.detectDrift`                        |
+| `task-drafting-agent`   | `draft`    | Natural-language → fully populated task form            | `fe.boardSnapshot`, `fe.similarTasks`                       |
+| `task-estimation-agent` | `estimate` | Story-point estimation + readiness check with citations | `fe.similarTasks`, `be.embeddingNeighbors`                  |
+| `chat-agent`            | `chat`     | Conversational Q&A grounded in project data             | All FE read tools, `be.summarize`                           |
+| `triage-agent`          | `triage`   | Proactive drift detection → nudges                      | `fe.boardSnapshot`, `be.detectDrift`                        |
+| `search-agent`          | —          | FE-candidate reranking via embeddings                   | `fe.searchCandidates`, `be.embed`, `be.embedding_neighbors` |
 
 Each agent is:
 
@@ -612,10 +613,11 @@ START → fetch_snapshot → detect_drift → generate_nudges → END
           (interrupt)      (be tool)       (LLM)
 ```
 
-- Runs on a **server-side schedule** (every 15 min per active project), not interactively.
-- For scheduled runs, `fe.boardSnapshot` is replaced by a server-side data fetch (the server calls the main REST API directly, using a service account token).
+- Triggered by the **FE**, not a server-side scheduler. The board page fires `triage-agent` at most once per `(projectId, browser session)`: the effect runs when the chat drawer first opens for a project, the remote backend is reachable (`aiUseLocalEngine` is false), and AI is enabled for the project. Subsequent drawer opens in the same session are no-ops (tracked via a `useRef` set).
+- `fetch_snapshot`: interrupts to the FE to obtain `fe.boardSnapshot` — the same interrupt pattern used by `board-brief-agent`.
 - `generate_nudges`: emits `custom` events with `kind: "nudge"`.
 - **Recursion limit:** 6. **Typical turns:** 1 (fire-and-forget).
+- A server-side scheduler (e.g. periodic background runs every N minutes per active project) is a future enhancement and has not shipped.
 
 ### 5A.7 Authentication and authorization middleware
 

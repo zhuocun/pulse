@@ -90,6 +90,16 @@ const useAiChat = (ctx: UseAiChatContext | null) => {
     const messagesRef = useRef(messages);
     messagesRef.current = messages;
 
+    /**
+     * Seed the chat history from an external source (e.g. localStorage).
+     * Only seeds once — if messages already exist the call is a no-op so
+     * a double-mount in React.StrictMode can't duplicate the history.
+     */
+    const seedMessages = useCallback((initial: AiChatMessage[]) => {
+        if (initial.length === 0) return;
+        setMessages((prev) => (prev.length === 0 ? initial : prev));
+    }, []);
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const [streamingText, setStreamingText] = useState("");
@@ -303,6 +313,7 @@ const useAiChat = (ctx: UseAiChatContext | null) => {
         isLoading,
         messages,
         reset,
+        seedMessages,
         send,
         streamingText
     };

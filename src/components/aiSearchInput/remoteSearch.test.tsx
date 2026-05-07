@@ -37,6 +37,7 @@ const baseAgent = (
     start: jest.fn().mockResolvedValue(undefined),
     resume: jest.fn().mockResolvedValue(undefined),
     abort: jest.fn(),
+    seedMessages: jest.fn(),
     isStreaming: false,
     state: { messages: [] },
     pendingInterrupt: null,

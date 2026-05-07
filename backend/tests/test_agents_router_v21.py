@@ -613,7 +613,7 @@ def test_invoke_records_usage_against_budget(
 
 
 def test_to_jsonable_falls_back_to_placeholder() -> None:
-    from app.routers.agents import _to_jsonable
+    from app.agents.sse import _to_jsonable
 
     class _Bad:
         def __repr__(self) -> str:

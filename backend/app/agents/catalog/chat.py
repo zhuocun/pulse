@@ -14,6 +14,8 @@ side in ``useAiChat.ts``).
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any, List, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -31,6 +33,7 @@ from app.agents.state import ChatState
 from app.agents.stream import emit_custom
 from app.tools import be_tools
 
+logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
     "You are Board Copilot, an assistant embedded in a Jira-style project "
@@ -113,7 +116,21 @@ class ChatAgent(BaseAgent):
                 conversation: List[Any] = [SystemMessage(content=_SYSTEM_PROMPT)]
                 conversation.extend(messages)
                 bound = chat_model.bind_tools(CHAT_TOOLS)
-                raw = await bound.ainvoke(conversation)
+                try:
+                    raw = await bound.ainvoke(conversation)
+                except (asyncio.CancelledError, GeneratorExit):
+                    raise
+                except Exception:  # noqa: BLE001 -- defensive boundary around provider call
+                    logger.warning(
+                        "chat-agent provider call failed; falling back to stub reply.",
+                        exc_info=True,
+                    )
+                    reply = _stub_response(user_text, project_id)
+                    response = AIMessage(content=reply)
+                    emit_custom(
+                        {"kind": "usage", "tokensIn": 0, "tokensOut": 0}
+                    )
+                    return {"messages": [response]}
                 if isinstance(raw, AIMessage):
                     response = raw
                 else:

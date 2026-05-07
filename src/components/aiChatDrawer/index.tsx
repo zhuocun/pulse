@@ -43,9 +43,11 @@ import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
-import { saveChatHistory } from "../../utils/ai/projectAiStorage";
+import {
+    loadChatHistory,
+    saveChatHistory
+} from "../../utils/ai/projectAiStorage";
 import useAiChat from "../../utils/hooks/useAiChat";
-import type { AiChatMessage } from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
@@ -429,6 +431,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      * text — falls back gracefully when the model produces none.
      */
     const inputRef = useRef<TextAreaRef | null>(null);
+    /**
+     * Tracks which project id has already had its localStorage history
+     * restored. Prevents re-seeding after the user starts a new conversation
+     * (reset clears messages but the project id stays the same).
+     */
+    const historyRestoredForRef = useRef<string | null>(null);
     const screens = Grid.useBreakpoint();
     const drawerWidth = screens.md ? 420 : "100%";
     const initialPromptHandled = useRef<string | null>(null);
@@ -486,9 +494,32 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         isLoading,
         messages,
         reset,
+        seedMessages,
         send,
         streamingText
     } = environment.aiUseLocalEngine ? localChat : agentChat;
+
+    /**
+     * F-1 restore: on first open for a given project, seed the active hook
+     * with any history saved to localStorage. We only seed once per project
+     * per drawer mount so that a user's "New conversation" reset is not
+     * immediately undone by a re-seed.
+     */
+    useEffect(() => {
+        if (!open || !project?._id) return;
+        if (historyRestoredForRef.current === project._id) return;
+        historyRestoredForRef.current = project._id;
+        const saved = loadChatHistory(project._id).filter(
+            (m) =>
+                (m.role === "user" ||
+                    m.role === "assistant" ||
+                    m.role === "tool") &&
+                typeof m.content === "string"
+        );
+        if (saved.length > 0) {
+            seedMessages(saved);
+        }
+    }, [open, project?._id, seedMessages]);
 
     useEffect(() => {
         setLocalProposalHandled(false);
@@ -893,9 +924,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading]);
 
     /**
-     * P2-C (Phase B save): persist history to localStorage whenever messages
-     * change and we have a project ID.
-     * TODO: Phase B restore on open
+     * P2-C (Phase B): persist history to localStorage whenever messages
+     * change and we have a project ID. History is restored on open via the
+     * seedMessages effect above.
      */
     useEffect(() => {
         if (project?._id && messages.length > 0) {

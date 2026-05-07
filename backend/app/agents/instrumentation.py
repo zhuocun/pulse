@@ -103,6 +103,17 @@ class _AgentRunSpan:
 
         self._tokens_in, self._tokens_out = _result_tokens(result)
 
+    def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+        """Set token counts directly.
+
+        Used by the streaming path, which aggregates totals across all
+        messages in the final graph state rather than handing back a single
+        result dict like ``ainvoke`` does.
+        """
+
+        self._tokens_in = tokens_in
+        self._tokens_out = tokens_out
+
     def __exit__(
         self,
         exc_type: Optional[type[BaseException]],

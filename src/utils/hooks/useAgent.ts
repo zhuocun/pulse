@@ -56,6 +56,12 @@ export interface UseAgentResult {
     start: (input: unknown, options?: StartOptions) => Promise<void>;
     resume: (resumeValue: unknown) => Promise<void>;
     abort: () => void;
+    /**
+     * Seeds the message list from a prior session (e.g. localStorage).
+     * No-op when messages already exist so a double-mount in
+     * React.StrictMode can't duplicate the history.
+     */
+    seedMessages: (initial: AgentMessage[]) => void;
     isStreaming: boolean;
     state: UseAgentState;
     pendingInterrupt: InterruptPayload | null;
@@ -517,6 +523,7 @@ const useAgent = (
                 let nextBody = body;
                 // Auto-resume loop: if the agent interrupts with a known FE
                 // tool, run the tool synchronously and POST a `resume` body.
+                let loopExhausted = false;
                 for (let round = 0; round < 8; round += 1) {
                     if (controller.signal.aborted) break;
                     const { pendingResume, streamFailed } = await consumeStream(
@@ -538,6 +545,34 @@ const useAgent = (
                     };
                     // Clear interrupt state on successful auto-resume.
                     if (mountedRef.current) setPendingInterrupt(null);
+                    if (round === 7) {
+                        // All 8 rounds consumed and the last still requested
+                        // a resume — the agent never produced a final answer.
+                        loopExhausted = true;
+                    }
+                }
+                if (
+                    loopExhausted &&
+                    !turnErrored &&
+                    !controller.signal.aborted &&
+                    mountedRef.current
+                ) {
+                    // Inspect the latest messages via a state updater so we
+                    // read the post-stream value, not the stale closure value.
+                    let hasRealAnswer = false;
+                    setState((prev) => {
+                        const lastMsg = prev.messages[prev.messages.length - 1];
+                        hasRealAnswer =
+                            lastMsg?.role === "assistant" &&
+                            lastMsg.content.trim().length > 0;
+                        return prev; // no change to state, just a read
+                    });
+                    if (!hasRealAnswer) {
+                        setError(
+                            new Error(microcopy.ai.toolRoundExhausted as string)
+                        );
+                        turnErrored = true;
+                    }
                 }
             } catch (err) {
                 // already surfaced
@@ -714,6 +749,14 @@ const useAgent = (
         if (mountedRef.current) setLastSuggestion(null);
     }, []);
 
+    const seedMessages = useCallback((initial: AgentMessage[]) => {
+        if (!mountedRef.current) return;
+        setState((prev) => {
+            if (prev.messages.length > 0 || initial.length === 0) return prev;
+            return { ...prev, messages: initial };
+        });
+    }, []);
+
     const dismissNudge = useCallback((nudgeId: string) => {
         if (!mountedRef.current) return;
         setNudgeEntries((prev) => {
@@ -754,6 +797,7 @@ const useAgent = (
             start,
             resume,
             abort,
+            seedMessages,
             isStreaming,
             state,
             pendingInterrupt,
@@ -784,6 +828,7 @@ const useAgent = (
             pendingProposal,
             reset,
             resume,
+            seedMessages,
             start,
             state,
             threadId,
