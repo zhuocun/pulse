@@ -42,8 +42,7 @@ const PageError: React.FC<{ error: Error | null; onRetry?: () => void }> = ({
                 }}
                 type="danger"
             >
-                {error?.message ||
-                    microcopy.feedback.loadFailed}
+                {error?.message || microcopy.feedback.loadFailed}
             </Typography.Text>
             {onRetry ? (
                 <Button onClick={onRetry} type="primary">

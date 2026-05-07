@@ -342,7 +342,9 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <AppstoreOutlined />
                         </StatIcon>
-                        <StatLabel>{microcopy.projectsPage.totalProjects}</StatLabel>
+                        <StatLabel>
+                            {microcopy.projectsPage.totalProjects}
+                        </StatLabel>
                     </StatHeader>
                     <StatValue>{pLoading ? "—" : stats.total}</StatValue>
                 </StatCard>
@@ -351,7 +353,9 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <BankOutlined />
                         </StatIcon>
-                        <StatLabel>{microcopy.projectsPage.organizations}</StatLabel>
+                        <StatLabel>
+                            {microcopy.projectsPage.organizations}
+                        </StatLabel>
                     </StatHeader>
                     <StatValue>
                         {pLoading ? "—" : stats.organizations}
@@ -362,7 +366,9 @@ const ProjectPage = () => {
                         <StatIcon aria-hidden>
                             <TeamOutlined />
                         </StatIcon>
-                        <StatLabel>{microcopy.projectsPage.teamMembers}</StatLabel>
+                        <StatLabel>
+                            {microcopy.projectsPage.teamMembers}
+                        </StatLabel>
                     </StatHeader>
                     <StatValue>
                         {mLoading ? "—" : (members?.length ?? 0)}

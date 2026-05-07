@@ -160,8 +160,8 @@ const CopilotShell: FC<CopilotShellProps> = ({
             onClose={onClose}
             open={open}
             placement="right"
+            styles={{ wrapper: { width: drawerWidth } }}
             title={titleNode}
-            width={drawerWidth}
         >
             <Tabs
                 defaultActiveKey={defaultTab}

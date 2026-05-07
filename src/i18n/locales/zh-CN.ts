@@ -710,8 +710,7 @@ const zhCN: Dictionary = {
         localModeTag: "本地引擎",
         remoteModeDescription:
             "由远程 AI 模型提供支持。您的数据会按照您的隐私设置进行处理。",
-        localModeDescription:
-            "运行在本地 AI 引擎上。您的数据保留在此设备上。",
+        localModeDescription: "运行在本地 AI 引擎上。您的数据保留在此设备上。",
         knowledgeCutoff: "知识截止时间：2025 年 1 月"
     },
     mutation: {

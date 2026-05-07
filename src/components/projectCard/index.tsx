@@ -323,10 +323,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     />
                     <TitleStack>
                         <Organization>
-                            {
-                                project.organization ||
-                                microcopy.labels.noOrganization
-                            }
+                            {project.organization ||
+                                microcopy.labels.noOrganization}
                         </Organization>
                         <TitleLink
                             to={`/projects/${project._id}`}

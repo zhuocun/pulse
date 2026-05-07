@@ -19,7 +19,7 @@ describe("status components", () => {
         render(<PageError error={null} />);
 
         expect(
-            screen.getByText("Page failed to load, please try again later.")
+            screen.getByText("Couldn't load. Please try again.")
         ).toBeInTheDocument();
     });
 });

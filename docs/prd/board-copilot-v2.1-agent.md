@@ -1,13 +1,13 @@
 # PRD: Board Copilot v2.1 — Agentic AI for `pulse`
 
-| Field             | Value                                                                                                                                                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status            | Draft v2.1 — supersedes the earlier v2 agent draft. v1 capabilities ship as the fallback experience; v2.1 is the new default once the Python agent server is reachable.                                                           |
-| Author            | Product (this document is the design-reviewed revision of the v2 Board Copilot PRD)                                                                                                                                               |
-| Last updated      | 2026-05-01                                                                                                                                                                                                                        |
-| Target repository | `pulse` (frontend, `src/`) + Python agent server at `${REACT_APP_AI_BASE_URL}` (`backend/`), built on LangGraph 1.x with agents registered in `app/agents/catalog/`                                                           |
-| Document scope    | Product critique of v2, redesigned architecture aligned to LangGraph substrate, FE↔BE agent contract, governance & rollout. Server internals are referenced where they affect the wire contract.                                  |
-| Companion docs    | [`board-copilot.md`](board-copilot.md) (v1 design), [`board-copilot-progress.md`](board-copilot-progress.md), [`ui-ux-optimization-plan.md`](../ui-ux-optimization-plan.md) |
+| Field             | Value                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status            | Draft v2.1 — supersedes the earlier v2 agent draft. v1 capabilities ship as the fallback experience; v2.1 is the new default once the Python agent server is reachable.                          |
+| Author            | Product (this document is the design-reviewed revision of the v2 Board Copilot PRD)                                                                                                              |
+| Last updated      | 2026-05-01                                                                                                                                                                                       |
+| Target repository | `pulse` (frontend, `src/`) + Python agent server at `${REACT_APP_AI_BASE_URL}` (`backend/`), built on LangGraph 1.x with agents registered in `app/agents/catalog/`                              |
+| Document scope    | Product critique of v2, redesigned architecture aligned to LangGraph substrate, FE↔BE agent contract, governance & rollout. Server internals are referenced where they affect the wire contract. |
+| Companion docs    | [`board-copilot.md`](board-copilot.md) (v1 design), [`board-copilot-progress.md`](board-copilot-progress.md), [`ui-ux-optimization-plan.md`](../ui-ux-optimization-plan.md)                      |
 
 ---
 
