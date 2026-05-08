@@ -37,6 +37,7 @@ single uvicorn worker no longer collapses to one request at a time.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -53,7 +54,12 @@ from app.agents.catalog.search import polish_search
 from app.agents.catalog.task_drafting import polish_draft
 from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
 from app.agents.errors import AgentError
-from app.agents.llm import is_stub_model, make_stub_chat_model
+from app.agents.llm import (
+    is_stub_model,
+    make_stub_chat_model,
+    result_token_usage_from_graph_result,
+)
+from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
 from app.middleware import budget as _budget
 from app.middleware import rate_limit as _rate_limit
@@ -76,12 +82,20 @@ router = APIRouter()
 
 
 def _idem_fail(idem: IdempotencyContext, exc: BaseException) -> None:
-    """Release an idempotency reservation unless the process is exiting."""
+    """Release an idempotency reservation unless the process is exiting.
+
+    Re-raises with ``raise ... from None`` so error reporters see the
+    original traceback chain (preserved on ``exc.__traceback__``)
+    without grafting on whatever exception happens to be active in
+    ``sys.exc_info`` at the call site -- this matters for tests that
+    invoke ``_idem_fail`` directly with a constructed exception
+    instance instead of from within an ``except`` clause.
+    """
 
     if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-        raise exc
+        raise exc from None
     idem.release()
-    raise exc
+    raise exc from None
 
 
 def _get_runtime(request: Request) -> AgentRuntime:
@@ -876,22 +890,48 @@ async def chat(
         if project_id:
             inputs["project_id"] = project_id
 
+        timeout = settings.agent_request_timeout_seconds
         try:
-            result = await runtime.ainvoke(
-                "chat-agent",
-                inputs,
-                user_id=user_id,
+            result = await asyncio.wait_for(
+                runtime.ainvoke(
+                    "chat-agent",
+                    inputs,
+                    user_id=user_id,
+                ),
+                timeout=timeout,
             )
+        except asyncio.TimeoutError as exc:
+            logger.warning("chat-agent v1 shim exceeded %ss timeout", timeout)
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail={
+                    "error": {
+                        "code": "timeout",
+                        "message": f"Agent run exceeded {timeout}s timeout",
+                    }
+                },
+            ) from exc
         except AgentError as exc:
             logger.warning("chat-agent failed via v1 shim", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={"error": "agent_unavailable"},
+                detail={
+                    "error": {
+                        "code": "agent_unavailable",
+                        "message": "Agent failed to respond.",
+                    }
+                },
             ) from exc
 
         text, tool_calls = _extract_chat_response(result)
+        # Record real token usage from the graph result so the budget
+        # tracker reflects what the provider actually charged. The flat
+        # 1-token debit that used to live here under-charged every chat
+        # call by hundreds of tokens with a real model wired up.
         if project_id:
-            _budget.budget_tracker.record(project_id, tokens=1)
+            tokens_in, tokens_out = result_token_usage_from_graph_result(result)
+            actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
+            _budget.budget_tracker.record(project_id, tokens=max(1, actual))
         if tool_calls:
             body: Dict[str, Any] = {"kind": "tool_calls", "toolCalls": tool_calls}
         else:

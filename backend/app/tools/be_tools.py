@@ -265,6 +265,41 @@ def embedding_neighbors(
 _WIP_LIMIT = 5
 _STALE_DAYS = 7
 
+# Common column-name labels that indicate a "Done" / completed bucket
+# when no explicit ``isDone`` flag is set on the column. Lowercased
+# match. Keep terse and locale-aware -- the previous version only
+# matched English ``"done"``, which silently disabled WIP overflow
+# detection on non-English boards (column names like "Terminé"
+# wrongly triggered overflow signals when they shouldn't).
+_DONE_COLUMN_NAMES = frozenset(
+    {
+        "done",
+        "complete",
+        "completed",
+        "closed",
+        "shipped",
+        "released",
+        "terminé",  # fr
+        "terminée",  # fr
+        "abgeschlossen",  # de
+        "fertig",  # de
+        "完了",  # ja
+        "完成",  # zh
+        "完成済み",  # ja
+        "hecho",  # es
+        "concluido",  # pt
+    }
+)
+
+
+def _is_done_column(col: dict[str, Any]) -> bool:
+    """Return True if ``col`` should be excluded from WIP overflow detection."""
+
+    if col.get("isDone") is True:
+        return True
+    name = (col.get("name") or "").strip().lower()
+    return bool(name) and name in _DONE_COLUMN_NAMES
+
 
 def _parse_iso(value: str | None) -> datetime | None:
     if not value:
@@ -300,18 +335,26 @@ def detect_drift(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     for col in columns:
         col_id = col.get("id")
-        col_name = (col.get("name") or "").strip().lower()
-        if col_name == "done" or col_id is None:
+        if col_id is None or _is_done_column(col):
             continue
+        # Honour an explicit per-column ``wipLimit`` when the FE
+        # supplies one; otherwise fall back to the org-default. A
+        # ``wipLimit`` of 0 / negative is treated as "no limit set".
+        explicit = col.get("wipLimit")
+        limit = (
+            int(explicit)
+            if isinstance(explicit, int) and explicit > 0
+            else _WIP_LIMIT
+        )
         count = column_counts.get(col_id, 0)
-        if count > _WIP_LIMIT:
+        if count > limit:
             signals.append(
                 {
                     "type": "wip_overflow",
                     "column_id": col_id,
                     "column_name": col.get("name"),
                     "count": count,
-                    "limit": _WIP_LIMIT,
+                    "limit": limit,
                 }
             )
 

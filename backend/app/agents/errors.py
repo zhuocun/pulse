@@ -12,7 +12,15 @@ from app.errors import AppError
 
 
 class AgentError(AppError):
-    """Base class for agent-related errors."""
+    """Base class for agent-related errors.
+
+    ``code`` is a stable machine-readable enum. The SSE stream and
+    JSON error envelopes surface it under ``data.code`` / ``error.code``
+    so the FE can branch on a canonical value instead of string-
+    matching ``message``. Subclasses override the class attribute.
+    """
+
+    code: str = "agent_error"
 
     def __init__(
         self,
@@ -32,6 +40,8 @@ class AgentError(AppError):
 class AgentNotFoundError(AgentError):
     """Raised when an unknown agent name is requested."""
 
+    code = "agent_not_found"
+
     def __init__(self, name: str) -> None:
         super().__init__(
             f"Agent '{name}' is not registered",
@@ -43,6 +53,8 @@ class AgentNotFoundError(AgentError):
 
 class AgentAlreadyRegisteredError(AgentError):
     """Raised when two agents try to register under the same name."""
+
+    code = "agent_already_registered"
 
     def __init__(self, name: str) -> None:
         super().__init__(
@@ -56,6 +68,8 @@ class AgentAlreadyRegisteredError(AgentError):
 class AgentConfigurationError(AgentError):
     """Raised when an agent or its runtime is misconfigured."""
 
+    code = "agent_configuration"
+
     def __init__(self, message: str, *, details: Any = None) -> None:
         super().__init__(
             message,
@@ -66,6 +80,8 @@ class AgentConfigurationError(AgentError):
 
 class AgentRecursionError(AgentError):
     """Raised when an agent exceeds its configured ``recursion_limit``."""
+
+    code = "agent_recursion"
 
     def __init__(self, name: str, recursion_limit: int) -> None:
         super().__init__(
@@ -79,6 +95,8 @@ class AgentRecursionError(AgentError):
 
 class AgentExecutionError(AgentError):
     """Raised when an agent's graph fails for an otherwise unmapped reason."""
+
+    code = "agent_execution"
 
     def __init__(
         self,

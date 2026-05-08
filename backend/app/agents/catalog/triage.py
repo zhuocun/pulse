@@ -29,14 +29,40 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._shared import unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.agents.stream import emit_custom
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact_dict
 
 logger = logging.getLogger(__name__)
+
+
+# Cap how much board snapshot we forward to the provider. Real boards
+# can carry hundreds of tasks; the headline / nudge prompt only needs
+# enough context to recognise drift, and a 200kB snapshot wastes the
+# context window.
+_SNAPSHOT_TRUNCATION = {
+    "tasks": 20,
+    "columns": 12,
+    "members": 25,
+}
+
+
+def _truncate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of ``snapshot`` with bulky list fields capped."""
+
+    if not isinstance(snapshot, dict):
+        return snapshot
+    out = dict(snapshot)
+    for key, cap in _SNAPSHOT_TRUNCATION.items():
+        items = snapshot.get(key)
+        if isinstance(items, list) and len(items) > cap:
+            out[key] = items[:cap]
+    return out
 
 
 _FE_NUDGE_SEVERITY = {
@@ -54,7 +80,21 @@ _NUDGE_TITLES = {
 }
 
 
+# Per-signal severity. The board-level ``drift["severity"]`` is the
+# *aggregate* (e.g. "critical" if any unowned bug exists) and used to be
+# applied to every nudge identically -- so a board with one unowned bug
+# and one stale task surfaced the stale task as ``"critical"``. Map each
+# signal type to its own severity instead. Unknown types fall back to
+# the aggregate so a future signal kind keeps a sensible default.
+_SIGNAL_SEVERITY = {
+    "unowned_bug": "critical",
+    "wip_overflow": "warn",
+    "stale_task": "warn",
+}
+
+
 def _nudges_for(drift: dict[str, Any]) -> list[dict[str, Any]]:
+    aggregate_severity = drift.get("severity", "info")
     nudges: list[dict[str, Any]] = []
     for signal in drift.get("signals", []):
         signal_type = signal.get("type")
@@ -62,7 +102,7 @@ def _nudges_for(drift: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "type": signal_type,
                 "title": _NUDGE_TITLES.get(signal_type, "Triage"),
-                "severity": drift.get("severity", "info"),
+                "severity": _SIGNAL_SEVERITY.get(signal_type, aggregate_severity),
                 "details": signal,
                 "actions": [
                     {"label": "Acknowledge"},
@@ -134,14 +174,19 @@ async def polish_triage(
         }
         for idx, n in enumerate(deterministic_nudges)
     ]
+    # Trim and redact the snapshot before forwarding to the provider:
+    # raw boards can carry hundreds of tasks (context-window pressure)
+    # and column / task names that contain user PII.
+    safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
+    safe_nudges = redact_dict(nudge_summaries)
     prompt = (
         "Rewrite the summary for each board-triage nudge below so it is "
         "specific and actionable, incorporating the signal details (e.g. "
         "column name, current count vs. WIP limit, task id). Keep each "
         "summary <=120 chars and on a single line. Preserve the nudge_id "
         "verbatim; do not invent new nudges. Return JSON matching the schema.\n\n"
-        f"Board snapshot: {json.dumps(board_snapshot)}\n"
-        f"Nudges: {json.dumps(nudge_summaries)}"
+        f"Board snapshot: {json.dumps(safe_snapshot)}\n"
+        f"Nudges: {json.dumps(safe_nudges)}"
     )
     try:
         structured = model.with_structured_output(TriagePolish, include_raw=True)
@@ -150,9 +195,7 @@ async def polish_triage(
         logger.exception("triage structured output failed; falling back.")
         return deterministic_nudges, 0, 0
 
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, TriagePolish):
         return deterministic_nudges, tokens_in, tokens_out
@@ -224,7 +267,6 @@ class TriageAgent(BaseAgent):
                 chat_model, nudges, board_snapshot
             )
             project_id = state.get("project_id") or ""
-            severity = _FE_NUDGE_SEVERITY.get(drift.get("severity", "info"), "info")
             for index, nudge in enumerate(polished_nudges):
                 details = nudge.get("details") or {}
                 target_ids = [
@@ -235,13 +277,19 @@ class TriageAgent(BaseAgent):
                     )
                     if isinstance(target_id, str) and target_id
                 ]
+                # Use the per-nudge severity (set by ``_nudges_for``) so a
+                # mixed-signal board surfaces stale tasks as ``"warn"`` even
+                # when an unowned bug bumped the aggregate to ``"critical"``.
+                fe_severity = _FE_NUDGE_SEVERITY.get(
+                    nudge.get("severity", "info"), "info"
+                )
                 fe_nudge = {
                     "nudge_id": f"{nudge.get('type', 'triage')}:{index}",
                     "kind": nudge.get("type", "stale_task"),
                     "project_id": project_id,
                     "summary": nudge.get("title", "Triage"),
                     "target_ids": target_ids,
-                    "severity": severity,
+                    "severity": fe_severity,
                 }
                 emit_custom({"kind": "nudge", "nudge": fe_nudge})
             emit_custom({"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out})

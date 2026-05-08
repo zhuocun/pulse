@@ -18,9 +18,10 @@ needs without a separate wiring layer.
 
 from __future__ import annotations
 
+import re
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-import re
 from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -146,7 +147,7 @@ class BaseAgent(ABC):
     metadata: AgentMetadata
 
     def __init__(self, *, chat_model: Any = None) -> None:
-        if not getattr(self, "metadata", None):
+        if not isinstance(getattr(self, "metadata", None), AgentMetadata):
             raise TypeError(
                 f"{type(self).__name__} must define a class-level 'metadata'",
             )
@@ -157,6 +158,9 @@ class BaseAgent(ABC):
         self._compiled: Optional[Pregel] = None
         self._compiled_checkpointer: Any = None
         self._compiled_store: Any = None
+        # Serialise concurrent ``compile()`` callers so two tasks racing
+        # on the cache miss path cannot both call ``self.build()``.
+        self._compile_lock = threading.Lock()
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -224,15 +228,26 @@ class BaseAgent(ABC):
         ``id()`` recycling cannot short-circuit a rebuild to a stale
         graph (review F-4). The runtime hands a single pair to every
         agent for its lifetime, so cache hits dominate in production.
+
+        ``self._compile_lock`` serialises concurrent callers; without
+        it, two tasks racing the cache-miss path could both invoke
+        ``self.build()`` and the second-write-wins semantic would
+        discard one freshly-built graph that may already be executing.
         """
 
-        same_checkpointer = self._compiled_checkpointer is checkpointer
-        same_store = self._compiled_store is store
-        if self._compiled is None or not same_checkpointer or not same_store or force:
-            self._compiled = self.build(checkpointer=checkpointer, store=store)
-            self._compiled_checkpointer = checkpointer
-            self._compiled_store = store
-        return self._compiled
+        with self._compile_lock:
+            same_checkpointer = self._compiled_checkpointer is checkpointer
+            same_store = self._compiled_store is store
+            if (
+                self._compiled is None
+                or not same_checkpointer
+                or not same_store
+                or force
+            ):
+                self._compiled = self.build(checkpointer=checkpointer, store=store)
+                self._compiled_checkpointer = checkpointer
+                self._compiled_store = store
+            return self._compiled
 
     @staticmethod
     def _normalize_input(inputs: Any) -> Any:

@@ -40,6 +40,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._shared import unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import SearchState
@@ -180,9 +181,7 @@ async def polish_search(
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("search structured output failed; falling back.")
         return deterministic, 0, 0
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, SearchRanking):
         return deterministic, tokens_in, tokens_out

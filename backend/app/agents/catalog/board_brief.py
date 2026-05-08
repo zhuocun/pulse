@@ -25,6 +25,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._shared import unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
@@ -33,6 +34,7 @@ from app.services import v1_engine
 from app.tools import be_tools
 from app.tools.be_tools import validated_citation_ref
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact, redact_dict
 
 logger = logging.getLogger(__name__)
 
@@ -206,11 +208,15 @@ async def polish_headline(
 
     if is_stub_model(model):
         return deterministic, 0, 0
+    # ``facts`` carries snippets of FE-supplied signal data (column names,
+    # task ids); redact PII patterns so emails / secrets in user-entered
+    # column names never reach the provider.
+    safe_facts = redact_dict(facts)
     prompt = (
         "Write a single-line, <=120-character standup headline for this "
         "Jira-style board snapshot. Do not invent counts; only use the "
         "facts provided. Return JSON matching the schema. Facts (JSON):\n"
-        + json.dumps(facts)
+        + json.dumps(safe_facts)
     )
     try:
         structured = model.with_structured_output(BriefHeadline, include_raw=True)
@@ -218,9 +224,7 @@ async def polish_headline(
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("board-brief structured output failed; falling back.")
         return deterministic, 0, 0
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, BriefHeadline):
         return deterministic, tokens_in, tokens_out
@@ -308,19 +312,25 @@ class BoardBriefAgent(BaseAgent):
             columns = snapshot.get("columns") or []
             refs: list[dict[str, Any]] = []
             for task in tasks[:3]:
+                raw_quote = task.get("taskName") or task.get("id") or ""
                 refs.append(
                     validated_citation_ref(
                         source="task",
                         id=task.get("id"),
-                        quote=task.get("taskName") or task.get("id") or "",
+                        quote=redact(raw_quote)[0]
+                        if isinstance(raw_quote, str)
+                        else raw_quote,
                     )
                 )
             for column in columns[:2]:
+                raw_quote = column.get("name") or column.get("id") or ""
                 refs.append(
                     validated_citation_ref(
                         source="column",
                         id=column.get("id"),
-                        quote=column.get("name") or column.get("id") or "",
+                        quote=redact(raw_quote)[0]
+                        if isinstance(raw_quote, str)
+                        else raw_quote,
                     )
                 )
             if refs:

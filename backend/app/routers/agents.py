@@ -759,11 +759,19 @@ async def stream_agent(
                                 tokens_in_total += usage[0]
                                 tokens_out_total += usage[1]
             except AgentError as exc:
-                yield encode_sse(error_envelope(str(exc), recoverable=False))
+                yield encode_sse(
+                    error_envelope(
+                        str(exc),
+                        recoverable=False,
+                        code=getattr(exc, "code", "agent_error"),
+                    )
+                )
             except asyncio.TimeoutError:
                 yield encode_sse(
                     error_envelope(
-                        f"Agent run exceeded {timeout}s timeout", recoverable=False
+                        f"Agent run exceeded {timeout}s timeout",
+                        recoverable=False,
+                        code="timeout",
                     )
                 )
             except _ClientDisconnected:
@@ -777,6 +785,7 @@ async def stream_agent(
                     error_envelope(
                         "Agent run failed; see server logs for details.",
                         recoverable=False,
+                        code="agent_error",
                     )
                 )
             else:

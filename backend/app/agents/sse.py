@@ -58,6 +58,11 @@ def _to_jsonable(value: Any) -> Any:
             )
             return {"__unserializable__": type(value).__name__}
 
+    # ``jsonable_encoder`` can return a structure that ``json.dumps``
+    # subsequently rejects (e.g. it walked into a nested ``object()``
+    # and surfaced it as-is). Validate once so the SSE writer does not
+    # 500 the whole stream on a single bad chunk; the placeholder lets
+    # the rest of the response continue.
     try:
         json.dumps(encoded)
     except TypeError:
@@ -188,13 +193,24 @@ def translate_event(
     yield {"type": "custom", "ns": ns, "data": {"mode": mode, "chunk": _to_jsonable(chunk)}}
 
 
-def error_envelope(message: str, *, recoverable: bool = False) -> dict[str, Any]:
-    """Build a typed mid-stream ``error`` envelope."""
+def error_envelope(
+    message: str, *, recoverable: bool = False, code: str = "stream_error"
+) -> dict[str, Any]:
+    """Build a typed mid-stream ``error`` envelope.
+
+    ``code`` is a stable machine-readable enum (``"timeout"``,
+    ``"agent_recursion"``, ``"agent_unavailable"`` ...) so the FE can
+    branch on a canonical value instead of string-matching ``message``.
+    Keeping the existing ``data: {message, recoverable}`` shape preserves
+    the SSE wire contract; ``code`` is added alongside without renaming
+    the wrapper. Defaults to ``"stream_error"`` for backwards-compat
+    when the caller has no more specific classification.
+    """
 
     return {
         "type": "error",
         "ns": [],
-        "data": {"message": message, "recoverable": recoverable},
+        "data": {"code": code, "message": message, "recoverable": recoverable},
     }
 
 
@@ -213,9 +229,23 @@ def usage_envelope(tokens_in: int, tokens_out: int) -> dict[str, Any]:
 
 
 def encode_sse(envelope: dict[str, Any]) -> bytes:
-    """Encode an envelope as a complete SSE frame."""
+    """Encode an envelope as a complete SSE frame.
 
-    return f"data: {json.dumps(envelope)}\n\n".encode("utf-8")
+    Falls back to a placeholder error frame if ``envelope`` itself
+    contains a value that survived ``_to_jsonable`` but tripped the
+    final ``json.dumps`` (e.g. a NaN inside a numeric field). Without
+    this guard a single bad chunk would 500 the entire stream.
+    """
+
+    try:
+        body = json.dumps(envelope)
+    except (TypeError, ValueError):
+        logger.warning(
+            "SSE envelope failed final JSON encode; substituting error frame.",
+            exc_info=True,
+        )
+        body = json.dumps(error_envelope("invalid stream chunk", code="encode_error"))
+    return f"data: {body}\n\n".encode("utf-8")
 
 
 DONE_FRAME = b"data: [DONE]\n\n"
