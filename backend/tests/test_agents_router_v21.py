@@ -808,3 +808,210 @@ def test_runtime_emits_span_and_invocation_metric(
     finally:
         metrics_module.reset_for_tests()
         otel_module.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# tags validation (lines 154, 156 in agents.py)
+# ---------------------------------------------------------------------------
+
+
+def test_invoke_rejects_tags_list_exceeding_20_entries(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+) -> None:
+    """_optional_tags raises 400 when more than 20 tags are supplied."""
+    response = client.post(
+        "/api/v1/agents/noise/invoke",
+        json={"inputs": {"text": "x"}, "tags": [f"tag{i}" for i in range(21)]},
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert "exceed 20" in response.text
+
+
+def test_invoke_rejects_tag_exceeding_128_chars(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+) -> None:
+    """_optional_tags raises 400 when any single tag exceeds 128 characters."""
+    response = client.post(
+        "/api/v1/agents/noise/invoke",
+        json={"inputs": {"text": "x"}, "tags": ["a" * 129]},
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert "128 characters" in response.text
+
+
+# ---------------------------------------------------------------------------
+# stream_agent rate_limited / budget_exhausted metrics (lines 737-740, 744-747)
+# ---------------------------------------------------------------------------
+
+
+def test_stream_records_rate_limited_invocation_metric(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """stream_agent records 'rate_limited' metric on 429."""
+    from app.observability import metrics as metrics_module
+    from app.config import settings as app_settings
+
+    metrics_module.configure_metrics(
+        settings=replace(app_settings, prometheus_metrics=True)
+    )
+    try:
+        monkeypatch.setattr(
+            noise_agent,
+            "metadata",
+            replace(noise_agent.metadata, rate_limit=(1, 60)),
+        )
+        # First request succeeds and consumes the one-per-minute slot.
+        with client.stream(
+            "POST",
+            "/api/v1/agents/noise/stream",
+            json={"inputs": {"text": "x"}, "autonomy": "plan"},
+            headers=auth_headers,
+        ) as r1:
+            b"".join(r1.iter_bytes())
+        assert r1.status_code == HTTPStatus.OK
+        # Second request must be rate-limited.
+        response = client.post(
+            "/api/v1/agents/noise/stream",
+            json={"inputs": {"text": "x"}, "autonomy": "plan"},
+            headers=auth_headers,
+        )
+        assert response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        rate_limited_value = metrics_module.agent_invocations_total.labels(
+            agent="noise", outcome="rate_limited"
+        )._value.get()
+        assert rate_limited_value >= 1.0
+    finally:
+        metrics_module.reset_for_tests()
+
+
+def test_stream_records_budget_exhausted_invocation_metric(
+    client: TestClient,
+    noise_agent: _NoiseAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """stream_agent records 'budget_exhausted' metric on 402."""
+    from app.observability import metrics as metrics_module
+    from app.config import settings as app_settings
+
+    metrics_module.configure_metrics(
+        settings=replace(app_settings, prometheus_metrics=True)
+    )
+    try:
+        monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+        response = client.post(
+            "/api/v1/agents/noise/stream",
+            json={
+                "inputs": {"text": "x", "project_id": "p-budget-track"},
+                "autonomy": "plan",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
+        budget_exhausted_value = metrics_module.agent_invocations_total.labels(
+            agent="noise", outcome="budget_exhausted"
+        )._value.get()
+        assert budget_exhausted_value >= 1.0
+    finally:
+        metrics_module.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# _with_disconnect: await anext_task after cancel on timeout (lines 931-933)
+# and disconnect (lines 939-940)
+# ---------------------------------------------------------------------------
+
+
+def test_with_disconnect_awaits_cancelled_anext_task_on_timeout() -> None:
+    """Timeout path: anext_task is cancelled while pending; await must not hang."""
+    from app.routers.agents import _with_disconnect
+
+    class _Req:
+        async def is_disconnected(self) -> bool:
+            return False
+
+    async def slow_stream() -> AsyncIterator[Any]:
+        # Sleep long enough that anext_task is still pending when the
+        # timeout fires, so anext_task.cancel() + await anext_task is exercised.
+        await asyncio.sleep(5)
+        yield ("updates", {"x": 1})  # pragma: no cover
+
+    async def run() -> None:
+        async for _ in _with_disconnect(_Req(), slow_stream(), timeout=0.05):
+            pass  # pragma: no cover
+
+    import pytest as _pytest
+    with _pytest.raises(asyncio.TimeoutError):
+        asyncio.run(run())
+
+
+def test_with_disconnect_awaits_cancelled_anext_task_on_disconnect() -> None:
+    """Disconnect path: anext_task is cancelled while pending; await fires CancelledError."""
+    from app.routers.agents import _ClientDisconnected, _with_disconnect
+
+    class _Req:
+        def __init__(self, evt: asyncio.Event) -> None:
+            self._evt = evt
+
+        async def is_disconnected(self) -> bool:
+            # Signal disconnect after being called once (gives asyncio.wait
+            # time to schedule).
+            self._evt.set()
+            return True
+
+    async def slow_stream(evt: asyncio.Event) -> AsyncIterator[Any]:
+        # Wait until disconnect has been requested so the stream is still
+        # pending when the disconnect task fires.
+        await evt.wait()
+        await asyncio.sleep(5)
+        yield ("updates", {"x": 1})  # pragma: no cover
+
+    async def run() -> None:
+        evt = asyncio.Event()
+        req = _Req(evt)
+        async for _ in _with_disconnect(req, slow_stream(evt), timeout=10):
+            pass  # pragma: no cover
+
+    import pytest as _pytest
+    with _pytest.raises(_ClientDisconnected):
+        asyncio.run(run())
+
+
+def test_with_disconnect_suppresses_aclose_exception() -> None:
+    """aclose() raising on stream cleanup is swallowed (lines 954-955)."""
+    from app.routers.agents import _with_disconnect
+
+    class _Req:
+        async def is_disconnected(self) -> bool:
+            return False
+
+    class _BoomStream:
+        """Async generator stand-in whose aclose raises."""
+
+        def __aiter__(self) -> "_BoomStream":
+            return self
+
+        async def __anext__(self) -> Any:
+            raise StopAsyncIteration
+
+        async def aclose(self) -> None:
+            raise RuntimeError("aclose exploded")
+
+    async def run() -> list[Any]:
+        out: list[Any] = []
+        async for event in _with_disconnect(_Req(), _BoomStream(), timeout=10):
+            out.append(event)
+        return out
+
+    # Must complete without raising even though aclose() threw.
+    result = asyncio.run(run())
+    assert result == []
