@@ -150,7 +150,7 @@ describe("AiSearchInput — remote agent path", () => {
         jest.clearAllMocks();
     });
 
-    it("calls agent.start with the correct prompt when the user submits", () => {
+    it("calls agent.start with structured search input when the user submits", () => {
         const start = jest.fn().mockResolvedValue(undefined);
         renderInput({ start });
 
@@ -164,9 +164,10 @@ describe("AiSearchInput — remote agent path", () => {
             screen.getByRole("button", { name: /Find related tasks/i })
         );
 
-        expect(start).toHaveBeenCalledWith("Find tasks matching: login token", {
-            autonomy: "suggest"
-        });
+        expect(start).toHaveBeenCalledWith(
+            { query: "login token", kind: "tasks" },
+            { autonomy: "suggest" }
+        );
         expect(mockedStream).not.toHaveBeenCalled();
     });
 

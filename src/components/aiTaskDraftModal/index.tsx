@@ -233,9 +233,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         });
         if (isRemote) {
             setRemoteDraft(null);
-            await remoteStart(`Draft a task for: ${prompt}`, {
-                autonomy: "plan"
-            });
+            await remoteStart({ prompt }, { autonomy: "plan" });
         } else {
             const suggestion = await draftAi.run({
                 draft: {
@@ -259,7 +257,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         });
         if (isRemote) {
             await remoteStart(
-                `Break down the following prompt into subtasks using axis "${axis}" with count 3: ${prompt}`,
+                { prompt, breakdown_axis: axis },
                 { autonomy: "plan" }
             );
         } else {

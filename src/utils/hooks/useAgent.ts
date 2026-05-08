@@ -659,10 +659,18 @@ const useAgent = (
             setCitations([]);
             setNudgeEntries([]);
             setLastSuggestion(null);
-            const messages =
+            const inputPayload =
                 typeof input === "string"
-                    ? [{ role: "user" as const, content: input }]
-                    : ((input as { messages?: AgentMessage[] }).messages ?? []);
+                    ? {
+                          messages: [{ role: "user" as const, content: input }]
+                      }
+                    : input &&
+                        typeof input === "object" &&
+                        !Array.isArray(input)
+                      ? (input as Record<string, unknown>)
+                      : { messages: [] };
+            const messages =
+                (inputPayload.messages as AgentMessage[] | undefined) ?? [];
 
             // Reflect the user message immediately so chat UIs feel instant.
             safeSetState((prev) => ({
@@ -678,7 +686,7 @@ const useAgent = (
             // `options.userId` is still consumed above for FE-internal
             // bookkeeping (e.g. `feToolContext.userId`).
             await runStream({
-                input: { messages },
+                input: inputPayload,
                 config: {
                     configurable: {
                         thread_id: threadIdRef.current,

@@ -427,6 +427,7 @@ const zhCN: Dictionary = {
         citationSourceColumn: "列",
         citationSourceMember: "成员",
         citationSourceProject: "项目",
+        citationSourceUser: "用户",
         citationAriaLabel: "引用 {index}：{source} {id}",
         feedbackPromptDownTitle: "哪里出了问题?",
         feedbackPromptDownHelper:

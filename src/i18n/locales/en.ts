@@ -450,6 +450,7 @@ export const enSource = {
         citationSourceColumn: "Column",
         citationSourceMember: "Member",
         citationSourceProject: "Project",
+        citationSourceUser: "User",
         feedbackPromptDownTitle: "What went wrong?",
         feedbackPromptDownHelper:
             "Pick at least one — it helps us prioritize fixes without sending your message text.",

@@ -65,7 +65,8 @@ const getSourceLabel = (source: CitationRef["source"]): string => {
         task: microcopy.ai.citationSourceTask as string,
         column: microcopy.ai.citationSourceColumn as string,
         member: microcopy.ai.citationSourceMember as string,
-        project: microcopy.ai.citationSourceProject as string
+        project: microcopy.ai.citationSourceProject as string,
+        user: microcopy.ai.citationSourceUser as string
     };
     return labels[source] ?? source;
 };

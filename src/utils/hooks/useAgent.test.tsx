@@ -98,6 +98,34 @@ describe("useAgent", () => {
         expect(mockedStream).toHaveBeenCalledTimes(1);
     });
 
+    it("preserves structured input fields for non-chat agents", async () => {
+        mockedStream.mockReturnValueOnce(fromParts([]));
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("task-estimation-agent", { projectId: "p1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start({
+                task_draft: {
+                    taskName: "Implement OAuth login",
+                    note: "",
+                    type: "Task"
+                }
+            });
+        });
+
+        expect(mockedStream).toHaveBeenCalledTimes(1);
+        expect(mockedStream.mock.calls[0][0].body.input).toEqual({
+            task_draft: {
+                taskName: "Implement OAuth login",
+                note: "",
+                type: "Task"
+            }
+        });
+    });
+
     // The agent server derives identity from the JWT and rejects any
     // client-supplied `user_id` in `config.configurable` with HTTP 400
     // (see `backend/app/routers/agents.py::_normalize_payload`).

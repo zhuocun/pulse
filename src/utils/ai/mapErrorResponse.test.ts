@@ -137,6 +137,19 @@ describe("mapErrorResponse", () => {
         expect(err.message).toBe("no code here");
     });
 
+    it("falls back to JSON body.error when message is absent", async () => {
+        const err = await mapErrorResponse(
+            fakeResponse(403, {
+                code: "forbidden",
+                error: "Project AI access is disabled"
+            })
+        );
+
+        expect(err).toBeInstanceOf(AgentForbiddenError);
+        expect((err as AgentForbiddenError).code).toBe("forbidden");
+        expect(err.message).toBe("Project AI access is disabled");
+    });
+
     it("403 with empty body: falls back to default message, code undefined", async () => {
         const err = await mapErrorResponse(fakeResponse(403, null));
         expect(err).toBeInstanceOf(AgentForbiddenError);

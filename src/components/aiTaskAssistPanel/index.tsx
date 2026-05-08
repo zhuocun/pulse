@@ -37,24 +37,70 @@ const EMPTY_TASKS: ITask[] = [];
 const EMPTY_MEMBERS: IMember[] = [];
 const EMPTY_COLUMNS: IColumn[] = [];
 
-// v2.1 readiness payload uses {ready, missing[], rationale}; the UI expects
-// IReadinessReport {issues[]} — adapt rather than reshape backend contract.
-interface V21ReadinessMissingItem {
-    field?: string;
-    message?: string;
+type WireEstimateSuggestion = Omit<
+    IEstimateSuggestion,
+    "confidence" | "similar"
+> & {
+    confidence?: unknown;
+    similar?: IEstimateSuggestion["similar"];
+};
+
+const CONFIDENCE_BY_LABEL: Record<string, number> = {
+    low: 0.25,
+    moderate: 0.6,
+    high: 0.85
+};
+
+const normalizeEstimateConfidence = (confidence: unknown): number => {
+    if (typeof confidence === "number") return confidence;
+    if (typeof confidence !== "string") return 0;
+
+    const normalized = confidence.trim().toLowerCase();
+    if (normalized in CONFIDENCE_BY_LABEL) {
+        return CONFIDENCE_BY_LABEL[normalized];
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+interface V21ReadinessIssueItem {
+    field?: unknown;
+    severity?: unknown;
+    message?: unknown;
+    suggestion?: unknown;
 }
 interface V21ReadinessPayload {
     ready?: boolean;
-    missing?: V21ReadinessMissingItem[];
+    issues?: V21ReadinessIssueItem[];
+    missing?: V21ReadinessIssueItem[];
     rationale?: string;
 }
-const adaptV21Readiness = (r: V21ReadinessPayload): IReadinessReport => ({
-    issues: (r.missing ?? []).map((m) => ({
-        field: (m.field ?? "") as IReadinessIssue["field"],
-        severity: "warn" as const,
-        message: m.message ?? ""
-    }))
-});
+const normalizeReadinessSeverity = (
+    severity: unknown
+): IReadinessIssue["severity"] =>
+    severity === "warning"
+        ? "warn"
+        : severity === "info" || severity === "warn" || severity === "error"
+          ? severity
+          : "warn";
+
+const adaptV21Readiness = (r: V21ReadinessPayload): IReadinessReport => {
+    const issues = Array.isArray(r.issues) ? r.issues : (r.missing ?? []);
+    return {
+        issues: issues.map((issue) => ({
+            field:
+                typeof issue.field === "string"
+                    ? (issue.field as IReadinessIssue["field"])
+                    : ("" as IReadinessIssue["field"]),
+            severity: normalizeReadinessSeverity(issue.severity),
+            message: typeof issue.message === "string" ? issue.message : "",
+            ...(typeof issue.suggestion === "string"
+                ? { suggestion: issue.suggestion }
+                : {})
+        }))
+    };
+};
 
 interface AiTaskAssistPanelProps {
     values: {
@@ -117,10 +163,16 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         const s = remoteLastSuggestion;
         if (!s || s.surface !== "estimate") return undefined;
         const p = s.payload as {
-            estimate?: IEstimateSuggestion;
+            estimate?: WireEstimateSuggestion;
         };
         return p.estimate
-            ? { ...p.estimate, similar: p.estimate.similar ?? [] }
+            ? {
+                  ...p.estimate,
+                  confidence: normalizeEstimateConfidence(
+                      p.estimate.confidence
+                  ),
+                  similar: p.estimate.similar ?? []
+              }
             : undefined;
     }, [remoteLastSuggestion]);
 
@@ -177,20 +229,24 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
      * don't strand the panel.
      */
     const trimmedName = taskName.trim();
-    const remotePrompt = useMemo(() => {
-        if (!trimmedName) return "";
-        return (
-            `Estimate task: name="${trimmedName}"` +
-            (debouncedValues.type ? ` type="${debouncedValues.type}"` : "") +
-            (debouncedValues.epic ? ` epic="${debouncedValues.epic}"` : "") +
-            (debouncedValues.note ? ` note="${debouncedValues.note}"` : "")
-        );
-    }, [
-        trimmedName,
-        debouncedValues.type,
-        debouncedValues.epic,
-        debouncedValues.note
-    ]);
+    const remoteInput = useMemo(
+        () => ({
+            task_draft: {
+                taskName: trimmedName,
+                note: debouncedValues.note,
+                epic: debouncedValues.epic,
+                type: debouncedValues.type,
+                coordinatorId: debouncedValues.coordinatorId
+            }
+        }),
+        [
+            trimmedName,
+            debouncedValues.note,
+            debouncedValues.epic,
+            debouncedValues.type,
+            debouncedValues.coordinatorId
+        ]
+    );
     useEffect(() => {
         if (!trimmedName) {
             resetEstimate();
@@ -204,7 +260,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         }
         setDismissedKeys(new Set());
         if (isRemote) {
-            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
+            void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -250,7 +306,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remotePrompt,
+        remoteInput,
         startRemoteEstimate,
         abortRemoteEstimate,
         clearRemoteSuggestion,
@@ -327,7 +383,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         });
         if (isRemote) {
             clearRemoteSuggestion();
-            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
+            void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -357,7 +413,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remotePrompt,
+        remoteInput,
         startRemoteEstimate,
         clearRemoteSuggestion,
         runEstimate
