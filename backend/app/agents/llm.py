@@ -341,12 +341,24 @@ def result_token_usage_from_graph_result(result: Any) -> tuple[int, int]:
     ``custom`` stream events may still leave token counts on the trailing
     ``AIMessage`` in ``messages``. Shared by the HTTP router debit path
     and OTel span attributes so both stay aligned.
+
+    Sums across *all* ``AIMessage`` objects in ``messages`` so multi-turn
+    graphs (multiple LLM calls per run) are counted correctly -- reading
+    only ``messages[-1]`` undercounts every graph that makes more than one
+    LLM call.
     """
 
     if isinstance(result, dict):
         messages = result.get("messages") or []
         if isinstance(messages, list) and messages:
-            return extract_token_usage(messages[-1])
+            tokens_in = 0
+            tokens_out = 0
+            for msg in messages:
+                if isinstance(msg, AIMessage):
+                    ti, to = extract_token_usage(msg)
+                    tokens_in += ti
+                    tokens_out += to
+            return tokens_in, tokens_out
     return 0, 0
 
 

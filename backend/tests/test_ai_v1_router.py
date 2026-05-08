@@ -2163,3 +2163,192 @@ def test_unwrap_envelope_ignores_non_dict_value(
     # envelope value was not a dict, so the handler keeps the original body.
     assert response.status_code == HTTPStatus.OK
     assert response.json()["taskName"]
+
+
+# ---------------------------------------------------------------------------
+# _gate rate_limited path (lines 169-170 in ai.py)
+# ---------------------------------------------------------------------------
+
+
+def test_gate_records_rate_limited_on_429(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_gate emits record_invocation('rate_limited') and returns 429."""
+    from app.observability import metrics as metrics_module
+    from app.config import settings as app_settings
+
+    metrics_module.configure_metrics(
+        settings=replace(app_settings, prometheus_metrics=True)
+    )
+    try:
+        # Exhaust the rate limiter so the second task-draft call is blocked.
+        monkeypatch.setattr(
+            rate_limit_module.rate_limiter,
+            "check",
+            lambda *a, **kw: (False, 60),
+        )
+        response = client.post(
+            "/api/ai/task-draft",
+            headers=auth_headers,
+            json={"context": _project_context(), "prompt": "x"},
+        )
+        assert response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        rate_limited_value = metrics_module.agent_invocations_total.labels(
+            agent="v1-task-draft", outcome="rate_limited"
+        )._value.get()
+        assert rate_limited_value >= 1.0
+    finally:
+        metrics_module.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# _gate_with_reservation gate paths (lines 205, 210, 227-228 in ai.py)
+# ---------------------------------------------------------------------------
+
+
+def test_gate_with_reservation_rejects_disabled_project(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_gate_with_reservation raises 403 when AI is disabled for the project."""
+    monkeypatch.setattr(
+        "app.routers.ai.is_project_ai_enabled",
+        lambda *args, **kwargs: False,
+    )
+    response = client.post(
+        "/api/ai/chat",
+        headers=auth_headers,
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "context": {"project": {"_id": "p-1", "projectName": "Demo"}},
+        },
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert "disabled" in response.text
+
+
+def test_gate_with_reservation_rejects_non_manager(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """_gate_with_reservation raises 403 when caller is not the project manager."""
+    # p-budget-agent is managed by agent-user, not ai-user (who holds auth_headers).
+    response = client.post(
+        "/api/ai/chat",
+        headers=auth_headers,
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "context": {"project": {"_id": "p-budget-agent", "projectName": "Other"}},
+        },
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
+
+
+def test_gate_with_reservation_records_budget_exhausted_on_402(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_gate_with_reservation records 'budget_exhausted' and returns 402."""
+    from app.observability import metrics as metrics_module
+    from app.config import settings as app_settings
+
+    metrics_module.configure_metrics(
+        settings=replace(app_settings, prometheus_metrics=True)
+    )
+    try:
+        monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+        response = client.post(
+            "/api/ai/chat",
+            headers=auth_headers,
+            json={
+                "messages": [{"role": "user", "content": "hi"}],
+                "context": {"project": {"_id": "p-1", "projectName": "Demo"}},
+            },
+        )
+        assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
+        budget_exhausted_value = metrics_module.agent_invocations_total.labels(
+            agent="chat-agent", outcome="budget_exhausted"
+        )._value.get()
+        assert budget_exhausted_value >= 1.0
+    finally:
+        metrics_module.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# chat except BaseException refund path (ai.py except BaseException branch)
+# and budget record top-up when actual tokens exceed reservation (ai.py
+# budget_tracker.record call)
+# ---------------------------------------------------------------------------
+
+
+def test_chat_refunds_reservation_on_ainvoke_failure(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When runtime.ainvoke raises, the reserved budget token is refunded."""
+    project_id = "p-budget"
+    before = budget_module.budget_tracker.remaining(project_id)
+
+    async def explode(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("forced failure")
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "ainvoke", explode, raising=False)
+
+    lax = TestClient(client.app, raise_server_exceptions=False)
+    lax.post(
+        "/api/ai/chat",
+        headers=auth_headers,
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "context": {"project": {"_id": project_id, "projectName": "Budgeted"}},
+        },
+    )
+    after = budget_module.budget_tracker.remaining(project_id)
+    # The reservation must have been refunded: remaining should be unchanged.
+    assert after == before
+
+
+def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When actual token usage > 1 (the reservation), the delta is recorded."""
+    project_id = "p-budget"
+    before = budget_module.budget_tracker.remaining(project_id)
+
+    async def scripted_ainvoke(*args: Any, **kwargs: Any) -> Any:
+        return {
+            "messages": [
+                AIMessage(
+                    content="hello",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 5,
+                        "total_tokens": 15,
+                    },
+                )
+            ]
+        }
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "ainvoke", scripted_ainvoke, raising=False)
+
+    response = client.post(
+        "/api/ai/chat",
+        headers=auth_headers,
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "context": {"project": {"_id": project_id, "projectName": "Budgeted"}},
+        },
+    )
+    assert response.status_code == HTTPStatus.OK
+    after = budget_module.budget_tracker.remaining(project_id)
+    # reserve(1) + record(delta=14) = 15 total tokens debited.
+    assert before - after == 15

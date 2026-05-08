@@ -21,19 +21,20 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
-from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_structured_response
+from app.agents.catalog._shared import (
+    detect_drift_node,
+    fetch_snapshot_node,
+    unpack_structured_response,
+)
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.agents.stream import emit_custom
 from app.services import v1_engine
-from app.tools import be_tools
-from app.tools.be_tools import validated_citation_ref
-from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.be_tools import _is_done_column, validated_citation_ref
 from app.tools.redaction import redact, redact_dict
 
 logger = logging.getLogger(__name__)
@@ -258,26 +259,33 @@ class BoardBriefAgent(BaseAgent):
     ) -> Pregel:
         chat_model: BaseChatModel = self.chat_model
 
-        def fetch_snapshot(state: BoardBriefState) -> dict[str, Any]:
-            snapshot = interrupt(
-                interrupt_payload(
-                    "fe.boardSnapshot",
-                    {"project_id": state.get("project_id")},
-                )
-            )
-            return {"board_snapshot": snapshot}
-
-        def detect_drift(state: BoardBriefState) -> dict[str, Any]:
-            snapshot = state.get("board_snapshot") or {}
-            return {"drift_result": be_tools.detect_drift(snapshot)}
+        # Both bodies are shared with triage-agent (same state keys, same
+        # logic).  See ``app.agents.catalog._shared`` for the implementations.
+        fetch_snapshot = fetch_snapshot_node
+        detect_drift = detect_drift_node
 
         async def generate_brief(state: BoardBriefState) -> dict[str, Any]:
             snapshot = state.get("board_snapshot") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []
+            # Build the set of done column ids using the same logic as the
+            # drift detector (_is_done_column checks isDone flag + synonym set)
+            # so boards with columns named "Completed", "Finished", etc. are
+            # counted correctly rather than only matching a literal "done".
+            done_col_ids = {
+                col.get("id")
+                for col in columns
+                if isinstance(col, dict) and _is_done_column(col)
+            }
             done_count = sum(
-                1 for t in tasks if (t.get("column") or "").lower() == "done"
+                1
+                for t in tasks
+                if isinstance(t, dict)
+                and (
+                    t.get("columnId") in done_col_ids
+                    or t.get("column") in done_col_ids
+                )
             )
             severity = drift.get("severity", "info")
             facts = {

@@ -25,8 +25,11 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_structured_response
-from app.agents.llm import extract_token_usage, is_stub_model
+from app.agents.catalog._shared import (
+    structured_llm_call,
+    unpack_similar_payload,
+)
+from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
 from app.agents.stream import emit_custom
@@ -84,8 +87,6 @@ async def polish_readiness(
     blank polished string preserves the deterministic copy.
     """
 
-    if is_stub_model(model):
-        return deterministic, 0, 0
     issues = deterministic.get("issues") or []
     if not issues:
         return deterministic, 0, 0
@@ -100,35 +101,32 @@ async def polish_readiness(
         f"Draft: {json.dumps(safe_draft)}\n"
         f"Issues: {json.dumps(safe_issues)}"
     )
-    try:
-        structured = model.with_structured_output(
-            ReadinessPolish, include_raw=True
-        )
-        response = await structured.ainvoke([HumanMessage(content=prompt)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("readiness structured output failed; falling back.")
-        return deterministic, 0, 0
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, ReadinessPolish):
-        return deterministic, tokens_in, tokens_out
 
-    polished_by_field: dict[str, ReadinessIssuePolish] = {
-        item.field: item for item in parsed.issues if item.field
-    }
-    merged_issues: list[dict[str, Any]] = []
-    for issue in issues:
-        merged = dict(issue)
-        update = polished_by_field.get(issue.get("field"))
-        if update is not None:
-            for key in ("message", "suggestion"):
-                polished = (getattr(update, key).splitlines() or [""])[0].strip()
-                # Blank polish keeps the deterministic copy: a model
-                # that returns ``""`` cannot wipe out a useful suggestion.
-                if polished:
-                    merged[key] = polished[:160]
-        merged_issues.append(merged)
-    return {**deterministic, "issues": merged_issues}, tokens_in, tokens_out
+    def _merge(parsed: ReadinessPolish) -> dict[str, Any]:
+        polished_by_field: dict[str, ReadinessIssuePolish] = {
+            item.field: item for item in parsed.issues if item.field
+        }
+        merged_issues: list[dict[str, Any]] = []
+        for issue in issues:
+            merged = dict(issue)
+            update = polished_by_field.get(issue.get("field"))
+            if update is not None:
+                for key in ("message", "suggestion"):
+                    polished = (getattr(update, key).splitlines() or [""])[0].strip()
+                    # Blank polish keeps the deterministic copy: a model
+                    # that returns ``""`` cannot wipe out a useful suggestion.
+                    if polished:
+                        merged[key] = polished[:160]
+            merged_issues.append(merged)
+        return {**deterministic, "issues": merged_issues}
+
+    return await structured_llm_call(
+        model,
+        ReadinessPolish,
+        [HumanMessage(content=prompt)],
+        fallback=deterministic,
+        merge_fn=_merge,
+    )
 
 
 async def polish_rationale(
@@ -140,8 +138,6 @@ async def polish_rationale(
 ) -> tuple[str, int, int]:
     """LLM-polish the estimation rationale; deterministic fallback on stub."""
 
-    if is_stub_model(model):
-        return deterministic, 0, 0
     safe_draft = redact_task_fields(draft)
     safe_neighbours = redact_dict(neighbours[:3])
     prompt = (
@@ -152,23 +148,20 @@ async def polish_rationale(
         f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
         f"Neighbours: {json.dumps(safe_neighbours)}"
     )
-    try:
-        structured = model.with_structured_output(
-            EstimationRationale, include_raw=True
-        )
-        response = await structured.ainvoke([HumanMessage(content=prompt)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("task-estimation structured output failed; falling back.")
-        return deterministic, 0, 0
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, EstimationRationale):
-        return deterministic, tokens_in, tokens_out
-    text = (parsed.rationale or "").strip()
-    if not text:
-        return deterministic, tokens_in, tokens_out
-    cleaned = text.splitlines()[0]
-    return cleaned[:180], tokens_in, tokens_out
+
+    def _merge(parsed: EstimationRationale) -> str:
+        text = (parsed.rationale or "").strip()
+        if not text:
+            return deterministic
+        return text.splitlines()[0][:180]
+
+    return await structured_llm_call(
+        model,
+        EstimationRationale,
+        [HumanMessage(content=prompt)],
+        fallback=deterministic,
+        merge_fn=_merge,
+    )
 
 
 def _estimate_for(task_draft: dict[str, Any], neighbours: list[dict[str, Any]]) -> int:
@@ -257,11 +250,7 @@ class TaskEstimationAgent(BaseAgent):
             # FE may return either a raw list (legacy / test fixtures) or
             # the schema-conformant {"similar": [...]} envelope. Normalise
             # so downstream nodes always see a list of ``{id, text}`` items.
-            if isinstance(payload, dict) and "similar" in payload:
-                similar = payload["similar"]
-            else:
-                similar = payload
-            return {"similar_tasks": similar or []}
+            return {"similar_tasks": unpack_similar_payload(payload)}
 
         async def fetch_embeddings(state: TaskEstimationState) -> dict[str, Any]:
             similar = state.get("similar_tasks") or []
@@ -305,9 +294,16 @@ class TaskEstimationAgent(BaseAgent):
                 }
             }
 
-        def readiness(state: TaskEstimationState) -> dict[str, Any]:
+        async def readiness(state: TaskEstimationState) -> dict[str, Any]:
             draft = state.get("task_draft") or {}
-            return {"readiness": _readiness(draft)}
+            deterministic = _readiness(draft)
+            polished, tokens_in, tokens_out = await polish_readiness(
+                chat_model, deterministic, draft
+            )
+            emit_custom(
+                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
+            )
+            return {"readiness": polished}
 
         def emit_citations(state: TaskEstimationState) -> dict[str, Any]:
             payload = {

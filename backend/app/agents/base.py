@@ -18,11 +18,12 @@ needs without a separate wiring layer.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence
+from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence, get_args
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.pregel import Pregel
@@ -91,19 +92,20 @@ class AgentMetadata:
             )
         if self.recursion_limit < 1:
             raise ValueError("Agent recursion_limit must be at least 1")
-        if self.status not in ("active", "deprecated", "shadow"):
+        _valid_statuses = get_args(AgentStatus)
+        if self.status not in _valid_statuses:
             raise ValueError(
-                "Agent status must be one of 'active', 'deprecated', 'shadow'",
+                f"Agent status must be one of {_valid_statuses!r}",
             )
         if len(self.rate_limit) != 2 or any(value < 1 for value in self.rate_limit):
             raise ValueError(
                 "Agent rate_limit must be (per_minute, per_hour) positive ints",
             )
+        _valid_autonomy = get_args(AutonomyLevel)
         for level in self.allowed_autonomy:
-            if level not in ("suggest", "plan", "auto"):
+            if level not in _valid_autonomy:
                 raise ValueError(
-                    "Agent allowed_autonomy entries must be one of "
-                    "'suggest', 'plan', 'auto'",
+                    f"Agent allowed_autonomy entries must be one of {_valid_autonomy!r}",
                 )
 
     def as_dict(self) -> dict[str, Any]:
@@ -161,6 +163,11 @@ class BaseAgent(ABC):
         # Serialise concurrent ``compile()`` callers so two tasks racing
         # on the cache miss path cannot both call ``self.build()``.
         self._compile_lock = threading.Lock()
+        # Async variant used by ``acompile()`` -- avoids blocking the event
+        # loop on ``self.build()`` (which may call LangGraph's graph compiler
+        # and take meaningful time).  Initialised lazily on first use so that
+        # agents constructed outside an asyncio context still work fine.
+        self._compile_lock_async: Optional[asyncio.Lock] = None
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -249,6 +256,41 @@ class BaseAgent(ABC):
                 self._compiled_store = store
             return self._compiled
 
+    async def acompile(
+        self,
+        *,
+        checkpointer: Optional[BaseCheckpointSaver] = None,
+        store: Optional[BaseStore] = None,
+        force: bool = False,
+    ) -> Pregel:
+        """Async variant of :meth:`compile`; preferred in async contexts.
+
+        Uses an :class:`asyncio.Lock` for serialisation and dispatches
+        ``self.build()`` to a thread via :func:`asyncio.to_thread` so the
+        event loop is never blocked during graph compilation.  The compiled
+        graph is cached with the same ``(checkpointer, store)`` identity
+        semantics as the sync path.
+        """
+
+        # Lazily initialise the async lock inside the running event loop so
+        # agents constructed outside asyncio (e.g. in a sync test) don't
+        # break.
+        if self._compile_lock_async is None:
+            self._compile_lock_async = asyncio.Lock()
+        async with self._compile_lock_async:
+            if (
+                self._compiled is None
+                or self._compiled_checkpointer is not checkpointer
+                or self._compiled_store is not store
+                or force
+            ):
+                self._compiled = await asyncio.to_thread(
+                    self.build, checkpointer=checkpointer, store=store
+                )
+                self._compiled_checkpointer = checkpointer
+                self._compiled_store = store
+            return self._compiled
+
     @staticmethod
     def _normalize_input(inputs: Any) -> Any:
         """Pass :class:`Command` resume payloads through untouched.
@@ -288,7 +330,7 @@ class BaseAgent(ABC):
         checkpointer: Optional[BaseCheckpointSaver] = None,
         store: Optional[BaseStore] = None,
     ) -> Any:
-        graph = self.compile(checkpointer=checkpointer, store=store)
+        graph = await self.acompile(checkpointer=checkpointer, store=store)
         return await graph.ainvoke(
             self._normalize_input(inputs),
             config=dict(config) if config else None,
@@ -312,7 +354,7 @@ class BaseAgent(ABC):
         so consumers can fan them out to SSE / WebSocket / log sinks.
         """
 
-        graph = self.compile(checkpointer=checkpointer, store=store)
+        graph = await self.acompile(checkpointer=checkpointer, store=store)
         async for event in graph.astream(
             self._normalize_input(inputs),
             config=dict(config) if config else None,

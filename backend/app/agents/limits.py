@@ -25,7 +25,15 @@ _MAX_MESSAGE_CONTENT_BYTES: int = int(os.getenv("AI_MAX_MESSAGE_CONTENT_BYTES", 
 def enforce_request_limits(payload: dict) -> None:  # type: ignore[type-arg]
     """Raise HTTP 413 when ``payload`` exceeds any configured size limit."""
 
-    body_size = len(json.dumps(payload))
+    # TODO: accept an optional ``request: Request`` arg and use
+    # ``request.headers.get("content-length")`` as the primary byte count so
+    # we read the client's wire size rather than re-serialising.  That change
+    # requires updating the callers in routers/agents.py and routers/ai.py,
+    # which are owned by a parallel agent; deferred to a follow-up.
+    #
+    # ``separators=(",",":")`` produces the most compact JSON, giving us a
+    # cheaper upper-bound estimate without whitespace inflation.
+    body_size = len(json.dumps(payload, separators=(",", ":")))
     if body_size > _MAX_BODY_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

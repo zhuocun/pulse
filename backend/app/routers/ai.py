@@ -182,6 +182,60 @@ def _gate(
     request.state.redaction_spans = []
 
 
+def _gate_with_reservation(
+    request: Request,
+    user_id: str,
+    project_id: Optional[str],
+    *,
+    metadata: Optional[AgentMetadata] = None,
+    agent_label: str = "v1-shim",
+) -> int:
+    """Like ``_gate`` but atomically reserves 1 token instead of read-only ``can_spend``.
+
+    Used only by the chat handler, which calls the live LLM and reconciles
+    actual usage afterwards; the other v1 routes use deterministic stubs so
+    the TOCTOU window in ``_gate`` is not exploitable there.
+
+    Returns the reservation amount (1 when project_id is set, 0 otherwise)
+    so the caller can pass it to ``_budget.budget_tracker.refund`` on failure
+    or top-up via ``record`` on success.
+    """
+
+    if not is_project_ai_enabled(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "AI is disabled for this project"},
+        )
+    if project_id and not is_project_manager(project_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "Forbidden"},
+        )
+    limits = metadata.rate_limit if metadata is not None else DEFAULT_LIMIT
+    allowed, retry_after = _rate_limit.rate_limiter.check(
+        agent_label, user_id, limits=limits
+    )
+    if not allowed:
+        record_invocation(agent_label, "rate_limited")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"error": "rate limit exceeded"},
+            headers={"Retry-After": str(retry_after)},
+        )
+    if project_id:
+        if not _budget.budget_tracker.reserve(project_id, tokens=1):
+            record_invocation(agent_label, "budget_exhausted")
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={"error": "project budget exhausted"},
+                headers={"X-Reason": "budget"},
+            )
+        request.state.redaction_spans = []
+        return 1
+    request.state.redaction_spans = []
+    return 0
+
+
 def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
     """Pull a project_id from any of the FE wire envelopes.
 
@@ -867,10 +921,16 @@ async def chat(
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
         return replay
+    reserved_budget = 0
+    budget_reconciled = False
+    project_id: Optional[str] = None
     try:
         chat_metadata = runtime.get("chat-agent").metadata
         project_id = _project_id_from_payload(payload)
-        _gate(
+        # Use reserve-based gate (not read-only can_spend) to prevent TOCTOU
+        # budget overrun under concurrent requests; other v1 routes use stubs
+        # so _gate's can_spend is acceptable there.
+        reserved_budget = _gate_with_reservation(
             request,
             user_id,
             project_id,
@@ -924,14 +984,15 @@ async def chat(
             ) from exc
 
         text, tool_calls = _extract_chat_response(result)
-        # Record real token usage from the graph result so the budget
-        # tracker reflects what the provider actually charged. The flat
-        # 1-token debit that used to live here under-charged every chat
-        # call by hundreds of tokens with a real model wired up.
+        # Reconcile reservation against actual provider usage. The 1-token
+        # reservation from _gate_with_reservation is topped up or refunded here.
         if project_id:
             tokens_in, tokens_out = result_token_usage_from_graph_result(result)
             actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-            _budget.budget_tracker.record(project_id, tokens=max(1, actual))
+            delta = max(0, max(1, actual) - reserved_budget)
+            if delta > 0:
+                _budget.budget_tracker.record(project_id, tokens=delta)
+        budget_reconciled = True
         if tool_calls:
             body: Dict[str, Any] = {"kind": "tool_calls", "toolCalls": tool_calls}
         else:
@@ -940,4 +1001,6 @@ async def chat(
         record_idempotency(route_path, "miss")
         return body
     except BaseException as exc:
+        if not budget_reconciled and reserved_budget and project_id:
+            _budget.budget_tracker.refund(project_id, tokens=reserved_budget)
         _idem_fail(idem, exc)
