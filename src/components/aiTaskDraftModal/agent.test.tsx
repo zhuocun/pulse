@@ -186,11 +186,13 @@ describe("AiTaskDraftModal — remote agent path", () => {
         fireEvent.click(screen.getByLabelText("Draft task with Copilot"));
 
         await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-        const [promptArg, opts] = start.mock.calls[0] as [
-            string,
+        const [inputArg, opts] = start.mock.calls[0] as [
+            { prompt: string },
             { autonomy: string }
         ];
-        expect(promptArg).toMatch(/Investigate flaky login on Safari/);
+        expect(inputArg).toEqual({
+            prompt: "Investigate flaky login on Safari"
+        });
         expect(opts?.autonomy).toBe("plan");
     });
 
@@ -299,7 +301,7 @@ describe("AiTaskDraftModal — remote agent path", () => {
         expect(screen.getByText("Phase 2 task")).toBeInTheDocument();
     });
 
-    it("calls agent.start with axis and count in breakdown mode", async () => {
+    it("calls agent.start with prompt and axis in breakdown mode", async () => {
         const start = jest.fn().mockResolvedValue(undefined);
         renderModal(true, jest.fn(), { start });
 
@@ -311,9 +313,13 @@ describe("AiTaskDraftModal — remote agent path", () => {
         );
 
         await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-        const [promptArg] = start.mock.calls[0] as [string];
-        expect(promptArg).toMatch(/Build sprint dashboard/);
-        expect(promptArg).toMatch(/freeform/);
+        const [inputArg] = start.mock.calls[0] as [
+            { prompt: string; breakdown_axis: string }
+        ];
+        expect(inputArg).toEqual({
+            prompt: "Build sprint dashboard",
+            breakdown_axis: "freeform"
+        });
     });
 
     it("calls agent.abort and clearSuggestion when modal closes", () => {

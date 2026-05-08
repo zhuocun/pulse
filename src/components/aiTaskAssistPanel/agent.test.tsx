@@ -311,12 +311,16 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         ).not.toBeInTheDocument();
     });
 
-    it("calls agent.start with a natural-language prompt when the task name is present", () => {
+    it("calls agent.start with structured task draft input when the task name is present", () => {
         const start = jest.fn().mockResolvedValue(undefined);
         renderPanel({ start });
 
         expect(start).toHaveBeenCalledWith(
-            expect.stringContaining("Implement OAuth login"),
+            expect.objectContaining({
+                task_draft: expect.objectContaining({
+                    taskName: "Implement OAuth login"
+                })
+            }),
             expect.objectContaining({ autonomy: "plan" })
         );
     });

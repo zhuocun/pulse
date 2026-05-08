@@ -1800,6 +1800,58 @@ def test_router_stream_resume_completes_interrupted_run(
         global_registry.unregister(agent.name)
 
 
+def test_router_stream_resume_allows_config_project_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """Matches the FE useAgent resume envelope with project_id in configurable."""
+
+    agent = _InterruptingAgent()
+    global_registry.register(agent)
+    try:
+        config = {
+            "configurable": {
+                "thread_id": "http-resume-config-project",
+                "project_id": "p-budget-agent",
+            }
+        }
+        with client.stream(
+            "POST",
+            "/api/v1/agents/interrupting/stream",
+            json={"input": {"started": False}, "config": config},
+            headers=auth_headers,
+        ) as response:
+            assert response.status_code == HTTPStatus.OK
+            b"".join(response.iter_bytes())
+
+        with client.stream(
+            "POST",
+            "/api/v1/agents/interrupting/stream",
+            json={
+                "input": None,
+                "command": {"resume": "stream-resume"},
+                "config": config,
+            },
+            headers=auth_headers,
+        ) as response:
+            assert response.status_code == HTTPStatus.OK
+            body = b"".join(response.iter_bytes()).decode("utf-8")
+
+        decoded = [
+            json.loads(frame.removeprefix("data: "))
+            for frame in body.split("\n\n")
+            if frame and frame != "data: [DONE]"
+        ]
+        assert any(
+            payload.get("type") == "updates"
+            and isinstance(payload.get("data"), dict)
+            and payload["data"].get("gate", {}).get("received") == "stream-resume"
+            for payload in decoded
+        )
+    finally:
+        global_registry.unregister(agent.name)
+
+
 def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     client: TestClient,
     echo_in_global_registry: EchoAgent,

@@ -85,8 +85,10 @@ def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
       ``autonomy`` are hoisted to top-level keys (only when not already
       supplied), so ``_run_options`` can keep reading them off the root
       payload.
-    * ``config.configurable.project_id`` is forwarded into ``inputs``,
-      because budget and project-access checks read it from there.
+    * ``config.configurable.project_id`` is forwarded into non-resume
+      ``inputs``, because budget and project-access checks read it from
+      there. Resume requests keep ``inputs`` empty so they remain valid
+      LangGraph ``Command(resume=...)`` calls.
     * ``config.configurable.user_id`` is treated exactly like a
       top-level ``user_id``: rejected, since user identity comes from
       authentication.
@@ -118,8 +120,11 @@ def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         if key in configurable and key not in normalized:
             normalized[key] = configurable[key]
 
+    command = normalized.get("command")
+    is_resume = isinstance(command, dict) and "resume" in command
+
     project_id = configurable.get("project_id")
-    if project_id is not None:
+    if project_id is not None and not is_resume:
         inputs = normalized.get("inputs")
         if inputs is None:
             normalized["inputs"] = {"project_id": project_id}

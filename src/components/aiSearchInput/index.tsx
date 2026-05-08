@@ -330,10 +330,13 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 return;
             }
             if (isRemote) {
-                const kindLabel = props.kind === "tasks" ? "tasks" : "projects";
-                void startRemoteSearch(`Find ${kindLabel} matching: ${query}`, {
-                    autonomy: "suggest"
-                });
+                void startRemoteSearch(
+                    {
+                        query,
+                        kind: props.kind
+                    },
+                    { autonomy: "suggest" }
+                );
                 return;
             }
             let raw: ISearchResult;

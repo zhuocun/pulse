@@ -229,20 +229,24 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
      * don't strand the panel.
      */
     const trimmedName = taskName.trim();
-    const remotePrompt = useMemo(() => {
-        if (!trimmedName) return "";
-        return (
-            `Estimate task: name="${trimmedName}"` +
-            (debouncedValues.type ? ` type="${debouncedValues.type}"` : "") +
-            (debouncedValues.epic ? ` epic="${debouncedValues.epic}"` : "") +
-            (debouncedValues.note ? ` note="${debouncedValues.note}"` : "")
-        );
-    }, [
-        trimmedName,
-        debouncedValues.type,
-        debouncedValues.epic,
-        debouncedValues.note
-    ]);
+    const remoteInput = useMemo(
+        () => ({
+            task_draft: {
+                taskName: trimmedName,
+                note: debouncedValues.note,
+                epic: debouncedValues.epic,
+                type: debouncedValues.type,
+                coordinatorId: debouncedValues.coordinatorId
+            }
+        }),
+        [
+            trimmedName,
+            debouncedValues.note,
+            debouncedValues.epic,
+            debouncedValues.type,
+            debouncedValues.coordinatorId
+        ]
+    );
     useEffect(() => {
         if (!trimmedName) {
             resetEstimate();
@@ -256,7 +260,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         }
         setDismissedKeys(new Set());
         if (isRemote) {
-            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
+            void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -302,7 +306,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remotePrompt,
+        remoteInput,
         startRemoteEstimate,
         abortRemoteEstimate,
         clearRemoteSuggestion,
@@ -379,7 +383,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         });
         if (isRemote) {
             clearRemoteSuggestion();
-            void startRemoteEstimate(remotePrompt, { autonomy: "plan" });
+            void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
             runEstimate({
                 estimate: {
@@ -409,7 +413,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         tasks,
         members,
         isRemote,
-        remotePrompt,
+        remoteInput,
         startRemoteEstimate,
         clearRemoteSuggestion,
         runEstimate
