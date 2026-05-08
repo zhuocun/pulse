@@ -555,7 +555,7 @@ def test_triage_unknown_signal_type_uses_default_title() -> None:
             "severity": "warn",
         }
     )
-    assert nudges[0]["title"] == "Triage"
+    assert nudges[0]["summary"] == "Triage"
 
 
 # ---------------------------------------------------------------------------

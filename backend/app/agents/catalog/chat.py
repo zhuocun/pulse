@@ -20,6 +20,7 @@ from typing import Any, List, Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages.utils import trim_messages
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -27,10 +28,10 @@ from langgraph.store.base import BaseStore
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._chat_tools import CHAT_TOOLS
+from app.agents.catalog._shared import emit_usage
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import ChatState
-from app.agents.stream import emit_custom
 from app.tools import be_tools
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,8 @@ class ChatAgent(BaseAgent):
         chat_model: BaseChatModel = self.chat_model
 
         async def respond(state: ChatState) -> dict[str, Any]:
+            # Keep _last_user_text reading the full (un-trimmed) history so
+            # the stub-fallback summary still picks up the actual last user input.
             user_text = _last_user_text(state)
             project_id = state.get("project_id") or "unknown"
             messages = list(state.get("messages") or [])
@@ -113,8 +116,20 @@ class ChatAgent(BaseAgent):
                 # executed tool catalogue to the model; the FE posts each
                 # tool result back as a ``role: "tool"`` message and the
                 # shim's loop continues until the model emits plain text.
+                #
+                # Trim the history before building the conversation so that
+                # long sessions (recursion_limit=15, ~4 messages/turn) do not
+                # overflow the provider's context window.
+                trimmed = trim_messages(
+                    messages,
+                    max_tokens=4000,  # rough budget for chat-agent
+                    strategy="last",
+                    token_counter=len,  # approximate; real provider counters add cost
+                    include_system=False,  # the system prompt is added separately
+                    allow_partial=False,
+                )
                 conversation: List[Any] = [SystemMessage(content=_SYSTEM_PROMPT)]
-                conversation.extend(messages)
+                conversation.extend(trimmed)
                 bound = chat_model.bind_tools(CHAT_TOOLS)
                 try:
                     raw = await bound.ainvoke(conversation)
@@ -127,9 +142,7 @@ class ChatAgent(BaseAgent):
                     )
                     reply = _stub_response(user_text, project_id)
                     response = AIMessage(content=reply)
-                    emit_custom(
-                        {"kind": "usage", "tokensIn": 0, "tokensOut": 0}
-                    )
+                    emit_usage(0, 0)
                     return {"messages": [response]}
                 if isinstance(raw, AIMessage):
                     response = raw
@@ -139,9 +152,7 @@ class ChatAgent(BaseAgent):
                     )
                 tokens_in, tokens_out = extract_token_usage(response)
 
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
+            emit_usage(tokens_in, tokens_out)
             # No citation event here: the user's own message is not a
             # citable entity and ``source: "user"`` is not in the FE
             # contract enum (``task | column | member | project`` --

@@ -22,16 +22,19 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
-from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_similar_payload, unpack_structured_response
-from app.agents.llm import extract_token_usage, is_stub_model
+from app.agents.catalog._shared import (
+    emit_usage,
+    fetch_similar_node,
+    fetch_snapshot_node,
+    structured_llm_call,
+)
+from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
 from app.agents.stream import emit_custom
-from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
@@ -82,8 +85,6 @@ async def polish_draft(
     to the deterministic baseline.
     """
 
-    if is_stub_model(model):
-        return deterministic, 0, 0
     # Redact PII from every field that crosses the provider boundary.
     # ``deterministic`` is the freshly-built draft we own; ``prompt`` and
     # ``similar`` come from the FE and may contain emails / secrets / SSNs.
@@ -99,22 +100,22 @@ async def polish_draft(
         f"Similar tasks: {json.dumps(safe_similar)}\n"
         f"Current draft: {json.dumps(safe_draft)}"
     )
-    try:
-        structured = model.with_structured_output(DraftPolish, include_raw=True)
-        response = await structured.ainvoke([HumanMessage(content=instruction)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("task-drafting structured output failed; falling back.")
-        return deterministic, 0, 0
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, DraftPolish):
-        return deterministic, tokens_in, tokens_out
-    polished = dict(deterministic)
-    for field_name in ("taskName", "note", "rationale"):
-        value = getattr(parsed, field_name, "")
-        if isinstance(value, str) and value.strip():
-            polished[field_name] = value.strip()
-    return polished, tokens_in, tokens_out
+
+    def _merge(parsed: DraftPolish) -> dict[str, Any]:
+        polished = dict(deterministic)
+        for field_name in ("taskName", "note", "rationale"):
+            value = getattr(parsed, field_name, "")
+            if isinstance(value, str) and value.strip():
+                polished[field_name] = value.strip()
+        return polished
+
+    return await structured_llm_call(
+        model,
+        DraftPolish,
+        [HumanMessage(content=instruction)],
+        fallback=deterministic,
+        merge_fn=_merge,
+    )
 
 
 class TaskDraftingAgent(BaseAgent):
@@ -140,29 +141,9 @@ class TaskDraftingAgent(BaseAgent):
     ) -> Pregel:
         chat_model: BaseChatModel = self.chat_model
 
-        def fetch_snapshot(state: TaskDraftingState) -> dict[str, Any]:
-            snapshot = interrupt(
-                interrupt_payload(
-                    "fe.boardSnapshot",
-                    {"project_id": state.get("project_id")},
-                )
-            )
-            return {"board_snapshot": snapshot}
-
-        def fetch_similar(state: TaskDraftingState) -> dict[str, Any]:
-            payload = interrupt(
-                interrupt_payload(
-                    "fe.similarTasks",
-                    {
-                        "project_id": state.get("project_id"),
-                        "query": state.get("prompt") or "",
-                    },
-                )
-            )
-            # FE may return either a raw list (legacy / test fixtures) or
-            # the schema-conformant {"similar": [...]} envelope. Normalise
-            # so downstream nodes always see a list of ``{id, text}`` items.
-            return {"similar_tasks": unpack_similar_payload(payload)}
+        # Shared node bodies from _shared.py (same logic as board_brief / triage).
+        fetch_snapshot = fetch_snapshot_node
+        fetch_similar = fetch_similar_node
 
         async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
             prompt = state.get("prompt") or ""
@@ -184,9 +165,7 @@ class TaskDraftingAgent(BaseAgent):
             else:
                 draft = polished
             surface = "draft"
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
+            emit_usage(tokens_in, tokens_out)
             emit_custom(
                 {"kind": "suggestion", "surface": surface, "payload": draft}
             )

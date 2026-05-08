@@ -40,8 +40,8 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_structured_response
-from app.agents.llm import extract_token_usage, is_stub_model
+from app.agents.catalog._shared import emit_usage, structured_llm_call
+from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import SearchState
 from app.agents.stream import emit_custom
@@ -159,8 +159,6 @@ async def polish_search(
     so the FE layout stays byte-identical with the no-key path.
     """
 
-    if is_stub_model(model):
-        return deterministic, 0, 0
     # Empty candidate list means the deterministic ranker found nothing
     # to score; the LLM has no useful work and would hallucinate ids.
     if not candidates:
@@ -175,57 +173,60 @@ async def polish_search(
         f"Query: {query}\n"
         f"Candidates: {json.dumps(candidates[:30])}"
     )
-    try:
-        structured = model.with_structured_output(SearchRanking, include_raw=True)
-        response = await structured.ainvoke([HumanMessage(content=prompt)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("search structured output failed; falling back.")
-        return deterministic, 0, 0
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, SearchRanking):
-        return deterministic, tokens_in, tokens_out
+
     candidate_ids = {
         c.get("id")
         for c in candidates
         if isinstance(c, dict) and isinstance(c.get("id"), str)
     }
-    polished_ids = [i for i in parsed.ids if isinstance(i, str) and i in candidate_ids]
-    if not polished_ids:
-        # The model returned only hallucinated ids (or an empty list);
-        # the deterministic ranking is still our best signal.
-        return deterministic, tokens_in, tokens_out
-    rationale_lines = (parsed.rationale or "").strip().splitlines()
-    rationale = (rationale_lines[0] if rationale_lines else "")[:240]
-    if not rationale:
-        rationale = deterministic.get("rationale", "")
-    # Recompute matches for the new id order so strength still corresponds
-    # 1:1 with each id.  Prefer the original cosine scores threaded through
-    # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
-    # floor from ``_strength_to_score`` for ids not in the map (e.g. when
-    # ``polish_search`` is called directly by the v1 shim without a ``rank``
-    # node that set ``_score_map``).
-    score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
-    if not score_map:
-        # Backward-compat path: reconstruct from strength buckets.
-        score_map = {
-            m["id"]: _strength_to_score(m["strength"])
-            for m in (deterministic.get("matches") or [])
-            if isinstance(m, dict)
+
+    def _merge(parsed: SearchRanking) -> dict[str, Any]:
+        polished_ids = [
+            i for i in parsed.ids if isinstance(i, str) and i in candidate_ids
+        ]
+        if not polished_ids:
+            # The model returned only hallucinated ids (or an empty list);
+            # the deterministic ranking is still our best signal.
+            return deterministic
+        rationale_lines = (parsed.rationale or "").strip().splitlines()
+        rationale = (rationale_lines[0] if rationale_lines else "")[:240]
+        if not rationale:
+            rationale = deterministic.get("rationale", "")
+        # Recompute matches for the new id order so strength still corresponds
+        # 1:1 with each id.  Prefer the original cosine scores threaded through
+        # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
+        # floor from ``_strength_to_score`` for ids not in the map (e.g. when
+        # ``polish_search`` is called directly by the v1 shim without a ``rank``
+        # node that set ``_score_map``).
+        score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
+        if not score_map:
+            # Backward-compat path: reconstruct from strength buckets.
+            score_map = {
+                m["id"]: _strength_to_score(m["strength"])
+                for m in (deterministic.get("matches") or [])
+                if isinstance(m, dict)
+            }
+        polished_matches = _build_matches(polished_ids[:10], score_map)
+        polished: dict[str, Any] = {
+            **deterministic,
+            "ids": polished_ids[:10],
+            "rationale": rationale,
+            "matches": polished_matches,
         }
-    polished_matches = _build_matches(polished_ids[:10], score_map)
-    polished: dict[str, Any] = {
-        **deterministic,
-        "ids": polished_ids[:10],
-        "rationale": rationale,
-        "matches": polished_matches,
-    }
-    expanded = [
-        t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
-    ]
-    if expanded:
-        polished["expandedTerms"] = expanded
-    return polished, tokens_in, tokens_out
+        expanded = [
+            t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
+        ]
+        if expanded:
+            polished["expandedTerms"] = expanded
+        return polished
+
+    return await structured_llm_call(
+        model,
+        SearchRanking,
+        [HumanMessage(content=prompt)],
+        fallback=deterministic,
+        merge_fn=_merge,
+    )
 
 
 class SearchAgent(BaseAgent):
@@ -320,7 +321,7 @@ class SearchAgent(BaseAgent):
                     "ranking": {
                         "ids": [],
                         "matches": [],
-                        "rationale": f"Ranked by embedding similarity over {n} candidates.",
+                        "rationale": "No candidates returned for this query.",
                     }
                 }
             # Embed query and all candidate texts in a single batch where
@@ -360,10 +361,10 @@ class SearchAgent(BaseAgent):
             polished, tokens_in, tokens_out = await polish_search(
                 chat_model, deterministic, query, candidates
             )
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
-            return {"ranking": polished}
+            emit_usage(tokens_in, tokens_out)
+            # Strip ``_score_map`` before persisting: it only needs to live
+            # across rank → polish and should never reach the checkpointer.
+            return {"ranking": {k: v for k, v in polished.items() if k != "_score_map"}}
 
         def emit(state: SearchState) -> dict[str, Any]:
             """Emit the final ranking as a suggestion event and as an AIMessage.

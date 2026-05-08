@@ -5,9 +5,7 @@ agent file:
 
 - :func:`unpack_structured_response`: every ``polish_*`` helper unpacks
   the ``(raw, parsed, parsing_error)`` triple from a
-  ``with_structured_output(..., include_raw=True)`` call. The block was
-  duplicated five times before this module existed -- one update would
-  silently diverge across catalog modules.
+  ``with_structured_output(..., include_raw=True)`` call.
 
 - :func:`unpack_similar_payload`: normalises the two FE shapes for a
   ``similarTasks`` payload -- the v2.1 ``{"similar": [...]}`` envelope
@@ -15,14 +13,28 @@ agent file:
   ``task_drafting.py`` and ``task_estimation.py``.
 
 - :func:`structured_llm_call`: generic scaffold for
-  ``with_structured_output`` polish calls. Currently adopted by
-  ``polish_rationale`` and ``polish_readiness`` in
-  ``task_estimation.py`` as a proof of concept.  The four functions
-  still to migrate are:
-    - ``polish_draft``      (task_drafting.py)
-    - ``polish_headline``   (board_brief.py)
-    - ``polish_triage``     (triage.py)
-    - ``polish_search``     (search.py)
+  ``with_structured_output`` polish calls. Adopted by all four
+  ``polish_*`` functions across the catalog.
+
+- :func:`emit_usage`: wraps ``emit_custom`` for ``{"kind": "usage"}``
+  events.  Centralises the wire keys so a single change here propagates
+  to all six call sites.
+
+- :func:`build_citation_refs`: builds a validated, redacted list of
+  ``{"source", "id", "quote"}`` refs from an arbitrary item list.
+
+- :func:`emit_citation_refs`: thin wrapper around
+  :func:`build_citation_refs` that also emits the ``{"kind":
+  "citation"}`` custom event.
+
+- :func:`fetch_snapshot_node`: shared ``fetch_snapshot`` node body for
+  board-brief and triage agents.
+
+- :func:`fetch_similar_node`: shared ``fetch_similar`` node body for
+  task-drafting and task-estimation agents.
+
+- :func:`detect_drift_node`: shared ``detect_drift`` node body for
+  board-brief and triage agents.
 
 The module name is prefixed with ``_`` so the catalog auto-discovery
 loop (``app/agents/catalog/__init__.py``) skips it; helpers here are
@@ -93,6 +105,36 @@ def fetch_snapshot_node(state: Any) -> dict[str, Any]:
     return {"board_snapshot": snapshot}
 
 
+def fetch_similar_node(state: Any) -> dict[str, Any]:
+    """Shared ``fetch_similar`` node body for task-drafting and task-estimation.
+
+    Both agents interrupt for ``fe.similarTasks`` keyed by ``project_id``
+    and a query derived from ``prompt`` or ``task_draft.taskName``.  The
+    result is normalised via :func:`unpack_similar_payload` and stored in
+    ``similar_tasks``.
+    """
+
+    from langgraph.types import interrupt
+
+    from app.tools.fe_tool_schemas import interrupt_payload
+
+    query = (
+        state.get("prompt")
+        or (state.get("task_draft") or {}).get("taskName")
+        or ""
+    )
+    payload = interrupt(
+        interrupt_payload(
+            "fe.similarTasks",
+            {
+                "project_id": state.get("project_id"),
+                "query": query,
+            },
+        )
+    )
+    return {"similar_tasks": unpack_similar_payload(payload)}
+
+
 def detect_drift_node(state: Any) -> dict[str, Any]:
     """Shared ``detect_drift`` node body for board-brief and triage agents.
 
@@ -106,6 +148,93 @@ def detect_drift_node(state: Any) -> dict[str, Any]:
 
     snapshot = state.get("board_snapshot") or {}
     return {"drift_result": be_tools.detect_drift(snapshot)}
+
+
+def emit_usage(tokens_in: int, tokens_out: int) -> None:
+    """Emit a ``{"kind": "usage"}`` custom event with token counts.
+
+    Centralises the wire keys (``tokensIn`` / ``tokensOut``) so all six
+    inline call sites can be replaced with a single import.
+    """
+
+    from app.agents.stream import emit_custom
+
+    emit_custom({"kind": "usage", "tokensIn": int(tokens_in), "tokensOut": int(tokens_out)})
+
+
+def build_citation_refs(
+    items: list[dict],
+    source: str,
+    *,
+    max_items: int = 3,
+    get_id: Optional[Callable[[dict], Any]] = None,
+    get_quote: Optional[Callable[[dict], str]] = None,
+) -> list[dict]:
+    """Build a validated, redacted list of citation refs from ``items``.
+
+    Each ref has shape ``{"source", "id", "quote"}`` as required by the
+    FE citation contract. Quotes are redacted via
+    :func:`app.tools.redaction.redact` and each ref is validated via
+    :func:`app.tools.be_tools.validated_citation_ref` before inclusion.
+
+    ``get_id`` and ``get_quote`` are optional callbacks to extract the id
+    and quote from each item dict. Sensible defaults are provided for the
+    standard ``{id, text, taskName, name}`` shapes used across the catalog.
+
+    Returns the refs list so callers can reuse it (e.g. in
+    ``recommendationDetail.sources``).
+    """
+
+    from app.tools.be_tools import validated_citation_ref
+    from app.tools.redaction import redact
+
+    if get_id is None:
+        get_id = lambda x: x.get("id")  # noqa: E731
+    if get_quote is None:
+        get_quote = lambda x: x.get("text") or x.get("taskName") or x.get("name") or ""  # noqa: E731
+
+    refs: list[dict] = []
+    for item in items[:max_items]:
+        raw_quote = get_quote(item)
+        quote = redact(raw_quote)[0] if isinstance(raw_quote, str) else raw_quote
+        refs.append(
+            validated_citation_ref(
+                source=source,
+                id=get_id(item),
+                quote=quote,
+            )
+        )
+    return refs
+
+
+def emit_citation_refs(
+    items: list[dict],
+    source: str,
+    *,
+    max_items: int = 3,
+    get_id: Optional[Callable[[dict], Any]] = None,
+    get_quote: Optional[Callable[[dict], str]] = None,
+) -> list[dict]:
+    """Build citation refs and emit a ``{"kind": "citation"}`` event if non-empty.
+
+    Thin wrapper around :func:`build_citation_refs` that additionally calls
+    :func:`app.agents.stream.emit_custom` with the citation payload.
+    Returns the refs list so callers can attach it to other payloads
+    (e.g. ``recommendationDetail.sources``).
+    """
+
+    from app.agents.stream import emit_custom
+
+    refs = build_citation_refs(
+        items,
+        source,
+        max_items=max_items,
+        get_id=get_id,
+        get_quote=get_quote,
+    )
+    if refs:
+        emit_custom({"kind": "citation", "refs": refs})
+    return refs
 
 
 async def structured_llm_call(
@@ -149,7 +278,11 @@ async def structured_llm_call(
 
 
 __all__ = [
+    "build_citation_refs",
     "detect_drift_node",
+    "emit_citation_refs",
+    "emit_usage",
+    "fetch_similar_node",
     "fetch_snapshot_node",
     "structured_llm_call",
     "unpack_similar_payload",

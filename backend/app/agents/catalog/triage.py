@@ -30,10 +30,10 @@ from pydantic import BaseModel, Field
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._shared import (
     detect_drift_node,
+    emit_usage,
     fetch_snapshot_node,
-    unpack_structured_response,
+    structured_llm_call,
 )
-from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.agents.stream import emit_custom
@@ -102,7 +102,7 @@ def _nudges_for(drift: dict[str, Any]) -> list[dict[str, Any]]:
         nudges.append(
             {
                 "type": signal_type,
-                "title": _NUDGE_TITLES.get(signal_type, "Triage"),
+                "summary": _NUDGE_TITLES.get(signal_type, "Triage"),
                 "severity": _SIGNAL_SEVERITY.get(signal_type, aggregate_severity),
                 "details": signal,
                 "actions": [
@@ -160,17 +160,15 @@ async def polish_triage(
     Returns ``(polished_nudges, tokens_in, tokens_out)``.
     """
 
-    if is_stub_model(model):
-        return deterministic_nudges, 0, 0
     if not deterministic_nudges:
         return deterministic_nudges, 0, 0
 
-    # Build the FE nudge_id -> title mapping for the prompt so the model has
+    # Build the FE nudge_id -> summary mapping for the prompt so the model has
     # the same context that the generate_nudges node constructs.
     nudge_summaries = [
         {
             "nudge_id": f"{n.get('type', 'triage')}:{idx}",
-            "summary": n.get("title", "Triage"),
+            "summary": n.get("summary", "Triage"),
             "details": n.get("details") or {},
         }
         for idx, n in enumerate(deterministic_nudges)
@@ -189,39 +187,37 @@ async def polish_triage(
         f"Board snapshot: {json.dumps(safe_snapshot)}\n"
         f"Nudges: {json.dumps(safe_nudges)}"
     )
-    try:
-        structured = model.with_structured_output(TriagePolish, include_raw=True)
-        response = await structured.ainvoke([HumanMessage(content=prompt)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("triage structured output failed; falling back.")
-        return deterministic_nudges, 0, 0
-
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, TriagePolish):
-        return deterministic_nudges, tokens_in, tokens_out
 
     # Build a lookup keyed by the stable nudge_id format.
     valid_ids = {
         f"{n.get('type', 'triage')}:{idx}" for idx, n in enumerate(deterministic_nudges)
     }
-    polished_by_id: dict[str, NudgePolish] = {
-        item.nudge_id: item
-        for item in parsed.nudges
-        if item.nudge_id and item.nudge_id in valid_ids
-    }
 
-    merged: list[dict[str, Any]] = []
-    for idx, nudge in enumerate(deterministic_nudges):
-        nudge_id = f"{nudge.get('type', 'triage')}:{idx}"
-        update = polished_by_id.get(nudge_id)
-        merged_nudge = dict(nudge)
-        if update is not None:
-            polished_summary = (update.summary.splitlines() or [""])[0].strip()
-            if polished_summary:
-                merged_nudge["title"] = polished_summary[:120]
-        merged.append(merged_nudge)
-    return merged, tokens_in, tokens_out
+    def _merge(parsed: TriagePolish) -> list[dict[str, Any]]:
+        polished_by_id: dict[str, NudgePolish] = {
+            item.nudge_id: item
+            for item in parsed.nudges
+            if item.nudge_id and item.nudge_id in valid_ids
+        }
+        merged: list[dict[str, Any]] = []
+        for idx, nudge in enumerate(deterministic_nudges):
+            nudge_id = f"{nudge.get('type', 'triage')}:{idx}"
+            update = polished_by_id.get(nudge_id)
+            merged_nudge = dict(nudge)
+            if update is not None:
+                polished_summary = (update.summary.splitlines() or [""])[0].strip()
+                if polished_summary:
+                    merged_nudge["summary"] = polished_summary[:120]
+            merged.append(merged_nudge)
+        return merged
+
+    return await structured_llm_call(
+        model,
+        TriagePolish,
+        [HumanMessage(content=prompt)],
+        fallback=deterministic_nudges,
+        merge_fn=_merge,
+    )
 
 
 class TriageAgent(BaseAgent):
@@ -281,12 +277,12 @@ class TriageAgent(BaseAgent):
                     "nudge_id": f"{nudge.get('type', 'triage')}:{index}",
                     "kind": nudge.get("type", "stale_task"),
                     "project_id": project_id,
-                    "summary": nudge.get("title", "Triage"),
+                    "summary": nudge.get("summary", "Triage"),
                     "target_ids": target_ids,
                     "severity": fe_severity,
                 }
                 emit_custom({"kind": "nudge", "nudge": fe_nudge})
-            emit_custom({"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out})
+            emit_usage(tokens_in, tokens_out)
             return {
                 "nudges": polished_nudges,
                 "messages": [AIMessage(content=json.dumps(polished_nudges))],

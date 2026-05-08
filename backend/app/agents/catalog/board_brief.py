@@ -25,17 +25,19 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._shared import (
+    build_citation_refs,
     detect_drift_node,
+    emit_usage,
     fetch_snapshot_node,
-    unpack_structured_response,
+    structured_llm_call,
 )
-from app.agents.llm import extract_token_usage, is_stub_model
+from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.agents.stream import emit_custom
 from app.services import v1_engine
-from app.tools.be_tools import _is_done_column, validated_citation_ref
-from app.tools.redaction import redact, redact_dict
+from app.tools.be_tools import _is_done_column
+from app.tools.redaction import redact_dict
 
 logger = logging.getLogger(__name__)
 
@@ -207,8 +209,6 @@ async def polish_headline(
     fallback so the FE layout never breaks.
     """
 
-    if is_stub_model(model):
-        return deterministic, 0, 0
     # ``facts`` carries snippets of FE-supplied signal data (column names,
     # task ids); redact PII patterns so emails / secrets in user-entered
     # column names never reach the provider.
@@ -219,21 +219,20 @@ async def polish_headline(
         "facts provided. Return JSON matching the schema. Facts (JSON):\n"
         + json.dumps(safe_facts)
     )
-    try:
-        structured = model.with_structured_output(BriefHeadline, include_raw=True)
-        response = await structured.ainvoke([HumanMessage(content=prompt)])
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("board-brief structured output failed; falling back.")
-        return deterministic, 0, 0
-    raw, parsed, error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if error is not None or not isinstance(parsed, BriefHeadline):
-        return deterministic, tokens_in, tokens_out
-    text = (parsed.headline or "").strip()
-    if not text:
-        return deterministic, tokens_in, tokens_out
-    cleaned = text.splitlines()[0]
-    return cleaned[:120], tokens_in, tokens_out
+
+    def _merge(parsed: BriefHeadline) -> str:
+        text = (parsed.headline or "").strip()
+        if not text:
+            return deterministic
+        return text.splitlines()[0][:120]
+
+    return await structured_llm_call(
+        model,
+        BriefHeadline,
+        [HumanMessage(content=prompt)],
+        fallback=deterministic,
+        merge_fn=_merge,
+    )
 
 
 class BoardBriefAgent(BaseAgent):
@@ -305,9 +304,7 @@ class BoardBriefAgent(BaseAgent):
                 chat_model, deterministic, facts
             )
             brief = {**brief, "headline": headline}
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
+            emit_usage(tokens_in, tokens_out)
             # Store drift severity and drift result separately so downstream
             # nodes (e.g. triage) can still read them without touching ``brief``.
             return {"brief": brief, "drift_severity": severity, "drift": drift}
@@ -318,29 +315,20 @@ class BoardBriefAgent(BaseAgent):
             snapshot = state.get("board_snapshot") or {}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []
-            refs: list[dict[str, Any]] = []
-            for task in tasks[:3]:
-                raw_quote = task.get("taskName") or task.get("id") or ""
-                refs.append(
-                    validated_citation_ref(
-                        source="task",
-                        id=task.get("id"),
-                        quote=redact(raw_quote)[0]
-                        if isinstance(raw_quote, str)
-                        else raw_quote,
-                    )
-                )
-            for column in columns[:2]:
-                raw_quote = column.get("name") or column.get("id") or ""
-                refs.append(
-                    validated_citation_ref(
-                        source="column",
-                        id=column.get("id"),
-                        quote=redact(raw_quote)[0]
-                        if isinstance(raw_quote, str)
-                        else raw_quote,
-                    )
-                )
+            # Build refs without emitting yet: we need to attach them to
+            # recommendationDetail before the suggestion event goes out.
+            task_refs = build_citation_refs(
+                tasks,
+                "task",
+                get_quote=lambda t: t.get("taskName") or t.get("id") or "",
+            )
+            col_refs = build_citation_refs(
+                columns,
+                "column",
+                max_items=2,
+                get_quote=lambda c: c.get("name") or c.get("id") or "",
+            )
+            refs = task_refs + col_refs
             if refs:
                 emit_custom({"kind": "citation", "refs": refs})
             # Attach recommendationDetail so the FE can render the strength
