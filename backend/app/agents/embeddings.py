@@ -223,10 +223,27 @@ def assert_embeddings_provider_available(
     No-op when the resolved provider is the deterministic stub: the
     stub has no integration package to import and is the documented
     fallback for embeddings-disabled deployments.
+
+    Also logs a WARNING (not a raise) when the resolved provider is
+    ``openai`` and the configured dimension differs from
+    ``STUB_EMBEDDING_DIM``: if the process previously ran with the stub
+    against a Postgres vector store, the existing column may be sized
+    for the stub width.  Re-create the store schema before depending on
+    the new width.
     """
 
-    resolved = spec if spec is not None else resolve_embeddings_spec(settings=settings)
+    cfg = settings if settings is not None else default_settings
+    resolved = spec if spec is not None else resolve_embeddings_spec(settings=cfg)
     _require_integration(resolved.provider)
+    if resolved.provider == PROVIDER_OPENAI and cfg.embeddings_dimensions != STUB_EMBEDDING_DIM:
+        logger.warning(
+            "Embedding width changed (configured=%d, stub=%d). If you previously "
+            "ran with the stub against a Postgres store, the existing vector column "
+            "may be sized for the stub width — re-create the store schema before "
+            "depending on this width.",
+            cfg.embeddings_dimensions,
+            STUB_EMBEDDING_DIM,
+        )
 
 
 def is_stub_embeddings(model: object) -> bool:

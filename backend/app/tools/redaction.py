@@ -17,14 +17,24 @@ from dataclasses import dataclass
 
 # Order matters: more-specific patterns must run before broader ones to avoid
 # the broad CARD pattern stealing matches that the SSN pattern would catch.
+# JWT must appear before the broad SECRET pattern so a full header.payload.sig
+# token is claimed as [SECRET] by the JWT rule rather than only the prefix.
 PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
         "[EMAIL]",
     ),
     (
+        # JWT-shaped tokens (header.payload.signature, base64url encoded).
         re.compile(
-            r"\b(?:Bearer\s+|sk-|pk_|ghp_|gho_|token[:=])\S{10,}",
+            r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+        ),
+        "[SECRET]",
+    ),
+    (
+        re.compile(
+            r"\b(?:Bearer\s+|sk-ant-|xoxb-|xoxp-|SG\.|ya29\."
+            r"|sk-|pk_|ghp_|gho_|token[:=])\S{10,}",
             re.IGNORECASE,
         ),
         "[SECRET]",
