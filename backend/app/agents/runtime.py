@@ -407,7 +407,7 @@ class AgentRuntime:
                 # span at 0 rather than spend extra graph calls.
                 if self._checkpointer is not None:
                     try:
-                        graph = agent.compile(
+                        graph = await agent.acompile(
                             checkpointer=self._checkpointer,
                             store=self._store,
                         )

@@ -25,17 +25,18 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
-from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_structured_response
+from app.agents.catalog._shared import (
+    detect_drift_node,
+    fetch_snapshot_node,
+    unpack_structured_response,
+)
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.agents.stream import emit_custom
-from app.tools import be_tools
-from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact_dict
 
 logger = logging.getLogger(__name__)
@@ -246,18 +247,11 @@ class TriageAgent(BaseAgent):
     ) -> Pregel:
         chat_model: BaseChatModel = self.chat_model
 
-        def fetch_snapshot(state: TriageState) -> dict[str, Any]:
-            snapshot = interrupt(
-                interrupt_payload(
-                    "fe.boardSnapshot",
-                    {"project_id": state.get("project_id")},
-                )
-            )
-            return {"board_snapshot": snapshot}
-
-        def detect_drift(state: TriageState) -> dict[str, Any]:
-            snapshot = state.get("board_snapshot") or {}
-            return {"drift_result": be_tools.detect_drift(snapshot)}
+        # Both bodies are shared with board-brief-agent (same state keys,
+        # same logic).  See ``app.agents.catalog._shared`` for the
+        # implementations.
+        fetch_snapshot = fetch_snapshot_node
+        detect_drift = detect_drift_node
 
         async def generate_nudges(state: TriageState) -> dict[str, Any]:
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}

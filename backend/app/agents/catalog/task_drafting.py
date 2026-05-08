@@ -26,7 +26,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import unpack_structured_response
+from app.agents.catalog._shared import unpack_similar_payload, unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
@@ -162,11 +162,7 @@ class TaskDraftingAgent(BaseAgent):
             # FE may return either a raw list (legacy / test fixtures) or
             # the schema-conformant {"similar": [...]} envelope. Normalise
             # so downstream nodes always see a list of ``{id, text}`` items.
-            if isinstance(payload, dict) and "similar" in payload:
-                similar = payload["similar"]
-            else:
-                similar = payload
-            return {"similar_tasks": similar or []}
+            return {"similar_tasks": unpack_similar_payload(payload)}
 
         async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
             prompt = state.get("prompt") or ""

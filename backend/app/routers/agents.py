@@ -150,6 +150,10 @@ def _optional_tags(payload: Mapping[str, Any]) -> Optional[list[str]]:
         return None
     if not isinstance(value, list) or not all(isinstance(tag, str) for tag in value):
         api_error(status.HTTP_400_BAD_REQUEST, "tags must be a list of strings")
+    if len(value) > 20:
+        api_error(status.HTTP_400_BAD_REQUEST, "tags must not exceed 20 entries")
+    if not all(len(t) <= 128 for t in value if isinstance(t, str)):
+        api_error(status.HTTP_400_BAD_REQUEST, "each tag must not exceed 128 characters")
     return value
 
 
@@ -545,9 +549,14 @@ def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> No
     Catalog agents read it off ``state["autonomy_level"]`` (PRD §5A.2);
     putting it on inputs is sufficient because :class:`BaseAgentState`
     declares the field.
+
+    Security: strip any client-supplied ``autonomy_level`` first so a
+    caller cannot bypass ``_resolve_autonomy``'s validation by smuggling
+    a value through ``inputs``.
     """
 
-    if autonomy is not None and "autonomy_level" not in inputs:
+    inputs.pop("autonomy_level", None)
+    if autonomy is not None:
         inputs["autonomy_level"] = autonomy
 
 
@@ -586,6 +595,10 @@ async def invoke_agent(
 
         inputs, resume, resuming = _resolve_resume_and_inputs(payload, request)
         project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
+        if resuming and project_id is None:
+            project_id = (
+                payload.get("config", {}).get("configurable", {}).get("project_id")
+            )
         if not resuming:
             _autonomy_into_inputs(inputs, autonomy)
 
@@ -682,6 +695,10 @@ async def stream_agent(
 
     inputs, resume, resuming = _resolve_resume_and_inputs(payload, request)
     project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
+    if resuming and project_id is None:
+        project_id = (
+            payload.get("config", {}).get("configurable", {}).get("project_id")
+        )
     if not resuming:
         _autonomy_into_inputs(inputs, autonomy)
 
@@ -715,9 +732,19 @@ async def stream_agent(
     try:
         _enforce_project_access(project_id)
         _require_project_manager(project_id, user_id)
-        _enforce_rate_limit(name, user_id, metadata)
+        try:
+            _enforce_rate_limit(name, user_id, metadata)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+                record_invocation(name, "rate_limited")
+            raise
         prebooked = max(1, _input_token_estimate(inputs))
-        reserved_budget = _enforce_budget(project_id, tokens=prebooked)
+        try:
+            reserved_budget = _enforce_budget(project_id, tokens=prebooked)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_402_PAYMENT_REQUIRED:
+                record_invocation(name, "budget_exhausted")
+            raise
 
         options = _run_options(payload, user_id=user_id)
         context = _request_context(name, payload, runtime)
@@ -900,9 +927,17 @@ async def _with_disconnect(
             )
             if not done:
                 anext_task.cancel()
+                try:
+                    await anext_task
+                except (asyncio.CancelledError, StopAsyncIteration):
+                    pass
                 raise asyncio.TimeoutError()
             if disconnect_task in done:
                 anext_task.cancel()
+                try:
+                    await anext_task
+                except (asyncio.CancelledError, StopAsyncIteration):
+                    pass
                 raise _ClientDisconnected()
             try:
                 event = anext_task.result()

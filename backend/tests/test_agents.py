@@ -1224,11 +1224,16 @@ def test_agent_runtime_astream_swallows_aggregation_errors(
                 yield ev
 
     real_compile = agent.compile
+    real_acompile = agent.acompile
 
     def boom_compile(**kwargs: Any) -> Any:
         return _BoomGraph(real_compile(**kwargs))
 
+    async def boom_acompile(**kwargs: Any) -> Any:
+        return _BoomGraph(await real_acompile(**kwargs))
+
     agent.compile = boom_compile  # type: ignore[assignment]
+    agent.acompile = boom_acompile  # type: ignore[assignment]
 
     try:
         async def collect() -> None:
@@ -1241,6 +1246,7 @@ def test_agent_runtime_astream_swallows_aggregation_errors(
     finally:
         runtime_mod.start_run_span = original_start
         agent.compile = real_compile  # type: ignore[assignment]
+        agent.acompile = real_acompile  # type: ignore[assignment]
 
     # set_token_usage must NOT have been called because aggregation raised
     # and we suppressed the exception rather than failing the stream.

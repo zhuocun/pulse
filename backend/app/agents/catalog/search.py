@@ -200,13 +200,19 @@ async def polish_search(
     if not rationale:
         rationale = deterministic.get("rationale", "")
     # Recompute matches for the new id order so strength still corresponds
-    # 1:1 with each id.  The score_map comes from the deterministic ranking;
-    # if the LLM reorders, each id keeps its embedding-derived strength.
-    score_map: dict[str, float] = {
-        m["id"]: _strength_to_score(m["strength"])
-        for m in (deterministic.get("matches") or [])
-        if isinstance(m, dict)
-    }
+    # 1:1 with each id.  Prefer the original cosine scores threaded through
+    # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
+    # floor from ``_strength_to_score`` for ids not in the map (e.g. when
+    # ``polish_search`` is called directly by the v1 shim without a ``rank``
+    # node that set ``_score_map``).
+    score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
+    if not score_map:
+        # Backward-compat path: reconstruct from strength buckets.
+        score_map = {
+            m["id"]: _strength_to_score(m["strength"])
+            for m in (deterministic.get("matches") or [])
+            if isinstance(m, dict)
+        }
     polished_matches = _build_matches(polished_ids[:10], score_map)
     polished: dict[str, Any] = {
         **deterministic,
@@ -339,6 +345,10 @@ class SearchAgent(BaseAgent):
                     "ids": ids,
                     "matches": matches,
                     "rationale": f"Ranked by embedding similarity over {n} candidates.",
+                    # Thread the original cosine scores through to ``polish``
+                    # so LLM-reranked ids keep their real scores rather than
+                    # the bucket floor from ``_strength_to_score``.
+                    "_score_map": score_map,
                 }
             }
 
@@ -362,8 +372,14 @@ class SearchAgent(BaseAgent):
             ``/invoke`` path (which do not receive SSE custom events) can still
             read the ranking from the returned state -- consistent with how
             task-estimation-agent surfaces its payload on the messages channel.
+
+            ``_score_map`` is stripped here so it never reaches the FE wire
+            contract; it is an internal implementation detail used only by
+            the ``polish`` node.
             """
-            ranking = state.get("ranking") or {"ids": [], "rationale": ""}
+            ranking_raw = state.get("ranking") or {"ids": [], "rationale": ""}
+            # Strip the internal ``_score_map`` field before serialising.
+            ranking = {k: v for k, v in ranking_raw.items() if k != "_score_map"}
             emit_custom(
                 {
                     "kind": "suggestion",
