@@ -109,7 +109,7 @@ const estimateSuggestionWithV21IssuesPayload = {
         issues: [
             {
                 field: "note",
-                severity: "error",
+                severity: "warning",
                 message: "Acceptance criteria are missing.",
                 suggestion: "Add concrete acceptance criteria."
             }
@@ -259,7 +259,9 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         expect(
             screen.getByText(/Add concrete acceptance criteria\./)
         ).toBeInTheDocument();
-        expect(container.querySelector(".ant-alert-error")).toBeInTheDocument();
+        expect(
+            container.querySelector(".ant-alert-warning")
+        ).toBeInTheDocument();
 
         act(() => {
             screen

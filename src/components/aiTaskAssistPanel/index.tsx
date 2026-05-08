@@ -79,9 +79,11 @@ interface V21ReadinessPayload {
 const normalizeReadinessSeverity = (
     severity: unknown
 ): IReadinessIssue["severity"] =>
-    severity === "info" || severity === "warn" || severity === "error"
-        ? severity
-        : "warn";
+    severity === "warning"
+        ? "warn"
+        : severity === "info" || severity === "warn" || severity === "error"
+          ? severity
+          : "warn";
 
 const adaptV21Readiness = (r: V21ReadinessPayload): IReadinessReport => {
     const issues = Array.isArray(r.issues) ? r.issues : (r.missing ?? []);
