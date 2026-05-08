@@ -275,6 +275,21 @@ class SearchAgent(BaseAgent):
         rate_limit=(30, 300),
         allowed_autonomy=("suggest",),
         tools=("fe.searchCandidates", "be.embed", "be.embedding_neighbors"),
+        redactable_text_fields=("query",),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Linear graph (fetch_candidates → rank → polish → emit); "
+                "8 leaves headroom for any future expand-then-rerank loop."
+            ),
+            "rate_limit": (
+                "Highest of any agent: search is type-ahead-style and "
+                "expected to fire repeatedly within a session."
+            ),
+            "allowed_autonomy": (
+                "Read-only rerank: suggest-only, never plan/auto."
+            ),
+        },
     )
 
     def build(

@@ -86,6 +86,17 @@ class AgentMetadata:
     rate_limit: tuple[int, int] = DEFAULT_LIMIT
     allowed_autonomy: tuple[AutonomyLevel, ...] = ("suggest", "plan")
     tools: tuple[str, ...] = field(default_factory=tuple)
+    # Declarative redaction contract (PRD §5A.10). Routers walk these
+    # tuples to redact user-supplied input uniformly instead of keeping
+    # per-route field tuples in the HTTP layer.  ``redactable_text_fields``
+    # are top-level string keys; ``redactable_dict_fields`` are nested
+    # objects whose strings should be recursively redacted.
+    redactable_text_fields: tuple[str, ...] = field(default_factory=tuple)
+    redactable_dict_fields: tuple[str, ...] = field(default_factory=tuple)
+    # ``rationale`` is a free-form ``{policy_field: justification}`` map
+    # so a future author reading e.g. ``recursion_limit=15`` can find the
+    # reason inline. Not enforced at runtime; renders in agent docs.
+    rationale: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not AGENT_NAME_RE.fullmatch(self.name):

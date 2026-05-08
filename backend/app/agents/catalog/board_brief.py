@@ -249,6 +249,20 @@ class BoardBriefAgent(BaseAgent):
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
         tools=("fe.boardSnapshot", "be.detect_drift", "be.summarize"),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Single-pass graph (fetch → detect → generate → emit); "
+                "6 is comfortably above the 4 supersteps needed."
+            ),
+            "rate_limit": (
+                "Briefs are dashboard refreshes, not interactive; 10/min "
+                "matches a one-per-six-second polling ceiling."
+            ),
+            "allowed_autonomy": (
+                "Read-only summary surface; suggest-only by policy."
+            ),
+        },
     )
 
     def build(

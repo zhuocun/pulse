@@ -84,6 +84,19 @@ class ChatAgent(BaseAgent):
             "listTasks",
             "getTask",
         ),
+        rationale={
+            "recursion_limit": (
+                "Multi-turn FE tool loops can take ~5 round-trips; 15 keeps "
+                "headroom for follow-up questions in a single user turn."
+            ),
+            "rate_limit": (
+                "Interactive UX. 20/min mirrors the chat input throttle."
+            ),
+            "allowed_autonomy": (
+                "All three levels supported: chat is the primary surface "
+                "for autonomy-aware command suggestions."
+            ),
+        },
     )
 
     def build(

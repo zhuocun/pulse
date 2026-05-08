@@ -231,6 +231,20 @@ class TriageAgent(BaseAgent):
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
         tools=("fe.boardSnapshot", "be.detect_drift"),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Three-node linear graph (fetch → detect → generate); "
+                "6 mirrors board-brief's structurally identical pattern."
+            ),
+            "rate_limit": (
+                "Triage is dashboard-refresh-paced like board-brief; "
+                "10/min keeps idle pollers cheap."
+            ),
+            "allowed_autonomy": (
+                "Nudges are advisory; suggest-only by policy."
+            ),
+        },
     )
 
     def build(

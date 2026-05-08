@@ -136,6 +136,22 @@ class TaskDraftingAgent(BaseAgent):
         rate_limit=(10, 100),
         allowed_autonomy=("suggest", "plan"),
         tools=("fe.boardSnapshot", "fe.similarTasks"),
+        redactable_text_fields=("prompt",),
+        redactable_dict_fields=("context", "task_draft"),
+        rationale={
+            "recursion_limit": (
+                "fetch_snapshot → fetch_similar → polish covers ~4 supersteps; "
+                "12 leaves headroom for breakdown variants."
+            ),
+            "rate_limit": (
+                "Drafts are slow user actions; 10/min matches the typical "
+                "board edit rhythm."
+            ),
+            "allowed_autonomy": (
+                "Plan mode supports drafts that auto-apply once accepted; "
+                "auto is reserved for read-only loops."
+            ),
+        },
     )
 
     def build(

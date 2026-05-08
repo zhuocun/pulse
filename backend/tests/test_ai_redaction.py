@@ -192,6 +192,58 @@ def test_polish_readiness_stub_model_returns_deterministic() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Metadata-driven redaction in the v2.1 router
+# ---------------------------------------------------------------------------
+
+
+def test_redact_inputs_consults_metadata_text_fields() -> None:
+    """``_redact_inputs`` redacts agent-declared ``redactable_text_fields``
+    in addition to the built-in ``prompt`` slot."""
+
+    from app.agents.base import AgentMetadata
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    metadata = AgentMetadata(
+        name="x", redactable_text_fields=("query",)
+    )
+    out = _redact_inputs(
+        {"query": "search alice@example.com"}, _RequestStub(), metadata
+    )
+    assert "alice@example.com" not in out["query"]
+    assert "[EMAIL]" in out["query"]
+
+
+def test_redact_inputs_consults_metadata_dict_fields() -> None:
+    """Nested objects declared on ``redactable_dict_fields`` are recursively
+    redacted via ``redact_dict``."""
+
+    from app.agents.base import AgentMetadata
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    metadata = AgentMetadata(
+        name="x", redactable_dict_fields=("task_draft",)
+    )
+    out = _redact_inputs(
+        {"task_draft": {"taskName": "Email bob@corp.com"}},
+        _RequestStub(),
+        metadata,
+    )
+    assert "bob@corp.com" not in out["task_draft"]["taskName"]
+
+
+# ---------------------------------------------------------------------------
 # Integration: polish_search must not forward PII from candidate text
 # ---------------------------------------------------------------------------
 

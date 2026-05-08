@@ -229,6 +229,21 @@ class TaskEstimationAgent(BaseAgent):
         rate_limit=(20, 200),
         allowed_autonomy=("suggest", "plan"),
         tools=("fe.similarTasks", "be.embed", "be.embedding_neighbors"),
+        redactable_dict_fields=("task_draft", "context"),
+        rationale={
+            "recursion_limit": (
+                "Linear graph (fetch → embed → estimate → readiness → emit); "
+                "8 covers all five nodes with retry headroom."
+            ),
+            "rate_limit": (
+                "Cheap per call (one polish pass each for rationale + readiness); "
+                "20/min mirrors chat tier."
+            ),
+            "allowed_autonomy": (
+                "Plan mode supports auto-applied estimates after accept; "
+                "auto disallowed since estimates feed budget gates."
+            ),
+        },
     )
 
     def build(
