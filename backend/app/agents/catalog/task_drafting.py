@@ -25,6 +25,11 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._schemas import (
+    DRAFT_RATIONALE_MAX,
+    NOTE_MAX,
+    TASKNAME_MAX,
+)
 from app.agents.catalog._shared import (
     emit_usage,
     fetch_similar_node,
@@ -49,9 +54,9 @@ class DraftPolish(BaseModel):
     clamps points to Fibonacci, so an LLM rewrite there is wasted tokens.
     """
 
-    taskName: str = Field(default="", max_length=80)
-    note: str = Field(default="", max_length=500)
-    rationale: str = Field(default="", max_length=180)
+    taskName: str = Field(default="", max_length=TASKNAME_MAX)
+    note: str = Field(default="", max_length=NOTE_MAX)
+    rationale: str = Field(default="", max_length=DRAFT_RATIONALE_MAX)
 
 
 def _draft_from_prompt(prompt: str) -> dict[str, Any]:
@@ -131,6 +136,22 @@ class TaskDraftingAgent(BaseAgent):
         rate_limit=(10, 100),
         allowed_autonomy=("suggest", "plan"),
         tools=("fe.boardSnapshot", "fe.similarTasks"),
+        redactable_text_fields=("prompt",),
+        redactable_dict_fields=("context", "task_draft"),
+        rationale={
+            "recursion_limit": (
+                "fetch_snapshot → fetch_similar → polish covers ~4 supersteps; "
+                "12 leaves headroom for breakdown variants."
+            ),
+            "rate_limit": (
+                "Drafts are slow user actions; 10/min matches the typical "
+                "board edit rhythm."
+            ),
+            "allowed_autonomy": (
+                "Plan mode supports drafts that auto-apply once accepted; "
+                "auto is reserved for read-only loops."
+            ),
+        },
     )
 
     def build(

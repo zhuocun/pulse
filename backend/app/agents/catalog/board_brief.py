@@ -24,8 +24,10 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._schemas import HEADLINE_MAX
 from app.agents.catalog._shared import (
     build_citation_refs,
+    cap_polished_text,
     detect_drift_node,
     emit_usage,
     fetch_snapshot_node,
@@ -186,7 +188,7 @@ class BriefHeadline(BaseModel):
 
     headline: str = Field(
         default="",
-        max_length=120,
+        max_length=HEADLINE_MAX,
         description=(
             "Single-line, <=120-character standup headline for the board, "
             "grounded only in the provided facts."
@@ -221,10 +223,9 @@ async def polish_headline(
     )
 
     def _merge(parsed: BriefHeadline) -> str:
-        text = (parsed.headline or "").strip()
-        if not text:
-            return deterministic
-        return text.splitlines()[0][:120]
+        return cap_polished_text(
+            parsed.headline, max_chars=HEADLINE_MAX, fallback=deterministic
+        )
 
     return await structured_llm_call(
         model,
@@ -248,6 +249,20 @@ class BoardBriefAgent(BaseAgent):
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
         tools=("fe.boardSnapshot", "be.detect_drift", "be.summarize"),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Single-pass graph (fetch → detect → generate → emit); "
+                "6 is comfortably above the 4 supersteps needed."
+            ),
+            "rate_limit": (
+                "Briefs are dashboard refreshes, not interactive; 10/min "
+                "matches a one-per-six-second polling ceiling."
+            ),
+            "allowed_autonomy": (
+                "Read-only summary surface; suggest-only by policy."
+            ),
+        },
     )
 
     def build(

@@ -339,25 +339,29 @@ def _require_project_manager(project_id: Optional[str], user_id: str) -> None:
 
 
 def _enforce_status(metadata: AgentMetadata, response_headers: dict[str, str]) -> None:
-    """Block ``shadow`` agents and stamp ``Sunset`` on ``deprecated`` agents.
+    """Stamp ``Sunset`` / ``Deprecation`` headers on ``deprecated`` agents.
 
-    Shadow agents are reserved for offline comparison runs and must not be
-    callable from the public surface; deprecated agents stay reachable but
-    emit RFC 8594 ``Sunset`` / ``Deprecation`` headers so clients can
-    react.
+    Shadow-status enforcement lives in :class:`AgentRegistry` so internal
+    callers and HTTP callers see the same hidden surface.  This helper
+    only needs to handle the deprecation header today.
     """
 
-    if metadata.status == "shadow":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": f"Agent '{metadata.name}' not found"},
-        )
     if metadata.status == "deprecated":
         response_headers["Deprecation"] = "true"
 
 
-def _redact_inputs(inputs: dict[str, Any], request: Request) -> dict[str, Any]:
+def _redact_inputs(
+    inputs: dict[str, Any],
+    request: Request,
+    metadata: Optional[AgentMetadata] = None,
+) -> dict[str, Any]:
     """Apply redaction to user-supplied text in ``inputs`` (PRD §5A.10).
+
+    Built-in handling covers ``prompt`` (string) and ``messages``
+    (per-user-message ``content``).  Additional fields declared on
+    ``metadata.redactable_text_fields`` / ``redactable_dict_fields`` are
+    redacted opportunistically when present, so an agent author scopes
+    redaction by editing the agent class instead of editing the router.
 
     Spans are stashed on ``request.state.redaction_spans`` so a future
     ``GET /api/v1/agents/{name}/spans`` (the "What is shared?" panel) can
@@ -367,11 +371,15 @@ def _redact_inputs(inputs: dict[str, Any], request: Request) -> dict[str, Any]:
     spans: list[Any] = []
     redacted = dict(inputs)
 
-    prompt = redacted.get("prompt")
-    if isinstance(prompt, str):
-        replaced, prompt_spans = redact(prompt)
-        redacted["prompt"] = replaced
-        spans.extend(prompt_spans)
+    text_fields: set[str] = {"prompt"}
+    if metadata is not None:
+        text_fields.update(metadata.redactable_text_fields)
+    for field_name in text_fields:
+        value = redacted.get(field_name)
+        if isinstance(value, str):
+            replaced, field_spans = redact(value)
+            redacted[field_name] = replaced
+            spans.extend(field_spans)
 
     messages = redacted.get("messages")
     if isinstance(messages, list):
@@ -388,6 +396,11 @@ def _redact_inputs(inputs: dict[str, Any], request: Request) -> dict[str, Any]:
             else:
                 new_messages.append(message)
         redacted["messages"] = new_messages
+
+    if metadata is not None:
+        for field_name in metadata.redactable_dict_fields:
+            if field_name in redacted and redacted[field_name] is not None:
+                redacted[field_name] = redact_dict(redacted[field_name])
 
     request.state.redaction_spans = spans
     return redacted
@@ -441,7 +454,9 @@ def _record_real_usage(
 
 
 def _resolve_resume_and_inputs(
-    payload: Mapping[str, Any], request: Request
+    payload: Mapping[str, Any],
+    request: Request,
+    metadata: Optional[AgentMetadata] = None,
 ) -> tuple[dict[str, Any], Any, bool]:
     """Build ``(inputs, resume, resuming)`` from a request body.
 
@@ -449,6 +464,9 @@ def _resolve_resume_and_inputs(
     the ``resume`` payload to forward (or ``None``). ``resuming`` is
     ``True`` when the request opted into the resume branch -- callers use
     that flag to decide whether to skip input parsing.
+
+    ``metadata`` is forwarded to :func:`_redact_inputs` so agent-declared
+    ``redactable_*_fields`` are honoured.
     """
 
     raw_resume = _request_command(payload)
@@ -465,7 +483,7 @@ def _resolve_resume_and_inputs(
         request.state.redaction_spans = []
         return {}, _redact_resume(raw_resume), True
 
-    return _redact_inputs(inputs, request), None, False
+    return _redact_inputs(inputs, request, metadata), None, False
 
 
 def _input_token_estimate(inputs: Mapping[str, Any]) -> int:
@@ -495,10 +513,7 @@ def list_agents(
     """List active and deprecated agents; ``shadow`` agents are hidden."""
 
     current_user_id(auth_payload)
-    visible = [
-        meta.as_dict() for meta in runtime.list_metadata() if meta.status != "shadow"
-    ]
-    return {"agents": visible}
+    return {"agents": [meta.as_dict() for meta in runtime.list_metadata()]}
 
 
 @router.get("/_tools", status_code=status.HTTP_200_OK)
@@ -534,13 +549,7 @@ def get_agent(
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> Dict[str, Any]:
     current_user_id(auth_payload)
-    metadata = runtime.get(name).metadata
-    if metadata.status == "shadow":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": f"Agent '{metadata.name}' not found"},
-        )
-    return metadata.as_dict()
+    return runtime.get(name).metadata.as_dict()
 
 
 def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> None:
@@ -593,7 +602,9 @@ async def invoke_agent(
         _enforce_status(metadata, response_headers)
         autonomy = _resolve_autonomy(payload, metadata)
 
-        inputs, resume, resuming = _resolve_resume_and_inputs(payload, request)
+        inputs, resume, resuming = _resolve_resume_and_inputs(
+            payload, request, metadata
+        )
         project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
         if resuming and project_id is None:
             project_id = (
@@ -693,7 +704,9 @@ async def stream_agent(
     _enforce_status(metadata, response_headers)
     autonomy = _resolve_autonomy(payload, metadata)
 
-    inputs, resume, resuming = _resolve_resume_and_inputs(payload, request)
+    inputs, resume, resuming = _resolve_resume_and_inputs(
+        payload, request, metadata
+    )
     project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
     if resuming and project_id is None:
         project_id = (

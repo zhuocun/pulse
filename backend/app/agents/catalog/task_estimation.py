@@ -24,10 +24,17 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._schemas import (
+    ESTIMATION_RATIONALE_MAX,
+    READINESS_FIELD_MAX,
+    READINESS_MESSAGE_MAX,
+)
 from app.agents.catalog._shared import (
+    cap_polished_text,
     emit_citation_refs,
     emit_usage,
     fetch_similar_node,
+    merge_keyed_string_updates,
     structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
@@ -46,7 +53,7 @@ class EstimationRationale(BaseModel):
 
     rationale: str = Field(
         default="",
-        max_length=180,
+        max_length=ESTIMATION_RATIONALE_MAX,
         description=(
             "Single-line, <=180-character rationale for the story-point "
             "estimate. Factual tone; do not propose a different point value."
@@ -57,9 +64,9 @@ class EstimationRationale(BaseModel):
 class ReadinessIssuePolish(BaseModel):
     """One polished readiness issue. ``field`` keys back to the deterministic row."""
 
-    field: str = Field(default="", max_length=40)
-    message: str = Field(default="", max_length=160)
-    suggestion: str = Field(default="", max_length=160)
+    field: str = Field(default="", max_length=READINESS_FIELD_MAX)
+    message: str = Field(default="", max_length=READINESS_MESSAGE_MAX)
+    suggestion: str = Field(default="", max_length=READINESS_MESSAGE_MAX)
 
 
 class ReadinessPolish(BaseModel):
@@ -103,21 +110,16 @@ async def polish_readiness(
     )
 
     def _merge(parsed: ReadinessPolish) -> dict[str, Any]:
-        polished_by_field: dict[str, ReadinessIssuePolish] = {
-            item.field: item for item in parsed.issues if item.field
-        }
-        merged_issues: list[dict[str, Any]] = []
-        for issue in issues:
-            merged = dict(issue)
-            update = polished_by_field.get(issue.get("field"))
-            if update is not None:
-                for key in ("message", "suggestion"):
-                    polished = (getattr(update, key).splitlines() or [""])[0].strip()
-                    # Blank polish keeps the deterministic copy: a model
-                    # that returns ``""`` cannot wipe out a useful suggestion.
-                    if polished:
-                        merged[key] = polished[:160]
-            merged_issues.append(merged)
+        merged_issues = merge_keyed_string_updates(
+            parsed.issues,
+            issues,
+            key_from_parsed=lambda item: item.field,
+            key_from_deterministic=lambda issue, _idx: issue.get("field"),
+            string_fields={
+                "message": READINESS_MESSAGE_MAX,
+                "suggestion": READINESS_MESSAGE_MAX,
+            },
+        )
         return {**deterministic, "issues": merged_issues}
 
     return await structured_llm_call(
@@ -150,10 +152,11 @@ async def polish_rationale(
     )
 
     def _merge(parsed: EstimationRationale) -> str:
-        text = (parsed.rationale or "").strip()
-        if not text:
-            return deterministic
-        return text.splitlines()[0][:180]
+        return cap_polished_text(
+            parsed.rationale,
+            max_chars=ESTIMATION_RATIONALE_MAX,
+            fallback=deterministic,
+        )
 
     return await structured_llm_call(
         model,
@@ -226,6 +229,21 @@ class TaskEstimationAgent(BaseAgent):
         rate_limit=(20, 200),
         allowed_autonomy=("suggest", "plan"),
         tools=("fe.similarTasks", "be.embed", "be.embedding_neighbors"),
+        redactable_dict_fields=("task_draft", "context"),
+        rationale={
+            "recursion_limit": (
+                "Linear graph (fetch → embed → estimate → readiness → emit); "
+                "8 covers all five nodes with retry headroom."
+            ),
+            "rate_limit": (
+                "Cheap per call (one polish pass each for rationale + readiness); "
+                "20/min mirrors chat tier."
+            ),
+            "allowed_autonomy": (
+                "Plan mode supports auto-applied estimates after accept; "
+                "auto disallowed since estimates feed budget gates."
+            ),
+        },
     )
 
     def build(

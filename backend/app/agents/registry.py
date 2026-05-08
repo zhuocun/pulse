@@ -45,20 +45,39 @@ class AgentRegistry:
                 raise AgentNotFoundError(name)
             del self._agents[name]
 
-    def get(self, name: str) -> BaseAgent:
+    def get(self, name: str, *, include_shadow: bool = False) -> BaseAgent:
+        """Look up an agent by name.
+
+        ``shadow``-status agents are hidden by default so the policy lives
+        in one place.  Internal callers (e.g. offline comparison runs) can
+        opt in via ``include_shadow=True``.
+        """
+
         with self._lock:
             try:
-                return self._agents[name]
+                agent = self._agents[name]
             except KeyError as exc:
                 raise AgentNotFoundError(name) from exc
+        if not include_shadow and agent.metadata.status == "shadow":
+            raise AgentNotFoundError(name)
+        return agent
 
-    def names(self) -> list[str]:
+    def names(self, *, include_shadow: bool = False) -> list[str]:
         with self._lock:
-            return sorted(self._agents)
+            items = [
+                name
+                for name, agent in self._agents.items()
+                if include_shadow or agent.metadata.status != "shadow"
+            ]
+        return sorted(items)
 
-    def metadata(self) -> list[AgentMetadata]:
+    def metadata(self, *, include_shadow: bool = False) -> list[AgentMetadata]:
         with self._lock:
-            return [self._agents[name].metadata for name in sorted(self._agents)]
+            return [
+                self._agents[name].metadata
+                for name in sorted(self._agents)
+                if include_shadow or self._agents[name].metadata.status != "shadow"
+            ]
 
     def clear(self) -> None:
         with self._lock:

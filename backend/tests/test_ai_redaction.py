@@ -192,6 +192,123 @@ def test_polish_readiness_stub_model_returns_deterministic() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Metadata-driven redaction in the v2.1 router
+# ---------------------------------------------------------------------------
+
+
+def test_redact_inputs_consults_metadata_text_fields() -> None:
+    """``_redact_inputs`` redacts agent-declared ``redactable_text_fields``
+    in addition to the built-in ``prompt`` slot."""
+
+    from app.agents.base import AgentMetadata
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    metadata = AgentMetadata(
+        name="x", redactable_text_fields=("query",)
+    )
+    out = _redact_inputs(
+        {"query": "search alice@example.com"}, _RequestStub(), metadata
+    )
+    assert "alice@example.com" not in out["query"]
+    assert "[EMAIL]" in out["query"]
+
+
+def test_redact_inputs_consults_metadata_dict_fields() -> None:
+    """Nested objects declared on ``redactable_dict_fields`` are recursively
+    redacted via ``redact_dict``."""
+
+    from app.agents.base import AgentMetadata
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    metadata = AgentMetadata(
+        name="x", redactable_dict_fields=("task_draft",)
+    )
+    out = _redact_inputs(
+        {"task_draft": {"taskName": "Email bob@corp.com"}},
+        _RequestStub(),
+        metadata,
+    )
+    assert "bob@corp.com" not in out["task_draft"]["taskName"]
+
+
+# ---------------------------------------------------------------------------
+# Integration: polish_search must not forward PII from candidate text
+# ---------------------------------------------------------------------------
+
+
+class _SearchCapturingModel:
+    """Capturing chat model for the SearchRanking schema."""
+
+    def __init__(self) -> None:
+        self.received_prompts: list[str] = []
+
+    def with_structured_output(self, schema: Any, *, include_raw: bool = False) -> Any:
+        from app.agents.catalog.search import SearchRanking
+
+        model_self = self
+
+        class _Runnable:
+            def _build_response(self, messages: Any) -> dict[str, Any]:
+                for msg in messages:
+                    if isinstance(msg, HumanMessage):
+                        model_self.received_prompts.append(msg.content)
+                # Return one of the candidate ids so _merge runs the
+                # rationale-trimming branch (not the deterministic
+                # fallback).  Tests below pass id="t1".
+                parsed = SearchRanking(
+                    ids=["t1"], rationale="match by name", expanded_terms=[]
+                )
+                return {"raw": None, "parsed": parsed, "parsing_error": None}
+
+            def invoke(self, messages: Any, **_: Any) -> dict[str, Any]:
+                return self._build_response(messages)
+
+            async def ainvoke(self, messages: Any, **_: Any) -> dict[str, Any]:
+                return self._build_response(messages)
+
+        return _Runnable()
+
+
+def test_polish_search_redacts_candidate_text_before_provider() -> None:
+    """Candidate ``text`` (task / project names) must be redacted before
+    reaching the LLM.  The id-allowlist still uses the original ids."""
+
+    from app.agents.catalog.search import polish_search
+
+    model = _SearchCapturingModel()
+    deterministic: dict[str, Any] = {
+        "ids": ["t1"],
+        "rationale": "deterministic",
+        "matches": [{"id": "t1", "strength": "moderate"}],
+    }
+    candidates = [
+        {"id": "t1", "text": "Email alice@example.com about onboarding"},
+        {"id": "t2", "text": "SSN 555-12-9999 review"},
+    ]
+
+    asyncio.run(polish_search(model, deterministic, "find user@secret.org", candidates))  # type: ignore[arg-type]
+
+    assert model.received_prompts, "model was not called"
+    prompt_text = "\n".join(model.received_prompts)
+    assert "alice@example.com" not in prompt_text
+    assert "555-12-9999" not in prompt_text
+    assert "user@secret.org" not in prompt_text
+    assert "[EMAIL]" in prompt_text
+
+
+# ---------------------------------------------------------------------------
 # New SECRET pattern coverage tests
 # ---------------------------------------------------------------------------
 

@@ -40,13 +40,24 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.catalog._shared import emit_usage, structured_llm_call
+from app.agents.catalog._schemas import (
+    EXPANDED_TERMS_MAX,
+    SEARCH_IDS_MAX,
+    SEARCH_RATIONALE_MAX,
+)
+from app.agents.catalog._shared import (
+    cap_polished_text,
+    emit_usage,
+    filter_to_allowed_ids,
+    structured_llm_call,
+)
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import SearchState
 from app.agents.stream import emit_custom
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact, redact_dict
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +78,7 @@ class SearchRanking(BaseModel):
 
     ids: list[str] = Field(
         default_factory=list,
-        max_length=10,
+        max_length=SEARCH_IDS_MAX,
         description=(
             "Ranked task or project ids, most relevant first. Subset of "
             "the candidate list; never invent ids."
@@ -75,7 +86,7 @@ class SearchRanking(BaseModel):
     )
     rationale: str = Field(
         default="",
-        max_length=240,
+        max_length=SEARCH_RATIONALE_MAX,
         description=(
             "Single-line, <=240-character explanation naming the ranking "
             "factors that drove the order."
@@ -83,6 +94,7 @@ class SearchRanking(BaseModel):
     )
     expanded_terms: list[str] = Field(
         default_factory=list,
+        max_length=EXPANDED_TERMS_MAX,
         description=(
             "Query expansion terms: synonyms or related keywords the model "
             "used to broaden the search. Leave empty if none were needed."
@@ -163,6 +175,11 @@ async def polish_search(
     # to score; the LLM has no useful work and would hallucinate ids.
     if not candidates:
         return deterministic, 0, 0
+    # Redact PII before sending candidate ``text`` (task names, project
+    # names) to the provider.  The id-allowlist below uses the unredacted
+    # ids from ``candidates`` so the FE round-trip still works.
+    safe_candidates = redact_dict(candidates[:30])
+    safe_query = redact(query)[0] if isinstance(query, str) else query
     prompt = (
         "You are re-ranking search results for a Jira-style project tool. "
         "Pick up to 10 of the candidate ids that best match the query, "
@@ -170,8 +187,8 @@ async def polish_search(
         "candidate list; never invent new ids. Return JSON matching the "
         "schema, including a single-line rationale (<=240 chars) naming "
         "the ranking factors.\n\n"
-        f"Query: {query}\n"
-        f"Candidates: {json.dumps(candidates[:30])}"
+        f"Query: {safe_query}\n"
+        f"Candidates: {json.dumps(safe_candidates)}"
     )
 
     candidate_ids = {
@@ -181,17 +198,16 @@ async def polish_search(
     }
 
     def _merge(parsed: SearchRanking) -> dict[str, Any]:
-        polished_ids = [
-            i for i in parsed.ids if isinstance(i, str) and i in candidate_ids
-        ]
+        polished_ids = filter_to_allowed_ids(parsed.ids, candidate_ids)
         if not polished_ids:
             # The model returned only hallucinated ids (or an empty list);
             # the deterministic ranking is still our best signal.
             return deterministic
-        rationale_lines = (parsed.rationale or "").strip().splitlines()
-        rationale = (rationale_lines[0] if rationale_lines else "")[:240]
-        if not rationale:
-            rationale = deterministic.get("rationale", "")
+        rationale = cap_polished_text(
+            parsed.rationale,
+            max_chars=SEARCH_RATIONALE_MAX,
+            fallback=deterministic.get("rationale", ""),
+        )
         # Recompute matches for the new id order so strength still corresponds
         # 1:1 with each id.  Prefer the original cosine scores threaded through
         # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
@@ -206,10 +222,10 @@ async def polish_search(
                 for m in (deterministic.get("matches") or [])
                 if isinstance(m, dict)
             }
-        polished_matches = _build_matches(polished_ids[:10], score_map)
+        polished_matches = _build_matches(polished_ids[:SEARCH_IDS_MAX], score_map)
         polished: dict[str, Any] = {
             **deterministic,
-            "ids": polished_ids[:10],
+            "ids": polished_ids[:SEARCH_IDS_MAX],
             "rationale": rationale,
             "matches": polished_matches,
         }
@@ -259,6 +275,21 @@ class SearchAgent(BaseAgent):
         rate_limit=(30, 300),
         allowed_autonomy=("suggest",),
         tools=("fe.searchCandidates", "be.embed", "be.embedding_neighbors"),
+        redactable_text_fields=("query",),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Linear graph (fetch_candidates → rank → polish → emit); "
+                "8 leaves headroom for any future expand-then-rerank loop."
+            ),
+            "rate_limit": (
+                "Highest of any agent: search is type-ahead-style and "
+                "expected to fire repeatedly within a session."
+            ),
+            "allowed_autonomy": (
+                "Read-only rerank: suggest-only, never plan/auto."
+            ),
+        },
     )
 
     def build(

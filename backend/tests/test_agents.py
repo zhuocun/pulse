@@ -435,6 +435,86 @@ def test_registry_get_missing_raises(fresh_registry: AgentRegistry) -> None:
         fresh_registry.get("nope")
 
 
+class _ShadowEchoAgent(BaseAgent):
+    metadata = AgentMetadata(name="shadow-echo", status="shadow")
+
+    def build(self, *, checkpointer, store):  # type: ignore[no-untyped-def]
+        from langgraph.graph import END, START, StateGraph
+
+        from app.agents.state import AgentState
+
+        graph = StateGraph(AgentState)
+        graph.add_node("noop", lambda state: {"messages": []})
+        graph.add_edge(START, "noop")
+        graph.add_edge("noop", END)
+        return graph.compile(checkpointer=checkpointer, store=store)
+
+
+def test_set_chat_model_after_compile_logs_rebuild_warning(
+    caplog: Any,
+) -> None:
+    """A test that injects a model AFTER first compile gets a debug log
+    so the misuse is greppable."""
+
+    import logging
+
+    agent = EchoAgent()
+    agent.compile()
+    with caplog.at_level(logging.DEBUG, logger="app.agents.base"):
+        agent.set_chat_model(object())
+    assert any(
+        "set_chat_model called on 'echo' after compile()" in r.message
+        for r in caplog.records
+    )
+
+
+def test_set_chat_model_before_compile_is_silent(caplog: Any) -> None:
+    """No warning when called before any compile (the canonical pattern)."""
+
+    import logging
+
+    agent = EchoAgent()
+    with caplog.at_level(logging.DEBUG, logger="app.agents.base"):
+        agent.set_chat_model(object())
+    assert not any(
+        "set_chat_model called on 'echo' after compile()" in r.message
+        for r in caplog.records
+    )
+
+
+def test_registry_get_shadow_default_404s(fresh_registry: AgentRegistry) -> None:
+    """``get(name)`` hides shadow agents so direct registry callers see the
+    same surface as the public router (the policy lives in the registry)."""
+
+    fresh_registry.register(_ShadowEchoAgent())
+    with pytest.raises(AgentNotFoundError):
+        fresh_registry.get("shadow-echo")
+
+
+def test_registry_get_shadow_opt_in_returns(fresh_registry: AgentRegistry) -> None:
+    """``include_shadow=True`` lets internal callers reach shadow agents."""
+
+    agent = _ShadowEchoAgent()
+    fresh_registry.register(agent)
+    assert fresh_registry.get("shadow-echo", include_shadow=True) is agent
+
+
+def test_registry_names_metadata_filter_shadow(
+    fresh_registry: AgentRegistry,
+) -> None:
+    fresh_registry.register(EchoAgent())
+    fresh_registry.register(_ShadowEchoAgent())
+    assert fresh_registry.names() == ["echo"]
+    assert [m.name for m in fresh_registry.metadata()] == ["echo"]
+    assert sorted(fresh_registry.names(include_shadow=True)) == [
+        "echo",
+        "shadow-echo",
+    ]
+    assert sorted(
+        m.name for m in fresh_registry.metadata(include_shadow=True)
+    ) == ["echo", "shadow-echo"]
+
+
 def test_build_checkpointer_modes() -> None:
     assert build_checkpointer("none") is None
     assert build_checkpointer("") is None
@@ -1251,6 +1331,107 @@ def test_agent_runtime_astream_swallows_aggregation_errors(
     # set_token_usage must NOT have been called because aggregation raised
     # and we suppressed the exception rather than failing the stream.
     assert captured == []
+
+
+def test_agent_runtime_astream_records_token_usage_on_translated_failure(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Token aggregation must run on the translated-exception branches too,
+    so cancelled / errored streams do not silently zero the budget tracker."""
+
+    import app.agents.runtime as runtime_mod
+
+    captured: list[tuple[int, int]] = []
+
+    class _CapturingSpan:
+        def __enter__(self) -> "_CapturingSpan":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            captured.append((tokens_in, tokens_out))
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: _CapturingSpan()  # type: ignore[assignment]
+
+    try:
+        fresh_registry.register(BoomAgent())
+        runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+        async def collect() -> None:
+            async for _ in runtime.astream("boom", {"text": "x"}):
+                pass
+
+        with pytest.raises(AgentExecutionError):
+            asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+
+    # Aggregation ran (set_token_usage was called) even though the run
+    # raised an exception.  Counts are 0 because BoomAgent never wrote
+    # any AIMessage with usage metadata, but the call itself proves the
+    # failure-path aggregation branch executed.
+    assert captured == [(0, 0)]
+
+
+def test_agent_runtime_astream_failure_aggregation_does_not_mask_original(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """If the failure-path aggregation itself raises, the original
+    translated exception must still propagate (best-effort cleanup)."""
+
+    import app.agents.runtime as runtime_mod
+
+    class _Span:
+        def __enter__(self) -> "_Span":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            pass
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: _Span()  # type: ignore[assignment]
+
+    fresh_registry.register(BoomAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    agent = fresh_registry.get("boom")
+    real_acompile = agent.acompile
+
+    class _BoomGraph:
+        def __init__(self, real: Any) -> None:
+            self._real = real
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._real, name)
+
+        async def aget_state(self, *args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("aggregation failed too")
+
+        async def astream(self, *args: Any, **kwargs: Any) -> Any:
+            async for ev in self._real.astream(*args, **kwargs):
+                yield ev
+
+    async def patched_acompile(**kwargs: Any) -> Any:
+        return _BoomGraph(await real_acompile(**kwargs))
+
+    agent.acompile = patched_acompile  # type: ignore[assignment]
+
+    async def collect() -> None:
+        async for _ in runtime.astream("boom", {"text": "x"}):
+            pass
+
+    try:
+        with pytest.raises(AgentExecutionError):
+            asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+        agent.acompile = real_acompile  # type: ignore[assignment]
 
 
 def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(

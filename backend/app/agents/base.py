@@ -19,6 +19,7 @@ needs without a separate wiring layer.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import threading
 from abc import ABC, abstractmethod
@@ -31,6 +32,8 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Command
 
 from app.middleware.rate_limit import DEFAULT_LIMIT
+
+logger = logging.getLogger(__name__)
 
 AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
@@ -83,6 +86,17 @@ class AgentMetadata:
     rate_limit: tuple[int, int] = DEFAULT_LIMIT
     allowed_autonomy: tuple[AutonomyLevel, ...] = ("suggest", "plan")
     tools: tuple[str, ...] = field(default_factory=tuple)
+    # Declarative redaction contract (PRD §5A.10). Routers walk these
+    # tuples to redact user-supplied input uniformly instead of keeping
+    # per-route field tuples in the HTTP layer.  ``redactable_text_fields``
+    # are top-level string keys; ``redactable_dict_fields`` are nested
+    # objects whose strings should be recursively redacted.
+    redactable_text_fields: tuple[str, ...] = field(default_factory=tuple)
+    redactable_dict_fields: tuple[str, ...] = field(default_factory=tuple)
+    # ``rationale`` is a free-form ``{policy_field: justification}`` map
+    # so a future author reading e.g. ``recursion_limit=15`` can find the
+    # reason inline. Not enforced at runtime; renders in agent docs.
+    rationale: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not AGENT_NAME_RE.fullmatch(self.name):
@@ -211,7 +225,16 @@ class BaseAgent(ABC):
         return self._chat_model
 
     def set_chat_model(self, model: Any) -> None:
-        """Inject a chat model (used by the runtime / tests)."""
+        """Inject a chat model (used by the runtime / tests).
+
+        When called after ``compile()`` the cached graph is invalidated so
+        the next compile binds the new model.  In-flight invocations
+        continue with the previously-bound model: LangGraph's compiled
+        graph closes over the model reference, which is the desired
+        behaviour for live runs but a frequent source of surprise in
+        tests.  A debug log is emitted when the swap forces a rebuild so
+        the misuse is greppable rather than invisible.
+        """
 
         self._chat_model = model
         self._chat_model_resolved = True
@@ -219,6 +242,12 @@ class BaseAgent(ABC):
         # Hold the build lock while clearing so we don't race with a
         # concurrent compile() or acompile() that may be mid-build.
         with self._build_lock:
+            if self._compiled is not None:
+                logger.debug(
+                    "set_chat_model called on %r after compile(); "
+                    "next compile() will rebuild with the new model.",
+                    self.metadata.name,
+                )
             self._compiled = None
             self._compiled_checkpointer = None
             self._compiled_store = None

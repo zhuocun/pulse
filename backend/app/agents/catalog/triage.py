@@ -28,10 +28,12 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
     emit_usage,
     fetch_snapshot_node,
+    merge_keyed_string_updates,
     structured_llm_call,
 )
 from app.agents.registry import registry
@@ -122,10 +124,10 @@ def _nudges_for(drift: dict[str, Any]) -> list[dict[str, Any]]:
 class NudgePolish(BaseModel):
     """One polished nudge row. ``nudge_id`` keys back to the deterministic nudge."""
 
-    nudge_id: str = Field(default="", max_length=80)
+    nudge_id: str = Field(default="", max_length=NUDGE_ID_MAX)
     summary: str = Field(
         default="",
-        max_length=120,
+        max_length=NUDGE_SUMMARY_MAX,
         description=(
             "Single-line, <=120-character refined summary for this nudge. "
             "Include signal-specific details (e.g. column name, count vs. limit). "
@@ -193,23 +195,19 @@ async def polish_triage(
         f"{n.get('type', 'triage')}:{idx}" for idx, n in enumerate(deterministic_nudges)
     }
 
+    def _nudge_key(nudge: dict[str, Any], idx: int) -> str:
+        return f"{nudge.get('type', 'triage')}:{idx}"
+
     def _merge(parsed: TriagePolish) -> list[dict[str, Any]]:
-        polished_by_id: dict[str, NudgePolish] = {
-            item.nudge_id: item
-            for item in parsed.nudges
-            if item.nudge_id and item.nudge_id in valid_ids
-        }
-        merged: list[dict[str, Any]] = []
-        for idx, nudge in enumerate(deterministic_nudges):
-            nudge_id = f"{nudge.get('type', 'triage')}:{idx}"
-            update = polished_by_id.get(nudge_id)
-            merged_nudge = dict(nudge)
-            if update is not None:
-                polished_summary = (update.summary.splitlines() or [""])[0].strip()
-                if polished_summary:
-                    merged_nudge["summary"] = polished_summary[:120]
-            merged.append(merged_nudge)
-        return merged
+        return merge_keyed_string_updates(
+            parsed.nudges,
+            deterministic_nudges,
+            key_from_parsed=lambda item: item.nudge_id
+            if item.nudge_id in valid_ids
+            else None,
+            key_from_deterministic=_nudge_key,
+            string_fields={"summary": NUDGE_SUMMARY_MAX},
+        )
 
     return await structured_llm_call(
         model,
@@ -233,6 +231,20 @@ class TriageAgent(BaseAgent):
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
         tools=("fe.boardSnapshot", "be.detect_drift"),
+        redactable_dict_fields=("context",),
+        rationale={
+            "recursion_limit": (
+                "Three-node linear graph (fetch → detect → generate); "
+                "6 mirrors board-brief's structurally identical pattern."
+            ),
+            "rate_limit": (
+                "Triage is dashboard-refresh-paced like board-brief; "
+                "10/min keeps idle pollers cheap."
+            ),
+            "allowed_autonomy": (
+                "Nudges are advisory; suggest-only by policy."
+            ),
+        },
     )
 
     def build(
