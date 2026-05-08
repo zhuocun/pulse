@@ -846,6 +846,58 @@ def test_open_store_passes_through_none_backend() -> None:
     assert asyncio.run(run()) is None
 
 
+def test_open_checkpointer_postgres_uses_default_settings_when_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``open_checkpointer("postgres")`` falls back to ``app.config.settings``.
+
+    Mirrors :func:`test_build_checkpointer_postgres_uses_default_settings_when_omitted`
+    but exercises the additional ``settings is None`` fallback inside
+    ``open_checkpointer`` introduced for ``agent_pg_pool_size`` lookup
+    (F-SC1).
+    """
+
+    state = _install_fake_postgres_saver_module(monkeypatch)
+    from app import config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "settings",
+        Settings(agent_postgres_uri="postgres://default-open-fallback"),
+    )
+
+    async def run() -> Any:
+        async with AsyncExitStack() as stack:
+            return await open_checkpointer("postgres", stack=stack)
+
+    saver = asyncio.run(run())
+    assert saver is state["saver"]
+    assert saver.conn_string == "postgres://default-open-fallback"
+
+
+def test_open_store_postgres_uses_default_settings_when_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``open_store("postgres")`` falls back to ``app.config.settings``."""
+
+    state = _install_fake_postgres_store_module(monkeypatch)
+    from app import config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "settings",
+        Settings(agent_postgres_uri="postgres://default-open-fallback"),
+    )
+
+    async def run() -> Any:
+        async with AsyncExitStack() as stack:
+            return await open_store("postgres", stack=stack)
+
+    store = asyncio.run(run())
+    assert store is state["store"]
+    assert store.conn_string == "postgres://default-open-fallback"
+
+
 def test_agent_postgres_uri_prefers_agent_specific_env() -> None:
     cfg = Settings(agent_postgres_uri="A", postgres_uri="B")
     assert _resolve_agent_postgres_uri(cfg, backend_env="postgres") == "A"
