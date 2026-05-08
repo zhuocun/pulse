@@ -283,8 +283,9 @@ describe("useAgent", () => {
                     type: "custom",
                     ns: ["root"],
                     data: {
-                        kind: "nudge",
-                        nudge: {
+                        kind: "suggestion",
+                        surface: "nudge",
+                        payload: {
                             nudge_id: "n1",
                             kind: "load_imbalance",
                             project_id: "p1",
@@ -421,8 +422,9 @@ describe("useAgent", () => {
                         type: "custom",
                         ns: ["root"],
                         data: {
-                            kind: "nudge",
-                            nudge: {
+                            kind: "suggestion",
+                            surface: "nudge",
+                            payload: {
                                 nudge_id: "n1",
                                 kind: "load_imbalance",
                                 project_id: "p1",
@@ -922,8 +924,9 @@ describe("useAgent", () => {
                         type: "custom",
                         ns: ["root"],
                         data: {
-                            kind: "nudge",
-                            nudge: {
+                            kind: "suggestion",
+                            surface: "nudge",
+                            payload: {
                                 nudge_id: "n-keep",
                                 kind: "wip_overflow",
                                 project_id: "p1",
@@ -937,8 +940,9 @@ describe("useAgent", () => {
                         type: "custom",
                         ns: ["root"],
                         data: {
-                            kind: "nudge",
-                            nudge: {
+                            kind: "suggestion",
+                            surface: "nudge",
+                            payload: {
                                 nudge_id: "n-drop",
                                 kind: "stale_task",
                                 project_id: "p1",
@@ -980,8 +984,9 @@ describe("useAgent", () => {
                         type: "custom",
                         ns: ["root"],
                         data: {
-                            kind: "nudge",
-                            nudge: {
+                            kind: "suggestion",
+                            surface: "nudge",
+                            payload: {
                                 nudge_id: "old",
                                 kind: "wip_overflow",
                                 project_id: "p1",
@@ -995,8 +1000,9 @@ describe("useAgent", () => {
                         type: "custom",
                         ns: ["root"],
                         data: {
-                            kind: "nudge",
-                            nudge: {
+                            kind: "suggestion",
+                            surface: "nudge",
+                            payload: {
                                 nudge_id: "new",
                                 kind: "wip_overflow",
                                 project_id: "p1",

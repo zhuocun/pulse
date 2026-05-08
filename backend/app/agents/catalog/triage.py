@@ -293,7 +293,7 @@ class TriageAgent(BaseAgent):
                     "target_ids": target_ids,
                     "severity": fe_severity,
                 }
-                emit_custom({"kind": "nudge", "nudge": fe_nudge})
+                emit_custom({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
             emit_usage(tokens_in, tokens_out)
             return {
                 "nudges": polished_nudges,

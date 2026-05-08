@@ -100,17 +100,28 @@ async def open_store(
 
     For ``"none"`` and ``"memory"`` this is a thin wrapper around
     :func:`build_store`. For ``"postgres"`` it lazy-imports
-    :class:`AsyncPostgresStore`, enters ``from_conn_string`` on the
-    supplied :class:`contextlib.AsyncExitStack`, awaits ``setup()`` once,
+    :class:`AsyncPostgresStore` and :class:`~psycopg_pool.AsyncConnectionPool`,
+    opens a connection pool sized by ``settings.agent_pg_pool_size``, registers
+    the pool for cleanup on the supplied :class:`contextlib.AsyncExitStack`,
     and returns the live store.
+
+    Each call creates its own pool. A future refactor can hoist to a single
+    process-wide pool shared by both the checkpointer and the store.
     """
 
     spec = build_store(backend, settings=settings)
     if not isinstance(spec, PostgresStoreSpec):
         return spec
 
+    if settings is None:
+        from app.config import settings as default_settings
+
+        settings = default_settings
+
     try:
         from langgraph.store.postgres.aio import AsyncPostgresStore
+        from psycopg.rows import dict_row
+        from psycopg_pool import AsyncConnectionPool
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError(
             "langgraph-checkpoint-postgres is not installed; install with "
@@ -118,7 +129,14 @@ async def open_store(
             "AGENT_STORE_BACKEND=memory"
         ) from exc
 
-    cm = AsyncPostgresStore.from_conn_string(spec.conn_string)
-    store = await stack.enter_async_context(cm)
+    pool = AsyncConnectionPool(
+        conninfo=spec.conn_string,
+        min_size=1,
+        max_size=settings.agent_pg_pool_size,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=False,
+    )
+    await stack.enter_async_context(pool)
+    store = AsyncPostgresStore(pool)
     await store.setup()
     return store

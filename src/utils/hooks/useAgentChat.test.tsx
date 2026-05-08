@@ -269,8 +269,9 @@ describe("useAgentChat", () => {
                     type: "custom",
                     ns: ["root"],
                     data: {
-                        kind: "nudge",
-                        nudge: {
+                        kind: "suggestion",
+                        surface: "nudge",
+                        payload: {
                             nudge_id: "n-adapter-1",
                             kind: "load_imbalance" as const,
                             project_id: "p1",
@@ -306,8 +307,9 @@ describe("useAgentChat", () => {
                     type: "custom",
                     ns: ["root"],
                     data: {
-                        kind: "nudge",
-                        nudge: {
+                        kind: "suggestion",
+                        surface: "nudge",
+                        payload: {
                             nudge_id: "n-dismiss-1",
                             kind: "stale_task" as const,
                             project_id: "p1",
@@ -347,8 +349,9 @@ describe("useAgentChat", () => {
                     type: "custom",
                     ns: ["root"],
                     data: {
-                        kind: "nudge",
-                        nudge: {
+                        kind: "suggestion",
+                        surface: "nudge",
+                        payload: {
                             nudge_id: "n-inbox-1",
                             kind: "load_imbalance" as const,
                             project_id: "p1",
@@ -559,8 +562,9 @@ describe("useAgentChat", () => {
                     type: "custom",
                     ns: ["root"],
                     data: {
-                        kind: "nudge",
-                        nudge: {
+                        kind: "suggestion",
+                        surface: "nudge",
+                        payload: {
                             nudge_id: "n-reset-1",
                             kind: "wip_overflow" as const,
                             project_id: "p1",

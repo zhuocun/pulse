@@ -25,6 +25,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, Tuple, runtime_checkable
 
+from fastapi import Request
+
 DEFAULT_LIMIT: tuple[int, int] = (60, 600)
 
 
@@ -147,3 +149,14 @@ def configure_rate_limit_backend(backend: RateLimitBackend) -> None:
 
     global rate_limiter
     rate_limiter = backend
+
+
+def get_rate_limiter(request: Request) -> RateLimitBackend:
+    """FastAPI dependency: returns the per-app rate limiter backend.
+
+    Reads from ``request.app.state.rate_limiter`` so tests can override via
+    ``app.dependency_overrides[get_rate_limiter] = ...``. Falls back to the
+    module-level singleton when state is not populated (e.g. in unit tests
+    that bypass the lifespan).
+    """
+    return getattr(request.app.state, "rate_limiter", rate_limiter)

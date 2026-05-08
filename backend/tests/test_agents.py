@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 from typing import Any, Iterable, Optional
 
 import pytest
@@ -537,23 +537,91 @@ def test_build_store_modes() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Postgres backend (architecture-review F-1).
+# Postgres backend (architecture-review F-1 / F-SC1).
 # ---------------------------------------------------------------------------
+
+
+class _FakeAsyncConnectionPool:
+    """Minimal stand-in for ``psycopg_pool.AsyncConnectionPool``.
+
+    Tracks whether ``open`` / ``close`` were called and exposes the
+    ``conninfo`` so tests can assert the correct URI was threaded through.
+    Supports both the explicit ``await pool.open()`` / ``pool.close()``
+    lifecycle *and* use as an async context manager (enter_async_context).
+    """
+
+    def __init__(self, conninfo: str, **kwargs: Any) -> None:
+        self.conninfo = conninfo
+        self.kwargs = kwargs
+        self.open_calls = 0
+        self.close_calls = 0
+
+    async def open(self) -> None:
+        self.open_calls += 1
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+    async def __aenter__(self) -> "_FakeAsyncConnectionPool":
+        await self.open()
+        return self
+
+    async def __aexit__(self, *_: Any) -> None:
+        await self.close()
 
 
 class _FakeAsyncPostgresHandle:
     """Stand-in for ``AsyncPostgresSaver`` / ``AsyncPostgresStore``.
 
-    Records ``setup`` calls and exposes the ``conn_string`` that
-    ``from_conn_string`` was invoked with so tests can assert on it.
+    Accepts either a pool (new pooled constructor path) or a plain
+    ``conn_string`` string (legacy ``from_conn_string`` path) so that both
+    production code and any backward-compatible tests continue to work.
+
+    Exposes ``conn_string`` derived from the pool's ``conninfo`` so test
+    assertions like ``saver.conn_string == "postgres://..."`` still pass.
     """
 
-    def __init__(self, conn_string: str) -> None:
-        self.conn_string = conn_string
+    def __init__(
+        self, pool_or_conn_string: "Any" = None, *, conn_string: str = ""
+    ) -> None:
+        if isinstance(pool_or_conn_string, str):
+            # Legacy from_conn_string path.
+            self.conn_string = pool_or_conn_string
+            self.pool: Optional[_FakeAsyncConnectionPool] = None
+        elif pool_or_conn_string is not None:
+            # New pooled constructor path: argument is a _FakeAsyncConnectionPool.
+            self.pool = pool_or_conn_string
+            self.conn_string = pool_or_conn_string.conninfo
+        else:
+            self.conn_string = conn_string
+            self.pool = None
         self.setup_calls = 0
 
     async def setup(self) -> None:
         self.setup_calls += 1
+
+
+def _install_fake_psycopg_pool_module(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch ``psycopg_pool`` and ``psycopg.rows`` into ``sys.modules``.
+
+    Called alongside the postgres saver / store module installers so that
+    the lazy ``from psycopg_pool import AsyncConnectionPool`` and
+    ``from psycopg.rows import dict_row`` imports inside
+    ``open_checkpointer`` / ``open_store`` resolve to test doubles rather
+    than raising ``ImportError`` in environments without the real library.
+    """
+
+    fake_pool_module = ModuleType("psycopg_pool")
+    fake_pool_module.AsyncConnectionPool = _FakeAsyncConnectionPool  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "psycopg_pool", fake_pool_module)
+
+    # psycopg.rows.dict_row is imported lazily alongside the pool; stub it out
+    # so tests that lack the real psycopg package don't fail on import.
+    fake_psycopg_module = sys.modules.get("psycopg") or ModuleType("psycopg")
+    fake_psycopg_rows_module = ModuleType("psycopg.rows")
+    fake_psycopg_rows_module.dict_row = None  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "psycopg", fake_psycopg_module)
+    monkeypatch.setitem(sys.modules, "psycopg.rows", fake_psycopg_rows_module)
 
 
 def _install_fake_postgres_saver_module(
@@ -561,48 +629,100 @@ def _install_fake_postgres_saver_module(
 ) -> dict[str, Any]:
     """Wire a fake ``langgraph.checkpoint.postgres.aio`` into ``sys.modules``.
 
+    Also installs the ``psycopg_pool`` / ``psycopg.rows`` fakes so that the
+    pooled constructor path inside ``open_checkpointer`` works without the
+    real optional dependencies.
+
     Returns a dict the test can inspect after ``open_checkpointer`` runs:
     ``{"saver": _FakeAsyncPostgresHandle, "exited": bool}`` — ``exited``
-    flips True when the ``from_conn_string`` async-context manager
-    finalizes (i.e. when the exit stack tears down).
+    flips True when the pool's async context manager finalises (i.e. when
+    the exit stack tears down).
     """
+
+    _install_fake_psycopg_pool_module(monkeypatch)
 
     state: dict[str, Any] = {"saver": None, "exited": False}
 
+    class _FakeSaverCls(_FakeAsyncPostgresHandle):
+        """Callable fake for ``AsyncPostgresSaver(pool)``."""
+
+        def __init__(self, pool_or_conn_string: Any = None) -> None:
+            super().__init__(pool_or_conn_string)
+            state["saver"] = self
+
+    # Keep from_conn_string for backward-compat (no longer called by
+    # production code but preserved so legacy test helpers still compile).
     @asynccontextmanager
     async def from_conn_string(conn_string: str):
-        handle = _FakeAsyncPostgresHandle(conn_string)
-        state["saver"] = handle
+        handle = _FakeSaverCls(conn_string)
         try:
             yield handle
         finally:
             state["exited"] = True
 
-    fake_saver_cls = SimpleNamespace(from_conn_string=from_conn_string)
+    _FakeSaverCls.from_conn_string = staticmethod(from_conn_string)  # type: ignore[attr-defined]
+
     fake_module = ModuleType("langgraph.checkpoint.postgres.aio")
-    fake_module.AsyncPostgresSaver = fake_saver_cls  # type: ignore[attr-defined]
+    fake_module.AsyncPostgresSaver = _FakeSaverCls  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "langgraph.checkpoint.postgres.aio", fake_module)
+
+    # The production code uses enter_async_context(pool) which calls
+    # pool.__aenter__ / __aexit__.  Flip exited when the pool closes.
+    _orig_pool_exit = _FakeAsyncConnectionPool.__aexit__
+
+    async def _patched_pool_exit(self: _FakeAsyncConnectionPool, *args: Any) -> None:
+        await _orig_pool_exit(self, *args)
+        state["exited"] = True
+
+    monkeypatch.setattr(_FakeAsyncConnectionPool, "__aexit__", _patched_pool_exit)
+
     return state
 
 
 def _install_fake_postgres_store_module(
     monkeypatch: pytest.MonkeyPatch,
 ) -> dict[str, Any]:
+    """Wire a fake ``langgraph.store.postgres.aio`` into ``sys.modules``.
+
+    Also installs the ``psycopg_pool`` / ``psycopg.rows`` fakes (idempotent
+    if ``_install_fake_postgres_saver_module`` was already called).
+    """
+
+    _install_fake_psycopg_pool_module(monkeypatch)
+
     state: dict[str, Any] = {"store": None, "exited": False}
 
+    class _FakeStoreCls(_FakeAsyncPostgresHandle):
+        """Callable fake for ``AsyncPostgresStore(pool)``."""
+
+        def __init__(self, pool_or_conn_string: Any = None) -> None:
+            super().__init__(pool_or_conn_string)
+            state["store"] = self
+
+    # Keep from_conn_string for backward-compat.
     @asynccontextmanager
     async def from_conn_string(conn_string: str):
-        handle = _FakeAsyncPostgresHandle(conn_string)
-        state["store"] = handle
+        handle = _FakeStoreCls(conn_string)
         try:
             yield handle
         finally:
             state["exited"] = True
 
-    fake_store_cls = SimpleNamespace(from_conn_string=from_conn_string)
+    _FakeStoreCls.from_conn_string = staticmethod(from_conn_string)  # type: ignore[attr-defined]
+
     fake_module = ModuleType("langgraph.store.postgres.aio")
-    fake_module.AsyncPostgresStore = fake_store_cls  # type: ignore[attr-defined]
+    fake_module.AsyncPostgresStore = _FakeStoreCls  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "langgraph.store.postgres.aio", fake_module)
+
+    # Flip exited when the pool closes (mirrors the saver approach).
+    _orig_pool_exit = _FakeAsyncConnectionPool.__aexit__
+
+    async def _patched_pool_exit(self: _FakeAsyncConnectionPool, *args: Any) -> None:
+        await _orig_pool_exit(self, *args)
+        state["exited"] = True
+
+    monkeypatch.setattr(_FakeAsyncConnectionPool, "__aexit__", _patched_pool_exit)
+
     return state
 
 
@@ -724,6 +844,58 @@ def test_open_store_passes_through_none_backend() -> None:
             return await open_store("none", stack=stack)
 
     assert asyncio.run(run()) is None
+
+
+def test_open_checkpointer_postgres_uses_default_settings_when_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``open_checkpointer("postgres")`` falls back to ``app.config.settings``.
+
+    Mirrors :func:`test_build_checkpointer_postgres_uses_default_settings_when_omitted`
+    but exercises the additional ``settings is None`` fallback inside
+    ``open_checkpointer`` introduced for ``agent_pg_pool_size`` lookup
+    (F-SC1).
+    """
+
+    state = _install_fake_postgres_saver_module(monkeypatch)
+    from app import config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "settings",
+        Settings(agent_postgres_uri="postgres://default-open-fallback"),
+    )
+
+    async def run() -> Any:
+        async with AsyncExitStack() as stack:
+            return await open_checkpointer("postgres", stack=stack)
+
+    saver = asyncio.run(run())
+    assert saver is state["saver"]
+    assert saver.conn_string == "postgres://default-open-fallback"
+
+
+def test_open_store_postgres_uses_default_settings_when_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``open_store("postgres")`` falls back to ``app.config.settings``."""
+
+    state = _install_fake_postgres_store_module(monkeypatch)
+    from app import config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "settings",
+        Settings(agent_postgres_uri="postgres://default-open-fallback"),
+    )
+
+    async def run() -> Any:
+        async with AsyncExitStack() as stack:
+            return await open_store("postgres", stack=stack)
+
+    store = asyncio.run(run())
+    assert store is state["store"]
+    assert store.conn_string == "postgres://default-open-fallback"
 
 
 def test_agent_postgres_uri_prefers_agent_specific_env() -> None:

@@ -161,18 +161,28 @@ async def open_checkpointer(
 
     For the ``"none"`` and ``"memory"`` backends this is a thin wrapper
     around :func:`build_checkpointer`. For ``"postgres"`` it lazy-imports
-    :class:`AsyncPostgresSaver`, enters its ``from_conn_string`` async
-    context manager on the supplied :class:`contextlib.AsyncExitStack`,
-    awaits ``setup()`` exactly once, and returns the live saver. The
-    stack guarantees the connection is closed when the lifespan exits.
+    :class:`AsyncPostgresSaver` and :class:`~psycopg_pool.AsyncConnectionPool`,
+    opens a connection pool sized by ``settings.agent_pg_pool_size``, registers
+    the pool for cleanup on the supplied :class:`contextlib.AsyncExitStack`,
+    and returns the live saver.
+
+    Each call creates its own pool. A future refactor can hoist to a single
+    process-wide pool shared by both the checkpointer and the store.
     """
 
     spec = build_checkpointer(backend, settings=settings)
     if not isinstance(spec, PostgresCheckpointerSpec):
         return spec
 
+    if settings is None:
+        from app.config import settings as default_settings
+
+        settings = default_settings
+
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg.rows import dict_row
+        from psycopg_pool import AsyncConnectionPool
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError(
             "langgraph-checkpoint-postgres is not installed; install with "
@@ -180,9 +190,14 @@ async def open_checkpointer(
             "AGENT_CHECKPOINT_BACKEND=memory"
         ) from exc
 
-    # TODO(perf): swap the single-connection saver for an AsyncConnectionPool
-    # once the runtime exposes a process-wide pool config.
-    cm = AsyncPostgresSaver.from_conn_string(spec.conn_string)
-    saver = await stack.enter_async_context(cm)
+    pool = AsyncConnectionPool(
+        conninfo=spec.conn_string,
+        min_size=1,
+        max_size=settings.agent_pg_pool_size,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=False,
+    )
+    await stack.enter_async_context(pool)
+    saver = AsyncPostgresSaver(pool)
     await saver.setup()
     return saver

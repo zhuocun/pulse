@@ -189,3 +189,97 @@ def test_idempotency_module_singleton_exists() -> None:
     assert isinstance(
         idempotency_module.idempotency_cache, InMemoryIdempotencyBackend
     )
+
+
+# ---------------------------------------------------------------------------
+# DI getter tests: get_rate_limiter
+# ---------------------------------------------------------------------------
+
+
+def test_get_rate_limiter_returns_app_state_when_set() -> None:
+    """dependency_overrides path: app.state.rate_limiter is returned."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.middleware.rate_limit import RateLimiter, RateLimitBackend, get_rate_limiter
+
+    fake = RateLimiter()
+    mini_app = FastAPI()
+
+    @mini_app.get("/_test/rate-limiter-id")
+    def _route(limiter: RateLimitBackend = Depends(get_rate_limiter)) -> dict:
+        return {"id": id(limiter)}
+
+    mini_app.state.rate_limiter = fake
+
+    with TestClient(mini_app, raise_server_exceptions=True) as client:
+        resp = client.get("/_test/rate-limiter-id")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == id(fake)
+
+
+def test_get_rate_limiter_falls_back_to_singleton_when_state_missing() -> None:
+    """No app.state.rate_limiter → module-level singleton is returned."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.middleware import rate_limit as rl_module
+    from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
+
+    mini_app = FastAPI()
+
+    @mini_app.get("/_test/rate-limiter-id")
+    def _route(limiter: RateLimitBackend = Depends(get_rate_limiter)) -> dict:
+        return {"id": id(limiter)}
+
+    with TestClient(mini_app, raise_server_exceptions=True) as client:
+        resp = client.get("/_test/rate-limiter-id")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == id(rl_module.rate_limiter)
+
+
+# ---------------------------------------------------------------------------
+# DI getter tests: get_budget_tracker
+# ---------------------------------------------------------------------------
+
+
+def test_get_budget_tracker_returns_app_state_when_set() -> None:
+    """dependency_overrides path: app.state.budget_tracker is returned."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.middleware.budget import BudgetBackend, BudgetTracker, get_budget_tracker
+
+    fake = BudgetTracker(monthly_cap=42)
+    mini_app = FastAPI()
+
+    @mini_app.get("/_test/budget-tracker-id")
+    def _route(tracker: BudgetBackend = Depends(get_budget_tracker)) -> dict:
+        return {"id": id(tracker)}
+
+    mini_app.state.budget_tracker = fake
+
+    with TestClient(mini_app, raise_server_exceptions=True) as client:
+        resp = client.get("/_test/budget-tracker-id")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == id(fake)
+
+
+def test_get_budget_tracker_falls_back_to_singleton_when_state_missing() -> None:
+    """No app.state.budget_tracker → module-level singleton is returned."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.middleware import budget as budget_mod
+    from app.middleware.budget import BudgetBackend, get_budget_tracker
+
+    mini_app = FastAPI()
+
+    @mini_app.get("/_test/budget-tracker-id")
+    def _route(tracker: BudgetBackend = Depends(get_budget_tracker)) -> dict:
+        return {"id": id(tracker)}
+
+    with TestClient(mini_app, raise_server_exceptions=True) as client:
+        resp = client.get("/_test/budget-tracker-id")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == id(budget_mod.budget_tracker)

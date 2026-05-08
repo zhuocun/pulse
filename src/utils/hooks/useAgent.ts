@@ -270,14 +270,15 @@ const applyStreamPart = async (
                         tokensOut: event.tokensOut
                     });
                     return undefined;
-                case "nudge":
-                    handlers.setNudges(event.nudge);
-                    return undefined;
                 case "suggestion":
-                    handlers.setLastSuggestion({
-                        surface: event.surface,
-                        payload: event.payload
-                    });
+                    if (event.surface === "nudge") {
+                        handlers.setNudges(event.payload);
+                    } else {
+                        handlers.setLastSuggestion({
+                            surface: event.surface,
+                            payload: event.payload
+                        });
+                    }
                     return undefined;
                 default:
                     return undefined;

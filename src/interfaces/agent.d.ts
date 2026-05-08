@@ -101,8 +101,12 @@ export type CustomEvent =
           surface: "brief" | "draft" | "estimate" | "readiness" | "search";
           payload: unknown;
       }
-    | { kind: "usage"; tokensIn: number; tokensOut: number }
-    | { kind: "nudge"; nudge: TriageNudge };
+    | {
+          kind: "suggestion";
+          surface: "nudge";
+          payload: TriageNudge;
+      }
+    | { kind: "usage"; tokensIn: number; tokensOut: number };
 
 export interface InterruptPayload {
     tool: string;

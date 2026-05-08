@@ -495,6 +495,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     logger.info("Connected to %s successfully.", settings.database)
     async with AsyncExitStack() as stack:
         agent_catalog.discover()
+        application.state.rate_limiter = _rate_limit.rate_limiter
+        application.state.budget_tracker = _budget.budget_tracker
         application.state.agent_runtime = await AgentRuntime.from_settings_async(
             settings, stack=stack
         )
