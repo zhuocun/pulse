@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, Protocol, runtime_checkable
 
+from fastapi import Request
+
 from app.config import settings
 
 DEFAULT_MONTHLY_TOKEN_CAP = 1_000_000
@@ -174,3 +176,13 @@ def configure_budget_backend(backend: BudgetBackend) -> None:
 
     global budget_tracker
     budget_tracker = backend
+
+
+def get_budget_tracker(request: Request) -> BudgetBackend:
+    """FastAPI dependency: returns the per-app budget tracker backend.
+
+    Reads from ``request.app.state.budget_tracker`` so tests can override via
+    ``app.dependency_overrides[get_budget_tracker] = ...``. Falls back to the
+    module-level singleton when state is not populated.
+    """
+    return getattr(request.app.state, "budget_tracker", budget_tracker)

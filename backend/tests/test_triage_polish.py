@@ -10,12 +10,44 @@ here so the mocking idiom stays consistent across the catalog.
 from __future__ import annotations
 
 import asyncio
+from typing import Any
+from unittest.mock import patch
 
 from langchain_core.messages import AIMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.types import Command
 
-from app.agents.catalog.triage import NudgePolish, TriagePolish, polish_triage
+from app.agents.catalog.triage import NudgePolish, TriageAgent, TriagePolish, polish_triage
 from app.agents.llm import make_stub_chat_model
+from app.agents import stream as stream_module
 from tests.conftest import structured_model
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared with emit-shape test
+# ---------------------------------------------------------------------------
+
+
+def _persistence() -> tuple[InMemorySaver, InMemoryStore]:
+    return InMemorySaver(), InMemoryStore()
+
+
+def _drive(
+    graph: Any,
+    inputs: dict[str, Any],
+    resumes: list[Any],
+    thread_id: str,
+) -> dict[str, Any]:
+    cfg = {"configurable": {"thread_id": thread_id}}
+
+    async def run() -> dict[str, Any]:
+        result = await graph.ainvoke(inputs, config=cfg)
+        for resume in resumes:
+            result = await graph.ainvoke(Command(resume=resume), config=cfg)
+        return result
+
+    return asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
@@ -240,3 +272,63 @@ def test_polish_triage_empty_nudges_with_real_model_returns_early() -> None:
     result, tokens_in, tokens_out = asyncio.run(polish_triage(model, [], _BOARD_SNAPSHOT))
     assert result == []
     assert (tokens_in, tokens_out) == (0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Emit-shape test: generate_nudges must emit {kind: "suggestion", surface: "nudge", payload: ...}
+# ---------------------------------------------------------------------------
+
+
+def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
+    """The ``generate_nudges`` node must emit the F-G1 wire shape.
+
+    Asserts that ``emit_custom`` is called with
+    ``{"kind": "suggestion", "surface": "nudge", "payload": ...}``
+    (not the old ``{"kind": "nudge", "nudge": ...}`` shape).
+
+    Patching strategy mirrors ``test_search_agent_v21.py``: we patch
+    ``get_stream_writer`` on the ``app.agents.stream`` module so the
+    patch is visible inside the ``emit_custom`` closure, then drive the
+    graph through its single interrupt (``fe.boardSnapshot``).
+    """
+    agent = TriageAgent()
+    checkpointer, store = _persistence()
+    graph = agent.build(checkpointer=checkpointer, store=store)
+
+    # A snapshot that triggers at least one nudge (unowned bug).
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Todo", "wip_limit": 5}],
+        "tasks": [{"id": "bug-1", "column_id": "c1", "type": "bug"}],
+    }
+
+    emitted: list[Any] = []
+
+    def fake_writer(payload: Any) -> None:
+        emitted.append(payload)
+
+    with patch.object(stream_module, "get_stream_writer", return_value=fake_writer):
+        _drive(
+            graph,
+            {"project_id": "p-emit-test"},
+            [snapshot],
+            thread_id="nudge-emit-shape-1",
+        )
+
+    suggestion_events = [
+        e for e in emitted if isinstance(e, dict) and e.get("kind") == "suggestion"
+    ]
+    assert suggestion_events, "Expected at least one suggestion event from generate_nudges"
+
+    for evt in suggestion_events:
+        assert evt.get("surface") == "nudge", (
+            f"Expected surface='nudge', got {evt.get('surface')!r}"
+        )
+        assert "payload" in evt, "Expected 'payload' key in suggestion event"
+        payload = evt["payload"]
+        # Verify inner TriageNudge shape.
+        assert "nudge_id" in payload
+        assert "kind" in payload
+        assert "project_id" in payload
+        assert "summary" in payload
+        assert "target_ids" in payload
+        assert "severity" in payload

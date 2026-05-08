@@ -86,6 +86,37 @@ Four commits, **876 tests passing, 100 % coverage, ruff clean**.
 
 ---
 
+## Shipped on `claude/finish-subagent-orchestrator-docs-QDAmR`
+
+Three further deferred items resolved. **881 BE tests passing, ruff clean, FE typecheck + Jest (40/40 affected hook tests) clean.**
+
+### F-G1 — Suggestion event surface (BE + FE coordinated)
+
+- **BE**: `app/agents/catalog/triage.py:296` now emits `{"kind": "suggestion", "surface": "nudge", "payload": fe_nudge}` matching every other catalog agent. The previous `{"kind": "nudge", "nudge": ...}` shape is gone.
+- **FE type**: `src/interfaces/agent.d.ts` `CustomEvent` union loses the `kind: "nudge"` arm and gains a second `kind: "suggestion"` arm with `surface: "nudge"; payload: TriageNudge` so the discriminator narrows correctly when nudge-shaped.
+- **FE consumer**: `src/utils/hooks/useAgent.ts:273-282` collapses to a single `case "suggestion"` that branches on `event.surface === "nudge"` to call `setNudges(event.payload)`; otherwise calls `setLastSuggestion`.
+- **Tests**: `useAgent.test.tsx` (5 fixtures) and `useAgentChat.test.tsx` (4 fixtures) all rewritten to the new shape. New BE test `test_generate_nudges_emits_suggestion_nudge_shape` in `tests/test_triage_polish.py` asserts the wire shape directly.
+
+### F-SC1 — AsyncConnectionPool for Postgres checkpointer / store
+
+- `app/config.py` — new `agent_pg_pool_size: int = env_positive_int("AGENT_PG_POOL_SIZE", "10")`.
+- `app/agents/checkpointing.py` — `open_checkpointer` now lazy-imports `psycopg_pool.AsyncConnectionPool` and `psycopg.rows.dict_row`, opens an `AsyncConnectionPool(conninfo=..., min_size=1, max_size=settings.agent_pg_pool_size, kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row}, open=False)`, registers it on the lifespan `AsyncExitStack`, and constructs `AsyncPostgresSaver(pool)`. The original `# TODO(perf)` is resolved.
+- `app/agents/stores.py` — symmetric change for `AsyncPostgresStore(pool)`.
+- For now each function opens its own pool. A one-line comment in each file flags that a future refactor can hoist to a single process-wide pool.
+- `tests/test_agents.py` — extended fakes: new `_FakeAsyncConnectionPool` (with `open` / `close` / `__aenter__` / `__aexit__`); new `_install_fake_psycopg_pool_module(monkeypatch)` patching `sys.modules["psycopg_pool"]` and `sys.modules["psycopg.rows"]`; saver / store fakes refactored into callable classes that accept either a pool (new path) or a conn-string (legacy `from_conn_string`, kept for backward compatibility). All 17 postgres-backend tests pass.
+
+### F-SC3 — DI seam for middleware singletons (staged step 1)
+
+Per the doc's own staged-migration recommendation, this PR lands step 1 only — introduce the seam without breaking existing callers or tests. Steps 2–3 (router migration, singleton removal) remain a follow-up.
+
+- `app/middleware/rate_limit.py` — new `get_rate_limiter(request: Request) -> RateLimitBackend` reads `request.app.state.rate_limiter`, falls back to the module-level singleton via `getattr` so unit tests bypassing the lifespan still work.
+- `app/middleware/budget.py` — symmetric `get_budget_tracker(request: Request) -> BudgetBackend`.
+- `app/main.py` lifespan — attaches `application.state.rate_limiter` / `application.state.budget_tracker` to the existing module-level singletons.
+- `tests/test_middleware.py` — four new tests demonstrating both the `app.state` and singleton-fallback paths for each getter.
+- No router or production caller changed; existing `rate_limiter.reset()` / `budget_tracker.reset()` fixture pattern is untouched. The 6 test files using that pattern continue to pass.
+
+---
+
 ## Deferred (with rationale)
 
 Each deferred item is independently shippable in a follow-up PR. Reasons are explicit so the next author isn't guessing what was tried.
@@ -98,11 +129,9 @@ Each deferred item is independently shippable in a follow-up PR. Reasons are exp
 
 **To revisit if**: a second non-structured agent appears (e.g. a multi-turn planning agent) with the same shape.
 
-### F-G1 / P2.4 — Standardise the suggestion event surface
+### F-G1 / P2.4 — Standardise the suggestion event surface — **shipped**
 
-**What the plan said**: Triage emits `{kind: "suggestion", surface: "nudge", payload: fe_nudge}` matching every other agent. FE updates `agent.d.ts` discriminator and `useAi*` hooks to listen for `surface === "nudge"`.
-
-**Why deferred**: BE → FE wire-format change must be atomic. The Python venv on this branch can't run the FE Jest suite, and 9+ FE test files reference `kind: "nudge"` (`useAgent.test.tsx`, `useAgentChat.test.tsx`, `nudgeCard/index.tsx`). Shipping just the BE half breaks the live FE; shipping just the FE half is meaningless. Needs a coordinated branch with FE tests run.
+Resolved on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section above.
 
 ### F-M2 / P3.3 — Polish helpers via the registry
 
@@ -127,17 +156,13 @@ This is a multi-day refactor. Out of scope for the surgical-fixes-and-seams pass
 
 **Why deferred**: meaningful test churn (`test_idempotency.py` is keyed on the path-based cache shape), and the practical impact is low — clients rarely re-key the same Idempotency-Key against two URL aliases. Better as a follow-up alongside F-M1.
 
-### F-SC1 / P5.1 — AsyncConnectionPool for Postgres checkpointer / store
+### F-SC1 / P5.1 — AsyncConnectionPool for Postgres checkpointer / store — **shipped**
 
-**What the plan said**: Resolve the existing TODO by wiring an `AsyncConnectionPool` per process at lifespan startup; pass it to `AsyncPostgresSaver(conn=pool)` and `AsyncPostgresStore(conn=pool)`. Configure pool size via `AGENT_PG_POOL_SIZE` (default 10).
+Resolved on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section above. Each function still opens its own pool — a future refactor can hoist to a single process-wide pool shared by both the checkpointer and the store, and pair it with a Postgres integration smoke test so the pool's lifecycle is exercised against a real DB.
 
-**Why deferred**: the existing test fakes (`_FakeAsyncPostgresHandle`, `_install_fake_postgres_saver_module` in `test_agents.py:540-600`) stub `AsyncPostgresSaver.from_conn_string`. Switching to the pool pattern requires writing new fakes for `psycopg_pool.AsyncConnectionPool` and the direct `AsyncPostgresSaver(conn=pool)` constructor. Code change is small, test change is moderate. Recommend doing it alongside a Postgres integration smoke test so the pool's lifecycle is exercised against a real DB.
+### F-SC3 / P5.3 — Inject middleware instead of importing singletons — **partial (step 1 shipped)**
 
-### F-SC3 / P5.3 — Inject middleware instead of importing singletons
-
-**What the plan said**: Wrap `rate_limit.rate_limiter` and `budget.budget_tracker` in FastAPI dependencies, with the singleton attached to `app.state` at lifespan startup. Routers receive the instance via `Depends(get_rate_limiter)`; tests get clean per-test instances via FastAPI's dependency overrides.
-
-**Why deferred**: every test fixture currently calls `rate_limiter.reset()` / `budget_tracker.reset()` in setup/teardown. Migrating to DI without breaking the existing reset pattern requires either a parallel teardown shim or rewriting every fixture. Recommended sequencing: (1) introduce the DI getters with the singleton as default; (2) migrate one test file at a time to override; (3) remove the singletons.
+Step 1 (introduce DI getters with the singleton as default) shipped on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section above. Step 2 (migrate one test file at a time to use `app.dependency_overrides`) and step 3 (remove the singletons; finalise Redis-backed swap point) remain deferred.
 
 ### F-G2 / P6.1 — `RunContext` for graph-node observability
 
@@ -149,10 +174,11 @@ This is a multi-day refactor. Out of scope for the surgical-fixes-and-seams pass
 
 ## Pickup checklist for the next pass
 
-The deferred items are not equally cheap. Suggested order if a follow-up branch tackles them:
+After the `claude/finish-subagent-orchestrator-docs-QDAmR` round, F-G1, F-SC1, and step 1 of F-SC3 have shipped. The remaining work is:
 
-1. **F-G1 (suggestion event surface)** — small BE change + FE coordination. Highest UX clarity gain.
-2. **F-SC1 (AsyncConnectionPool)** — small code, moderate test rewrite. Real production scalability win.
-3. **F-M1 + F-M2 + F-M6 + P3.3 (V1_ROUTES dispatcher + idempotency keys)** — single coordinated refactor. Largest maintenance dividend.
-4. **F-SC3 (DI middleware)** — unblocks Redis-backed budget/rate-limit. Pair with a Redis adapter PR.
-5. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam.
+1. **F-M1 + F-M2 + F-M6 + P3.3 (V1_ROUTES dispatcher + idempotency keys)** — single coordinated refactor. Largest maintenance dividend. ~5 distinct polish-helper signatures, 7 handlers, 74 tests in `test_ai_v1_router.py`. Multi-day; deliberately untouched on this pass.
+2. **F-SC3 step 2 (router migration to DI)** — switch each router to `Depends(get_rate_limiter)` / `Depends(get_budget_tracker)`, and migrate fixture teardown to `app.dependency_overrides` one test file at a time (6 files: `test_ai_v1_router.py`, `test_agents_router_v21.py`, `test_ai_limits.py`, `test_coverage_filling.py`, `test_agents.py`, `test_idempotency.py`). Step 3 (remove singletons) follows.
+3. **F-SC3 step-2 follow-up — Redis swap point** — once routers receive the limiter via DI, the Redis-backed implementations in `app/middleware/redis_backends.py` can be wired through `app.state` at lifespan startup based on a config flag, without touching production callers.
+4. **F-SC1 follow-up — process-wide pool** — hoist the pool to a single `AsyncConnectionPool` shared by checkpointer and store; pair with a Postgres integration smoke test so the pool lifecycle is exercised against a real DB.
+5. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
+6. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.

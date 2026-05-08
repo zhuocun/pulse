@@ -84,6 +84,7 @@ class Settings:
     postgres_port: int = env_int("POSTGRES_PORT", "5432")
     postgres_ssl: bool = env_bool("POSTGRES_SSL")
     agent_postgres_uri: str = os.getenv("AGENT_POSTGRES_URI", "")
+    agent_pg_pool_size: int = env_positive_int("AGENT_PG_POOL_SIZE", "10")
     jwt_secret: str = _DEFAULT_JWT_SECRET
     jwt_expires_seconds: int = env_int("JWT_EXPIRES_SECONDS", "86400")
     cors_origins: tuple[str, ...] = env_csv(
