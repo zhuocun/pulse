@@ -140,7 +140,7 @@ def test_is_multi_true_when_uvicorn_workers_greater_than_one(
 # ---------------------------------------------------------------------------
 
 
-def test_validate_memory_agent_backends_raises_on_production_with_checkpoint_memory(
+def test_validate_memory_agent_backends_warns_on_production_with_checkpoint_memory(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -161,7 +161,7 @@ def test_validate_memory_agent_backends_raises_on_production_with_checkpoint_mem
     assert any("AGENT_CHECKPOINT_BACKEND" in r.getMessage() for r in caplog.records)
 
 
-def test_validate_memory_agent_backends_error_names_agent_store_backend(
+def test_validate_memory_agent_backends_warning_names_agent_store_backend(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -224,11 +224,11 @@ def test_validate_memory_agent_backends_no_op_when_both_postgres(
 
 
 # ---------------------------------------------------------------------------
-# _configure_middleware_backends — multi-instance hard-fail for memory backends
+# _configure_middleware_backends — multi-instance warnings for memory backends
 # ---------------------------------------------------------------------------
 
 
-def test_configure_middleware_backends_raises_on_vercel_with_idempotency_memory(
+def test_configure_middleware_backends_warns_on_vercel_with_idempotency_memory(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -251,7 +251,7 @@ def test_configure_middleware_backends_raises_on_vercel_with_idempotency_memory(
     assert any("IDEMPOTENCY_BACKEND" in r.getMessage() for r in caplog.records)
 
 
-def test_configure_middleware_backends_raises_on_vercel_lists_all_memory_backends(
+def test_configure_middleware_backends_warns_on_vercel_lists_all_memory_backends(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -298,7 +298,7 @@ def test_configure_middleware_backends_no_raise_for_local_dev_all_memory(
     main._configure_middleware_backends(cfg)
 
 
-def test_configure_middleware_backends_raises_on_web_concurrency_2(
+def test_configure_middleware_backends_warns_on_web_concurrency_2(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
