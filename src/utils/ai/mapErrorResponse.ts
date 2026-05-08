@@ -40,6 +40,46 @@ const transportFallback = (surface: ErrorSurface, status: number) =>
         ? `AI request failed (${status})`
         : `Agent request failed (${status})`;
 
+const firstString = (...values: unknown[]): string | undefined =>
+    values.find((value): value is string => typeof value === "string");
+
+const readStructuredError = (
+    body: unknown
+): { message?: string; code?: string } => {
+    if (typeof body === "string") {
+        return { message: body };
+    }
+    if (typeof body !== "object" || body === null) {
+        return {};
+    }
+
+    const envelope = body as {
+        code?: unknown;
+        message?: unknown;
+        error?: unknown;
+    };
+    const nestedError =
+        typeof envelope.error === "object" && envelope.error !== null
+            ? (envelope.error as {
+                  code?: unknown;
+                  message?: unknown;
+                  error?: unknown;
+              })
+            : undefined;
+
+    return {
+        message: firstString(
+            envelope.message,
+            typeof envelope.error === "string" ? envelope.error : undefined,
+            nestedError?.message,
+            typeof nestedError?.error === "string"
+                ? nestedError.error
+                : undefined
+        ),
+        code: firstString(envelope.code, nestedError?.code)
+    };
+};
+
 /**
  * Convert a non-OK `Response` into the appropriate typed Error subclass.
  * Body parsing is best-effort: if the server returns JSON we surface its
@@ -62,19 +102,8 @@ const mapErrorResponseForSurface = async (
     } catch {
         body = null;
     }
-    const messageFromBody =
-        typeof body === "object" && body !== null
-            ? (((body as { message?: unknown; error?: unknown }).message ??
-                  (body as { message?: unknown; error?: unknown }).error) as
-                  | string
-                  | undefined)
-            : typeof body === "string"
-              ? body
-              : undefined;
-    const codeFromBody: string | undefined =
-        typeof body === "object" && body !== null
-            ? ((body as { code?: unknown }).code as string | undefined)
-            : undefined;
+    const { message: messageFromBody, code: codeFromBody } =
+        readStructuredError(body);
 
     const status = response.status;
     if (status === 401) {

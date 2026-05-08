@@ -18,6 +18,11 @@ when a fix is non-obvious from the code alone.
   `NUDGE_INBOX_MAX = 5`, dedup by `(kind, project_id)`, `NUDGE_EXPIRY_MS = 4h`,
   60-second prune sweep, plus an explicit `dismissNudge(nudge_id)` API. The
   pure `reduceNudgeInbox` reducer is exported for unit tests.
+- The FastAPI backend wraps typed AI errors as `{"error": {"code", "message"}}`
+  rather than returning `code`/`message` at the top level. Keep
+  `src/utils/ai/mapErrorResponse.ts` compatible with both shapes, because older
+  tests/docs still refer to the flat envelope while the live FE-BE contract is
+  nested.
 - Tests that render `BoardPage` or `AiChatDrawer` and partial-mock
   `../utils/hooks/useAiEnabled` MUST also mock `useAutonomyLevel: () => ({level:
 "plan", setLevel: jest.fn()})`. Otherwise `useAgent` crashes destructuring

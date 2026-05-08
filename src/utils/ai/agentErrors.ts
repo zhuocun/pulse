@@ -29,9 +29,10 @@ export class AgentAuthError extends Error {
  * triggers).
  *
  * The optional `code` field carries the structured error code from the
- * server's `{"code": "...", "message": "..."}` envelope (e.g. `"forbidden"`).
- * Downstream consumers can branch on it; omitting it preserves backwards
- * compatibility with single-string construction sites.
+ * server's typed envelope (typically `{"error": {"code": "...", "message": "..."}}`,
+ * with flat `{"code": "...", "message": "..."}` still accepted for backwards
+ * compatibility). Downstream consumers can branch on it without parsing the
+ * message string.
  */
 export class AgentForbiddenError extends Error {
     constructor(
@@ -58,8 +59,8 @@ export class AgentRateLimitError extends Error {
 
 /**
  * The optional `code` field carries the structured error code from the
- * server's `{"code": "...", "message": "..."}` envelope (e.g. `"quota_exceeded"`).
- * Omitting it preserves backwards compatibility with single-string construction sites.
+ * server's typed envelope (typically nested under `error`, though flat bodies
+ * remain supported for backwards compatibility).
  */
 export class AgentBudgetError extends Error {
     constructor(
