@@ -765,3 +765,70 @@ def test_normalize_snapshot_skips_non_dict_items_and_preserves_existing_id() -> 
     assert out["tasks"][1]["_id"] == "t-new"
     # Member with both id and _id is unchanged: existing _id wins.
     assert out["members"][0]["_id"] == "m-1-existing"
+
+
+# ---------------------------------------------------------------------------
+# _shared.py polish-merge helpers (extracted from per-agent _merge bodies)
+# ---------------------------------------------------------------------------
+
+
+def test_cap_polished_text_returns_fallback_for_non_string() -> None:
+    from app.agents.catalog._shared import cap_polished_text
+
+    assert cap_polished_text(None, max_chars=10, fallback="det") == "det"
+    assert cap_polished_text(42, max_chars=10, fallback="det") == "det"
+
+
+def test_cap_polished_text_first_line_and_strip_and_cap() -> None:
+    from app.agents.catalog._shared import cap_polished_text
+
+    assert (
+        cap_polished_text("  hello world\nignored", max_chars=5, fallback="x")
+        == "hello"
+    )
+
+
+def test_cap_polished_text_blank_returns_fallback() -> None:
+    from app.agents.catalog._shared import cap_polished_text
+
+    assert cap_polished_text("   ", max_chars=10, fallback="x") == "x"
+
+
+def test_filter_to_allowed_ids_strips_unknown_and_non_string() -> None:
+    from app.agents.catalog._shared import filter_to_allowed_ids
+
+    assert filter_to_allowed_ids(["a", "b", "c", 7, None], {"a", "c"}) == ["a", "c"]
+
+
+def test_filter_to_allowed_ids_non_list_returns_empty() -> None:
+    from app.agents.catalog._shared import filter_to_allowed_ids
+
+    assert filter_to_allowed_ids(None, {"a"}) == []
+    assert filter_to_allowed_ids("not a list", {"a"}) == []
+
+
+def test_merge_keyed_string_updates_handles_non_list_inputs() -> None:
+    from app.agents.catalog._shared import merge_keyed_string_updates
+
+    out = merge_keyed_string_updates(
+        None,
+        None,
+        key_from_parsed=lambda x: x,
+        key_from_deterministic=lambda x, _i: x,
+        string_fields={"summary": 10},
+    )
+    assert out == []
+
+
+def test_merge_keyed_string_updates_passes_through_non_dict_items() -> None:
+    from app.agents.catalog._shared import merge_keyed_string_updates
+
+    out = merge_keyed_string_updates(
+        [],
+        ["not-a-dict", {"id": "a", "summary": "x"}],
+        key_from_parsed=lambda x: x,
+        key_from_deterministic=lambda d, _i: d.get("id"),
+        string_fields={"summary": 5},
+    )
+    assert out == ["not-a-dict", {"id": "a", "summary": "x"}]
+
