@@ -75,6 +75,11 @@ class AgentRuntime:
         self._registry = registry if registry is not None else default_registry
         self._default_thread_id = default_thread_id
         self._recursion_limit = recursion_limit
+        # Cache the model id at construction time so every ainvoke/astream
+        # request doesn't re-parse settings.  Intentionally snapshotted at
+        # construction: set_chat_model testing uses the model directly and
+        # span attribution is informational only.
+        self._model_id: str = resolved_chat_model_id()
 
     @classmethod
     def from_settings(
@@ -164,13 +169,22 @@ class AgentRuntime:
         """Namespace the thread id by ``(agent, user)``.
 
         The canonical form is ``{agent}:{scope}:{tail}`` where ``scope``
-        is the authenticated user_id (or ``"anon"``). To prevent a
-        client from binding a checkpoint to another user's namespace by
-        injecting a victim's prefix, any pre-existing ``{agent}:*:``
-        prefix on the supplied id is stripped before the canonical
-        prefix for the current user is reapplied. The legitimate case
-        where a client round-trips its own previously-namespaced id is
-        preserved -- the strip + reapply produces the same final id.
+        is the authenticated user_id (or ``"anon"``). To prevent a client
+        from binding a checkpoint to another user's namespace by injecting a
+        victim's prefix (e.g. passing ``{agent}:{victim}:{tail}``), all
+        leading ``{agent}:{any_segment}:`` prefixes where ``{agent}`` is
+        THIS agent's name are stripped iteratively before the canonical
+        prefix for the current user is reapplied.
+
+        This protects against chained prefix injection
+        (e.g. ``agent:user_a:agent:user_b:tail`` is fully stripped to
+        ``tail`` before renaming). Cross-agent thread sharing is a
+        separate concern handled by checkpointer namespacing, if at all.
+
+        The legitimate round-trip case is preserved: a client that
+        replays its own previously-namespaced id
+        (``{agent}:{scope}:{tail}``) ends up with the same final id
+        after strip + reapply.
         """
 
         base = (thread_id or self._default_thread_id).strip()
@@ -179,16 +193,24 @@ class AgentRuntime:
         scope = (user_id or "anon").strip() or "anon"
         prefix = f"{agent.name}:{scope}:"
         agent_prefix = f"{agent.name}:"
-        if base.startswith(agent_prefix):
+        # Iteratively strip all leading ``{agent}:{any_segment}:`` prefixes
+        # so a chained injection like ``agent:u1:agent:u2:tail`` is reduced
+        # to ``tail`` rather than ``agent:u2:tail`` after the first pass.
+        # When the stripped form has no second colon (legacy ``{agent}:{tail}``
+        # format), the remaining segment IS the tail -- preserve it.
+        while base.startswith(agent_prefix):
             remainder = base[len(agent_prefix):]
-            # Drop a leading ``<scope>:`` segment so a client cannot
-            # bind their work to another user's thread by replaying a
-            # ``{agent}:{victim}:{tail}`` id. The unscoped tail is the
-            # only part the caller "owns"; we re-namespace it below.
             first_colon = remainder.find(":")
             if first_colon != -1:
-                remainder = remainder[first_colon + 1:]
-            base = remainder or self._default_thread_id
+                # Has another scope segment; strip it and loop again in case
+                # of further chained agent prefixes.
+                stripped = remainder[first_colon + 1:]
+                base = stripped or self._default_thread_id
+            else:
+                # Legacy ``{agent}:{tail}`` with no scope component -- the
+                # remainder is the tail itself (not a scope to drop).
+                base = remainder or self._default_thread_id
+                break
         return f"{prefix}{base}"
 
     def _resolved_recursion_limit(self, agent: BaseAgent) -> int:
@@ -322,11 +344,10 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
-        model_id = resolved_chat_model_id()
         with start_run_span(
             operation="invoke_agent",
             agent_name=name,
-            model_id=model_id,
+            model_id=self._model_id,
             project_id=_project_id(inputs),
             autonomy=_autonomy(inputs),
         ) as run_span:
@@ -372,11 +393,10 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
-        model_id = resolved_chat_model_id()
         with start_run_span(
             operation="stream_agent",
             agent_name=name,
-            model_id=model_id,
+            model_id=self._model_id,
             project_id=_project_id(inputs),
             autonomy=_autonomy(inputs),
         ) as run_span:
@@ -406,6 +426,11 @@ class AgentRuntime:
                 # to read back the final state; without one we leave the
                 # span at 0 rather than spend extra graph calls.
                 if self._checkpointer is not None:
+                    # Best-effort token aggregation — never fail the stream.
+                    # Only catch expected failure modes from acompile /
+                    # aget_state; let TypeError / AssertionError / AttributeError
+                    # propagate so unrelated programming bugs surface in tests
+                    # rather than being silently swallowed.
                     try:
                         graph = await agent.acompile(
                             checkpointer=self._checkpointer,
@@ -420,7 +445,9 @@ class AgentRuntime:
                             tokens_in += ti
                             tokens_out += to
                         run_span.set_token_usage(tokens_in, tokens_out)
-                    except Exception:  # noqa: BLE001 -- best-effort; never fail the stream
+                    except AgentError:
+                        raise
+                    except (LookupError, KeyError, ValueError, RuntimeError):
                         logger.debug(
                             "astream token aggregation failed; span will show 0 tokens.",
                             exc_info=True,
