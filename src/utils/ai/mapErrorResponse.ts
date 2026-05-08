@@ -64,7 +64,10 @@ const mapErrorResponseForSurface = async (
     }
     const messageFromBody =
         typeof body === "object" && body !== null
-            ? ((body as { message?: unknown }).message as string | undefined)
+            ? (((body as { message?: unknown; error?: unknown }).message ??
+                  (body as { message?: unknown; error?: unknown }).error) as
+                  | string
+                  | undefined)
             : typeof body === "string"
               ? body
               : undefined;

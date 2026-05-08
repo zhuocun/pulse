@@ -26,7 +26,7 @@ export interface AgentListResponse {
 }
 
 export interface CitationRef {
-    source: "task" | "column" | "member" | "project";
+    source: "task" | "column" | "member" | "project" | "user";
     id: string;
     quote: string;
 }

@@ -62,6 +62,8 @@ describe("warnIfMissingObservabilityEndpoints", () => {
         expect(warnSpy.mock.calls[1][0]).toContain(
             "VITE_ERROR_REPORT_ENDPOINT"
         );
+        expect(warnSpy.mock.calls[1][0]).toContain("AI error events");
+        expect(warnSpy.mock.calls[1][0]).not.toContain("analytics events");
     });
 
     it("emits only the analytics warning when only analytics endpoint is missing in production", () => {

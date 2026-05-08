@@ -88,10 +88,33 @@ const estimateSuggestionPayload = {
         missing: [
             {
                 field: "note",
-                message: "Add acceptance criteria to the description."
+                severity: "warn",
+                message: "Add acceptance criteria to the description.",
+                suggestion: "Add acceptance criteria before implementation."
             }
         ],
         rationale: "Missing acceptance criteria."
+    }
+};
+
+const estimateSuggestionWithV21IssuesPayload = {
+    estimate: {
+        storyPoints: 3 as StoryPoints,
+        confidence: "moderate",
+        rationale: "Comparable scope to other authentication tasks.",
+        similar: []
+    },
+    readiness: {
+        ready: false,
+        issues: [
+            {
+                field: "note",
+                severity: "error",
+                message: "Acceptance criteria are missing.",
+                suggestion: "Add concrete acceptance criteria."
+            }
+        ],
+        rationale: "The task needs clearer completion criteria."
     }
 };
 
@@ -186,7 +209,7 @@ describe("AiTaskAssistPanel — remote agent path", () => {
     });
 
     it("renders readiness issues from the same surface:estimate suggestion payload", async () => {
-        renderPanel({
+        const { container, onApplySuggestion } = renderPanel({
             lastSuggestion: {
                 surface: "estimate",
                 payload: estimateSuggestionPayload
@@ -197,6 +220,56 @@ describe("AiTaskAssistPanel — remote agent path", () => {
             expect(
                 screen.getByText(/Add acceptance criteria to the description\./)
             ).toBeInTheDocument()
+        );
+        expect(
+            screen.getByText(/Add acceptance criteria before implementation\./)
+        ).toBeInTheDocument();
+        expect(
+            container.querySelector(".ant-alert-warning")
+        ).toBeInTheDocument();
+
+        act(() => {
+            screen
+                .getByLabelText(/Apply readiness suggestion for note/)
+                .click();
+        });
+
+        expect(onApplySuggestion).toHaveBeenCalledWith(
+            "note",
+            "Add acceptance criteria before implementation."
+        );
+    });
+
+    it("adapts v2.1 readiness issues and string confidence from a surface:estimate payload", async () => {
+        const { container, onApplySuggestion } = renderPanel({
+            lastSuggestion: {
+                surface: "estimate",
+                payload: estimateSuggestionWithV21IssuesPayload
+            }
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.getByLabelText(/Confidence moderate, 60%/i)
+            ).toBeInTheDocument()
+        );
+        expect(
+            screen.getByText(/Acceptance criteria are missing\./)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/Add concrete acceptance criteria\./)
+        ).toBeInTheDocument();
+        expect(container.querySelector(".ant-alert-error")).toBeInTheDocument();
+
+        act(() => {
+            screen
+                .getByLabelText(/Apply readiness suggestion for note/)
+                .click();
+        });
+
+        expect(onApplySuggestion).toHaveBeenCalledWith(
+            "note",
+            "Add concrete acceptance criteria."
         );
     });
 

@@ -75,7 +75,7 @@ export function warnIfMissingObservabilityEndpoints(
     }
     if (!errorEndpointValue) {
         warnings.push(
-            "Board Copilot: VITE_ERROR_REPORT_ENDPOINT is not set; AI analytics events will be dropped (devMemorySink only)."
+            "Board Copilot: VITE_ERROR_REPORT_ENDPOINT is not set; AI error events will be dropped."
         );
     }
 
