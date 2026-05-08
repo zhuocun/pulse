@@ -154,11 +154,11 @@ class AgentRuntime:
     def recursion_limit(self) -> int:
         return self._recursion_limit
 
-    def list_metadata(self) -> list[AgentMetadata]:
-        return self._registry.metadata()
+    def list_metadata(self, *, include_shadow: bool = False) -> list[AgentMetadata]:
+        return self._registry.metadata(include_shadow=include_shadow)
 
-    def get(self, name: str) -> BaseAgent:
-        return self._registry.get(name)
+    def get(self, name: str, *, include_shadow: bool = False) -> BaseAgent:
+        return self._registry.get(name, include_shadow=include_shadow)
 
     def _namespaced_thread(
         self,
@@ -411,40 +411,35 @@ class AgentRuntime:
                 ):
                     yield event
             except AgentError:
+                await self._aggregate_astream_tokens_no_propagate(
+                    agent, config, run_span
+                )
                 raise
             except GraphRecursionError as exc:
+                await self._aggregate_astream_tokens_no_propagate(
+                    agent, config, run_span
+                )
                 raise AgentRecursionError(
                     name, self._resolved_recursion_limit(agent)
                 ) from exc
             except Exception as exc:  # noqa: BLE001 -- intentional translation boundary
+                await self._aggregate_astream_tokens_no_propagate(
+                    agent, config, run_span
+                )
                 logger.exception("Agent %r failed during astream.", name)
                 raise AgentExecutionError(name, cause=exc) from exc
             else:
                 # On a successful stream, aggregate token usage from the
                 # final graph state so OTel and Prometheus see real token
-                # counts instead of always 0. This requires a checkpointer
-                # to read back the final state; without one we leave the
-                # span at 0 rather than spend extra graph calls.
+                # counts instead of always 0. AgentError from aggregation
+                # surfaces normally on this path so a misbehaving graph is
+                # visible; on the failure paths above we suppress it to
+                # preserve the original exception cause.
                 if self._checkpointer is not None:
-                    # Best-effort token aggregation — never fail the stream.
-                    # Only catch expected failure modes from acompile /
-                    # aget_state; let TypeError / AssertionError / AttributeError
-                    # propagate so unrelated programming bugs surface in tests
-                    # rather than being silently swallowed.
                     try:
-                        graph = await agent.acompile(
-                            checkpointer=self._checkpointer,
-                            store=self._store,
+                        await self._aggregate_astream_tokens(
+                            agent, config, run_span
                         )
-                        final_state = await graph.aget_state(config)
-                        messages = (final_state.values or {}).get("messages") or []
-                        tokens_in = 0
-                        tokens_out = 0
-                        for msg in messages:
-                            ti, to = extract_token_usage(msg)
-                            tokens_in += ti
-                            tokens_out += to
-                        run_span.set_token_usage(tokens_in, tokens_out)
                     except AgentError:
                         raise
                     except (LookupError, KeyError, ValueError, RuntimeError):
@@ -452,6 +447,57 @@ class AgentRuntime:
                             "astream token aggregation failed; span will show 0 tokens.",
                             exc_info=True,
                         )
+
+    async def _aggregate_astream_tokens(
+        self,
+        agent: BaseAgent,
+        config: Mapping[str, Any],
+        run_span: Any,
+    ) -> None:
+        """Read the final graph state and report token totals on the span.
+
+        Lets exceptions propagate so callers can decide whether to swallow
+        (failure paths) or surface (success path).  Callers must gate on
+        ``self._checkpointer is not None`` — no checkpointer means no
+        persisted final state to read back.
+        """
+
+        graph = await agent.acompile(
+            checkpointer=self._checkpointer,
+            store=self._store,
+        )
+        final_state = await graph.aget_state(config)
+        messages = (final_state.values or {}).get("messages") or []
+        tokens_in = 0
+        tokens_out = 0
+        for msg in messages:
+            ti, to = extract_token_usage(msg)
+            tokens_in += ti
+            tokens_out += to
+        run_span.set_token_usage(tokens_in, tokens_out)
+
+    async def _aggregate_astream_tokens_no_propagate(
+        self,
+        agent: BaseAgent,
+        config: Mapping[str, Any],
+        run_span: Any,
+    ) -> None:
+        """Best-effort aggregation on failure paths.
+
+        Runs after a translated exception is in flight; the original cause
+        must win, so any aggregation failure (including AgentError) is
+        swallowed.  Without a checkpointer there's no state to read.
+        """
+
+        if self._checkpointer is None:
+            return
+        try:
+            await self._aggregate_astream_tokens(agent, config, run_span)
+        except (AgentError, LookupError, KeyError, ValueError, RuntimeError):
+            logger.debug(
+                "Token aggregation during failure cleanup failed; span will show 0 tokens.",
+                exc_info=True,
+            )
 
 
 def _project_id(inputs: Mapping[str, Any]) -> Optional[str]:

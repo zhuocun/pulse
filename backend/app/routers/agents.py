@@ -339,19 +339,13 @@ def _require_project_manager(project_id: Optional[str], user_id: str) -> None:
 
 
 def _enforce_status(metadata: AgentMetadata, response_headers: dict[str, str]) -> None:
-    """Block ``shadow`` agents and stamp ``Sunset`` on ``deprecated`` agents.
+    """Stamp ``Sunset`` / ``Deprecation`` headers on ``deprecated`` agents.
 
-    Shadow agents are reserved for offline comparison runs and must not be
-    callable from the public surface; deprecated agents stay reachable but
-    emit RFC 8594 ``Sunset`` / ``Deprecation`` headers so clients can
-    react.
+    Shadow-status enforcement lives in :class:`AgentRegistry` so internal
+    callers and HTTP callers see the same hidden surface.  This helper
+    only needs to handle the deprecation header today.
     """
 
-    if metadata.status == "shadow":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": f"Agent '{metadata.name}' not found"},
-        )
     if metadata.status == "deprecated":
         response_headers["Deprecation"] = "true"
 
@@ -495,10 +489,7 @@ def list_agents(
     """List active and deprecated agents; ``shadow`` agents are hidden."""
 
     current_user_id(auth_payload)
-    visible = [
-        meta.as_dict() for meta in runtime.list_metadata() if meta.status != "shadow"
-    ]
-    return {"agents": visible}
+    return {"agents": [meta.as_dict() for meta in runtime.list_metadata()]}
 
 
 @router.get("/_tools", status_code=status.HTTP_200_OK)
@@ -534,13 +525,7 @@ def get_agent(
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> Dict[str, Any]:
     current_user_id(auth_payload)
-    metadata = runtime.get(name).metadata
-    if metadata.status == "shadow":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": f"Agent '{metadata.name}' not found"},
-        )
-    return metadata.as_dict()
+    return runtime.get(name).metadata.as_dict()
 
 
 def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> None:

@@ -47,6 +47,7 @@ from app.agents.state import SearchState
 from app.agents.stream import emit_custom
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact, redact_dict
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,11 @@ async def polish_search(
     # to score; the LLM has no useful work and would hallucinate ids.
     if not candidates:
         return deterministic, 0, 0
+    # Redact PII before sending candidate ``text`` (task names, project
+    # names) to the provider.  The id-allowlist below uses the unredacted
+    # ids from ``candidates`` so the FE round-trip still works.
+    safe_candidates = redact_dict(candidates[:30])
+    safe_query = redact(query)[0] if isinstance(query, str) else query
     prompt = (
         "You are re-ranking search results for a Jira-style project tool. "
         "Pick up to 10 of the candidate ids that best match the query, "
@@ -170,8 +176,8 @@ async def polish_search(
         "candidate list; never invent new ids. Return JSON matching the "
         "schema, including a single-line rationale (<=240 chars) naming "
         "the ranking factors.\n\n"
-        f"Query: {query}\n"
-        f"Candidates: {json.dumps(candidates[:30])}"
+        f"Query: {safe_query}\n"
+        f"Candidates: {json.dumps(safe_candidates)}"
     )
 
     candidate_ids = {
