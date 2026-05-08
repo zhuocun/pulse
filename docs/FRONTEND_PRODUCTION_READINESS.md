@@ -2,11 +2,11 @@
 
 Consolidated view of what is GA-ready, what is internal-beta-only, and what blocks a public ship from the React client side. Source of truth for severity; for the per-feature detail and file/test inventory see [`prd/board-copilot-progress.md`](prd/board-copilot-progress.md). Server-side counterpart: `../backend/docs/BACKEND_PRODUCTION_READINESS.md`.
 
-Last updated: 2026-05-05.
+Last updated: 2026-05-08.
 
 ## TL;DR
 
-- **GA-ready surfaces.** All six v2.1 SSE agents consumed via `useAgent` / `useAgentChat` in remote builds; deterministic local-engine fallback under `aiUseLocalEngine`; PRD AC-V14 nudge inbox; autonomy selector; observability; jest-axe a11y coverage; typed `{code, message}` error envelope.
+- **GA-ready surfaces.** All six v2.1 SSE agents consumed via `useAgent` / `useAgentChat` in remote builds; deterministic local-engine fallback under `aiUseLocalEngine`; PRD AC-V14 nudge inbox; autonomy selector; observability; jest-axe a11y coverage; typed backend error envelopes surfaced through FE typed errors.
 - **Internal beta only.** Anything that surfaces `MutationProposalCard` to the user — see Hard Blocker §1.
 - **Blocks public GA.** Two FE-owned hard blockers below; the rest is polish or out of FE scope.
 
@@ -85,26 +85,26 @@ Removed on `claude/v2.1-ai-readiness-check-TbxeM`. The surrounding docblock alre
 
 ## What's GA-ready right now
 
-| Surface                                                                        | Status | Notes                                                                 |
-| ------------------------------------------------------------------------------ | ------ | --------------------------------------------------------------------- |
-| Local engine (deterministic)                                                   | ✅     | Full coverage; demo-able with no backend                              |
-| `useAgent("board-brief-agent")` (remote)                                       | ✅     | Suggestion + citations rendered in `BoardBriefDrawer`                 |
-| `useAgent("task-drafting-agent")` (remote)                                     | ✅     | Two sequential interrupts auto-resumed                                |
-| `useAgent("task-estimation-agent")` (remote)                                   | ⚠️     | Quality bounded by §3                                                 |
-| `useAgent("search-agent")` (remote)                                            | ⚠️     | Quality bounded by §3                                                 |
-| `useAgentChat("chat-agent")` (remote)                                          | ✅     | SSE streaming; **proposal cards must be hidden** until BE §1 closes   |
-| `useAgent("triage-agent")` (remote)                                            | ✅     | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation) |
-| Autonomy selector UI                                                           | ⚠️     | Suggest/Plan ✅; Auto silently no-ops — see §4                        |
-| Agent health badge in header                                                   | ✅     | Renders only when `degraded`/`offline` and remote mode                |
-| `useAgentHealth` + `AGENT_HEALTH_DEGRADED` analytics                           | ✅     | Deduped per transition                                                |
-| Per-project AI opt-out + typed 403 envelope                                    | ✅     | `mapErrorResponse` honors `body.code` (Resolved 2026-05-05)           |
-| `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` observability                    | ✅     | TTFT, durationMs, tokensIn/Out                                        |
-| `Idempotency-Key` header on all AI requests                                    | ✅     |                                                                       |
-| i18n (`en`, `zh-CN`) for AI surfaces                                           | ✅     | Including autonomy selector keys                                      |
-| jest-axe a11y coverage                                                         | ✅     | 31 tests across all AI surfaces                                       |
-| `REACT_APP_AI_BASE_URL` validation (rejects `javascript:` / `data:` / `file:`) | ✅     |                                                                       |
-| `Disable AI for this project` switch                                           | ✅     | `boardCopilot:disabledProjectIds`                                     |
-| `Board Copilot` runtime toggle                                                 | ✅     | `boardCopilot:enabled`                                                |
+| Surface                                                                        | Status | Notes                                                                                                             |
+| ------------------------------------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| Local engine (deterministic)                                                   | ✅     | Full coverage; demo-able with no backend                                                                          |
+| `useAgent("board-brief-agent")` (remote)                                       | ✅     | Suggestion + citations rendered in `BoardBriefDrawer`                                                             |
+| `useAgent("task-drafting-agent")` (remote)                                     | ✅     | Two sequential interrupts auto-resumed                                                                            |
+| `useAgent("task-estimation-agent")` (remote)                                   | ⚠️     | Quality bounded by §3                                                                                             |
+| `useAgent("search-agent")` (remote)                                            | ⚠️     | Quality bounded by §3                                                                                             |
+| `useAgentChat("chat-agent")` (remote)                                          | ✅     | SSE streaming; **proposal cards must be hidden** until BE §1 closes                                               |
+| `useAgent("triage-agent")` (remote)                                            | ✅     | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation)                                             |
+| Autonomy selector UI                                                           | ⚠️     | Suggest/Plan ✅; Auto silently no-ops — see §4                                                                    |
+| Agent health badge in header                                                   | ✅     | Renders only when `degraded`/`offline` and remote mode                                                            |
+| `useAgentHealth` + `AGENT_HEALTH_DEGRADED` analytics                           | ✅     | Deduped per transition                                                                                            |
+| Per-project AI opt-out + typed 403 envelope                                    | ✅     | `mapErrorResponse` honors the backend's typed error envelope, including nested `error.code` (Resolved 2026-05-08) |
+| `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` observability                    | ✅     | TTFT, durationMs, tokensIn/Out                                                                                    |
+| `Idempotency-Key` header on all AI requests                                    | ✅     |                                                                                                                   |
+| i18n (`en`, `zh-CN`) for AI surfaces                                           | ✅     | Including autonomy selector keys                                                                                  |
+| jest-axe a11y coverage                                                         | ✅     | 31 tests across all AI surfaces                                                                                   |
+| `REACT_APP_AI_BASE_URL` validation (rejects `javascript:` / `data:` / `file:`) | ✅     |                                                                                                                   |
+| `Disable AI for this project` switch                                           | ✅     | `boardCopilot:disabledProjectIds`                                                                                 |
+| `Board Copilot` runtime toggle                                                 | ✅     | `boardCopilot:enabled`                                                                                            |
 
 ## Recommended ship sequence
 

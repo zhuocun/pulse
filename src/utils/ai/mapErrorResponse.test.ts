@@ -3,9 +3,10 @@
  *
  * Key contracts:
  *   1. Correct typed-error class per HTTP status.
- *   2. 403 with a structured `{"code", "message"}` body threads `code` into
- *      AgentForbiddenError (server envelope introduced in v2.1 session).
- *   3. 402 with a structured body threads `code` into AgentBudgetError.
+ *   2. 403 with either a flat `{"code", "message"}` body or the backend's
+ *      nested `{"error": {"code", "message"}}` envelope threads `code` into
+ *      AgentForbiddenError.
+ *   3. 402 with either structured envelope threads `code` into AgentBudgetError.
  *   4. Legacy plain-string body still works (backwards compat).
  *   5. Missing / malformed body falls back gracefully.
  */
@@ -106,7 +107,7 @@ describe("mapErrorResponse", () => {
     });
 
     // ------------------------------------------------------------------
-    // Fix 1: structured {code, message} envelope for 403
+    // Fix 1: structured typed envelopes for 403
     // ------------------------------------------------------------------
 
     it("403 with {code, message} envelope: carries code on AgentForbiddenError", async () => {
@@ -114,6 +115,20 @@ describe("mapErrorResponse", () => {
             fakeResponse(403, {
                 code: "forbidden",
                 message: "AI is disabled for this project"
+            })
+        );
+        expect(err).toBeInstanceOf(AgentForbiddenError);
+        expect((err as AgentForbiddenError).code).toBe("forbidden");
+        expect(err.message).toBe("AI is disabled for this project");
+    });
+
+    it("403 with nested backend envelope: carries code on AgentForbiddenError", async () => {
+        const err = await mapErrorResponse(
+            fakeResponse(403, {
+                error: {
+                    code: "forbidden",
+                    message: "AI is disabled for this project"
+                }
             })
         );
         expect(err).toBeInstanceOf(AgentForbiddenError);
@@ -165,7 +180,7 @@ describe("mapErrorResponse", () => {
     });
 
     // ------------------------------------------------------------------
-    // Fix 1: structured {code, message} envelope for 402
+    // Fix 1: structured typed envelopes for 402
     // ------------------------------------------------------------------
 
     it("402 with {code, message} envelope: carries code on AgentBudgetError", async () => {
@@ -173,6 +188,20 @@ describe("mapErrorResponse", () => {
             fakeResponse(402, {
                 code: "quota_exceeded",
                 message: "Monthly token quota exhausted"
+            })
+        );
+        expect(err).toBeInstanceOf(AgentBudgetError);
+        expect((err as AgentBudgetError).code).toBe("quota_exceeded");
+        expect(err.message).toBe("Monthly token quota exhausted");
+    });
+
+    it("402 with nested backend envelope: carries code on AgentBudgetError", async () => {
+        const err = await mapErrorResponse(
+            fakeResponse(402, {
+                error: {
+                    code: "quota_exceeded",
+                    message: "Monthly token quota exhausted"
+                }
             })
         );
         expect(err).toBeInstanceOf(AgentBudgetError);
@@ -204,6 +233,20 @@ describe("mapAgentErrorResponse", () => {
         );
         expect(err).toBeInstanceOf(AgentForbiddenError);
         expect((err as AgentForbiddenError).code).toBe("forbidden");
+    });
+
+    it("maps 403 with nested backend envelope to AgentForbiddenError carrying code", async () => {
+        const err = await mapAgentErrorResponse(
+            fakeResponse(403, {
+                error: {
+                    code: "forbidden",
+                    message: "AI is disabled for this project"
+                }
+            })
+        );
+        expect(err).toBeInstanceOf(AgentForbiddenError);
+        expect((err as AgentForbiddenError).code).toBe("forbidden");
+        expect(err.message).toBe("AI is disabled for this project");
     });
 
     it("maps 401 to AgentAuthError", async () => {
