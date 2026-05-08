@@ -198,3 +198,19 @@ def test_translate_messages_flattens_bare_message() -> None:
     token, metadata = events[0]["data"]
     assert token == {"content": "solo", "type": "AIMessageChunk"}
     assert metadata == {}
+
+
+def test_translate_messages_list_content_emits_blocks() -> None:
+    """Tool-call streaming produces list[dict] content; must not stringify it."""
+    # Simulate a tool-call chunk where content is a list of content blocks.
+    tool_blocks = [{"type": "tool_use", "id": "call_1", "name": "search", "input": {}}]
+    msg = AIMessageChunk(content=tool_blocks)
+    events = list(translate_event("messages", (msg, {"langgraph_node": "agent"})))
+    assert len(events) == 1
+    token, metadata = events[0]["data"]
+    # content must be empty string (not a repr of the list)
+    assert token["content"] == ""
+    # the raw blocks must be surfaced under "blocks"
+    assert token["blocks"] == tool_blocks
+    assert token["type"] == "AIMessageChunk"
+    assert metadata == {"langgraph_node": "agent"}

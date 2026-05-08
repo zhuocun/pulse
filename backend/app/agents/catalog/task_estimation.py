@@ -21,13 +21,14 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
-from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._shared import (
+    emit_citation_refs,
+    emit_usage,
+    fetch_similar_node,
     structured_llm_call,
-    unpack_similar_payload,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
@@ -35,8 +36,7 @@ from app.agents.state import TaskEstimationState
 from app.agents.stream import emit_custom
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
-from app.tools.fe_tool_schemas import interrupt_payload
-from app.tools.redaction import redact, redact_dict, redact_task_fields
+from app.tools.redaction import redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
 
@@ -236,21 +236,8 @@ class TaskEstimationAgent(BaseAgent):
     ) -> Pregel:
         chat_model: BaseChatModel = self.chat_model
 
-        def fetch_similar(state: TaskEstimationState) -> dict[str, Any]:
-            draft = state.get("task_draft") or {}
-            payload = interrupt(
-                interrupt_payload(
-                    "fe.similarTasks",
-                    {
-                        "project_id": state.get("project_id"),
-                        "query": draft.get("taskName") or "",
-                    },
-                )
-            )
-            # FE may return either a raw list (legacy / test fixtures) or
-            # the schema-conformant {"similar": [...]} envelope. Normalise
-            # so downstream nodes always see a list of ``{id, text}`` items.
-            return {"similar_tasks": unpack_similar_payload(payload)}
+        # Shared node body from _shared.py (same logic as task-drafting-agent).
+        fetch_similar = fetch_similar_node
 
         async def fetch_embeddings(state: TaskEstimationState) -> dict[str, Any]:
             similar = state.get("similar_tasks") or []
@@ -283,9 +270,7 @@ class TaskEstimationAgent(BaseAgent):
             rationale, tokens_in, tokens_out = await polish_rationale(
                 chat_model, deterministic, draft, points, neighbours
             )
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
+            emit_usage(tokens_in, tokens_out)
             return {
                 "estimate": {
                     "storyPoints": points,
@@ -300,9 +285,7 @@ class TaskEstimationAgent(BaseAgent):
             polished, tokens_in, tokens_out = await polish_readiness(
                 chat_model, deterministic, draft
             )
-            emit_custom(
-                {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
-            )
+            emit_usage(tokens_in, tokens_out)
             return {"readiness": polished}
 
         def emit_citations(state: TaskEstimationState) -> dict[str, Any]:
@@ -311,18 +294,7 @@ class TaskEstimationAgent(BaseAgent):
                 "readiness": state.get("readiness"),
             }
             similar = state.get("similar_tasks") or []
-            refs: list[dict[str, Any]] = []
-            for item in similar[:3]:
-                quote = item.get("text") or item.get("id") or ""
-                refs.append(
-                    be_tools.validated_citation_ref(
-                        source="task",
-                        id=item.get("id"),
-                        quote=redact(quote)[0] if isinstance(quote, str) else quote,
-                    )
-                )
-            if refs:
-                emit_custom({"kind": "citation", "refs": refs})
+            emit_citation_refs(similar, "task")
             emit_custom(
                 {
                     "kind": "suggestion",

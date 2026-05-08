@@ -139,7 +139,13 @@ def _flatten_messages_chunk(chunk: Any) -> list[Any]:
 
     content = getattr(message, "content", message)
     msg_type = getattr(message, "type", None) or getattr(message, "role", None)
-    token = {"content": content if isinstance(content, str) else str(content)}
+    if isinstance(content, list):
+        # Tool-call streaming: content is list[dict] (LangChain content blocks).
+        # Stringifying it produces a useless repr, so emit the blocks as-is
+        # under a dedicated key so the FE can inspect tool-call details.
+        token: dict[str, Any] = {"content": "", "blocks": _to_jsonable(content)}
+    else:
+        token = {"content": content if isinstance(content, str) else str(content)}
     if isinstance(msg_type, str):
         token["type"] = msg_type
     metadata_dict = metadata if isinstance(metadata, dict) else {}

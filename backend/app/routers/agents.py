@@ -902,14 +902,15 @@ async def _with_disconnect(
     iterator = stream.__aiter__()
 
     async def _watch_disconnect() -> None:
-        # Poll once per second so the watcher does not pin a CPU
-        # spinning. ``request.is_disconnected()`` is cheap (peeks at
-        # the receive queue) so this is well under any reasonable
-        # disconnect-detection latency.
+        # Poll every 100 ms (down from 1 s) so a disconnected client
+        # stops incurring token spend within at most one polling interval
+        # rather than up to a full second. ``request.is_disconnected()``
+        # is cheap (peeks at the receive queue) so the tighter cadence
+        # has negligible CPU cost.
         while True:
             if await request.is_disconnected():
                 return
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.1)
 
     disconnect_task: Optional[asyncio.Task[None]] = None
     try:

@@ -61,6 +61,10 @@ class _AgentRunSpan:
     logic between ``ainvoke`` and ``astream``. The caller calls
     :meth:`set_result` on a successful run so we can extract token
     counts before the span closes.
+
+    # Sync context manager is intentional — the underlying OTel
+    # start_as_current_span is sync; awaiting inside the run loop is
+    # unnecessary.
     """
 
     def __init__(

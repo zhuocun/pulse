@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage
 
 from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
 from app.agents.llm import make_stub_chat_model
-from app.tools.redaction import redact_task_fields
+from app.tools.redaction import redact, redact_task_fields
 
 
 # ---------------------------------------------------------------------------
@@ -189,3 +189,50 @@ def test_polish_readiness_stub_model_returns_deterministic() -> None:
     )
     assert result == det
     assert (ti, to) == (0, 0)
+
+
+# ---------------------------------------------------------------------------
+# New SECRET pattern coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_redact_anthropic_key() -> None:
+    out, _ = redact("key=sk-ant-api03-abcdefghijklmno")
+    assert "[SECRET]" in out
+    assert "sk-ant-api03" not in out
+
+
+def test_redact_slack_bot_token() -> None:
+    out, _ = redact("token xoxb-1234-5678-abcdefghijklm")
+    assert "[SECRET]" in out
+    assert "xoxb-" not in out
+
+
+def test_redact_slack_user_token() -> None:
+    out, _ = redact("Authorization: xoxp-9876-5432-zyxwvutsrqponm")
+    assert "[SECRET]" in out
+    assert "xoxp-" not in out
+
+
+def test_redact_sendgrid_key() -> None:
+    out, _ = redact("SG.abcdefghij.KLMNOPQRSTUVWXYZ1234567890abc")
+    assert "[SECRET]" in out
+    assert "SG.abcdefghij" not in out
+
+
+def test_redact_google_oauth_token() -> None:
+    out, _ = redact("access_token ya29.a0AfH6SMCthisisafaketoken1234567890")
+    assert "[SECRET]" in out
+    assert "ya29." not in out
+
+
+def test_redact_jwt_token() -> None:
+    # Well-formed JWT with base64url header.payload.signature structure.
+    jwt = (
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        ".eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0"
+        ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    )
+    out, _ = redact(f"Bearer {jwt}")
+    assert "[SECRET]" in out
+    assert "eyJhbGci" not in out

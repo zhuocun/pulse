@@ -34,14 +34,14 @@ _BOARD_SNAPSHOT: dict = {
 _DETERMINISTIC_NUDGES = [
     {
         "type": "wip_overflow",
-        "title": "WIP overflow",
+        "summary": "WIP overflow",
         "severity": "warn",
         "details": {"column_id": "col-1", "count": 8, "limit": 5},
         "actions": [{"label": "Acknowledge"}, {"label": "Snooze"}],
     },
     {
         "type": "stale_task",
-        "title": "Stale task",
+        "summary": "Stale task",
         "severity": "info",
         "details": {"task_id": "t-42", "days_stale": 14},
         "actions": [{"label": "Acknowledge"}, {"label": "Snooze"}],
@@ -98,8 +98,8 @@ def test_polish_triage_merges_polished_summary() -> None:
         polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT)
     )
 
-    assert result[0]["title"] == "WIP overflow in 'In Progress' (8/5) — move 3 tasks out"
-    assert result[1]["title"] == "Task t-42 stale for 14 days — reassign or close"
+    assert result[0]["summary"] == "WIP overflow in 'In Progress' (8/5) — move 3 tasks out"
+    assert result[1]["summary"] == "Task t-42 stale for 14 days — reassign or close"
     # Non-polished fields are preserved unchanged.
     assert result[0]["type"] == "wip_overflow"
     assert result[1]["details"] == {"task_id": "t-42", "days_stale": 14}
@@ -169,8 +169,8 @@ def test_polish_triage_preserves_deterministic_when_summary_blank() -> None:
     )
     model = structured_model(parsed=parsed)
     result, *_ = asyncio.run(polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT))
-    assert result[0]["title"] == "WIP overflow"
-    assert result[1]["title"] == "Stale task"
+    assert result[0]["summary"] == "WIP overflow"
+    assert result[1]["summary"] == "Stale task"
 
 
 # ---------------------------------------------------------------------------
@@ -205,9 +205,9 @@ def test_polish_triage_ignores_unknown_nudge_id() -> None:
     # The list length must not grow.
     assert len(result) == len(_DETERMINISTIC_NUDGES)
     # Valid nudge was polished.
-    assert result[0]["title"] == "WIP overflow in 'In Progress' (8/5)"
-    # Second nudge keeps its deterministic title (no polish provided for it).
-    assert result[1]["title"] == "Stale task"
+    assert result[0]["summary"] == "WIP overflow in 'In Progress' (8/5)"
+    # Second nudge keeps its deterministic summary (no polish provided for it).
+    assert result[1]["summary"] == "Stale task"
     assert (tokens_in, tokens_out) == (1, 1)
 
 
@@ -225,7 +225,7 @@ def test_polish_triage_caps_summary_at_120_chars() -> None:
     )
     model = structured_model(parsed=parsed)
     result, *_ = asyncio.run(polish_triage(model, _DETERMINISTIC_NUDGES, _BOARD_SNAPSHOT))
-    assert len(result[0]["title"]) <= 120
+    assert len(result[0]["summary"]) <= 120
 
 
 # ---------------------------------------------------------------------------

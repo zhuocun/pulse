@@ -249,44 +249,48 @@ def assert_provider_available(
     500s on the SSE stream.
 
     A second, parallel failure mode also fails fast here: an operator
-    sets ``AGENT_CHAT_MODEL_PROVIDER=anthropic`` (or ``=openai``) but
-    forgets to set the matching ``ANTHROPIC_API_KEY`` /
-    ``OPENAI_API_KEY``. Today this only blows up mid-SSE on the first
-    real model call; on a production-shaped deploy that surfaces as a
-    user-visible error envelope. We raise here so the deploy log carries
-    the wiring problem instead.
+    sets ``AGENT_CHAT_MODEL_PROVIDER=anthropic`` (or ``=openai``, or
+    ``=auto`` on a deploy where the key is absent) but forgets to set
+    the matching ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY``. Today this
+    only blows up mid-SSE on the first real model call; on a
+    production-shaped deploy that surfaces as a user-visible error
+    envelope. We raise here so the deploy log carries the wiring problem
+    instead.
+
+    The guard fires on the *resolved* provider (not the raw configured
+    value), so ``provider=auto`` that resolved to anthropic/openai with
+    an empty key is also caught.  Local dev with ``auto`` falling back
+    to the stub is unaffected because the resolved provider will be
+    ``stub``.
 
     The check is gated on a production-shaped env on purpose: local dev
     runs without API keys and uses ``provider=auto`` (which falls back
     to the stub). Default ``auto`` keeps that degrade behaviour
-    untouched -- only an *explicit* provider with a missing key trips
-    the new guard.
+    untouched.
 
     No-op when the resolved provider is the deterministic stub: the stub
     has no integration package to import and is the documented fallback
     for AI-disabled deployments.
     """
 
-    cfg = settings if settings is not None else default_settings
-    raw_provider = (cfg.agent_chat_model_provider or PROVIDER_AUTO).strip().lower()
     resolved = spec if spec is not None else resolve_chat_model_spec(settings)
     _require_integration(resolved.provider)
 
     if (
-        raw_provider in (PROVIDER_ANTHROPIC, PROVIDER_OPENAI)
+        resolved.provider in (PROVIDER_ANTHROPIC, PROVIDER_OPENAI)
         and not resolved.api_key
         and _is_production_like_env()
     ):
         env_var = (
             "ANTHROPIC_API_KEY"
-            if raw_provider == PROVIDER_ANTHROPIC
+            if resolved.provider == PROVIDER_ANTHROPIC
             else "OPENAI_API_KEY"
         )
         raise RuntimeError(
-            f"AGENT_CHAT_MODEL_PROVIDER={raw_provider} but {env_var} is "
-            "empty on a production-shaped deploy; the first agent run "
-            f"would fail mid-SSE. Set {env_var} or switch the provider "
-            "to 'auto' / 'stub'."
+            f"AGENT_CHAT_MODEL_PROVIDER resolved to '{resolved.provider}' but "
+            f"{env_var} is empty on a production-shaped deploy; the first "
+            f"agent run would fail mid-SSE. Set {env_var} or switch the "
+            "provider to 'auto' / 'stub'."
         )
 
 

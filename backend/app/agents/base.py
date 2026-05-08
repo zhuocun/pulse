@@ -115,9 +115,8 @@ class AgentMetadata:
         the dataclass because the runtime / router still read them
         internally (recursion-limit clamp, context-schema introspection
         on the streaming endpoint), but they are deliberately *not*
-        emitted here -- the FE never reads them and including them just
-        bloats every metadata response. Trim per the v2.1 audit
-        follow-up (open item 9).
+        emitted here -- trim metadata fields the FE never reads from the
+        wire payload.
         """
 
         per_minute, per_hour = self.rate_limit
@@ -160,14 +159,14 @@ class BaseAgent(ABC):
         self._compiled: Optional[Pregel] = None
         self._compiled_checkpointer: Any = None
         self._compiled_store: Any = None
-        # Serialise concurrent ``compile()`` callers so two tasks racing
-        # on the cache miss path cannot both call ``self.build()``.
-        self._compile_lock = threading.Lock()
-        # Async variant used by ``acompile()`` -- avoids blocking the event
-        # loop on ``self.build()`` (which may call LangGraph's graph compiler
-        # and take meaningful time).  Initialised lazily on first use so that
-        # agents constructed outside an asyncio context still work fine.
-        self._compile_lock_async: Optional[asyncio.Lock] = None
+        # Single threading.Lock guards ALL writes to the compile-cache fields
+        # (_compiled, _compiled_checkpointer, _compiled_store).  Using one
+        # lock for both sync and async paths prevents cross-path races where
+        # sync invoke() (running in a threadpool) and async astream() (running
+        # in the event loop) both observe a stale cache and both call build().
+        # acompile() acquires this lock via asyncio.to_thread so the event
+        # loop is never blocked during graph compilation.
+        self._build_lock = threading.Lock()
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -217,9 +216,12 @@ class BaseAgent(ABC):
         self._chat_model = model
         self._chat_model_resolved = True
         # Force a rebuild on next compile so the new model is bound.
-        self._compiled = None
-        self._compiled_checkpointer = None
-        self._compiled_store = None
+        # Hold the build lock while clearing so we don't race with a
+        # concurrent compile() or acompile() that may be mid-build.
+        with self._build_lock:
+            self._compiled = None
+            self._compiled_checkpointer = None
+            self._compiled_store = None
 
     def compile(
         self,
@@ -236,13 +238,13 @@ class BaseAgent(ABC):
         graph (review F-4). The runtime hands a single pair to every
         agent for its lifetime, so cache hits dominate in production.
 
-        ``self._compile_lock`` serialises concurrent callers; without
+        ``self._build_lock`` serialises concurrent callers; without
         it, two tasks racing the cache-miss path could both invoke
         ``self.build()`` and the second-write-wins semantic would
         discard one freshly-built graph that may already be executing.
         """
 
-        with self._compile_lock:
+        with self._build_lock:
             same_checkpointer = self._compiled_checkpointer is checkpointer
             same_store = self._compiled_store is store
             if (
@@ -265,31 +267,32 @@ class BaseAgent(ABC):
     ) -> Pregel:
         """Async variant of :meth:`compile`; preferred in async contexts.
 
-        Uses an :class:`asyncio.Lock` for serialisation and dispatches
-        ``self.build()`` to a thread via :func:`asyncio.to_thread` so the
-        event loop is never blocked during graph compilation.  The compiled
-        graph is cached with the same ``(checkpointer, store)`` identity
-        semantics as the sync path.
+        Uses the shared :attr:`_build_lock` (a :class:`threading.Lock`) for
+        serialisation, acquired via :func:`asyncio.to_thread` so the event
+        loop is never blocked.  Dispatching the entire critical section to a
+        thread also means async and sync paths compete on the same lock, which
+        prevents cross-path races where ``invoke()`` (in a threadpool) and
+        ``astream()`` (in the event loop) both observe a stale cache and both
+        call ``self.build()``.  The compiled graph is cached with the same
+        ``(checkpointer, store)`` identity semantics as the sync path.
         """
 
-        # Lazily initialise the async lock inside the running event loop so
-        # agents constructed outside asyncio (e.g. in a sync test) don't
-        # break.
-        if self._compile_lock_async is None:
-            self._compile_lock_async = asyncio.Lock()
-        async with self._compile_lock_async:
-            if (
-                self._compiled is None
-                or self._compiled_checkpointer is not checkpointer
-                or self._compiled_store is not store
-                or force
-            ):
-                self._compiled = await asyncio.to_thread(
-                    self.build, checkpointer=checkpointer, store=store
-                )
-                self._compiled_checkpointer = checkpointer
-                self._compiled_store = store
-            return self._compiled
+        def _compile_sync() -> Pregel:
+            with self._build_lock:
+                if (
+                    self._compiled is None
+                    or self._compiled_checkpointer is not checkpointer
+                    or self._compiled_store is not store
+                    or force
+                ):
+                    self._compiled = self.build(
+                        checkpointer=checkpointer, store=store
+                    )
+                    self._compiled_checkpointer = checkpointer
+                    self._compiled_store = store
+                return self._compiled
+
+        return await asyncio.to_thread(_compile_sync)
 
     @staticmethod
     def _normalize_input(inputs: Any) -> Any:

@@ -27,6 +27,7 @@ import hashlib
 import logging
 import math
 import re
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -117,6 +118,7 @@ def _stub_embed(texts: list[str], dim: int = 16) -> list[list[float]]:
 # server treats as fixed-at-boot). Cache invalidation is a test-only
 # concern -- :func:`reset_embeddings_singleton` exists for that.
 _embeddings_singleton: Any = None
+_embeddings_lock = threading.Lock()
 
 
 def _resolve_embeddings() -> Any:
@@ -124,11 +126,13 @@ def _resolve_embeddings() -> Any:
 
     global _embeddings_singleton
     if _embeddings_singleton is None:
-        # Local import: the agents package imports this module for the
-        # stub implementation, so the top-level import would cycle.
-        from app.agents.embeddings import make_embeddings
+        with _embeddings_lock:
+            if _embeddings_singleton is None:  # double-checked locking
+                # Local import: the agents package imports this module for the
+                # stub implementation, so the top-level import would cycle.
+                from app.agents.embeddings import make_embeddings
 
-        _embeddings_singleton = make_embeddings()
+                _embeddings_singleton = make_embeddings()
     return _embeddings_singleton
 
 
@@ -146,6 +150,10 @@ async def embed_async(texts: list[str], dim: int = 16) -> list[list[float]]:
     run the blocking ``embed_documents`` call in a worker thread so a
     slow OpenAI round-trip does not stall other HTTP requests on the
     same worker.
+
+    When a real provider is configured, ``dim`` is honoured only for
+    the SHA-256 stub fallback; the real provider always returns
+    ``EMBEDDINGS_DIMENSIONS``-wide vectors.
     """
 
     if dim < 1:
@@ -172,6 +180,10 @@ async def embed_async(texts: list[str], dim: int = 16) -> list[list[float]]:
 def embed(texts: list[str], dim: int = 16) -> list[list[float]]:
     """Return a ``dim``-dimensional embedding per input string.
 
+    Tests and synchronous call sites only. Async LangGraph nodes MUST
+    use :func:`embed_async`; the sync call blocks the event loop on
+    real-provider round-trips.
+
     Routes through the configured provider (currently only OpenAI) when
     one resolves and falls back to the deterministic SHA-256 stub when
     the resolved model is the stub or the provider call raises. The
@@ -180,10 +192,10 @@ def embed(texts: list[str], dim: int = 16) -> list[list[float]]:
     ``task-estimation`` agent.
 
     The ``dim`` parameter is honoured on the stub path for backwards
-    compatibility with callers that override the width; the OpenAI
-    branch always returns ``STUB_EMBEDDING_DIM`` floats per the
-    ``dimensions=`` request parameter pinned in
-    :func:`app.agents.embeddings.make_embeddings`.
+    compatibility with callers that override the width. When a real
+    provider is configured, ``dim`` is honoured only for the SHA-256
+    stub fallback; the real provider always returns
+    ``EMBEDDINGS_DIMENSIONS``-wide vectors.
     """
 
     if dim < 1:

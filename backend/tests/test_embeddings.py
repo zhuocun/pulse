@@ -250,3 +250,19 @@ def test_assert_embeddings_provider_available_raises_for_missing_openai(
     )
     with pytest.raises(RuntimeError, match="langchain-openai is not installed"):
         assert_embeddings_provider_available(spec)
+
+
+def test_assert_embeddings_provider_available_warns_on_dim_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """OpenAI provider configured with a dim != stub width logs a warning."""
+
+    spec = EmbeddingsSpec(
+        provider=PROVIDER_OPENAI, model="text-embedding-3-small", api_key="sk-x"
+    )
+    with caplog.at_level("WARNING", logger=embeddings_module.__name__):
+        assert_embeddings_provider_available(
+            spec,
+            settings=_settings(embeddings_dimensions=STUB_EMBEDDING_DIM + 16),
+        )
+    assert any("Embedding width changed" in rec.message for rec in caplog.records)

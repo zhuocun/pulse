@@ -1253,6 +1253,70 @@ def test_agent_runtime_astream_swallows_aggregation_errors(
     assert captured == []
 
 
+def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """An AgentError raised by aget_state must propagate, not be swallowed
+    alongside generic best-effort failures (compile/lookup glitches)."""
+    import app.agents.runtime as runtime_mod
+    from app.agents.errors import AgentExecutionError
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    class _Span:
+        def __enter__(self) -> "_Span":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_result(self, result: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            pass
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: _Span()  # type: ignore[assignment]
+
+    agent = fresh_registry.get("echo")
+
+    class _AgentErrGraph:
+        def __init__(self, real: Any) -> None:
+            self._real = real
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._real, name)
+
+        async def aget_state(self, *args: Any, **kwargs: Any) -> Any:
+            raise AgentExecutionError("echo", message="forced")
+
+        async def astream(self, *args: Any, **kwargs: Any) -> Any:
+            async for ev in self._real.astream(*args, **kwargs):
+                yield ev
+
+    real_acompile = agent.acompile
+
+    async def patched_acompile(**kwargs: Any) -> Any:
+        return _AgentErrGraph(await real_acompile(**kwargs))
+
+    agent.acompile = patched_acompile  # type: ignore[assignment]
+
+    async def collect() -> None:
+        async for _ in runtime.astream(
+            "echo", {"text": "x"}, context=EchoContext()
+        ):
+            pass
+
+    try:
+        with pytest.raises(AgentExecutionError):
+            asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+        agent.acompile = real_acompile  # type: ignore[assignment]
+
+
 def test_lifespan_attaches_runtime(client: TestClient) -> None:
     runtime = main.app.state.agent_runtime
     assert isinstance(runtime, AgentRuntime)

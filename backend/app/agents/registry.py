@@ -21,9 +21,10 @@ class AgentRegistry:
     (catalog auto-discovery on cold start) and tests calling
     ``registry.clear()`` in teardown can race on the underlying dict.
     All mutating operations take :attr:`_lock` so the dict mutation is
-    serialised. Read operations also take it briefly to publish the
-    latest write through the lock's memory barrier on platforms with
-    weak memory ordering.
+    serialised. Read operations also take it briefly so that test
+    teardown calling ``clear()`` while a request thread iterates cannot
+    produce a ``RuntimeError: dictionary changed size during iteration``
+    -- the lock keeps reads consistent during writes.
     """
 
     def __init__(self) -> None:
