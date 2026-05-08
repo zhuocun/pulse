@@ -77,6 +77,35 @@ def test_exactly_50_messages_passes() -> None:
     enforce_request_limits({"messages": messages})
 
 
+def test_content_length_header_fastpath_rejects_oversized() -> None:
+    """An oversized ``Content-Length`` header is rejected before the
+    parsed-body re-serialisation cost is paid."""
+
+    class _RequestStub:
+        headers = {"content-length": "10000000"}  # 10 MB declared
+
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"prompt": "tiny"}, request=_RequestStub())  # type: ignore[arg-type]
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
+def test_content_length_header_invalid_falls_through_to_body_check() -> None:
+    """A malformed ``Content-Length`` does not cause a fast-path rejection;
+    the body-size check still runs (and passes for a tiny payload)."""
+
+    class _RequestStub:
+        headers = {"content-length": "not-a-number"}
+
+    enforce_request_limits({"prompt": "tiny"}, request=_RequestStub())  # type: ignore[arg-type]
+
+
+def test_content_length_header_within_limit_falls_through() -> None:
+    class _RequestStub:
+        headers = {"content-length": "100"}
+
+    enforce_request_limits({"prompt": "ok"}, request=_RequestStub())  # type: ignore[arg-type]
+
+
 # ---------------------------------------------------------------------------
 # HTTP integration: v1 router family (/api/ai/*)
 # ---------------------------------------------------------------------------
