@@ -1777,3 +1777,159 @@ def test_chat_agent_invoke_skips_custom_emit_without_streaming_context(
         headers=auth_headers,
     )
     assert response.status_code == HTTPStatus.OK
+
+
+# ---------------------------------------------------------------------------
+# Coverage for review-cycle fixes
+# ---------------------------------------------------------------------------
+
+
+def test_unpack_structured_response_handles_non_dict_response() -> None:
+    """A non-dict response is treated as a complete miss."""
+
+    from app.agents.catalog._shared import unpack_structured_response
+
+    raw, parsed, error = unpack_structured_response("not a dict")
+    assert raw is None
+    assert parsed is None
+    assert error is None
+
+
+def test_catalog_last_discovery_failures_returns_recorded_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A broken catalog module surfaces in :func:`last_discovery_failures`."""
+
+    import importlib
+
+    from app.agents import catalog as catalog_module
+
+    real_import = importlib.import_module
+
+    def _flaky_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name.endswith(".chat"):
+            raise ImportError("simulated failure")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", _flaky_import)
+    catalog_module.discover()
+    failures = catalog_module.last_discovery_failures()
+    assert any(
+        f.module_name.endswith(".chat") and f.error_type == "ImportError"
+        for f in failures
+    )
+
+
+def test_triage_truncate_snapshot_caps_oversized_lists() -> None:
+    """Bulky tasks/columns/members lists are clipped before LLM dispatch."""
+
+    from app.agents.catalog.triage import _truncate_snapshot
+
+    snapshot = {
+        "tasks": list(range(50)),
+        "columns": list(range(20)),
+        "members": list(range(40)),
+        "project_id": "p1",
+    }
+    out = _truncate_snapshot(snapshot)
+    assert len(out["tasks"]) == 20
+    assert len(out["columns"]) == 12
+    assert len(out["members"]) == 25
+    assert out["project_id"] == "p1"
+
+
+def test_truncate_snapshot_passthrough_for_non_dict() -> None:
+    from app.agents.catalog.triage import _truncate_snapshot
+
+    assert _truncate_snapshot("nope") == "nope"  # type: ignore[arg-type]
+
+
+def test_be_tools_detect_drift_honours_explicit_per_column_wip_limit() -> None:
+    """A column with a small ``wipLimit`` overflows below the org default."""
+
+    from app.tools import be_tools
+
+    # 3 tasks in a column with explicit limit 2 => overflow.
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Doing", "wipLimit": 2}],
+        "tasks": [
+            {"id": "t1", "columnId": "c1"},
+            {"id": "t2", "columnId": "c1"},
+            {"id": "t3", "columnId": "c1"},
+        ],
+    }
+    result = be_tools.detect_drift(snapshot)
+    overflow = [s for s in result["signals"] if s["type"] == "wip_overflow"]
+    assert overflow == [
+        {
+            "type": "wip_overflow",
+            "column_id": "c1",
+            "column_name": "Doing",
+            "count": 3,
+            "limit": 2,
+        }
+    ]
+
+
+def test_be_tools_detect_drift_skips_columns_marked_done_by_flag() -> None:
+    """Non-English ``"Terminé"`` (or ``isDone=True``) columns skip WIP checks."""
+
+    from app.tools import be_tools
+
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Terminé"}],
+        "tasks": [{"id": f"t{i}", "columnId": "c1"} for i in range(10)],
+    }
+    result = be_tools.detect_drift(snapshot)
+    assert all(s["type"] != "wip_overflow" for s in result["signals"])
+
+
+def test_be_tools_detect_drift_skips_columns_with_isdone_true() -> None:
+    """An explicit ``isDone=True`` flag also excludes the column from WIP."""
+
+    from app.tools import be_tools
+
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Closed Bucket", "isDone": True}],
+        "tasks": [{"id": f"t{i}", "columnId": "c1"} for i in range(10)],
+    }
+    result = be_tools.detect_drift(snapshot)
+    assert all(s["type"] != "wip_overflow" for s in result["signals"])
+
+
+def test_v1_chat_returns_504_on_timeout(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The v1 ``/api/ai/chat`` shim now wraps ``runtime.ainvoke`` in
+    ``asyncio.wait_for``; a hung provider call surfaces as a 504 error
+    envelope rather than blocking the worker indefinitely."""
+
+    import asyncio
+
+    async def _hang(*args: Any, **kwargs: Any) -> Any:
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(client.app.state.agent_runtime, "ainvoke", _hang, raising=False)
+
+    from dataclasses import replace
+
+    from app.config import settings as cfg
+
+    monkeypatch.setattr(
+        "app.routers.ai.settings", replace(cfg, agent_request_timeout_seconds=0.05)
+    )
+
+    response = client.post(
+        "/api/ai/chat",
+        headers=auth_headers,
+        json={
+            "messages": [{"role": "user", "content": "ping"}],
+            "context": {"project": {"_id": "p-fill-chat", "projectName": "Demo"}},
+        },
+    )
+    assert response.status_code == HTTPStatus.GATEWAY_TIMEOUT
+    body = response.json()
+    detail = body.get("detail") or body
+    assert detail["error"]["code"] == "timeout"

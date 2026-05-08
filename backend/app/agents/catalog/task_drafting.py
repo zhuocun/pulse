@@ -26,11 +26,13 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._shared import unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
 from app.agents.stream import emit_custom
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact, redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
 
@@ -82,14 +84,20 @@ async def polish_draft(
 
     if is_stub_model(model):
         return deterministic, 0, 0
+    # Redact PII from every field that crosses the provider boundary.
+    # ``deterministic`` is the freshly-built draft we own; ``prompt`` and
+    # ``similar`` come from the FE and may contain emails / secrets / SSNs.
+    safe_prompt = redact(prompt)[0]
+    safe_similar = redact_dict(similar[:3])
+    safe_draft = redact_task_fields(deterministic)
     instruction = (
         "You are drafting a Jira task card. Update only the eligible text "
         "fields and return them in the structured schema. Keep taskName "
         "<=80 chars, note <=500 chars (plain text), rationale <=180 "
         "chars. Do not invent ids; do not change story points.\n\n"
-        f"Prompt: {prompt}\n"
-        f"Similar tasks: {json.dumps(similar[:3])}\n"
-        f"Current draft: {json.dumps(deterministic)}"
+        f"Prompt: {safe_prompt}\n"
+        f"Similar tasks: {json.dumps(safe_similar)}\n"
+        f"Current draft: {json.dumps(safe_draft)}"
     )
     try:
         structured = model.with_structured_output(DraftPolish, include_raw=True)
@@ -97,9 +105,7 @@ async def polish_draft(
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("task-drafting structured output failed; falling back.")
         return deterministic, 0, 0
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, DraftPolish):
         return deterministic, tokens_in, tokens_out
@@ -175,11 +181,13 @@ class TaskDraftingAgent(BaseAgent):
                     {**polished, "taskName": f"{polished['taskName']} ({axis} {i})"}
                     for i in range(1, 4)
                 ]
+                # Breakdown still rides the ``"draft"`` surface; the FE
+                # discriminates by ``payload.axis`` (see
+                # ``src/components/aiTaskDraftModal/index.tsx``).
                 draft: dict[str, Any] = {"axis": axis, "items": pieces}
-                surface = "draft"
             else:
                 draft = polished
-                surface = "draft"
+            surface = "draft"
             emit_custom(
                 {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
             )

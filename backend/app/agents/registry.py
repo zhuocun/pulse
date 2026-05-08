@@ -7,6 +7,7 @@ an agent is purely a question of importing (or not importing) its module.
 
 from __future__ import annotations
 
+import threading
 from typing import Iterator
 
 from app.agents.base import AgentMetadata, BaseAgent
@@ -14,46 +15,68 @@ from app.agents.errors import AgentAlreadyRegisteredError, AgentNotFoundError
 
 
 class AgentRegistry:
-    """Mapping of agent name to instance with conflict detection."""
+    """Mapping of agent name to instance with conflict detection.
+
+    The registry is a process-wide mutable singleton; concurrent imports
+    (catalog auto-discovery on cold start) and tests calling
+    ``registry.clear()`` in teardown can race on the underlying dict.
+    All mutating operations take :attr:`_lock` so the dict mutation is
+    serialised. Read operations also take it briefly to publish the
+    latest write through the lock's memory barrier on platforms with
+    weak memory ordering.
+    """
 
     def __init__(self) -> None:
         self._agents: dict[str, BaseAgent] = {}
+        self._lock = threading.Lock()
 
     def register(self, agent: BaseAgent, *, replace: bool = False) -> BaseAgent:
         name = agent.name
-        if not replace and name in self._agents:
-            raise AgentAlreadyRegisteredError(name)
-        self._agents[name] = agent
+        with self._lock:
+            if not replace and name in self._agents:
+                raise AgentAlreadyRegisteredError(name)
+            self._agents[name] = agent
         return agent
 
     def unregister(self, name: str) -> None:
-        if name not in self._agents:
-            raise AgentNotFoundError(name)
-        del self._agents[name]
+        with self._lock:
+            if name not in self._agents:
+                raise AgentNotFoundError(name)
+            del self._agents[name]
 
     def get(self, name: str) -> BaseAgent:
-        try:
-            return self._agents[name]
-        except KeyError as exc:
-            raise AgentNotFoundError(name) from exc
+        with self._lock:
+            try:
+                return self._agents[name]
+            except KeyError as exc:
+                raise AgentNotFoundError(name) from exc
 
     def names(self) -> list[str]:
-        return sorted(self._agents)
+        with self._lock:
+            return sorted(self._agents)
 
     def metadata(self) -> list[AgentMetadata]:
-        return [self._agents[name].metadata for name in self.names()]
+        with self._lock:
+            return [self._agents[name].metadata for name in sorted(self._agents)]
 
     def clear(self) -> None:
-        self._agents.clear()
+        with self._lock:
+            self._agents.clear()
 
     def __contains__(self, name: object) -> bool:
-        return isinstance(name, str) and name in self._agents
+        if not isinstance(name, str):
+            return False
+        with self._lock:
+            return name in self._agents
 
     def __iter__(self) -> Iterator[BaseAgent]:
-        return (self._agents[name] for name in self.names())
+        with self._lock:
+            snapshot = [self._agents[name] for name in sorted(self._agents)]
+        return iter(snapshot)
 
     def __len__(self) -> int:
-        return len(self._agents)
+        with self._lock:
+            return len(self._agents)
 
 
 registry = AgentRegistry()

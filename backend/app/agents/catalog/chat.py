@@ -142,19 +142,11 @@ class ChatAgent(BaseAgent):
             emit_custom(
                 {"kind": "usage", "tokensIn": tokens_in, "tokensOut": tokens_out}
             )
-            if user_text:
-                emit_custom(
-                    {
-                        "kind": "citation",
-                        "refs": [
-                            {
-                                "source": "user",
-                                "id": project_id,
-                                "quote": be_tools.summarize(user_text, max_chars=200),
-                            }
-                        ],
-                    }
-                )
+            # No citation event here: the user's own message is not a
+            # citable entity and ``source: "user"`` is not in the FE
+            # contract enum (``task | column | member | project`` --
+            # see ``src/interfaces/agent.d.ts``). Emitting it caused the
+            # FE citation chip renderer to silently drop the ref.
             return {"messages": [response]}
 
         graph: StateGraph = StateGraph(ChatState)

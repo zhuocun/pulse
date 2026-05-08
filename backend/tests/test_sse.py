@@ -141,8 +141,30 @@ def test_error_envelope_shape() -> None:
     assert envelope == {
         "type": "error",
         "ns": [],
-        "data": {"message": "boom", "recoverable": True},
+        "data": {"code": "stream_error", "message": "boom", "recoverable": True},
     }
+
+
+def test_error_envelope_accepts_explicit_code() -> None:
+    """Callers can tag the envelope with a stable machine-readable code."""
+
+    envelope = error_envelope("ran out of time", recoverable=False, code="timeout")
+    assert envelope["data"]["code"] == "timeout"
+    assert envelope["data"]["message"] == "ran out of time"
+    assert envelope["data"]["recoverable"] is False
+
+
+def test_encode_sse_substitutes_error_frame_on_unencodable_envelope() -> None:
+    """A single bad chunk must not 500 the stream -- substitute an error frame."""
+
+    from app.agents.sse import encode_sse
+
+    # ``float("nan")`` survives ``json.dumps`` only with allow_nan=True
+    # (the default); use a literal ``object()`` which always trips it.
+    bad = {"type": "custom", "ns": [], "data": {"x": object()}}
+    frame = encode_sse(bad)
+    assert frame.startswith(b"data: ")
+    assert b"encode_error" in frame
 
 
 def test_usage_envelope_shape() -> None:

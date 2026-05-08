@@ -25,6 +25,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.catalog._shared import unpack_structured_response
 from app.agents.llm import extract_token_usage, is_stub_model
 from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
@@ -32,6 +33,7 @@ from app.agents.stream import emit_custom
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
+from app.tools.redaction import redact, redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
 
@@ -87,14 +89,16 @@ async def polish_readiness(
     issues = deterministic.get("issues") or []
     if not issues:
         return deterministic, 0, 0
+    safe_draft = redact_task_fields(draft)
+    safe_issues = redact_dict(issues)
     prompt = (
         "Rewrite the message and suggestion strings for each readiness "
         "issue below so they are specific and actionable for this Jira-"
         "style task draft. Keep each string <=160 chars and on a single "
         "line. Preserve the field id verbatim; do not invent new fields. "
         "Return JSON matching the schema.\n\n"
-        f"Draft: {json.dumps(draft)}\n"
-        f"Issues: {json.dumps(issues)}"
+        f"Draft: {json.dumps(safe_draft)}\n"
+        f"Issues: {json.dumps(safe_issues)}"
     )
     try:
         structured = model.with_structured_output(
@@ -104,9 +108,7 @@ async def polish_readiness(
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("readiness structured output failed; falling back.")
         return deterministic, 0, 0
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, ReadinessPolish):
         return deterministic, tokens_in, tokens_out
@@ -140,13 +142,15 @@ async def polish_rationale(
 
     if is_stub_model(model):
         return deterministic, 0, 0
+    safe_draft = redact_task_fields(draft)
+    safe_neighbours = redact_dict(neighbours[:3])
     prompt = (
         "Write a single-line, <=180-character rationale for this story-point "
         "estimate. Keep tone factual; reference the provided neighbours "
         "if helpful. Do not propose a different point value. Return the "
         "structured schema.\n\n"
-        f"Draft: {json.dumps(draft)}\nPoints: {points}\n"
-        f"Neighbours: {json.dumps(neighbours[:3])}"
+        f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
+        f"Neighbours: {json.dumps(safe_neighbours)}"
     )
     try:
         structured = model.with_structured_output(
@@ -156,9 +160,7 @@ async def polish_rationale(
     except Exception:  # noqa: BLE001 -- defensive boundary around provider call
         logger.exception("task-estimation structured output failed; falling back.")
         return deterministic, 0, 0
-    raw = response.get("raw") if isinstance(response, dict) else None
-    parsed = response.get("parsed") if isinstance(response, dict) else None
-    error = response.get("parsing_error") if isinstance(response, dict) else None
+    raw, parsed, error = unpack_structured_response(response)
     tokens_in, tokens_out = extract_token_usage(raw)
     if error is not None or not isinstance(parsed, EstimationRationale):
         return deterministic, tokens_in, tokens_out
@@ -266,10 +268,14 @@ class TaskEstimationAgent(BaseAgent):
             draft = state.get("task_draft") or {}
             corpus_texts = [item.get("text", "") for item in similar]
             corpus_ids = [item.get("id", str(idx)) for idx, item in enumerate(similar)]
-            corpus_vectors = (
-                await be_tools.embed_async(corpus_texts) if corpus_texts else []
-            )
-            query_vec = (await be_tools.embed_async([draft.get("taskName", "")]))[0]
+            query_text = draft.get("taskName", "")
+            # Embed query and corpus in a single batched call so a load-
+            # balanced provider can't drift between two HTTP round-trips
+            # and produce vectors in slightly different embedding spaces
+            # (which would silently corrupt cosine scores).
+            vectors = await be_tools.embed_async([query_text] + corpus_texts)
+            query_vec = vectors[0]
+            corpus_vectors = vectors[1:]
             corpus = list(zip(corpus_ids, corpus_vectors))
             neighbours = (
                 be_tools.embedding_neighbors(query_vec, corpus, k=3) if corpus else []
@@ -311,11 +317,12 @@ class TaskEstimationAgent(BaseAgent):
             similar = state.get("similar_tasks") or []
             refs: list[dict[str, Any]] = []
             for item in similar[:3]:
+                quote = item.get("text") or item.get("id") or ""
                 refs.append(
                     be_tools.validated_citation_ref(
                         source="task",
                         id=item.get("id"),
-                        quote=item.get("text") or item.get("id") or "",
+                        quote=redact(quote)[0] if isinstance(quote, str) else quote,
                     )
                 )
             if refs:

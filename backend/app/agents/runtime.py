@@ -163,12 +163,14 @@ class AgentRuntime:
     ) -> str:
         """Namespace the thread id by ``(agent, user)``.
 
-        Without the user component, a caller could supply somebody
-        else's ``thread_id`` and resume against a checkpointer that
-        served the victim's prior conversation -- a tenancy breach
-        whenever the checkpointer survives across requests (Postgres
-        backend in particular). Including ``user_id`` in the prefix
-        scopes every thread to the issuing user.
+        The canonical form is ``{agent}:{scope}:{tail}`` where ``scope``
+        is the authenticated user_id (or ``"anon"``). To prevent a
+        client from binding a checkpoint to another user's namespace by
+        injecting a victim's prefix, any pre-existing ``{agent}:*:``
+        prefix on the supplied id is stripped before the canonical
+        prefix for the current user is reapplied. The legitimate case
+        where a client round-trips its own previously-namespaced id is
+        preserved -- the strip + reapply produces the same final id.
         """
 
         base = (thread_id or self._default_thread_id).strip()
@@ -176,13 +178,17 @@ class AgentRuntime:
             base = self._default_thread_id
         scope = (user_id or "anon").strip() or "anon"
         prefix = f"{agent.name}:{scope}:"
-        if base.startswith(prefix):
-            return base
-        # Strip a legacy ``{agent}:`` prefix so we do not double-prefix
-        # threads that were namespaced under the old scheme.
-        agent_only = f"{agent.name}:"
-        if base.startswith(agent_only) and not base.startswith(prefix):
-            base = base[len(agent_only):]
+        agent_prefix = f"{agent.name}:"
+        if base.startswith(agent_prefix):
+            remainder = base[len(agent_prefix):]
+            # Drop a leading ``<scope>:`` segment so a client cannot
+            # bind their work to another user's thread by replaying a
+            # ``{agent}:{victim}:{tail}`` id. The unscoped tail is the
+            # only part the caller "owns"; we re-namespace it below.
+            first_colon = remainder.find(":")
+            if first_colon != -1:
+                remainder = remainder[first_colon + 1:]
+            base = remainder or self._default_thread_id
         return f"{prefix}{base}"
 
     def _resolved_recursion_limit(self, agent: BaseAgent) -> int:

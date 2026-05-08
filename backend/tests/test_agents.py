@@ -944,6 +944,28 @@ def test_agent_runtime_replaces_blank_thread_with_default(
     assert cfg["configurable"]["thread_id"] == "echo:anon:default"
 
 
+def test_agent_runtime_rebinds_thread_to_authenticated_user(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A thread id namespaced for another user is rebound to the caller.
+
+    A client cannot resume against another user's checkpointed state by
+    replaying a ``{agent}:{victim}:{tail}`` id -- the runtime strips the
+    victim's scope and re-namespaces under the authenticated user, so
+    the resulting thread is the caller's own (separate) namespace.
+    """
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    cfg = runtime.build_config(
+        runtime.get("echo"),
+        thread_id="echo:victim:secret",
+        user_id="attacker",
+    )
+    assert cfg["configurable"]["thread_id"] == "echo:attacker:secret"
+    assert "victim" not in cfg["configurable"]["thread_id"]
+
+
 def test_agent_runtime_invoke_and_ainvoke_with_context(
     fresh_registry: AgentRegistry,
 ) -> None:
@@ -2173,7 +2195,16 @@ def test_v21_catalog_agents_emit_citation_custom_events(
             assert ref["quote"]
 
 
-def test_chat_agent_emits_citation_custom_event() -> None:
+def test_chat_agent_does_not_emit_invalid_user_citation() -> None:
+    """User messages are not citable; no ``source: "user"`` ref must escape.
+
+    The FE wire contract (``src/interfaces/agent.d.ts``) constrains
+    citation sources to ``task | column | member | project``. The chat
+    agent used to emit a placeholder citation pointing at the user's own
+    input, which the FE silently dropped. Now it emits no citation at
+    all -- a usage event still fires so the budget UI stays accurate.
+    """
+
     from langchain_core.messages import HumanMessage
 
     runtime = main.app.state.agent_runtime
@@ -2193,9 +2224,13 @@ def test_chat_agent_emits_citation_custom_event() -> None:
 
     events = asyncio.run(collect())
     custom = [payload for mode, payload in events if mode == "custom"]
+    citations = [
+        c for c in custom if isinstance(c, dict) and c.get("kind") == "citation"
+    ]
+    assert citations == [], "chat-agent must not emit citations for user text"
+    # Usage event still fires so the FE budget display stays accurate.
     assert any(
-        isinstance(c, dict) and c.get("kind") == "citation" and c["refs"]
-        for c in custom
+        isinstance(c, dict) and c.get("kind") == "usage" for c in custom
     )
 
 
