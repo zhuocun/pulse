@@ -21,6 +21,9 @@ exception handler renders them as JSON without leaking tracebacks.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as _hmac
 import logging
 from contextlib import AsyncExitStack
 from typing import Any, AsyncIterator, Mapping, Optional
@@ -55,6 +58,93 @@ from app.agents.stores import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Signed thread-key helpers (Phase 6C)
+# ---------------------------------------------------------------------------
+
+# Token prefix used to detect the signed envelope format.
+_SIGNED_PREFIX = "sigv1."
+# NUL byte used as a field separator inside the payload (never valid in a
+# thread ID so it cannot be injected).
+_SEP = "\x00"
+
+
+def _signing_key() -> bytes:
+    """Return the HMAC-SHA256 signing key (bytes-encoded JWT secret)."""
+    from app.config import settings as _settings
+
+    return _settings.jwt_secret.encode()
+
+
+def sign_thread_key(
+    agent_name: str,
+    scope: str,
+    original_thread_id: str,
+) -> str:
+    """Return an opaque signed token for ``(agent_name, scope, original_thread_id)``.
+
+    The token is a ``sigv1.<base64url>`` string where the base64url payload
+    encodes ``agent_name NUL scope NUL original_thread_id NUL hmac_hex``.
+    The HMAC-SHA256 digest is computed over the same three fields so
+    the signature covers all components and cannot be stripped or swapped.
+
+    Signing is deterministic: same inputs → same token regardless of call order.
+    """
+    message = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}"
+    digest = _hmac.new(
+        _signing_key(), message.encode(), hashlib.sha256
+    ).hexdigest()
+    payload = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}{_SEP}{digest}"
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode()
+    return f"{_SIGNED_PREFIX}{encoded}"
+
+
+def _try_verify_signed_thread_key(
+    token: str,
+    agent_name: str,
+    scope: str,
+) -> Optional[str]:
+    """Validate a signed token and return the original thread_id, or ``None``.
+
+    Returns ``None`` when:
+    - the token does not have the ``sigv1.`` prefix,
+    - base64 decoding fails,
+    - the payload does not have the expected 4 NUL-separated fields,
+    - the embedded agent_name / scope do not match the current call, or
+    - the HMAC signature is invalid (constant-time comparison).
+
+    Callers that receive ``None`` should fall back to the iterative-strip
+    path for backwards compatibility with unsigned thread IDs.
+    """
+    if not token.startswith(_SIGNED_PREFIX):
+        return None
+    encoded = token[len(_SIGNED_PREFIX):]
+    try:
+        payload = base64.urlsafe_b64decode(encoded.encode()).decode()
+    except Exception:  # noqa: BLE001 -- malformed base64
+        return None
+    parts = payload.split(_SEP, 3)
+    if len(parts) != 4:
+        return None
+    tok_agent, tok_scope, tok_original, tok_digest = parts
+    # Reject tokens for a different agent or user scope.
+    if tok_agent != agent_name or tok_scope != scope:
+        raise ValueError(
+            f"Signed thread key rejected: token was issued for "
+            f"agent={tok_agent!r} scope={tok_scope!r}, but the current "
+            f"call is agent={agent_name!r} scope={scope!r}."
+        )
+    # Constant-time HMAC comparison.
+    message = f"{tok_agent}{_SEP}{tok_scope}{_SEP}{tok_original}"
+    expected = _hmac.new(
+        _signing_key(), message.encode(), hashlib.sha256
+    ).hexdigest()
+    if not _hmac.compare_digest(expected, tok_digest):
+        raise ValueError(
+            "Signed thread key rejected: HMAC signature mismatch."
+        )
+    return tok_original
 
 
 class AgentRuntime:
@@ -193,29 +283,50 @@ class AgentRuntime:
         """Namespace the thread id by ``(agent, user)``.
 
         The canonical form is ``{agent}:{scope}:{tail}`` where ``scope``
-        is the authenticated user_id (or ``"anon"``). To prevent a client
-        from binding a checkpoint to another user's namespace by injecting a
-        victim's prefix (e.g. passing ``{agent}:{victim}:{tail}``), all
-        leading ``{agent}:{any_segment}:`` prefixes where ``{agent}`` is
-        THIS agent's name are stripped iteratively before the canonical
-        prefix for the current user is reapplied.
+        is the authenticated user_id (or ``"anon"``).
 
-        This protects against chained prefix injection
-        (e.g. ``agent:user_a:agent:user_b:tail`` is fully stripped to
-        ``tail`` before renaming). Cross-agent thread sharing is a
-        separate concern handled by checkpointer namespacing, if at all.
+        **Signed path** (preferred, Phase 6C): if ``thread_id`` starts with
+        the ``sigv1.`` prefix, it is treated as an HMAC-signed envelope.  The
+        signature is validated against the JWT secret and the original thread
+        ID is extracted.  A mismatched agent/scope or invalid HMAC raises
+        :class:`ValueError` immediately so prefix-injection via a stolen token
+        is rejected with a clear error rather than silently re-scoped.
 
-        The legitimate round-trip case is preserved: a client that
-        replays its own previously-namespaced id
-        (``{agent}:{scope}:{tail}``) ends up with the same final id
-        after strip + reapply.
+        **Unsigned fallback** (backwards compat): plain thread IDs (no
+        ``sigv1.`` prefix) are processed with the original iterative-strip
+        logic so rolling restarts and older clients remain functional.  All
+        leading ``{agent}:{any_segment}:`` prefixes are stripped iteratively
+        before the canonical prefix for the current user is reapplied.  This
+        protects against chained prefix injection
+        (``agent:u1:agent:u2:tail`` → ``tail`` → ``agent:u_current:tail``).
         """
 
-        base = (thread_id or self._default_thread_id).strip()
-        if not base:
-            base = self._default_thread_id
+        raw = (thread_id or self._default_thread_id).strip()
+        if not raw:
+            raw = self._default_thread_id
         scope = (user_id or "anon").strip() or "anon"
         prefix = f"{agent.name}:{scope}:"
+
+        # ------------------------------------------------------------------
+        # Signed path: validate and unwrap the HMAC envelope.
+        # ------------------------------------------------------------------
+        if raw.startswith(_SIGNED_PREFIX):
+            original = _try_verify_signed_thread_key(raw, agent.name, scope)
+            if original is None:
+                # Malformed envelope; treat as an unsigned id to preserve
+                # rolling-restart safety (the new server code may restart
+                # while old clients are mid-flight with a plain id that
+                # coincidentally starts with "sigv1." -- extremely unlikely
+                # but handle gracefully).
+                pass
+            else:
+                base = original.strip() or self._default_thread_id
+                return f"{prefix}{base}"
+
+        # ------------------------------------------------------------------
+        # Unsigned fallback: iterative-strip (backwards compat).
+        # ------------------------------------------------------------------
+        base = raw
         agent_prefix = f"{agent.name}:"
         # Iteratively strip all leading ``{agent}:{any_segment}:`` prefixes
         # so a chained injection like ``agent:u1:agent:u2:tail`` is reduced

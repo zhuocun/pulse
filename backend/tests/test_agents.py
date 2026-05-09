@@ -1311,6 +1311,145 @@ def test_agent_runtime_rebinds_thread_to_authenticated_user(
     assert "victim" not in cfg["configurable"]["thread_id"]
 
 
+# ---------------------------------------------------------------------------
+# 6C: Signed thread key tests
+# ---------------------------------------------------------------------------
+
+
+def test_signed_thread_key_rejects_prefix_injection(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Prefix-injection via a signed token is rejected with a clear error.
+
+    When a token is valid but was issued for a different agent or user scope,
+    ``_try_verify_signed_thread_key`` raises ``ValueError`` rather than
+    silently re-scoping the thread.
+    """
+    from app.agents.runtime import sign_thread_key, _try_verify_signed_thread_key
+
+    # Create a valid token for "other-agent" and "other-user".
+    token = sign_thread_key("other-agent", "other-user", "my-thread")
+
+    # Trying to verify it as "echo" / "attacker" must raise.
+    with pytest.raises(ValueError, match="Signed thread key rejected"):
+        _try_verify_signed_thread_key(token, "echo", "attacker")
+
+
+def test_signed_thread_key_unsigned_fallback_still_works(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Old unsigned thread_ids continue to work via the iterative-strip fallback."""
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    # Plain (unsigned) thread id -- must route through fallback, not signed path.
+    cfg = runtime.build_config(
+        runtime.get("echo"),
+        thread_id="my-plain-thread",
+        user_id="u1",
+    )
+    assert cfg["configurable"]["thread_id"] == "echo:u1:my-plain-thread"
+
+
+def test_signed_thread_key_is_deterministic(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Signing is deterministic: same (agent, user, original) → same token."""
+    from app.agents.runtime import sign_thread_key
+
+    t1 = sign_thread_key("echo", "u1", "my-thread")
+    t2 = sign_thread_key("echo", "u1", "my-thread")
+    assert t1 == t2
+    # Different inputs produce different tokens.
+    t3 = sign_thread_key("echo", "u2", "my-thread")
+    assert t1 != t3
+
+
+def test_signed_thread_key_round_trips_through_namespaced_thread(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A signed token round-trips correctly through ``_namespaced_thread``.
+
+    A client that receives a signed token and echoes it back should get
+    the same canonical thread ID as if they had passed the original plain id.
+    """
+    from app.agents.runtime import sign_thread_key
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    agent = runtime.get("echo")
+
+    # Build config with the plain thread id first.
+    plain_cfg = runtime.build_config(agent, thread_id="t-1", user_id="u1")
+    plain_thread = plain_cfg["configurable"]["thread_id"]
+
+    # Now create a signed token and pass it back.
+    token = sign_thread_key("echo", "u1", "t-1")
+    signed_cfg = runtime.build_config(agent, thread_id=token, user_id="u1")
+    signed_thread = signed_cfg["configurable"]["thread_id"]
+
+    assert signed_thread == plain_thread, (
+        f"Signed round-trip mismatch: plain={plain_thread!r}, signed={signed_thread!r}"
+    )
+
+
+def test_try_verify_returns_none_for_non_signed_token() -> None:
+    """_try_verify_signed_thread_key returns None for tokens without the prefix."""
+    from app.agents.runtime import _try_verify_signed_thread_key
+
+    result = _try_verify_signed_thread_key("plain-thread-id", "echo", "u1")
+    assert result is None
+
+
+def test_try_verify_returns_none_for_malformed_base64() -> None:
+    """_try_verify_signed_thread_key returns None for invalid base64 after prefix."""
+    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX
+
+    result = _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}!!!not_base64!!!", "echo", "u1")
+    assert result is None
+
+
+def test_try_verify_returns_none_for_wrong_field_count() -> None:
+    """_try_verify_signed_thread_key returns None when payload has wrong NUL field count."""
+    import base64
+    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX, _SEP
+
+    # Only 2 NUL-separated fields (need 4)
+    payload = f"echo{_SEP}u1"
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode()
+    result = _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}{encoded}", "echo", "u1")
+    assert result is None
+
+
+def test_try_verify_raises_on_invalid_hmac() -> None:
+    """_try_verify_signed_thread_key raises ValueError when HMAC is wrong."""
+    import base64
+    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX, _SEP
+
+    # Build a payload with the right fields but a bogus digest.
+    payload = f"echo{_SEP}u1{_SEP}my-thread{_SEP}0000000000000000000000000000000000000000000000000000000000000000"
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode()
+    with pytest.raises(ValueError, match="HMAC signature mismatch"):
+        _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}{encoded}", "echo", "u1")
+
+
+def test_namespaced_thread_treats_malformed_sigv1_as_unsigned(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A ``sigv1.`` token that returns None from verification falls back to unsigned path."""
+    from app.agents.runtime import _SIGNED_PREFIX
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    agent = runtime.get("echo")
+
+    # Construct a token that starts with sigv1. but has invalid base64 body.
+    malformed_token = f"{_SIGNED_PREFIX}!!!invalid!!!"
+    # Should not raise; falls back to iterative-strip treating the whole
+    # token as a plain thread id.
+    cfg = runtime.build_config(agent, thread_id=malformed_token, user_id="u1")
+    assert cfg["configurable"]["thread_id"].startswith("echo:u1:")
+
+
 def test_agent_runtime_invoke_and_ainvoke_with_context(
     fresh_registry: AgentRegistry,
 ) -> None:
