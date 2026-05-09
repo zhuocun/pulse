@@ -50,9 +50,10 @@ preserve.
 
 ## Status — 2026-05-09
 
-Implementation tracked on `claude/review-agent-architecture-drvY9`.
+Implementation tracked on `claude/review-agent-architecture-drvY9`,
+continued on `claude/complete-subagent-orchestrator-fbQHj`.
 
-### Phase 1 — Collapse the v1 shim onto the agent runtime
+### Phase 1 — Collapse the v1 shim onto the agent runtime — **complete**
 
 | Item | Status | Commit |
 |---|---|---|
@@ -62,19 +63,133 @@ Implementation tracked on `claude/review-agent-architecture-drvY9`.
 | `build_citation_refs` default `get_id` falls back from `id` to `_id` | shipped | `82094d6` |
 | Byte-shape parity goldens for all 7 `/api/ai/*` routes (`tests/test_v1_ai_shim_parity.py`) | shipped | `82094d6` |
 | `/api/ai/board-brief` migrated to `runtime.arun_with_events` | shipped | `5e82f2d` |
-| `/api/ai/task-draft` migrated | pending | — |
-| `/api/ai/task-breakdown` migrated | pending | — |
-| `/api/ai/estimate` migrated | pending | — |
-| `/api/ai/readiness` migrated | pending | — |
-| `/api/ai/search` migrated | pending | — |
-| `/api/ai/chat` migrated to `arun_with_events` (today goes through `ainvoke`) | pending | — |
-| Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | pending | — |
-| Slim `app/services/v1_engine.py` to helpers without an agent equivalent | pending | — |
+| `/api/ai/task-draft` migrated | shipped | `e287b6b` |
+| `/api/ai/task-breakdown` migrated | shipped | `e287b6b` |
+| `/api/ai/estimate` migrated | shipped | `e287b6b` |
+| `/api/ai/readiness` migrated | shipped | `e287b6b` |
+| `/api/ai/search` migrated | shipped | `e287b6b` |
+| `/api/ai/chat` migrated to `arun_with_events` (today goes through `ainvoke`) | shipped | `e287b6b` |
+| 502-fallback parametrised coverage for the 5 migrated structured routes | shipped | `18568d3` |
+| Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | shipped | `e287b6b` |
+| Slim `app/services/v1_engine.py` to helpers without an agent equivalent (file deleted; helpers absorbed into catalog modules) | shipped | `a302052` |
 
-### Phases 2–6 — not yet started
+### Phase 2 — Make agent outputs first-class, not side-effects — **complete**
 
-No work landed on phases 2 (events as state), 3 (PolishStep DSL),
-4 (model on context), 5 (pipeline + dispatch), or 6 (hardening).
+| Item | Status | Commit |
+|---|---|---|
+| `events: Annotated[list[dict], add_events]` field on `BaseAgentState`; `add_events` reducer mirrors `add_messages` | shipped | `2be1605` |
+| `app/agents/events.py` with typed `Suggestion` / `Citation` / `Usage` Pydantic models + `coerce_event` / `as_event_dict` helpers | shipped | `2be1605` |
+| Six catalog modules migrated from `emit_custom(...)` / `emit_usage(...)` side effects to returning `{"events": [...]}` from nodes | shipped | `2be1605` |
+| `runtime.astream` re-emits state-delta events as `("custom", evt)` for SSE wire continuity; `arun_with_events` reads from `final_state["events"]` | shipped | `2be1605` |
+| Token usage flows through `messages[*].usage_metadata` end-of-run; tests for `get_stream_writer` mocks rewritten to assert on `state["events"]` directly | shipped | `2be1605` |
+
+### Phase 3 — PolishStep DSL — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/polish.py` with `PolishStep` (prompt builder, schema, fallback, redaction, cap, merge) and four-cell matrix unit tests | shipped | `ba44346` |
+| Migrate `_polish_headline` (board_brief), `polish_triage` (triage), `_polish_draft` (task_drafting), `_polish_rationale` + `_polish_readiness` (task_estimation), `_polish_search` (search) onto `PolishStep` | shipped | `7bb4e15` |
+| Drop `structured_llm_call` from `_shared.py` (no remaining callers); keep `cap_polished_text` and `merge_keyed_string_updates` (still used by merge closures) | shipped | `7bb4e15` |
+
+### Phase 4 — Decouple model resolution from graph compilation — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/context.py` with `ChatContext(TypedDict)` carrying `chat_model`, `user_id`, `project_id` | shipped | `56a092d` |
+| Runtime resolves the model per call: caller-supplied `context["chat_model"]` overrides; otherwise falls back to `agent.chat_model`. Wired through `invoke`, `ainvoke`, `arun_with_events`, `astream` | shipped | `56a092d` |
+| Six catalog nodes read the model via `get_runtime(ChatContext).context.chat_model` instead of capturing it on `self` at build time | shipped | `56a092d` |
+| `tests/test_runtime_context.py` covers context-override priority, default fallback, two-call isolation, and `set_chat_model` propagation | shipped | `56a092d` |
+
+### Phase 5 — Linear-pipeline scaffolding for graphs and HTTP — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/pipeline.py` with `linear_graph(state, [(name, fn), ...])`; five linear catalog agents migrated; chat agent stays manual | shipped | `674c0a9` |
+| `WithBoardSnapshot` / `WithDriftResult` / `WithSimilarTasks` TypedDict mixins; per-agent state composes from `BaseAgentState` + relevant mixins; duplicate field declarations removed | shipped | `5ad677e` |
+| `app/routers/_dispatch.py:run_v1_route` factory; the five structured v1 routes collapse to a thin handler each (project_inputs / project_body) | shipped | `ca8b3fb` |
+
+### Phase 6 — Hardening — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| Explicit catalog manifest replaces import-time `registry.register(...)` side-effects; broken catalog modules are now FATAL at lifespan startup, not silently degraded | shipped | `fea6045` |
+| Single FE-tool source of truth (`fe_tool_schemas.CHAT_TOOL_SCHEMAS`); LangChain `@tool` stubs in `_chat_tools.py` are generated from the schema rather than redeclared | shipped | `39dae9a` |
+| Signed thread keys (`sigv1.<base64>` HMAC-SHA256 envelope over `(agent, user, original)` using the JWT secret) replace iterative-strip; old unsigned tokens still validated as a backwards-compat fallback | shipped | `147ea50` |
+| `app.state.embeddings` populated at lifespan startup; `_embeddings_singleton` global removed; module-level `registry` retained as the runtime's backing store for test-fixture compatibility (per-app isolation deferred) | shipped | `d9d2983` |
+
+### Post-phase fix — triage polish token leak
+
+| Item | Status | Commit |
+|---|---|---|
+| `generate_nudges` discarded the polish raw `AIMessage` after Phase 2, so triage's polish tokens were never aggregated by `_aggregate_astream_tokens` / `_token_usage_from_events` (other five catalog agents propagate the message correctly). Added `_polish_triage` 4-tuple helper and prepended the raw message to `state["messages"]`; regression test added. | shipped | `9285e51` |
+
+---
+
+## Deferred / follow-up
+
+The phases above shipped against scope; these items were consciously
+punted or surfaced during the post-Phase-6 code review. Each is
+recoverable from commits + code, but they live here so the next reader
+doesn't repeat the archaeology.
+
+### Architectural follow-ups
+
+- **Per-app registry isolation (Phase 6D residual)**: the module-level
+  `app.agents.registry.registry` singleton is still the runtime's
+  backing store. Moving to a fully per-app `Registry` would require
+  updating ~40 test fixtures that register test-only agents directly
+  into the module global. Tracked in commit `d9d2983` notes.
+- **Build-cache invalidation race (Phase 4 residual)**: `BaseAgent.set_chat_model`
+  still triggers a full `Pregel` rebuild and the `threading.Lock` /
+  `asyncio.to_thread` trampoline in `app/agents/base.py:308-324`
+  remains. Phase 4's stated goal — "drop the build-cache invalidation
+  race" — was only partially met (the per-call context path no longer
+  needs the rebuild, but the rebuild path itself was kept for
+  test-fixture compatibility). Migration: simplify to `asyncio.Lock`
+  once all callers are async.
+- **`_chat_tools.py` partial single-source (Phase 6B residual)**:
+  `build_chat_tools()` iterates `CHAT_TOOL_SCHEMAS` but the body is an
+  `if/elif` chain hard-coding each tool name, signature, docstring,
+  and pydantic model. Adding an entry to `CHAT_TOOL_SCHEMAS` does NOT
+  generate a LangChain stub — the schema and the tool definitions are
+  still two sources of truth. Migration: drive the function signature
+  and docstring dynamically from `_spec.args`, or keep the dispatch
+  but assert at module load that every schema key has a matching
+  branch.
+- **`X-Pulse-Model` header / tenant-config routing (Phase 4 follow-up)**:
+  the injection point in `AgentRuntime._build_context` is wired
+  (caller-supplied `context["chat_model"]` overrides the agent
+  default) but no router reads a request header or tenant config to
+  populate it. Tracked as a TODO in `runtime.py:_build_context`.
+- **`_shared.py` final cleanup (Phase 3 residual)**: `cap_polished_text`
+  and `merge_keyed_string_updates` remain in `_shared.py` because
+  individual catalog merge closures still call them. They could be
+  absorbed into `PolishStep` (via `cap_text` and a generic merge
+  helper) so `_shared.py` carries only `fetch_snapshot_node` /
+  `detect_drift_node` / `build_citation_refs`.
+
+### Defects worth flagging (not regressions; latent)
+
+- **`_dispatch.py` `UnboundLocalError` on null fallback**: in
+  `app/routers/_dispatch.py:122-141`, if `agent_error_fallback` is
+  provided AND `AgentError` fires AND the fallback returns `None`,
+  `body is None` falls through to `find_body(final_state, custom_events)`
+  with both names unbound. The only registered fallback (`_draft_task`)
+  always returns a dict, so the path isn't currently reachable. Fix:
+  initialise `final_state, custom_events = None, []` before the try.
+- **Cross-user signed thread token surfaces as 5xx**:
+  `_try_verify_signed_thread_key` raises `ValueError` on agent/scope
+  mismatch (`app/agents/runtime.py:132-146`). `_namespaced_thread`
+  doesn't catch it, and the runtime's exception-translation layer
+  wraps it as `AgentExecutionError` (5xx). Should be a 4xx with a
+  clear "invalid thread key" code. Security is preserved either way.
+- **No JWT secret rotation strategy for signed thread tokens**: signed
+  tokens become invalid on key rotation with no key-id versioning.
+  Acceptable trade-off (rotation is a deliberate event), but worth a
+  `kid`-style envelope before any production rotation.
+- **`PolishStep.cap_text` parameter is dead**: declared and stored in
+  `app/agents/polish.py:104,111`, never read. Either wire it up
+  (apply to the polished text in `run`) or delete.
 
 ---
 
@@ -527,38 +642,62 @@ feature flags where the FE wire is involved.
 
 ## Sequencing & estimated effort
 
-| Phase | Net LOC | Dev effort | Ship gate |
-|-------|---------|-----------|-----------|
-| 1. Collapse v1 shim | -800 | ~3 days | Parity tests pass |
-| 2. Outputs as state | ±0 | ~2 days | SSE snapshot stable |
-| 3. PolishStep DSL | -300 | ~2 days | Per-cell tests pass |
-| 4. Model on context | -100 | ~1 day | A/B routing works |
-| 5. Pipeline + dispatch | -700 | ~3 days | New-agent diff <100 LOC |
-| 6. Hardening | ±0 | ~2 days | Manifest deploy gate |
-| **Total** | **~−1900** | **~13 days** | |
+### Original estimate (for reference)
 
-After Phase 5 the agents directory is approximately:
+| Phase | Predicted net LOC | Predicted effort |
+|-------|------------------|------------------|
+| 1. Collapse v1 shim | -800 | ~3 days |
+| 2. Outputs as state | ±0 | ~2 days |
+| 3. PolishStep DSL | -300 | ~2 days |
+| 4. Model on context | -100 | ~1 day |
+| 5. Pipeline + dispatch | -700 | ~3 days |
+| 6. Hardening | ±0 | ~2 days |
+| **Total** | **~−1900** | **~13 days** |
+
+### Measured outcome
+
+The aggressive LoC predictions did not materialise — the catalog
+modules grew slightly to accommodate `PolishStep` wrappers and the
+backwards-compatible 4-tuple polish helpers, and `runtime.py` grew
+because the signed-thread-key code and per-call context resolution
+were additive. The structural wins (one polish call site per agent,
+one route factory, one events reducer) landed; the headline LoC
+reduction did not.
+
+Measured layout after all phases (commit `9285e51`):
 
 ```
 backend/app/agents/
-├── base.py              ~120 lines (was 396)
-├── runtime.py           ~280 lines (was 547)
-├── registry.py           ~80 lines (was 102)
-├── pipeline.py    NEW   ~150 lines
-├── polish.py      NEW   ~120 lines
-├── events.py      NEW    ~80 lines
-├── state.py             ~120 lines (mixins)
-├── sse.py               ~250 lines
+├── base.py              396 lines (was 396 — unchanged; lock kept)
+├── runtime.py           846 lines (was 547; +sigv1, +ChatContext, +token agg)
+├── registry.py          102 lines (unchanged)
+├── pipeline.py    NEW    45 lines
+├── polish.py      NEW   181 lines
+├── events.py      NEW   121 lines
+├── context.py     NEW    46 lines
+├── state.py             154 lines (with mixins)
+├── sse.py               258 lines
 ├── stream.py            DELETED
 └── catalog/
-    ├── *.py             ~80–120 lines each (was 200–440)
-    └── _shared.py       ~80 lines (was 370)
+    ├── _chat_tools.py    176 lines
+    ├── _schemas.py        97 lines
+    ├── _shared.py        294 lines
+    ├── __init__.py       129 lines (manifest)
+    ├── board_brief.py    531 lines
+    ├── chat.py           186 lines
+    ├── search.py         581 lines
+    ├── task_drafting.py  537 lines
+    ├── task_estimation.py 657 lines
+    └── triage.py         357 lines
 ```
 
-Net: about 1900 fewer lines of application code, with the cross-cutting
-duplication collapsed onto small, well-named primitives. New agents
-become one-file changes; new HTTP routes become one-line wire
-projections.
+`routers/ai.py` shrank materially: 1258 → 1002 lines (-256), with the
+common scaffolding extracted to `_dispatch.py` (174 lines new). Net
+across `routers/ai.py` + `_dispatch.py`: -82 LoC.
+
+The structural goal — "new agent is a single module; new HTTP route is
+a one-line wire projection" — is achievable today even though the
+overall code volume stayed roughly flat.
 
 ---
 

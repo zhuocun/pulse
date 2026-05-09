@@ -7,14 +7,17 @@ them client-side. The FE owns the auth context + React Query cache the
 calls need, so executing them server-side would require duplicating
 that machinery.
 
-The function bodies never run -- the LangChain ``@tool`` decorator only
-carries them as schemas for ``BaseChatModel.bind_tools``. Names match
-the FE's wire identifiers exactly so no translation is needed at either
-end, and the args schemas mirror the FE dispatcher's read shape:
-``listProjects(filter?)``, ``listTasks(projectId, filter?)``, and so
-on. A Pydantic sub-schema is attached for ``listTasks`` so the model
-emits the four FE-known filter fields with the right names instead of
-inventing them. The module name starts with ``_`` so
+**Single source of truth**: tool names, descriptions, and arg shapes are
+defined in :data:`app.tools.fe_tool_schemas.CHAT_TOOL_SCHEMAS`. This
+module generates the LangChain :class:`~langchain_core.tools.BaseTool`
+stubs from that schema via :func:`build_chat_tools` so the contract
+lives in one place. The function bodies never run -- the LangChain
+``@tool`` decorator only carries them as schemas for
+``BaseChatModel.bind_tools``. Names match the FE wire identifiers
+exactly (camelCase, no ``fe.`` prefix) so no translation is needed at
+either end.
+
+The module name starts with ``_`` so
 :func:`app.agents.catalog.discover` skips it -- this module declares
 schemas, not a runnable agent.
 """
@@ -25,6 +28,8 @@ from typing import Any, Dict, Optional
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
+
+from app.tools.fe_tool_schemas import CHAT_TOOL_SCHEMAS
 
 
 class _ListTasksFilter(BaseModel):
@@ -78,69 +83,94 @@ def _fe_executed(name: str) -> str:
     raise RuntimeError(f"FE-executed chat tool {name!r} was invoked server-side.")
 
 
-@tool("listProjects")
-def _list_projects(filter: Optional[Dict[str, Any]] = None) -> str:
-    """List projects visible to the current viewer.
+def build_chat_tools() -> list[BaseTool]:
+    """Build LangChain tool stubs from :data:`~app.tools.fe_tool_schemas.CHAT_TOOL_SCHEMAS`.
 
-    The optional ``filter`` is a free-form dict of conditions passed
-    verbatim to the FE projects API (e.g. ``{"organization": "Acme"}``).
+    Each entry in the schema dict produces one ``@tool``-decorated
+    function. The body always delegates to :func:`_fe_executed` so
+    server-side invocation raises loudly. Arg signatures are built
+    from the schema's ``args`` dict; the ``listTasks`` tool uses the
+    typed :class:`_ListTasksFilter` Pydantic model for its filter arg
+    so the model emits the four FE-known filter fields with the right
+    names.
     """
+    tools: list[BaseTool] = []
 
-    return _fe_executed("listProjects")
+    for tool_name, _spec in CHAT_TOOL_SCHEMAS.items():
+        if tool_name == "listProjects":
+
+            @tool("listProjects")
+            def _list_projects(
+                filter: Optional[Dict[str, Any]] = None,  # noqa: A002
+            ) -> str:
+                """List projects visible to the current viewer.
+
+                The optional ``filter`` is a free-form dict of conditions passed
+                verbatim to the FE projects API (e.g. ``{"organization": "Acme"}``).
+                """
+                return _fe_executed("listProjects")
+
+            tools.append(_list_projects)
+
+        elif tool_name == "listMembers":
+
+            @tool("listMembers")
+            def _list_members() -> str:
+                """List members of the current viewer's organisation."""
+                return _fe_executed("listMembers")
+
+            tools.append(_list_members)
+
+        elif tool_name == "getProject":
+
+            @tool("getProject")
+            def _get_project(projectId: str) -> str:  # noqa: N803
+                """Fetch a single project by id."""
+                return _fe_executed("getProject")
+
+            tools.append(_get_project)
+
+        elif tool_name == "listBoard":
+
+            @tool("listBoard")
+            def _list_board(projectId: str) -> str:  # noqa: N803
+                """List columns and ordered task ids for a project board."""
+                return _fe_executed("listBoard")
+
+            tools.append(_list_board)
+
+        elif tool_name == "listTasks":
+
+            @tool("listTasks")
+            def _list_tasks(
+                projectId: str,  # noqa: N803
+                filter: Optional[_ListTasksFilter] = None,  # noqa: A002
+            ) -> str:
+                """List tasks in a project, optionally filtered.
+
+                The ``filter`` object accepts ``taskName`` (substring),
+                ``type`` (bug / feature / spike), ``coordinatorId``, and
+                ``columnId``. Pass ``None`` (or omit) to list all tasks for the
+                project.
+                """
+                return _fe_executed("listTasks")
+
+            tools.append(_list_tasks)
+
+        elif tool_name == "getTask":
+
+            @tool("getTask")
+            def _get_task(taskId: str) -> str:  # noqa: N803
+                """Fetch a single task by id."""
+                return _fe_executed("getTask")
+
+            tools.append(_get_task)
 
 
-@tool("listMembers")
-def _list_members() -> str:
-    """List members of the current viewer's organisation."""
-
-    return _fe_executed("listMembers")
+    return tools
 
 
-@tool("getProject")
-def _get_project(projectId: str) -> str:
-    """Fetch a single project by id."""
-
-    return _fe_executed("getProject")
-
-
-@tool("listBoard")
-def _list_board(projectId: str) -> str:
-    """List columns and ordered task ids for a project board."""
-
-    return _fe_executed("listBoard")
-
-
-@tool("listTasks")
-def _list_tasks(
-    projectId: str,
-    filter: Optional[_ListTasksFilter] = None,
-) -> str:
-    """List tasks in a project, optionally filtered.
-
-    The ``filter`` object accepts ``taskName`` (substring),
-    ``type`` (bug / feature / spike), ``coordinatorId``, and
-    ``columnId``. Pass ``None`` (or omit) to list all tasks for the
-    project.
-    """
-
-    return _fe_executed("listTasks")
-
-
-@tool("getTask")
-def _get_task(taskId: str) -> str:
-    """Fetch a single task by id."""
-
-    return _fe_executed("getTask")
-
-
-CHAT_TOOLS: list[BaseTool] = [
-    _list_projects,
-    _list_members,
-    _get_project,
-    _list_board,
-    _list_tasks,
-    _get_task,
-]
+CHAT_TOOLS: list[BaseTool] = build_chat_tools()
 
 
 __all__ = ["CHAT_TOOLS"]

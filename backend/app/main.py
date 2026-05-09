@@ -10,10 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agents import AgentRuntime
-from app.agents import catalog as agent_catalog
 from app.agents.checkpointing import resolve_agent_postgres_uri
 from app.agents.errors import AgentConfigurationError
-from app.agents.embeddings import assert_embeddings_provider_available
+from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
 from app.agents.llm import assert_provider_available
 from app.config import Settings, settings
 from app.errors import AppError
@@ -511,9 +510,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     repository.ensure_schema()
     logger.info("Connected to %s successfully.", settings.database)
     async with AsyncExitStack() as stack:
-        agent_catalog.discover()
         application.state.rate_limiter = middleware_backends.rate_limiter
         application.state.budget_tracker = middleware_backends.budget_tracker
+        application.state.embeddings = make_embeddings(settings=settings)
         application.state.agent_runtime = await AgentRuntime.from_settings_async(
             settings, stack=stack
         )

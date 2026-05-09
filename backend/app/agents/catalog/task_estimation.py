@@ -16,36 +16,143 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     ESTIMATION_RATIONALE_MAX,
     READINESS_FIELD_MAX,
     READINESS_MESSAGE_MAX,
 )
 from app.agents.catalog._shared import (
+    build_citation_refs,
     cap_polished_text,
-    emit_citation_refs,
-    emit_usage,
     fetch_similar_node,
     merge_keyed_string_updates,
-    structured_llm_call,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
-from app.agents.registry import registry
+from app.agents.polish import PolishStep
 from app.agents.state import TaskEstimationState
-from app.agents.stream import emit_custom
+from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.redaction import redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# v1-compatible deterministic helpers (ported from v1_engine.py).
+# These produce the exact same wire shapes as v1_engine.estimate /
+# v1_engine.readiness so the route can skip pre-calling v1_engine and the
+# parity tests continue to pass byte-identically.
+# ---------------------------------------------------------------------------
+
+import re as _re  # noqa: E402 — placed here to avoid polluting module top
+
+_TOKEN_RE_EST = _re.compile(r"[A-Za-z0-9]+")
+
+
+def _tokens_est(text: str) -> list[str]:
+    return [m.group(0).lower() for m in _TOKEN_RE_EST.finditer(text or "")]
+
+
+def _token_set_est(text: str) -> set[str]:
+    return set(_tokens_est(text))
+
+
+def _jaccard_est(a: set[str], b: set[str]) -> float:
+    union = a | b
+    if not union:
+        return 0.0
+    return len(a & b) / len(union)
+
+
+def _clamp_fibonacci_est(value: int) -> int:
+    """Snap ``value`` to the nearest Fibonacci point."""
+    closest = FIBONACCI_STORY_POINTS[0]
+    best = abs(value - closest)
+    for point in FIBONACCI_STORY_POINTS[1:]:
+        delta = abs(value - point)
+        if delta < best:
+            closest = point
+            best = delta
+    return closest
+
+
+def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IEstimateSuggestion`` matching v1_engine.estimate wire shape.
+
+    This is the deterministic baseline the ``estimate`` node uses when the
+    route does not pre-populate ``state["estimate"]``.  The output is
+    byte-identical to :func:`app.services.v1_engine.estimate`.
+    """
+    description = (payload.get("note") or "") + (payload.get("taskName") or "")
+    context = payload.get("context") or {}
+    tasks = context.get("tasks") or []
+    query_tokens = _token_set_est(description)
+    similars: list[tuple[str, float, str]] = []
+    for task in tasks if isinstance(tasks, list) else []:
+        if not isinstance(task, dict):
+            continue
+        task_id = task.get("_id")
+        if not isinstance(task_id, str):
+            continue
+        score = _jaccard_est(
+            query_tokens,
+            _token_set_est((task.get("taskName") or "") + " " + (task.get("note") or "")),
+        )
+        if score:
+            reason = f"shares {int(score * 100)}% keywords"
+            similars.append((task_id, score, reason))
+    similars.sort(key=lambda triple: triple[1], reverse=True)
+    top = similars[:3]
+    avg_neighbour_points = (
+        sum(_clamp_fibonacci_est(point) for point in (3, 5, 3)) / 3 if top else 3
+    )
+    points = _clamp_fibonacci_est(
+        int(round((len(description) / 80) + avg_neighbour_points))
+    )
+    confidence = 0.7 if top else 0.45
+    return {
+        "storyPoints": points,
+        "confidence": confidence,
+        "rationale": "Derived from prompt length + nearest-neighbour tasks."
+        if top
+        else "Derived from prompt length; no similar tasks found.",
+        "similar": [{"_id": tid, "reason": reason} for tid, _, reason in top],
+    }
+
+
+def readiness_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IReadinessReport`` matching v1_engine.readiness wire shape.
+
+    Byte-identical to :func:`app.services.v1_engine.readiness`.
+    """
+    issues: list[dict[str, Any]] = []
+    fields = {
+        "taskName": "Task name is required.",
+        "note": "Acceptance criteria are missing.",
+        "epic": "Epic helps grouping; pick one.",
+        "type": "Choose feature / bug / spike.",
+        "coordinatorId": "Assign a coordinator.",
+    }
+    for field, message in fields.items():
+        if not payload.get(field):
+            issue: dict[str, Any] = {
+                "field": field,
+                "severity": "error" if field == "taskName" else "warn",
+                "message": message,
+            }
+            issues.append(issue)
+    return {"issues": issues}
 
 
 class EstimationRationale(BaseModel):
@@ -82,24 +189,12 @@ class ReadinessPolish(BaseModel):
     issues: list[ReadinessIssuePolish] = Field(default_factory=list)
 
 
-async def polish_readiness(
-    model: BaseChatModel,
-    deterministic: dict[str, Any],
-    draft: dict[str, Any],
-) -> tuple[dict[str, Any], int, int]:
-    """Polish readiness issue messages/suggestions; deterministic on stub.
-
-    Polished rows are merged back onto the deterministic ``issues`` by
-    ``field`` id, so the FE validator never sees a new field id and a
-    blank polished string preserves the deterministic copy.
-    """
-
-    issues = deterministic.get("issues") or []
-    if not issues:
-        return deterministic, 0, 0
+def _build_readiness_prompt(state: dict[str, Any]) -> str:
+    draft = state["_draft"]
+    issues = state["_issues"]
     safe_draft = redact_task_fields(draft)
     safe_issues = redact_dict(issues)
-    prompt = (
+    return (
         "Rewrite the message and suggestion strings for each readiness "
         "issue below so they are specific and actionable for this Jira-"
         "style task draft. Keep each string <=160 chars and on a single "
@@ -109,7 +204,11 @@ async def polish_readiness(
         f"Issues: {json.dumps(safe_issues)}"
     )
 
-    def _merge(parsed: ReadinessPolish) -> dict[str, Any]:
+
+def _merge_readiness(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    issues = state["_issues"]
+    if isinstance(parsed, ReadinessPolish):
         merged_issues = merge_keyed_string_updates(
             parsed.issues,
             issues,
@@ -120,15 +219,136 @@ async def polish_readiness(
                 "suggestion": READINESS_MESSAGE_MAX,
             },
         )
-        return {**deterministic, "issues": merged_issues}
+        return {"_result": {**deterministic, "issues": merged_issues}}
+    return {"_result": parsed}  # fallback value (dict)
 
-    return await structured_llm_call(
-        model,
-        ReadinessPolish,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+
+_readiness_step: PolishStep[ReadinessPolish] = PolishStep(
+    prompt_fn=_build_readiness_prompt,
+    schema=ReadinessPolish,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_readiness,
+)
+
+
+async def _polish_readiness(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    draft: dict[str, Any],
+) -> tuple[dict[str, Any], Any, int, int]:
+    """Polish readiness issue messages/suggestions; deterministic on stub.
+
+    Polished rows are merged back onto the deterministic ``issues`` by
+    ``field`` id, so the FE validator never sees a new field id and a
+    blank polished string preserves the deterministic copy.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
+    """
+    issues = deterministic.get("issues") or []
+    if not issues:
+        return deterministic, None, 0, 0
+    _state = {"_deterministic": deterministic, "_draft": draft, "_issues": issues}
+    update, tokens_in, tokens_out = await _readiness_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
+def _build_rationale_prompt(state: dict[str, Any]) -> str:
+    draft = state["_draft"]
+    points = state["_points"]
+    neighbours = state["_neighbours"]
+    safe_draft = redact_task_fields(draft)
+    safe_neighbours = redact_dict(neighbours[:3])
+    return (
+        "Write a single-line, <=180-character rationale for this story-point "
+        "estimate. Keep tone factual; reference the provided neighbours "
+        "if helpful. Do not propose a different point value. Return the "
+        "structured schema.\n\n"
+        f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
+        f"Neighbours: {json.dumps(safe_neighbours)}"
+    )
+
+
+def _merge_rationale(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    if isinstance(parsed, EstimationRationale):
+        return {
+            "_result": cap_polished_text(
+                parsed.rationale,
+                max_chars=ESTIMATION_RATIONALE_MAX,
+                fallback=deterministic,
+            )
+        }
+    return {"_result": parsed}  # fallback value (str)
+
+
+_rationale_step: PolishStep[EstimationRationale] = PolishStep(
+    prompt_fn=_build_rationale_prompt,
+    schema=EstimationRationale,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_rationale,
+)
+
+
+async def _polish_rationale(
+    model: BaseChatModel,
+    deterministic: str,
+    draft: dict[str, Any],
+    points: int,
+    neighbours: list[dict[str, Any]],
+) -> tuple[str, Any, int, int]:
+    """LLM-polish the estimation rationale; deterministic fallback on stub.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
+    """
+    _state = {
+        "_deterministic": deterministic,
+        "_draft": draft,
+        "_points": points,
+        "_neighbours": neighbours,
+    }
+    update, tokens_in, tokens_out = await _rationale_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
+    )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
+async def polish_readiness(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    draft: dict[str, Any],
+) -> tuple[dict[str, Any], int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_readiness`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  Internal node code
+    calls :func:`_polish_readiness` directly.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_readiness(
+        model, deterministic, draft
+    )
+    return result, tokens_in, tokens_out
 
 
 async def polish_rationale(
@@ -138,33 +358,16 @@ async def polish_rationale(
     points: int,
     neighbours: list[dict[str, Any]],
 ) -> tuple[str, int, int]:
-    """LLM-polish the estimation rationale; deterministic fallback on stub."""
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_rationale`.
 
-    safe_draft = redact_task_fields(draft)
-    safe_neighbours = redact_dict(neighbours[:3])
-    prompt = (
-        "Write a single-line, <=180-character rationale for this story-point "
-        "estimate. Keep tone factual; reference the provided neighbours "
-        "if helpful. Do not propose a different point value. Return the "
-        "structured schema.\n\n"
-        f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
-        f"Neighbours: {json.dumps(safe_neighbours)}"
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  Internal node code
+    calls :func:`_polish_rationale` directly.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_rationale(
+        model, deterministic, draft, points, neighbours
     )
-
-    def _merge(parsed: EstimationRationale) -> str:
-        return cap_polished_text(
-            parsed.rationale,
-            max_chars=ESTIMATION_RATIONALE_MAX,
-            fallback=deterministic,
-        )
-
-    return await structured_llm_call(
-        model,
-        EstimationRationale,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
-    )
+    return result, tokens_in, tokens_out
 
 
 def _estimate_for(task_draft: dict[str, Any], neighbours: list[dict[str, Any]]) -> int:
@@ -252,7 +455,7 @@ class TaskEstimationAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Shared node body from _shared.py (same logic as task-drafting-agent).
         fetch_similar = fetch_similar_node
@@ -281,60 +484,174 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def estimate(state: TaskEstimationState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
+            pre_estimate = state.get("estimate")
+            # ------------------------------------------------------------------
+            # v1-shim path: route passes raw ``context_tasks`` (and the task
+            # draft in ``task_draft``); compute the v1_engine-compatible
+            # deterministic baseline here instead of having the route pre-call
+            # v1_engine.estimate.  ``context_tasks`` is set only when this path
+            # is active; otherwise fall through to the normal estimate logic.
+            # ------------------------------------------------------------------
+            if pre_estimate is None and state.get("context_tasks") is not None:
+                task_draft = state.get("task_draft") or {}
+                v1_payload: dict[str, Any] = {
+                    "note": task_draft.get("note") or "",
+                    "taskName": task_draft.get("taskName") or "",
+                    "context": {"tasks": state.get("context_tasks") or []},
+                }
+                pre_estimate = estimate_from_payload(v1_payload)
+            if isinstance(pre_estimate, dict):
+                # Pre-populated estimate (from v1 path or older callers).
+                # Polish the rationale field and return the updated estimate;
+                # all other fields (storyPoints, confidence, similar) come from
+                # the baseline unchanged so the wire shape stays byte-identical
+                # on the stub path and gains only a polished rationale on the real path.
+                #
+                # The ``_skip_polish`` sentinel is set by the ``/readiness`` shim route
+                # so that running the shared estimation graph from that route does NOT
+                # charge the estimate's rationale polish against the project budget.
+                # Only the readiness node's polish tokens are attributable to that route.
+                if pre_estimate.get("_skip_polish"):
+                    return {}
+                draft = state.get("task_draft") or {}
+                neighbours = state.get("embedding_neighbors") or []
+                points = pre_estimate.get("storyPoints") or 0
+                deterministic_rationale = pre_estimate.get("rationale") or ""
+                rationale, raw_msg_rat, _tokens_in, _tokens_out = await _polish_rationale(
+                    chat_model, deterministic_rationale, draft, points, neighbours
+                )
+                extra_msgs_rat = [raw_msg_rat] if raw_msg_rat is not None else []
+                return {
+                    "estimate": {**pre_estimate, "rationale": rationale},
+                    **({"messages": extra_msgs_rat} if extra_msgs_rat else {}),
+                }
             draft = state.get("task_draft") or {}
             neighbours = state.get("embedding_neighbors") or []
             points = _estimate_for(draft, neighbours)
             deterministic = "Derived from prompt length + grounded neighbours."
-            rationale, tokens_in, tokens_out = await polish_rationale(
+            rationale, raw_msg_rat2, _tokens_in, _tokens_out = await _polish_rationale(
                 chat_model, deterministic, draft, points, neighbours
             )
-            emit_usage(tokens_in, tokens_out)
+            extra_msgs_rat2 = [raw_msg_rat2] if raw_msg_rat2 is not None else []
             return {
                 "estimate": {
                     "storyPoints": points,
                     "confidence": "moderate" if neighbours else "low",
                     "rationale": rationale,
-                }
+                },
+                **({"messages": extra_msgs_rat2} if extra_msgs_rat2 else {}),
             }
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
+            pre_readiness = state.get("readiness")
+            # ------------------------------------------------------------------
+            # v1-shim path: route passes raw ``context_tasks`` and the task
+            # draft; compute the v1_engine-compatible readiness baseline here.
+            # When ``context_tasks`` is set the route is in "raw payload" mode
+            # and we derive readiness from the task_draft fields directly.
+            # ------------------------------------------------------------------
+            if pre_readiness is None and state.get("context_tasks") is not None:
+                task_draft = state.get("task_draft") or {}
+                # Reconstruct the v1 payload fields the readiness function inspects.
+                v1_payload_rd: dict[str, Any] = {
+                    "taskName": task_draft.get("taskName") or "",
+                    "note": task_draft.get("note") or "",
+                    "epic": task_draft.get("epic") or "",
+                    "type": task_draft.get("type") or "",
+                    "coordinatorId": task_draft.get("coordinatorId") or None,
+                }
+                pre_readiness = readiness_from_payload(v1_payload_rd)
+            if isinstance(pre_readiness, dict):
+                # Pre-populated readiness: polish the issue messages/suggestions.
+                # The v1_engine shape ``{issues: [...]}`` is preserved so the
+                # parity test and the FE validator both pass byte-identically on
+                # the stub path.
+                draft = state.get("task_draft") or {}
+                polished, raw_msg_rd, _tokens_in, _tokens_out = await _polish_readiness(
+                    chat_model, pre_readiness, draft
+                )
+                extra_msgs_rd = [raw_msg_rd] if raw_msg_rd is not None else []
+                return {
+                    "readiness": polished,
+                    **({"messages": extra_msgs_rd} if extra_msgs_rd else {}),
+                }
             draft = state.get("task_draft") or {}
             deterministic = _readiness(draft)
-            polished, tokens_in, tokens_out = await polish_readiness(
+            polished, raw_msg_rd2, _tokens_in, _tokens_out = await _polish_readiness(
                 chat_model, deterministic, draft
             )
-            emit_usage(tokens_in, tokens_out)
-            return {"readiness": polished}
+            extra_msgs_rd2 = [raw_msg_rd2] if raw_msg_rd2 is not None else []
+            return {
+                "readiness": polished,
+                **({"messages": extra_msgs_rd2} if extra_msgs_rd2 else {}),
+            }
 
         def emit_citations(state: TaskEstimationState) -> dict[str, Any]:
+            est_payload = state.get("estimate")
+            read_payload = state.get("readiness")
+            # Combined v2.1 surface: ``{estimate, readiness}`` for the streaming
+            # SSE consumer and for any caller that wants both in one event.
             payload = {
-                "estimate": state.get("estimate"),
-                "readiness": state.get("readiness"),
+                "estimate": est_payload,
+                "readiness": read_payload,
             }
             similar = state.get("similar_tasks") or []
-            emit_citation_refs(similar, "task")
-            emit_custom(
+            refs = build_citation_refs(similar, "task")
+            new_events: list[dict] = []
+            if refs:
+                new_events.append({"kind": "citation", "refs": refs})
+            new_events.append(
                 {
                     "kind": "suggestion",
                     "surface": "estimate",
                     "payload": payload,
                 }
             )
-            return {"messages": [AIMessage(content=json.dumps(payload))]}
+            # Additional v1-shim-compatible surfaces so ``/api/ai/estimate`` and
+            # ``/api/ai/readiness`` can each extract exactly the payload they need
+            # without projecting the combined event.
+            if est_payload is not None:
+                new_events.append(
+                    {
+                        "kind": "suggestion",
+                        "surface": "estimate_v1",
+                        "payload": est_payload,
+                    }
+                )
+            if read_payload is not None:
+                new_events.append(
+                    {
+                        "kind": "suggestion",
+                        "surface": "readiness_v1",
+                        "payload": read_payload,
+                    }
+                )
+            return {
+                "messages": [AIMessage(content=json.dumps(payload))],
+                "events": new_events,
+            }
 
-        graph: StateGraph = StateGraph(TaskEstimationState)
-        graph.add_node("fetch_similar", fetch_similar)
-        graph.add_node("fetch_embeddings", fetch_embeddings)
-        graph.add_node("estimate", estimate)
-        graph.add_node("readiness", readiness)
-        graph.add_node("emit_citations", emit_citations)
-        graph.add_edge(START, "fetch_similar")
-        graph.add_edge("fetch_similar", "fetch_embeddings")
-        graph.add_edge("fetch_embeddings", "estimate")
-        graph.add_edge("estimate", "readiness")
-        graph.add_edge("readiness", "emit_citations")
-        graph.add_edge("emit_citations", END)
+        graph: StateGraph = linear_graph(
+            TaskEstimationState,
+            [
+                ("fetch_similar", fetch_similar),
+                ("fetch_embeddings", fetch_embeddings),
+                ("estimate", estimate),
+                ("readiness", readiness),
+                ("emit_citations", emit_citations),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(TaskEstimationAgent(), replace=True)

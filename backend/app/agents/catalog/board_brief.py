@@ -13,35 +13,137 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import HEADLINE_MAX
 from app.agents.catalog._shared import (
     build_citation_refs,
     cap_polished_text,
     detect_drift_node,
-    emit_usage,
     fetch_snapshot_node,
-    structured_llm_call,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
-from app.agents.registry import registry
+from app.agents.polish import PolishStep
 from app.agents.state import BoardBriefState
-from app.agents.stream import emit_custom
-from app.services import v1_engine
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
 
+from langgraph.runtime import get_runtime
+
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic board-brief baseline (ported from v1_engine.py).
+# ---------------------------------------------------------------------------
+
+
+def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IBoardBrief`` for the given board context.
+
+    Byte-identical to :func:`app.services.v1_engine.board_brief`.
+    This function is intentionally kept at module level so it can be
+    tested directly.
+    """
+    columns = context.get("columns") or []
+    tasks = context.get("tasks") or []
+    task_list = tasks if isinstance(tasks, list) else []
+    members = context.get("members") or []
+    counts: list[dict[str, Any]] = []
+    column_index: dict[str, str] = {}
+    for col in columns if isinstance(columns, list) else []:
+        if not isinstance(col, dict):
+            continue
+        cid = col.get("_id")
+        if isinstance(cid, str):
+            column_index[cid] = col.get("name") or cid
+    column_task_count: Counter[str] = Counter()
+    for task in task_list:
+        if not isinstance(task, dict):
+            continue
+        cid = task.get("columnId")
+        if isinstance(cid, str):
+            column_task_count[cid] += 1
+    for cid, name in column_index.items():
+        counts.append(
+            {
+                "columnId": cid,
+                "columnName": name,
+                "count": column_task_count.get(cid, 0),
+            }
+        )
+    largest = sorted(
+        [t for t in task_list if isinstance(t, dict) and isinstance(t.get("_id"), str)],
+        key=lambda t: int(t.get("storyPoints") or 0),
+        reverse=True,
+    )[:3]
+    largest_unstarted = [
+        {
+            "taskId": t["_id"],
+            "taskName": t.get("taskName") or "",
+            "storyPoints": int(t.get("storyPoints") or 0),
+        }
+        for t in largest
+        if (
+            t.get("columnId")
+            and column_index.get(t.get("columnId"), "").lower().strip() != "done"
+        )
+    ]
+    unowned = [
+        {"taskId": t["_id"], "taskName": t.get("taskName") or ""}
+        for t in task_list
+        if isinstance(t, dict)
+        and isinstance(t.get("_id"), str)
+        and not t.get("coordinatorId")
+    ][:5]
+    member_index = {m.get("_id"): m for m in members if isinstance(m, dict)}
+    member_load: dict[str, dict[str, Any]] = {}
+    for task in task_list:
+        if not isinstance(task, dict):
+            continue
+        coordinator = task.get("coordinatorId")
+        if not isinstance(coordinator, str):
+            continue
+        entry = member_load.setdefault(
+            coordinator,
+            {
+                "memberId": coordinator,
+                "username": (member_index.get(coordinator) or {}).get(
+                    "username", coordinator
+                ),
+                "openTasks": 0,
+                "openPoints": 0,
+            },
+        )
+        entry["openTasks"] += 1
+        entry["openPoints"] += int(task.get("storyPoints") or 0)
+    workload = sorted(
+        member_load.values(), key=lambda m: m["openPoints"], reverse=True
+    )[:5]
+    headline = (
+        f"{len(task_list)} tasks across {len(columns)} columns; "
+        f"{len(unowned)} unowned, {len(largest_unstarted)} large unstarted."
+    )
+    return {
+        "headline": headline[:140],
+        "counts": counts,
+        "largestUnstarted": largest_unstarted,
+        "unowned": unowned,
+        "workload": workload,
+        "recommendation": "Reassign unowned bugs first; chunk large unstarted cards.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +298,60 @@ class BriefHeadline(BaseModel):
     )
 
 
+def _build_headline_prompt(state: dict[str, Any]) -> str:
+    safe_facts = redact_dict(state["_facts"])
+    return (
+        "Write a single-line, <=120-character standup headline for this "
+        "Jira-style board snapshot. Do not invent counts; only use the "
+        "facts provided. Return JSON matching the schema. Facts (JSON):\n"
+        + json.dumps(safe_facts)
+    )
+
+
+_headline_step: PolishStep[BriefHeadline] = PolishStep(
+    prompt_fn=_build_headline_prompt,
+    schema=BriefHeadline,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=lambda state, parsed: {
+        "_result": cap_polished_text(
+            parsed.headline if isinstance(parsed, BriefHeadline) else parsed,
+            max_chars=HEADLINE_MAX,
+            fallback=state["_deterministic"],
+        )
+    },
+)
+
+
+async def _polish_headline(
+    model: BaseChatModel,
+    deterministic: str,
+    facts: dict[str, Any],
+) -> tuple[str, Any, int, int]:
+    """Internal 4-tuple variant of :func:`polish_headline`.
+
+    Returns ``(headline, raw_message, tokens_in, tokens_out)``. The
+    ``raw_message`` is the underlying ``AIMessage`` with ``usage_metadata``
+    populated. The ``generate_brief`` node captures this to include in state
+    messages for budget tracking.  It is ``None`` on the stub path or when the
+    call fails.
+    """
+    _state = {"_deterministic": deterministic, "_facts": facts}
+    update, tokens_in, tokens_out = await _headline_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
+    )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
 async def polish_headline(
     model: BaseChatModel,
     deterministic: str,
@@ -209,31 +365,14 @@ async def polish_headline(
     underlying ``AIMessage``. Any structured-output error (parsing failure,
     blank field, unsupported provider) lands on the deterministic
     fallback so the FE layout never breaks.
+
+    For internal use (where budget tracking needs the raw ``AIMessage``),
+    call :func:`_polish_headline` instead.
     """
-
-    # ``facts`` carries snippets of FE-supplied signal data (column names,
-    # task ids); redact PII patterns so emails / secrets in user-entered
-    # column names never reach the provider.
-    safe_facts = redact_dict(facts)
-    prompt = (
-        "Write a single-line, <=120-character standup headline for this "
-        "Jira-style board snapshot. Do not invent counts; only use the "
-        "facts provided. Return JSON matching the schema. Facts (JSON):\n"
-        + json.dumps(safe_facts)
+    headline, _raw_msg, tokens_in, tokens_out = await _polish_headline(
+        model, deterministic, facts
     )
-
-    def _merge(parsed: BriefHeadline) -> str:
-        return cap_polished_text(
-            parsed.headline, max_chars=HEADLINE_MAX, fallback=deterministic
-        )
-
-    return await structured_llm_call(
-        model,
-        BriefHeadline,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
-    )
+    return headline, tokens_in, tokens_out
 
 
 class BoardBriefAgent(BaseAgent):
@@ -271,7 +410,7 @@ class BoardBriefAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Both bodies are shared with triage-agent (same state keys, same
         # logic).  See ``app.agents.catalog._shared`` for the implementations.
@@ -279,6 +418,12 @@ class BoardBriefAgent(BaseAgent):
         detect_drift = detect_drift_node
 
         async def generate_brief(state: BoardBriefState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default
+            # captured at build time for callers that don't inject a context.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             snapshot = state.get("board_snapshot") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             tasks = snapshot.get("tasks") or []
@@ -313,16 +458,23 @@ class BoardBriefAgent(BaseAgent):
             # headline is polished by the LLM (deterministic fallback on stub).
             # Normalize id→_id so v1_engine (which uses _id keys) works
             # correctly with the FE-supplied snapshot (which uses id keys).
-            brief = v1_engine.board_brief(_normalize_snapshot_for_v1_engine(snapshot))
+            brief = _compute_board_brief(_normalize_snapshot_for_v1_engine(snapshot))
             deterministic = brief["headline"]
-            headline, tokens_in, tokens_out = await polish_headline(
+            headline, raw_msg, _tokens_in, _tokens_out = await _polish_headline(
                 chat_model, deterministic, facts
             )
             brief = {**brief, "headline": headline}
-            emit_usage(tokens_in, tokens_out)
+            # Include the raw AIMessage (with usage_metadata) in state messages
+            # so budget tracking can aggregate token counts from state.
+            extra_messages = [raw_msg] if raw_msg is not None else []
             # Store drift severity and drift result separately so downstream
             # nodes (e.g. triage) can still read them without touching ``brief``.
-            return {"brief": brief, "drift_severity": severity, "drift": drift}
+            return {
+                "brief": brief,
+                "drift_severity": severity,
+                "drift": drift,
+                **({"messages": extra_messages} if extra_messages else {}),
+            }
 
         def emit_citations(state: BoardBriefState) -> dict[str, Any]:
             brief = state.get("brief") or {}
@@ -330,8 +482,8 @@ class BoardBriefAgent(BaseAgent):
             snapshot = state.get("board_snapshot") or {}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []
-            # Build refs without emitting yet: we need to attach them to
-            # recommendationDetail before the suggestion event goes out.
+            # Build refs: we need to attach them to recommendationDetail
+            # before the suggestion event goes out.
             task_refs = build_citation_refs(
                 tasks,
                 "task",
@@ -344,33 +496,36 @@ class BoardBriefAgent(BaseAgent):
                 get_quote=lambda c: c.get("name") or c.get("id") or "",
             )
             refs = task_refs + col_refs
+            new_events: list[dict] = []
             if refs:
-                emit_custom({"kind": "citation", "refs": refs})
+                new_events.append({"kind": "citation", "refs": refs})
             # Attach recommendationDetail so the FE can render the strength
             # badge and "Why" disclosure inline; reuses the same refs so
             # provenance is consistent with the citation event above.
             recommendation_detail = build_recommendation_detail(brief, drift, refs)
             payload = {**brief, "recommendationDetail": recommendation_detail}
-            emit_custom(
+            new_events.append(
                 {
                     "kind": "suggestion",
                     "surface": "brief",
                     "payload": payload,
                 }
             )
-            return {"messages": [AIMessage(content=json.dumps(payload))]}
+            return {
+                "messages": [AIMessage(content=json.dumps(payload))],
+                "events": new_events,
+            }
 
-        graph: StateGraph = StateGraph(BoardBriefState)
-        graph.add_node("fetch_snapshot", fetch_snapshot)
-        graph.add_node("detect_drift", detect_drift)
-        graph.add_node("generate_brief", generate_brief)
-        graph.add_node("emit_citations", emit_citations)
-        graph.add_edge(START, "fetch_snapshot")
-        graph.add_edge("fetch_snapshot", "detect_drift")
-        graph.add_edge("detect_drift", "generate_brief")
-        graph.add_edge("generate_brief", "emit_citations")
-        graph.add_edge("emit_citations", END)
+        graph: StateGraph = linear_graph(
+            BoardBriefState,
+            [
+                ("fetch_snapshot", fetch_snapshot),
+                ("detect_drift", detect_drift),
+                ("generate_brief", generate_brief),
+                ("emit_citations", emit_citations),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(BoardBriefAgent(), replace=True)

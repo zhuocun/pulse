@@ -31,8 +31,8 @@ _CHAT_TOOL_NAMES: frozenset[str] = frozenset(t.name for t in CHAT_TOOLS)
 def test_catalog_tool_references_are_valid() -> None:
     """Every tool declared in agent metadata must resolve to a known schema."""
 
-    # Ensure all catalog modules are imported so agents are registered.
-    catalog.discover()
+    # Ensure all catalog agents are registered via the explicit manifest.
+    catalog.register_all(registry)
 
     errors: list[str] = []
     for meta in registry.metadata():

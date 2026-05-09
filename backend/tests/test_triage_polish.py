@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import patch
 
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
@@ -20,7 +19,6 @@ from langgraph.types import Command
 
 from app.agents.catalog.triage import NudgePolish, TriageAgent, TriagePolish, polish_triage
 from app.agents.llm import make_stub_chat_model
-from app.agents import stream as stream_module
 from tests.conftest import structured_model
 
 
@@ -279,17 +277,58 @@ def test_polish_triage_empty_nudges_with_real_model_returns_early() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_generate_nudges_appends_polish_usage_message_for_budget() -> None:
+    """The polish AIMessage with usage_metadata must reach state['messages'].
+
+    Budget reconciliation aggregates token usage from messages at end-of-run
+    (Phase 2). Without the raw AIMessage in messages, triage's polish tokens
+    would be silently dropped from OTel + Prometheus + project budget.
+    """
+    raw = AIMessage(
+        content="ignored",
+        usage_metadata={"input_tokens": 7, "output_tokens": 4, "total_tokens": 11},
+    )
+    parsed = TriagePolish(
+        nudges=[NudgePolish(nudge_id="unowned_bug:0", summary="Polished")]
+    )
+    agent = TriageAgent()
+    agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
+    checkpointer, store = _persistence()
+    graph = agent.build(checkpointer=checkpointer, store=store)
+
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Todo", "wip_limit": 5}],
+        "tasks": [{"id": "bug-1", "column_id": "c1", "type": "bug"}],
+    }
+    final = _drive(
+        graph,
+        {"project_id": "p-1"},
+        [snapshot],
+        thread_id="nudge-budget-1",
+    )
+
+    messages = final.get("messages") or []
+    polish_msgs = [
+        m
+        for m in messages
+        if isinstance(m, AIMessage)
+        and (getattr(m, "usage_metadata", None) or {}).get("total_tokens")
+    ]
+    assert polish_msgs, "Expected polish AIMessage with usage_metadata in state['messages']"
+    usage = polish_msgs[0].usage_metadata
+    assert usage["input_tokens"] == 7
+    assert usage["output_tokens"] == 4
+
+
 def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
-    """The ``generate_nudges`` node must emit the F-G1 wire shape.
+    """The ``generate_nudges`` node must populate ``state['events']`` with nudge suggestions.
 
-    Asserts that ``emit_custom`` is called with
-    ``{"kind": "suggestion", "surface": "nudge", "payload": ...}``
-    (not the old ``{"kind": "nudge", "nudge": ...}`` shape).
+    Phase 2: events are first-class state. The node returns
+    ``{"events": [{"kind": "suggestion", "surface": "nudge", "payload": ...}, ...]}``
+    which the ``add_events`` reducer accumulates into the final state.
 
-    Patching strategy mirrors ``test_search_agent_v21.py``: we patch
-    ``get_stream_writer`` on the ``app.agents.stream`` module so the
-    patch is visible inside the ``emit_custom`` closure, then drive the
-    graph through its single interrupt (``fe.boardSnapshot``).
+    Previously this test patched ``get_stream_writer`` to intercept
+    ``emit_custom`` calls; now it inspects ``final_state["events"]`` directly.
     """
     agent = TriageAgent()
     checkpointer, store = _persistence()
@@ -301,23 +340,18 @@ def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
         "tasks": [{"id": "bug-1", "column_id": "c1", "type": "bug"}],
     }
 
-    emitted: list[Any] = []
+    final = _drive(
+        graph,
+        {"project_id": "p-emit-test"},
+        [snapshot],
+        thread_id="nudge-emit-shape-1",
+    )
 
-    def fake_writer(payload: Any) -> None:
-        emitted.append(payload)
-
-    with patch.object(stream_module, "get_stream_writer", return_value=fake_writer):
-        _drive(
-            graph,
-            {"project_id": "p-emit-test"},
-            [snapshot],
-            thread_id="nudge-emit-shape-1",
-        )
-
+    events = final.get("events") or []
     suggestion_events = [
-        e for e in emitted if isinstance(e, dict) and e.get("kind") == "suggestion"
+        e for e in events if isinstance(e, dict) and e.get("kind") == "suggestion"
     ]
-    assert suggestion_events, "Expected at least one suggestion event from generate_nudges"
+    assert suggestion_events, "Expected at least one suggestion event in state['events'] from generate_nudges"
 
     for evt in suggestion_events:
         assert evt.get("surface") == "nudge", (

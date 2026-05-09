@@ -4,6 +4,10 @@ LangGraph 1.x lets each graph define its own state. We expose a small,
 opinionated default that covers the 90% case (a chat-style ``messages``
 list plus a free-form ``metadata`` bag) plus a family of per-agent
 ``TypedDict`` schemas for the Board Copilot v2.1 agents (PRD §5A).
+
+Shared-field mixins (``WithBoardSnapshot``, ``WithDriftResult``,
+``WithSimilarTasks``) let multiple agent states compose the same field
+declarations via multiple inheritance rather than repeating them.
 """
 
 from typing import Annotated, Any, TypedDict
@@ -11,6 +15,21 @@ from typing import Annotated, Any, TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import NotRequired
+
+
+def add_events(
+    left: list[dict] | None,
+    right: list[dict] | None,
+) -> list[dict]:
+    """Reducer for the ``events`` field: append-only accumulation.
+
+    Mirrors :func:`langgraph.graph.message.add_messages` semantics for
+    the typed event list. Both ``left`` and ``right`` may be ``None``
+    (e.g. on the very first superstep before any node has run), which is
+    normalised to an empty list so the final value is always a plain list.
+    """
+
+    return list(left or []) + list(right or [])
 
 
 class AgentState(TypedDict, total=False):
@@ -32,40 +51,76 @@ class BaseAgentState(TypedDict):
     """Common state shared by all Board Copilot v2.1 agents (PRD §5A.2)."""
 
     messages: Annotated[list[BaseMessage], add_messages]
+    events: Annotated[list[dict], add_events]
     project_id: NotRequired[str]
     user_id: NotRequired[str]
     autonomy_level: NotRequired[str]  # "suggest" | "plan" | "auto"
 
 
-class BoardBriefState(BaseAgentState):
+# ---------------------------------------------------------------------------
+# Shared-field mixins (PRD §5A.2 — Phase 5B)
+# ---------------------------------------------------------------------------
+
+
+class WithBoardSnapshot(TypedDict, total=False):
+    """Mixin: board snapshot fetched from the FE via interrupt."""
+
+    board_snapshot: dict[str, Any]
+
+
+class WithDriftResult(TypedDict, total=False):
+    """Mixin: drift-detection result produced by the detect_drift node."""
+
+    drift_result: dict[str, Any]
+
+
+class WithSimilarTasks(TypedDict, total=False):
+    """Mixin: similar-task list fetched from the FE via interrupt."""
+
+    similar_tasks: list[dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
+# Per-agent state schemas
+# ---------------------------------------------------------------------------
+
+
+class BoardBriefState(BaseAgentState, WithBoardSnapshot, WithDriftResult):
     """State for ``board-brief-agent`` (PRD §5A.3)."""
 
-    board_snapshot: NotRequired[dict[str, Any] | None]
-    drift_result: NotRequired[dict[str, Any] | None]
     brief: NotRequired[dict[str, Any] | None]
     last_brief_read_at: NotRequired[str | None]
     drift_severity: NotRequired[str | None]
     drift: NotRequired[dict[str, Any] | None]
 
 
-class TaskDraftingState(BaseAgentState):
+class TaskDraftingState(BaseAgentState, WithBoardSnapshot, WithSimilarTasks):
     """State for ``task-drafting-agent`` (PRD §5A.4)."""
 
     prompt: NotRequired[str]
     breakdown_axis: NotRequired[str | None]
-    board_snapshot: NotRequired[dict[str, Any] | None]
-    similar_tasks: NotRequired[list[dict[str, Any]] | None]
     draft: NotRequired[dict[str, Any] | None]
+    # Optional fields forwarded from the raw v1 route payload so the agent
+    # can compute the deterministic baseline without the route pre-calling
+    # v1_engine.draft_task.  All three are absent for native v2.1 callers.
+    column_id: NotRequired[str | None]
+    coordinator_id: NotRequired[str | None]
+    breakdown_count: NotRequired[int | None]
+    # Sentinel set by v1 shim routes: when True the generate_draft node
+    # computes the v1-compatible baseline from board_snapshot.
+    _use_v1_baseline: NotRequired[bool]
 
 
-class TaskEstimationState(BaseAgentState):
+class TaskEstimationState(BaseAgentState, WithSimilarTasks):
     """State for ``task-estimation-agent`` (PRD §5A.5)."""
 
     task_draft: NotRequired[dict[str, Any]]
-    similar_tasks: NotRequired[list[dict[str, Any]] | None]
     embedding_neighbors: NotRequired[list[dict[str, Any]] | None]
     estimate: NotRequired[dict[str, Any] | None]
     readiness: NotRequired[dict[str, Any] | None]
+    # Context tasks forwarded from the raw v1 route payload so the agent
+    # can compute the v1_engine.estimate baseline without the route pre-calling it.
+    context_tasks: NotRequired[list[dict[str, Any]] | None]
 
 
 class ChatState(BaseAgentState):
@@ -76,11 +131,9 @@ class ChatState(BaseAgentState):
     """
 
 
-class TriageState(BaseAgentState):
+class TriageState(BaseAgentState, WithBoardSnapshot, WithDriftResult):
     """State for ``triage-agent`` (PRD §5A.7)."""
 
-    board_snapshot: NotRequired[dict[str, Any] | None]
-    drift_result: NotRequired[dict[str, Any] | None]
     nudges: NotRequired[list[dict[str, Any]]]
 
 

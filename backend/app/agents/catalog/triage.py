@@ -20,26 +20,26 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
-    emit_usage,
     fetch_snapshot_node,
     merge_keyed_string_updates,
-    structured_llm_call,
 )
-from app.agents.registry import registry
+from app.agents.context import ChatContext
+from app.agents.polish import PolishStep
 from app.agents.state import TriageState
-from app.agents.stream import emit_custom
 from app.tools.redaction import redact_dict
+from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -147,26 +147,9 @@ class TriagePolish(BaseModel):
     nudges: list[NudgePolish] = Field(default_factory=list)
 
 
-async def polish_triage(
-    model: BaseChatModel,
-    deterministic_nudges: list[dict[str, Any]],
-    board_snapshot: dict[str, Any],
-) -> tuple[list[dict[str, Any]], int, int]:
-    """Polish nudge summaries with LLM context; deterministic fallback on stub.
-
-    Polished ``summary`` strings are merged back onto the deterministic nudge
-    list keyed by ``nudge_id``. An unknown ``nudge_id`` from the model is
-    ignored (no new nudges injected). A blank polished ``summary`` preserves
-    the deterministic copy.
-
-    Returns ``(polished_nudges, tokens_in, tokens_out)``.
-    """
-
-    if not deterministic_nudges:
-        return deterministic_nudges, 0, 0
-
-    # Build the FE nudge_id -> summary mapping for the prompt so the model has
-    # the same context that the generate_nudges node constructs.
+def _build_triage_prompt(state: dict[str, Any]) -> str:
+    deterministic_nudges = state["_nudges"]
+    board_snapshot = state["_snapshot"]
     nudge_summaries = [
         {
             "nudge_id": f"{n.get('type', 'triage')}:{idx}",
@@ -175,12 +158,9 @@ async def polish_triage(
         }
         for idx, n in enumerate(deterministic_nudges)
     ]
-    # Trim and redact the snapshot before forwarding to the provider:
-    # raw boards can carry hundreds of tasks (context-window pressure)
-    # and column / task names that contain user PII.
     safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
     safe_nudges = redact_dict(nudge_summaries)
-    prompt = (
+    return (
         "Rewrite the summary for each board-triage nudge below so it is "
         "specific and actionable, incorporating the signal details (e.g. "
         "column name, current count vs. WIP limit, task id). Keep each "
@@ -190,16 +170,19 @@ async def polish_triage(
         f"Nudges: {json.dumps(safe_nudges)}"
     )
 
-    # Build a lookup keyed by the stable nudge_id format.
+
+def _merge_triage(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic_nudges = state["_nudges"]
     valid_ids = {
-        f"{n.get('type', 'triage')}:{idx}" for idx, n in enumerate(deterministic_nudges)
+        f"{n.get('type', 'triage')}:{idx}"
+        for idx, n in enumerate(deterministic_nudges)
     }
 
     def _nudge_key(nudge: dict[str, Any], idx: int) -> str:
         return f"{nudge.get('type', 'triage')}:{idx}"
 
-    def _merge(parsed: TriagePolish) -> list[dict[str, Any]]:
-        return merge_keyed_string_updates(
+    if isinstance(parsed, TriagePolish):
+        result = merge_keyed_string_updates(
             parsed.nudges,
             deterministic_nudges,
             key_from_parsed=lambda item: item.nudge_id
@@ -208,14 +191,64 @@ async def polish_triage(
             key_from_deterministic=_nudge_key,
             string_fields={"summary": NUDGE_SUMMARY_MAX},
         )
+    else:
+        result = parsed  # fallback value (list)
+    return {"_result": result}
 
-    return await structured_llm_call(
-        model,
-        TriagePolish,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic_nudges,
-        merge_fn=_merge,
+
+_triage_step: PolishStep[TriagePolish] = PolishStep(
+    prompt_fn=_build_triage_prompt,
+    schema=TriagePolish,
+    fallback_fn=lambda state: state["_nudges"],
+    merge_fn=_merge_triage,
+)
+
+
+async def _polish_triage(
+    model: BaseChatModel,
+    deterministic_nudges: list[dict[str, Any]],
+    board_snapshot: dict[str, Any],
+) -> tuple[list[dict[str, Any]], Optional[AIMessage], int, int]:
+    """4-tuple variant: returns ``(nudges, raw_msg, tokens_in, tokens_out)``.
+
+    The raw ``AIMessage`` carries ``usage_metadata`` so ``generate_nudges``
+    can include it in state messages for end-of-run budget reconciliation.
+    """
+    if not deterministic_nudges:
+        return deterministic_nudges, None, 0, 0
+    _state = {"_nudges": deterministic_nudges, "_snapshot": board_snapshot}
+    update, tokens_in, tokens_out = await _triage_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
+async def polish_triage(
+    model: BaseChatModel,
+    deterministic_nudges: list[dict[str, Any]],
+    board_snapshot: dict[str, Any],
+) -> tuple[list[dict[str, Any]], int, int]:
+    """3-tuple wrapper: ``(polished_nudges, tokens_in, tokens_out)``.
+
+    Kept for backward compatibility with tests that import it directly.
+    Internal callers use :func:`_polish_triage` so the raw ``AIMessage``
+    can be appended to state messages for budget reconciliation.
+    """
+
+    nudges, _raw_msg, tokens_in, tokens_out = await _polish_triage(
+        model, deterministic_nudges, board_snapshot
+    )
+    return nudges, tokens_in, tokens_out
 
 
 class TriageAgent(BaseAgent):
@@ -253,7 +286,7 @@ class TriageAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Both bodies are shared with board-brief-agent (same state keys,
         # same logic).  See ``app.agents.catalog._shared`` for the
@@ -262,13 +295,20 @@ class TriageAgent(BaseAgent):
         detect_drift = detect_drift_node
 
         async def generate_nudges(state: TriageState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
-            polished_nudges, tokens_in, tokens_out = await polish_triage(
+            polished_nudges, raw_msg, _tokens_in, _tokens_out = await _polish_triage(
                 chat_model, nudges, board_snapshot
             )
             project_id = state.get("project_id") or ""
+            extra_messages = [raw_msg] if raw_msg is not None else []
+            new_events: list[dict] = []
             for index, nudge in enumerate(polished_nudges):
                 details = nudge.get("details") or {}
                 target_ids = [
@@ -293,22 +333,25 @@ class TriageAgent(BaseAgent):
                     "target_ids": target_ids,
                     "severity": fe_severity,
                 }
-                emit_custom({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
-            emit_usage(tokens_in, tokens_out)
+                new_events.append({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
             return {
                 "nudges": polished_nudges,
-                "messages": [AIMessage(content=json.dumps(polished_nudges))],
+                "messages": [
+                    *extra_messages,
+                    AIMessage(content=json.dumps(polished_nudges)),
+                ],
+                "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(TriageState)
-        graph.add_node("fetch_snapshot", fetch_snapshot)
-        graph.add_node("detect_drift", detect_drift)
-        graph.add_node("generate_nudges", generate_nudges)
-        graph.add_edge(START, "fetch_snapshot")
-        graph.add_edge("fetch_snapshot", "detect_drift")
-        graph.add_edge("detect_drift", "generate_nudges")
-        graph.add_edge("generate_nudges", END)
+        graph: StateGraph = linear_graph(
+            TriageState,
+            [
+                ("fetch_snapshot", fetch_snapshot),
+                ("detect_drift", detect_drift),
+                ("generate_nudges", generate_nudges),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(TriageAgent(), replace=True)

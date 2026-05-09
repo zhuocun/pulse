@@ -21,6 +21,9 @@ exception handler renders them as JSON without leaking tracebacks.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as _hmac
 import logging
 from contextlib import AsyncExitStack
 from typing import Any, AsyncIterator, Mapping, Optional
@@ -43,6 +46,7 @@ from app.agents.errors import (
     AgentExecutionError,
     AgentRecursionError,
 )
+from app.agents.context import ChatContext
 from app.agents.instrumentation import start_run_span
 from app.agents.llm import extract_token_usage, resolved_chat_model_id
 from app.agents.registry import AgentRegistry
@@ -54,6 +58,93 @@ from app.agents.stores import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Signed thread-key helpers (Phase 6C)
+# ---------------------------------------------------------------------------
+
+# Token prefix used to detect the signed envelope format.
+_SIGNED_PREFIX = "sigv1."
+# NUL byte used as a field separator inside the payload (never valid in a
+# thread ID so it cannot be injected).
+_SEP = "\x00"
+
+
+def _signing_key() -> bytes:
+    """Return the HMAC-SHA256 signing key (bytes-encoded JWT secret)."""
+    from app.config import settings as _settings
+
+    return _settings.jwt_secret.encode()
+
+
+def sign_thread_key(
+    agent_name: str,
+    scope: str,
+    original_thread_id: str,
+) -> str:
+    """Return an opaque signed token for ``(agent_name, scope, original_thread_id)``.
+
+    The token is a ``sigv1.<base64url>`` string where the base64url payload
+    encodes ``agent_name NUL scope NUL original_thread_id NUL hmac_hex``.
+    The HMAC-SHA256 digest is computed over the same three fields so
+    the signature covers all components and cannot be stripped or swapped.
+
+    Signing is deterministic: same inputs → same token regardless of call order.
+    """
+    message = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}"
+    digest = _hmac.new(
+        _signing_key(), message.encode(), hashlib.sha256
+    ).hexdigest()
+    payload = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}{_SEP}{digest}"
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode()
+    return f"{_SIGNED_PREFIX}{encoded}"
+
+
+def _try_verify_signed_thread_key(
+    token: str,
+    agent_name: str,
+    scope: str,
+) -> Optional[str]:
+    """Validate a signed token and return the original thread_id, or ``None``.
+
+    Returns ``None`` when:
+    - the token does not have the ``sigv1.`` prefix,
+    - base64 decoding fails,
+    - the payload does not have the expected 4 NUL-separated fields,
+    - the embedded agent_name / scope do not match the current call, or
+    - the HMAC signature is invalid (constant-time comparison).
+
+    Callers that receive ``None`` should fall back to the iterative-strip
+    path for backwards compatibility with unsigned thread IDs.
+    """
+    if not token.startswith(_SIGNED_PREFIX):
+        return None
+    encoded = token[len(_SIGNED_PREFIX):]
+    try:
+        payload = base64.urlsafe_b64decode(encoded.encode()).decode()
+    except Exception:  # noqa: BLE001 -- malformed base64
+        return None
+    parts = payload.split(_SEP, 3)
+    if len(parts) != 4:
+        return None
+    tok_agent, tok_scope, tok_original, tok_digest = parts
+    # Reject tokens for a different agent or user scope.
+    if tok_agent != agent_name or tok_scope != scope:
+        raise ValueError(
+            f"Signed thread key rejected: token was issued for "
+            f"agent={tok_agent!r} scope={tok_scope!r}, but the current "
+            f"call is agent={agent_name!r} scope={scope!r}."
+        )
+    # Constant-time HMAC comparison.
+    message = f"{tok_agent}{_SEP}{tok_scope}{_SEP}{tok_original}"
+    expected = _hmac.new(
+        _signing_key(), message.encode(), hashlib.sha256
+    ).hexdigest()
+    if not _hmac.compare_digest(expected, tok_digest):
+        raise ValueError(
+            "Signed thread key rejected: HMAC signature mismatch."
+        )
+    return tok_original
 
 
 class AgentRuntime:
@@ -100,6 +191,13 @@ class AgentRuntime:
                 "Postgres-backed agent persistence requires async setup; use "
                 "AgentRuntime.from_settings_async(settings, stack=stack) instead.",
             )
+        # Populate the registry with catalog agents if the caller did not
+        # supply a pre-populated one. Using replace=True (via register_all)
+        # makes repeated startups (e.g. test suite) idempotent.
+        if registry is None:
+            from app.agents.catalog import register_all as _register_all
+
+            _register_all(default_registry)
         return cls(
             checkpointer=checkpointer,
             store=store,
@@ -153,6 +251,13 @@ class AgentRuntime:
             settings=settings,
             pool=shared_pool,
         )
+        # Populate the registry with catalog agents if the caller did not
+        # supply a pre-populated one. Using replace=True (via register_all)
+        # makes repeated startups (e.g. test suite) idempotent.
+        if registry is None:
+            from app.agents.catalog import register_all as _register_all
+
+            _register_all(default_registry)
         return cls(
             checkpointer=checkpointer,
             store=store,
@@ -192,29 +297,50 @@ class AgentRuntime:
         """Namespace the thread id by ``(agent, user)``.
 
         The canonical form is ``{agent}:{scope}:{tail}`` where ``scope``
-        is the authenticated user_id (or ``"anon"``). To prevent a client
-        from binding a checkpoint to another user's namespace by injecting a
-        victim's prefix (e.g. passing ``{agent}:{victim}:{tail}``), all
-        leading ``{agent}:{any_segment}:`` prefixes where ``{agent}`` is
-        THIS agent's name are stripped iteratively before the canonical
-        prefix for the current user is reapplied.
+        is the authenticated user_id (or ``"anon"``).
 
-        This protects against chained prefix injection
-        (e.g. ``agent:user_a:agent:user_b:tail`` is fully stripped to
-        ``tail`` before renaming). Cross-agent thread sharing is a
-        separate concern handled by checkpointer namespacing, if at all.
+        **Signed path** (preferred, Phase 6C): if ``thread_id`` starts with
+        the ``sigv1.`` prefix, it is treated as an HMAC-signed envelope.  The
+        signature is validated against the JWT secret and the original thread
+        ID is extracted.  A mismatched agent/scope or invalid HMAC raises
+        :class:`ValueError` immediately so prefix-injection via a stolen token
+        is rejected with a clear error rather than silently re-scoped.
 
-        The legitimate round-trip case is preserved: a client that
-        replays its own previously-namespaced id
-        (``{agent}:{scope}:{tail}``) ends up with the same final id
-        after strip + reapply.
+        **Unsigned fallback** (backwards compat): plain thread IDs (no
+        ``sigv1.`` prefix) are processed with the original iterative-strip
+        logic so rolling restarts and older clients remain functional.  All
+        leading ``{agent}:{any_segment}:`` prefixes are stripped iteratively
+        before the canonical prefix for the current user is reapplied.  This
+        protects against chained prefix injection
+        (``agent:u1:agent:u2:tail`` → ``tail`` → ``agent:u_current:tail``).
         """
 
-        base = (thread_id or self._default_thread_id).strip()
-        if not base:
-            base = self._default_thread_id
+        raw = (thread_id or self._default_thread_id).strip()
+        if not raw:
+            raw = self._default_thread_id
         scope = (user_id or "anon").strip() or "anon"
         prefix = f"{agent.name}:{scope}:"
+
+        # ------------------------------------------------------------------
+        # Signed path: validate and unwrap the HMAC envelope.
+        # ------------------------------------------------------------------
+        if raw.startswith(_SIGNED_PREFIX):
+            original = _try_verify_signed_thread_key(raw, agent.name, scope)
+            if original is None:
+                # Malformed envelope; treat as an unsigned id to preserve
+                # rolling-restart safety (the new server code may restart
+                # while old clients are mid-flight with a plain id that
+                # coincidentally starts with "sigv1." -- extremely unlikely
+                # but handle gracefully).
+                pass
+            else:
+                base = original.strip() or self._default_thread_id
+                return f"{prefix}{base}"
+
+        # ------------------------------------------------------------------
+        # Unsigned fallback: iterative-strip (backwards compat).
+        # ------------------------------------------------------------------
+        base = raw
         agent_prefix = f"{agent.name}:"
         # Iteratively strip all leading ``{agent}:{any_segment}:`` prefixes
         # so a chained injection like ``agent:u1:agent:u2:tail`` is reduced
@@ -238,6 +364,68 @@ class AgentRuntime:
 
     def _resolved_recursion_limit(self, agent: BaseAgent) -> int:
         return min(agent.metadata.recursion_limit, self._recursion_limit)
+
+    def set_chat_model(self, name: str, model: Any) -> None:
+        """Set the default chat model for the named agent.
+
+        The model is stored on the agent instance via
+        :meth:`~app.agents.base.BaseAgent.set_chat_model` and then propagated
+        onto the per-call context by :meth:`_build_context` so every
+        subsequent invocation uses the new default.
+
+        This is the primary injection point for tests: calling
+        ``runtime.set_chat_model("board-brief-agent", fake_model)`` is
+        equivalent to the old pattern of ``agent.set_chat_model(fake_model)``
+        but also ensures the context carries the model for the new per-call
+        context path.
+        """
+        self.get(name).set_chat_model(model)
+
+    def _build_context(
+        self,
+        agent: BaseAgent,
+        caller_context: Any,
+        *,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> Any:
+        """Resolve a context object for one agent call.
+
+        For catalog agents that declare ``context_schema=ChatContext`` (or
+        no context_schema at all), the runtime builds and returns a
+        :class:`~app.agents.context.ChatContext` dict with the resolved
+        ``chat_model``.  Resolution order:
+
+        1. ``caller_context["chat_model"]`` — enables per-request overrides;
+           TODO wire to ``X-Pulse-Model`` header / tenant config in Phase 5.
+        2. Agent's own ``chat_model`` property (resolved lazily from settings
+           on first access).
+
+        For agents with a *different* ``context_schema`` (e.g. test-only
+        agents, or future agents with specialised contexts), the caller's
+        context is returned unchanged so LangGraph can coerce it against the
+        declared schema without a ``KeyError``.
+
+        ``user_id`` and ``project_id`` are informational fields mirrored from
+        ``configurable``.
+        """
+        schema = agent.metadata.context_schema
+        if schema is not None and schema is not ChatContext:
+            # Non-ChatContext agent: pass caller's context through unchanged.
+            return caller_context
+
+        # ChatContext agent (or no declared schema): inject the resolved model.
+        ctx_model: Any = None
+        if isinstance(caller_context, dict):
+            ctx_model = caller_context.get("chat_model")
+        if ctx_model is None:
+            ctx_model = agent.chat_model
+        ctx: ChatContext = {"chat_model": ctx_model}
+        if user_id is not None:
+            ctx["user_id"] = user_id
+        if project_id is not None:
+            ctx["project_id"] = project_id
+        return ctx
 
     def build_config(
         self,
@@ -295,11 +483,14 @@ class AgentRuntime:
             assistant_id=assistant_id,
             tags=tags,
         )
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         try:
             return agent.invoke(
                 inputs,
                 config=config,
-                context=context,
+                context=resolved_context,
                 checkpointer=self._checkpointer,
                 store=self._store,
             )
@@ -367,6 +558,9 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         with start_run_span(
             operation="invoke_agent",
             agent_name=name,
@@ -378,7 +572,7 @@ class AgentRuntime:
                 result = await agent.ainvoke(
                     graph_input,
                     config=config,
-                    context=context,
+                    context=resolved_context,
                     checkpointer=self._checkpointer,
                     store=self._store,
                 )
@@ -408,22 +602,11 @@ class AgentRuntime:
     ) -> tuple[Any, list[Any]]:
         """Run agent ``name`` to completion, capturing custom events.
 
-        Returns ``(final_state, custom_events)``.  The first element is
-        the agent's final state dict (the same value :meth:`ainvoke`
-        returns); the second is the ordered list of payloads written via
-        :func:`app.agents.stream.emit_custom` during the run.
-
-        LangGraph's :meth:`Pregel.ainvoke` discards custom-stream events
-        — by design, since the JSON-style entry point doesn't otherwise
-        surface them.  But the catalog agents emit suggestions,
-        citations and nudges through ``emit_custom``, and JSON callers
-        (the ``/api/ai`` shim, future MCP surface, replay tooling) need
-        to see them too.  Internally this method calls
-        ``agent.astream(stream_mode=("values", "custom"))`` because
-        ``ainvoke`` is itself implemented as a thin wrapper over
-        ``astream`` in LangGraph 1.x; running multi-mode and partitioning
-        the chunks adds zero round-trips while making the events
-        first-class.
+        Returns ``(final_state, events)`` where ``events`` is
+        ``final_state.get("events", [])``.  The first element is the
+        agent's final state dict; the second is the ordered list of event
+        dicts accumulated on ``state["events"]`` during the run (Phase 2
+        — events are first-class state, not side-effects).
 
         The same span / error-translation machinery as :meth:`ainvoke`
         wraps the run, so OTel and Prometheus dimensions stay aligned
@@ -439,8 +622,10 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         final_state: Any = None
-        custom_events: list[Any] = []
         with start_run_span(
             operation="run_agent_with_events",
             agent_name=name,
@@ -452,14 +637,12 @@ class AgentRuntime:
                 async for mode, payload in agent.astream(
                     graph_input,
                     config=config,
-                    context=context,
+                    context=resolved_context,
                     stream_mode=("values", "custom"),
                     checkpointer=self._checkpointer,
                     store=self._store,
                 ):
-                    if mode == "custom":
-                        custom_events.append(payload)
-                    elif mode == "values":
+                    if mode == "values":
                         # ``values`` yields after every superstep; the last
                         # one is the final state.  Overwriting is correct.
                         final_state = payload
@@ -475,7 +658,12 @@ class AgentRuntime:
                 )
                 raise AgentExecutionError(name, cause=exc) from exc
             run_span.set_result(final_state)
-            return final_state, custom_events
+            # Source events from state (Phase 2); fall back to empty list when
+            # the agent pre-dates the ``events`` field (e.g. test-only agents).
+            events: list[Any] = list(
+                (final_state or {}).get("events") or []
+            )
+            return final_state, events
 
     async def astream(
         self,
@@ -499,6 +687,19 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
+        # Track how many events we have already surfaced as ``custom`` chunks
+        # so we can emit exactly the new ones after each superstep.
+        _emitted_event_count = 0
+        # Determine which modes to request from LangGraph. We always add
+        # ``"values"`` so we can diff the ``events`` list after each superstep
+        # and re-emit new entries as ``custom`` chunks (Phase 2 SSE re-emission).
+        _request_modes: tuple[str, ...] = stream_mode
+        _need_values = "values" not in stream_mode
+        if _need_values:
+            _request_modes = stream_mode + ("values",)
         with start_run_span(
             operation="stream_agent",
             agent_name=name,
@@ -510,11 +711,26 @@ class AgentRuntime:
                 async for event in agent.astream(
                     graph_input,
                     config=config,
-                    context=context,
-                    stream_mode=stream_mode,
+                    context=resolved_context,
+                    stream_mode=_request_modes,
                     checkpointer=self._checkpointer,
                     store=self._store,
                 ):
+                    mode, payload = event
+                    if mode == "values":
+                        # After each superstep, emit new state-events as
+                        # ``custom`` chunks so SSE consumers see the same
+                        # wire shape regardless of whether the node used
+                        # ``emit_custom`` or returned ``{"events": [...]}``.
+                        current_events: list[Any] = list(
+                            (payload or {}).get("events") or []
+                        )
+                        for evt in current_events[_emitted_event_count:]:
+                            yield ("custom", evt)
+                        _emitted_event_count = len(current_events)
+                        if _need_values:
+                            # Caller did not ask for ``values``; skip it.
+                            continue
                     yield event
             except AgentError:
                 await self._aggregate_astream_tokens_no_propagate(

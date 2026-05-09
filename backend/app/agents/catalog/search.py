@@ -31,15 +31,16 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     EXPANDED_TERMS_MAX,
     SEARCH_IDS_MAX,
@@ -47,19 +48,103 @@ from app.agents.catalog._schemas import (
 )
 from app.agents.catalog._shared import (
     cap_polished_text,
-    emit_usage,
     filter_to_allowed_ids,
-    structured_llm_call,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
-from app.agents.registry import registry
+from app.agents.polish import PolishStep
 from app.agents.state import SearchState
-from app.agents.stream import emit_custom
+from langgraph.runtime import get_runtime
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# v1-compatible semantic search baseline (ported from v1_engine.py).
+# The ``rank`` node uses this when ``ranking`` is not pre-populated so the
+# route no longer needs to pre-call v1_engine.semantic_search.
+# ---------------------------------------------------------------------------
+
+import re as _re_search  # noqa: E402
+
+_SEARCH_TOKEN_RE = _re_search.compile(r"[A-Za-z0-9]+")
+
+
+def _search_tokens(text: str) -> list[str]:
+    return [m.group(0).lower() for m in _SEARCH_TOKEN_RE.finditer(text or "")]
+
+
+def _search_token_set(text: str) -> set[str]:
+    return set(_search_tokens(text))
+
+
+def _search_jaccard(a: set[str], b: set[str]) -> float:
+    union = a | b
+    if not union:
+        return 0.0
+    return len(a & b) / len(union)
+
+
+def semantic_search(
+    kind: str,
+    query: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Return an ``ISearchResult`` ranking matching ids by Jaccard.
+
+    Byte-identical to :func:`app.services.v1_engine.semantic_search`.
+    """
+    query_tokens = _search_token_set(query)
+    if kind == "tasks":
+        items = context.get("tasks") or []
+        searchables = [
+            (
+                t.get("_id"),
+                _search_token_set(
+                    " ".join(
+                        str(t.get(field) or "")
+                        for field in ("taskName", "note", "type", "epic")
+                    )
+                ),
+            )
+            for t in items
+            if isinstance(t, dict) and isinstance(t.get("_id"), str)
+        ]
+    else:
+        items = context.get("projects") or []
+        searchables = [
+            (
+                p.get("_id"),
+                _search_token_set(
+                    " ".join(
+                        str(p.get(field) or "")
+                        for field in (
+                            "projectName",
+                            "organization",
+                            "organisation",
+                            "managerId",
+                            "manager",
+                        )
+                    )
+                ),
+            )
+            for p in items
+            if isinstance(p, dict) and isinstance(p.get("_id"), str)
+        ]
+    scored = [(id_, _search_jaccard(query_tokens, tokens)) for id_, tokens in searchables]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    matched = [id_ for id_, score in scored if score > 0.0]
+    return {
+        "ids": matched[:10],
+        "rationale": (
+            f"Ranked by keyword overlap with the query (top {len(matched[:10])})."
+            if matched
+            else "No matches; try broader keywords."
+        ),
+    }
 
 
 class SearchRanking(BaseModel):
@@ -153,34 +238,12 @@ def _strength_to_score(strength: str) -> float:
     return 0.0
 
 
-async def polish_search(
-    model: BaseChatModel,
-    deterministic: dict[str, Any],
-    query: str,
-    candidates: list[dict[str, Any]],
-) -> tuple[dict[str, Any], int, int]:
-    """LLM-rerank deterministic search hits; deterministic fallback on stub.
-
-    ``candidates`` is a list of ``{id, text}`` dicts the v1 shim derived
-    from ``context.tasks`` / ``context.projects``. The ranking the LLM
-    returns is intersected with these so a hallucinated id never reaches
-    the FE -- the FE validator does the same check, but doing it
-    server-side keeps the contract tight and avoids round-trips to
-    discover that an id was bogus. A blank rationale or any structured-
-    output failure preserves the deterministic ``ids`` + ``rationale``
-    so the FE layout stays byte-identical with the no-key path.
-    """
-
-    # Empty candidate list means the deterministic ranker found nothing
-    # to score; the LLM has no useful work and would hallucinate ids.
-    if not candidates:
-        return deterministic, 0, 0
-    # Redact PII before sending candidate ``text`` (task names, project
-    # names) to the provider.  The id-allowlist below uses the unredacted
-    # ids from ``candidates`` so the FE round-trip still works.
+def _build_search_prompt(state: dict[str, Any]) -> str:
+    candidates = state["_candidates"]
+    query = state["_query"]
     safe_candidates = redact_dict(candidates[:30])
     safe_query = redact(query)[0] if isinstance(query, str) else query
-    prompt = (
+    return (
         "You are re-ranking search results for a Jira-style project tool. "
         "Pick up to 10 of the candidate ids that best match the query, "
         "ordered most to least relevant. Use only ids that appear in the "
@@ -191,62 +254,120 @@ async def polish_search(
         f"Candidates: {json.dumps(safe_candidates)}"
     )
 
+
+def _merge_search(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    candidates = state["_candidates"]
     candidate_ids = {
         c.get("id")
         for c in candidates
         if isinstance(c, dict) and isinstance(c.get("id"), str)
     }
-
-    def _merge(parsed: SearchRanking) -> dict[str, Any]:
-        polished_ids = filter_to_allowed_ids(parsed.ids, candidate_ids)
-        if not polished_ids:
-            # The model returned only hallucinated ids (or an empty list);
-            # the deterministic ranking is still our best signal.
-            return deterministic
-        rationale = cap_polished_text(
-            parsed.rationale,
-            max_chars=SEARCH_RATIONALE_MAX,
-            fallback=deterministic.get("rationale", ""),
-        )
-        # Recompute matches for the new id order so strength still corresponds
-        # 1:1 with each id.  Prefer the original cosine scores threaded through
-        # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
-        # floor from ``_strength_to_score`` for ids not in the map (e.g. when
-        # ``polish_search`` is called directly by the v1 shim without a ``rank``
-        # node that set ``_score_map``).
-        score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
-        if not score_map:
-            # Backward-compat path: reconstruct from strength buckets.
-            score_map = {
-                m["id"]: _strength_to_score(m["strength"])
-                for m in (deterministic.get("matches") or [])
-                if isinstance(m, dict)
-            }
-        polished_matches = _build_matches(polished_ids[:SEARCH_IDS_MAX], score_map)
-        polished: dict[str, Any] = {
-            **deterministic,
-            "ids": polished_ids[:SEARCH_IDS_MAX],
-            "rationale": rationale,
-            "matches": polished_matches,
-        }
-        expanded = [
-            t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
-        ]
-        if expanded:
-            polished["expandedTerms"] = expanded
-        return polished
-
-    return await structured_llm_call(
-        model,
-        SearchRanking,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+    if not isinstance(parsed, SearchRanking):
+        return {"_result": parsed}  # fallback value (dict)
+    polished_ids = filter_to_allowed_ids(parsed.ids, candidate_ids)
+    if not polished_ids:
+        return {"_result": deterministic}
+    rationale = cap_polished_text(
+        parsed.rationale,
+        max_chars=SEARCH_RATIONALE_MAX,
+        fallback=deterministic.get("rationale", ""),
     )
+    score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
+    if not score_map:
+        score_map = {
+            m["id"]: _strength_to_score(m["strength"])
+            for m in (deterministic.get("matches") or [])
+            if isinstance(m, dict)
+        }
+    polished_matches = _build_matches(polished_ids[:SEARCH_IDS_MAX], score_map)
+    polished: dict[str, Any] = {
+        **deterministic,
+        "ids": polished_ids[:SEARCH_IDS_MAX],
+        "rationale": rationale,
+        "matches": polished_matches,
+    }
+    expanded = [
+        t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
+    ]
+    if expanded:
+        polished["expandedTerms"] = expanded
+    return {"_result": polished}
+
+
+_search_step: PolishStep[SearchRanking] = PolishStep(
+    prompt_fn=_build_search_prompt,
+    schema=SearchRanking,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_search,
+)
+
+
+async def _polish_search(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    query: str,
+    candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any], Any, int, int]:
+    """LLM-rerank deterministic search hits; deterministic fallback on stub.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
+    ``raw_message`` is the underlying ``AIMessage`` with ``usage_metadata``
+    populated; callers should include it in the node's ``messages`` return
+    value so budget tracking can find the token counts.  It is ``None`` on
+    the stub path, the empty-candidates short-circuit, or when the call fails.
+
+    ``candidates`` is a list of ``{id, text}`` dicts the v1 shim derived
+    from ``context.tasks`` / ``context.projects``. The ranking the LLM
+    returns is intersected with these so a hallucinated id never reaches
+    the FE -- the FE validator does the same check, but doing it
+    server-side keeps the contract tight and avoids round-trips to
+    discover that an id was bogus. A blank rationale or any structured-
+    output failure preserves the deterministic ``ids`` + ``rationale``
+    so the FE layout stays byte-identical with the no-key path.
+    """
+    # Empty candidate list means the deterministic ranker found nothing
+    # to score; the LLM has no useful work and would hallucinate ids.
+    if not candidates:
+        return deterministic, None, 0, 0
+    _state = {"_deterministic": deterministic, "_query": query, "_candidates": candidates}
+    update, tokens_in, tokens_out = await _search_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
+    )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
+async def polish_search(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    query: str,
+    candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any], int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_search`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  The ``polish`` node
+    inside :class:`SearchAgent` calls :func:`_polish_search` directly so it
+    can also capture the raw ``AIMessage`` for budget tracking.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_search(
+        model, deterministic, query, candidates
+    )
+    return result, tokens_in, tokens_out
 
 
 class SearchAgent(BaseAgent):
-    """Embedding-rerank search agent.  The v1 shim still uses :func:`polish_search`
+    """Embedding-rerank search agent.  Internal callers use ``_polish_search``
     and ``runtime.get("search-agent").chat_model`` -- both remain stable.
 
     The v2.1 graph implements:
@@ -300,11 +421,11 @@ class SearchAgent(BaseAgent):
     ) -> Pregel:
         """Compile the v2.1 search graph.
 
-        The chat model is captured at build time (standard catalog pattern)
-        so the graph closure holds a single model reference for the lifetime
-        of the compiled graph -- identical to how task-estimation-agent works.
+        The default chat model is captured at build time as a fallback; nodes
+        prefer the per-call context model injected by the runtime so
+        per-request overrides work without rebuilding the graph.
         """
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         def fetch_candidates(state: SearchState) -> dict[str, Any]:
             """Interrupt to the FE requesting the candidate set.
@@ -342,6 +463,11 @@ class SearchAgent(BaseAgent):
         async def rank(state: SearchState) -> dict[str, Any]:
             """Embed query + candidates; rank by cosine similarity.
 
+            Short-circuits when ``ranking`` is already on state -- the v1 shim
+            pre-populates it with the ``v1_engine.semantic_search`` result so
+            the agent skips embedding-based computation and goes straight to
+            ``polish``.
+
             When the candidate list is empty we skip embedding (no work to do)
             and return ``{ids: [], rationale: "..."}`` so downstream nodes
             have a safe, non-None value to work with.
@@ -351,6 +477,8 @@ class SearchAgent(BaseAgent):
             carries the corresponding strength bucket so the FE
             ``AiMatchStrengthBadge`` can render a coloured chip per result.
             """
+            if state.get("ranking") is not None:
+                return {}
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             n = len(candidates)
@@ -392,20 +520,28 @@ class SearchAgent(BaseAgent):
             }
 
         async def polish(state: SearchState) -> dict[str, Any]:
-            """LLM-polish the deterministic ranking; emit token usage."""
+            """LLM-polish the deterministic ranking."""
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}
-            polished, tokens_in, tokens_out = await polish_search(
+            polished, raw_msg_search, _tokens_in, _tokens_out = await _polish_search(
                 chat_model, deterministic, query, candidates
             )
-            emit_usage(tokens_in, tokens_out)
+            extra_msgs_search = [raw_msg_search] if raw_msg_search is not None else []
             # Strip ``_score_map`` before persisting: it only needs to live
             # across rank → polish and should never reach the checkpointer.
-            return {"ranking": {k: v for k, v in polished.items() if k != "_score_map"}}
+            return {
+                "ranking": {k: v for k, v in polished.items() if k != "_score_map"},
+                **({"messages": extra_msgs_search} if extra_msgs_search else {}),
+            }
 
         def emit(state: SearchState) -> dict[str, Any]:
-            """Emit the final ranking as a suggestion event and as an AIMessage.
+            """Return the final ranking as a suggestion event and as an AIMessage.
 
             Writing the ranking to ``messages`` ensures that callers on the
             ``/invoke`` path (which do not receive SSE custom events) can still
@@ -419,26 +555,27 @@ class SearchAgent(BaseAgent):
             ranking_raw = state.get("ranking") or {"ids": [], "rationale": ""}
             # Strip the internal ``_score_map`` field before serialising.
             ranking = {k: v for k, v in ranking_raw.items() if k != "_score_map"}
-            emit_custom(
-                {
-                    "kind": "suggestion",
-                    "surface": "search",
-                    "payload": ranking,
-                }
-            )
-            return {"messages": [AIMessage(content=json.dumps(ranking))]}
+            return {
+                "messages": [AIMessage(content=json.dumps(ranking))],
+                "events": [
+                    {
+                        "kind": "suggestion",
+                        "surface": "search",
+                        "payload": ranking,
+                    }
+                ],
+            }
 
-        graph: StateGraph = StateGraph(SearchState)
-        graph.add_node("fetch_candidates", fetch_candidates)
-        graph.add_node("rank", rank)
-        graph.add_node("polish", polish)
-        graph.add_node("emit", emit)
-        graph.add_edge(START, "fetch_candidates")
-        graph.add_edge("fetch_candidates", "rank")
-        graph.add_edge("rank", "polish")
-        graph.add_edge("polish", "emit")
-        graph.add_edge("emit", END)
+        graph: StateGraph = linear_graph(
+            SearchState,
+            [
+                ("fetch_candidates", fetch_candidates),
+                ("rank", rank),
+                ("polish", polish),
+                ("emit", emit),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(SearchAgent(), replace=True)

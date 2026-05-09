@@ -28,11 +28,11 @@ from langgraph.store.base import BaseStore
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._chat_tools import CHAT_TOOLS
-from app.agents.catalog._shared import emit_usage
-from app.agents.llm import extract_token_usage, is_stub_model
-from app.agents.registry import registry
+from app.agents.context import ChatContext
+from app.agents.llm import is_stub_model
 from app.agents.state import ChatState
 from app.tools import be_tools
+from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +105,14 @@ class ChatAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         async def respond(state: ChatState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             # Keep _last_user_text reading the full (un-trimmed) history so
             # the stub-fallback summary still picks up the actual last user input.
             user_text = _last_user_text(state)
@@ -120,8 +125,6 @@ class ChatAgent(BaseAgent):
             if is_stub_model(chat_model):
                 reply = _stub_response(user_text, project_id)
                 response: AIMessage = AIMessage(content=reply)
-                tokens_in = 0
-                tokens_out = 0
             else:
                 # Use ``ainvoke`` so a real provider call yields the
                 # event loop; otherwise the synchronous HTTP roundtrip
@@ -158,7 +161,6 @@ class ChatAgent(BaseAgent):
                     )
                     reply = _stub_response(user_text, project_id)
                     response = AIMessage(content=reply)
-                    emit_usage(0, 0)
                     return {"messages": [response]}
                 if isinstance(raw, AIMessage):
                     response = raw
@@ -166,21 +168,19 @@ class ChatAgent(BaseAgent):
                     response = AIMessage(
                         content=str(getattr(raw, "content", raw))
                     )
-                tokens_in, tokens_out = extract_token_usage(response)
 
-            emit_usage(tokens_in, tokens_out)
             # No citation event here: the user's own message is not a
             # citable entity and ``source: "user"`` is not in the FE
             # contract enum (``task | column | member | project`` --
             # see ``src/interfaces/agent.d.ts``). Emitting it caused the
             # FE citation chip renderer to silently drop the ref.
+            # Token usage is aggregated end-of-run from AIMessage.usage_metadata.
             return {"messages": [response]}
 
-        graph: StateGraph = StateGraph(ChatState)
+        graph: StateGraph = StateGraph(ChatState, context_schema=ChatContext)
         graph.add_node("respond", respond)
         graph.add_edge(START, "respond")
         graph.add_edge("respond", END)
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(ChatAgent(), replace=True)

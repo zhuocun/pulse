@@ -290,79 +290,64 @@ def test_stub_model_returns_deterministic_ranking() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Token usage emission on polish
+# Token usage and suggestion events via state (Phase 2)
 # ---------------------------------------------------------------------------
 
 
-def test_token_usage_emitted_on_polish() -> None:
-    """The ``polish`` node emits a ``{"kind": "usage", ...}`` custom event.
+def test_token_usage_not_emitted_as_custom_event_on_polish() -> None:
+    """Phase 2: the ``polish`` node no longer emits ``kind=usage`` custom events.
 
-    ``emit_custom`` is a no-op when there is no active stream writer (the
-    ``/invoke`` path). This test verifies that the node *attempts* to emit
-    by patching the stream helper at its local name inside
-    ``app.agents.stream`` so the patch takes effect inside the node
-    closure.
+    Token usage now flows through ``AIMessage.usage_metadata`` at run-end
+    rather than as a side-effect through the stream writer. This test
+    verifies that no ``kind=usage`` event appears in ``state["events"]``
+    after a run, which would indicate a regression back to the old path.
     """
 
     agent = SearchAgent()
     checkpointer, store = _persistence()
     graph = agent.build(checkpointer=checkpointer, store=store)
 
-    emitted: list[Any] = []
+    final = _drive(
+        graph,
+        {"messages": [], "query": "auth bug", "project_id": "p1"},
+        [_CANDIDATES],
+        thread_id="usage-emit-1",
+    )
 
-    def fake_writer(payload: Any) -> None:
-        emitted.append(payload)
-
-    from app.agents import stream as stream_module
-
-    with patch.object(stream_module, "get_stream_writer", return_value=fake_writer):
-        _drive(
-            graph,
-            {"messages": [], "query": "auth bug", "project_id": "p1"},
-            [_CANDIDATES],
-            thread_id="usage-emit-1",
-        )
-
+    events = final.get("events") or []
     usage_events = [
-        e for e in emitted if isinstance(e, dict) and e.get("kind") == "usage"
+        e for e in events if isinstance(e, dict) and e.get("kind") == "usage"
     ]
-    assert usage_events, "Expected at least one usage emission from the polish node"
-    usage = usage_events[0]
-    assert "tokensIn" in usage
-    assert "tokensOut" in usage
+    assert not usage_events, (
+        "Phase 2: usage events must not appear in state['events']; "
+        "token accounting flows through AIMessage.usage_metadata instead."
+    )
 
 
-def test_suggestion_event_emitted_on_emit_node() -> None:
-    """The ``emit`` node must emit a ``{"kind": "suggestion", ...}`` custom event.
+def test_suggestion_event_in_state_events_on_emit_node() -> None:
+    """The ``emit`` node must populate ``state['events']`` with a suggestion.
 
-    Same patching strategy as ``test_token_usage_emitted_on_polish``: we
-    patch ``get_stream_writer`` at its local name in ``app.agents.stream``
-    so the patch is visible inside the node's ``emit_custom`` call.
+    Phase 2: events are first-class state rather than stream-writer side-effects.
+    The node returns ``{"events": [{"kind": "suggestion", ...}]}`` which
+    LangGraph's ``add_events`` reducer accumulates into the final state.
     """
 
     agent = SearchAgent()
     checkpointer, store = _persistence()
     graph = agent.build(checkpointer=checkpointer, store=store)
 
-    emitted: list[Any] = []
+    final = _drive(
+        graph,
+        {"messages": [], "query": "auth bug", "project_id": "p1"},
+        [_CANDIDATES],
+        thread_id="suggestion-emit-1",
+    )
 
-    def fake_writer(payload: Any) -> None:
-        emitted.append(payload)
-
-    from app.agents import stream as stream_module
-
-    with patch.object(stream_module, "get_stream_writer", return_value=fake_writer):
-        _drive(
-            graph,
-            {"messages": [], "query": "auth bug", "project_id": "p1"},
-            [_CANDIDATES],
-            thread_id="suggestion-emit-1",
-        )
-
+    events = final.get("events") or []
     suggestion_events = [
-        e for e in emitted if isinstance(e, dict) and e.get("kind") == "suggestion"
+        e for e in events if isinstance(e, dict) and e.get("kind") == "suggestion"
     ]
-    assert suggestion_events, "Expected a suggestion event from the emit node"
+    assert suggestion_events, "Expected a suggestion event in state['events'] from the emit node"
     evt = suggestion_events[0]
     assert evt.get("surface") == "search"
     assert "payload" in evt
@@ -471,31 +456,29 @@ def test_empty_candidates_produces_empty_matches() -> None:
 
 
 def test_suggestion_payload_includes_matches() -> None:
-    """The ``suggestion`` custom event's payload must carry ``matches``."""
+    """The suggestion event in ``state['events']`` must carry ``matches``.
+
+    Phase 2: events live on state, not on a stream writer side-effect.
+    The ``emit`` node returns ``{"events": [...]}`` which is accumulated
+    by the ``add_events`` reducer into the final state dict.
+    """
 
     agent = SearchAgent()
     checkpointer, store = _persistence()
     graph = agent.build(checkpointer=checkpointer, store=store)
 
-    emitted: list[Any] = []
+    final = _drive(
+        graph,
+        {"messages": [], "query": "auth bug", "project_id": "p1"},
+        [_CANDIDATES],
+        thread_id="suggestion-matches-1",
+    )
 
-    def fake_writer(payload: Any) -> None:
-        emitted.append(payload)
-
-    from app.agents import stream as stream_module
-
-    with patch.object(stream_module, "get_stream_writer", return_value=fake_writer):
-        _drive(
-            graph,
-            {"messages": [], "query": "auth bug", "project_id": "p1"},
-            [_CANDIDATES],
-            thread_id="suggestion-matches-1",
-        )
-
+    events = final.get("events") or []
     suggestion_events = [
-        e for e in emitted if isinstance(e, dict) and e.get("kind") == "suggestion"
+        e for e in events if isinstance(e, dict) and e.get("kind") == "suggestion"
     ]
-    assert suggestion_events
+    assert suggestion_events, "Expected a suggestion event in state['events']"
     payload = suggestion_events[0]["payload"]
     assert "matches" in payload
     assert len(payload["matches"]) == len(payload["ids"])

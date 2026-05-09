@@ -12,20 +12,8 @@ agent file:
   and the legacy raw list -- to a flat list.  Used by
   ``task_drafting.py`` and ``task_estimation.py``.
 
-- :func:`structured_llm_call`: generic scaffold for
-  ``with_structured_output`` polish calls. Adopted by all four
-  ``polish_*`` functions across the catalog.
-
-- :func:`emit_usage`: wraps ``emit_custom`` for ``{"kind": "usage"}``
-  events.  Centralises the wire keys so a single change here propagates
-  to all six call sites.
-
 - :func:`build_citation_refs`: builds a validated, redacted list of
   ``{"source", "id", "quote"}`` refs from an arbitrary item list.
-
-- :func:`emit_citation_refs`: thin wrapper around
-  :func:`build_citation_refs` that also emits the ``{"kind":
-  "citation"}`` custom event.
 
 - :func:`fetch_snapshot_node`: shared ``fetch_snapshot`` node body for
   board-brief and triage agents.
@@ -244,18 +232,6 @@ def detect_drift_node(state: Any) -> dict[str, Any]:
     return {"drift_result": be_tools.detect_drift(snapshot)}
 
 
-def emit_usage(tokens_in: int, tokens_out: int) -> None:
-    """Emit a ``{"kind": "usage"}`` custom event with token counts.
-
-    Centralises the wire keys (``tokensIn`` / ``tokensOut``) so all six
-    inline call sites can be replaced with a single import.
-    """
-
-    from app.agents.stream import emit_custom
-
-    emit_custom({"kind": "usage", "tokensIn": int(tokens_in), "tokensOut": int(tokens_out)})
-
-
 def build_citation_refs(
     items: list[dict],
     source: str,
@@ -305,87 +281,14 @@ def build_citation_refs(
     return refs
 
 
-def emit_citation_refs(
-    items: list[dict],
-    source: str,
-    *,
-    max_items: int = 3,
-    get_id: Optional[Callable[[dict], Any]] = None,
-    get_quote: Optional[Callable[[dict], str]] = None,
-) -> list[dict]:
-    """Build citation refs and emit a ``{"kind": "citation"}`` event if non-empty.
-
-    Thin wrapper around :func:`build_citation_refs` that additionally calls
-    :func:`app.agents.stream.emit_custom` with the citation payload.
-    Returns the refs list so callers can attach it to other payloads
-    (e.g. ``recommendationDetail.sources``).
-    """
-
-    from app.agents.stream import emit_custom
-
-    refs = build_citation_refs(
-        items,
-        source,
-        max_items=max_items,
-        get_id=get_id,
-        get_quote=get_quote,
-    )
-    if refs:
-        emit_custom({"kind": "citation", "refs": refs})
-    return refs
-
-
-async def structured_llm_call(
-    model: Any,
-    schema_type: type,
-    messages: list,
-    *,
-    fallback: Any,
-    merge_fn: Optional[Callable[[Any], Any]] = None,
-) -> tuple[Any, int, int]:
-    """Generic scaffold for structured-output polish calls.
-
-    Handles the stub-model short-circuit, the ``with_structured_output``
-    invocation, exception catching, response unpacking, token extraction,
-    and typed-result validation.  Returns ``(result, tokens_in, tokens_out)``.
-
-    ``merge_fn``, when provided, is called with the parsed Pydantic object
-    to convert it into the domain type expected by the caller (e.g. merging
-    polished fields back onto a deterministic baseline dict).
-    """
-
-    # Import here to avoid circular imports at module level; these two
-    # helpers live in separate packages and are always available.
-    from app.agents.llm import extract_token_usage, is_stub_model
-
-    if is_stub_model(model):
-        return fallback, 0, 0
-    try:
-        response = await model.with_structured_output(
-            schema_type, include_raw=True
-        ).ainvoke(messages)
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("structured_llm_call failed for %s", schema_type.__name__)
-        return fallback, 0, 0
-    raw, parsed, _error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if _error is not None or not isinstance(parsed, schema_type):
-        return fallback, tokens_in, tokens_out
-    result = merge_fn(parsed) if merge_fn else parsed
-    return result, tokens_in, tokens_out
-
-
 __all__ = [
     "build_citation_refs",
     "cap_polished_text",
     "detect_drift_node",
-    "emit_citation_refs",
-    "emit_usage",
     "fetch_similar_node",
     "fetch_snapshot_node",
     "filter_to_allowed_ids",
     "merge_keyed_string_updates",
-    "structured_llm_call",
     "unpack_similar_payload",
     "unpack_structured_response",
 ]

@@ -17,7 +17,7 @@ from app.agents.state import (
 
 def test_base_agent_state_keys() -> None:
     hints = get_type_hints(BaseAgentState, include_extras=True)
-    assert set(hints) == {"messages", "project_id", "user_id", "autonomy_level"}
+    assert set(hints) == {"messages", "events", "project_id", "user_id", "autonomy_level"}
 
 
 def test_board_brief_state_keys() -> None:

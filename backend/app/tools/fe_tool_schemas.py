@@ -285,6 +285,87 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Chat-tool schemas (single source of truth for _chat_tools.py generation)
+# ---------------------------------------------------------------------------
+# These define the LangChain tool stubs that chat-agent declares so the LLM
+# can request FE-side execution. Names and arg shapes here must match the FE
+# dispatcher in ``src/utils/ai/chatTools.ts`` exactly. The generator in
+# ``app/agents/catalog/_chat_tools.py`` derives the ``@tool``-decorated
+# functions from this dict so the schema lives in one place.
+
+CHAT_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+    "listProjects": {
+        "description": "List projects visible to the current viewer.",
+        "args": {
+            "filter": {
+                "type": "object",
+                "description": (
+                    "Free-form dict of conditions passed verbatim to the FE "
+                    "projects API (e.g. {\"organization\": \"Acme\"})."
+                ),
+                "optional": True,
+            },
+        },
+    },
+    "listMembers": {
+        "description": "List members of the current viewer's organisation.",
+        "args": {},
+    },
+    "getProject": {
+        "description": "Fetch a single project by id.",
+        "args": {
+            "projectId": {
+                "type": "string",
+                "description": "Project identifier.",
+            },
+        },
+    },
+    "listBoard": {
+        "description": "List columns and ordered task ids for a project board.",
+        "args": {
+            "projectId": {
+                "type": "string",
+                "description": "Project identifier.",
+            },
+        },
+    },
+    "listTasks": {
+        "description": (
+            "List tasks in a project, optionally filtered. "
+            "The ``filter`` object accepts ``taskName`` (substring), "
+            "``type`` (bug / feature / spike), ``coordinatorId``, and "
+            "``columnId``. Pass ``None`` (or omit) to list all tasks for the "
+            "project."
+        ),
+        "args": {
+            "projectId": {
+                "type": "string",
+                "description": "Project identifier.",
+            },
+            "filter": {
+                "type": "object",
+                "description": (
+                    "Optional filter. Fields: taskName (substring, case-insensitive), "
+                    "type (bug/feature/spike), coordinatorId, columnId."
+                ),
+                "optional": True,
+                "filter_fields": ["taskName", "type", "coordinatorId", "columnId"],
+            },
+        },
+    },
+    "getTask": {
+        "description": "Fetch a single task by id.",
+        "args": {
+            "taskId": {
+                "type": "string",
+                "description": "Task identifier.",
+            },
+        },
+    },
+}
+
+
 def fe_tool_definitions() -> list[dict[str, Any]]:
     """Return the FE tool catalogue as a list (for FE discoverability)."""
 

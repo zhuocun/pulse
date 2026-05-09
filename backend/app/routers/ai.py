@@ -11,14 +11,13 @@ by:
 1. Authenticating with the same JWT used elsewhere.
 2. Running the redaction / project-access / rate-limit / budget gates
    that the v2.1 router enforces.
-3. Delegating to deterministic implementations in
-   :mod:`app.services.v1_engine` for the structured routes, then
-   handing the result through the catalog agents' ``polish_*``
-   helpers so a configured ``ANTHROPIC_API_KEY`` /
-   ``OPENAI_API_KEY`` actually flips the FE-visible output. The
-   helpers internally short-circuit on the deterministic stub or on
-   any provider exception, so the wire shape stays byte-identical
-   when no key is set.
+3. Calling :meth:`~app.agents.AgentRuntime.arun_with_events` for all
+   structured routes so the catalog agents drive both the deterministic
+   baseline (via pre-populated state that short-circuits interrupt nodes)
+   and the optional LLM polish step in a single graph run. The agents'
+   custom ``{"kind": "suggestion"}`` events carry the final payload; the
+   routes extract the right surface and return it as plain JSON. The wire
+   shape stays byte-identical with the old ``polish_*``-based path.
 4. Forwarding ``chat`` to the ``chat-agent`` runtime so the LLM is
    shared. The chat agent binds the FE-executed tool catalogue (see
    :mod:`app.agents.catalog._chat_tools`) when a real model is
@@ -26,13 +25,10 @@ by:
    whenever the model picks a tool and the FE drives the multi-round
    loop until the model returns text.
 
-Polish helpers are async (``with_structured_output(...).ainvoke(...)``),
-so the route handlers ``await`` them directly. The event loop suspends at
-the provider I/O boundary and yields control back to uvicorn while the
-LLM responds, keeping concurrent requests progressing. With the
-deterministic stub the helpers short-circuit before any I/O, so the
-coroutine overhead is negligible; with a real key set, throughput on a
-single uvicorn worker no longer collapses to one request at a time.
+All agent calls run through :func:`asyncio.wait_for` (chat) or the
+agent's own timeout / retry logic (structured routes) so a hung
+provider call surfaces as an error rather than blocking the worker
+indefinitely.
 """
 
 from __future__ import annotations
@@ -40,25 +36,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Final, List, Optional, Tuple
+from typing import Any, Dict, Final, List, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents import AgentRuntime
 from app.agents.base import AgentMetadata
 from app.agents.limits import enforce_request_limits
-from app.agents.catalog.search import polish_search
-from app.agents.catalog.task_drafting import polish_draft
-from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
 from app.agents.errors import AgentError
-from app.agents.llm import (
-    is_stub_model,
-    make_stub_chat_model,
-    result_token_usage_from_graph_result,
-)
+from app.agents.llm import result_token_usage_from_graph_result
 from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
 from app.middleware.budget import BudgetBackend, get_budget_tracker
@@ -72,9 +60,10 @@ from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
 from app.security import current_user_id, current_user_payload
 from app.services.project_service import is_project_manager
-from app.services import v1_engine
+from app.agents.catalog.search import semantic_search as _semantic_search
 from app.tools.redaction import redact, redact_task_fields
 from app.validation import api_error
+from app.routers._dispatch import _find_suggestion, run_v1_route
 
 
 logger = logging.getLogger(__name__)
@@ -339,6 +328,55 @@ def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _token_usage_from_events(custom_events: List[Any]) -> Tuple[int, int]:
+    """Sum ``(tokens_in, tokens_out)`` from ``{"kind": "usage"}`` custom events.
+
+    Phase 2: catalog agents now include raw ``AIMessage`` objects (with
+    ``usage_metadata``) in state messages so
+    :func:`~app.agents.llm.result_token_usage_from_graph_result` can aggregate
+    them directly.  This function is retained as a fallback for any custom
+    agent that still emits ``{"kind": "usage"}`` side-channel events or for
+    forward-compatibility with persisted event lists that contain usage entries.
+    """
+
+    tokens_in = 0
+    tokens_out = 0
+    for event in custom_events:
+        if isinstance(event, dict) and event.get("kind") == "usage":
+            tokens_in += int(event.get("tokensIn") or 0)
+            tokens_out += int(event.get("tokensOut") or 0)
+    return tokens_in, tokens_out
+
+
+def _reconcile_token_budget(
+    project_id: Optional[str],
+    budget_tracker: BudgetBackend,
+    final_state: Any,
+    custom_events: List[Any],
+) -> None:
+    """True-up the project token budget after an agent run.
+
+    Tries :func:`~app.agents.llm.result_token_usage_from_graph_result` first
+    (populated by chat-agent and board-brief-agent which store AIMessages with
+    usage_metadata); falls back to the ``{"kind": "usage"}`` custom events
+    emitted by catalog agents that short-circuit onto pre-populated state
+    (task-draft, estimate, readiness, search).
+
+    The gate already debited 1 token at entry, so we top-up by
+    ``max(0, total - 1)``.
+    """
+
+    if not project_id:
+        return
+    tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
+    if tokens_in == 0 and tokens_out == 0:
+        tokens_in, tokens_out = _token_usage_from_events(custom_events)
+    actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
+    delta = max(0, actual - 1)
+    if delta > 0:
+        budget_tracker.record(project_id, tokens=delta)
+
+
 def _redact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for message in messages:
@@ -353,53 +391,6 @@ def _redact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _resolve_polish_model(runtime: AgentRuntime, agent_name: str) -> BaseChatModel:
-    """Return ``agent_name``'s configured chat model, or a stub on lookup miss.
-
-    The shim's _gate already enforces project access / rate limit /
-    budget regardless of which provider is wired up, so a missing
-    catalog agent should not 5xx the route -- it should just fall back
-    to the deterministic Python path. ``polish_*`` helpers detect the
-    stub via :func:`is_stub_model` and skip the LLM call entirely.
-    """
-
-    try:
-        return runtime.get(agent_name).chat_model
-    except AgentError:
-        return make_stub_chat_model()
-
-
-async def _polish_and_record(
-    project_id: Optional[str],
-    budget_tracker: BudgetBackend,
-    polish: Callable[..., Any],
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Invoke ``polish`` and true-up the project budget.
-
-    The polish helpers are async (LangChain ``with_structured_output``
-    + ``.ainvoke``) and are awaited directly here since the route handlers
-    are already ``async def``. This keeps the event loop free for concurrent
-    requests: the coroutine suspends at the provider I/O boundary and yields
-    control back to uvicorn while the LLM responds.
-
-    The :func:`_gate` step already debited 1 token at entry to the route
-    (so a runaway provider can't burst past the cap before we see usage).
-    Real usage is reported by the polish helper as
-    ``(value, tokens_in, tokens_out)``; we top-up by the delta
-    ``max(0, total - 1)`` so the budget tracker reflects what the
-    provider charged. A stubbed call reports ``(0, 0)`` and produces no
-    top-up.
-    """
-
-    polished, tokens_in, tokens_out = await polish(*args, **kwargs)
-    if project_id:
-        actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-        delta = max(0, actual - 1)
-        if delta > 0:
-            budget_tracker.record(project_id, tokens=delta)
-    return polished
 
 
 def _idempotent_replay(
@@ -521,54 +512,43 @@ async def task_draft(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        p = dict(p)
+        if isinstance(p.get("prompt"), str):
+            p["prompt"] = _redact(p["prompt"])
+        context = p.get("context") or {}
+        inp: Dict[str, Any] = {
+            "prompt": p.get("prompt") or "",
+            "similar_tasks": _similar_from_context(context),
+            "board_snapshot": context if isinstance(context, dict) else {},
+            "_use_v1_baseline": True,
+        }
+        if p.get("columnId") is not None:
+            inp["column_id"] = p["columnId"]
+        if p.get("coordinatorId") is not None:
+            inp["coordinator_id"] = p["coordinatorId"]
+        if project_id:
+            inp["project_id"] = project_id
+        return inp
+
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "draft")
+
+    def _fallback(p: Dict[str, Any]) -> Any:
+        from app.agents.catalog.task_drafting import draft_task as _draft_task  # noqa: PLC0415
+        return _draft_task(p)
+
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
+        agent_error_fallback=_fallback,
     )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        payload = dict(payload)
-        if isinstance(payload.get("prompt"), str):
-            payload["prompt"] = _redact(payload["prompt"])
-        deterministic = v1_engine.draft_task(payload)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            body = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_draft,
-                model,
-                deterministic,
-                payload.get("prompt") or "",
-                _similar_from_context(payload.get("context")),
-            )
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
 
 
 @router.post("/task-breakdown", status_code=status.HTTP_200_OK)
@@ -580,85 +560,40 @@ async def task_breakdown(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        p = dict(p)
+        if isinstance(p.get("prompt"), str):
+            p["prompt"] = _redact(p["prompt"])
+        count = p.get("count")
+        context_bd = p.get("context") or {}
+        inp: Dict[str, Any] = {
+            "prompt": p.get("prompt") or "",
+            "similar_tasks": _similar_from_context(context_bd),
+            "board_snapshot": context_bd if isinstance(context_bd, dict) else {},
+            "breakdown_count": int(count) if isinstance(count, int) else 3,
+            "_use_v1_baseline": True,
+        }
+        if p.get("columnId") is not None:
+            inp["column_id"] = p["columnId"]
+        if p.get("coordinatorId") is not None:
+            inp["coordinator_id"] = p["coordinatorId"]
+        if project_id:
+            inp["project_id"] = project_id
+        return inp
+
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "breakdown")
+
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
     )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        payload = dict(payload)
-        if isinstance(payload.get("prompt"), str):
-            payload["prompt"] = _redact(payload["prompt"])
-        count = payload.get("count")
-        deterministic = v1_engine.breakdown_task(
-            payload, count=int(count) if isinstance(count, int) else 3
-        )
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            items = list(deterministic.get("items") or [])
-            # Polish the shared base draft once (without the per-item ``(part i)``
-            # suffix), then re-apply each item's deterministic suffix on top of
-            # the polished prefix. Mirrors what ``task_drafting.py`` does at
-            # lines 166-171 and keeps cost flat with the task-draft route.
-            base_draft = v1_engine.draft_task(payload)
-            polished_base = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_draft,
-                model,
-                dict(base_draft),
-                payload.get("prompt") or "",
-                _similar_from_context(payload.get("context")),
-            )
-            polished_taskName = polished_base.get("taskName") or ""
-            polished_note = polished_base.get("note") or ""
-            polished_rationale = polished_base.get("rationale")
-            base_taskName = base_draft.get("taskName") or ""
-            polished_items: List[Dict[str, Any]] = []
-            for item in items:
-                merged = dict(item)
-                # ``v1_engine.breakdown_task`` always builds each item's
-                # taskName as ``f"{base_taskName} (part {i})"`` -- strip the
-                # shared base to recover the suffix and apply it on top of the
-                # polished prefix. Trusting the upstream invariant keeps this
-                # code path simple and 100% coverable.
-                item_taskName = item.get("taskName") or ""
-                suffix = item_taskName[len(base_taskName) :]
-                merged["taskName"] = polished_taskName + suffix
-                merged["note"] = polished_note
-                # Each piece keeps its v1_engine ``Slice i of...`` deterministic
-                # rationale unless polish produced a non-blank shared rationale.
-                if isinstance(polished_rationale, str) and polished_rationale.strip():
-                    merged["rationale"] = polished_rationale
-                polished_items.append(merged)
-            body = {**deterministic, "items": polished_items}
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
 
 
 @router.post("/estimate", status_code=status.HTTP_200_OK)
@@ -670,53 +605,32 @@ async def estimate(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        task_draft = redact_task_fields(_draft_from_payload(p, _ESTIMATE_DRAFT_FIELDS))
+        context = p.get("context") or {}
+        context_tasks = context.get("tasks") if isinstance(context, dict) else None
+        inp: Dict[str, Any] = {
+            "task_draft": task_draft,
+            "similar_tasks": [],
+            "context_tasks": context_tasks if isinstance(context_tasks, list) else [],
+        }
+        if project_id:
+            inp["project_id"] = project_id
+        return inp
+
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "estimate_v1")
+
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
     )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        deterministic = v1_engine.estimate(payload)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            rationale = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_rationale,
-                model,
-                deterministic.get("rationale") or "",
-                redact_task_fields(_draft_from_payload(payload, _ESTIMATE_DRAFT_FIELDS)),
-                int(deterministic.get("storyPoints") or 0),
-                deterministic.get("similar") or [],
-            )
-            body = {**deterministic, "rationale": rationale}
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
 
 
 @router.post("/readiness", status_code=status.HTTP_200_OK)
@@ -728,53 +642,34 @@ async def readiness(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        task_draft = redact_task_fields(_draft_from_payload(p, _READINESS_DRAFT_FIELDS))
+        context = p.get("context") or {}
+        context_tasks_rd = context.get("tasks") if isinstance(context, dict) else None
+        inp: Dict[str, Any] = {
+            "task_draft": task_draft,
+            "similar_tasks": [],
+            "context_tasks": context_tasks_rd if isinstance(context_tasks_rd, list) else [],
+            # Sentinel: estimate node short-circuits; only readiness tokens counted.
+            "estimate": {"_skip_polish": True},
+        }
+        if project_id:
+            inp["project_id"] = project_id
+        return inp
+
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "readiness_v1")
+
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
     )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        deterministic = v1_engine.readiness(payload)
-        if not deterministic.get("issues"):
-            body: Any = deterministic
-        else:
-            model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-            if is_stub_model(model):
-                body = deterministic
-            else:
-                body = await _polish_and_record(
-                    project_id,
-                    budget_tracker,
-                    polish_readiness,
-                    model,
-                    deterministic,
-                    redact_task_fields(_draft_from_payload(payload, _READINESS_DRAFT_FIELDS)),
-                )
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
 
 
 @router.post("/board-brief", status_code=status.HTTP_200_OK)
@@ -786,79 +681,28 @@ async def board_brief(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
-    )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        context = payload.get("context") or {}
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        context = p.get("context") or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
-        inputs: Dict[str, Any] = {"board_snapshot": context}
+        inp: Dict[str, Any] = {"board_snapshot": context}
         if project_id:
-            inputs["project_id"] = project_id
+            inp["project_id"] = project_id
+        return inp
 
-        final_state, custom_events = await runtime.arun_with_events(
-            meta.catalog_agent_name,  # "board-brief-agent"
-            inputs,
-            user_id=user_id,
-        )
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "brief")
 
-        # The agent's emit_citations node writes the full IBoardBrief +
-        # recommendationDetail payload onto a custom event with
-        # kind="suggestion", surface="brief".  That's the legacy v1 wire shape.
-        suggestion = next(
-            (
-                e for e in custom_events
-                if isinstance(e, dict)
-                and e.get("kind") == "suggestion"
-                and e.get("surface") == "brief"
-            ),
-            None,
-        )
-        if suggestion is None:
-            # Defensive: should never happen — the graph always reaches emit_citations.
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a brief."}},
-            )
-        body = suggestion["payload"]
-
-        # Reconcile budget against actual provider usage (same logic as
-        # _polish_and_record but on the full agent run, not a single polish call).
-        if project_id:
-            tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
-            actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-            delta = max(0, actual - 1)  # _gate already debited 1 token
-            if delta > 0:
-                budget_tracker.record(project_id, tokens=delta)
-
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
+    )
 
 
 @router.post("/search", status_code=status.HTTP_200_OK)
@@ -870,64 +714,43 @@ async def search(
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    user_id = current_user_id(auth_payload)
-    route_path = request.url.path
-    meta = _legacy_ai_route_meta(route_path)
-    agent_label = meta.agent_label
-    payload = _maybe_unwrap_legacy_payload(payload, meta)
-    idem = await check_idempotency_with_metrics(
-        request,
-        payload,
-        auth_subject=user_id,
-        route=route_path,
-        operation_id=meta.idempotency_operation,
-    )
-    replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
-    if replay is not None:
-        return replay
-    try:
-        project_id = _project_id_from_payload(payload)
-        _gate(
-            request,
-            user_id,
-            project_id,
-            rate_limiter=rate_limiter,
-            budget_tracker=budget_tracker,
-            agent_label=agent_label,
-        )
-        enforce_request_limits(payload, request=request)
-        kind = payload.get("kind")
+    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+        kind = p.get("kind")
         if kind not in {"tasks", "projects"}:
             api_error(status.HTTP_400_BAD_REQUEST, "kind must be 'tasks' or 'projects'")
-        query = payload.get("query")
+        query = p.get("query")
         if not isinstance(query, str):
             api_error(status.HTTP_400_BAD_REQUEST, "query must be a string")
         redacted_query = _redact(query)
-        if kind == "tasks":
-            context = payload.get("projectContext") or {}
-        else:
-            context = payload.get("projectsContext") or {}
+        context = p.get("projectContext") if kind == "tasks" else p.get("projectsContext")
+        context = context or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
-        deterministic = v1_engine.semantic_search(kind, redacted_query, context)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body: Any = deterministic
-        else:
-            body = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_search,
-                model,
-                deterministic,
-                redacted_query,
-                _candidates_from_context(kind, context),
-            )
-        idem.store(status_code=status.HTTP_200_OK, body=body)
-        record_idempotency(route_path, "miss")
-        return body
-    except BaseException as exc:
-        _idem_fail(idem, exc)
+        deterministic = _semantic_search(kind, redacted_query, context)
+        candidates = _candidates_from_context(kind, context)
+        inp: Dict[str, Any] = {
+            "query": redacted_query,
+            "kind": kind,
+            "candidates": candidates,
+            "ranking": deterministic,
+        }
+        if project_id:
+            inp["project_id"] = project_id
+        return inp
+
+    def _body(_final_state: Any, events: List[Any]) -> Any:
+        return _find_suggestion(events, "search")
+
+    return await run_v1_route(
+        request=request,
+        payload=payload,
+        auth_payload=auth_payload,
+        runtime=runtime,
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
+        project_inputs=_inputs,
+        find_body=_body,
+    )
 
 
 def _normalize_tool_calls(value: Any) -> List[Dict[str, Any]]:
@@ -1125,8 +948,8 @@ async def chat(
 
         timeout = settings.agent_request_timeout_seconds
         try:
-            result = await asyncio.wait_for(
-                runtime.ainvoke(
+            result, _chat_events = await asyncio.wait_for(
+                runtime.arun_with_events(
                     meta.catalog_agent_name,
                     inputs,
                     user_id=user_id,
