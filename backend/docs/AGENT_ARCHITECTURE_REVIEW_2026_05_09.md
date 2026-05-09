@@ -48,6 +48,36 @@ preserve.
 
 ---
 
+## Status — 2026-05-09
+
+Implementation tracked on `claude/review-agent-architecture-drvY9`.
+
+### Phase 1 — Collapse the v1 shim onto the agent runtime
+
+| Item | Status | Commit |
+|---|---|---|
+| `AgentRuntime.arun_with_events` (capture `(state, custom_events)` via `astream(stream_mode=("values","custom"))`) | shipped | `82094d6` |
+| `fetch_snapshot_node` / `fetch_similar_node` short-circuit when state pre-populated | shipped | `82094d6` |
+| `SearchAgent.fetch_candidates` short-circuit | shipped | `82094d6` |
+| `build_citation_refs` default `get_id` falls back from `id` to `_id` | shipped | `82094d6` |
+| Byte-shape parity goldens for all 7 `/api/ai/*` routes (`tests/test_v1_ai_shim_parity.py`) | shipped | `82094d6` |
+| `/api/ai/board-brief` migrated to `runtime.arun_with_events` | shipped | `5e82f2d` |
+| `/api/ai/task-draft` migrated | pending | — |
+| `/api/ai/task-breakdown` migrated | pending | — |
+| `/api/ai/estimate` migrated | pending | — |
+| `/api/ai/readiness` migrated | pending | — |
+| `/api/ai/search` migrated | pending | — |
+| `/api/ai/chat` migrated to `arun_with_events` (today goes through `ainvoke`) | pending | — |
+| Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | pending | — |
+| Slim `app/services/v1_engine.py` to helpers without an agent equivalent | pending | — |
+
+### Phases 2–6 — not yet started
+
+No work landed on phases 2 (events as state), 3 (PolishStep DSL),
+4 (model on context), 5 (pipeline + dispatch), or 6 (hardening).
+
+---
+
 ## Design issues identified
 
 ### A. Two parallel agent execution paths (highest leverage)
