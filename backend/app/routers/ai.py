@@ -549,7 +549,7 @@ async def task_draft(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         payload = dict(payload)
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
@@ -608,7 +608,7 @@ async def task_breakdown(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         payload = dict(payload)
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
@@ -698,7 +698,7 @@ async def estimate(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         deterministic = v1_engine.estimate(payload)
         model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
@@ -756,7 +756,7 @@ async def readiness(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         deterministic = v1_engine.readiness(payload)
         if not deterministic.get("issues"):
             body: Any = deterministic
@@ -814,7 +814,7 @@ async def board_brief(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         context = payload.get("context") or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
@@ -908,7 +908,7 @@ async def search(
             budget_tracker=budget_tracker,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         kind = payload.get("kind")
         if kind not in {"tasks", "projects"}:
             api_error(status.HTTP_400_BAD_REQUEST, "kind must be 'tasks' or 'projects'")
@@ -1123,7 +1123,7 @@ async def chat(
             metadata=chat_metadata,
             agent_label=agent_label,
         )
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
 
         raw_messages = payload.get("messages")
         if not isinstance(raw_messages, list):

@@ -114,6 +114,9 @@ class ChatAgent(BaseAgent):
             project_id = state.get("project_id") or "unknown"
             messages = list(state.get("messages") or [])
 
+            # Chat is intentionally outside structured_llm_call(): it binds FE
+            # tools, preserves disconnect cancellation, and falls back to a stub
+            # reply on provider errors.
             if is_stub_model(chat_model):
                 reply = _stub_response(user_text, project_id)
                 response: AIMessage = AIMessage(content=reply)
