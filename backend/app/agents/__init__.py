@@ -18,6 +18,7 @@ from app.agents.errors import (
     AgentExecutionError,
     AgentNotFoundError,
     AgentRecursionError,
+    InvalidThreadKeyError,
 )
 from app.agents.registry import AgentRegistry, registry
 from app.agents.runtime import AgentRuntime
@@ -42,6 +43,7 @@ __all__ = [
     "AgentRecursionError",
     "AgentRegistry",
     "AgentRuntime",
+    "InvalidThreadKeyError",
     "AgentState",
     "BaseAgent",
     "BaseAgentState",

@@ -2518,3 +2518,42 @@ def test_board_brief_records_budget_top_up_when_actual_tokens_exceed_reservation
     # so the post-run record is ``max(0, actual - 1)`` = 14 — same
     # under-by-one debit the pre-migration ``_polish_and_record`` had.
     assert before - after == 14
+
+
+# ---------------------------------------------------------------------------
+# Defect 1: _dispatch.py UnboundLocalError on null fallback
+# ---------------------------------------------------------------------------
+
+
+def test_task_draft_returns_502_when_agent_error_and_fallback_returns_none(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When ``agent_error_fallback`` is provided AND the agent raises
+    ``AgentError`` AND the fallback returns ``None``, ``run_v1_route``
+    must return a 502 ``agent_unavailable`` response instead of raising
+    an ``UnboundLocalError`` (latent defect: ``final_state`` and
+    ``custom_events`` were previously unbound on this code path).
+    """
+    from app.agents.errors import AgentError
+    from app.agents.catalog import task_drafting as td_mod
+
+    # Make the runtime raise AgentError so the fallback branch is taken.
+    async def _raise_agent_error(*args: Any, **kwargs: Any) -> Any:
+        raise AgentError("agent unavailable for test")
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "arun_with_events", _raise_agent_error, raising=False)
+
+    # Make the fallback return None to exercise the null-fallback path.
+    monkeypatch.setattr(td_mod, "draft_task", lambda _p: None, raising=True)
+
+    response = client.post(
+        "/api/ai/task-draft",
+        headers=auth_headers,
+        json={"context": _project_context(), "prompt": "Fix login bug"},
+    )
+    assert response.status_code == HTTPStatus.BAD_GATEWAY
+    body = response.json()
+    assert body["error"]["code"] == "agent_unavailable"

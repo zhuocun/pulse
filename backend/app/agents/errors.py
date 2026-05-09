@@ -112,3 +112,19 @@ class AgentExecutionError(AgentError):
         )
         self.name = name
         self.cause = cause
+
+
+class InvalidThreadKeyError(AgentError):
+    """Raised when a signed thread key is rejected (cross-user or tampered token).
+
+    Carries HTTP 400 so callers get a 4xx (client error) rather than the
+    5xx that the generic :class:`AgentExecutionError` wraps would produce.
+    """
+
+    code = "invalid_thread_key"
+
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            message,
+            status_code=HTTPStatus.BAD_REQUEST,
+        )

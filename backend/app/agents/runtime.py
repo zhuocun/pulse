@@ -45,6 +45,7 @@ from app.agents.errors import (
     AgentError,
     AgentExecutionError,
     AgentRecursionError,
+    InvalidThreadKeyError,
 )
 from app.agents.context import ChatContext
 from app.agents.instrumentation import start_run_span
@@ -325,7 +326,10 @@ class AgentRuntime:
         # Signed path: validate and unwrap the HMAC envelope.
         # ------------------------------------------------------------------
         if raw.startswith(_SIGNED_PREFIX):
-            original = _try_verify_signed_thread_key(raw, agent.name, scope)
+            try:
+                original = _try_verify_signed_thread_key(raw, agent.name, scope)
+            except ValueError as exc:
+                raise InvalidThreadKeyError(str(exc)) from exc
             if original is None:
                 # Malformed envelope; treat as an unsigned id to preserve
                 # rolling-restart safety (the new server code may restart

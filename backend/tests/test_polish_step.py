@@ -273,3 +273,73 @@ def test_polish_step_empty_parsed_field_is_still_returned_as_parsed() -> None:
 
     # merge_fn receives the parsed _TextSchema with text="" and maps it to "".
     assert update == {"result": ""}
+
+
+# ---------------------------------------------------------------------------
+# cap_field shorthand — validation errors and happy path
+# ---------------------------------------------------------------------------
+
+
+def test_polish_step_both_cap_field_and_merge_fn_raises() -> None:
+    """Providing both cap_field and merge_fn is a programming error."""
+    import pytest
+
+    with pytest.raises(ValueError, match="cap_field or merge_fn"):
+        PolishStep(
+            prompt_fn=_prompt_fn,
+            schema=_TextSchema,
+            fallback_fn=_fallback_fn,
+            merge_fn=_merge_fn,
+            cap_field=("text", 50),
+        )
+
+
+def test_polish_step_neither_cap_field_nor_merge_fn_raises() -> None:
+    """Omitting both cap_field and merge_fn is a programming error."""
+    import pytest
+
+    with pytest.raises(ValueError, match="cap_field or merge_fn"):
+        PolishStep(
+            prompt_fn=_prompt_fn,
+            schema=_TextSchema,
+            fallback_fn=_fallback_fn,
+        )
+
+
+def test_polish_step_cap_field_stub_returns_deterministic() -> None:
+    """cap_field shorthand: stub model falls back to state['_deterministic']."""
+    stub = make_stub_chat_model()
+    step = PolishStep(
+        prompt_fn=_prompt_fn,
+        schema=_TextSchema,
+        fallback_fn=lambda state: state["_deterministic"],
+        cap_field=("text", 20),
+    )
+    state = {"_deterministic": "fallback text", "prompt": "hello"}
+    update, tokens_in, tokens_out = asyncio.run(step.run(state, stub))
+
+    assert update == {"_result": "fallback text"}
+    assert (tokens_in, tokens_out) == (0, 0)
+
+
+def test_polish_step_cap_field_real_model_applies_cap() -> None:
+    """cap_field shorthand: parsed field is capped and returned as _result."""
+    raw = AIMessage(
+        content="ignored",
+        usage_metadata={"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+    )
+    parsed = _TextSchema(text="  hello world  \nextra line")
+    model = structured_model(parsed=parsed, raw_message=raw)
+
+    step = PolishStep(
+        prompt_fn=_prompt_fn,
+        schema=_TextSchema,
+        fallback_fn=lambda state: state["_deterministic"],
+        cap_field=("text", 5),
+    )
+    state = {"_deterministic": "det", "prompt": "x"}
+    update, tokens_in, tokens_out = asyncio.run(step.run(state, model))
+
+    # First line stripped and capped at 5 chars: "hello world" → "hello"
+    assert update == {"_result": "hello"}
+    assert (tokens_in, tokens_out) == (5, 3)
