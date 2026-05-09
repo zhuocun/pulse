@@ -627,7 +627,7 @@ async def invoke_agent(
         if not resuming:
             _autonomy_into_inputs(inputs, autonomy)
 
-        enforce_request_limits(payload)
+        enforce_request_limits(payload, request=request)
         _enforce_project_access(project_id)
         _require_project_manager(project_id, user_id)
         try:
@@ -733,7 +733,7 @@ async def stream_agent(
     if not resuming:
         _autonomy_into_inputs(inputs, autonomy)
 
-    enforce_request_limits(payload)
+    enforce_request_limits(payload, request=request)
 
     # Idempotency on the initial POST only: the resume path is already
     # idempotent via thread-state checkpointing, so we never want a

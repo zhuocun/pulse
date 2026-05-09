@@ -165,6 +165,22 @@ def test_v1_estimate_oversized_body_returns_413(
     assert resp.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
 
 
+def test_v1_route_rejects_oversized_content_length_fastpath(
+    ai_client: TestClient, ai_headers: dict[str, str]
+) -> None:
+    headers = {
+        **ai_headers,
+        "content-type": "application/json",
+        "content-length": "10000000",
+    }
+    resp = ai_client.post(
+        "/api/ai/task-draft",
+        content=b'{"prompt":"tiny","context":{"project":{"_id":"p-1"}}}',
+        headers=headers,
+    )
+    assert resp.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+
+
 def test_v1_normal_payload_passes(
     ai_client: TestClient, ai_headers: dict[str, str]
 ) -> None:
@@ -175,3 +191,24 @@ def test_v1_normal_payload_passes(
     resp = ai_client.post("/api/ai/task-draft", json=payload, headers=ai_headers)
     # Any non-413 status means the limit check passed (could be 200 or other errors)
     assert resp.status_code != HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+
+
+# ---------------------------------------------------------------------------
+# HTTP integration: v2.1 router family (/api/v1/agents/*)
+# ---------------------------------------------------------------------------
+
+
+def test_v21_invoke_rejects_oversized_content_length_fastpath(
+    ai_client: TestClient, ai_headers: dict[str, str]
+) -> None:
+    headers = {
+        **ai_headers,
+        "content-type": "application/json",
+        "content-length": "10000000",
+    }
+    resp = ai_client.post(
+        "/api/v1/agents/chat-agent/invoke",
+        content=b'{"inputs":{"messages":[{"role":"user","content":"ping"}]}}',
+        headers=headers,
+    )
+    assert resp.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE

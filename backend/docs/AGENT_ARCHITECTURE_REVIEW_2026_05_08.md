@@ -85,6 +85,7 @@ Four commits, **876 tests passing, 100 % coverage, ruff clean**.
 ### Phase 5.2 — content-length fast-path (commit `ffb7a41`)
 
 - **F-SC2 fixed**: `enforce_request_limits` accepts an optional `request: Request` and rejects oversized bodies via `Content-Length` *before* re-serialising the parsed payload. Falls through to the existing body-size check when the header is missing or malformed (chunked transfer, decompressed payloads). Per-field byte checks still run (they need parsed JSON). New tests for header-fastpath, malformed-header, and within-limit behaviour.
+- **2026-05-09 re-check**: v1 and v2.1 AI routers now pass the FastAPI `Request` into `enforce_request_limits`, and `tests/test_ai_limits.py` covers route-level `Content-Length` rejection for both `/api/ai/*` and `/api/v1/agents/*/invoke`.
 
 ---
 
