@@ -314,7 +314,14 @@ class SearchAgent(BaseAgent):
             plumbing the FE doesn't expose.  The interrupt pattern is the
             established solution in this codebase (cf. task-estimation-agent's
             ``fetch_similar`` node).
+
+            Short-circuits when ``candidates`` is already on state — mirrors
+            :func:`app.agents.catalog._shared.fetch_snapshot_node`.  Lets the
+            v1 JSON shim pre-populate from ``projectContext`` /
+            ``projectsContext`` and skip the interrupt entirely.
             """
+            if state.get("candidates") is not None:
+                return {}
             candidates = interrupt(
                 interrupt_payload(
                     "fe.searchCandidates",
