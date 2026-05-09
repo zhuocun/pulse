@@ -39,6 +39,8 @@ from app.agents import (
     registry as global_registry,
 )
 from app.agents import catalog as agent_catalog
+from app.agents import checkpointing as agent_checkpointing
+from app.agents import stores as agent_stores
 from app.agents.checkpointing import (
     SUPPORTED_BACKENDS as SUPPORTED_CHECKPOINT_BACKENDS,
     PostgresCheckpointerSpec,
@@ -1037,15 +1039,106 @@ def test_from_settings_async_postgres_happy_path(
             )
             assert runtime.checkpointer is saver_state["saver"]
             assert runtime.store is store_state["store"]
+            assert saver_state["saver"].pool is store_state["store"].pool
             assert saver_state["saver"].setup_calls == 1
             assert store_state["store"].setup_calls == 1
             assert runtime.recursion_limit == cfg.agent_recursion_limit
             return runtime
 
     asyncio.run(run())
-    # Both async context managers must have been popped off the stack.
+    # Single pool: exited once; exit-stack hooks from both installers may set
+    # both flags on the shared context tear-down.
+    shared = saver_state["saver"].pool
+    assert shared is not None
+    assert shared.close_calls == 1
     assert saver_state["exited"] is True
     assert store_state["exited"] is True
+
+
+def test_from_settings_async_postgres_distinct_dsns_use_two_pools(
+    monkeypatch: pytest.MonkeyPatch,
+    fresh_registry: AgentRegistry,
+) -> None:
+    """When resolved checkpoint and store DSNs differ, each side opens its own pool."""
+
+    def _split_resolve(_settings: Any, *, backend_env: str) -> str:
+        if backend_env == "AGENT_CHECKPOINT_BACKEND":
+            return "postgres://checkpoint"
+        if backend_env == "AGENT_STORE_BACKEND":
+            return "postgres://store"
+        raise AssertionError(backend_env)
+
+    monkeypatch.setattr(
+        agent_checkpointing,
+        "resolve_agent_postgres_uri",
+        _split_resolve,
+    )
+    monkeypatch.setattr(
+        agent_stores,
+        "resolve_agent_postgres_uri",
+        _split_resolve,
+    )
+
+    saver_state = _install_fake_postgres_saver_module(monkeypatch)
+    store_state = _install_fake_postgres_store_module(monkeypatch)
+    cfg = Settings(
+        agent_checkpoint_backend="postgres",
+        agent_store_backend="postgres",
+    )
+
+    async def run() -> None:
+        async with AsyncExitStack() as stack:
+            runtime = await AgentRuntime.from_settings_async(
+                cfg, stack=stack, registry=fresh_registry
+            )
+            cp_pool = saver_state["saver"].pool
+            st_pool = store_state["store"].pool
+            assert cp_pool is not None and st_pool is not None
+            assert cp_pool is not st_pool
+            assert runtime.checkpointer is saver_state["saver"]
+            assert runtime.store is store_state["store"]
+
+    asyncio.run(run())
+    assert saver_state["saver"].pool.close_calls == 1
+    assert store_state["store"].pool.close_calls == 1
+
+
+def test_from_settings_async_postgres_concurrent_stacks_keep_pools_independent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parallel lifespans each get a shared pool internally but never share across stacks."""
+
+    _install_fake_postgres_saver_module(monkeypatch)
+    _install_fake_postgres_store_module(monkeypatch)
+    cfg = Settings(
+        agent_checkpoint_backend="postgres",
+        agent_store_backend="postgres",
+        agent_postgres_uri="postgres://concurrent",
+    )
+
+    seen: list[tuple[Any, Any]] = []
+
+    async def worker() -> None:
+        reg = AgentRegistry()
+        async with AsyncExitStack() as stack:
+            runtime = await AgentRuntime.from_settings_async(
+                cfg, stack=stack, registry=reg
+            )
+            cp = runtime.checkpointer
+            st = runtime.store
+            assert cp is not None and st is not None
+            assert cp.pool is st.pool  # type: ignore[attr-defined]
+            seen.append((cp.pool, st.pool))  # type: ignore[attr-defined]
+
+    async def run() -> None:
+        await asyncio.gather(worker(), worker())
+
+    asyncio.run(run())
+    assert len(seen) == 2
+    (p1a, p1b), (p2a, p2b) = seen
+    assert p1a is p1b
+    assert p2a is p2b
+    assert p1a is not p2a
 
 
 def test_from_settings_async_memory_path_skips_postgres_imports(

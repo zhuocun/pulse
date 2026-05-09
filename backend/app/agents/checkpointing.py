@@ -12,7 +12,10 @@ Backends supported today:
       backed by ``langgraph-checkpoint-postgres``. Requires async setup, so
       :func:`build_checkpointer` returns a :class:`PostgresCheckpointerSpec`
       that the FastAPI lifespan resolves via :func:`open_checkpointer` on
-      its :class:`contextlib.AsyncExitStack`.
+      its :class:`contextlib.AsyncExitStack`. When the store uses Postgres
+      with the same resolved DSN, :meth:`AgentRuntime.from_settings_async`
+      registers a single shared :class:`~psycopg_pool.AsyncConnectionPool`
+      via :func:`enter_agent_postgres_pool` for both layers.
 
 Future backends (not implemented yet, but this is where they plug in):
     - ``"sqlite"`` -- ``langgraph.checkpoint.sqlite.SqliteSaver``.
@@ -22,7 +25,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
@@ -151,23 +154,59 @@ def build_checkpointer(
     )
 
 
+async def enter_agent_postgres_pool(
+    stack: AsyncExitStack,
+    conn_string: str,
+    settings: "Settings",
+) -> Any:
+    """Open an :class:`~psycopg_pool.AsyncConnectionPool` and register it on
+    ``stack``.
+
+    Shared by :func:`open_checkpointer`, :func:`app.agents.stores.open_store`,
+    and :meth:`AgentRuntime.from_settings_async` when both persistence layers
+    use Postgres with the same resolved connection string — then the pool is
+    entered exactly once for the process/lifespan stack.
+    """
+
+    try:
+        from psycopg.rows import dict_row
+        from psycopg_pool import AsyncConnectionPool
+    except ImportError as exc:  # pragma: no cover - import guard
+        raise RuntimeError(
+            "langgraph-checkpoint-postgres is not installed; install with "
+            '`pip install ".[postgres-agents]"` or set agent persistence '
+            "backends to memory/none."
+        ) from exc
+
+    pool = AsyncConnectionPool(
+        conninfo=conn_string,
+        min_size=1,
+        max_size=settings.agent_pg_pool_size,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=False,
+    )
+    await stack.enter_async_context(pool)
+    return pool
+
+
 async def open_checkpointer(
     backend: str,
     *,
     stack: AsyncExitStack,
     settings: Optional["Settings"] = None,
+    pool: Optional[Any] = None,
 ) -> Optional[BaseCheckpointSaver]:
     """Async counterpart of :func:`build_checkpointer`.
 
     For the ``"none"`` and ``"memory"`` backends this is a thin wrapper
     around :func:`build_checkpointer`. For ``"postgres"`` it lazy-imports
-    :class:`AsyncPostgresSaver` and :class:`~psycopg_pool.AsyncConnectionPool`,
-    opens a connection pool sized by ``settings.agent_pg_pool_size``, registers
-    the pool for cleanup on the supplied :class:`contextlib.AsyncExitStack`,
-    and returns the live saver.
+    :class:`AsyncPostgresSaver` and (unless ``pool`` is already provided)
+    :func:`enter_agent_postgres_pool`, then returns the live saver.
 
-    Each call creates its own pool. A future refactor can hoist to a single
-    process-wide pool shared by both the checkpointer and the store.
+    When ``pool`` is passed, the caller must have already registered it on
+    ``stack`` (or otherwise owns its lifetime). :meth:`AgentRuntime.
+    from_settings_async` passes a shared pool when both backends are Postgres
+    and resolve to the same DSN.
     """
 
     spec = build_checkpointer(backend, settings=settings)
@@ -179,10 +218,11 @@ async def open_checkpointer(
 
         settings = default_settings
 
+    if pool is None:
+        pool = await enter_agent_postgres_pool(stack, spec.conn_string, settings)
+
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-        from psycopg.rows import dict_row
-        from psycopg_pool import AsyncConnectionPool
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError(
             "langgraph-checkpoint-postgres is not installed; install with "
@@ -190,14 +230,6 @@ async def open_checkpointer(
             "AGENT_CHECKPOINT_BACKEND=memory"
         ) from exc
 
-    pool = AsyncConnectionPool(
-        conninfo=spec.conn_string,
-        min_size=1,
-        max_size=settings.agent_pg_pool_size,
-        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
-        open=False,
-    )
-    await stack.enter_async_context(pool)
     saver = AsyncPostgresSaver(pool)
     await saver.setup()
     return saver

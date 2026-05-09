@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
@@ -32,6 +32,7 @@ from app.agents.checkpointing import (
     BACKEND_MEMORY,
     BACKEND_NONE,
     BACKEND_POSTGRES,
+    enter_agent_postgres_pool,
     resolve_agent_postgres_uri,
 )
 from app.agents.errors import AgentConfigurationError
@@ -95,18 +96,18 @@ async def open_store(
     *,
     stack: AsyncExitStack,
     settings: Optional["Settings"] = None,
+    pool: Optional[Any] = None,
 ) -> Optional[BaseStore]:
     """Async counterpart of :func:`build_store`.
 
     For ``"none"`` and ``"memory"`` this is a thin wrapper around
     :func:`build_store`. For ``"postgres"`` it lazy-imports
-    :class:`AsyncPostgresStore` and :class:`~psycopg_pool.AsyncConnectionPool`,
-    opens a connection pool sized by ``settings.agent_pg_pool_size``, registers
-    the pool for cleanup on the supplied :class:`contextlib.AsyncExitStack`,
-    and returns the live store.
+    :class:`AsyncPostgresStore` and uses :func:`app.agents.checkpointing.
+    enter_agent_postgres_pool` unless ``pool`` is already supplied.
 
-    Each call creates its own pool. A future refactor can hoist to a single
-    process-wide pool shared by both the checkpointer and the store.
+    When ``pool`` is passed, the caller must have registered it on ``stack``.
+    :meth:`AgentRuntime.from_settings_async` shares one pool between the
+    saver and the store when both use Postgres with the same DSN.
     """
 
     spec = build_store(backend, settings=settings)
@@ -118,10 +119,11 @@ async def open_store(
 
         settings = default_settings
 
+    if pool is None:
+        pool = await enter_agent_postgres_pool(stack, spec.conn_string, settings)
+
     try:
         from langgraph.store.postgres.aio import AsyncPostgresStore
-        from psycopg.rows import dict_row
-        from psycopg_pool import AsyncConnectionPool
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError(
             "langgraph-checkpoint-postgres is not installed; install with "
@@ -129,14 +131,6 @@ async def open_store(
             "AGENT_STORE_BACKEND=memory"
         ) from exc
 
-    pool = AsyncConnectionPool(
-        conninfo=spec.conn_string,
-        min_size=1,
-        max_size=settings.agent_pg_pool_size,
-        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
-        open=False,
-    )
-    await stack.enter_async_context(pool)
     store = AsyncPostgresStore(pool)
     await store.setup()
     return store
