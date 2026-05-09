@@ -8,7 +8,7 @@
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.
 
-**Current status (2026-05-09)**: this review is **not** fully complete. The merged follow-up on `cursor/finish-agent-architecture-review-7dbd` closed F-G1, F-M7, F-SC3, and the shared-pool portion of F-SC1, but four items still remain: the coordinated v1 dispatcher/idempotency refactor (F-M1 + F-M2 + F-M6 + P3.3), a live Postgres smoke test for the shared pool, F-G2 (`RunContext`), and F-S5 (stub-branching unification when a second non-structured agent appears).
+**Current status (2026-05-09)**: the actionable follow-up work from this pass is complete. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. F-G2 (`RunContext`) and F-S5 (stub-branching unification) remain deliberately deferred until a catalog agent needs those seams.
 
 ---
 
@@ -141,6 +141,28 @@ Three of the documented follow-ups were completed. **885 BE tests passing, 100 %
 
 ---
 
+## Shipped on `cursor/finish-agent-architecture-review-14d2`
+
+The remaining actionable follow-ups were resolved or converted into explicit opt-in coverage.
+
+### F-M1 / P4.1 — Legacy v1 route metadata
+
+- `app/routers/ai.py` now has a typed `LegacyAiRouteMeta` table for all seven legacy `/api/ai/*` handlers. The table centralises envelope keys, metrics/rate-limit labels, catalog agent names, and logical idempotency operations so handler-local string drift is no longer the source of truth.
+- Existing handler bodies remain separate because their deterministic and polish merge paths have route-specific wire contracts, but every handler now resolves its shared identity through the table.
+
+### F-M6 / P4.2 — Idempotency by logical operation
+
+- `app/middleware/idempotency_guard.py` accepts an optional `operation_id`; both `app/routers/ai.py` and `app/routers/agents.py` pass stable operation identities instead of relying on raw URL paths.
+- `app/middleware/idempotency.py` also canonicalises the dual-mounted v1 AI prefixes (`/api/ai/*` and `/api/v1/ai/*`) so legacy aliases replay the same cached response.
+- `tests/test_idempotency.py` covers operation-id replay, AI prefix alias replay, mismatch handling across aliases, and a real v1 chat replay across both mounted prefixes.
+
+### F-SC1 follow-up — live Postgres smoke path
+
+- `tests/test_agents_postgres_live.py` is an opt-in smoke test gated by `PYTEST_AGENT_POSTGRES_URI`. When pointed at a throwaway Postgres database, it exercises `AgentRuntime.from_settings_async()` with both agent persistence backends set to Postgres, asserts the saver and store share the same real `AsyncConnectionPool`, probes the database through that pool, and verifies the exit stack closes it.
+- The normal backend suite skips this test when the env var is unset, so the default in-memory/fakeredis suite still has no external service dependency.
+
+---
+
 ## Deferred (with rationale)
 
 Each deferred item is independently shippable in a follow-up PR. Reasons are explicit so the next author isn't guessing what was tried.
@@ -163,26 +185,28 @@ Resolved on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section ab
 
 **Why deferred**: each polish function has a different signature (`polish_headline(model, deterministic, facts)` vs `polish_draft(model, deterministic, prompt, similar)` vs `polish_search(model, deterministic, query, candidates)`). The v1 shim still has to know the signature to pass arguments — so removing the import statement does not actually decouple the shim from the catalog. The cleaner fix is to standardise the polish signature to `polish(model, deterministic, **kwargs)` and parse `kwargs` inside each polish helper, but that is a larger refactor than this seam justifies on its own. Better tackled alongside F-M1 / P4.1 below.
 
-### F-M1, F-M2 / P4.1 — V1_ROUTES dispatcher table
+### F-M1, F-M2 / P4.1 — V1_ROUTES dispatcher table — **shipped for shared route identity**
 
 **What the plan said**: Replace seven near-identical handlers in `routers/ai.py` (`task_draft`, `task_breakdown`, `estimate`, `readiness`, `board_brief`, `search`, `chat`) with a single dispatcher driven by a `V1_ROUTES` table that names the agent, the deterministic function, the polish function, and any per-route post-processing hook.
 
-**Why deferred**: ~600 lines of seven handlers, each with subtly different gate / idempotency / agent-label logic; every handler has its own quirks (chat's reservation/reconciliation flow, task-breakdown's per-item suffix re-application, search's `projectContext` envelope). The test suite couples to the per-handler shape. A safe migration needs:
+**Outcome**: `cursor/finish-agent-architecture-review-14d2` landed the safe half of this refactor: a typed route metadata table now owns the common route identity, envelope key, catalog agent name, metrics label, and idempotency operation. The handlers still keep their route-specific post-processing because chat's reservation/reconciliation flow, task-breakdown's per-item suffix re-application, and search's `projectContext` envelope are materially different.
+
+A future full single-dispatcher rewrite would still need:
 1. Standardising the polish signature (see P3.3 above).
-2. Building a typed `V1Route` dataclass that captures the gate variant, idempotency strategy, and post-processor.
+2. Extending the typed route metadata into a `V1Route` dataclass that captures the gate variant and post-processor.
 3. Migrating one handler at a time to the dispatcher, running the v1 test suite at each step.
 
-This is a multi-day refactor. Out of scope for the surgical-fixes-and-seams pass.
+The remaining value is now lower because the drift-prone strings and idempotency identities are centralised.
 
-### F-M6 / P4.2 — Idempotency keys by `(agent, payload)`
+### F-M6 / P4.2 — Idempotency keys by `(agent, payload)` — **shipped**
 
 **What the plan said**: Cache key derived from `(auth_subject, agent_name, sha256(canonical_payload))` rather than `(auth_subject, route, raw_idempotency_key)`. Survives URL aliasing and agent rename.
 
-**Why deferred**: meaningful test churn (`test_idempotency.py` is keyed on the path-based cache shape), and the practical impact is low — clients rarely re-key the same Idempotency-Key against two URL aliases. Better as a follow-up alongside F-M1.
+Resolved on `cursor/finish-agent-architecture-review-14d2`; see the section above.
 
 ### F-SC1 / P5.1 — AsyncConnectionPool for Postgres checkpointer / store — **shipped**
 
-Resolved across `claude/finish-subagent-orchestrator-docs-QDAmR` and `cursor/finish-agent-architecture-review-7dbd`; see the sections above. The shared-pool refactor is now shipped. The only remaining follow-up is a real Postgres integration smoke test so the pool lifecycle is exercised against a live DB.
+Resolved across `claude/finish-subagent-orchestrator-docs-QDAmR`, `cursor/finish-agent-architecture-review-7dbd`, and `cursor/finish-agent-architecture-review-14d2`; see the sections above. The shared-pool refactor is shipped, and the live Postgres smoke path is now available behind `PYTEST_AGENT_POSTGRES_URI`.
 
 ### F-SC3 / P5.3 — Inject middleware instead of importing singletons — **shipped**
 
@@ -198,9 +222,7 @@ Step 1 (introduce DI getters with the singleton as default) shipped on `claude/f
 
 ## Pickup checklist for the next pass
 
-After the `cursor/finish-agent-architecture-review-7dbd` round, F-G1, F-M7, F-SC3, and the shared-pool portion of F-SC1 have shipped. The remaining work is:
+After the `cursor/finish-agent-architecture-review-14d2` round, the actionable items from this review have shipped. The remaining items are conditional design seams:
 
-1. **F-M1 + F-M2 + F-M6 + P3.3 (V1_ROUTES dispatcher + idempotency keys)** — single coordinated refactor. Largest maintenance dividend. ~5 distinct polish-helper signatures, 7 handlers, 74 tests in `test_ai_v1_router.py`. Multi-day; deliberately untouched on this pass.
-2. **F-SC1 follow-up — real Postgres smoke test** — the pool is now shared, but the lifecycle is only covered by fakes. Add a live-DB smoke test when CI / local env can supply Postgres cheaply.
-3. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
-4. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.
+1. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
+2. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.

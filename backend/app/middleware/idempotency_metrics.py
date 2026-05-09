@@ -16,11 +16,17 @@ async def check_idempotency_with_metrics(
     *,
     auth_subject: str,
     route: str,
+    operation_id: str | None = None,
 ) -> IdempotencyContext:
     """Wrap :func:`check_idempotency` so 422 / 409 outcomes get counted."""
 
     try:
-        return await check_idempotency(request, payload, auth_subject=auth_subject)
+        return await check_idempotency(
+            request,
+            payload,
+            auth_subject=auth_subject,
+            operation_id=operation_id,
+        )
     except HTTPException as exc:
         if exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
             record_idempotency(route, "mismatch")

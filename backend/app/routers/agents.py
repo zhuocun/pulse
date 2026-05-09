@@ -591,7 +591,11 @@ async def invoke_agent(
     payload = _normalize_payload(payload)
     route_path = request.url.path
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=f"agent:{name}:invoke",
     )
     if idem.cached_response is not None:
         cached = idem.cached_response
@@ -742,7 +746,11 @@ async def stream_agent(
     idem = None
     if not resuming:
         idem = await check_idempotency_with_metrics(
-            request, payload, auth_subject=user_id, route=route_path
+            request,
+            payload,
+            auth_subject=user_id,
+            route=route_path,
+            operation_id=f"agent:{name}:stream",
         )
         if idem.cached_response is not None:
             cached = idem.cached_response

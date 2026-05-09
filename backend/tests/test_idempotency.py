@@ -654,6 +654,32 @@ def test_check_idempotency_returns_fresh_context_for_first_call() -> None:
     assert ctx.cached_response is None
 
 
+def test_check_idempotency_can_key_by_logical_operation() -> None:
+    payload = {"a": 1}
+    raw_key = "logical"
+    operation = "agent:task-drafting-agent:invoke"
+    fp = fingerprint_request("POST", operation, payload)
+    slot = cache_key("u-1", operation, raw_key)
+    _idempotency.idempotency_cache.reserve(slot, fp)
+    _idempotency.idempotency_cache.store(
+        slot,
+        CachedResponse(200, {"hit": True}, {}, fp),
+    )
+
+    ctx = _run(
+        check_idempotency(  # type: ignore[arg-type]
+            _StubRequest(idempotency_key=raw_key, path="/renamed/url"),
+            payload,
+            auth_subject="u-1",
+            operation_id=operation,
+        )
+    )
+
+    assert ctx.cache_key == slot
+    assert ctx.cached_response is not None
+    assert ctx.cached_response.body == {"hit": True}
+
+
 def test_check_idempotency_replays_across_ai_url_aliases() -> None:
     payload = {"kind": "tasks", "query": "x"}
     raw_key = "alias-replay"
@@ -1031,9 +1057,10 @@ def test_invoke_returns_409_for_in_flight_sibling(
     """Manually reserve the slot to simulate an in-flight sibling call."""
 
     body = {"inputs": {"text": "x"}, "autonomy": "plan"}
-    fp = fingerprint_request("POST", "/api/v1/agents/idem-noise/invoke", body)
+    operation = "agent:idem-noise:invoke"
+    fp = fingerprint_request("POST", operation, body)
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/invoke", "in-flight-key"),
+        cache_key("idem-user", operation, "in-flight-key"),
         fp,
     )
     response = client.post(
@@ -1417,9 +1444,10 @@ def test_stream_returns_409_for_in_flight_sibling(
     """Manually reserve the slot to simulate an in-flight sibling call."""
 
     body = {"inputs": {"text": "x"}, "autonomy": "plan"}
-    fp = fingerprint_request("POST", "/api/v1/agents/idem-noise/stream", body)
+    operation = "agent:idem-noise:stream"
+    fp = fingerprint_request("POST", operation, body)
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/stream", "stream-in-flight"),
+        cache_key("idem-user", operation, "stream-in-flight"),
         fp,
     )
     response = client.post(
@@ -1447,7 +1475,7 @@ def test_stream_resume_skips_idempotency_check(
     key = "stream-resume-key"
     # Reserve as if a sibling already used this key.
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/stream", key),
+        cache_key("idem-user", "agent:idem-noise:stream", key),
         "fp-other",
     )
     with client.stream(

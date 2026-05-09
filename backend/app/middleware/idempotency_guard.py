@@ -88,6 +88,7 @@ async def check_idempotency(
     payload: Any,
     *,
     auth_subject: str,
+    operation_id: Optional[str] = None,
 ) -> IdempotencyContext:
     """Look up ``Idempotency-Key`` in the cache and return the per-request context.
 
@@ -124,7 +125,7 @@ async def check_idempotency(
             },
         )
 
-    path = request.url.path
+    path = operation_id or request.url.path
     fingerprint = _idempotency.fingerprint_request(request.method, path, payload)
     key = _idempotency.cache_key(auth_subject, path, raw)
 

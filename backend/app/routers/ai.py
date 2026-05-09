@@ -101,6 +101,10 @@ class LegacyAiRouteMeta:
     agent_label: str
     catalog_agent_name: str
 
+    @property
+    def idempotency_operation(self) -> str:
+        return f"legacy-ai:{self.agent_label}"
+
 
 _LEGACY_AI_ROUTE_METADATA: Final[dict[str, LegacyAiRouteMeta]] = {
     "task-draft": LegacyAiRouteMeta(
@@ -526,7 +530,11 @@ async def task_draft(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -581,7 +589,11 @@ async def task_breakdown(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -667,7 +679,11 @@ async def estimate(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -721,7 +737,11 @@ async def readiness(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -775,7 +795,11 @@ async def board_brief(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -865,7 +889,11 @@ async def search(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -1068,7 +1096,11 @@ async def chat(
     agent_label = meta.agent_label
     payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
