@@ -2363,3 +2363,91 @@ def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
     after = ai_budget_backend.remaining(project_id)
     # reserve(1) + record(delta=14) = 15 total tokens debited.
     assert before - after == 15
+
+
+def test_board_brief_returns_502_when_agent_emits_no_suggestion(  # noqa: E501
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Defensive fallback: if the agent never reaches its emit_citations
+    node (impossible in practice — every catalog graph runs through it),
+    the v1 shim returns a typed 502 instead of crashing on a missing
+    payload key."""
+
+    async def empty_run(*args: Any, **kwargs: Any) -> Any:
+        return {}, []
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(
+        runtime, "arun_with_events", empty_run, raising=False
+    )
+    response = client.post(
+        "/api/ai/board-brief",
+        headers=auth_headers,
+        json={"context": _project_context()},
+    )
+    assert response.status_code == HTTPStatus.BAD_GATEWAY
+    # The app-level HTTPException handler unwraps ``detail`` so the response
+    # body is whatever was passed as ``detail`` (here: ``{"error": {...}}``).
+    body = response.json()
+    assert body["error"]["code"] == "agent_unavailable"
+
+
+def test_board_brief_records_budget_top_up_when_actual_tokens_exceed_reservation(  # noqa: E501
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
+) -> None:
+    """Real-model parity for the board-brief route: when the agent's
+    final state carries token usage above the 1-token pre-reservation
+    floor, the route tops the budget tracker up by ``actual - 1``.
+    Mirrors the historical ``_polish_and_record`` debit semantics that
+    the migration replaced.
+    """
+
+    project_id = "p-budget"
+    before = ai_budget_backend.remaining(project_id)
+
+    async def scripted_run(*args: Any, **kwargs: Any) -> Any:
+        final_state = {
+            "messages": [
+                AIMessage(
+                    content="hello",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 5,
+                        "total_tokens": 15,
+                    },
+                )
+            ]
+        }
+        custom_events = [
+            {
+                "kind": "suggestion",
+                "surface": "brief",
+                "payload": {"headline": "stub"},
+            }
+        ]
+        return final_state, custom_events
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(
+        runtime, "arun_with_events", scripted_run, raising=False
+    )
+    response = client.post(
+        "/api/ai/board-brief",
+        headers=auth_headers,
+        json={
+            "context": {
+                "project": {"_id": project_id, "projectName": "Budgeted"}
+            }
+        },
+    )
+    assert response.status_code == HTTPStatus.OK
+    after = ai_budget_backend.remaining(project_id)
+    # ``_gate`` does NOT reserve (it is a read-only ``can_spend`` check),
+    # so the post-run record is ``max(0, actual - 1)`` = 14 — same
+    # under-by-one debit the pre-migration ``_polish_and_record`` had.
+    assert before - after == 14

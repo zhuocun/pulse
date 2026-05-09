@@ -1419,6 +1419,52 @@ def test_agent_runtime_ainvoke_passes_through_agent_error(
         asyncio.run(runtime.ainvoke("raises", {}))
 
 
+def test_agent_runtime_arun_with_events_translates_recursion_error(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """``arun_with_events`` must translate LangGraph recursion overflow.
+
+    Mirrors :func:`test_agent_runtime_translates_async_recursion_error`
+    so the new entry point and ``ainvoke`` agree on error mapping.
+    """
+
+    fresh_registry.register(LoopAgent())
+    runtime = AgentRuntime(registry=fresh_registry, recursion_limit=3)
+    with pytest.raises(AgentRecursionError) as exc:
+        asyncio.run(runtime.arun_with_events("loop", {"count": 0}))
+    assert exc.value.recursion_limit == 3
+
+
+def test_agent_runtime_arun_with_events_translates_execution_error(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A generic exception inside the graph becomes :class:`AgentExecutionError`."""
+
+    fresh_registry.register(BoomAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    with pytest.raises(AgentExecutionError) as exc:
+        asyncio.run(runtime.arun_with_events("boom", {"text": "x"}))
+    assert exc.value.cause is not None
+
+
+def test_agent_runtime_arun_with_events_passes_through_agent_error(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """An ``AgentError`` raised at compile time propagates unchanged."""
+
+    class RaisingAgent(BaseAgent):
+        metadata = AgentMetadata(name="raises-arun")
+
+        def build(self, *, checkpointer, store):  # type: ignore[no-untyped-def]
+            raise AgentError("custom", status_code=418)
+
+    fresh_registry.register(RaisingAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    with pytest.raises(AgentError) as exc:
+        asyncio.run(runtime.arun_with_events("raises-arun", {}))
+    assert exc.value.status_code == 418
+
+
 def test_agent_runtime_astream_yields_and_translates(
     fresh_registry: AgentRegistry,
 ) -> None:
