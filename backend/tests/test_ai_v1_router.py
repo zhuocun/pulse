@@ -2400,6 +2400,67 @@ def test_board_brief_returns_502_when_agent_emits_no_suggestion(  # noqa: E501
     assert body["error"]["code"] == "agent_unavailable"
 
 
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [
+        (
+            "/api/ai/task-draft",
+            {"context": _project_context(), "prompt": "Fix login bug"},
+        ),
+        (
+            "/api/ai/task-breakdown",
+            {"context": _project_context(), "prompt": "Fix login bug", "count": 3},
+        ),
+        (
+            "/api/ai/estimate",
+            {
+                "context": _project_context(),
+                "taskName": "Fix login bug",
+                "note": "Auth flow breaks",
+                "type": "bug",
+                "epic": "Bug Fix",
+            },
+        ),
+        (
+            "/api/ai/readiness",
+            {
+                "context": _project_context(),
+                "taskName": "x",
+                "note": "",
+                "type": "",
+                "epic": "",
+                "coordinatorId": "",
+            },
+        ),
+        (
+            "/api/ai/search",
+            {"kind": "tasks", "query": "login", "context": _project_context()},
+        ),
+    ],
+)
+def test_v1_route_returns_502_when_agent_emits_no_suggestion(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    body: dict[str, Any],
+) -> None:
+    """The five non-board-brief migrated routes all return a typed 502 when
+    the runtime returns no matching ``suggestion`` custom event — symmetric
+    with ``test_board_brief_returns_502_when_agent_emits_no_suggestion``."""
+
+    async def empty_run(*args: Any, **kwargs: Any) -> Any:
+        return {}, []
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(
+        runtime, "arun_with_events", empty_run, raising=False
+    )
+    response = client.post(path, headers=auth_headers, json=body)
+    assert response.status_code == HTTPStatus.BAD_GATEWAY
+    assert response.json()["error"]["code"] == "agent_unavailable"
+
+
 def test_board_brief_records_budget_top_up_when_actual_tokens_exceed_reservation(  # noqa: E501
     client: TestClient,
     auth_headers: dict[str, str],
