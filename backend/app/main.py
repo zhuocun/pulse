@@ -511,7 +511,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     repository.ensure_schema()
     logger.info("Connected to %s successfully.", settings.database)
     async with AsyncExitStack() as stack:
-        agent_catalog.discover()
+        from app.agents.registry import registry as _catalog_registry
+        agent_catalog.register_all(_catalog_registry)
         application.state.rate_limiter = middleware_backends.rate_limiter
         application.state.budget_tracker = middleware_backends.budget_tracker
         application.state.agent_runtime = await AgentRuntime.from_settings_async(

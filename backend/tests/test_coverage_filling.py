@@ -1757,10 +1757,16 @@ def test_current_user_id_rejects_non_string_subject() -> None:
     assert exc.value.status_code == 401
 
 
-def test_catalog_discover_logs_and_skips_failed_modules(
+def test_catalog_discover_propagates_import_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A single broken catalog module does not take down ``discover()``."""
+    """``discover()`` no longer swallows import errors -- they propagate.
+
+    Under the explicit-manifest regime, a broken catalog module must
+    fail loudly at startup rather than silently degrading the catalog.
+    This test verifies that an injected import error propagates out of
+    :func:`discover` instead of being silently swallowed.
+    """
 
     from app.agents import catalog as catalog_module
 
@@ -1774,11 +1780,9 @@ def test_catalog_discover_logs_and_skips_failed_modules(
 
     monkeypatch.setattr(catalog_module.importlib, "import_module", _flaky_import)
 
-    imported = catalog_module.discover()
-    names = {module.__name__ for module in imported}
-    assert targeted not in names
-    # Other agents still imported successfully.
-    assert any(name.startswith("app.agents.catalog.") for name in names)
+    import pytest as _pytest
+    with _pytest.raises(RuntimeError, match="boom"):
+        catalog_module.discover()
 
 
 def test_sse_to_jsonable_placeholder_when_encoded_not_json_serializable(
@@ -1851,29 +1855,37 @@ def test_unpack_structured_response_handles_non_dict_response() -> None:
     assert error is None
 
 
-def test_catalog_last_discovery_failures_returns_recorded_failures(
+def test_catalog_register_all_fatal_on_broken_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A broken catalog module surfaces in :func:`last_discovery_failures`."""
+    """A broken factory in :data:`AGENT_FACTORIES` is fatal (no silent degrade).
 
-    import importlib
+    Under the explicit-manifest regime, :func:`register_all` raises
+    ``RuntimeError`` when any factory raises, so a broken agent module
+    fails the deploy at startup rather than silently degrading the
+    catalog.
+    """
 
     from app.agents import catalog as catalog_module
+    from app.agents.registry import AgentRegistry
 
-    real_import = importlib.import_module
+    fresh_registry = AgentRegistry()
+    original_factories = catalog_module.AGENT_FACTORIES
 
-    def _flaky_import(name: str, *args: Any, **kwargs: Any) -> Any:
-        if name.endswith(".chat"):
-            raise ImportError("simulated failure")
-        return real_import(name, *args, **kwargs)
+    def _boom() -> Any:
+        raise ImportError("simulated factory failure")
 
-    monkeypatch.setattr(importlib, "import_module", _flaky_import)
-    catalog_module.discover()
-    failures = catalog_module.last_discovery_failures()
-    assert any(
-        f.module_name.endswith(".chat") and f.error_type == "ImportError"
-        for f in failures
+    monkeypatch.setattr(
+        catalog_module,
+        "AGENT_FACTORIES",
+        [("broken-agent", _boom)],
     )
+    import pytest as _pytest
+    try:
+        with _pytest.raises(RuntimeError, match="broken-agent"):
+            catalog_module.register_all(fresh_registry)
+    finally:
+        monkeypatch.setattr(catalog_module, "AGENT_FACTORIES", original_factories)
 
 
 def test_triage_truncate_snapshot_caps_oversized_lists() -> None:

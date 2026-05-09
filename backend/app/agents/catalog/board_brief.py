@@ -36,7 +36,6 @@ from app.agents.catalog._shared import (
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
-from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
@@ -530,4 +529,3 @@ class BoardBriefAgent(BaseAgent):
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(BoardBriefAgent(), replace=True)

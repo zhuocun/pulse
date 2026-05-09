@@ -39,7 +39,6 @@ from app.agents.catalog._shared import (
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
-from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
 from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
@@ -656,4 +655,3 @@ class TaskEstimationAgent(BaseAgent):
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(TaskEstimationAgent(), replace=True)

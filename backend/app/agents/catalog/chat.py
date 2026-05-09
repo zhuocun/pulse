@@ -30,7 +30,6 @@ from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._chat_tools import CHAT_TOOLS
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model
-from app.agents.registry import registry
 from app.agents.state import ChatState
 from app.tools import be_tools
 from langgraph.runtime import get_runtime
@@ -185,4 +184,3 @@ class ChatAgent(BaseAgent):
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(ChatAgent(), replace=True)

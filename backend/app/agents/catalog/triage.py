@@ -37,7 +37,6 @@ from app.agents.catalog._shared import (
 )
 from app.agents.context import ChatContext
 from app.agents.polish import PolishStep
-from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.tools.redaction import redact_dict
 from langgraph.runtime import get_runtime
@@ -332,4 +331,3 @@ class TriageAgent(BaseAgent):
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
-registry.register(TriageAgent(), replace=True)
