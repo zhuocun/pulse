@@ -131,7 +131,12 @@ export type StreamPart =
     | {
           type: "error";
           ns: string[];
-          data: { message: string; recoverable?: boolean };
+          data: {
+              message: string;
+              /** Stable machine-readable code from the agent server SSE layer. */
+              code?: string;
+              recoverable?: boolean;
+          };
       };
 
 export interface AgentStreamRequest {

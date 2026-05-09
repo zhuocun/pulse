@@ -112,11 +112,16 @@ const parseSseLine = (chunk: string): StreamPart | null => {
     }
     if (dataLines.length === 0) return null;
     const payload = dataLines.join("\n");
-    if (!payload || payload === "[DONE]") return null;
+    const trimmedProbe = payload.trim();
+    if (!trimmedProbe || trimmedProbe === "[DONE]") return null;
     try {
         return JSON.parse(payload) as StreamPart;
-    } catch {
-        return null;
+    } catch (cause) {
+        throw new AgentTransportError(
+            "Malformed agent stream event (invalid JSON)",
+            cause,
+            "sse_invalid_json"
+        );
     }
 };
 

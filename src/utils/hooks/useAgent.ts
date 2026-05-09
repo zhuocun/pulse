@@ -13,7 +13,11 @@ import type {
     TriageNudge
 } from "../../interfaces/agent";
 import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
-import { AgentForbiddenError } from "../ai/agentErrors";
+import {
+    AgentBudgetError,
+    AgentForbiddenError,
+    AgentTransportError
+} from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
 import {
@@ -162,9 +166,38 @@ interface ApplyStreamPartHandlers {
     setLastSuggestion: (suggestion: AgentSuggestion) => void;
     /** Write the latest token counts into a ref so AGENT_TURN_COMPLETED can read them. */
     setLastUsageRef: (usage: { tokensIn: number; tokensOut: number }) => void;
+    /** Mid-stream {@link StreamPart} `error` → hook `error` + terminate this SSE read. */
+    onMidStreamErrorEnvelope: (err: Error) => void;
     autoResume: boolean;
     ctx: FeToolContext;
 }
+
+/**
+ * Map a mid-stream SSE `error` envelope to hook-level errors. Aligns with
+ * HTTP-era subclasses when `code` matches known server enums.
+ */
+const hookErrorFromAgentStreamErrorData = (
+    data: Extract<StreamPart, { type: "error" }>["data"]
+): Error => {
+    const message = data.message ?? "Agent stream error";
+    const code =
+        typeof data.code === "string" && data.code.length > 0
+            ? data.code
+            : undefined;
+
+    if (code === "budget" || code === "budget_exhausted") {
+        return new AgentBudgetError(message, code);
+    }
+    if (
+        code === "forbidden" ||
+        code === "autonomy_denied" ||
+        code === "permission_denied"
+    ) {
+        return new AgentForbiddenError(message, code);
+    }
+
+    return new AgentTransportError(message, undefined, code);
+};
 
 /**
  * Triage-nudge inbox rules per PRD AC-V14. A nudge entry carries its
@@ -303,14 +336,9 @@ const applyStreamPart = async (
             return undefined;
         }
         case "error": {
-            const message = part.data.message ?? "Agent stream error";
-            handlers.setState((prev) => ({
-                ...prev,
-                messages: [
-                    ...prev.messages,
-                    { role: "system", content: message }
-                ]
-            }));
+            handlers.onMidStreamErrorEnvelope(
+                hookErrorFromAgentStreamErrorData(part.data)
+            );
             return undefined;
         }
         default:
@@ -412,6 +440,7 @@ const useAgent = (
             streamFailed: boolean;
         }> => {
             let pendingResume: unknown | undefined;
+            let terminatedByStreamError = false;
             // Watchdog: if no stream chunk arrives for STREAM_WATCHDOG_MS,
             // abort the run and surface a "took too long" error (UA-R1).
             const armWatchdog = () => {
@@ -477,10 +506,15 @@ const useAgent = (
                         setLastUsageRef: (usage) => {
                             lastUsageRef.current = usage;
                         },
+                        onMidStreamErrorEnvelope: (streamErr) => {
+                            terminatedByStreamError = true;
+                            if (mountedRef.current) setError(streamErr);
+                        },
                         autoResume: autoResumeRef.current,
                         ctx
                     });
                     if (pendingResume !== undefined) break;
+                    if (terminatedByStreamError) break;
                 }
             } catch (err) {
                 if (err instanceof Error && err.name !== "AbortError") {
@@ -489,6 +523,9 @@ const useAgent = (
                 }
             } finally {
                 clearWatchdog();
+            }
+            if (terminatedByStreamError) {
+                return { pendingResume: undefined, streamFailed: true };
             }
             return { pendingResume, streamFailed: false };
         },

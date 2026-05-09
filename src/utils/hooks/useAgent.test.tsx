@@ -27,6 +27,7 @@ jest.mock("../../constants/env", () => ({
 }));
 
 // eslint-disable-next-line simple-import-sort/imports
+import { AgentBudgetError, AgentTransportError } from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import useAgent, {
@@ -665,6 +666,91 @@ describe("useAgent", () => {
                 ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_COMPLETED
             );
             expect(completedCalls).toHaveLength(0);
+        });
+
+        it("surfaces mid-stream error envelopes on hook error and marks turn completed with error", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "error",
+                        ns: [],
+                        data: {
+                            message: "timed out",
+                            code: "timeout",
+                            recoverable: false
+                        }
+                    }
+                ])
+            );
+            const tracked: Array<
+                [string, Record<string, unknown> | undefined]
+            > = [];
+            const previous = setAnalyticsSink((event, payload) => {
+                tracked.push([event, payload]);
+            });
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            try {
+                await act(async () => {
+                    await result.current.start("hello");
+                });
+                await waitFor(() => {
+                    expect(result.current.isStreaming).toBe(false);
+                });
+            } finally {
+                setAnalyticsSink(previous);
+            }
+
+            expect(result.current.error).toBeInstanceOf(AgentTransportError);
+            expect(result.current.error?.message).toBe("timed out");
+            expect((result.current.error as AgentTransportError).code).toBe(
+                "timeout"
+            );
+            expect(
+                result.current.state.messages.some((m) => m.role === "system")
+            ).toBe(false);
+
+            const completedCall = tracked.find(
+                ([e]) => e === ANALYTICS_EVENTS.AGENT_TURN_COMPLETED
+            );
+            expect(completedCall?.[1]).toMatchObject({ error: true });
+        });
+
+        it("maps budget stream error codes to AgentBudgetError", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "error",
+                        ns: [],
+                        data: {
+                            message: "Cap reached",
+                            code: "budget_exhausted",
+                            recoverable: false
+                        }
+                    }
+                ])
+            );
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+
+            await act(async () => {
+                await result.current.start("hello");
+            });
+
+            await waitFor(() => {
+                expect(result.current.isStreaming).toBe(false);
+            });
+
+            expect(result.current.error).toBeInstanceOf(AgentBudgetError);
+            expect((result.current.error as AgentBudgetError).code).toBe(
+                "budget_exhausted"
+            );
         });
     });
 

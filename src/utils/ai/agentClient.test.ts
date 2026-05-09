@@ -357,6 +357,38 @@ describe("agentClient", () => {
             expect(message.data[0].content).toBe("ok ");
         });
 
+        it("throws AgentTransportError when an SSE data payload is not valid JSON", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                buildStreamResponse(["data: not-json\n\n"])
+            );
+            try {
+                for await (const _ of streamAgent(baseRequest)) {
+                    // exhaust
+                }
+                throw new Error("expected throw");
+            } catch (err) {
+                expect(err).toBeInstanceOf(AgentTransportError);
+                expect(err).toMatchObject({
+                    name: "AgentTransportError",
+                    code: "sse_invalid_json",
+                    message: "Malformed agent stream event (invalid JSON)"
+                });
+            }
+        });
+
+        it("throws AgentTransportError when the final buffer holds invalid JSON without a closing blank line", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                buildStreamResponse(["data: {oops"])
+            );
+            await expect(
+                (async () => {
+                    for await (const _ of streamAgent(baseRequest)) {
+                        // exhaust
+                    }
+                })()
+            ).rejects.toMatchObject({ code: "sse_invalid_json" });
+        });
+
         it("wraps a mid-stream reader error as AgentTransportError", async () => {
             // Mock a reader that returns one good chunk then rejects on
             // the next read. The async generator should map that into a
