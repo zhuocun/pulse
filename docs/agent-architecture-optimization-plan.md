@@ -76,7 +76,7 @@
 | Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in `AI_REMAINING_WORK.md`.                                            |
 | Wire **accept/reject** to LangGraph **`Command(resume=…)`** with persisted proposal ids                                            | Ensures graph continues after human decision.                                                              |
 | Add **audit log / analytics** for accepted mutations; define **undo** semantics (10s toast vs server undo endpoint)                | Progress doc notes missing `AGENT_PROPOSAL_UNDONE` path — pick one product rule and implement both halves. |
-| Autonomy gates:\*\* **Suggest / Plan / Auto** must map to enforceable server checks, not UI-only                                   | Aligns with PRD §6 and shadow-mode story.                                                                  |
+| **Autonomy gates:** Suggest / Plan / Auto must map to enforceable server checks, not UI-only                                       | Aligns with PRD §6 and shadow-mode story.                                                                  |
 
 **Exit criteria:** Acceptance tests cover full loop: proposal → approve → mutation applied → idempotent replay does not re-apply.
 
