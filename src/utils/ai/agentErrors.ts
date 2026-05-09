@@ -7,7 +7,9 @@
 export class AgentTransportError extends Error {
     constructor(
         message: string,
-        public cause?: unknown
+        public cause?: unknown,
+        /** Structured code (HTTP mapper, malformed SSE, mid-stream envelope `code`, …). */
+        public code?: string
     ) {
         super(message);
         this.name = "AgentTransportError";
