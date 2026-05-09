@@ -394,6 +394,89 @@ class AgentRuntime:
             run_span.set_result(result)
             return result
 
+    async def arun_with_events(
+        self,
+        name: str,
+        inputs: Mapping[str, Any],
+        *,
+        thread_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        assistant_id: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        context: Any = None,
+        resume: Any = None,
+    ) -> tuple[Any, list[Any]]:
+        """Run agent ``name`` to completion, capturing custom events.
+
+        Returns ``(final_state, custom_events)``.  The first element is
+        the agent's final state dict (the same value :meth:`ainvoke`
+        returns); the second is the ordered list of payloads written via
+        :func:`app.agents.stream.emit_custom` during the run.
+
+        LangGraph's :meth:`Pregel.ainvoke` discards custom-stream events
+        — by design, since the JSON-style entry point doesn't otherwise
+        surface them.  But the catalog agents emit suggestions,
+        citations and nudges through ``emit_custom``, and JSON callers
+        (the ``/api/ai`` shim, future MCP surface, replay tooling) need
+        to see them too.  Internally this method calls
+        ``agent.astream(stream_mode=("values", "custom"))`` because
+        ``ainvoke`` is itself implemented as a thin wrapper over
+        ``astream`` in LangGraph 1.x; running multi-mode and partitioning
+        the chunks adds zero round-trips while making the events
+        first-class.
+
+        The same span / error-translation machinery as :meth:`ainvoke`
+        wraps the run, so OTel and Prometheus dimensions stay aligned
+        across the two entry points.
+        """
+
+        agent = self.get(name)
+        config = self.build_config(
+            agent,
+            thread_id=thread_id,
+            user_id=user_id,
+            assistant_id=assistant_id,
+            tags=tags,
+        )
+        graph_input = self._resume_input(inputs, resume, thread_id)
+        final_state: Any = None
+        custom_events: list[Any] = []
+        with start_run_span(
+            operation="run_agent_with_events",
+            agent_name=name,
+            model_id=self._model_id,
+            project_id=_project_id(inputs),
+            autonomy=_autonomy(inputs),
+        ) as run_span:
+            try:
+                async for mode, payload in agent.astream(
+                    graph_input,
+                    config=config,
+                    context=context,
+                    stream_mode=("values", "custom"),
+                    checkpointer=self._checkpointer,
+                    store=self._store,
+                ):
+                    if mode == "custom":
+                        custom_events.append(payload)
+                    elif mode == "values":
+                        # ``values`` yields after every superstep; the last
+                        # one is the final state.  Overwriting is correct.
+                        final_state = payload
+            except AgentError:
+                raise
+            except GraphRecursionError as exc:
+                raise AgentRecursionError(
+                    name, self._resolved_recursion_limit(agent)
+                ) from exc
+            except Exception as exc:  # noqa: BLE001 -- intentional translation boundary
+                logger.exception(
+                    "Agent %r failed during arun_with_events.", name
+                )
+                raise AgentExecutionError(name, cause=exc) from exc
+            run_span.set_result(final_state)
+            return final_state, custom_events
+
     async def astream(
         self,
         name: str,

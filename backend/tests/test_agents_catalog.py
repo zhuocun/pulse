@@ -832,3 +832,42 @@ def test_merge_keyed_string_updates_passes_through_non_dict_items() -> None:
     )
     assert out == ["not-a-dict", {"id": "a", "summary": "x"}]
 
+
+def test_fetch_similar_node_short_circuits_when_pre_populated() -> None:
+    """Returning ``{}`` when ``similar_tasks`` is already on state lets a
+    JSON caller (e.g. the v1 ``/api/ai`` shim) pre-populate the field
+    and skip the FE interrupt that the v2.1 SSE surface uses.  v2.1
+    callers don't pre-populate so they still hit the interrupt branch.
+    """
+
+    from app.agents.catalog._shared import fetch_similar_node
+
+    state = {"similar_tasks": [{"id": "t-1", "text": "neighbour"}]}
+    assert fetch_similar_node(state) == {}
+
+
+def test_search_fetch_candidates_short_circuits_when_pre_populated() -> None:
+    """Same short-circuit contract as :func:`fetch_similar_node`, but
+    inside the search-agent's own ``fetch_candidates`` closure.
+    Exercised through the compiled graph because the closure is not
+    importable directly.
+    """
+
+    agent = SearchAgent()
+    graph = agent.build(checkpointer=None, store=None)
+    # Pre-populate ``candidates``; the short-circuit branch returns
+    # ``{}``, the ``rank`` node embeds the supplied candidates, and the
+    # run completes without ever raising the FE interrupt.  ``rank`` is
+    # an async node (it ``await``s the embeddings provider), so we use
+    # ``ainvoke``.
+    result = asyncio.run(
+        graph.ainvoke(
+            {
+                "query": "ignored",
+                "candidates": [{"id": "x-1", "text": "hello world"}],
+            }
+        )
+    )
+    assert "ranking" in result
+    assert result["ranking"]["ids"] == ["x-1"]
+

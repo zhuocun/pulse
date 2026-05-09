@@ -50,7 +50,6 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from app.agents import AgentRuntime
 from app.agents.base import AgentMetadata
 from app.agents.limits import enforce_request_limits
-from app.agents.catalog.board_brief import build_recommendation_detail, polish_headline
 from app.agents.catalog.search import polish_search
 from app.agents.catalog.task_drafting import polish_draft
 from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
@@ -74,8 +73,6 @@ from app.observability.metrics import record_idempotency, record_invocation
 from app.security import current_user_id, current_user_payload
 from app.services.project_service import is_project_manager
 from app.services import v1_engine
-from app.tools import be_tools
-from app.tools.be_tools import validated_citation_ref
 from app.tools.redaction import redact, redact_task_fields
 from app.validation import api_error
 
@@ -818,55 +815,45 @@ async def board_brief(
         context = payload.get("context") or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
-        deterministic = v1_engine.board_brief(context)
-        drift = be_tools.detect_drift(context)
-        # Build citation refs for the recommendationDetail sources; mirrors
-        # what the v2.1 graph does in its emit_citations node.
-        v1_tasks = context.get("tasks") or []
-        v1_columns = context.get("columns") or []
-        v1_refs: List[Dict[str, Any]] = []
-        for task in v1_tasks[:3]:
-            if isinstance(task, dict):
-                v1_refs.append(
-                    validated_citation_ref(
-                        source="task",
-                        id=task.get("_id") or task.get("id"),
-                        quote=task.get("taskName") or task.get("_id") or "",
-                    )
-                )
-        for col in v1_columns[:2]:
-            if isinstance(col, dict):
-                v1_refs.append(
-                    validated_citation_ref(
-                        source="column",
-                        id=col.get("_id") or col.get("id"),
-                        quote=col.get("name") or col.get("_id") or "",
-                    )
-                )
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            base_brief: Any = deterministic
-        else:
-            # When polish is in effect we let the schema's 120-char cap stand;
-            # the deterministic ``v1_engine.board_brief`` truncates at 140, but
-            # ``BriefHeadline.headline`` (Pydantic) enforces ``max_length=120``
-            # so the polished output is already within bounds.
-            facts = {
-                "tasks": len(context.get("tasks") or []),
-                "columns": len(context.get("columns") or []),
-                "members": len(context.get("members") or []),
-            }
-            headline = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_headline,
-                model,
-                deterministic.get("headline") or "",
-                facts,
+        inputs: Dict[str, Any] = {"board_snapshot": context}
+        if project_id:
+            inputs["project_id"] = project_id
+
+        final_state, custom_events = await runtime.arun_with_events(
+            meta.catalog_agent_name,  # "board-brief-agent"
+            inputs,
+            user_id=user_id,
+        )
+
+        # The agent's emit_citations node writes the full IBoardBrief +
+        # recommendationDetail payload onto a custom event with
+        # kind="suggestion", surface="brief".  That's the legacy v1 wire shape.
+        suggestion = next(
+            (
+                e for e in custom_events
+                if isinstance(e, dict)
+                and e.get("kind") == "suggestion"
+                and e.get("surface") == "brief"
+            ),
+            None,
+        )
+        if suggestion is None:
+            # Defensive: should never happen — the graph always reaches emit_citations.
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a brief."}},
             )
-            base_brief = {**deterministic, "headline": headline}
-        recommendation_detail = build_recommendation_detail(base_brief, drift, v1_refs)
-        body = {**base_brief, "recommendationDetail": recommendation_detail}
+        body = suggestion["payload"]
+
+        # Reconcile budget against actual provider usage (same logic as
+        # _polish_and_record but on the full agent run, not a single polish call).
+        if project_id:
+            tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
+            actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
+            delta = max(0, actual - 1)  # _gate already debited 1 token
+            if delta > 0:
+                budget_tracker.record(project_id, tokens=delta)
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body

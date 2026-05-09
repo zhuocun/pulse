@@ -167,7 +167,17 @@ def fetch_snapshot_node(state: Any) -> dict[str, Any]:
     result in ``board_snapshot``.  The bodies were identical, so this
     single function is reused by both graph closures (cf.
     ``board_brief.py`` and ``triage.py``).
+
+    Short-circuits when ``board_snapshot`` is already on state.  v2.1 SSE
+    callers don't pre-populate it (they expect the interrupt), so this
+    is purely additive for them.  JSON callers that already have the
+    snapshot in the request body can pre-populate it on input and skip
+    the interrupt entirely — required for the v1 ``/api/ai`` shim to
+    drive the same agent graph end-to-end.
     """
+
+    if state.get("board_snapshot") is not None:
+        return {}
 
     from langgraph.types import interrupt
 
@@ -189,7 +199,14 @@ def fetch_similar_node(state: Any) -> dict[str, Any]:
     and a query derived from ``prompt`` or ``task_draft.taskName``.  The
     result is normalised via :func:`unpack_similar_payload` and stored in
     ``similar_tasks``.
+
+    Short-circuits when ``similar_tasks`` is already on state, mirroring
+    :func:`fetch_snapshot_node`.  Lets JSON callers that already have
+    similar-task references in the request body skip the interrupt.
     """
+
+    if state.get("similar_tasks") is not None:
+        return {}
 
     from langgraph.types import interrupt
 
@@ -266,7 +283,11 @@ def build_citation_refs(
     from app.tools.redaction import redact
 
     if get_id is None:
-        get_id = lambda x: x.get("id")  # noqa: E731
+        # ``id`` is the v2.1 FE-snapshot key; ``_id`` is the Mongo-shaped key
+        # the v1 ``/api/ai`` shim sends through ``context``.  Falling back
+        # keeps the citation refs valid for both wire shapes without forcing
+        # the caller to normalise the snapshot.
+        get_id = lambda x: x.get("id") or x.get("_id")  # noqa: E731
     if get_quote is None:
         get_quote = lambda x: x.get("text") or x.get("taskName") or x.get("name") or ""  # noqa: E731
 
