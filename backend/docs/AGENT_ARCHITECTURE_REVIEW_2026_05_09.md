@@ -50,9 +50,10 @@ preserve.
 
 ## Status — 2026-05-09
 
-Implementation tracked on `claude/review-agent-architecture-drvY9`.
+Implementation tracked on `claude/review-agent-architecture-drvY9`,
+continued on `claude/complete-subagent-orchestrator-fbQHj`.
 
-### Phase 1 — Collapse the v1 shim onto the agent runtime
+### Phase 1 — Collapse the v1 shim onto the agent runtime — **complete**
 
 | Item | Status | Commit |
 |---|---|---|
@@ -62,19 +63,20 @@ Implementation tracked on `claude/review-agent-architecture-drvY9`.
 | `build_citation_refs` default `get_id` falls back from `id` to `_id` | shipped | `82094d6` |
 | Byte-shape parity goldens for all 7 `/api/ai/*` routes (`tests/test_v1_ai_shim_parity.py`) | shipped | `82094d6` |
 | `/api/ai/board-brief` migrated to `runtime.arun_with_events` | shipped | `5e82f2d` |
-| `/api/ai/task-draft` migrated | pending | — |
-| `/api/ai/task-breakdown` migrated | pending | — |
-| `/api/ai/estimate` migrated | pending | — |
-| `/api/ai/readiness` migrated | pending | — |
-| `/api/ai/search` migrated | pending | — |
-| `/api/ai/chat` migrated to `arun_with_events` (today goes through `ainvoke`) | pending | — |
-| Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | pending | — |
-| Slim `app/services/v1_engine.py` to helpers without an agent equivalent | pending | — |
+| `/api/ai/task-draft` migrated | shipped | `e287b6b` |
+| `/api/ai/task-breakdown` migrated | shipped | `e287b6b` |
+| `/api/ai/estimate` migrated | shipped | `e287b6b` |
+| `/api/ai/readiness` migrated | shipped | `e287b6b` |
+| `/api/ai/search` migrated | shipped | `e287b6b` |
+| `/api/ai/chat` migrated to `arun_with_events` (today goes through `ainvoke`) | shipped | `e287b6b` |
+| 502-fallback parametrised coverage for the 5 migrated structured routes | shipped | `18568d3` |
+| Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | shipped | `e287b6b` |
+| Slim `app/services/v1_engine.py` to helpers without an agent equivalent (file deleted; helpers absorbed into catalog modules) | shipped | `a302052` |
 
-### Phases 2–6 — not yet started
+### Phases 2–6 — in progress
 
-No work landed on phases 2 (events as state), 3 (PolishStep DSL),
-4 (model on context), 5 (pipeline + dispatch), or 6 (hardening).
+Phase 2 (events as state, single end-of-run token aggregation) is in
+flight on the same branch. Phases 3–6 are not yet started.
 
 ---
 
