@@ -8,7 +8,7 @@
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.
 
-**Current status (2026-05-09)**: the actionable follow-up work from this pass is complete. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. F-G2 (`RunContext`) and F-S5 (stub-branching unification) remain deliberately deferred until a catalog agent needs those seams.
+**Current status (2026-05-09)**: the actionable follow-up work from this pass is complete, but the full review is **not** fully implemented. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. Three design seams remain deliberately deferred until there is product pressure to justify the churn: F-M2 / P3.3 (standardised polish-helper signatures through the registry), F-G2 (`RunContext`), and F-S5 (stub-branching unification).
 
 ---
 
@@ -133,7 +133,7 @@ Three of the documented follow-ups were completed. **885 BE tests passing, 100 %
 
 - `AgentRuntime.from_settings_async()` now reuses one `AsyncConnectionPool` when the checkpointer and store both use Postgres and resolve to the same DSN. `open_checkpointer()` / `open_store()` still support their standalone paths, but accept an injected pool so the shared-lifespan case enters and cleans up the pool exactly once.
 - `tests/test_agents.py` now asserts the shared-pool path, the split-DSN path (two pools), and concurrent lifespans (one pool per runtime, not process-global leakage).
-- The original "real Postgres smoke test" follow-up is still open; current coverage proves lifecycle correctness with fakes, not against a live database.
+- The original "real Postgres smoke test" follow-up shipped later on `cursor/finish-agent-architecture-review-14d2`; see the live-smoke section below.
 
 ### F-M7 — Magic LangGraph key
 
@@ -183,7 +183,7 @@ Resolved on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section ab
 
 **What the plan said**: Add `agent.deterministic()` and `agent.polish()` accessors on `BaseAgent` that lazy-import functions referenced in `polish_fn_path` / `deterministic_fn_path`. The v1 shim then calls `runtime.get(name).polish(...)` instead of importing `polish_draft` directly.
 
-**Why deferred**: each polish function has a different signature (`polish_headline(model, deterministic, facts)` vs `polish_draft(model, deterministic, prompt, similar)` vs `polish_search(model, deterministic, query, candidates)`). The v1 shim still has to know the signature to pass arguments — so removing the import statement does not actually decouple the shim from the catalog. The cleaner fix is to standardise the polish signature to `polish(model, deterministic, **kwargs)` and parse `kwargs` inside each polish helper, but that is a larger refactor than this seam justifies on its own. Better tackled alongside F-M1 / P4.1 below.
+**Why deferred**: each polish function has a different signature (`polish_headline(model, deterministic, facts)` vs `polish_draft(model, deterministic, prompt, similar)` vs `polish_search(model, deterministic, query, candidates)`). The v1 shim still has to know the signature to pass arguments — so removing the import statement does not actually decouple the shim from the catalog. The cleaner fix is to standardise the polish signature to `polish(model, deterministic, **kwargs)` and parse `kwargs` inside each polish helper. The `cursor/finish-agent-architecture-review-14d2` pass reduced the practical risk by centralising route identity and catalog agent names; a full polish signature migration is now a standalone follow-up, not required for the completed idempotency / route-metadata fix.
 
 ### F-M1, F-M2 / P4.1 — V1_ROUTES dispatcher table — **shipped for shared route identity**
 
@@ -200,7 +200,7 @@ The remaining value is now lower because the drift-prone strings and idempotency
 
 ### F-M6 / P4.2 — Idempotency keys by `(agent, payload)` — **shipped**
 
-**What the plan said**: Cache key derived from `(auth_subject, agent_name, sha256(canonical_payload))` rather than `(auth_subject, route, raw_idempotency_key)`. Survives URL aliasing and agent rename.
+**What the plan said**: Cache key derived from a logical operation identity rather than a raw URL path. The shipped shape keeps Stripe-style client keys (`Idempotency-Key`) but uses operation strings such as `legacy-ai:v1-task-draft`, `agent:{name}:invoke`, and `agent:{name}:stream` for the slot and fingerprint identity. The body fingerprint still hashes the canonical operation plus payload so same-key / different-body replays remain 422.
 
 Resolved on `cursor/finish-agent-architecture-review-14d2`; see the section above.
 
@@ -224,5 +224,6 @@ Step 1 (introduce DI getters with the singleton as default) shipped on `claude/f
 
 After the `cursor/finish-agent-architecture-review-14d2` round, the actionable items from this review have shipped. The remaining items are conditional design seams:
 
-1. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
-2. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.
+1. **F-M2 / P3.3 (polish-helper signature standardisation)** — revisit when v1 shim / catalog duplication starts blocking agent work. Route identity is now centralised, but the direct `polish_*` imports remain because the helpers still have incompatible argument shapes.
+2. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
+3. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.
