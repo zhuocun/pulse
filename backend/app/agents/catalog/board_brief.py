@@ -29,7 +29,6 @@ from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import HEADLINE_MAX
 from app.agents.catalog._shared import (
     build_citation_refs,
-    cap_polished_text,
     detect_drift_node,
     fetch_snapshot_node,
 )
@@ -312,13 +311,7 @@ _headline_step: PolishStep[BriefHeadline] = PolishStep(
     prompt_fn=_build_headline_prompt,
     schema=BriefHeadline,
     fallback_fn=lambda state: state["_deterministic"],
-    merge_fn=lambda state, parsed: {
-        "_result": cap_polished_text(
-            parsed.headline if isinstance(parsed, BriefHeadline) else parsed,
-            max_chars=HEADLINE_MAX,
-            fallback=state["_deterministic"],
-        )
-    },
+    cap_field=("headline", HEADLINE_MAX),
 )
 
 

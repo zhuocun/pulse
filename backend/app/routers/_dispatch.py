@@ -120,6 +120,8 @@ async def run_v1_route(
         inputs: Dict[str, Any] = project_inputs(payload, project_id)
 
         body: Any = None
+        final_state: Any = None
+        custom_events: List[Any] = []
         if agent_error_fallback is not None:
             try:
                 final_state, custom_events = await runtime.arun_with_events(
@@ -137,6 +139,16 @@ async def run_v1_route(
             )
 
         if body is None:
+            if final_state is None:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={
+                        "error": {
+                            "code": "agent_unavailable",
+                            "message": "Agent did not emit an expected result.",
+                        }
+                    },
+                )
             body = find_body(final_state, custom_events)
             if body is None:
                 raise HTTPException(

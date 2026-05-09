@@ -24,6 +24,10 @@ agent file:
 - :func:`detect_drift_node`: shared ``detect_drift`` node body for
   board-brief and triage agents.
 
+- :func:`cap_polished_text` and :func:`merge_keyed_string_updates` are
+  re-exported here for backward compatibility; the canonical
+  implementations now live in :mod:`app.agents.polish`.
+
 The module name is prefixed with ``_`` so the catalog auto-discovery
 loop (``app/agents/catalog/__init__.py``) skips it; helpers here are
 not standalone agents.
@@ -32,26 +36,13 @@ not standalone agents.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Optional
+
+# Re-exported for backward compatibility; canonical implementations are in
+# app.agents.polish so all polish-related machinery lives in one module.
+from app.agents.polish import cap_polished_text, merge_keyed_string_updates
 
 logger = logging.getLogger(__name__)
-
-
-def cap_polished_text(text: Any, *, max_chars: int, fallback: str) -> str:
-    """First-line, stripped, length-capped polish output with fallback.
-
-    Five of the six catalog agents collapse a polished string into a
-    single line and cap it at ``max_chars`` so the wire shape stays
-    predictable.  A blank or non-string result preserves
-    ``fallback``: the deterministic baseline is more useful than ``""``.
-    """
-
-    if not isinstance(text, str):
-        return fallback
-    text = text.strip()
-    if not text:
-        return fallback
-    return text.splitlines()[0][:max_chars]
 
 
 def filter_to_allowed_ids(
@@ -67,51 +58,6 @@ def filter_to_allowed_ids(
     if not isinstance(parsed_ids, list):
         return []
     return [i for i in parsed_ids if isinstance(i, str) and i in allowed_ids]
-
-
-def merge_keyed_string_updates(
-    parsed_items: Any,
-    deterministic_items: Any,
-    *,
-    key_from_parsed: Callable[[Any], Any],
-    key_from_deterministic: Callable[[dict[str, Any], int], Any],
-    string_fields: Mapping[str, int],
-) -> list[dict[str, Any]]:
-    """Merge polished string fields onto a deterministic baseline list.
-
-    Polished values are taken first-line, stripped and length-capped per
-    ``string_fields``; blank polished values keep the deterministic copy.
-    Used by ``polish_readiness`` (key = field id) and ``polish_triage``
-    (key = ``"{type}:{idx}"``) — both want "validate, normalise, merge by
-    key" without inventing new rows.
-    """
-
-    polished_by_key: dict[Any, Any] = {}
-    if isinstance(parsed_items, list):
-        for item in parsed_items:
-            k = key_from_parsed(item)
-            if k:
-                polished_by_key[k] = item
-    out: list[dict[str, Any]] = []
-    if not isinstance(deterministic_items, list):
-        return out
-    for idx, item in enumerate(deterministic_items):
-        if not isinstance(item, dict):
-            out.append(item)
-            continue
-        merged = dict(item)
-        update = polished_by_key.get(key_from_deterministic(item, idx))
-        if update is not None:
-            for field_name, max_chars in string_fields.items():
-                polished = cap_polished_text(
-                    getattr(update, field_name, ""),
-                    max_chars=max_chars,
-                    fallback="",
-                )
-                if polished:
-                    merged[field_name] = polished
-        out.append(merged)
-    return out
 
 
 def unpack_structured_response(
@@ -160,7 +106,7 @@ def fetch_snapshot_node(state: Any) -> dict[str, Any]:
     callers don't pre-populate it (they expect the interrupt), so this
     is purely additive for them.  JSON callers that already have the
     snapshot in the request body can pre-populate it on input and skip
-    the interrupt entirely — required for the v1 ``/api/ai`` shim to
+    the interrupt entirely -- required for the v1 ``/api/ai`` shim to
     drive the same agent graph end-to-end.
     """
 

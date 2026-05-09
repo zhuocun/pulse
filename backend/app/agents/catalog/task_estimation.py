@@ -32,7 +32,6 @@ from app.agents.catalog._schemas import (
 )
 from app.agents.catalog._shared import (
     build_citation_refs,
-    cap_polished_text,
     fetch_similar_node,
     merge_keyed_string_updates,
 )
@@ -280,24 +279,11 @@ def _build_rationale_prompt(state: dict[str, Any]) -> str:
     )
 
 
-def _merge_rationale(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
-    deterministic = state["_deterministic"]
-    if isinstance(parsed, EstimationRationale):
-        return {
-            "_result": cap_polished_text(
-                parsed.rationale,
-                max_chars=ESTIMATION_RATIONALE_MAX,
-                fallback=deterministic,
-            )
-        }
-    return {"_result": parsed}  # fallback value (str)
-
-
 _rationale_step: PolishStep[EstimationRationale] = PolishStep(
     prompt_fn=_build_rationale_prompt,
     schema=EstimationRationale,
     fallback_fn=lambda state: state["_deterministic"],
-    merge_fn=_merge_rationale,
+    cap_field=("rationale", ESTIMATION_RATIONALE_MAX),
 )
 
 

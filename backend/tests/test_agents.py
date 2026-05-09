@@ -1461,6 +1461,71 @@ def test_namespaced_thread_treats_malformed_sigv1_as_unsigned(
     assert cfg["configurable"]["thread_id"].startswith("echo:u1:")
 
 
+# ---------------------------------------------------------------------------
+# Defect 2: Cross-user signed thread token returns 5xx instead of 4xx
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_thread_key_error_raised_by_namespaced_thread(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A cross-user signed token raises ``InvalidThreadKeyError`` (4xx) not
+    the generic ``AgentExecutionError`` (5xx) that the runtime's translation
+    boundary used to produce.
+    """
+    from app.agents.errors import InvalidThreadKeyError
+    from app.agents.runtime import sign_thread_key
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    agent = runtime.get("echo")
+
+    # Issue a valid token for a different agent and scope.
+    stolen_token = sign_thread_key("other-agent", "victim-user", "their-thread")
+
+    # Passing it to the correct agent under a different user must raise
+    # InvalidThreadKeyError with a 400 status, not AgentExecutionError (500).
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        runtime.build_config(agent, thread_id=stolen_token, user_id="attacker")
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
+
+
+def test_invalid_thread_key_error_propagates_through_ainvoke(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A stolen signed token passed to ``ainvoke`` must surface as
+    ``InvalidThreadKeyError`` (4xx), not wrapped in ``AgentExecutionError``.
+
+    ``build_config`` is called before the internal try/except boundary,
+    so the error must propagate unchanged.
+    """
+    from app.agents.errors import InvalidThreadKeyError
+    from app.agents.runtime import sign_thread_key
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    stolen_token = sign_thread_key("other-agent", "victim-user", "their-thread")
+
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        asyncio.run(
+            runtime.ainvoke(
+                "echo",
+                {"text": "hi"},
+                thread_id=stolen_token,
+                user_id="attacker",
+            )
+        )
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
+    assert err.status_code < 500
+
+
 def test_agent_runtime_invoke_and_ainvoke_with_context(
     fresh_registry: AgentRegistry,
 ) -> None:
