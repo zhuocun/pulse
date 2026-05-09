@@ -8,13 +8,13 @@
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.
 
-**Current status (2026-05-09)**: the actionable follow-up work from this pass is complete. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. F-G2 (`RunContext`) and F-S5 (stub-branching unification) remain deliberately deferred until a catalog agent needs those seams.
+**Current status (2026-05-09)**: the actionable follow-up work from this pass is complete. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. `cursor/finish-agent-architecture-review-b59f` re-verified this status against the current code and tightened the decision log. F-G2 (`RunContext`) and F-S5 (stub-branching unification) remain deliberately deferred until a catalog agent needs those seams.
 
 ---
 
 ## Findings catalogue
 
-Cited at file:line. Severity is engineering judgement — none of these are GA-blockers but several were quietly doing the wrong thing.
+Locations are the primary references from the review pass; shipped fixes may have shifted exact line numbers. Severity is engineering judgement — none of these are GA-blockers but several were quietly doing the wrong thing.
 
 ### Smartness / correctness
 
@@ -24,13 +24,13 @@ Cited at file:line. Severity is engineering judgement — none of these are GA-b
 | F-S2 | `astream` token aggregation only ran on the success branch. Translated-exception paths (`AgentRecursionError`, `AgentExecutionError`) silently recorded zero tokens, even when the run actually consumed provider tokens before failing. Budget bookkeeping under-reported. | `app/agents/runtime.py:428-454` | Medium |
 | F-S3 | Shadow-status agents were filtered at the router (`_enforce_status` in `agents.py:341`), not at the registry. A direct registry caller (other internal services, future MCP surface) would happily invoke a shadow agent. Policy lived in the wrong layer. | `app/routers/agents.py:341-356` | Medium |
 | F-S4 | `BaseAgent.set_chat_model` after first `compile()` silently invalidated the cache without any signal. Tests that forgot to inject before first compile fell through to the previously-cached model with no error. Easy bug to write, invisible to read. | `app/agents/base.py:213-224` | Low |
-| F-S5 | Stub-detection is split across two patterns: `chat.py:104` checks `is_stub_model()` *before* the provider call; every other agent delegates to `structured_llm_call()` which checks *inside* (`_shared.py:263`). Two ways to express the same predicate makes new agents pick the wrong template. | `app/agents/catalog/chat.py:104`, `app/agents/catalog/_shared.py:263` | Low |
+| F-S5 | Stub-detection is split across two patterns: `chat.py:117` checks `is_stub_model()` *before* the provider call; every other agent delegates to `structured_llm_call()` which checks *inside* (`_shared.py:340`). Two ways to express the same predicate makes new agents pick the wrong template. | `app/agents/catalog/chat.py:117`, `app/agents/catalog/_shared.py:340` | Low |
 
 ### Gracefulness
 
 | ID | Finding | Location | Severity |
 |---|---|---|---|
-| F-G1 | Triage agent emits `{kind: "nudge"}`; every other agent emits `{kind: "suggestion", surface: "..."}`. The FE forks its discriminator. Either consolidate under `suggestion` with `surface: "nudge"`, or document the divergence in the wire-format spec. | `app/agents/catalog/triage.py:284`, `src/interfaces/agent.d.ts:105` | Low |
+| F-G1 | Triage agent emits `{kind: "nudge"}`; every other agent emits `{kind: "suggestion", surface: "..."}`. The FE forks its discriminator. Either consolidate under `suggestion` with `surface: "nudge"`, or document the divergence in the wire-format spec. | `app/agents/catalog/triage.py:296`, `src/interfaces/agent.d.ts` | Low |
 | F-G2 | No agent-level observability seam. Catalog nodes that want to tag a span ("fetch_embeddings started", neighbour count, drift severity) have to import `logging` and emit unstructured logs. The runtime span (`instrumentation.py:_AgentRunSpan`) is opaque to graph nodes. | `app/agents/base.py`, `app/agents/instrumentation.py:56-148` | Low |
 
 ### Scalability
@@ -39,7 +39,7 @@ Cited at file:line. Severity is engineering judgement — none of these are GA-b
 |---|---|---|---|
 | F-SC1 | Single-connection Postgres checkpointer. `AsyncPostgresSaver.from_conn_string` opens one async connection; every checkpoint write serialises through it. The same applies to `AsyncPostgresStore`. Existing TODO in source. | `app/agents/checkpointing.py:183`, `app/agents/stores.py` | Medium |
 | F-SC2 | Limit enforcement re-serialises the whole request body to measure size. For large bodies this is double work. Existing TODO. | `app/agents/limits.py:25-71` | Low |
-| F-SC3 | Module-level middleware singletons (`rate_limit.rate_limiter`, `budget.budget_tracker`). Tests must reset them via fixtures (`test_ai_v1_router.py:47-53`); production runs share state across requests with no swap point. Blocks horizontal scale (no shared backend) and process isolation in tests. Symptoms today minor; will bite when budget/rate-limit move to Redis. | `app/middleware/rate_limit.py`, `app/middleware/budget.py` | Medium |
+| F-SC3 | Module-level middleware singletons (`rate_limit.rate_limiter`, `budget.budget_tracker`). Tests had to reset them through suite fixtures; production runs shared state across requests with no swap point. Blocks horizontal scale (no shared backend) and process isolation in tests. Symptoms today minor; will bite when budget/rate-limit move to Redis. | `app/middleware/rate_limit.py`, `app/middleware/budget.py` | Medium |
 
 ### Maintainability
 
@@ -133,7 +133,7 @@ Three of the documented follow-ups were completed. **885 BE tests passing, 100 %
 
 - `AgentRuntime.from_settings_async()` now reuses one `AsyncConnectionPool` when the checkpointer and store both use Postgres and resolve to the same DSN. `open_checkpointer()` / `open_store()` still support their standalone paths, but accept an injected pool so the shared-lifespan case enters and cleans up the pool exactly once.
 - `tests/test_agents.py` now asserts the shared-pool path, the split-DSN path (two pools), and concurrent lifespans (one pool per runtime, not process-global leakage).
-- The original "real Postgres smoke test" follow-up is still open; current coverage proves lifecycle correctness with fakes, not against a live database.
+- At this point the original "real Postgres smoke test" follow-up was still open; `cursor/finish-agent-architecture-review-14d2` closed it with the opt-in `PYTEST_AGENT_POSTGRES_URI` smoke path below.
 
 ### F-M7 — Magic LangGraph key
 
@@ -163,15 +163,17 @@ The remaining actionable follow-ups were resolved or converted into explicit opt
 
 ---
 
-## Deferred (with rationale)
+## Decision log (resolved or deliberately deferred)
 
-Each deferred item is independently shippable in a follow-up PR. Reasons are explicit so the next author isn't guessing what was tried.
+The shipped items below were considered during this review but closed by later follow-ups. The deliberately deferred items are independently shippable in a future PR, with explicit reasons so the next author is not guessing what was tried.
 
 ### F-S5 / P2.3 — Stub-branching unification
 
 **What the plan said**: Move chat's pre-call `is_stub_model` check into a shared `chat_with_stub_fallback(...)` helper alongside the existing `structured_llm_call(...)`.
 
 **Why deferred**: chat uses `bind_tools` (not `with_structured_output`), has special `asyncio.CancelledError` / `GeneratorExit` handling for client disconnects, and has a stub-response-on-exception fallback that no other agent has. A unified helper would have a callback signature awkward enough that callers still effectively have to re-implement chat's flow. The duplication is ~10 lines in one file, not five — extracting it would obscure rather than clarify.
+
+**2026-05-09 re-check**: still true. `chat-agent` is still the only non-structured `bind_tools` agent; all other polish paths use `structured_llm_call(...)`. A code comment now marks this as intentional rather than an unmissed helper extraction.
 
 **To revisit if**: a second non-structured agent appears (e.g. a multi-turn planning agent) with the same shape.
 
@@ -218,11 +220,13 @@ Step 1 (introduce DI getters with the singleton as default) shipped on `claude/f
 
 **Why deferred**: additive but plumbing-heavy. LangGraph's context is a typed schema per agent; adding a shared `RunContext` either forces every agent's context schema to inherit from a base (mild type-system gymnastics) or requires a sidecar mechanism (e.g. a contextvar). Both work; both warrant their own design pass. No agent currently *needs* this seam to ship correctly.
 
+**2026-05-09 re-check**: still defer. Runtime-level spans already wrap `ainvoke` / `astream`, while catalog nodes have no current span consumer and only a few error-path log call sites. The smallest future implementation should ship with a real consumer, likely by exporting an active-span contextvar or by introducing a shared LangGraph context schema.
+
 ---
 
 ## Pickup checklist for the next pass
 
-After the `cursor/finish-agent-architecture-review-14d2` round, the actionable items from this review have shipped. The remaining items are conditional design seams:
+After the `cursor/finish-agent-architecture-review-b59f` re-check, no code work remains from this review. The remaining items are conditional design seams:
 
-1. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
-2. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.
+1. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Ship it with an actual node-level span attribute or metric so the context propagation design is exercised end-to-end.
+2. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools`, cancellation, and stub-fallback shape as `chat`.
