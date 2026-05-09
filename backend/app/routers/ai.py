@@ -330,11 +330,12 @@ def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
 def _token_usage_from_events(custom_events: List[Any]) -> Tuple[int, int]:
     """Sum ``(tokens_in, tokens_out)`` from ``{"kind": "usage"}`` custom events.
 
-    Catalog agents emit token usage via :func:`app.agents.catalog._shared.emit_usage`
-    rather than writing it into AIMessage.usage_metadata on the graph state.
-    Routes that pre-populate state (task-draft, estimate, readiness, search)
-    collect those events here as a fallback when
-    :func:`~app.agents.llm.result_token_usage_from_graph_result` returns ``(0, 0)``.
+    Phase 2: catalog agents now include raw ``AIMessage`` objects (with
+    ``usage_metadata``) in state messages so
+    :func:`~app.agents.llm.result_token_usage_from_graph_result` can aggregate
+    them directly.  This function is retained as a fallback for any custom
+    agent that still emits ``{"kind": "usage"}`` side-channel events or for
+    forward-compatibility with persisted event lists that contain usage entries.
     """
 
     tokens_in = 0

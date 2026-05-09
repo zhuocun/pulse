@@ -33,7 +33,6 @@ from app.agents.catalog._schemas import (
     TASKNAME_MAX,
 )
 from app.agents.catalog._shared import (
-    emit_usage,
     fetch_similar_node,
     fetch_snapshot_node,
     structured_llm_call,
@@ -41,7 +40,6 @@ from app.agents.catalog._shared import (
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
-from app.agents.stream import emit_custom
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
@@ -253,7 +251,7 @@ async def _polish_draft(
     deterministic: dict[str, Any],
     prompt: str,
     similar: list[dict[str, Any]],
-) -> tuple[dict[str, Any], int, int]:
+) -> tuple[dict[str, Any], Any, int, int]:
     """Ask the model to refine the draft text fields; deterministic on stub.
 
     Only ``taskName``, ``note``, and ``rationale`` are eligible for LLM
@@ -263,6 +261,12 @@ async def _polish_draft(
     is asked for a typed :class:`DraftPolish` payload via
     ``with_structured_output`` so a malformed response cleanly degrades
     to the deterministic baseline.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.  ``raw_message``
+    is the underlying ``AIMessage`` with ``usage_metadata`` populated; callers
+    should include it in the node's ``messages`` return value so budget
+    tracking can find the token counts.  It is ``None`` on the stub path or
+    when the call fails.
     """
 
     # Redact PII from every field that crosses the provider boundary.
@@ -298,9 +302,23 @@ async def _polish_draft(
     )
 
 
-# Backward-compatible public alias kept for tests that import ``polish_draft``
-# directly.  Internal callers use the private ``_polish_draft`` name.
-polish_draft = _polish_draft
+async def polish_draft(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    prompt: str,
+    similar: list[dict[str, Any]],
+) -> tuple[dict[str, Any], int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_draft`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  Internal node code
+    calls :func:`_polish_draft` directly to also capture the raw
+    ``AIMessage`` for budget tracking.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_draft(
+        model, deterministic, prompt, similar
+    )
+    return result, tokens_in, tokens_out
 
 
 class TaskDraftingAgent(BaseAgent):
@@ -410,18 +428,15 @@ class TaskDraftingAgent(BaseAgent):
                 clean_payload: dict[str, Any] = {"items": items_raw}
                 if not isinstance(base_draft_meta, dict) or is_stub_model(chat_model):
                     # Stub path or no base metadata: emit deterministic result.
-                    emit_custom(
-                        {"kind": "suggestion", "surface": "breakdown", "payload": clean_payload}
-                    )
                     return {
                         "draft": clean_payload,
                         "messages": [AIMessage(content=json.dumps(clean_payload))],
+                        "events": [{"kind": "suggestion", "surface": "breakdown", "payload": clean_payload}],
                     }
                 # Real-model path: polish base draft, reconstruct per-item names.
-                polished_base, tokens_in, tokens_out = await _polish_draft(
+                polished_base, raw_msg_bd, _tokens_in, _tokens_out = await _polish_draft(
                     chat_model, dict(base_draft_meta), bd_prompt, bd_similar
                 )
-                emit_usage(tokens_in, tokens_out)
                 polished_taskName = polished_base.get("taskName") or ""
                 polished_note = polished_base.get("note") or ""
                 polished_rationale = polished_base.get("rationale")
@@ -439,29 +454,26 @@ class TaskDraftingAgent(BaseAgent):
                         merged["rationale"] = polished_rationale
                     polished_items.append(merged)
                 result_payload: dict[str, Any] = {"items": polished_items}
-                emit_custom(
-                    {"kind": "suggestion", "surface": "breakdown", "payload": result_payload}
-                )
+                extra_msgs_bd = [raw_msg_bd] if raw_msg_bd is not None else []
                 return {
                     "draft": result_payload,
-                    "messages": [AIMessage(content=json.dumps(result_payload))],
+                    "messages": extra_msgs_bd + [AIMessage(content=json.dumps(result_payload))],
+                    "events": [{"kind": "suggestion", "surface": "breakdown", "payload": result_payload}],
                 }
             if isinstance(pre_draft, dict):
                 # Single-draft baseline: polish the text fields
                 # and emit on the ``"draft"`` surface.
-                polished, tokens_in, tokens_out = await _polish_draft(
+                polished, raw_msg_sd, _tokens_in, _tokens_out = await _polish_draft(
                     chat_model, pre_draft, prompt, similar
                 )
-                emit_usage(tokens_in, tokens_out)
-                emit_custom(
-                    {"kind": "suggestion", "surface": "draft", "payload": polished}
-                )
+                extra_msgs_sd = [raw_msg_sd] if raw_msg_sd is not None else []
                 return {
                     "draft": polished,
-                    "messages": [AIMessage(content=json.dumps(polished))],
+                    "messages": extra_msgs_sd + [AIMessage(content=json.dumps(polished))],
+                    "events": [{"kind": "suggestion", "surface": "draft", "payload": polished}],
                 }
             base = _draft_from_prompt(prompt)
-            polished, tokens_in, tokens_out = await _polish_draft(
+            polished, raw_msg_base, _tokens_in, _tokens_out = await _polish_draft(
                 chat_model, base, prompt, similar
             )
             axis = state.get("breakdown_axis")
@@ -476,14 +488,11 @@ class TaskDraftingAgent(BaseAgent):
                 draft: dict[str, Any] = {"axis": axis, "items": pieces}
             else:
                 draft = polished
-            surface = "draft"
-            emit_usage(tokens_in, tokens_out)
-            emit_custom(
-                {"kind": "suggestion", "surface": surface, "payload": draft}
-            )
+            extra_msgs_base = [raw_msg_base] if raw_msg_base is not None else []
             return {
                 "draft": draft,
-                "messages": [AIMessage(content=json.dumps(draft))],
+                "messages": extra_msgs_base + [AIMessage(content=json.dumps(draft))],
+                "events": [{"kind": "suggestion", "surface": "draft", "payload": draft}],
             }
 
         graph: StateGraph = StateGraph(TaskDraftingState)

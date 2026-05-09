@@ -31,14 +31,12 @@ from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
-    emit_usage,
     fetch_snapshot_node,
     merge_keyed_string_updates,
     structured_llm_call,
 )
 from app.agents.registry import registry
 from app.agents.state import TriageState
-from app.agents.stream import emit_custom
 from app.tools.redaction import redact_dict
 
 logger = logging.getLogger(__name__)
@@ -160,6 +158,10 @@ async def polish_triage(
     the deterministic copy.
 
     Returns ``(polished_nudges, tokens_in, tokens_out)``.
+
+    Note: this function intentionally keeps a 3-tuple return for backward
+    compatibility with tests that import it directly. The raw AIMessage is
+    consumed internally within ``generate_nudges`` via ``structured_llm_call``.
     """
 
     if not deterministic_nudges:
@@ -209,13 +211,14 @@ async def polish_triage(
             string_fields={"summary": NUDGE_SUMMARY_MAX},
         )
 
-    return await structured_llm_call(
+    result, _raw_msg, tokens_in, tokens_out = await structured_llm_call(
         model,
         TriagePolish,
         [HumanMessage(content=prompt)],
         fallback=deterministic_nudges,
         merge_fn=_merge,
     )
+    return result, tokens_in, tokens_out
 
 
 class TriageAgent(BaseAgent):
@@ -265,10 +268,11 @@ class TriageAgent(BaseAgent):
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
-            polished_nudges, tokens_in, tokens_out = await polish_triage(
+            polished_nudges, _tokens_in, _tokens_out = await polish_triage(
                 chat_model, nudges, board_snapshot
             )
             project_id = state.get("project_id") or ""
+            new_events: list[dict] = []
             for index, nudge in enumerate(polished_nudges):
                 details = nudge.get("details") or {}
                 target_ids = [
@@ -293,11 +297,11 @@ class TriageAgent(BaseAgent):
                     "target_ids": target_ids,
                     "severity": fe_severity,
                 }
-                emit_custom({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
-            emit_usage(tokens_in, tokens_out)
+                new_events.append({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
             return {
                 "nudges": polished_nudges,
                 "messages": [AIMessage(content=json.dumps(polished_nudges))],
+                "events": new_events,
             }
 
         graph: StateGraph = StateGraph(TriageState)

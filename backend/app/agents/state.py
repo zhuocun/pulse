@@ -13,6 +13,21 @@ from langgraph.graph.message import add_messages
 from typing_extensions import NotRequired
 
 
+def add_events(
+    left: list[dict] | None,
+    right: list[dict] | None,
+) -> list[dict]:
+    """Reducer for the ``events`` field: append-only accumulation.
+
+    Mirrors :func:`langgraph.graph.message.add_messages` semantics for
+    the typed event list. Both ``left`` and ``right`` may be ``None``
+    (e.g. on the very first superstep before any node has run), which is
+    normalised to an empty list so the final value is always a plain list.
+    """
+
+    return list(left or []) + list(right or [])
+
+
 class AgentState(TypedDict, total=False):
     """Default state for chat-style agents.
 
@@ -32,6 +47,7 @@ class BaseAgentState(TypedDict):
     """Common state shared by all Board Copilot v2.1 agents (PRD §5A.2)."""
 
     messages: Annotated[list[BaseMessage], add_messages]
+    events: Annotated[list[dict], add_events]
     project_id: NotRequired[str]
     user_id: NotRequired[str]
     autonomy_level: NotRequired[str]  # "suggest" | "plan" | "auto"

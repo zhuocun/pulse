@@ -47,14 +47,12 @@ from app.agents.catalog._schemas import (
 )
 from app.agents.catalog._shared import (
     cap_polished_text,
-    emit_usage,
     filter_to_allowed_ids,
     structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import SearchState
-from app.agents.stream import emit_custom
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
@@ -243,8 +241,14 @@ async def _polish_search(
     deterministic: dict[str, Any],
     query: str,
     candidates: list[dict[str, Any]],
-) -> tuple[dict[str, Any], int, int]:
+) -> tuple[dict[str, Any], Any, int, int]:
     """LLM-rerank deterministic search hits; deterministic fallback on stub.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
+    ``raw_message`` is the underlying ``AIMessage`` with ``usage_metadata``
+    populated; callers should include it in the node's ``messages`` return
+    value so budget tracking can find the token counts.  It is ``None`` on
+    the stub path, the empty-candidates short-circuit, or when the call fails.
 
     ``candidates`` is a list of ``{id, text}`` dicts the v1 shim derived
     from ``context.tasks`` / ``context.projects``. The ranking the LLM
@@ -259,7 +263,7 @@ async def _polish_search(
     # Empty candidate list means the deterministic ranker found nothing
     # to score; the LLM has no useful work and would hallucinate ids.
     if not candidates:
-        return deterministic, 0, 0
+        return deterministic, None, 0, 0
     # Redact PII before sending candidate ``text`` (task names, project
     # names) to the provider.  The id-allowlist below uses the unredacted
     # ids from ``candidates`` so the FE round-trip still works.
@@ -330,9 +334,23 @@ async def _polish_search(
     )
 
 
-# Backward-compatible public alias kept for tests that import ``polish_search``
-# directly.  Internal callers use the private ``_polish_search`` name.
-polish_search = _polish_search
+async def polish_search(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    query: str,
+    candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any], int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_search`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  The ``polish`` node
+    inside :class:`SearchAgent` calls :func:`_polish_search` directly so it
+    can also capture the raw ``AIMessage`` for budget tracking.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_search(
+        model, deterministic, query, candidates
+    )
+    return result, tokens_in, tokens_out
 
 
 class SearchAgent(BaseAgent):
@@ -489,20 +507,23 @@ class SearchAgent(BaseAgent):
             }
 
         async def polish(state: SearchState) -> dict[str, Any]:
-            """LLM-polish the deterministic ranking; emit token usage."""
+            """LLM-polish the deterministic ranking."""
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}
-            polished, tokens_in, tokens_out = await _polish_search(
+            polished, raw_msg_search, _tokens_in, _tokens_out = await _polish_search(
                 chat_model, deterministic, query, candidates
             )
-            emit_usage(tokens_in, tokens_out)
+            extra_msgs_search = [raw_msg_search] if raw_msg_search is not None else []
             # Strip ``_score_map`` before persisting: it only needs to live
             # across rank → polish and should never reach the checkpointer.
-            return {"ranking": {k: v for k, v in polished.items() if k != "_score_map"}}
+            return {
+                "ranking": {k: v for k, v in polished.items() if k != "_score_map"},
+                **({"messages": extra_msgs_search} if extra_msgs_search else {}),
+            }
 
         def emit(state: SearchState) -> dict[str, Any]:
-            """Emit the final ranking as a suggestion event and as an AIMessage.
+            """Return the final ranking as a suggestion event and as an AIMessage.
 
             Writing the ranking to ``messages`` ensures that callers on the
             ``/invoke`` path (which do not receive SSE custom events) can still
@@ -516,14 +537,16 @@ class SearchAgent(BaseAgent):
             ranking_raw = state.get("ranking") or {"ids": [], "rationale": ""}
             # Strip the internal ``_score_map`` field before serialising.
             ranking = {k: v for k, v in ranking_raw.items() if k != "_score_map"}
-            emit_custom(
-                {
-                    "kind": "suggestion",
-                    "surface": "search",
-                    "payload": ranking,
-                }
-            )
-            return {"messages": [AIMessage(content=json.dumps(ranking))]}
+            return {
+                "messages": [AIMessage(content=json.dumps(ranking))],
+                "events": [
+                    {
+                        "kind": "suggestion",
+                        "surface": "search",
+                        "payload": ranking,
+                    }
+                ],
+            }
 
         graph: StateGraph = StateGraph(SearchState)
         graph.add_node("fetch_candidates", fetch_candidates)

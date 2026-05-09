@@ -1466,6 +1466,77 @@ def test_emit_custom_no_op_when_no_streaming_context() -> None:
     emit_custom({"kind": "noop"})
 
 
+def test_emit_custom_forwards_payload_when_stream_writer_active() -> None:
+    """``emit_custom`` calls ``writer(payload)`` when inside a streaming context.
+
+    This exercises ``stream.py`` line 41 -- the actual writer call that runs
+    when ``get_stream_writer()`` succeeds (i.e. inside a LangGraph streaming
+    invocation with ``stream_mode="custom"``).
+    """
+
+    import asyncio as _asyncio
+    from typing import Any as _Any, TypedDict as _TypedDict
+
+    from langgraph.graph import END, START, StateGraph
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from app.agents.stream import emit_custom
+
+    class _S(_TypedDict):
+        x: int
+
+    def _node(state: _S) -> dict[str, _Any]:
+        emit_custom({"kind": "test_payload", "val": 42})
+        return {}
+
+    graph = StateGraph(_S)
+    graph.add_node("n", _node)
+    graph.add_edge(START, "n")
+    graph.add_edge("n", END)
+    compiled = graph.compile(checkpointer=InMemorySaver())
+
+    async def _run() -> list[_Any]:
+        collected: list[_Any] = []
+        cfg = {"configurable": {"thread_id": "emit-custom-live-1"}}
+        # LangGraph yields raw payloads when a single stream_mode string is
+        # requested; use the tuple form to get (mode, payload) pairs.
+        async for event in compiled.astream(
+            {"x": 1}, config=cfg, stream_mode="custom"
+        ):
+            collected.append(event)
+        return collected
+
+    results = _asyncio.run(_run())
+    assert any(
+        isinstance(r, dict) and r.get("kind") == "test_payload"
+        for r in results
+    ), f"Expected a 'test_payload' custom event, got {results!r}"
+
+
+def test_token_usage_from_events_sums_kind_usage_entries() -> None:
+    """``_token_usage_from_events`` sums token counts from ``kind=usage`` events.
+
+    This function is a fallback in :func:`_reconcile_token_budget` for any
+    agent that still emits side-channel usage events. Phase 2 catalog agents
+    no longer emit these (they write raw AIMessage objects to state instead),
+    but the fallback is retained for backward-compatibility and forward-compat
+    with persisted event lists.
+    """
+
+    from app.routers.ai import _token_usage_from_events
+
+    events = [
+        {"kind": "usage", "tokensIn": 10, "tokensOut": 5},
+        {"kind": "suggestion", "surface": "brief", "payload": {}},
+        {"kind": "usage", "tokensIn": 3, "tokensOut": 2},
+        "not a dict",
+        None,
+    ]
+    tokens_in, tokens_out = _token_usage_from_events(events)
+    assert tokens_in == 13
+    assert tokens_out == 7
+
+
 def test_column_reorder_no_op_when_from_equals_reference() -> None:
     """Self-move of a column produces an empty update list (no corruption)."""
 

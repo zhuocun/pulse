@@ -30,9 +30,8 @@ from app.agents.catalog._schemas import (
     READINESS_MESSAGE_MAX,
 )
 from app.agents.catalog._shared import (
+    build_citation_refs,
     cap_polished_text,
-    emit_citation_refs,
-    emit_usage,
     fetch_similar_node,
     merge_keyed_string_updates,
     structured_llm_call,
@@ -40,7 +39,6 @@ from app.agents.catalog._shared import (
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
-from app.agents.stream import emit_custom
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.redaction import redact_dict, redact_task_fields
@@ -193,17 +191,19 @@ async def _polish_readiness(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     draft: dict[str, Any],
-) -> tuple[dict[str, Any], int, int]:
+) -> tuple[dict[str, Any], Any, int, int]:
     """Polish readiness issue messages/suggestions; deterministic on stub.
 
     Polished rows are merged back onto the deterministic ``issues`` by
     ``field`` id, so the FE validator never sees a new field id and a
     blank polished string preserves the deterministic copy.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
     """
 
     issues = deterministic.get("issues") or []
     if not issues:
-        return deterministic, 0, 0
+        return deterministic, None, 0, 0
     safe_draft = redact_task_fields(draft)
     safe_issues = redact_dict(issues)
     prompt = (
@@ -244,8 +244,11 @@ async def _polish_rationale(
     draft: dict[str, Any],
     points: int,
     neighbours: list[dict[str, Any]],
-) -> tuple[str, int, int]:
-    """LLM-polish the estimation rationale; deterministic fallback on stub."""
+) -> tuple[str, Any, int, int]:
+    """LLM-polish the estimation rationale; deterministic fallback on stub.
+
+    Returns ``(result, raw_message, tokens_in, tokens_out)``.
+    """
 
     safe_draft = redact_task_fields(draft)
     safe_neighbours = redact_dict(neighbours[:3])
@@ -274,10 +277,40 @@ async def _polish_rationale(
     )
 
 
-# Backward-compatible public aliases kept for tests that import these helpers
-# directly.  Internal callers use the private ``_polish_*`` names.
-polish_readiness = _polish_readiness
-polish_rationale = _polish_rationale
+async def polish_readiness(
+    model: BaseChatModel,
+    deterministic: dict[str, Any],
+    draft: dict[str, Any],
+) -> tuple[dict[str, Any], int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_readiness`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  Internal node code
+    calls :func:`_polish_readiness` directly.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_readiness(
+        model, deterministic, draft
+    )
+    return result, tokens_in, tokens_out
+
+
+async def polish_rationale(
+    model: BaseChatModel,
+    deterministic: str,
+    draft: dict[str, Any],
+    points: int,
+    neighbours: list[dict[str, Any]],
+) -> tuple[str, int, int]:
+    """Backward-compatible 3-tuple wrapper around :func:`_polish_rationale`.
+
+    External callers (v1 shim, tests) rely on the 3-tuple
+    ``(result, tokens_in, tokens_out)`` signature.  Internal node code
+    calls :func:`_polish_rationale` directly.
+    """
+    result, _raw_msg, tokens_in, tokens_out = await _polish_rationale(
+        model, deterministic, draft, points, neighbours
+    )
+    return result, tokens_in, tokens_out
 
 
 def _estimate_for(task_draft: dict[str, Any], neighbours: list[dict[str, Any]]) -> int:
@@ -427,25 +460,29 @@ class TaskEstimationAgent(BaseAgent):
                 neighbours = state.get("embedding_neighbors") or []
                 points = pre_estimate.get("storyPoints") or 0
                 deterministic_rationale = pre_estimate.get("rationale") or ""
-                rationale, tokens_in, tokens_out = await _polish_rationale(
+                rationale, raw_msg_rat, _tokens_in, _tokens_out = await _polish_rationale(
                     chat_model, deterministic_rationale, draft, points, neighbours
                 )
-                emit_usage(tokens_in, tokens_out)
-                return {"estimate": {**pre_estimate, "rationale": rationale}}
+                extra_msgs_rat = [raw_msg_rat] if raw_msg_rat is not None else []
+                return {
+                    "estimate": {**pre_estimate, "rationale": rationale},
+                    **({"messages": extra_msgs_rat} if extra_msgs_rat else {}),
+                }
             draft = state.get("task_draft") or {}
             neighbours = state.get("embedding_neighbors") or []
             points = _estimate_for(draft, neighbours)
             deterministic = "Derived from prompt length + grounded neighbours."
-            rationale, tokens_in, tokens_out = await _polish_rationale(
+            rationale, raw_msg_rat2, _tokens_in, _tokens_out = await _polish_rationale(
                 chat_model, deterministic, draft, points, neighbours
             )
-            emit_usage(tokens_in, tokens_out)
+            extra_msgs_rat2 = [raw_msg_rat2] if raw_msg_rat2 is not None else []
             return {
                 "estimate": {
                     "storyPoints": points,
                     "confidence": "moderate" if neighbours else "low",
                     "rationale": rationale,
-                }
+                },
+                **({"messages": extra_msgs_rat2} if extra_msgs_rat2 else {}),
             }
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
@@ -473,18 +510,24 @@ class TaskEstimationAgent(BaseAgent):
                 # parity test and the FE validator both pass byte-identically on
                 # the stub path.
                 draft = state.get("task_draft") or {}
-                polished, tokens_in, tokens_out = await _polish_readiness(
+                polished, raw_msg_rd, _tokens_in, _tokens_out = await _polish_readiness(
                     chat_model, pre_readiness, draft
                 )
-                emit_usage(tokens_in, tokens_out)
-                return {"readiness": polished}
+                extra_msgs_rd = [raw_msg_rd] if raw_msg_rd is not None else []
+                return {
+                    "readiness": polished,
+                    **({"messages": extra_msgs_rd} if extra_msgs_rd else {}),
+                }
             draft = state.get("task_draft") or {}
             deterministic = _readiness(draft)
-            polished, tokens_in, tokens_out = await _polish_readiness(
+            polished, raw_msg_rd2, _tokens_in, _tokens_out = await _polish_readiness(
                 chat_model, deterministic, draft
             )
-            emit_usage(tokens_in, tokens_out)
-            return {"readiness": polished}
+            extra_msgs_rd2 = [raw_msg_rd2] if raw_msg_rd2 is not None else []
+            return {
+                "readiness": polished,
+                **({"messages": extra_msgs_rd2} if extra_msgs_rd2 else {}),
+            }
 
         def emit_citations(state: TaskEstimationState) -> dict[str, Any]:
             est_payload = state.get("estimate")
@@ -496,8 +539,11 @@ class TaskEstimationAgent(BaseAgent):
                 "readiness": read_payload,
             }
             similar = state.get("similar_tasks") or []
-            emit_citation_refs(similar, "task")
-            emit_custom(
+            refs = build_citation_refs(similar, "task")
+            new_events: list[dict] = []
+            if refs:
+                new_events.append({"kind": "citation", "refs": refs})
+            new_events.append(
                 {
                     "kind": "suggestion",
                     "surface": "estimate",
@@ -508,7 +554,7 @@ class TaskEstimationAgent(BaseAgent):
             # ``/api/ai/readiness`` can each extract exactly the payload they need
             # without projecting the combined event.
             if est_payload is not None:
-                emit_custom(
+                new_events.append(
                     {
                         "kind": "suggestion",
                         "surface": "estimate_v1",
@@ -516,14 +562,17 @@ class TaskEstimationAgent(BaseAgent):
                     }
                 )
             if read_payload is not None:
-                emit_custom(
+                new_events.append(
                     {
                         "kind": "suggestion",
                         "surface": "readiness_v1",
                         "payload": read_payload,
                     }
                 )
-            return {"messages": [AIMessage(content=json.dumps(payload))]}
+            return {
+                "messages": [AIMessage(content=json.dumps(payload))],
+                "events": new_events,
+            }
 
         graph: StateGraph = StateGraph(TaskEstimationState)
         graph.add_node("fetch_similar", fetch_similar)

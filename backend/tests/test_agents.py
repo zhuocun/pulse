@@ -2791,10 +2791,8 @@ def test_chat_agent_does_not_emit_invalid_user_citation() -> None:
         c for c in custom if isinstance(c, dict) and c.get("kind") == "citation"
     ]
     assert citations == [], "chat-agent must not emit citations for user text"
-    # Usage event still fires so the FE budget display stays accurate.
-    assert any(
-        isinstance(c, dict) and c.get("kind") == "usage" for c in custom
-    )
+    # Phase 2: chat-agent no longer emits mid-stream kind=usage events;
+    # token accounting flows through AIMessage.usage_metadata at run-end.
 
 
 def test_task_estimation_agent_emits_citation_custom_event() -> None:

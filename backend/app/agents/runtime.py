@@ -408,22 +408,11 @@ class AgentRuntime:
     ) -> tuple[Any, list[Any]]:
         """Run agent ``name`` to completion, capturing custom events.
 
-        Returns ``(final_state, custom_events)``.  The first element is
-        the agent's final state dict (the same value :meth:`ainvoke`
-        returns); the second is the ordered list of payloads written via
-        :func:`app.agents.stream.emit_custom` during the run.
-
-        LangGraph's :meth:`Pregel.ainvoke` discards custom-stream events
-        — by design, since the JSON-style entry point doesn't otherwise
-        surface them.  But the catalog agents emit suggestions,
-        citations and nudges through ``emit_custom``, and JSON callers
-        (the ``/api/ai`` shim, future MCP surface, replay tooling) need
-        to see them too.  Internally this method calls
-        ``agent.astream(stream_mode=("values", "custom"))`` because
-        ``ainvoke`` is itself implemented as a thin wrapper over
-        ``astream`` in LangGraph 1.x; running multi-mode and partitioning
-        the chunks adds zero round-trips while making the events
-        first-class.
+        Returns ``(final_state, events)`` where ``events`` is
+        ``final_state.get("events", [])``.  The first element is the
+        agent's final state dict; the second is the ordered list of event
+        dicts accumulated on ``state["events"]`` during the run (Phase 2
+        — events are first-class state, not side-effects).
 
         The same span / error-translation machinery as :meth:`ainvoke`
         wraps the run, so OTel and Prometheus dimensions stay aligned
@@ -440,7 +429,6 @@ class AgentRuntime:
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
         final_state: Any = None
-        custom_events: list[Any] = []
         with start_run_span(
             operation="run_agent_with_events",
             agent_name=name,
@@ -457,9 +445,7 @@ class AgentRuntime:
                     checkpointer=self._checkpointer,
                     store=self._store,
                 ):
-                    if mode == "custom":
-                        custom_events.append(payload)
-                    elif mode == "values":
+                    if mode == "values":
                         # ``values`` yields after every superstep; the last
                         # one is the final state.  Overwriting is correct.
                         final_state = payload
@@ -475,7 +461,12 @@ class AgentRuntime:
                 )
                 raise AgentExecutionError(name, cause=exc) from exc
             run_span.set_result(final_state)
-            return final_state, custom_events
+            # Source events from state (Phase 2); fall back to empty list when
+            # the agent pre-dates the ``events`` field (e.g. test-only agents).
+            events: list[Any] = list(
+                (final_state or {}).get("events") or []
+            )
+            return final_state, events
 
     async def astream(
         self,
@@ -499,6 +490,16 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        # Track how many events we have already surfaced as ``custom`` chunks
+        # so we can emit exactly the new ones after each superstep.
+        _emitted_event_count = 0
+        # Determine which modes to request from LangGraph. We always add
+        # ``"values"`` so we can diff the ``events`` list after each superstep
+        # and re-emit new entries as ``custom`` chunks (Phase 2 SSE re-emission).
+        _request_modes: tuple[str, ...] = stream_mode
+        _need_values = "values" not in stream_mode
+        if _need_values:
+            _request_modes = stream_mode + ("values",)
         with start_run_span(
             operation="stream_agent",
             agent_name=name,
@@ -511,10 +512,25 @@ class AgentRuntime:
                     graph_input,
                     config=config,
                     context=context,
-                    stream_mode=stream_mode,
+                    stream_mode=_request_modes,
                     checkpointer=self._checkpointer,
                     store=self._store,
                 ):
+                    mode, payload = event
+                    if mode == "values":
+                        # After each superstep, emit new state-events as
+                        # ``custom`` chunks so SSE consumers see the same
+                        # wire shape regardless of whether the node used
+                        # ``emit_custom`` or returned ``{"events": [...]}``.
+                        current_events: list[Any] = list(
+                            (payload or {}).get("events") or []
+                        )
+                        for evt in current_events[_emitted_event_count:]:
+                            yield ("custom", evt)
+                        _emitted_event_count = len(current_events)
+                        if _need_values:
+                            # Caller did not ask for ``values``; skip it.
+                            continue
                     yield event
             except AgentError:
                 await self._aggregate_astream_tokens_no_propagate(

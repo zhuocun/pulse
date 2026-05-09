@@ -30,14 +30,12 @@ from app.agents.catalog._shared import (
     build_citation_refs,
     cap_polished_text,
     detect_drift_node,
-    emit_usage,
     fetch_snapshot_node,
     structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
-from app.agents.stream import emit_custom
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
 
@@ -297,19 +295,18 @@ class BriefHeadline(BaseModel):
     )
 
 
-async def polish_headline(
+async def _polish_headline(
     model: BaseChatModel,
     deterministic: str,
     facts: dict[str, Any],
-) -> tuple[str, int, int]:
-    """Ask the model to write a one-line headline; deterministic fallback on stub.
+) -> tuple[str, Any, int, int]:
+    """Internal 4-tuple variant of :func:`polish_headline`.
 
-    Returns ``(headline, tokens_in, tokens_out)``. The model is asked for a
-    typed :class:`BriefHeadline` payload via ``with_structured_output``; we
-    keep ``include_raw=True`` so token usage stays observable on the
-    underlying ``AIMessage``. Any structured-output error (parsing failure,
-    blank field, unsupported provider) lands on the deterministic
-    fallback so the FE layout never breaks.
+    Returns ``(headline, raw_message, tokens_in, tokens_out)``. The
+    ``raw_message`` is the underlying ``AIMessage`` with ``usage_metadata``
+    populated. The ``generate_brief`` node captures this to include in state
+    messages for budget tracking.  It is ``None`` on the stub path or when the
+    call fails.
     """
 
     # ``facts`` carries snippets of FE-supplied signal data (column names,
@@ -335,6 +332,29 @@ async def polish_headline(
         fallback=deterministic,
         merge_fn=_merge,
     )
+
+
+async def polish_headline(
+    model: BaseChatModel,
+    deterministic: str,
+    facts: dict[str, Any],
+) -> tuple[str, int, int]:
+    """Ask the model to write a one-line headline; deterministic fallback on stub.
+
+    Returns ``(headline, tokens_in, tokens_out)``. The model is asked for a
+    typed :class:`BriefHeadline` payload via ``with_structured_output``; we
+    keep ``include_raw=True`` so token usage stays observable on the
+    underlying ``AIMessage``. Any structured-output error (parsing failure,
+    blank field, unsupported provider) lands on the deterministic
+    fallback so the FE layout never breaks.
+
+    For internal use (where budget tracking needs the raw ``AIMessage``),
+    call :func:`_polish_headline` instead.
+    """
+    headline, _raw_msg, tokens_in, tokens_out = await _polish_headline(
+        model, deterministic, facts
+    )
+    return headline, tokens_in, tokens_out
 
 
 class BoardBriefAgent(BaseAgent):
@@ -416,14 +436,21 @@ class BoardBriefAgent(BaseAgent):
             # correctly with the FE-supplied snapshot (which uses id keys).
             brief = _compute_board_brief(_normalize_snapshot_for_v1_engine(snapshot))
             deterministic = brief["headline"]
-            headline, tokens_in, tokens_out = await polish_headline(
+            headline, raw_msg, _tokens_in, _tokens_out = await _polish_headline(
                 chat_model, deterministic, facts
             )
             brief = {**brief, "headline": headline}
-            emit_usage(tokens_in, tokens_out)
+            # Include the raw AIMessage (with usage_metadata) in state messages
+            # so budget tracking can aggregate token counts from state.
+            extra_messages = [raw_msg] if raw_msg is not None else []
             # Store drift severity and drift result separately so downstream
             # nodes (e.g. triage) can still read them without touching ``brief``.
-            return {"brief": brief, "drift_severity": severity, "drift": drift}
+            return {
+                "brief": brief,
+                "drift_severity": severity,
+                "drift": drift,
+                **({"messages": extra_messages} if extra_messages else {}),
+            }
 
         def emit_citations(state: BoardBriefState) -> dict[str, Any]:
             brief = state.get("brief") or {}
@@ -431,8 +458,8 @@ class BoardBriefAgent(BaseAgent):
             snapshot = state.get("board_snapshot") or {}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []
-            # Build refs without emitting yet: we need to attach them to
-            # recommendationDetail before the suggestion event goes out.
+            # Build refs: we need to attach them to recommendationDetail
+            # before the suggestion event goes out.
             task_refs = build_citation_refs(
                 tasks,
                 "task",
@@ -445,21 +472,25 @@ class BoardBriefAgent(BaseAgent):
                 get_quote=lambda c: c.get("name") or c.get("id") or "",
             )
             refs = task_refs + col_refs
+            new_events: list[dict] = []
             if refs:
-                emit_custom({"kind": "citation", "refs": refs})
+                new_events.append({"kind": "citation", "refs": refs})
             # Attach recommendationDetail so the FE can render the strength
             # badge and "Why" disclosure inline; reuses the same refs so
             # provenance is consistent with the citation event above.
             recommendation_detail = build_recommendation_detail(brief, drift, refs)
             payload = {**brief, "recommendationDetail": recommendation_detail}
-            emit_custom(
+            new_events.append(
                 {
                     "kind": "suggestion",
                     "surface": "brief",
                     "payload": payload,
                 }
             )
-            return {"messages": [AIMessage(content=json.dumps(payload))]}
+            return {
+                "messages": [AIMessage(content=json.dumps(payload))],
+                "events": new_events,
+            }
 
         graph: StateGraph = StateGraph(BoardBriefState)
         graph.add_node("fetch_snapshot", fetch_snapshot)
