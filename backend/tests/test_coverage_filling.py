@@ -614,25 +614,25 @@ def test_chat_agent_handles_non_aimessage_response(
 
 
 def test_v1_engine_handles_empty_inputs() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import draft_task, breakdown_task
 
-    draft = v1_engine.draft_task({"context": {}, "prompt": ""})
+    draft = draft_task({"context": {}, "prompt": ""})
     assert draft["taskName"] == "New task"
     assert draft["columnId"] == ""
     assert draft["coordinatorId"] == ""
 
-    breakdown = v1_engine.breakdown_task({"context": {}, "prompt": "a"}, count=10)
+    breakdown = breakdown_task({"context": {}, "prompt": "a"}, count=10)
     # Count is clamped to <=5.
     assert len(breakdown["items"]) == 5
 
-    breakdown_low = v1_engine.breakdown_task({"context": {}, "prompt": "a"}, count=0)
+    breakdown_low = breakdown_task({"context": {}, "prompt": "a"}, count=0)
     assert len(breakdown_low["items"]) == 1
 
 
 def test_v1_engine_estimate_with_no_neighbours() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_estimation import estimate_from_payload
 
-    out = v1_engine.estimate({"context": {}, "taskName": "alpha", "note": "beta"})
+    out = estimate_from_payload({"context": {}, "taskName": "alpha", "note": "beta"})
     assert out["confidence"] == 0.45
     assert out["similar"] == []
 
@@ -684,9 +684,9 @@ def test_board_brief_recommendation_helpers_cover_basis_branches() -> None:
 
 
 def test_v1_engine_board_brief_skips_invalid_entries() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.board_brief import _compute_board_brief
 
-    out = v1_engine.board_brief(
+    out = _compute_board_brief(
         {
             "columns": [{"_id": "c1", "name": "Done"}, "junk"],
             "tasks": [
@@ -703,12 +703,12 @@ def test_v1_engine_board_brief_skips_invalid_entries() -> None:
 def test_v1_engine_board_brief_non_list_tasks_treated_as_empty() -> None:
     """Malformed ``tasks`` (not a list) must not iterate strings / corrupt aggregates."""
 
-    from app.services import v1_engine
+    from app.agents.catalog.board_brief import _compute_board_brief
 
     base_columns = [{"_id": "c1", "name": "To Do"}]
 
     for bad_tasks in ({}, "task-string-not-list", {"_id": "t1"}):
-        out = v1_engine.board_brief(
+        out = _compute_board_brief(
             {"columns": base_columns, "tasks": bad_tasks, "members": []}
         )
         assert out["unowned"] == []
@@ -717,7 +717,7 @@ def test_v1_engine_board_brief_non_list_tasks_treated_as_empty() -> None:
         assert "0 tasks across 1 columns" in out["headline"]
 
     # Columns still typed from ``columns``; task counts per column stay zero.
-    out_dict = v1_engine.board_brief(
+    out_dict = _compute_board_brief(
         {"columns": base_columns, "tasks": {}, "members": []}
     )
     assert out_dict["counts"][0]["count"] == 0
@@ -736,15 +736,15 @@ def test_recommendation_basis_wip_overflow_minimal_signal() -> None:
 
 
 def test_v1_engine_search_handles_empty_kind() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.search import semantic_search
 
-    out = v1_engine.semantic_search("tasks", "anything", {})
+    out = semantic_search("tasks", "anything", {})
     assert out["ids"] == []
     assert "No matches" in out["rationale"]
 
 
 def test_v1_engine_semantic_search_projects_includes_org_and_manager_fields() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.search import semantic_search
 
     ctx = {
         "projects": [
@@ -756,53 +756,53 @@ def test_v1_engine_semantic_search_projects_includes_org_and_manager_fields() ->
             }
         ]
     }
-    out = v1_engine.semantic_search("projects", "Acme alice", ctx)
+    out = semantic_search("projects", "Acme alice", ctx)
     assert "p1" in out["ids"]
 
 
 def test_v1_engine_epic_for_general_fallback() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _epic_for
 
-    assert v1_engine._epic_for("xyzzy") == "General"
+    assert _epic_for("xyzzy") == "General"
 
 
 def test_v1_engine_type_for_spike() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _type_for
 
-    assert v1_engine._type_for("investigate caching strategy") == "spike"
+    assert _type_for("investigate caching strategy") == "spike"
 
 
 def test_v1_engine_default_column_falls_back_to_first_when_no_named_match() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _default_column
 
-    column = v1_engine._default_column(
+    column = _default_column(
         {"columns": [{"_id": "c-arbitrary", "name": "Doing"}]}
     )
     assert column == "c-arbitrary"
 
 
 def test_v1_engine_default_column_handles_invalid_columns_list() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _default_column
 
-    assert v1_engine._default_column({"columns": "junk"}) is None
-    assert v1_engine._default_column({"columns": []}) is None
+    assert _default_column({"columns": "junk"}) is None
+    assert _default_column({"columns": []}) is None
     # No `_id` field means we cannot return a candidate.
-    assert v1_engine._default_column({"columns": [{"name": "Backlog"}]}) is None
+    assert _default_column({"columns": [{"name": "Backlog"}]}) is None
 
 
 def test_v1_engine_least_loaded_member_with_no_members() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _least_loaded_member
 
-    assert v1_engine._least_loaded_member({"members": []}) is None
-    assert v1_engine._least_loaded_member({}) is None
+    assert _least_loaded_member({"members": []}) is None
+    assert _least_loaded_member({}) is None
 
 
 def test_v1_engine_safe_id_branches() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _safe_id
 
-    assert v1_engine._safe_id("ok") == "ok"
-    assert v1_engine._safe_id("") is None
-    assert v1_engine._safe_id(None) is None
+    assert _safe_id("ok") == "ok"
+    assert _safe_id("") is None
+    assert _safe_id(None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -1369,22 +1369,22 @@ def test_make_chat_model_constructs_openai_with_spec(
 
 
 def test_v1_engine_least_loaded_member_with_only_invalid_entries() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_drafting import _least_loaded_member
 
-    out = v1_engine._least_loaded_member({"members": [{"username": "no-id"}, "junk"]})
+    out = _least_loaded_member({"members": [{"username": "no-id"}, "junk"]})
     assert out is None
 
 
 def test_v1_engine_jaccard_returns_zero_for_empty_inputs() -> None:
-    from app.services.v1_engine import _jaccard
+    from app.agents.catalog.task_drafting import _jaccard
 
     assert _jaccard([], []) == 0.0
 
 
 def test_v1_engine_estimate_skips_non_dict_and_non_string_id_tasks() -> None:
-    from app.services import v1_engine
+    from app.agents.catalog.task_estimation import estimate_from_payload
 
-    out = v1_engine.estimate(
+    out = estimate_from_payload(
         {
             "context": {
                 "tasks": [
@@ -1918,3 +1918,94 @@ def test_v1_chat_returns_504_on_timeout(
     body = response.json()
     detail = body.get("detail") or body
     assert detail["error"]["code"] == "timeout"
+
+
+# ---------------------------------------------------------------------------
+# Coverage for helpers moved from v1_engine.py into catalog modules.
+# These tests hit branches not exercised by the parity or scenario tests.
+# ---------------------------------------------------------------------------
+
+
+def test_task_drafting_jaccard_non_empty_inputs() -> None:
+    """_jaccard returns the correct Jaccard score for non-empty token sets."""
+    from app.agents.catalog.task_drafting import _jaccard
+
+    assert _jaccard(["a", "b"], ["b", "c"]) == pytest.approx(1 / 3)
+
+
+def test_task_drafting_clamp_fibonacci_midpoint() -> None:
+    """_clamp_fibonacci takes the closest candidate, updating both variables."""
+    from app.agents.catalog.task_drafting import _clamp_fibonacci
+
+    # 4 is equidistant between 3 and 5; 5 wins because the loop updates closest
+    # as soon as a strictly-smaller delta is found -- but the result is 5.
+    result = _clamp_fibonacci(4)
+    assert result in (3, 5)  # Either is a valid Fibonacci snap.
+    # 7 is closest to 8.
+    assert _clamp_fibonacci(7) == 8
+
+
+def test_task_estimation_jaccard_est_zero_for_empty() -> None:
+    """_jaccard_est returns 0.0 when both sets are empty."""
+    from app.agents.catalog.task_estimation import _jaccard_est
+
+    assert _jaccard_est(set(), set()) == 0.0
+
+
+def test_search_jaccard_zero_for_empty() -> None:
+    """_search_jaccard returns 0.0 when both sets are empty."""
+    from app.agents.catalog.search import _search_jaccard
+
+    assert _search_jaccard(set(), set()) == 0.0
+
+
+def test_task_draft_route_forwards_column_and_coordinator(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """POST /api/ai/task-draft forwards columnId and coordinatorId to the agent."""
+    resp = client.post(
+        "/api/ai/task-draft",
+        headers=auth_headers,
+        json={
+            "prompt": "Fix auth bug",
+            "columnId": "c-todo",
+            "coordinatorId": "m-1",
+            "context": {
+                "columns": [{"_id": "c-todo", "name": "To Do"}],
+                "tasks": [],
+                "members": [{"_id": "m-1", "username": "alice"}],
+            },
+        },
+    )
+    assert resp.status_code == HTTPStatus.OK
+    body = resp.json()
+    assert body["columnId"] == "c-todo"
+    assert body["coordinatorId"] == "m-1"
+
+
+def test_task_breakdown_route_forwards_column_and_coordinator(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """POST /api/ai/task-breakdown forwards columnId and coordinatorId to the agent."""
+    resp = client.post(
+        "/api/ai/task-breakdown",
+        headers=auth_headers,
+        json={
+            "prompt": "Fix auth bug",
+            "count": 2,
+            "columnId": "c-todo",
+            "coordinatorId": "m-1",
+            "context": {
+                "columns": [{"_id": "c-todo", "name": "To Do"}],
+                "tasks": [],
+                "members": [{"_id": "m-1", "username": "alice"}],
+            },
+        },
+    )
+    assert resp.status_code == HTTPStatus.OK
+    body = resp.json()
+    # All items should carry the forwarded column/coordinator ids.
+    assert all(item["columnId"] == "c-todo" for item in body["items"])
+    assert all(item["coordinatorId"] == "m-1" for item in body["items"])

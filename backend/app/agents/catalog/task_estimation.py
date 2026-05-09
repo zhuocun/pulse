@@ -48,6 +48,113 @@ from app.tools.redaction import redact_dict, redact_task_fields
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# v1-compatible deterministic helpers (ported from v1_engine.py).
+# These produce the exact same wire shapes as v1_engine.estimate /
+# v1_engine.readiness so the route can skip pre-calling v1_engine and the
+# parity tests continue to pass byte-identically.
+# ---------------------------------------------------------------------------
+
+import re as _re  # noqa: E402 — placed here to avoid polluting module top
+
+_TOKEN_RE_EST = _re.compile(r"[A-Za-z0-9]+")
+
+
+def _tokens_est(text: str) -> list[str]:
+    return [m.group(0).lower() for m in _TOKEN_RE_EST.finditer(text or "")]
+
+
+def _token_set_est(text: str) -> set[str]:
+    return set(_tokens_est(text))
+
+
+def _jaccard_est(a: set[str], b: set[str]) -> float:
+    union = a | b
+    if not union:
+        return 0.0
+    return len(a & b) / len(union)
+
+
+def _clamp_fibonacci_est(value: int) -> int:
+    """Snap ``value`` to the nearest Fibonacci point."""
+    closest = FIBONACCI_STORY_POINTS[0]
+    best = abs(value - closest)
+    for point in FIBONACCI_STORY_POINTS[1:]:
+        delta = abs(value - point)
+        if delta < best:
+            closest = point
+            best = delta
+    return closest
+
+
+def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IEstimateSuggestion`` matching v1_engine.estimate wire shape.
+
+    This is the deterministic baseline the ``estimate`` node uses when the
+    route does not pre-populate ``state["estimate"]``.  The output is
+    byte-identical to :func:`app.services.v1_engine.estimate`.
+    """
+    description = (payload.get("note") or "") + (payload.get("taskName") or "")
+    context = payload.get("context") or {}
+    tasks = context.get("tasks") or []
+    query_tokens = _token_set_est(description)
+    similars: list[tuple[str, float, str]] = []
+    for task in tasks if isinstance(tasks, list) else []:
+        if not isinstance(task, dict):
+            continue
+        task_id = task.get("_id")
+        if not isinstance(task_id, str):
+            continue
+        score = _jaccard_est(
+            query_tokens,
+            _token_set_est((task.get("taskName") or "") + " " + (task.get("note") or "")),
+        )
+        if score:
+            reason = f"shares {int(score * 100)}% keywords"
+            similars.append((task_id, score, reason))
+    similars.sort(key=lambda triple: triple[1], reverse=True)
+    top = similars[:3]
+    avg_neighbour_points = (
+        sum(_clamp_fibonacci_est(point) for point in (3, 5, 3)) / 3 if top else 3
+    )
+    points = _clamp_fibonacci_est(
+        int(round((len(description) / 80) + avg_neighbour_points))
+    )
+    confidence = 0.7 if top else 0.45
+    return {
+        "storyPoints": points,
+        "confidence": confidence,
+        "rationale": "Derived from prompt length + nearest-neighbour tasks."
+        if top
+        else "Derived from prompt length; no similar tasks found.",
+        "similar": [{"_id": tid, "reason": reason} for tid, _, reason in top],
+    }
+
+
+def readiness_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IReadinessReport`` matching v1_engine.readiness wire shape.
+
+    Byte-identical to :func:`app.services.v1_engine.readiness`.
+    """
+    issues: list[dict[str, Any]] = []
+    fields = {
+        "taskName": "Task name is required.",
+        "note": "Acceptance criteria are missing.",
+        "epic": "Epic helps grouping; pick one.",
+        "type": "Choose feature / bug / spike.",
+        "coordinatorId": "Assign a coordinator.",
+    }
+    for field, message in fields.items():
+        if not payload.get(field):
+            issue: dict[str, Any] = {
+                "field": field,
+                "severity": "error" if field == "taskName" else "warn",
+                "message": message,
+            }
+            issues.append(issue)
+    return {"issues": issues}
+
+
 class EstimationRationale(BaseModel):
     """Typed rationale slot the LLM fills via ``with_structured_output``."""
 
@@ -288,11 +395,26 @@ class TaskEstimationAgent(BaseAgent):
 
         async def estimate(state: TaskEstimationState) -> dict[str, Any]:
             pre_estimate = state.get("estimate")
+            # ------------------------------------------------------------------
+            # v1-shim path: route passes raw ``context_tasks`` (and the task
+            # draft in ``task_draft``); compute the v1_engine-compatible
+            # deterministic baseline here instead of having the route pre-call
+            # v1_engine.estimate.  ``context_tasks`` is set only when this path
+            # is active; otherwise fall through to the normal estimate logic.
+            # ------------------------------------------------------------------
+            if pre_estimate is None and state.get("context_tasks") is not None:
+                task_draft = state.get("task_draft") or {}
+                v1_payload: dict[str, Any] = {
+                    "note": task_draft.get("note") or "",
+                    "taskName": task_draft.get("taskName") or "",
+                    "context": {"tasks": state.get("context_tasks") or []},
+                }
+                pre_estimate = estimate_from_payload(v1_payload)
             if isinstance(pre_estimate, dict):
-                # v1 shim pre-populated ``estimate`` with the v1_engine deterministic
-                # result.  Polish the rationale field and return the updated estimate;
+                # Pre-populated estimate (from v1 path or older callers).
+                # Polish the rationale field and return the updated estimate;
                 # all other fields (storyPoints, confidence, similar) come from
-                # the v1_engine result unchanged so the wire shape stays byte-identical
+                # the baseline unchanged so the wire shape stays byte-identical
                 # on the stub path and gains only a polished rationale on the real path.
                 #
                 # The ``_skip_polish`` sentinel is set by the ``/readiness`` shim route
@@ -328,11 +450,28 @@ class TaskEstimationAgent(BaseAgent):
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
             pre_readiness = state.get("readiness")
+            # ------------------------------------------------------------------
+            # v1-shim path: route passes raw ``context_tasks`` and the task
+            # draft; compute the v1_engine-compatible readiness baseline here.
+            # When ``context_tasks`` is set the route is in "raw payload" mode
+            # and we derive readiness from the task_draft fields directly.
+            # ------------------------------------------------------------------
+            if pre_readiness is None and state.get("context_tasks") is not None:
+                task_draft = state.get("task_draft") or {}
+                # Reconstruct the v1 payload fields the readiness function inspects.
+                v1_payload_rd: dict[str, Any] = {
+                    "taskName": task_draft.get("taskName") or "",
+                    "note": task_draft.get("note") or "",
+                    "epic": task_draft.get("epic") or "",
+                    "type": task_draft.get("type") or "",
+                    "coordinatorId": task_draft.get("coordinatorId") or None,
+                }
+                pre_readiness = readiness_from_payload(v1_payload_rd)
             if isinstance(pre_readiness, dict):
-                # v1 shim pre-populated ``readiness`` with the v1_engine deterministic
-                # result.  Polish the issue messages/suggestions and return; the
-                # v1_engine shape ``{issues: [...]}`` is preserved so the parity test
-                # and the FE validator both pass byte-identically on the stub path.
+                # Pre-populated readiness: polish the issue messages/suggestions.
+                # The v1_engine shape ``{issues: [...]}`` is preserved so the
+                # parity test and the FE validator both pass byte-identically on
+                # the stub path.
                 draft = state.get("task_draft") or {}
                 polished, tokens_in, tokens_out = await _polish_readiness(
                     chat_model, pre_readiness, draft

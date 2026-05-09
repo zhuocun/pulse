@@ -62,6 +62,91 @@ from app.tools.redaction import redact, redact_dict
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# v1-compatible semantic search baseline (ported from v1_engine.py).
+# The ``rank`` node uses this when ``ranking`` is not pre-populated so the
+# route no longer needs to pre-call v1_engine.semantic_search.
+# ---------------------------------------------------------------------------
+
+import re as _re_search  # noqa: E402
+
+_SEARCH_TOKEN_RE = _re_search.compile(r"[A-Za-z0-9]+")
+
+
+def _search_tokens(text: str) -> list[str]:
+    return [m.group(0).lower() for m in _SEARCH_TOKEN_RE.finditer(text or "")]
+
+
+def _search_token_set(text: str) -> set[str]:
+    return set(_search_tokens(text))
+
+
+def _search_jaccard(a: set[str], b: set[str]) -> float:
+    union = a | b
+    if not union:
+        return 0.0
+    return len(a & b) / len(union)
+
+
+def semantic_search(
+    kind: str,
+    query: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Return an ``ISearchResult`` ranking matching ids by Jaccard.
+
+    Byte-identical to :func:`app.services.v1_engine.semantic_search`.
+    """
+    query_tokens = _search_token_set(query)
+    if kind == "tasks":
+        items = context.get("tasks") or []
+        searchables = [
+            (
+                t.get("_id"),
+                _search_token_set(
+                    " ".join(
+                        str(t.get(field) or "")
+                        for field in ("taskName", "note", "type", "epic")
+                    )
+                ),
+            )
+            for t in items
+            if isinstance(t, dict) and isinstance(t.get("_id"), str)
+        ]
+    else:
+        items = context.get("projects") or []
+        searchables = [
+            (
+                p.get("_id"),
+                _search_token_set(
+                    " ".join(
+                        str(p.get(field) or "")
+                        for field in (
+                            "projectName",
+                            "organization",
+                            "organisation",
+                            "managerId",
+                            "manager",
+                        )
+                    )
+                ),
+            )
+            for p in items
+            if isinstance(p, dict) and isinstance(p.get("_id"), str)
+        ]
+    scored = [(id_, _search_jaccard(query_tokens, tokens)) for id_, tokens in searchables]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    matched = [id_ for id_, score in scored if score > 0.0]
+    return {
+        "ids": matched[:10],
+        "rationale": (
+            f"Ranked by keyword overlap with the query (top {len(matched[:10])})."
+            if matched
+            else "No matches; try broader keywords."
+        ),
+    }
+
+
 class SearchRanking(BaseModel):
     """Typed schema the LLM fills via ``with_structured_output``.
 

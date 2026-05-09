@@ -60,7 +60,7 @@ from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
 from app.security import current_user_id, current_user_payload
 from app.services.project_service import is_project_manager
-from app.services import v1_engine
+from app.agents.catalog.search import semantic_search as _semantic_search
 from app.tools.redaction import redact, redact_task_fields
 from app.validation import api_error
 
@@ -539,16 +539,23 @@ async def task_draft(
         payload = dict(payload)
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
-        deterministic = v1_engine.draft_task(payload)
         context = payload.get("context") or {}
         inputs: Dict[str, Any] = {
-            "draft": deterministic,
             "prompt": payload.get("prompt") or "",
             "similar_tasks": _similar_from_context(context),
             # Pre-populate board_snapshot to short-circuit the fetch_snapshot
             # interrupt node (same pattern as board-brief route).
             "board_snapshot": context if isinstance(context, dict) else {},
+            # Signal the agent to compute the v1-compatible baseline from
+            # board_snapshot rather than waiting for a real LLM draft.
+            "_use_v1_baseline": True,
         }
+        # Forward optional fields so the agent can compute the v1-compatible
+        # deterministic baseline without calling v1_engine.draft_task.
+        if payload.get("columnId") is not None:
+            inputs["column_id"] = payload["columnId"]
+        if payload.get("coordinatorId") is not None:
+            inputs["coordinator_id"] = payload["coordinatorId"]
         if project_id:
             inputs["project_id"] = project_id
 
@@ -575,10 +582,10 @@ async def task_draft(
             body = suggestion["payload"]
             _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
         except AgentError:
-            # Agent not registered or agent execution failed; fall back to the
-            # deterministic result so a misconfigured catalog doesn't 5xx the
-            # route.
-            body = deterministic
+            # Agent not registered or agent execution failed; fall back to a
+            # deterministic result so a misconfigured catalog doesn't 5xx the route.
+            from app.agents.catalog.task_drafting import draft_task as _draft_task
+            body = _draft_task(payload)
 
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
@@ -626,27 +633,21 @@ async def task_breakdown(
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
         count = payload.get("count")
-        deterministic = v1_engine.breakdown_task(
-            payload, count=int(count) if isinstance(count, int) else 3
-        )
-        # For the polished path, the agent needs the base draft + suffix info.
-        # Pre-populate ``draft`` with the breakdown result so the agent emits
-        # it on the ``"breakdown"`` surface.  For the polished path the agent
-        # would need to know the base draft; pass it via ``_breakdown_base`` so
-        # the generate_draft node can reconstruct the per-item suffix pattern.
         context_bd = payload.get("context") or {}
-        base_draft = v1_engine.draft_task(payload)
         inputs: Dict[str, Any] = {
-            "draft": {
-                **deterministic,
-                "_breakdown_base": base_draft,
-                "_prompt": payload.get("prompt") or "",
-                "_similar": _similar_from_context(context_bd),
-            },
-            "similar_tasks": _similar_from_context(context_bd),
             "prompt": payload.get("prompt") or "",
+            "similar_tasks": _similar_from_context(context_bd),
             "board_snapshot": context_bd if isinstance(context_bd, dict) else {},
+            # Pass breakdown_count so generate_draft computes the v1-compatible
+            # baseline internally without the route calling v1_engine.breakdown_task.
+            "breakdown_count": int(count) if isinstance(count, int) else 3,
+            # Signal the agent to compute the v1-compatible baseline.
+            "_use_v1_baseline": True,
         }
+        if payload.get("columnId") is not None:
+            inputs["column_id"] = payload["columnId"]
+        if payload.get("coordinatorId") is not None:
+            inputs["coordinator_id"] = payload["coordinatorId"]
         if project_id:
             inputs["project_id"] = project_id
 
@@ -715,12 +716,16 @@ async def estimate(
             agent_label=agent_label,
         )
         enforce_request_limits(payload, request=request)
-        deterministic = v1_engine.estimate(payload)
         task_draft = redact_task_fields(_draft_from_payload(payload, _ESTIMATE_DRAFT_FIELDS))
+        context = payload.get("context") or {}
+        context_tasks = context.get("tasks") if isinstance(context, dict) else None
         inputs: Dict[str, Any] = {
-            "estimate": deterministic,
             "task_draft": task_draft,
             "similar_tasks": [],
+            # Forward context_tasks so the estimate node can compute the
+            # v1-compatible deterministic baseline without the route calling
+            # v1_engine.estimate.
+            "context_tasks": context_tasks if isinstance(context_tasks, list) else [],
         }
         if project_id:
             inputs["project_id"] = project_id
@@ -790,12 +795,16 @@ async def readiness(
             agent_label=agent_label,
         )
         enforce_request_limits(payload, request=request)
-        deterministic = v1_engine.readiness(payload)
         task_draft = redact_task_fields(_draft_from_payload(payload, _READINESS_DRAFT_FIELDS))
+        context = payload.get("context") or {}
+        context_tasks_rd = context.get("tasks") if isinstance(context, dict) else None
         inputs: Dict[str, Any] = {
-            "readiness": deterministic,
             "task_draft": task_draft,
             "similar_tasks": [],
+            # Forward context_tasks so the readiness node can compute the
+            # v1-compatible deterministic baseline without the route calling
+            # v1_engine.readiness.
+            "context_tasks": context_tasks_rd if isinstance(context_tasks_rd, list) else [],
             # Pass a sentinel estimate so the estimate node short-circuits without an
             # LLM call.  Only the readiness polish tokens are attributable to this route.
             "estimate": {"_skip_polish": True},
@@ -958,7 +967,7 @@ async def search(
             context = payload.get("projectsContext") or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
-        deterministic = v1_engine.semantic_search(kind, redacted_query, context)
+        deterministic = _semantic_search(kind, redacted_query, context)
         candidates = _candidates_from_context(kind, context)
         inputs: Dict[str, Any] = {
             "query": redacted_query,

@@ -56,6 +56,15 @@ class TaskDraftingState(BaseAgentState):
     board_snapshot: NotRequired[dict[str, Any] | None]
     similar_tasks: NotRequired[list[dict[str, Any]] | None]
     draft: NotRequired[dict[str, Any] | None]
+    # Optional fields forwarded from the raw v1 route payload so the agent
+    # can compute the deterministic baseline without the route pre-calling
+    # v1_engine.draft_task.  All three are absent for native v2.1 callers.
+    column_id: NotRequired[str | None]
+    coordinator_id: NotRequired[str | None]
+    breakdown_count: NotRequired[int | None]
+    # Sentinel set by v1 shim routes: when True the generate_draft node
+    # computes the v1-compatible baseline from board_snapshot.
+    _use_v1_baseline: NotRequired[bool]
 
 
 class TaskEstimationState(BaseAgentState):
@@ -66,6 +75,9 @@ class TaskEstimationState(BaseAgentState):
     embedding_neighbors: NotRequired[list[dict[str, Any]] | None]
     estimate: NotRequired[dict[str, Any] | None]
     readiness: NotRequired[dict[str, Any] | None]
+    # Context tasks forwarded from the raw v1 route payload so the agent
+    # can compute the v1_engine.estimate baseline without the route pre-calling it.
+    context_tasks: NotRequired[list[dict[str, Any]] | None]
 
 
 class ChatState(BaseAgentState):

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -37,11 +38,111 @@ from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test p
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.agents.stream import emit_custom
-from app.services import v1_engine
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic board-brief baseline (ported from v1_engine.py).
+# ---------------------------------------------------------------------------
+
+
+def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
+    """Return an ``IBoardBrief`` for the given board context.
+
+    Byte-identical to :func:`app.services.v1_engine.board_brief`.
+    This function is intentionally kept at module level so it can be
+    tested directly.
+    """
+    columns = context.get("columns") or []
+    tasks = context.get("tasks") or []
+    task_list = tasks if isinstance(tasks, list) else []
+    members = context.get("members") or []
+    counts: list[dict[str, Any]] = []
+    column_index: dict[str, str] = {}
+    for col in columns if isinstance(columns, list) else []:
+        if not isinstance(col, dict):
+            continue
+        cid = col.get("_id")
+        if isinstance(cid, str):
+            column_index[cid] = col.get("name") or cid
+    column_task_count: Counter[str] = Counter()
+    for task in task_list:
+        if not isinstance(task, dict):
+            continue
+        cid = task.get("columnId")
+        if isinstance(cid, str):
+            column_task_count[cid] += 1
+    for cid, name in column_index.items():
+        counts.append(
+            {
+                "columnId": cid,
+                "columnName": name,
+                "count": column_task_count.get(cid, 0),
+            }
+        )
+    largest = sorted(
+        [t for t in task_list if isinstance(t, dict) and isinstance(t.get("_id"), str)],
+        key=lambda t: int(t.get("storyPoints") or 0),
+        reverse=True,
+    )[:3]
+    largest_unstarted = [
+        {
+            "taskId": t["_id"],
+            "taskName": t.get("taskName") or "",
+            "storyPoints": int(t.get("storyPoints") or 0),
+        }
+        for t in largest
+        if (
+            t.get("columnId")
+            and column_index.get(t.get("columnId"), "").lower().strip() != "done"
+        )
+    ]
+    unowned = [
+        {"taskId": t["_id"], "taskName": t.get("taskName") or ""}
+        for t in task_list
+        if isinstance(t, dict)
+        and isinstance(t.get("_id"), str)
+        and not t.get("coordinatorId")
+    ][:5]
+    member_index = {m.get("_id"): m for m in members if isinstance(m, dict)}
+    member_load: dict[str, dict[str, Any]] = {}
+    for task in task_list:
+        if not isinstance(task, dict):
+            continue
+        coordinator = task.get("coordinatorId")
+        if not isinstance(coordinator, str):
+            continue
+        entry = member_load.setdefault(
+            coordinator,
+            {
+                "memberId": coordinator,
+                "username": (member_index.get(coordinator) or {}).get(
+                    "username", coordinator
+                ),
+                "openTasks": 0,
+                "openPoints": 0,
+            },
+        )
+        entry["openTasks"] += 1
+        entry["openPoints"] += int(task.get("storyPoints") or 0)
+    workload = sorted(
+        member_load.values(), key=lambda m: m["openPoints"], reverse=True
+    )[:5]
+    headline = (
+        f"{len(task_list)} tasks across {len(columns)} columns; "
+        f"{len(unowned)} unowned, {len(largest_unstarted)} large unstarted."
+    )
+    return {
+        "headline": headline[:140],
+        "counts": counts,
+        "largestUnstarted": largest_unstarted,
+        "unowned": unowned,
+        "workload": workload,
+        "recommendation": "Reassign unowned bugs first; chunk large unstarted cards.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +414,7 @@ class BoardBriefAgent(BaseAgent):
             # headline is polished by the LLM (deterministic fallback on stub).
             # Normalize id→_id so v1_engine (which uses _id keys) works
             # correctly with the FE-supplied snapshot (which uses id keys).
-            brief = v1_engine.board_brief(_normalize_snapshot_for_v1_engine(snapshot))
+            brief = _compute_board_brief(_normalize_snapshot_for_v1_engine(snapshot))
             deterministic = brief["headline"]
             headline, tokens_in, tokens_out = await polish_headline(
                 chat_model, deterministic, facts
