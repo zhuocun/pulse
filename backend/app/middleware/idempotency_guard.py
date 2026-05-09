@@ -4,6 +4,7 @@ Centralises the header-parse + reserve + store + release dance so the
 agent and AI routers can opt in with three short calls (check at the
 top, store before returning, release on exception) instead of
 re-implementing the Stripe-style protocol in every handler.
+Fingerprints and cache keys incorporate :func:`~app.middleware.idempotency.canonical_idempotency_path` via the helpers in that module.
 
 Header parsing is strict by design: an empty string is treated as
 "no header" so a FE that sends ``Idempotency-Key: `` does not silently
