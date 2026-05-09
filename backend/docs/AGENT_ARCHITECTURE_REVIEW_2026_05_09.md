@@ -138,7 +138,7 @@ doesn't repeat the archaeology.
   `app.agents.registry.registry` singleton is still the runtime's
   backing store. Moving to a fully per-app `Registry` would require
   updating ~40 test fixtures that register test-only agents directly
-  into the module global. Tracked in commit `d9d2983` notes.
+  into the module global. Tracked in commit `d9d2983` notes. **Status: open.**
 - **Build-cache invalidation race (Phase 4 residual)**: `BaseAgent.set_chat_model`
   still triggers a full `Pregel` rebuild and the `threading.Lock` /
   `asyncio.to_thread` trampoline in `app/agents/base.py:308-324`
@@ -146,50 +146,57 @@ doesn't repeat the archaeology.
   race" — was only partially met (the per-call context path no longer
   needs the rebuild, but the rebuild path itself was kept for
   test-fixture compatibility). Migration: simplify to `asyncio.Lock`
-  once all callers are async.
+  once all sync `invoke()` callers (~14 test sites) are migrated.
+  **Status: open** — gated on a separate test-suite migration.
 - **`_chat_tools.py` partial single-source (Phase 6B residual)**:
-  `build_chat_tools()` iterates `CHAT_TOOL_SCHEMAS` but the body is an
-  `if/elif` chain hard-coding each tool name, signature, docstring,
-  and pydantic model. Adding an entry to `CHAT_TOOL_SCHEMAS` does NOT
-  generate a LangChain stub — the schema and the tool definitions are
-  still two sources of truth. Migration: drive the function signature
-  and docstring dynamically from `_spec.args`, or keep the dispatch
-  but assert at module load that every schema key has a matching
-  branch.
-- **`X-Pulse-Model` header / tenant-config routing (Phase 4 follow-up)**:
-  the injection point in `AgentRuntime._build_context` is wired
-  (caller-supplied `context["chat_model"]` overrides the agent
-  default) but no router reads a request header or tenant config to
-  populate it. Tracked as a TODO in `runtime.py:_build_context`.
-- **`_shared.py` final cleanup (Phase 3 residual)**: `cap_polished_text`
-  and `merge_keyed_string_updates` remain in `_shared.py` because
-  individual catalog merge closures still call them. They could be
-  absorbed into `PolishStep` (via `cap_text` and a generic merge
-  helper) so `_shared.py` carries only `fetch_snapshot_node` /
-  `detect_drift_node` / `build_citation_refs`.
+  ~~`build_chat_tools()` iterates `CHAT_TOOL_SCHEMAS` but the body is
+  an `if/elif` chain.~~ **Resolved** by commit `ad2817a`: the function
+  is now a real data-driven generator that builds each LangChain tool
+  stub directly from the schema entry; adding a `CHAT_TOOL_SCHEMAS`
+  row produces a stub with no further code change.
+- ~~**`X-Pulse-Model` header / tenant-config routing (Phase 4 follow-up)**~~:
+  **Resolved.** New `AGENT_CHAT_MODEL_ALLOWLIST` setting gates which
+  model ids the per-request `X-Pulse-Model` header may select. When the
+  allowlist is empty the feature is off (header is rejected with a
+  400 `unsupported_chat_model`); otherwise allowlisted ids are built via
+  `make_chat_model_for_id()` (inherits provider/credentials from
+  settings) and injected as `context["chat_model"]` so the runtime
+  picks them up. Wired through `_dispatch.run_v1_route` (five v1
+  routes), the v1 chat handler in `routers/ai.py`, and the v2.1
+  `invoke` / `stream` handlers in `routers/agents.py` (merged with
+  payload `context`). Tenant-config routing is a follow-up but the
+  injection point is no longer dead.
+- **`_shared.py` final cleanup (Phase 3 residual)**: ~~`cap_polished_text`
+  and `merge_keyed_string_updates` remain in `_shared.py`.~~ **Resolved**
+  by commit `f802dd8`: both helpers' canonical implementations now live
+  in `app/agents/polish.py`; `_shared.py` only re-exports them for
+  backward compatibility with existing imports.
 
 ### Defects worth flagging (not regressions; latent)
 
-- **`_dispatch.py` `UnboundLocalError` on null fallback**: in
-  `app/routers/_dispatch.py:122-141`, if `agent_error_fallback` is
-  provided AND `AgentError` fires AND the fallback returns `None`,
-  `body is None` falls through to `find_body(final_state, custom_events)`
-  with both names unbound. The only registered fallback (`_draft_task`)
-  always returns a dict, so the path isn't currently reachable. Fix:
-  initialise `final_state, custom_events = None, []` before the try.
-- **Cross-user signed thread token surfaces as 5xx**:
-  `_try_verify_signed_thread_key` raises `ValueError` on agent/scope
-  mismatch (`app/agents/runtime.py:132-146`). `_namespaced_thread`
-  doesn't catch it, and the runtime's exception-translation layer
-  wraps it as `AgentExecutionError` (5xx). Should be a 4xx with a
-  clear "invalid thread key" code. Security is preserved either way.
-- **No JWT secret rotation strategy for signed thread tokens**: signed
-  tokens become invalid on key rotation with no key-id versioning.
-  Acceptable trade-off (rotation is a deliberate event), but worth a
-  `kid`-style envelope before any production rotation.
-- **`PolishStep.cap_text` parameter is dead**: declared and stored in
-  `app/agents/polish.py:104,111`, never read. Either wire it up
-  (apply to the polished text in `run`) or delete.
+- ~~**`_dispatch.py` `UnboundLocalError` on null fallback**~~: **Resolved**
+  in PR #173. `body`, `final_state`, `custom_events` are pre-initialised
+  before the `try` block (`_dispatch.py:122-124`); the `body is None`
+  branch now also checks `final_state is None` and emits the standard
+  `agent_unavailable` 502 instead of falling through.
+- ~~**Cross-user signed thread token surfaces as 5xx**~~: **Resolved**
+  in PR #173. `_namespaced_thread` (`runtime.py:328-332`) catches the
+  `ValueError` from `_try_verify_signed_thread_key` and re-raises a
+  dedicated `InvalidThreadKeyError` (a 4xx-mapped subclass of
+  `AgentError`). Coverage: `tests/test_agents.py:1488,1513`.
+- ~~**No JWT secret rotation strategy for signed thread tokens**~~:
+  **Resolved.** New `sigv2.<base64url>` envelope embeds a `kid` that
+  selects the secret from `AGENT_THREAD_SIGNING_KEYS` (a comma-separated
+  list of `kid:secret` entries; the *last* entry is the active signing
+  kid so operators rotate by appending). When the env is empty,
+  signing falls back to the legacy `sigv1.` envelope (no behaviour
+  change for clients that don't need rotation). Verification accepts
+  both prefixes during rolling restarts; an unknown kid is a soft
+  failure (returns `None` and falls through to the unsigned-fallback
+  path, never crashes).
+- ~~**`PolishStep.cap_text` parameter is dead**~~: **Resolved.** The
+  deprecated parameter has been removed from `PolishStep.__init__`;
+  `cap_field=(field_name, max_chars)` is the only supported shorthand.
 
 ---
 

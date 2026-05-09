@@ -134,6 +134,26 @@ class Settings:
     agent_chat_model_timeout_seconds: float = field(
         default_factory=lambda: env_float("AGENT_CHAT_MODEL_TIMEOUT_SECONDS", "30.0")
     )
+    # Comma-separated list of chat-model ids that callers may request via the
+    # ``X-Pulse-Model`` request header.  Empty (the default) disables the
+    # header-based override entirely; the request header is then ignored.
+    # When non-empty, only ids in this list are accepted; any other value
+    # surfaces as a 400 ``unsupported_chat_model`` error.  This is the
+    # whitelist that makes per-request model routing safe in production.
+    agent_chat_model_allowlist: tuple[str, ...] = env_csv(
+        "AGENT_CHAT_MODEL_ALLOWLIST", ""
+    )
+    # Comma-separated kid:secret pairs for signed-thread-key rotation.
+    # Format: ``kid1:secret1,kid2:secret2``.  When set, signing emits the
+    # ``sigv2.`` envelope using the *last* listed kid (the active key) and
+    # verification accepts any kid in the registry; when empty, signing
+    # falls back to the legacy ``sigv1.`` envelope (HMAC over ``jwt_secret``)
+    # and verification accepts both ``sigv1`` and ``sigv2`` for rolling
+    # restarts.  Production rotation: append the new ``kid:secret`` and
+    # restart; remove the old entry once all in-flight tokens have expired.
+    agent_thread_signing_keys: tuple[str, ...] = env_csv(
+        "AGENT_THREAD_SIGNING_KEYS", ""
+    )
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     # Embeddings provider. Selection mirrors AGENT_CHAT_MODEL_PROVIDER.

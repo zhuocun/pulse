@@ -171,9 +171,6 @@ class PolishStep(Generic[_SchemaT]):
         ``{"_result": capped}``.  When set, ``merge_fn`` must be ``None``
         (it is auto-generated).  The fallback in the cap call is always
         ``state["_deterministic"]``.
-    cap_text:
-        Deprecated alias kept for the Phase 3 stub; ignored.  Use
-        ``cap_field`` instead.
 
     Notes
     -----
@@ -194,7 +191,6 @@ class PolishStep(Generic[_SchemaT]):
         merge_fn: Optional[Callable[[Any, Any], dict[str, Any]]] = None,
         redact: Optional[Callable[[Any], Any]] = None,
         cap_field: Optional[tuple[str, int]] = None,
-        cap_text: Optional[int] = None,  # noqa: ARG002 -- deprecated, ignored
     ) -> None:
         if cap_field is not None and merge_fn is not None:
             raise ValueError("Provide either cap_field or merge_fn, not both.")
