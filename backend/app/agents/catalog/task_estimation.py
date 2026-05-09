@@ -16,7 +16,7 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -34,9 +34,9 @@ from app.agents.catalog._shared import (
     cap_polished_text,
     fetch_similar_node,
     merge_keyed_string_updates,
-    structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
 from app.domain.story_points import FIBONACCI_STORY_POINTS
@@ -187,6 +187,48 @@ class ReadinessPolish(BaseModel):
     issues: list[ReadinessIssuePolish] = Field(default_factory=list)
 
 
+def _build_readiness_prompt(state: dict[str, Any]) -> str:
+    draft = state["_draft"]
+    issues = state["_issues"]
+    safe_draft = redact_task_fields(draft)
+    safe_issues = redact_dict(issues)
+    return (
+        "Rewrite the message and suggestion strings for each readiness "
+        "issue below so they are specific and actionable for this Jira-"
+        "style task draft. Keep each string <=160 chars and on a single "
+        "line. Preserve the field id verbatim; do not invent new fields. "
+        "Return JSON matching the schema.\n\n"
+        f"Draft: {json.dumps(safe_draft)}\n"
+        f"Issues: {json.dumps(safe_issues)}"
+    )
+
+
+def _merge_readiness(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    issues = state["_issues"]
+    if isinstance(parsed, ReadinessPolish):
+        merged_issues = merge_keyed_string_updates(
+            parsed.issues,
+            issues,
+            key_from_parsed=lambda item: item.field,
+            key_from_deterministic=lambda issue, _idx: issue.get("field"),
+            string_fields={
+                "message": READINESS_MESSAGE_MAX,
+                "suggestion": READINESS_MESSAGE_MAX,
+            },
+        )
+        return {"_result": {**deterministic, "issues": merged_issues}}
+    return {"_result": parsed}  # fallback value (dict)
+
+
+_readiness_step: PolishStep[ReadinessPolish] = PolishStep(
+    prompt_fn=_build_readiness_prompt,
+    schema=ReadinessPolish,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_readiness,
+)
+
+
 async def _polish_readiness(
     model: BaseChatModel,
     deterministic: dict[str, Any],
@@ -200,42 +242,61 @@ async def _polish_readiness(
 
     Returns ``(result, raw_message, tokens_in, tokens_out)``.
     """
-
     issues = deterministic.get("issues") or []
     if not issues:
         return deterministic, None, 0, 0
-    safe_draft = redact_task_fields(draft)
-    safe_issues = redact_dict(issues)
-    prompt = (
-        "Rewrite the message and suggestion strings for each readiness "
-        "issue below so they are specific and actionable for this Jira-"
-        "style task draft. Keep each string <=160 chars and on a single "
-        "line. Preserve the field id verbatim; do not invent new fields. "
-        "Return JSON matching the schema.\n\n"
-        f"Draft: {json.dumps(safe_draft)}\n"
-        f"Issues: {json.dumps(safe_issues)}"
-    )
-
-    def _merge(parsed: ReadinessPolish) -> dict[str, Any]:
-        merged_issues = merge_keyed_string_updates(
-            parsed.issues,
-            issues,
-            key_from_parsed=lambda item: item.field,
-            key_from_deterministic=lambda issue, _idx: issue.get("field"),
-            string_fields={
-                "message": READINESS_MESSAGE_MAX,
-                "suggestion": READINESS_MESSAGE_MAX,
+    _state = {"_deterministic": deterministic, "_draft": draft, "_issues": issues}
+    update, tokens_in, tokens_out = await _readiness_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
             },
         )
-        return {**deterministic, "issues": merged_issues}
-
-    return await structured_llm_call(
-        model,
-        ReadinessPolish,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
+def _build_rationale_prompt(state: dict[str, Any]) -> str:
+    draft = state["_draft"]
+    points = state["_points"]
+    neighbours = state["_neighbours"]
+    safe_draft = redact_task_fields(draft)
+    safe_neighbours = redact_dict(neighbours[:3])
+    return (
+        "Write a single-line, <=180-character rationale for this story-point "
+        "estimate. Keep tone factual; reference the provided neighbours "
+        "if helpful. Do not propose a different point value. Return the "
+        "structured schema.\n\n"
+        f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
+        f"Neighbours: {json.dumps(safe_neighbours)}"
+    )
+
+
+def _merge_rationale(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    if isinstance(parsed, EstimationRationale):
+        return {
+            "_result": cap_polished_text(
+                parsed.rationale,
+                max_chars=ESTIMATION_RATIONALE_MAX,
+                fallback=deterministic,
+            )
+        }
+    return {"_result": parsed}  # fallback value (str)
+
+
+_rationale_step: PolishStep[EstimationRationale] = PolishStep(
+    prompt_fn=_build_rationale_prompt,
+    schema=EstimationRationale,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_rationale,
+)
 
 
 async def _polish_rationale(
@@ -249,32 +310,26 @@ async def _polish_rationale(
 
     Returns ``(result, raw_message, tokens_in, tokens_out)``.
     """
-
-    safe_draft = redact_task_fields(draft)
-    safe_neighbours = redact_dict(neighbours[:3])
-    prompt = (
-        "Write a single-line, <=180-character rationale for this story-point "
-        "estimate. Keep tone factual; reference the provided neighbours "
-        "if helpful. Do not propose a different point value. Return the "
-        "structured schema.\n\n"
-        f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
-        f"Neighbours: {json.dumps(safe_neighbours)}"
-    )
-
-    def _merge(parsed: EstimationRationale) -> str:
-        return cap_polished_text(
-            parsed.rationale,
-            max_chars=ESTIMATION_RATIONALE_MAX,
-            fallback=deterministic,
+    _state = {
+        "_deterministic": deterministic,
+        "_draft": draft,
+        "_points": points,
+        "_neighbours": neighbours,
+    }
+    update, tokens_in, tokens_out = await _rationale_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
         )
-
-    return await structured_llm_call(
-        model,
-        EstimationRationale,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
 
 
 async def polish_readiness(

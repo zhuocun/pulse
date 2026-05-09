@@ -20,7 +20,7 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -33,8 +33,8 @@ from app.agents.catalog._shared import (
     detect_drift_node,
     fetch_snapshot_node,
     merge_keyed_string_updates,
-    structured_llm_call,
 )
+from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.tools.redaction import redact_dict
@@ -145,6 +145,63 @@ class TriagePolish(BaseModel):
     nudges: list[NudgePolish] = Field(default_factory=list)
 
 
+def _build_triage_prompt(state: dict[str, Any]) -> str:
+    deterministic_nudges = state["_nudges"]
+    board_snapshot = state["_snapshot"]
+    nudge_summaries = [
+        {
+            "nudge_id": f"{n.get('type', 'triage')}:{idx}",
+            "summary": n.get("summary", "Triage"),
+            "details": n.get("details") or {},
+        }
+        for idx, n in enumerate(deterministic_nudges)
+    ]
+    safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
+    safe_nudges = redact_dict(nudge_summaries)
+    return (
+        "Rewrite the summary for each board-triage nudge below so it is "
+        "specific and actionable, incorporating the signal details (e.g. "
+        "column name, current count vs. WIP limit, task id). Keep each "
+        "summary <=120 chars and on a single line. Preserve the nudge_id "
+        "verbatim; do not invent new nudges. Return JSON matching the schema.\n\n"
+        f"Board snapshot: {json.dumps(safe_snapshot)}\n"
+        f"Nudges: {json.dumps(safe_nudges)}"
+    )
+
+
+def _merge_triage(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic_nudges = state["_nudges"]
+    valid_ids = {
+        f"{n.get('type', 'triage')}:{idx}"
+        for idx, n in enumerate(deterministic_nudges)
+    }
+
+    def _nudge_key(nudge: dict[str, Any], idx: int) -> str:
+        return f"{nudge.get('type', 'triage')}:{idx}"
+
+    if isinstance(parsed, TriagePolish):
+        result = merge_keyed_string_updates(
+            parsed.nudges,
+            deterministic_nudges,
+            key_from_parsed=lambda item: item.nudge_id
+            if item.nudge_id in valid_ids
+            else None,
+            key_from_deterministic=_nudge_key,
+            string_fields={"summary": NUDGE_SUMMARY_MAX},
+        )
+    else:
+        result = parsed  # fallback value (list)
+    return {"_result": result}
+
+
+_triage_step: PolishStep[TriagePolish] = PolishStep(
+    prompt_fn=_build_triage_prompt,
+    schema=TriagePolish,
+    fallback_fn=lambda state: state["_nudges"],
+    merge_fn=_merge_triage,
+)
+
+
 async def polish_triage(
     model: BaseChatModel,
     deterministic_nudges: list[dict[str, Any]],
@@ -161,64 +218,15 @@ async def polish_triage(
 
     Note: this function intentionally keeps a 3-tuple return for backward
     compatibility with tests that import it directly. The raw AIMessage is
-    consumed internally within ``generate_nudges`` via ``structured_llm_call``.
+    consumed internally within ``generate_nudges`` via ``PolishStep``.
     """
 
     if not deterministic_nudges:
         return deterministic_nudges, 0, 0
 
-    # Build the FE nudge_id -> summary mapping for the prompt so the model has
-    # the same context that the generate_nudges node constructs.
-    nudge_summaries = [
-        {
-            "nudge_id": f"{n.get('type', 'triage')}:{idx}",
-            "summary": n.get("summary", "Triage"),
-            "details": n.get("details") or {},
-        }
-        for idx, n in enumerate(deterministic_nudges)
-    ]
-    # Trim and redact the snapshot before forwarding to the provider:
-    # raw boards can carry hundreds of tasks (context-window pressure)
-    # and column / task names that contain user PII.
-    safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
-    safe_nudges = redact_dict(nudge_summaries)
-    prompt = (
-        "Rewrite the summary for each board-triage nudge below so it is "
-        "specific and actionable, incorporating the signal details (e.g. "
-        "column name, current count vs. WIP limit, task id). Keep each "
-        "summary <=120 chars and on a single line. Preserve the nudge_id "
-        "verbatim; do not invent new nudges. Return JSON matching the schema.\n\n"
-        f"Board snapshot: {json.dumps(safe_snapshot)}\n"
-        f"Nudges: {json.dumps(safe_nudges)}"
-    )
-
-    # Build a lookup keyed by the stable nudge_id format.
-    valid_ids = {
-        f"{n.get('type', 'triage')}:{idx}" for idx, n in enumerate(deterministic_nudges)
-    }
-
-    def _nudge_key(nudge: dict[str, Any], idx: int) -> str:
-        return f"{nudge.get('type', 'triage')}:{idx}"
-
-    def _merge(parsed: TriagePolish) -> list[dict[str, Any]]:
-        return merge_keyed_string_updates(
-            parsed.nudges,
-            deterministic_nudges,
-            key_from_parsed=lambda item: item.nudge_id
-            if item.nudge_id in valid_ids
-            else None,
-            key_from_deterministic=_nudge_key,
-            string_fields={"summary": NUDGE_SUMMARY_MAX},
-        )
-
-    result, _raw_msg, tokens_in, tokens_out = await structured_llm_call(
-        model,
-        TriagePolish,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic_nudges,
-        merge_fn=_merge,
-    )
-    return result, tokens_in, tokens_out
+    _state = {"_nudges": deterministic_nudges, "_snapshot": board_snapshot}
+    update, tokens_in, tokens_out = await _triage_step.run(_state, model)
+    return update["_result"], tokens_in, tokens_out
 
 
 class TriageAgent(BaseAgent):

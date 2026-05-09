@@ -12,10 +12,6 @@ agent file:
   and the legacy raw list -- to a flat list.  Used by
   ``task_drafting.py`` and ``task_estimation.py``.
 
-- :func:`structured_llm_call`: generic scaffold for
-  ``with_structured_output`` polish calls. Adopted by all four
-  ``polish_*`` functions across the catalog.
-
 - :func:`build_citation_refs`: builds a validated, redacted list of
   ``{"source", "id", "quote"}`` refs from an arbitrary item list.
 
@@ -285,54 +281,6 @@ def build_citation_refs(
     return refs
 
 
-async def structured_llm_call(
-    model: Any,
-    schema_type: type,
-    messages: list,
-    *,
-    fallback: Any,
-    merge_fn: Optional[Callable[[Any], Any]] = None,
-) -> tuple[Any, Any, int, int]:
-    """Generic scaffold for structured-output polish calls.
-
-    Handles the stub-model short-circuit, the ``with_structured_output``
-    invocation, exception catching, response unpacking, token extraction,
-    and typed-result validation.  Returns
-    ``(result, raw_message, tokens_in, tokens_out)``.
-
-    ``raw_message`` is the underlying ``AIMessage`` returned by the provider
-    (with ``usage_metadata`` populated). Callers should include it in the
-    node's ``messages`` return value so that
-    :func:`~app.agents.llm.result_token_usage_from_graph_result` can
-    aggregate token counts from state at run-end (Phase 2). On the stub
-    path or when the call fails, ``raw_message`` is ``None``.
-
-    ``merge_fn``, when provided, is called with the parsed Pydantic object
-    to convert it into the domain type expected by the caller (e.g. merging
-    polished fields back onto a deterministic baseline dict).
-    """
-
-    # Import here to avoid circular imports at module level; these two
-    # helpers live in separate packages and are always available.
-    from app.agents.llm import extract_token_usage, is_stub_model
-
-    if is_stub_model(model):
-        return fallback, None, 0, 0
-    try:
-        response = await model.with_structured_output(
-            schema_type, include_raw=True
-        ).ainvoke(messages)
-    except Exception:  # noqa: BLE001 -- defensive boundary around provider call
-        logger.exception("structured_llm_call failed for %s", schema_type.__name__)
-        return fallback, None, 0, 0
-    raw, parsed, _error = unpack_structured_response(response)
-    tokens_in, tokens_out = extract_token_usage(raw)
-    if _error is not None or not isinstance(parsed, schema_type):
-        return fallback, raw, tokens_in, tokens_out
-    result = merge_fn(parsed) if merge_fn else parsed
-    return result, raw, tokens_in, tokens_out
-
-
 __all__ = [
     "build_citation_refs",
     "cap_polished_text",
@@ -341,7 +289,6 @@ __all__ = [
     "fetch_snapshot_node",
     "filter_to_allowed_ids",
     "merge_keyed_string_updates",
-    "structured_llm_call",
     "unpack_similar_payload",
     "unpack_structured_response",
 ]

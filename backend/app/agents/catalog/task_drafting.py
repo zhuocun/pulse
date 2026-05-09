@@ -19,7 +19,7 @@ import re
 from typing import Any, Iterable, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -35,9 +35,9 @@ from app.agents.catalog._schemas import (
 from app.agents.catalog._shared import (
     fetch_similar_node,
     fetch_snapshot_node,
-    structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
 from app.domain.story_points import FIBONACCI_STORY_POINTS
@@ -246,6 +246,44 @@ def _draft_from_prompt(prompt: str) -> dict[str, Any]:
     }
 
 
+def _build_draft_prompt(state: dict[str, Any]) -> str:
+    deterministic = state["_deterministic"]
+    prompt = state["_prompt"]
+    similar = state["_similar"]
+    safe_prompt = redact(prompt)[0]
+    safe_similar = redact_dict(similar[:3])
+    safe_draft = redact_task_fields(deterministic)
+    return (
+        "You are drafting a Jira task card. Update only the eligible text "
+        "fields and return them in the structured schema. Keep taskName "
+        "<=80 chars, note <=500 chars (plain text), rationale <=180 "
+        "chars. Do not invent ids; do not change story points.\n\n"
+        f"Prompt: {safe_prompt}\n"
+        f"Similar tasks: {json.dumps(safe_similar)}\n"
+        f"Current draft: {json.dumps(safe_draft)}"
+    )
+
+
+def _merge_draft(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    if isinstance(parsed, DraftPolish):
+        polished = dict(deterministic)
+        for field_name in ("taskName", "note", "rationale"):
+            value = getattr(parsed, field_name, "")
+            if isinstance(value, str) and value.strip():
+                polished[field_name] = value.strip()
+        return {"_result": polished}
+    return {"_result": parsed}  # fallback value (dict)
+
+
+_draft_step: PolishStep[DraftPolish] = PolishStep(
+    prompt_fn=_build_draft_prompt,
+    schema=DraftPolish,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_draft,
+)
+
+
 async def _polish_draft(
     model: BaseChatModel,
     deterministic: dict[str, Any],
@@ -268,38 +306,21 @@ async def _polish_draft(
     tracking can find the token counts.  It is ``None`` on the stub path or
     when the call fails.
     """
-
-    # Redact PII from every field that crosses the provider boundary.
-    # ``deterministic`` is the freshly-built draft we own; ``prompt`` and
-    # ``similar`` come from the FE and may contain emails / secrets / SSNs.
-    safe_prompt = redact(prompt)[0]
-    safe_similar = redact_dict(similar[:3])
-    safe_draft = redact_task_fields(deterministic)
-    instruction = (
-        "You are drafting a Jira task card. Update only the eligible text "
-        "fields and return them in the structured schema. Keep taskName "
-        "<=80 chars, note <=500 chars (plain text), rationale <=180 "
-        "chars. Do not invent ids; do not change story points.\n\n"
-        f"Prompt: {safe_prompt}\n"
-        f"Similar tasks: {json.dumps(safe_similar)}\n"
-        f"Current draft: {json.dumps(safe_draft)}"
+    _state = {"_deterministic": deterministic, "_prompt": prompt, "_similar": similar}
+    update, tokens_in, tokens_out = await _draft_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
     )
-
-    def _merge(parsed: DraftPolish) -> dict[str, Any]:
-        polished = dict(deterministic)
-        for field_name in ("taskName", "note", "rationale"):
-            value = getattr(parsed, field_name, "")
-            if isinstance(value, str) and value.strip():
-                polished[field_name] = value.strip()
-        return polished
-
-    return await structured_llm_call(
-        model,
-        DraftPolish,
-        [HumanMessage(content=instruction)],
-        fallback=deterministic,
-        merge_fn=_merge,
-    )
+    return update["_result"], raw_msg, tokens_in, tokens_out
 
 
 async def polish_draft(

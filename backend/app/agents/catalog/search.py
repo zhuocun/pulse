@@ -31,7 +31,7 @@ import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -48,9 +48,9 @@ from app.agents.catalog._schemas import (
 from app.agents.catalog._shared import (
     cap_polished_text,
     filter_to_allowed_ids,
-    structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import SearchState
 from app.tools import be_tools
@@ -236,6 +236,71 @@ def _strength_to_score(strength: str) -> float:
     return 0.0
 
 
+def _build_search_prompt(state: dict[str, Any]) -> str:
+    candidates = state["_candidates"]
+    query = state["_query"]
+    safe_candidates = redact_dict(candidates[:30])
+    safe_query = redact(query)[0] if isinstance(query, str) else query
+    return (
+        "You are re-ranking search results for a Jira-style project tool. "
+        "Pick up to 10 of the candidate ids that best match the query, "
+        "ordered most to least relevant. Use only ids that appear in the "
+        "candidate list; never invent new ids. Return JSON matching the "
+        "schema, including a single-line rationale (<=240 chars) naming "
+        "the ranking factors.\n\n"
+        f"Query: {safe_query}\n"
+        f"Candidates: {json.dumps(safe_candidates)}"
+    )
+
+
+def _merge_search(state: dict[str, Any], parsed: Any) -> dict[str, Any]:
+    deterministic = state["_deterministic"]
+    candidates = state["_candidates"]
+    candidate_ids = {
+        c.get("id")
+        for c in candidates
+        if isinstance(c, dict) and isinstance(c.get("id"), str)
+    }
+    if not isinstance(parsed, SearchRanking):
+        return {"_result": parsed}  # fallback value (dict)
+    polished_ids = filter_to_allowed_ids(parsed.ids, candidate_ids)
+    if not polished_ids:
+        return {"_result": deterministic}
+    rationale = cap_polished_text(
+        parsed.rationale,
+        max_chars=SEARCH_RATIONALE_MAX,
+        fallback=deterministic.get("rationale", ""),
+    )
+    score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
+    if not score_map:
+        score_map = {
+            m["id"]: _strength_to_score(m["strength"])
+            for m in (deterministic.get("matches") or [])
+            if isinstance(m, dict)
+        }
+    polished_matches = _build_matches(polished_ids[:SEARCH_IDS_MAX], score_map)
+    polished: dict[str, Any] = {
+        **deterministic,
+        "ids": polished_ids[:SEARCH_IDS_MAX],
+        "rationale": rationale,
+        "matches": polished_matches,
+    }
+    expanded = [
+        t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
+    ]
+    if expanded:
+        polished["expandedTerms"] = expanded
+    return {"_result": polished}
+
+
+_search_step: PolishStep[SearchRanking] = PolishStep(
+    prompt_fn=_build_search_prompt,
+    schema=SearchRanking,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=_merge_search,
+)
+
+
 async def _polish_search(
     model: BaseChatModel,
     deterministic: dict[str, Any],
@@ -259,79 +324,25 @@ async def _polish_search(
     output failure preserves the deterministic ``ids`` + ``rationale``
     so the FE layout stays byte-identical with the no-key path.
     """
-
     # Empty candidate list means the deterministic ranker found nothing
     # to score; the LLM has no useful work and would hallucinate ids.
     if not candidates:
         return deterministic, None, 0, 0
-    # Redact PII before sending candidate ``text`` (task names, project
-    # names) to the provider.  The id-allowlist below uses the unredacted
-    # ids from ``candidates`` so the FE round-trip still works.
-    safe_candidates = redact_dict(candidates[:30])
-    safe_query = redact(query)[0] if isinstance(query, str) else query
-    prompt = (
-        "You are re-ranking search results for a Jira-style project tool. "
-        "Pick up to 10 of the candidate ids that best match the query, "
-        "ordered most to least relevant. Use only ids that appear in the "
-        "candidate list; never invent new ids. Return JSON matching the "
-        "schema, including a single-line rationale (<=240 chars) naming "
-        "the ranking factors.\n\n"
-        f"Query: {safe_query}\n"
-        f"Candidates: {json.dumps(safe_candidates)}"
-    )
-
-    candidate_ids = {
-        c.get("id")
-        for c in candidates
-        if isinstance(c, dict) and isinstance(c.get("id"), str)
-    }
-
-    def _merge(parsed: SearchRanking) -> dict[str, Any]:
-        polished_ids = filter_to_allowed_ids(parsed.ids, candidate_ids)
-        if not polished_ids:
-            # The model returned only hallucinated ids (or an empty list);
-            # the deterministic ranking is still our best signal.
-            return deterministic
-        rationale = cap_polished_text(
-            parsed.rationale,
-            max_chars=SEARCH_RATIONALE_MAX,
-            fallback=deterministic.get("rationale", ""),
+    _state = {"_deterministic": deterministic, "_query": query, "_candidates": candidates}
+    update, tokens_in, tokens_out = await _search_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
         )
-        # Recompute matches for the new id order so strength still corresponds
-        # 1:1 with each id.  Prefer the original cosine scores threaded through
-        # via ``_score_map`` (set by the ``rank`` node); fall back to the bucket
-        # floor from ``_strength_to_score`` for ids not in the map (e.g. when
-        # ``polish_search`` is called directly by the v1 shim without a ``rank``
-        # node that set ``_score_map``).
-        score_map: dict[str, float] = dict(deterministic.get("_score_map") or {})
-        if not score_map:
-            # Backward-compat path: reconstruct from strength buckets.
-            score_map = {
-                m["id"]: _strength_to_score(m["strength"])
-                for m in (deterministic.get("matches") or [])
-                if isinstance(m, dict)
-            }
-        polished_matches = _build_matches(polished_ids[:SEARCH_IDS_MAX], score_map)
-        polished: dict[str, Any] = {
-            **deterministic,
-            "ids": polished_ids[:SEARCH_IDS_MAX],
-            "rationale": rationale,
-            "matches": polished_matches,
-        }
-        expanded = [
-            t for t in (parsed.expanded_terms or []) if isinstance(t, str) and t.strip()
-        ]
-        if expanded:
-            polished["expandedTerms"] = expanded
-        return polished
-
-    return await structured_llm_call(
-        model,
-        SearchRanking,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
 
 
 async def polish_search(

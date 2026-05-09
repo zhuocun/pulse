@@ -17,7 +17,7 @@ from collections import Counter
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
@@ -31,9 +31,9 @@ from app.agents.catalog._shared import (
     cap_polished_text,
     detect_drift_node,
     fetch_snapshot_node,
-    structured_llm_call,
 )
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.tools.be_tools import _is_done_column
@@ -295,6 +295,30 @@ class BriefHeadline(BaseModel):
     )
 
 
+def _build_headline_prompt(state: dict[str, Any]) -> str:
+    safe_facts = redact_dict(state["_facts"])
+    return (
+        "Write a single-line, <=120-character standup headline for this "
+        "Jira-style board snapshot. Do not invent counts; only use the "
+        "facts provided. Return JSON matching the schema. Facts (JSON):\n"
+        + json.dumps(safe_facts)
+    )
+
+
+_headline_step: PolishStep[BriefHeadline] = PolishStep(
+    prompt_fn=_build_headline_prompt,
+    schema=BriefHeadline,
+    fallback_fn=lambda state: state["_deterministic"],
+    merge_fn=lambda state, parsed: {
+        "_result": cap_polished_text(
+            parsed.headline if isinstance(parsed, BriefHeadline) else parsed,
+            max_chars=HEADLINE_MAX,
+            fallback=state["_deterministic"],
+        )
+    },
+)
+
+
 async def _polish_headline(
     model: BaseChatModel,
     deterministic: str,
@@ -308,30 +332,21 @@ async def _polish_headline(
     messages for budget tracking.  It is ``None`` on the stub path or when the
     call fails.
     """
-
-    # ``facts`` carries snippets of FE-supplied signal data (column names,
-    # task ids); redact PII patterns so emails / secrets in user-entered
-    # column names never reach the provider.
-    safe_facts = redact_dict(facts)
-    prompt = (
-        "Write a single-line, <=120-character standup headline for this "
-        "Jira-style board snapshot. Do not invent counts; only use the "
-        "facts provided. Return JSON matching the schema. Facts (JSON):\n"
-        + json.dumps(safe_facts)
-    )
-
-    def _merge(parsed: BriefHeadline) -> str:
-        return cap_polished_text(
-            parsed.headline, max_chars=HEADLINE_MAX, fallback=deterministic
+    _state = {"_deterministic": deterministic, "_facts": facts}
+    update, tokens_in, tokens_out = await _headline_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
         )
-
-    return await structured_llm_call(
-        model,
-        BriefHeadline,
-        [HumanMessage(content=prompt)],
-        fallback=deterministic,
-        merge_fn=_merge,
+        if (tokens_in or tokens_out)
+        else None
     )
+    return update["_result"], raw_msg, tokens_in, tokens_out
 
 
 async def polish_headline(
