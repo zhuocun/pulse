@@ -443,11 +443,14 @@ class SearchAgent(BaseAgent):
             """
             if state.get("candidates") is not None:
                 return {}
+            # F-43: project_id is now in context, not state.
+            _rt = get_runtime(ChatContext)
+            _ctx = _rt.context or {}
             candidates = interrupt(
                 interrupt_payload(
                     "fe.searchCandidates",
                     {
-                        "project_id": state.get("project_id"),
+                        "project_id": _ctx.get("project_id"),
                         "query": state.get("query") or "",
                         "kind": state.get("kind") or "tasks",
                         "limit": 30,

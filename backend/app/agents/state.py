@@ -48,13 +48,16 @@ class AgentState(TypedDict, total=False):
 
 
 class BaseAgentState(TypedDict):
-    """Common state shared by all Board Copilot v2.1 agents (PRD §5A.2)."""
+    """Common state shared by all Board Copilot v2.1 agents (PRD §5A.2).
+
+    Static run-scoped fields (``project_id``, ``user_id``,
+    ``autonomy_level``) have been moved to
+    :class:`~app.agents.context.ChatContext` (F-43).  They no longer live
+    in state so checkpoints stay lean and time-travel replays are safe.
+    """
 
     messages: Annotated[list[BaseMessage], add_messages]
     events: Annotated[list[dict], add_events]
-    project_id: NotRequired[str]
-    user_id: NotRequired[str]
-    autonomy_level: NotRequired[str]  # "suggest" | "plan" | "auto"
 
 
 # ---------------------------------------------------------------------------

@@ -77,6 +77,7 @@ const baseAgent = (
     abort: jest.fn(),
     seedMessages: jest.fn(),
     isStreaming: false,
+    status: "idle",
     state: { messages: [] },
     pendingInterrupt: null,
     pendingProposal: null,

@@ -9,15 +9,23 @@ These tests exercise all branches of the Pydantic event models
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from app.agents.events import (
     AgentEvent,
     Citation,
+    IBoardBriefPayload,
+    IEstimatePayload,
+    INudgePayload,
+    ISearchPayload,
+    ITaskDraftPayload,
     Suggestion,
     Usage,
     as_event_dict,
     coerce_event,
+    validate_suggestion_payload,
 )
 
 
@@ -167,3 +175,198 @@ def test_coerce_event_raises_on_non_dict_non_model() -> None:
 def test_agent_event_union_is_exported() -> None:
     """AgentEvent is exported so external validators can use it."""
     assert AgentEvent is not None
+
+
+# ---------------------------------------------------------------------------
+# Per-surface payload schemas
+# ---------------------------------------------------------------------------
+
+
+def test_board_brief_payload_schema_accepts_known_good() -> None:
+    payload = {
+        "headline": "3 tasks across 2 columns; 1 unowned, 0 large unstarted.",
+        "counts": [{"columnId": "c1", "columnName": "Todo", "count": 1}],
+        "largestUnstarted": [],
+        "unowned": [{"taskId": "t1", "taskName": "Fix crash"}],
+        "workload": [],
+        "recommendation": "Reassign unowned bugs first.",
+        "recommendationDetail": {
+            "text": "Reassign unowned bugs first.",
+            "strength": "strong",
+            "basis": "1 unowned bug(s)",
+            "sources": [],
+        },
+    }
+    # Must not raise
+    IBoardBriefPayload(**payload)
+
+
+def test_task_draft_payload_schema_accepts_known_good() -> None:
+    payload = {
+        "taskName": "Fix SSO",
+        "type": "feature",
+        "epic": "Auth",
+        "storyPoints": 3,
+        "note": "Acceptance criteria pending.",
+        "columnId": "c1",
+        "coordinatorId": "u1",
+        "confidence": 0.55,
+        "rationale": "Heuristic draft from prompt keywords.",
+    }
+    ITaskDraftPayload(**payload)
+
+
+def test_task_draft_breakdown_payload_schema_accepts_items() -> None:
+    """``{axis, items}`` breakdown variant must also pass validation."""
+    payload = {
+        "axis": "frontend",
+        "items": [
+            {
+                "taskName": "Fix SSO (frontend 1)",
+                "type": "feature",
+                "epic": "Auth",
+                "storyPoints": 3,
+                "note": "part 1",
+                "columnId": "c1",
+                "coordinatorId": "u1",
+                "confidence": 0.55,
+                "rationale": "Slice 1",
+            }
+        ],
+    }
+    ITaskDraftPayload(**payload)
+
+
+def test_estimate_payload_schema_accepts_known_good() -> None:
+    payload = {
+        "estimate": {
+            "storyPoints": 5,
+            "confidence": "moderate",
+            "rationale": "Derived from prompt.",
+        },
+        "readiness": {
+            "ready": False,
+            "issues": [{"field": "taskName", "severity": "error", "message": "Required."}],
+            "rationale": "Missing required fields: taskName",
+        },
+    }
+    IEstimatePayload(**payload)
+
+
+def test_search_payload_schema_accepts_known_good() -> None:
+    payload = {
+        "ids": ["t-1", "t-2"],
+        "rationale": "Ranked by keyword overlap.",
+        "matches": [{"id": "t-1", "strength": "strong"}],
+    }
+    ISearchPayload(**payload)
+
+
+def test_nudge_payload_schema_accepts_known_good() -> None:
+    payload = {
+        "nudge_id": "unowned_bug:0",
+        "kind": "unowned_bug",
+        "project_id": "p1",
+        "summary": "Unowned bug",
+        "target_ids": ["t1"],
+        "severity": "critical",
+    }
+    INudgePayload(**payload)
+
+
+# ---------------------------------------------------------------------------
+# validate_suggestion_payload behaviour
+# ---------------------------------------------------------------------------
+
+
+def test_validate_suggestion_payload_known_good_brief() -> None:
+    """Known-good brief payload passes validation without warnings."""
+    evt = {
+        "kind": "suggestion",
+        "surface": "brief",
+        "payload": {
+            "headline": "3 tasks",
+            "counts": [],
+            "largestUnstarted": [],
+            "unowned": [],
+            "workload": [],
+            "recommendation": "ok",
+            "recommendationDetail": None,
+        },
+    }
+    result = validate_suggestion_payload(evt, agent="board-brief-agent")
+    assert result is evt  # same object returned
+
+
+def test_validate_suggestion_payload_known_good_nudge() -> None:
+    evt = {
+        "kind": "suggestion",
+        "surface": "nudge",
+        "payload": {
+            "nudge_id": "stale_task:0",
+            "kind": "stale_task",
+            "project_id": "p1",
+            "summary": "Stale task",
+            "target_ids": [],
+            "severity": "warn",
+        },
+    }
+    result = validate_suggestion_payload(evt)
+    assert result["surface"] == "nudge"
+
+
+def test_validate_suggestion_payload_bad_payload_logs_and_passes_through(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Extra field in payload triggers a warning but does not mutate or drop the event."""
+    evt = {
+        "kind": "suggestion",
+        "surface": "search",
+        "payload": {
+            "ids": ["t-1"],
+            "rationale": "ok",
+            "UNEXPECTED_EXTRA_FIELD": "should trigger warning",
+        },
+    }
+    with caplog.at_level(logging.WARNING, logger="app.agents.events"):
+        result = validate_suggestion_payload(evt, agent="search-agent")
+    # Event is passed through unchanged
+    assert result is evt
+    assert result["payload"]["UNEXPECTED_EXTRA_FIELD"] == "should trigger warning"
+    # A warning was logged
+    assert any("search" in record.message for record in caplog.records)
+
+
+def test_validate_suggestion_payload_does_not_mutate_dict() -> None:
+    """Validation must never mutate the payload dict."""
+    payload = {"ids": ["t-1"], "rationale": "ok"}
+    evt = {"kind": "suggestion", "surface": "search", "payload": payload}
+    before = dict(payload)
+    validate_suggestion_payload(evt)
+    assert payload == before
+
+
+def test_validate_suggestion_payload_unknown_surface_passes_through() -> None:
+    """Unknown surfaces are forwarded without validation."""
+    evt = {"kind": "suggestion", "surface": "future_surface", "payload": {"x": 1}}
+    result = validate_suggestion_payload(evt, agent="some-agent")
+    assert result is evt
+
+
+def test_validate_suggestion_payload_non_suggestion_event_passes_through() -> None:
+    """Citation and Usage events bypass validation."""
+    citation = {"kind": "citation", "refs": []}
+    result = validate_suggestion_payload(citation)
+    assert result is citation
+
+
+def test_validate_suggestion_payload_non_dict_passes_through() -> None:
+    """Non-dict values are returned as-is."""
+    assert validate_suggestion_payload("not a dict") == "not a dict"  # type: ignore[arg-type]
+
+
+def test_validate_suggestion_payload_non_dict_payload_passes_through() -> None:
+    """A suggestion whose ``payload`` is not a dict bypasses schema validation."""
+    evt = {"kind": "suggestion", "surface": "brief", "payload": "not a dict"}
+    result = validate_suggestion_payload(evt, agent="board-brief-agent")
+    assert result is evt

@@ -599,11 +599,13 @@ def get_agent(
 
 
 def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> None:
-    """Forward the validated autonomy into the LangGraph state.
+    """Forward the validated autonomy through inputs so the runtime can read it.
 
-    Catalog agents read it off ``state["autonomy_level"]`` (PRD §5A.2);
-    putting it on inputs is sufficient because :class:`BaseAgentState`
-    declares the field.
+    The runtime reads ``autonomy_level`` from inputs via ``_autonomy(inputs)``
+    and injects it into :class:`~app.agents.context.ChatContext` (F-43).
+    It is no longer declared on :class:`~app.agents.state.BaseAgentState` so
+    LangGraph discards it from state checkpoints.  Keeping it on inputs
+    preserves span-tagging and budget-reservation logic without change.
 
     Security: strip any client-supplied ``autonomy_level`` first so a
     caller cannot bypass ``_resolve_autonomy``'s validation by smuggling

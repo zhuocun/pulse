@@ -297,16 +297,16 @@ class TriageAgent(BaseAgent):
         async def generate_nudges(state: TriageState) -> dict[str, Any]:
             # Prefer the per-call context model; fall back to the default.
             _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            _ctx = _rt.context or {}
+            chat_model: BaseChatModel = _ctx.get("chat_model") or _default_model
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
             polished_nudges, raw_msg, _tokens_in, _tokens_out = await _polish_triage(
                 chat_model, nudges, board_snapshot
             )
-            project_id = state.get("project_id") or ""
+            # F-43: project_id is now in context, not state.
+            project_id = _ctx.get("project_id") or ""
             extra_messages = [raw_msg] if raw_msg is not None else []
             new_events: list[dict] = []
             for index, nudge in enumerate(polished_nudges):
