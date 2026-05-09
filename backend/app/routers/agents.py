@@ -55,6 +55,7 @@ from app.middleware.budget import BudgetBackend, get_budget_tracker
 from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
+from app.routers._dispatch import chat_model_override_from_request
 from app.security import current_user_id, current_user_payload
 from app.services.project_service import is_project_manager
 from app.tools.fe_tool_schemas import fe_tool_definitions
@@ -264,17 +265,54 @@ def _coerce_context(schema: type[Any], payload: Any) -> Any:
 
 
 def _request_context(
-    name: str, payload: Mapping[str, Any], runtime: AgentRuntime
+    name: str,
+    payload: Mapping[str, Any],
+    runtime: AgentRuntime,
+    request: Optional[Request] = None,
 ) -> Any:
-    if "context" not in payload:
-        return None
+    """Resolve the per-call context for an agent invocation.
 
-    schema = runtime.get(name).metadata.context_schema
-    if schema is None:
-        api_error(
-            status.HTTP_400_BAD_REQUEST, f"Agent '{name}' does not accept context"
-        )
-    return _coerce_context(schema, payload.get("context"))
+    Two sources are merged:
+
+    - the ``context`` key in the JSON request body (validated against the
+      agent's declared ``context_schema``), and
+    - the ``X-Pulse-Model`` request header (only when the allowlist
+      authorises the model id).
+
+    The header override wins on the ``chat_model`` field so an operator
+    A/B-testing a model never has it silently overridden by stale
+    payload state.  Returns ``None`` when neither source contributes.
+    """
+
+    body_context: Any = None
+    if "context" in payload:
+        schema = runtime.get(name).metadata.context_schema
+        if schema is None:
+            api_error(
+                status.HTTP_400_BAD_REQUEST,
+                f"Agent '{name}' does not accept context",
+            )
+        body_context = _coerce_context(schema, payload.get("context"))
+
+    header_override = (
+        chat_model_override_from_request(request) if request is not None else None
+    )
+    if header_override is None:
+        return body_context
+    if body_context is None:
+        return header_override
+    if isinstance(body_context, dict):
+        merged = dict(body_context)
+        merged.update(header_override)
+        return merged
+    # Pydantic / dataclass body context: assign chat_model where supported,
+    # otherwise the header override wins outright.
+    try:
+        for key, value in header_override.items():
+            setattr(body_context, key, value)
+        return body_context
+    except (AttributeError, TypeError):
+        return header_override
 
 
 def _enforce_rate_limit(
@@ -644,7 +682,7 @@ async def invoke_agent(
                 record_invocation(name, "budget_exhausted")
             raise
 
-        context = _request_context(name, payload, runtime)
+        context = _request_context(name, payload, runtime, request)
         timeout = settings.agent_request_timeout_seconds
         try:
             result = await asyncio.wait_for(
@@ -782,7 +820,7 @@ async def stream_agent(
             raise
 
         options = _run_options(payload, user_id=user_id)
-        context = _request_context(name, payload, runtime)
+        context = _request_context(name, payload, runtime, request)
         timeout = settings.agent_request_timeout_seconds
 
         async def event_generator() -> AsyncIterator[bytes]:

@@ -63,7 +63,11 @@ from app.services.project_service import is_project_manager
 from app.agents.catalog.search import semantic_search as _semantic_search
 from app.tools.redaction import redact, redact_task_fields
 from app.validation import api_error
-from app.routers._dispatch import _find_suggestion, run_v1_route
+from app.routers._dispatch import (
+    _find_suggestion,
+    chat_model_override_from_request,
+    run_v1_route,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -946,6 +950,7 @@ async def chat(
         if project_id:
             inputs["project_id"] = project_id
 
+        chat_override = chat_model_override_from_request(request)
         timeout = settings.agent_request_timeout_seconds
         try:
             result, _chat_events = await asyncio.wait_for(
@@ -953,6 +958,7 @@ async def chat(
                     meta.catalog_agent_name,
                     inputs,
                     user_id=user_id,
+                    context=chat_override,
                 ),
                 timeout=timeout,
             )

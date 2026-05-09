@@ -33,12 +33,58 @@ from fastapi import HTTPException, Request, status
 from app.agents import AgentRuntime
 from app.agents.errors import AgentError
 from app.agents.limits import enforce_request_limits
+from app.agents.llm import is_chat_model_allowed, make_chat_model_for_id
+from app.config import settings as default_settings
 from app.middleware.budget import BudgetBackend
 from app.middleware.idempotency_guard import IdempotencyContext
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.middleware.rate_limit import RateLimitBackend
 from app.observability.metrics import record_idempotency
 from app.security import current_user_id
+
+
+CHAT_MODEL_OVERRIDE_HEADER = "X-Pulse-Model"
+
+
+def chat_model_override_from_request(
+    request: Request,
+    *,
+    settings: Any = None,
+) -> Optional[Dict[str, Any]]:
+    """Resolve the ``X-Pulse-Model`` header into a context dict, or ``None``.
+
+    Returns ``{"chat_model": <BaseChatModel>}`` when the header is
+    present and points to an allowlisted model id; the runtime's
+    :meth:`AgentRuntime._build_context` picks up this key and overrides
+    the agent's default.  Returns ``None`` when the header is absent so
+    callers can fall through to the agent default.
+
+    Raises :class:`fastapi.HTTPException` (400 ``unsupported_chat_model``)
+    when the header is present but the value is not in the allowlist;
+    operators get a clear signal rather than silent fallback.
+    """
+
+    raw = request.headers.get(CHAT_MODEL_OVERRIDE_HEADER)
+    if raw is None:
+        return None
+    model_id = raw.strip()
+    if not model_id:
+        return None
+    cfg = settings if settings is not None else default_settings
+    if not is_chat_model_allowed(model_id, cfg):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": {
+                    "code": "unsupported_chat_model",
+                    "message": (
+                        f"Chat model {model_id!r} is not in "
+                        "AGENT_CHAT_MODEL_ALLOWLIST."
+                    ),
+                }
+            },
+        )
+    return {"chat_model": make_chat_model_for_id(model_id, settings=cfg)}
 
 
 async def run_v1_route(
@@ -118,6 +164,10 @@ async def run_v1_route(
         enforce_request_limits(payload, request=request)
 
         inputs: Dict[str, Any] = project_inputs(payload, project_id)
+        # Per-request chat-model override (``X-Pulse-Model`` header).  When
+        # absent or feature is off, ``override`` is ``None`` and the runtime
+        # falls back to the agent default.
+        override = chat_model_override_from_request(request)
 
         body: Any = None
         final_state: Any = None
@@ -128,6 +178,7 @@ async def run_v1_route(
                     meta.catalog_agent_name,
                     inputs,
                     user_id=user_id,
+                    context=override,
                 )
             except AgentError:
                 body = agent_error_fallback(payload)
@@ -136,6 +187,7 @@ async def run_v1_route(
                 meta.catalog_agent_name,
                 inputs,
                 user_id=user_id,
+                context=override,
             )
 
         if body is None:

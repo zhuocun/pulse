@@ -154,13 +154,18 @@ doesn't repeat the archaeology.
   is now a real data-driven generator that builds each LangChain tool
   stub directly from the schema entry; adding a `CHAT_TOOL_SCHEMAS`
   row produces a stub with no further code change.
-- **`X-Pulse-Model` header / tenant-config routing (Phase 4 follow-up)**:
-  the injection point in `AgentRuntime._build_context` is wired
-  (caller-supplied `context["chat_model"]` overrides the agent
-  default) but no router reads a request header or tenant config to
-  populate it. Tracked as a TODO in `runtime.py:_build_context`.
-  **Status: open** — needs a model-id whitelist + factory before
-  routers can populate the header path safely.
+- ~~**`X-Pulse-Model` header / tenant-config routing (Phase 4 follow-up)**~~:
+  **Resolved.** New `AGENT_CHAT_MODEL_ALLOWLIST` setting gates which
+  model ids the per-request `X-Pulse-Model` header may select. When the
+  allowlist is empty the feature is off (header is rejected with a
+  400 `unsupported_chat_model`); otherwise allowlisted ids are built via
+  `make_chat_model_for_id()` (inherits provider/credentials from
+  settings) and injected as `context["chat_model"]` so the runtime
+  picks them up. Wired through `_dispatch.run_v1_route` (five v1
+  routes), the v1 chat handler in `routers/ai.py`, and the v2.1
+  `invoke` / `stream` handlers in `routers/agents.py` (merged with
+  payload `context`). Tenant-config routing is a follow-up but the
+  injection point is no longer dead.
 - **`_shared.py` final cleanup (Phase 3 residual)**: ~~`cap_polished_text`
   and `merge_keyed_string_updates` remain in `_shared.py`.~~ **Resolved**
   by commit `f802dd8`: both helpers' canonical implementations now live
@@ -179,10 +184,16 @@ doesn't repeat the archaeology.
   `ValueError` from `_try_verify_signed_thread_key` and re-raises a
   dedicated `InvalidThreadKeyError` (a 4xx-mapped subclass of
   `AgentError`). Coverage: `tests/test_agents.py:1488,1513`.
-- **No JWT secret rotation strategy for signed thread tokens**: signed
-  tokens become invalid on key rotation with no key-id versioning.
-  Acceptable trade-off (rotation is a deliberate event), but worth a
-  `kid`-style envelope before any production rotation. **Status: open.**
+- ~~**No JWT secret rotation strategy for signed thread tokens**~~:
+  **Resolved.** New `sigv2.<base64url>` envelope embeds a `kid` that
+  selects the secret from `AGENT_THREAD_SIGNING_KEYS` (a comma-separated
+  list of `kid:secret` entries; the *last* entry is the active signing
+  kid so operators rotate by appending). When the env is empty,
+  signing falls back to the legacy `sigv1.` envelope (no behaviour
+  change for clients that don't need rotation). Verification accepts
+  both prefixes during rolling restarts; an unknown kid is a soft
+  failure (returns `None` and falls through to the unsigned-fallback
+  path, never crashes).
 - ~~**`PolishStep.cap_text` parameter is dead**~~: **Resolved.** The
   deprecated parameter has been removed from `PolishStep.__init__`;
   `cap_field=(field_name, max_chars)` is the only supported shorthand.

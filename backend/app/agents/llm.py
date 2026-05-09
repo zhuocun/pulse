@@ -157,6 +157,51 @@ def resolved_chat_model_id(settings: Optional[Settings] = None) -> str:
     return resolve_chat_model_spec(settings).model
 
 
+def is_chat_model_allowed(model_id: str, settings: Optional[Settings] = None) -> bool:
+    """Return ``True`` when ``model_id`` is in the configured allowlist.
+
+    Used by router-level handlers that read the ``X-Pulse-Model`` request
+    header.  An empty allowlist means the header-override feature is
+    disabled entirely; this returns ``False`` in that case so the caller
+    surfaces a 4xx (or ignores the header, depending on policy) rather
+    than silently building a model the operator never authorised.
+    """
+
+    cfg = settings if settings is not None else default_settings
+    allow = cfg.agent_chat_model_allowlist
+    return bool(allow) and model_id.strip() in allow
+
+
+def make_chat_model_for_id(
+    model_id: str,
+    *,
+    settings: Optional[Settings] = None,
+) -> BaseChatModel:
+    """Build a chat model for ``model_id`` using the configured provider.
+
+    The provider (Anthropic / OpenAI / stub) and credentials come from
+    ``settings``; only the *model id* is overridden.  This is the
+    intentional split: per-request callers cannot switch providers (would
+    require a per-request API key), only swap to another model on the
+    already-authenticated provider.
+
+    Caller is responsible for checking :func:`is_chat_model_allowed`
+    first; this function does **not** enforce the allowlist.
+    """
+
+    cfg = settings if settings is not None else default_settings
+    base = resolve_chat_model_spec(cfg)
+    spec = ChatModelSpec(
+        provider=base.provider,
+        model=model_id.strip(),
+        temperature=base.temperature,
+        api_key=base.api_key,
+        max_retries=base.max_retries,
+        timeout_seconds=base.timeout_seconds,
+    )
+    return make_chat_model(spec)
+
+
 def make_stub_chat_model(purpose: str = "stub") -> GenericFakeChatModel:
     """Return a ``GenericFakeChatModel`` that emits a single deterministic JSON message.
 
