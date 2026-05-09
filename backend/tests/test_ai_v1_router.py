@@ -1999,6 +1999,13 @@ def test_v1_route_records_idempotency_in_flight_metric(
         metrics_module.reset_for_tests()
 
 
+def test_legacy_ai_route_meta_unknown_suffix_raises_key_error() -> None:
+    from app.routers.ai import _legacy_ai_route_meta
+
+    with pytest.raises(KeyError, match="no legacy AI route metadata"):
+        _legacy_ai_route_meta("/api/ai/not-a-configured-endpoint")
+
+
 # ---------------------------------------------------------------------------
 # Wire-shape parity with pulse `useAi.ts`.
 #
