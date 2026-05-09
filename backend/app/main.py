@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from contextlib import AsyncExitStack, asynccontextmanager
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict
 
 from fastapi import FastAPI, HTTPException, Request
@@ -248,8 +249,16 @@ _SUPPORTED_BUDGET_BACKENDS = _SUPPORTED_MIDDLEWARE_BACKENDS
 _SUPPORTED_IDEMPOTENCY_BACKENDS = _SUPPORTED_MIDDLEWARE_BACKENDS
 
 
-def _configure_middleware_backends(cfg: Settings) -> None:
-    """Swap the rate-limit / budget / idempotency singletons based on settings.
+@dataclass(frozen=True)
+class MiddlewareBackends:
+    """Per-app middleware backends owned by the FastAPI lifespan."""
+
+    rate_limiter: _rate_limit.RateLimitBackend
+    budget_tracker: _budget.BudgetBackend
+
+
+def _configure_middleware_backends(cfg: Settings) -> MiddlewareBackends:
+    """Build the app-owned rate-limit / budget backends and configure idempotency.
 
     The default ``memory`` backends keep working without any config so
     local dev / tests do not need a Redis. When any of
@@ -257,11 +266,10 @@ def _configure_middleware_backends(cfg: Settings) -> None:
     resolves to ``redis`` we lazy-import
     :mod:`app.middleware.redis_backends` (the ``redis`` package only
     needs to be installed for that path), construct a single shared
-    :class:`redis.Redis` client from ``REDIS_URI``, and call the
-    matching ``configure_*_backend`` helper on the middleware modules.
-    Routers reach the singletons via the module attribute so the swap
-    takes effect for every subsequent gate check without any further
-    wiring.
+    :class:`redis.Redis` client from ``REDIS_URI``, and return concrete
+    limiter / budget backends for the lifespan to place on ``app.state``.
+    Only idempotency still uses the module-level configured singleton,
+    because its Starlette middleware helper is not DI-wired yet.
 
     Misconfiguration (an unknown backend name, a missing
     ``REDIS_URI`` when one of the backends is ``redis``) raises
@@ -294,6 +302,11 @@ def _configure_middleware_backends(cfg: Settings) -> None:
             f"expected one of {', '.join(_SUPPORTED_IDEMPOTENCY_BACKENDS)}."
         )
 
+    rate_limiter: _rate_limit.RateLimitBackend = _rate_limit.InMemoryRateLimitBackend()
+    budget_tracker: _budget.BudgetBackend = _budget.InMemoryBudgetBackend(
+        monthly_cap=cfg.agent_budget_monthly_token_cap
+    )
+
     # Warn when any memory-backed middleware runs in a multi-worker /
     # multi-instance environment: each worker maintains an independent
     # in-process counter, so rate limits and budget caps are multiplied by
@@ -325,14 +338,18 @@ def _configure_middleware_backends(cfg: Settings) -> None:
         and budget_backend == "memory"
         and idempotency_backend == "memory"
     ):
-        # No Redis client needed; refresh the in-memory idempotency
-        # cache so the configured TTL takes effect, then exit.
+        # No Redis client needed; build fresh in-memory backends for this app
+        # instance and refresh the idempotency cache so the configured TTL
+        # takes effect.
         _idempotency.configure_idempotency_backend(
             _idempotency.InMemoryIdempotencyBackend(
                 ttl_seconds=cfg.idempotency_ttl_seconds
             )
         )
-        return
+        return MiddlewareBackends(
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+        )
 
     if not cfg.redis_uri:
         raise RuntimeError(
@@ -349,14 +366,10 @@ def _configure_middleware_backends(cfg: Settings) -> None:
 
     client = redis_backends.build_redis_client(cfg.redis_uri)
     if rate_backend == "redis":
-        _rate_limit.configure_rate_limit_backend(
-            redis_backends.RedisRateLimitBackend(client)
-        )
+        rate_limiter = redis_backends.RedisRateLimitBackend(client)
     if budget_backend == "redis":
-        _budget.configure_budget_backend(
-            redis_backends.RedisBudgetBackend(
-                client, monthly_cap=cfg.agent_budget_monthly_token_cap
-            )
+        budget_tracker = redis_backends.RedisBudgetBackend(
+            client, monthly_cap=cfg.agent_budget_monthly_token_cap
         )
     if idempotency_backend == "redis":
         _idempotency.configure_idempotency_backend(
@@ -378,6 +391,10 @@ def _configure_middleware_backends(cfg: Settings) -> None:
         rate_backend,
         budget_backend,
         idempotency_backend,
+    )
+    return MiddlewareBackends(
+        rate_limiter=rate_limiter,
+        budget_tracker=budget_tracker,
     )
 
 
@@ -487,7 +504,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     metrics_app = make_metrics_app()
     if metrics_app is not None:
         application.mount("/metrics", metrics_app)
-    _configure_middleware_backends(settings)
+    middleware_backends = _configure_middleware_backends(settings)
     _warn_about_localhost_only_cors(settings)
     _validate_memory_agent_backends(settings)
     repository.ping()
@@ -495,8 +512,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     logger.info("Connected to %s successfully.", settings.database)
     async with AsyncExitStack() as stack:
         agent_catalog.discover()
-        application.state.rate_limiter = _rate_limit.rate_limiter
-        application.state.budget_tracker = _budget.budget_tracker
+        application.state.rate_limiter = middleware_backends.rate_limiter
+        application.state.budget_tracker = middleware_backends.budget_tracker
         application.state.agent_runtime = await AgentRuntime.from_settings_async(
             settings, stack=stack
         )
