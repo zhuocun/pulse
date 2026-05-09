@@ -8,6 +8,8 @@
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.
 
+**Current status (2026-05-09)**: this review is **not** fully complete. The merged follow-up on `cursor/finish-agent-architecture-review-7dbd` closed F-G1, F-M7, F-SC3, and the shared-pool portion of F-SC1, but four items still remain: the coordinated v1 dispatcher/idempotency refactor (F-M1 + F-M2 + F-M6 + P3.3), a live Postgres smoke test for the shared pool, F-G2 (`RunContext`), and F-S5 (stub-branching unification when a second non-structured agent appears).
+
 ---
 
 ## Findings catalogue
