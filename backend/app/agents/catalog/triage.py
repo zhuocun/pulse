@@ -204,31 +204,51 @@ _triage_step: PolishStep[TriagePolish] = PolishStep(
 )
 
 
+async def _polish_triage(
+    model: BaseChatModel,
+    deterministic_nudges: list[dict[str, Any]],
+    board_snapshot: dict[str, Any],
+) -> tuple[list[dict[str, Any]], Optional[AIMessage], int, int]:
+    """4-tuple variant: returns ``(nudges, raw_msg, tokens_in, tokens_out)``.
+
+    The raw ``AIMessage`` carries ``usage_metadata`` so ``generate_nudges``
+    can include it in state messages for end-of-run budget reconciliation.
+    """
+    if not deterministic_nudges:
+        return deterministic_nudges, None, 0, 0
+    _state = {"_nudges": deterministic_nudges, "_snapshot": board_snapshot}
+    update, tokens_in, tokens_out = await _triage_step.run(_state, model)
+    raw_msg: Optional[AIMessage] = (
+        AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        )
+        if (tokens_in or tokens_out)
+        else None
+    )
+    return update["_result"], raw_msg, tokens_in, tokens_out
+
+
 async def polish_triage(
     model: BaseChatModel,
     deterministic_nudges: list[dict[str, Any]],
     board_snapshot: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], int, int]:
-    """Polish nudge summaries with LLM context; deterministic fallback on stub.
+    """3-tuple wrapper: ``(polished_nudges, tokens_in, tokens_out)``.
 
-    Polished ``summary`` strings are merged back onto the deterministic nudge
-    list keyed by ``nudge_id``. An unknown ``nudge_id`` from the model is
-    ignored (no new nudges injected). A blank polished ``summary`` preserves
-    the deterministic copy.
-
-    Returns ``(polished_nudges, tokens_in, tokens_out)``.
-
-    Note: this function intentionally keeps a 3-tuple return for backward
-    compatibility with tests that import it directly. The raw AIMessage is
-    consumed internally within ``generate_nudges`` via ``PolishStep``.
+    Kept for backward compatibility with tests that import it directly.
+    Internal callers use :func:`_polish_triage` so the raw ``AIMessage``
+    can be appended to state messages for budget reconciliation.
     """
 
-    if not deterministic_nudges:
-        return deterministic_nudges, 0, 0
-
-    _state = {"_nudges": deterministic_nudges, "_snapshot": board_snapshot}
-    update, tokens_in, tokens_out = await _triage_step.run(_state, model)
-    return update["_result"], tokens_in, tokens_out
+    nudges, _raw_msg, tokens_in, tokens_out = await _polish_triage(
+        model, deterministic_nudges, board_snapshot
+    )
+    return nudges, tokens_in, tokens_out
 
 
 class TriageAgent(BaseAgent):
@@ -283,10 +303,11 @@ class TriageAgent(BaseAgent):
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
-            polished_nudges, _tokens_in, _tokens_out = await polish_triage(
+            polished_nudges, raw_msg, _tokens_in, _tokens_out = await _polish_triage(
                 chat_model, nudges, board_snapshot
             )
             project_id = state.get("project_id") or ""
+            extra_messages = [raw_msg] if raw_msg is not None else []
             new_events: list[dict] = []
             for index, nudge in enumerate(polished_nudges):
                 details = nudge.get("details") or {}
@@ -315,7 +336,10 @@ class TriageAgent(BaseAgent):
                 new_events.append({"kind": "suggestion", "surface": "nudge", "payload": fe_nudge})
             return {
                 "nudges": polished_nudges,
-                "messages": [AIMessage(content=json.dumps(polished_nudges))],
+                "messages": [
+                    *extra_messages,
+                    AIMessage(content=json.dumps(polished_nudges)),
+                ],
                 "events": new_events,
             }
 

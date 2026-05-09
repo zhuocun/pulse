@@ -277,6 +277,49 @@ def test_polish_triage_empty_nudges_with_real_model_returns_early() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_generate_nudges_appends_polish_usage_message_for_budget() -> None:
+    """The polish AIMessage with usage_metadata must reach state['messages'].
+
+    Budget reconciliation aggregates token usage from messages at end-of-run
+    (Phase 2). Without the raw AIMessage in messages, triage's polish tokens
+    would be silently dropped from OTel + Prometheus + project budget.
+    """
+    raw = AIMessage(
+        content="ignored",
+        usage_metadata={"input_tokens": 7, "output_tokens": 4, "total_tokens": 11},
+    )
+    parsed = TriagePolish(
+        nudges=[NudgePolish(nudge_id="unowned_bug:0", summary="Polished")]
+    )
+    agent = TriageAgent()
+    agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
+    checkpointer, store = _persistence()
+    graph = agent.build(checkpointer=checkpointer, store=store)
+
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Todo", "wip_limit": 5}],
+        "tasks": [{"id": "bug-1", "column_id": "c1", "type": "bug"}],
+    }
+    final = _drive(
+        graph,
+        {"project_id": "p-1"},
+        [snapshot],
+        thread_id="nudge-budget-1",
+    )
+
+    messages = final.get("messages") or []
+    polish_msgs = [
+        m
+        for m in messages
+        if isinstance(m, AIMessage)
+        and (getattr(m, "usage_metadata", None) or {}).get("total_tokens")
+    ]
+    assert polish_msgs, "Expected polish AIMessage with usage_metadata in state['messages']"
+    usage = polish_msgs[0].usage_metadata
+    assert usage["input_tokens"] == 7
+    assert usage["output_tokens"] == 4
+
+
 def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
     """The ``generate_nudges`` node must populate ``state['events']`` with nudge suggestions.
 
