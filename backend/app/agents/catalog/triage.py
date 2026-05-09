@@ -22,12 +22,13 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
@@ -319,14 +320,15 @@ class TriageAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(TriageState, context_schema=ChatContext)
-        graph.add_node("fetch_snapshot", fetch_snapshot)
-        graph.add_node("detect_drift", detect_drift)
-        graph.add_node("generate_nudges", generate_nudges)
-        graph.add_edge(START, "fetch_snapshot")
-        graph.add_edge("fetch_snapshot", "detect_drift")
-        graph.add_edge("detect_drift", "generate_nudges")
-        graph.add_edge("generate_nudges", END)
+        graph: StateGraph = linear_graph(
+            TriageState,
+            [
+                ("fetch_snapshot", fetch_snapshot),
+                ("detect_drift", detect_drift),
+                ("generate_nudges", generate_nudges),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 

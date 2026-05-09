@@ -21,12 +21,13 @@ from typing import Any, Iterable, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     DRAFT_RATIONALE_MAX,
     NOTE_MAX,
@@ -523,14 +524,15 @@ class TaskDraftingAgent(BaseAgent):
                 "events": [{"kind": "suggestion", "surface": "draft", "payload": draft}],
             }
 
-        graph: StateGraph = StateGraph(TaskDraftingState, context_schema=ChatContext)
-        graph.add_node("fetch_snapshot", fetch_snapshot)
-        graph.add_node("fetch_similar", fetch_similar)
-        graph.add_node("generate_draft", generate_draft)
-        graph.add_edge(START, "fetch_snapshot")
-        graph.add_edge("fetch_snapshot", "fetch_similar")
-        graph.add_edge("fetch_similar", "generate_draft")
-        graph.add_edge("generate_draft", END)
+        graph: StateGraph = linear_graph(
+            TaskDraftingState,
+            [
+                ("fetch_snapshot", fetch_snapshot),
+                ("fetch_similar", fetch_similar),
+                ("generate_draft", generate_draft),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 

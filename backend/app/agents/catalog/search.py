@@ -33,13 +33,14 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     EXPANDED_TERMS_MAX,
     SEARCH_IDS_MAX,
@@ -566,16 +567,16 @@ class SearchAgent(BaseAgent):
                 ],
             }
 
-        graph: StateGraph = StateGraph(SearchState, context_schema=ChatContext)
-        graph.add_node("fetch_candidates", fetch_candidates)
-        graph.add_node("rank", rank)
-        graph.add_node("polish", polish)
-        graph.add_node("emit", emit)
-        graph.add_edge(START, "fetch_candidates")
-        graph.add_edge("fetch_candidates", "rank")
-        graph.add_edge("rank", "polish")
-        graph.add_edge("polish", "emit")
-        graph.add_edge("emit", END)
+        graph: StateGraph = linear_graph(
+            SearchState,
+            [
+                ("fetch_candidates", fetch_candidates),
+                ("rank", rank),
+                ("polish", polish),
+                ("emit", emit),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 

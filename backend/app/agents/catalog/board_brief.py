@@ -19,12 +19,13 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import HEADLINE_MAX
 from app.agents.catalog._shared import (
     build_citation_refs,
@@ -516,16 +517,16 @@ class BoardBriefAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(BoardBriefState, context_schema=ChatContext)
-        graph.add_node("fetch_snapshot", fetch_snapshot)
-        graph.add_node("detect_drift", detect_drift)
-        graph.add_node("generate_brief", generate_brief)
-        graph.add_node("emit_citations", emit_citations)
-        graph.add_edge(START, "fetch_snapshot")
-        graph.add_edge("fetch_snapshot", "detect_drift")
-        graph.add_edge("detect_drift", "generate_brief")
-        graph.add_edge("generate_brief", "emit_citations")
-        graph.add_edge("emit_citations", END)
+        graph: StateGraph = linear_graph(
+            BoardBriefState,
+            [
+                ("fetch_snapshot", fetch_snapshot),
+                ("detect_drift", detect_drift),
+                ("generate_brief", generate_brief),
+                ("emit_citations", emit_citations),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 

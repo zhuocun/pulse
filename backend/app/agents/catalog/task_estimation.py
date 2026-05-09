@@ -18,12 +18,13 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     ESTIMATION_RATIONALE_MAX,
     READINESS_FIELD_MAX,
@@ -641,18 +642,17 @@ class TaskEstimationAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(TaskEstimationState, context_schema=ChatContext)
-        graph.add_node("fetch_similar", fetch_similar)
-        graph.add_node("fetch_embeddings", fetch_embeddings)
-        graph.add_node("estimate", estimate)
-        graph.add_node("readiness", readiness)
-        graph.add_node("emit_citations", emit_citations)
-        graph.add_edge(START, "fetch_similar")
-        graph.add_edge("fetch_similar", "fetch_embeddings")
-        graph.add_edge("fetch_embeddings", "estimate")
-        graph.add_edge("estimate", "readiness")
-        graph.add_edge("readiness", "emit_citations")
-        graph.add_edge("emit_citations", END)
+        graph: StateGraph = linear_graph(
+            TaskEstimationState,
+            [
+                ("fetch_similar", fetch_similar),
+                ("fetch_embeddings", fetch_embeddings),
+                ("estimate", estimate),
+                ("readiness", readiness),
+                ("emit_citations", emit_citations),
+            ],
+            context_schema=ChatContext,
+        )
         return graph.compile(checkpointer=checkpointer, store=store)
 
 
