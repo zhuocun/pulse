@@ -73,10 +73,49 @@ continued on `claude/complete-subagent-orchestrator-fbQHj`.
 | Privatise `polish_*` helpers (`polish_*` → `_polish_*`) once no router imports them | shipped | `e287b6b` |
 | Slim `app/services/v1_engine.py` to helpers without an agent equivalent (file deleted; helpers absorbed into catalog modules) | shipped | `a302052` |
 
-### Phases 2–6 — in progress
+### Phase 2 — Make agent outputs first-class, not side-effects — **complete**
 
-Phase 2 (events as state, single end-of-run token aggregation) is in
-flight on the same branch. Phases 3–6 are not yet started.
+| Item | Status | Commit |
+|---|---|---|
+| `events: Annotated[list[dict], add_events]` field on `BaseAgentState`; `add_events` reducer mirrors `add_messages` | shipped | `2be1605` |
+| `app/agents/events.py` with typed `Suggestion` / `Citation` / `Usage` Pydantic models + `coerce_event` / `as_event_dict` helpers | shipped | `2be1605` |
+| Six catalog modules migrated from `emit_custom(...)` / `emit_usage(...)` side effects to returning `{"events": [...]}` from nodes | shipped | `2be1605` |
+| `runtime.astream` re-emits state-delta events as `("custom", evt)` for SSE wire continuity; `arun_with_events` reads from `final_state["events"]` | shipped | `2be1605` |
+| Token usage flows through `messages[*].usage_metadata` end-of-run; tests for `get_stream_writer` mocks rewritten to assert on `state["events"]` directly | shipped | `2be1605` |
+
+### Phase 3 — PolishStep DSL — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/polish.py` with `PolishStep` (prompt builder, schema, fallback, redaction, cap, merge) and four-cell matrix unit tests | shipped | `ba44346` |
+| Migrate `_polish_headline` (board_brief), `polish_triage` (triage), `_polish_draft` (task_drafting), `_polish_rationale` + `_polish_readiness` (task_estimation), `_polish_search` (search) onto `PolishStep` | shipped | `7bb4e15` |
+| Drop `structured_llm_call` from `_shared.py` (no remaining callers); keep `cap_polished_text` and `merge_keyed_string_updates` (still used by merge closures) | shipped | `7bb4e15` |
+
+### Phase 4 — Decouple model resolution from graph compilation — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/context.py` with `ChatContext(TypedDict)` carrying `chat_model`, `user_id`, `project_id` | shipped | `56a092d` |
+| Runtime resolves the model per call: caller-supplied `context["chat_model"]` overrides; otherwise falls back to `agent.chat_model`. Wired through `invoke`, `ainvoke`, `arun_with_events`, `astream` | shipped | `56a092d` |
+| Six catalog nodes read the model via `get_runtime(ChatContext).context.chat_model` instead of capturing it on `self` at build time | shipped | `56a092d` |
+| `tests/test_runtime_context.py` covers context-override priority, default fallback, two-call isolation, and `set_chat_model` propagation | shipped | `56a092d` |
+
+### Phase 5 — Linear-pipeline scaffolding for graphs and HTTP — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| `app/agents/pipeline.py` with `linear_graph(state, [(name, fn), ...])`; five linear catalog agents migrated; chat agent stays manual | shipped | `674c0a9` |
+| `WithBoardSnapshot` / `WithDriftResult` / `WithSimilarTasks` TypedDict mixins; per-agent state composes from `BaseAgentState` + relevant mixins; duplicate field declarations removed | shipped | `5ad677e` |
+| `app/routers/_dispatch.py:run_v1_route` factory; the five structured v1 routes collapse to a thin handler each (project_inputs / project_body) | shipped | `ca8b3fb` |
+
+### Phase 6 — Hardening — **complete**
+
+| Item | Status | Commit |
+|---|---|---|
+| Explicit catalog manifest replaces import-time `registry.register(...)` side-effects; broken catalog modules are now FATAL at lifespan startup, not silently degraded | shipped | `fea6045` |
+| Single FE-tool source of truth (`fe_tool_schemas.CHAT_TOOL_SCHEMAS`); LangChain `@tool` stubs in `_chat_tools.py` are generated from the schema rather than redeclared | shipped | `39dae9a` |
+| Signed thread keys (`sigv1.<base64>` HMAC-SHA256 envelope over `(agent, user, original)` using the JWT secret) replace iterative-strip; old unsigned tokens still validated as a backwards-compat fallback | shipped | `147ea50` |
+| `app.state.embeddings` populated at lifespan startup; `_embeddings_singleton` global removed; module-level `registry` retained as the runtime's backing store for test-fixture compatibility (per-app isolation deferred) | shipped | `d9d2983` |
 
 ---
 
