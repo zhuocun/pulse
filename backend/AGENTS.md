@@ -49,3 +49,4 @@ Tests use an in-memory `FakeStore` and `fakeredis`; **no external services neede
 - **`UUID` env var** is the JWT signing secret. If it's shorter than 32 characters the server refuses to start.
 - All AI agents fall back to **deterministic stubs** without `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, so the app is fully functional for CRUD and agent-endpoint testing without any LLM keys.
 - The `[dev]` extra alone is **not enough** to run the full test suite — install `".[dev,ai]"` (or `".[dev]"` then `".[ai]"` separately) so the observability tests find their imports.
+- AI router tests should override `get_rate_limiter` / `get_budget_tracker` (or seed `app.state.rate_limiter` / `app.state.budget_tracker`) instead of mutating module singletons. The production app now owns fresh limiter/budget backends per lifespan; the module globals are only the fallback path for mini-app/unit tests that bypass lifespan startup.

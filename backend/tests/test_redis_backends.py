@@ -381,19 +381,18 @@ def test_configure_rate_limit_backend_swaps_the_module_singleton(
 # ---------------------------------------------------------------------------
 
 
-def test_configure_middleware_backends_no_op_for_default_memory() -> None:
+def test_configure_middleware_backends_builds_fresh_memory_backends() -> None:
     cfg = replace(
         app_settings,
         rate_limit_backend="memory",
         budget_backend="memory",
         redis_uri="",
     )
-    original_budget = _budget.budget_tracker
-    original_rate_limit = _rate_limit.rate_limiter
-    main._configure_middleware_backends(cfg)
-    # Pure no-op: same objects.
-    assert _budget.budget_tracker is original_budget
-    assert _rate_limit.rate_limiter is original_rate_limit
+    backends = main._configure_middleware_backends(cfg)
+    assert isinstance(backends.budget_tracker, _budget.InMemoryBudgetBackend)
+    assert isinstance(backends.rate_limiter, _rate_limit.InMemoryRateLimitBackend)
+    assert backends.budget_tracker is not _budget.budget_tracker
+    assert backends.rate_limiter is not _rate_limit.rate_limiter
 
 
 def test_configure_middleware_backends_rejects_unknown_rate_limit_backend() -> None:
@@ -429,7 +428,7 @@ def test_configure_middleware_backends_requires_redis_uri_for_redis_backend() ->
         main._configure_middleware_backends(cfg)
 
 
-def test_configure_middleware_backends_swaps_to_redis_via_fakeredis(
+def test_configure_middleware_backends_builds_redis_backends_via_fakeredis(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Patch ``build_redis_client`` to return fakeredis so the lifespan
@@ -447,15 +446,13 @@ def test_configure_middleware_backends_swaps_to_redis_via_fakeredis(
         redis_uri="redis://stub",
     )
 
-    main._configure_middleware_backends(cfg)
+    backends = main._configure_middleware_backends(cfg)
 
-    assert isinstance(_budget.budget_tracker, redis_backends.RedisBudgetBackend)
-    assert isinstance(
-        _rate_limit.rate_limiter, redis_backends.RedisRateLimitBackend
-    )
-    # Confirm the swapped singletons round-trip through the fake.
-    assert _budget.budget_tracker.reserve("p-a", 5) is True
-    allowed, _ = _rate_limit.rate_limiter.check(
+    assert isinstance(backends.budget_tracker, redis_backends.RedisBudgetBackend)
+    assert isinstance(backends.rate_limiter, redis_backends.RedisRateLimitBackend)
+    # Confirm the app-owned backends round-trip through the fake.
+    assert backends.budget_tracker.reserve("p-a", 5) is True
+    allowed, _ = backends.rate_limiter.check(
         "agent-x", "u-1", limits=(5, 50)
     )
     assert allowed is True
@@ -481,18 +478,16 @@ def test_configure_middleware_backends_handles_whitespace_and_case(
         redis_uri="redis://stub",
     )
 
-    main._configure_middleware_backends(cfg)
+    backends = main._configure_middleware_backends(cfg)
 
-    assert isinstance(_budget.budget_tracker, redis_backends.RedisBudgetBackend)
-    assert isinstance(
-        _rate_limit.rate_limiter, redis_backends.RedisRateLimitBackend
-    )
+    assert isinstance(backends.budget_tracker, redis_backends.RedisBudgetBackend)
+    assert isinstance(backends.rate_limiter, redis_backends.RedisRateLimitBackend)
 
 
-def test_configure_middleware_backends_only_swaps_the_selected_side(
+def test_configure_middleware_backends_only_builds_the_selected_side(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A mixed config (rate_limit=redis, budget=memory) must only swap one."""
+    """A mixed config (rate_limit=redis, budget=memory) must only switch one."""
 
     fake = fakeredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(
@@ -504,14 +499,10 @@ def test_configure_middleware_backends_only_swaps_the_selected_side(
         budget_backend="memory",
         redis_uri="redis://stub",
     )
-    original_budget = _budget.budget_tracker
+    backends = main._configure_middleware_backends(cfg)
 
-    main._configure_middleware_backends(cfg)
-
-    assert _budget.budget_tracker is original_budget
-    assert isinstance(
-        _rate_limit.rate_limiter, redis_backends.RedisRateLimitBackend
-    )
+    assert isinstance(backends.budget_tracker, _budget.InMemoryBudgetBackend)
+    assert isinstance(backends.rate_limiter, redis_backends.RedisRateLimitBackend)
 
 
 def test_configure_middleware_backends_blank_string_collapses_to_memory(
@@ -530,10 +521,7 @@ def test_configure_middleware_backends_blank_string_collapses_to_memory(
         budget_backend="",
         redis_uri="",
     )
-    original_budget = _budget.budget_tracker
-    original_rate_limit = _rate_limit.rate_limiter
+    backends = main._configure_middleware_backends(cfg)
 
-    main._configure_middleware_backends(cfg)
-
-    assert _budget.budget_tracker is original_budget
-    assert _rate_limit.rate_limiter is original_rate_limit
+    assert isinstance(backends.budget_tracker, _budget.InMemoryBudgetBackend)
+    assert isinstance(backends.rate_limiter, _rate_limit.InMemoryRateLimitBackend)

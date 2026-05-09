@@ -50,6 +50,7 @@ from app.middleware.idempotency_guard import (
 from app.security import create_token
 from app.auth import project_access as project_access_module
 from app.routers import ai as ai_router_module
+from app.middleware.budget import BudgetTracker
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
 
 
@@ -67,9 +68,8 @@ def fake_redis() -> Iterable[fakeredis.FakeRedis]:
 
 @pytest.fixture(autouse=True)
 def _restore_module_singletons() -> Iterable[None]:
-    """Restore every module-level singleton between tests so a swap
-    performed by one case never leaks into another (mirrors the
-    sibling fixture in :mod:`tests.test_redis_backends`)."""
+    """Restore module-level middleware singletons between tests so a swap
+    performed by one case never leaks into another."""
 
     original_idempotency = _idempotency.idempotency_cache
     original_budget = budget_module.budget_tracker
@@ -880,6 +880,7 @@ def test_invoke_replays_response_with_idempotency_key(
     client: TestClient,
     idem_agent: _IdemAgent,
     auth_headers: dict[str, str],
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     headers = {**auth_headers, "Idempotency-Key": "abc-123"}
     body = {
@@ -889,8 +890,7 @@ def test_invoke_replays_response_with_idempotency_key(
     first = client.post("/api/v1/agents/idem-noise/invoke", json=body, headers=headers)
     assert first.status_code == HTTPStatus.OK
     spent_after_first = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-replay")
+        ai_budget_backend.monthly_cap - ai_budget_backend.remaining("p-replay")
     )
     assert spent_after_first > 0
 
@@ -899,8 +899,7 @@ def test_invoke_replays_response_with_idempotency_key(
     assert second.headers.get("Idempotent-Replay") == "true"
     assert second.json() == first.json()
     spent_after_second = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-replay")
+        ai_budget_backend.monthly_cap - ai_budget_backend.remaining("p-replay")
     )
     assert spent_after_first == spent_after_second, "replay must not re-debit"
 
@@ -1237,6 +1236,7 @@ def test_stream_replays_completion_marker_with_idempotency_key(
     client: TestClient,
     idem_agent: _IdemAgent,
     auth_headers: dict[str, str],
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Initial POST streams SSE; a retry with the same key short-circuits
     to a 200 JSON marker carrying ``Idempotent-Replay: true`` instead of
@@ -1257,8 +1257,7 @@ def test_stream_replays_completion_marker_with_idempotency_key(
         # Drain so the generator runs to completion and stores the marker.
         b"".join(response.iter_bytes())
     spent_after_first = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-replay")
+        ai_budget_backend.monthly_cap - ai_budget_backend.remaining("p-replay")
     )
     assert spent_after_first > 0
 
@@ -1267,8 +1266,7 @@ def test_stream_replays_completion_marker_with_idempotency_key(
     assert second.headers.get("Idempotent-Replay") == "true"
     assert second.json() == {"status": "stream_completed"}
     spent_after_second = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-replay")
+        ai_budget_backend.monthly_cap - ai_budget_backend.remaining("p-replay")
     )
     assert spent_after_first == spent_after_second, "replay must not re-debit"
 

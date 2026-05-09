@@ -11,8 +11,6 @@ from pytest import FixtureRequest
 
 from app import main, security
 from app.agents.limits import enforce_request_limits
-from app.middleware import budget as budget_module
-from app.middleware import rate_limit as rate_limit_module
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
 
@@ -128,15 +126,6 @@ def ai_headers() -> dict[str, str]:
     )
     token = create_token("ai-user")
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def reset_limits() -> Iterable[None]:
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
-    yield
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
 
 
 def test_v1_task_draft_oversized_prompt_returns_413(

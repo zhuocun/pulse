@@ -24,8 +24,7 @@ from app import main
 from app import security
 from app.agents import AgentMetadata, BaseAgent
 from app.agents.registry import registry as global_registry
-from app.middleware import budget as budget_module
-from app.middleware import rate_limit as rate_limit_module
+from app.middleware.budget import BudgetTracker
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
 
@@ -149,15 +148,6 @@ def auth_headers() -> dict[str, str]:
     )
     token = create_token("router-user")
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def reset_state() -> Iterable[None]:
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
-    yield
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
 
 
 @pytest.fixture()
@@ -461,6 +451,7 @@ def test_invoke_timeout_refunds_reserved_budget(
     noise_agent: _NoiseAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Budget pre-books before the run; timeouts must not strand the reservation."""
 
@@ -473,7 +464,7 @@ def test_invoke_timeout_refunds_reserved_budget(
     monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(1))
 
     project_id = "p-budget-track"
-    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    remaining_before = ai_budget_backend.remaining(project_id)
     response = client.post(
         "/api/v1/agents/noise/invoke",
         json={
@@ -483,7 +474,7 @@ def test_invoke_timeout_refunds_reserved_budget(
         headers=auth_headers,
     )
     assert response.status_code == HTTPStatus.GATEWAY_TIMEOUT
-    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
+    assert ai_budget_backend.remaining(project_id) == remaining_before
 
 
 def _settings_with_timeout(seconds: int) -> Any:
@@ -548,6 +539,7 @@ def test_stream_runtime_failure_refunds_reserved_budget(
     noise_agent: _NoiseAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Astream errors before emitting usage must revert the gate reservation."""
 
@@ -561,7 +553,7 @@ def test_stream_runtime_failure_refunds_reserved_budget(
     monkeypatch.setattr(runtime, "astream", boom, raising=False)
 
     project_id = "p-budget-track"
-    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    remaining_before = ai_budget_backend.remaining(project_id)
     with client.stream(
         "POST",
         "/api/v1/agents/noise/stream",
@@ -572,7 +564,7 @@ def test_stream_runtime_failure_refunds_reserved_budget(
         headers=auth_headers,
     ) as response:
         b"".join(response.iter_bytes())
-    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
+    assert ai_budget_backend.remaining(project_id) == remaining_before
 
 
 def test_stream_refunds_budget_when_setup_fails_after_reserve(
@@ -580,6 +572,7 @@ def test_stream_refunds_budget_when_setup_fails_after_reserve(
     noise_agent: _NoiseAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Reserved tokens must be released if we error before returning StreamingResponse."""
 
@@ -589,7 +582,7 @@ def test_stream_refunds_budget_when_setup_fails_after_reserve(
 
     monkeypatch.setattr("app.routers.agents.StreamingResponse", _BoomStreamingResponse)
     project_id = "p-budget-track"
-    remaining_before = budget_module.budget_tracker.remaining(project_id)
+    remaining_before = ai_budget_backend.remaining(project_id)
     lax = TestClient(client.app, raise_server_exceptions=False)
     response = lax.post(
         "/api/v1/agents/noise/stream",
@@ -600,7 +593,7 @@ def test_stream_refunds_budget_when_setup_fails_after_reserve(
         headers=auth_headers,
     )
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
-    assert budget_module.budget_tracker.remaining(project_id) == remaining_before
+    assert ai_budget_backend.remaining(project_id) == remaining_before
 
 
 def test_stream_emits_error_envelope_on_unexpected_exception(
@@ -682,10 +675,12 @@ def test_invoke_returns_real_usage_when_chat_model_reports_tokens(
 
 
 def test_invoke_records_usage_against_budget(
-    client: TestClient, auth_headers: dict[str, str]
+    client: TestClient,
+    auth_headers: dict[str, str],
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     chat_agent = client.app.state.agent_runtime.get("chat-agent")
-    starting = budget_module.budget_tracker.remaining("p-budget-track")
+    starting = ai_budget_backend.remaining("p-budget-track")
     response = client.post(
         "/api/v1/agents/chat-agent/invoke",
         json={
@@ -697,7 +692,7 @@ def test_invoke_records_usage_against_budget(
         headers=auth_headers,
     )
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining("p-budget-track")
+    after = ai_budget_backend.remaining("p-budget-track")
     assert after < starting
     assert chat_agent  # used
 
@@ -898,6 +893,7 @@ def test_stream_records_budget_exhausted_invocation_metric(
     noise_agent: _NoiseAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """stream_agent records 'budget_exhausted' metric on 402."""
     from app.observability import metrics as metrics_module
@@ -907,7 +903,7 @@ def test_stream_records_budget_exhausted_invocation_metric(
         settings=replace(app_settings, prometheus_metrics=True)
     )
     try:
-        monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+        monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
         response = client.post(
             "/api/v1/agents/noise/stream",
             json={

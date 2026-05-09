@@ -117,6 +117,28 @@ Per the doc's own staged-migration recommendation, this PR lands step 1 only —
 
 ---
 
+## Shipped on `cursor/finish-agent-architecture-review-7dbd`
+
+Three of the documented follow-ups were completed. **885 BE tests passing, 100 % coverage, ruff clean.**
+
+### F-SC3 — Inject middleware instead of importing singletons (steps 2-3)
+
+- **Step 2 shipped**: both AI routers now receive `RateLimitBackend` / `BudgetBackend` via `Depends(get_rate_limiter)` and `Depends(get_budget_tracker)`. Shared helpers (`_gate`, `_gate_with_reservation`, `_polish_and_record`, `_enforce_rate_limit`, `_enforce_budget`, `_record_real_usage`) accept the injected backends explicitly, so no production route reaches into `rate_limit.rate_limiter` or `budget.budget_tracker` anymore.
+- **Test isolation shipped**: router-facing test suites moved off `rate_limiter.reset()` / `budget_tracker.reset()` teardown. `tests/conftest.py` now provides per-test `ai_rate_limit_backend` / `ai_budget_backend` fixtures and autouse `app.dependency_overrides[...]` wiring, so router tests get fresh backends without mutating shared module state.
+- **Step 3 shipped for the production path**: `app.main._configure_middleware_backends()` now returns app-owned limiter / budget backends, and the FastAPI lifespan stores them on `application.state`. Redis selection is therefore an app-state swap point rather than a router import convention. The module-level singleton fallback remains only for lightweight tests / mini-apps that bypass lifespan startup.
+
+### F-SC1 follow-up — process-wide pool sharing
+
+- `AgentRuntime.from_settings_async()` now reuses one `AsyncConnectionPool` when the checkpointer and store both use Postgres and resolve to the same DSN. `open_checkpointer()` / `open_store()` still support their standalone paths, but accept an injected pool so the shared-lifespan case enters and cleans up the pool exactly once.
+- `tests/test_agents.py` now asserts the shared-pool path, the split-DSN path (two pools), and concurrent lifespans (one pool per runtime, not process-global leakage).
+- The original "real Postgres smoke test" follow-up is still open; current coverage proves lifecycle correctness with fakes, not against a live database.
+
+### F-M7 — Magic LangGraph key
+
+- `app/agents/sse.py` now documents `_INTERRUPT_KEY = "__interrupt__"` as the single LangGraph-compat shim, with an explicit note that a future upstream rename should only require a one-line update there.
+
+---
+
 ## Deferred (with rationale)
 
 Each deferred item is independently shippable in a follow-up PR. Reasons are explicit so the next author isn't guessing what was tried.
@@ -158,11 +180,11 @@ This is a multi-day refactor. Out of scope for the surgical-fixes-and-seams pass
 
 ### F-SC1 / P5.1 — AsyncConnectionPool for Postgres checkpointer / store — **shipped**
 
-Resolved on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section above. Each function still opens its own pool — a future refactor can hoist to a single process-wide pool shared by both the checkpointer and the store, and pair it with a Postgres integration smoke test so the pool's lifecycle is exercised against a real DB.
+Resolved across `claude/finish-subagent-orchestrator-docs-QDAmR` and `cursor/finish-agent-architecture-review-7dbd`; see the sections above. The shared-pool refactor is now shipped. The only remaining follow-up is a real Postgres integration smoke test so the pool lifecycle is exercised against a live DB.
 
-### F-SC3 / P5.3 — Inject middleware instead of importing singletons — **partial (step 1 shipped)**
+### F-SC3 / P5.3 — Inject middleware instead of importing singletons — **shipped**
 
-Step 1 (introduce DI getters with the singleton as default) shipped on `claude/finish-subagent-orchestrator-docs-QDAmR`; see the section above. Step 2 (migrate one test file at a time to use `app.dependency_overrides`) and step 3 (remove the singletons; finalise Redis-backed swap point) remain deferred.
+Step 1 (introduce DI getters with the singleton as default) shipped on `claude/finish-subagent-orchestrator-docs-QDAmR`. Steps 2-3 shipped on `cursor/finish-agent-architecture-review-7dbd`: routers now receive the backends via `Depends(...)`, tests isolate them through `app.dependency_overrides`, and the production app owns the live limiter / budget instances on `app.state`. The module-level singletons remain only as a fallback for mini-app / unit-test scenarios that do not run the lifespan.
 
 ### F-G2 / P6.1 — `RunContext` for graph-node observability
 
@@ -174,11 +196,9 @@ Step 1 (introduce DI getters with the singleton as default) shipped on `claude/f
 
 ## Pickup checklist for the next pass
 
-After the `claude/finish-subagent-orchestrator-docs-QDAmR` round, F-G1, F-SC1, and step 1 of F-SC3 have shipped. The remaining work is:
+After the `cursor/finish-agent-architecture-review-7dbd` round, F-G1, F-M7, F-SC3, and the shared-pool portion of F-SC1 have shipped. The remaining work is:
 
 1. **F-M1 + F-M2 + F-M6 + P3.3 (V1_ROUTES dispatcher + idempotency keys)** — single coordinated refactor. Largest maintenance dividend. ~5 distinct polish-helper signatures, 7 handlers, 74 tests in `test_ai_v1_router.py`. Multi-day; deliberately untouched on this pass.
-2. **F-SC3 step 2 (router migration to DI)** — switch each router to `Depends(get_rate_limiter)` / `Depends(get_budget_tracker)`, and migrate fixture teardown to `app.dependency_overrides` one test file at a time (6 files: `test_ai_v1_router.py`, `test_agents_router_v21.py`, `test_ai_limits.py`, `test_coverage_filling.py`, `test_agents.py`, `test_idempotency.py`). Step 3 (remove singletons) follows.
-3. **F-SC3 step-2 follow-up — Redis swap point** — once routers receive the limiter via DI, the Redis-backed implementations in `app/middleware/redis_backends.py` can be wired through `app.state` at lifespan startup based on a config flag, without touching production callers.
-4. **F-SC1 follow-up — process-wide pool** — hoist the pool to a single `AsyncConnectionPool` shared by checkpointer and store; pair with a Postgres integration smoke test so the pool lifecycle is exercised against a real DB.
-5. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
-6. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.
+2. **F-SC1 follow-up — real Postgres smoke test** — the pool is now shared, but the lifecycle is only covered by fakes. Add a live-DB smoke test when CI / local env can supply Postgres cheaply.
+3. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Today only 3 catalog log call sites exist (all error paths in `__init__.py`, `_shared.py`, `chat.py`), so the demand isn't there yet.
+4. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools` shape as `chat`.

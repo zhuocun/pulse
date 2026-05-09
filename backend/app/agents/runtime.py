@@ -34,6 +34,7 @@ from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.checkpointing import (
     PostgresCheckpointerSpec,
     build_checkpointer,
+    enter_agent_postgres_pool,
     open_checkpointer,
 )
 from app.agents.errors import (
@@ -124,11 +125,33 @@ class AgentRuntime:
         from the lifespan regardless of which backend is configured.
         """
 
+        checkpointer_spec = build_checkpointer(
+            settings.agent_checkpoint_backend, settings=settings
+        )
+        store_spec = build_store(settings.agent_store_backend, settings=settings)
+
+        # One AsyncConnectionPool for both LangGraph layers when they target the
+        # same resolved DSN; otherwise each postgres open_* allocates its own.
+        shared_pool = None
+        if isinstance(checkpointer_spec, PostgresCheckpointerSpec) and isinstance(
+            store_spec, PostgresStoreSpec
+        ):
+            if checkpointer_spec.conn_string == store_spec.conn_string:
+                shared_pool = await enter_agent_postgres_pool(
+                    stack, checkpointer_spec.conn_string, settings
+                )
+
         checkpointer = await open_checkpointer(
-            settings.agent_checkpoint_backend, stack=stack, settings=settings
+            settings.agent_checkpoint_backend,
+            stack=stack,
+            settings=settings,
+            pool=shared_pool,
         )
         store = await open_store(
-            settings.agent_store_backend, stack=stack, settings=settings
+            settings.agent_store_backend,
+            stack=stack,
+            settings=settings,
+            pool=shared_pool,
         )
         return cls(
             checkpointer=checkpointer,

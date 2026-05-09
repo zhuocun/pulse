@@ -30,8 +30,9 @@ from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 
-# The LangGraph "updates" payload uses this key to surface paused
-# interrupts. We hide that detail from clients.
+# LangGraph 1.x exposes paused interrupts under this internal key in the
+# "updates" stream payload. Keep the constant centralized here so a future
+# LangGraph rename only touches one file.
 _INTERRUPT_KEY = "__interrupt__"
 
 

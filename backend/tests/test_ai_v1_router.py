@@ -18,8 +18,8 @@ from app.agents.catalog import task_drafting as td_module
 from app.agents.catalog import task_estimation as te_module
 from app.agents.llm import make_stub_chat_model
 from app.config import settings as default_settings
-from app.middleware import budget as budget_module
-from app.middleware import rate_limit as rate_limit_module
+from app.middleware.budget import BudgetTracker
+from app.middleware.rate_limit import RateLimiter
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
 from tests.conftest import is_not_stub, structured_model
@@ -42,15 +42,6 @@ def auth_headers() -> dict[str, str]:
     )
     token = create_token("ai-user")
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def reset_state() -> Iterable[None]:
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
-    yield
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
 
 
 def _project_context() -> dict[str, Any]:
@@ -564,8 +555,9 @@ def test_budget_exhausted_returns_402(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
-    monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+    monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
     response = client.post(
         "/api/ai/task-draft",
         headers=auth_headers,
@@ -621,7 +613,9 @@ def test_chat_redacts_user_email(
 
 
 def test_chat_records_budget_when_project_present(
-    client: TestClient, auth_headers: dict[str, str]
+    client: TestClient,
+    auth_headers: dict[str, str],
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     response = client.post(
         "/api/ai/chat",
@@ -632,7 +626,7 @@ def test_chat_records_budget_when_project_present(
         },
     )
     assert response.status_code == HTTPStatus.OK
-    remaining = budget_module.budget_tracker.remaining("p-budget")
+    remaining = ai_budget_backend.remaining("p-budget")
     assert remaining < default_settings.agent_budget_monthly_token_cap
 
 
@@ -744,6 +738,7 @@ def test_task_draft_records_real_usage_against_budget(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     monkeypatch.setattr(td_module, "is_stub_model", is_not_stub)
     raw = AIMessage(
@@ -757,7 +752,7 @@ def test_task_draft_records_real_usage_against_budget(
     )
     agent = client.app.state.agent_runtime.get("task-drafting-agent")
     agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
-    starting = budget_module.budget_tracker.remaining("p-1")
+    starting = ai_budget_backend.remaining("p-1")
     try:
         response = client.post(
             "/api/ai/task-draft",
@@ -770,7 +765,7 @@ def test_task_draft_records_real_usage_against_budget(
     finally:
         _restore_stub(client, "task-drafting-agent")
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining("p-1")
+    after = ai_budget_backend.remaining("p-1")
     # 1 token was debited at gate-time (in==9, out==6 -> total 15 -> top-up 14).
     assert starting - after == 14
 
@@ -966,6 +961,7 @@ def test_readiness_records_real_usage_against_budget(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Provider-reported usage is trued up against the project budget."""
 
@@ -985,7 +981,7 @@ def test_readiness_records_real_usage_against_budget(
     )
     agent = client.app.state.agent_runtime.get("task-estimation-agent")
     agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
-    starting = budget_module.budget_tracker.remaining("p-1")
+    starting = ai_budget_backend.remaining("p-1")
     try:
         response = client.post(
             "/api/ai/readiness",
@@ -995,7 +991,7 @@ def test_readiness_records_real_usage_against_budget(
     finally:
         _restore_stub(client, "task-estimation-agent")
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining("p-1")
+    after = ai_budget_backend.remaining("p-1")
     # 1 token debited at gate-time; in==10, out==6 -> total 16 -> top-up 15.
     assert starting - after == 15
 
@@ -1252,6 +1248,7 @@ def test_polish_and_record_no_op_when_project_id_is_none(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """Without a project_id in the payload, no budget debit is recorded."""
 
@@ -1269,7 +1266,7 @@ def test_polish_and_record_no_op_when_project_id_is_none(
     agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
     # Snapshot the budget for an unrelated project to make sure no debit
     # leaks through.
-    before = budget_module.budget_tracker.remaining("unrelated")
+    before = ai_budget_backend.remaining("unrelated")
     try:
         response = client.post(
             "/api/ai/task-draft",
@@ -1280,7 +1277,7 @@ def test_polish_and_record_no_op_when_project_id_is_none(
     finally:
         _restore_stub(client, "task-drafting-agent")
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining("unrelated")
+    after = ai_budget_backend.remaining("unrelated")
     assert before == after
 
 
@@ -1288,6 +1285,7 @@ def test_polish_and_record_skips_top_up_when_actual_is_zero(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """A model that reports ``(0, 0)`` tokens triggers no budget top-up."""
 
@@ -1300,7 +1298,7 @@ def test_polish_and_record_skips_top_up_when_actual_is_zero(
     # ``raw_message=None`` => extract_token_usage returns (0, 0).
     agent = client.app.state.agent_runtime.get("task-drafting-agent")
     agent.set_chat_model(structured_model(parsed=parsed, raw_message=None))
-    starting = budget_module.budget_tracker.remaining("p-1")
+    starting = ai_budget_backend.remaining("p-1")
     try:
         response = client.post(
             "/api/ai/task-draft",
@@ -1313,7 +1311,7 @@ def test_polish_and_record_skips_top_up_when_actual_is_zero(
     finally:
         _restore_stub(client, "task-drafting-agent")
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining("p-1")
+    after = ai_budget_backend.remaining("p-1")
     # Only the gate-time 1-token debit was recorded; no provider top-up.
     assert starting - after == 0
 
@@ -1456,6 +1454,7 @@ def test_search_records_real_usage_against_budget(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     from app.agents.catalog import search as search_module
 
@@ -1467,7 +1466,7 @@ def test_search_records_real_usage_against_budget(
     parsed = search_module.SearchRanking(ids=["t-1"], rationale="r")
     agent = client.app.state.agent_runtime.get("search-agent")
     agent.set_chat_model(structured_model(parsed=parsed, raw_message=raw))
-    starting = budget_module.budget_tracker.remaining("p-1")
+    starting = ai_budget_backend.remaining("p-1")
     try:
         response = client.post(
             "/api/ai/search",
@@ -1480,7 +1479,7 @@ def test_search_records_real_usage_against_budget(
         )
     finally:
         _restore_stub(client, "search-agent")
-    after = budget_module.budget_tracker.remaining("p-1")
+    after = ai_budget_backend.remaining("p-1")
     # Total 9 tokens; 1 was prebooked at the gate; delta = 8.
     assert response.status_code == HTTPStatus.OK
     assert starting - after == 8
@@ -2174,6 +2173,7 @@ def test_gate_records_rate_limited_on_429(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_rate_limit_backend: RateLimiter,
 ) -> None:
     """_gate emits record_invocation('rate_limited') and returns 429."""
     from app.observability import metrics as metrics_module
@@ -2185,7 +2185,7 @@ def test_gate_records_rate_limited_on_429(
     try:
         # Exhaust the rate limiter so the second task-draft call is blocked.
         monkeypatch.setattr(
-            rate_limit_module.rate_limiter,
+            ai_rate_limit_backend,
             "check",
             lambda *a, **kw: (False, 60),
         )
@@ -2251,6 +2251,7 @@ def test_gate_with_reservation_records_budget_exhausted_on_402(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """_gate_with_reservation records 'budget_exhausted' and returns 402."""
     from app.observability import metrics as metrics_module
@@ -2260,7 +2261,7 @@ def test_gate_with_reservation_records_budget_exhausted_on_402(
         settings=replace(app_settings, prometheus_metrics=True)
     )
     try:
-        monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+        monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
         response = client.post(
             "/api/ai/chat",
             headers=auth_headers,
@@ -2289,10 +2290,11 @@ def test_chat_refunds_reservation_on_ainvoke_failure(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """When runtime.ainvoke raises, the reserved budget token is refunded."""
     project_id = "p-budget"
-    before = budget_module.budget_tracker.remaining(project_id)
+    before = ai_budget_backend.remaining(project_id)
 
     async def explode(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError("forced failure")
@@ -2309,7 +2311,7 @@ def test_chat_refunds_reservation_on_ainvoke_failure(
             "context": {"project": {"_id": project_id, "projectName": "Budgeted"}},
         },
     )
-    after = budget_module.budget_tracker.remaining(project_id)
+    after = ai_budget_backend.remaining(project_id)
     # The reservation must have been refunded: remaining should be unchanged.
     assert after == before
 
@@ -2318,10 +2320,11 @@ def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
     client: TestClient,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
 ) -> None:
     """When actual token usage > 1 (the reservation), the delta is recorded."""
     project_id = "p-budget"
-    before = budget_module.budget_tracker.remaining(project_id)
+    before = ai_budget_backend.remaining(project_id)
 
     async def scripted_ainvoke(*args: Any, **kwargs: Any) -> Any:
         return {
@@ -2349,6 +2352,6 @@ def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
         },
     )
     assert response.status_code == HTTPStatus.OK
-    after = budget_module.budget_tracker.remaining(project_id)
+    after = ai_budget_backend.remaining(project_id)
     # reserve(1) + record(delta=14) = 15 total tokens debited.
     assert before - after == 15

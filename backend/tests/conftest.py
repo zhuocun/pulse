@@ -9,7 +9,10 @@ from pytest import FixtureRequest
 from app import database
 from app import main
 from app import security
+from app.config import settings
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
+from app.middleware.budget import BudgetTracker, get_budget_tracker
+from app.middleware.rate_limit import RateLimiter, get_rate_limiter
 from app.routers import health as health_router
 from app.services import (
     auth_service,
@@ -246,3 +249,31 @@ def client(request: FixtureRequest) -> Iterable[TestClient]:
     seed_agent_test_projects_if_absent(store)
     with TestClient(main.app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def ai_rate_limit_backend() -> Iterable[RateLimiter]:
+    backend = RateLimiter()
+    yield backend
+    backend.reset()
+
+
+@pytest.fixture()
+def ai_budget_backend() -> Iterable[BudgetTracker]:
+    backend = BudgetTracker(monthly_cap=settings.agent_budget_monthly_token_cap)
+    yield backend
+    backend.reset()
+
+
+@pytest.fixture(autouse=True)
+def _ai_router_dependency_overrides(
+    ai_rate_limit_backend: RateLimiter,
+    ai_budget_backend: BudgetTracker,
+) -> Iterable[None]:
+    """Isolate AI v1 / v2.1 router budget + rate state per test via DI overrides."""
+
+    main.app.dependency_overrides[get_rate_limiter] = lambda: ai_rate_limit_backend
+    main.app.dependency_overrides[get_budget_tracker] = lambda: ai_budget_backend
+    yield
+    main.app.dependency_overrides.pop(get_rate_limiter, None)
+    main.app.dependency_overrides.pop(get_budget_tracker, None)
