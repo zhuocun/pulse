@@ -156,3 +156,159 @@ def test_make_chat_model_for_id_uses_configured_provider() -> None:
     # Stub is a GenericFakeChatModel — same shape as
     # make_stub_chat_model().
     assert type(model) is type(make_stub_chat_model())
+
+
+# ---------------------------------------------------------------------------
+# _request_context merge logic (header override + payload context)
+# ---------------------------------------------------------------------------
+
+
+def _make_runtime_with_chat_agent():
+    """Build a runtime exposing a ``ChatContext`` agent for merge tests."""
+    from app.agents import AgentMetadata, AgentRuntime, BaseAgent
+    from app.agents.context import ChatContext
+    from app.agents.registry import AgentRegistry
+
+    class _Echo(BaseAgent):
+        metadata = AgentMetadata(
+            name="echo-ctx",
+            description="echo with ChatContext",
+            version="1.0.0",
+            context_schema=ChatContext,
+        )
+
+        def build(self, *, checkpointer=None, store=None):
+            raise NotImplementedError
+
+    registry = AgentRegistry()
+    registry.register(_Echo())
+    return AgentRuntime(registry=registry)
+
+
+def _make_runtime_no_context_schema():
+    """Build a runtime exposing an agent with no ``context_schema``."""
+    from app.agents import AgentMetadata, AgentRuntime, BaseAgent
+    from app.agents.registry import AgentRegistry
+
+    class _Echo(BaseAgent):
+        metadata = AgentMetadata(
+            name="echo-noctx",
+            description="echo without context schema",
+            version="1.0.0",
+        )
+
+        def build(self, *, checkpointer=None, store=None):
+            raise NotImplementedError
+
+    registry = AgentRegistry()
+    registry.register(_Echo())
+    return AgentRuntime(registry=registry)
+
+
+def test_request_context_header_only_no_payload_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Header override with no payload ``context`` returns the override
+    dict directly (no merge needed)."""
+    from app.routers.agents import _request_context
+
+    cfg = _settings_with(
+        agent_chat_model_allowlist=("stub",),
+        agent_chat_model_provider="stub",
+    )
+    monkeypatch.setattr("app.routers._dispatch.default_settings", cfg)
+
+    runtime = _make_runtime_with_chat_agent()
+    request = _request_with_headers({CHAT_MODEL_OVERRIDE_HEADER: "stub"})
+    out = _request_context("echo-ctx", {}, runtime, request)
+    assert isinstance(out, dict)
+    assert "chat_model" in out
+
+
+def test_request_context_header_merges_with_dict_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Header override merges with a dict payload ``context``; the header
+    wins on the ``chat_model`` key."""
+    from app.routers.agents import _request_context
+
+    cfg = _settings_with(
+        agent_chat_model_allowlist=("stub",),
+        agent_chat_model_provider="stub",
+    )
+    monkeypatch.setattr("app.routers._dispatch.default_settings", cfg)
+
+    runtime = _make_runtime_with_chat_agent()
+    request = _request_with_headers({CHAT_MODEL_OVERRIDE_HEADER: "stub"})
+    payload = {"context": {"chat_model": "ignored", "user_id": "u1"}}
+    out = _request_context("echo-ctx", payload, runtime, request)
+    assert isinstance(out, dict)
+    assert out["user_id"] == "u1"
+    # Header override wins on chat_model.
+    assert hasattr(out["chat_model"], "invoke")
+
+
+def test_request_context_header_assigns_onto_object_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """For object-like (non-dict) payload contexts, the header override
+    is assigned via ``setattr``; the result is the (mutated) body context."""
+    from app.routers.agents import _request_context
+
+    cfg = _settings_with(
+        agent_chat_model_allowlist=("stub",),
+        agent_chat_model_provider="stub",
+    )
+    monkeypatch.setattr("app.routers._dispatch.default_settings", cfg)
+
+    # Use a plain SimpleNamespace as the payload context — _coerce_context
+    # for ChatContext (TypedDict) returns a dict, so we patch the
+    # underlying coercion for this test.
+    from types import SimpleNamespace
+
+    runtime = _make_runtime_with_chat_agent()
+    request = _request_with_headers({CHAT_MODEL_OVERRIDE_HEADER: "stub"})
+
+    payload_obj = SimpleNamespace(other="kept")
+    monkeypatch.setattr(
+        "app.routers.agents._coerce_context",
+        lambda schema, value: payload_obj,
+    )
+    out = _request_context(
+        "echo-ctx", {"context": {"some": "data"}}, runtime, request
+    )
+    # The body object was mutated in place and returned.
+    assert out is payload_obj
+    assert out.other == "kept"
+    assert hasattr(out.chat_model, "invoke")
+
+
+def test_request_context_header_falls_back_when_setattr_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the body context rejects ``setattr`` (e.g. an immutable
+    object), the header override is returned as the context outright."""
+    from app.routers.agents import _request_context
+
+    cfg = _settings_with(
+        agent_chat_model_allowlist=("stub",),
+        agent_chat_model_provider="stub",
+    )
+    monkeypatch.setattr("app.routers._dispatch.default_settings", cfg)
+
+    class _Immutable:
+        __slots__ = ()  # no instance dict, setattr raises AttributeError
+
+    immutable = _Immutable()
+    monkeypatch.setattr(
+        "app.routers.agents._coerce_context",
+        lambda schema, value: immutable,
+    )
+    runtime = _make_runtime_with_chat_agent()
+    request = _request_with_headers({CHAT_MODEL_OVERRIDE_HEADER: "stub"})
+    out = _request_context(
+        "echo-ctx", {"context": {"some": "data"}}, runtime, request
+    )
+    # setattr failed — header override returned outright.
+    assert isinstance(out, dict)
+    assert "chat_model" in out

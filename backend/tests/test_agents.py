@@ -1665,6 +1665,41 @@ def test_keyring_skips_malformed_entries(
     assert keyring == {"v1": b"good"}
 
 
+def test_sigv2_malformed_base64_returns_none() -> None:
+    """``_verify_sigv2`` returns ``None`` when the body isn't valid base64
+    (malformed token from a stale client / random injection)."""
+    from app.agents.runtime import _verify_sigv2
+
+    assert _verify_sigv2("sigv2.!!!not-base64!!!", "echo", "u1") is None
+
+
+def test_sigv2_wrong_field_count_returns_none() -> None:
+    """``_verify_sigv2`` returns ``None`` when the decoded payload doesn't
+    have the expected five NUL-separated fields (truncated or hand-rolled
+    token)."""
+    import base64
+    from app.agents.runtime import _verify_sigv2
+
+    # Only three fields where five are expected.
+    bad = base64.urlsafe_b64encode(b"only\x00three\x00fields").decode()
+    assert _verify_sigv2(f"sigv2.{bad}", "echo", "u1") is None
+
+
+def test_sigv2_hmac_mismatch_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sigv2 token with a tampered HMAC raises a clear ``ValueError``
+    rather than silently accepting the forgery."""
+    import base64
+    from app.agents.runtime import _verify_sigv2
+
+    _patch_signing_keys(monkeypatch, ("v1:secret-one",))
+    payload = "v1\x00echo\x00u1\x00thread-x\x00deadbeef-not-the-real-hmac"
+    forged = "sigv2." + base64.urlsafe_b64encode(payload.encode()).decode()
+    with pytest.raises(ValueError, match="HMAC signature mismatch"):
+        _verify_sigv2(forged, "echo", "u1")
+
+
 def test_agent_runtime_invoke_and_ainvoke_with_context(
     fresh_registry: AgentRegistry,
 ) -> None:
