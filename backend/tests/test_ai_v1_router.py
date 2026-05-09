@@ -1983,9 +1983,10 @@ def test_v1_route_records_idempotency_in_flight_metric(
     )
     try:
         body = {"prompt": "x", "context": _project_context()}
-        fp = fingerprint_request("POST", "/api/ai/task-draft", body)
+        operation = "legacy-ai:v1-task-draft"
+        fp = fingerprint_request("POST", operation, body)
         _idempotency.idempotency_cache.reserve(
-            cache_key("ai-user", "/api/ai/task-draft", "v1-in-flight"),
+            cache_key("ai-user", operation, "v1-in-flight"),
             fp,
         )
         headers = {**auth_headers, "Idempotency-Key": "v1-in-flight"}
@@ -1997,6 +1998,13 @@ def test_v1_route_records_idempotency_in_flight_metric(
         assert in_flight == 1.0
     finally:
         metrics_module.reset_for_tests()
+
+
+def test_legacy_ai_route_meta_unknown_suffix_raises_key_error() -> None:
+    from app.routers.ai import _legacy_ai_route_meta
+
+    with pytest.raises(KeyError, match="no legacy AI route metadata"):
+        _legacy_ai_route_meta("/api/ai/not-a-configured-endpoint")
 
 
 # ---------------------------------------------------------------------------

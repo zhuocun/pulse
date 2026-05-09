@@ -4,6 +4,7 @@ Centralises the header-parse + reserve + store + release dance so the
 agent and AI routers can opt in with three short calls (check at the
 top, store before returning, release on exception) instead of
 re-implementing the Stripe-style protocol in every handler.
+Fingerprints and cache keys incorporate :func:`~app.middleware.idempotency.canonical_idempotency_path` via the helpers in that module.
 
 Header parsing is strict by design: an empty string is treated as
 "no header" so a FE that sends ``Idempotency-Key: `` does not silently
@@ -87,6 +88,7 @@ async def check_idempotency(
     payload: Any,
     *,
     auth_subject: str,
+    operation_id: Optional[str] = None,
 ) -> IdempotencyContext:
     """Look up ``Idempotency-Key`` in the cache and return the per-request context.
 
@@ -123,7 +125,7 @@ async def check_idempotency(
             },
         )
 
-    path = request.url.path
+    path = operation_id or request.url.path
     fingerprint = _idempotency.fingerprint_request(request.method, path, payload)
     key = _idempotency.cache_key(auth_subject, path, raw)
 

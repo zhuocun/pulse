@@ -1,7 +1,8 @@
 """Tests for the Stripe-style ``Idempotency-Key`` cache.
 
 Covers the in-memory and Redis backends, the
-:func:`fingerprint_request` / :func:`cache_key` helpers, the
+:func:`fingerprint_request` / :func:`cache_key` helpers,
+:func:`canonical_idempotency_path`, the
 :mod:`app.middleware.idempotency_guard` router helper, and the seven
 opted-in routes that wire idempotency into their handlers.
 """
@@ -39,6 +40,7 @@ from app.middleware.idempotency import (
     CachedResponse,
     InMemoryIdempotencyBackend,
     cache_key,
+    canonical_idempotency_path,
     configure_idempotency_backend,
     fingerprint_request,
     idempotency_cache,
@@ -117,10 +119,17 @@ def test_fingerprint_changes_when_body_differs() -> None:
     assert a != b
 
 
-def test_fingerprint_changes_when_path_differs() -> None:
+def test_fingerprint_changes_when_path_differs_for_non_ai_routes() -> None:
     a = fingerprint_request("POST", "/x", {"a": 1})
     b = fingerprint_request("POST", "/y", {"a": 1})
     assert a != b
+
+
+def test_fingerprint_unifies_ai_url_aliases() -> None:
+    body = {"project_id": "p"}
+    legacy = fingerprint_request("POST", "/api/ai/board-brief", body)
+    versioned = fingerprint_request("POST", "/api/v1/ai/board-brief", body)
+    assert legacy == versioned
 
 
 def test_fingerprint_changes_when_method_differs() -> None:
@@ -143,6 +152,29 @@ def test_fingerprint_handles_non_jsonable_via_default_str() -> None:
 
 def test_cache_key_shape() -> None:
     assert cache_key("u-1", "/api/x", "abc-123") == "u-1:/api/x:abc-123"
+
+
+def test_cache_key_unifies_ai_url_aliases() -> None:
+    assert cache_key("u-1", "/api/v1/ai/chat", "k") == cache_key(
+        "u-1", "/api/ai/chat", "k"
+    )
+
+
+def test_canonical_idempotency_path_maps_v1_ai_to_legacy_prefix() -> None:
+    assert canonical_idempotency_path("/api/v1/ai/task-draft") == "/api/ai/task-draft"
+    assert canonical_idempotency_path("/api/ai/task-draft") == "/api/ai/task-draft"
+
+
+def test_canonical_idempotency_path_leaves_agents_and_other_routes() -> None:
+    assert (
+        canonical_idempotency_path("/api/v1/agents/foo-bar/invoke")
+        == "/api/v1/agents/foo-bar/invoke"
+    )
+    assert canonical_idempotency_path("/api/other/x") == "/api/other/x"
+
+
+def test_canonical_idempotency_path_strips_trailing_slash() -> None:
+    assert canonical_idempotency_path("/api/v1/ai/board-brief/") == "/api/ai/board-brief"
 
 
 # ---------------------------------------------------------------------------
@@ -622,6 +654,98 @@ def test_check_idempotency_returns_fresh_context_for_first_call() -> None:
     assert ctx.cached_response is None
 
 
+def test_check_idempotency_can_key_by_logical_operation() -> None:
+    payload = {"a": 1}
+    raw_key = "logical"
+    operation = "agent:task-drafting-agent:invoke"
+    fp = fingerprint_request("POST", operation, payload)
+    slot = cache_key("u-1", operation, raw_key)
+    _idempotency.idempotency_cache.reserve(slot, fp)
+    _idempotency.idempotency_cache.store(
+        slot,
+        CachedResponse(200, {"hit": True}, {}, fp),
+    )
+
+    ctx = _run(
+        check_idempotency(  # type: ignore[arg-type]
+            _StubRequest(idempotency_key=raw_key, path="/renamed/url"),
+            payload,
+            auth_subject="u-1",
+            operation_id=operation,
+        )
+    )
+
+    assert ctx.cache_key == slot
+    assert ctx.cached_response is not None
+    assert ctx.cached_response.body == {"hit": True}
+
+
+def test_check_idempotency_replays_across_ai_url_aliases() -> None:
+    payload = {"kind": "tasks", "query": "x"}
+    raw_key = "alias-replay"
+    fp = fingerprint_request("POST", "/api/v1/ai/search", payload)
+    slot = cache_key("u-1", "/api/ai/search", raw_key)
+    _idempotency.idempotency_cache.reserve(slot, fp)
+    _idempotency.idempotency_cache.store(
+        slot,
+        CachedResponse(200, {"hit": True}, {"X": "y"}, fp),
+    )
+    ctx = _run(
+        check_idempotency(  # type: ignore[arg-type]
+            _StubRequest(idempotency_key=raw_key, path="/api/v1/ai/search"),
+            payload,
+            auth_subject="u-1",
+        )
+    )
+    assert ctx.cached_response is not None
+    assert ctx.cached_response.body == {"hit": True}
+
+
+def test_check_idempotency_isolates_distinct_ai_handlers_same_payload() -> None:
+    payload = {"shared": True}
+    raw_key = "isol"
+    fp_chat = fingerprint_request("POST", "/api/ai/chat", payload)
+    fp_draft = fingerprint_request("POST", "/api/ai/task-draft", payload)
+    assert fp_chat != fp_draft
+    slot = cache_key("u-1", "/api/v1/ai/chat", raw_key)
+    _idempotency.idempotency_cache.reserve(slot, fp_chat)
+    _idempotency.idempotency_cache.store(
+        slot,
+        CachedResponse(200, {"which": "chat"}, {}, fp_chat),
+    )
+    ctx = _run(
+        check_idempotency(  # type: ignore[arg-type]
+            _StubRequest(idempotency_key=raw_key, path="/api/ai/task-draft"),
+            payload,
+            auth_subject="u-1",
+        )
+    )
+    assert ctx.cached_response is None
+
+
+def test_check_idempotency_mismatch_still_422_across_ai_aliases() -> None:
+    payload_a = {"a": 1}
+    payload_b = {"a": 2}
+    raw_key = "m-alias"
+    fp_a = fingerprint_request("POST", "/api/ai/readiness", payload_a)
+    slot = cache_key("u-1", "/api/v1/ai/readiness", raw_key)
+    _idempotency.idempotency_cache.reserve(slot, fp_a)
+    _idempotency.idempotency_cache.store(
+        slot,
+        CachedResponse(200, {}, {}, fp_a),
+    )
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            check_idempotency(  # type: ignore[arg-type]
+                _StubRequest(idempotency_key=raw_key, path="/api/ai/readiness"),
+                payload_b,
+                auth_subject="u-1",
+            )
+        )
+    assert exc.value.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert exc.value.detail["error"] == "idempotency_key_reused"
+
+
 def test_check_idempotency_returns_cached_response_on_replay() -> None:
     _idempotency.idempotency_cache.reserve(
         "u-1:/api/x:abc-123",
@@ -933,9 +1057,10 @@ def test_invoke_returns_409_for_in_flight_sibling(
     """Manually reserve the slot to simulate an in-flight sibling call."""
 
     body = {"inputs": {"text": "x"}, "autonomy": "plan"}
-    fp = fingerprint_request("POST", "/api/v1/agents/idem-noise/invoke", body)
+    operation = "agent:idem-noise:invoke"
+    fp = fingerprint_request("POST", operation, body)
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/invoke", "in-flight-key"),
+        cache_key("idem-user", operation, "in-flight-key"),
         fp,
     )
     response = client.post(
@@ -1194,6 +1319,23 @@ def test_ai_route_gate_failure_releases_reservation(
     assert "Idempotent-Replay" not in retry.headers
 
 
+def test_ai_chat_replays_across_legacy_and_v1_prefix(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    payload = {
+        "messages": [{"role": "user", "content": "alias ping"}],
+        "context": {"project": {"_id": "p-idem", "projectName": "IdemDemo"}},
+    }
+    headers = {**auth_headers, "Idempotency-Key": "cross-prefix-chat"}
+    first = client.post("/api/ai/chat", json=payload, headers=headers)
+    assert first.status_code == HTTPStatus.OK
+    second = client.post("/api/v1/ai/chat", json=payload, headers=headers)
+    assert second.status_code == HTTPStatus.OK
+    assert second.headers.get("Idempotent-Replay") == "true"
+    assert second.json() == first.json()
+
+
 def test_ai_chat_handler_crash_releases_reservation(
     client: TestClient,
     auth_headers: dict[str, str],
@@ -1302,9 +1444,10 @@ def test_stream_returns_409_for_in_flight_sibling(
     """Manually reserve the slot to simulate an in-flight sibling call."""
 
     body = {"inputs": {"text": "x"}, "autonomy": "plan"}
-    fp = fingerprint_request("POST", "/api/v1/agents/idem-noise/stream", body)
+    operation = "agent:idem-noise:stream"
+    fp = fingerprint_request("POST", operation, body)
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/stream", "stream-in-flight"),
+        cache_key("idem-user", operation, "stream-in-flight"),
         fp,
     )
     response = client.post(
@@ -1332,7 +1475,7 @@ def test_stream_resume_skips_idempotency_check(
     key = "stream-resume-key"
     # Reserve as if a sibling already used this key.
     _idempotency.idempotency_cache.reserve(
-        cache_key("idem-user", "/api/v1/agents/idem-noise/stream", key),
+        cache_key("idem-user", "agent:idem-noise:stream", key),
         "fp-other",
     )
     with client.stream(

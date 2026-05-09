@@ -39,7 +39,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -82,6 +83,76 @@ from app.validation import api_error
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyAiRouteMeta:
+    """Central metadata for legacy POST ``/api/ai/<suffix>`` handlers.
+
+    The same router is mounted under ``/api/v1/ai``; :meth:`_legacy_ai_route_meta`
+    resolves entries by URL suffix so both prefixes share one table.
+
+    ``agent_label`` feeds rate-limit / metrics dimensions on the shim.
+    ``catalog_agent_name`` is the :class:`~app.agents.AgentRuntime` registry key
+    for polish helpers or for full ``chat-agent`` invocations.
+    """
+
+    envelope_key: Optional[str]
+    agent_label: str
+    catalog_agent_name: str
+
+    @property
+    def idempotency_operation(self) -> str:
+        return f"legacy-ai:{self.agent_label}"
+
+
+_LEGACY_AI_ROUTE_METADATA: Final[dict[str, LegacyAiRouteMeta]] = {
+    "task-draft": LegacyAiRouteMeta(
+        envelope_key="draft",
+        agent_label="v1-task-draft",
+        catalog_agent_name="task-drafting-agent",
+    ),
+    "task-breakdown": LegacyAiRouteMeta(
+        envelope_key="draft",
+        agent_label="v1-task-breakdown",
+        catalog_agent_name="task-drafting-agent",
+    ),
+    "estimate": LegacyAiRouteMeta(
+        envelope_key="estimate",
+        agent_label="v1-estimate",
+        catalog_agent_name="task-estimation-agent",
+    ),
+    "readiness": LegacyAiRouteMeta(
+        envelope_key="readiness",
+        agent_label="v1-readiness",
+        catalog_agent_name="task-estimation-agent",
+    ),
+    "board-brief": LegacyAiRouteMeta(
+        envelope_key="brief",
+        agent_label="v1-board-brief",
+        catalog_agent_name="board-brief-agent",
+    ),
+    "search": LegacyAiRouteMeta(
+        envelope_key="search",
+        agent_label="v1-search",
+        catalog_agent_name="search-agent",
+    ),
+    "chat": LegacyAiRouteMeta(
+        envelope_key=None,
+        agent_label="chat-agent",
+        catalog_agent_name="chat-agent",
+    ),
+}
+
+
+def _legacy_ai_route_meta(route_path: str) -> LegacyAiRouteMeta:
+    suffix = route_path.rstrip("/").rsplit("/", maxsplit=1)[-1]
+    try:
+        return _LEGACY_AI_ROUTE_METADATA[suffix]
+    except KeyError as exc:
+        raise KeyError(
+            f"no legacy AI route metadata for path {route_path!r} (suffix {suffix!r})"
+        ) from exc
 
 
 def _idem_fail(idem: IdempotencyContext, exc: BaseException) -> None:
@@ -130,6 +201,17 @@ def _unwrap_envelope(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
     if isinstance(inner, dict):
         return inner
     return payload
+
+
+def _maybe_unwrap_legacy_payload(
+    payload: Dict[str, Any], meta: LegacyAiRouteMeta
+) -> Dict[str, Any]:
+    """Apply :func:`_unwrap_envelope` when ``meta`` declares an FE envelope key."""
+
+    key = meta.envelope_key
+    if key is None:
+        return payload
+    return _unwrap_envelope(payload, key)
 
 
 def _gate(
@@ -444,10 +526,15 @@ async def task_draft(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-task-draft"
-    payload = _unwrap_envelope(payload, "draft")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -467,7 +554,7 @@ async def task_draft(
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
         deterministic = v1_engine.draft_task(payload)
-        model = _resolve_polish_model(runtime, "task-drafting-agent")
+        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
             body = deterministic
         else:
@@ -498,10 +585,15 @@ async def task_breakdown(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-task-breakdown"
-    payload = _unwrap_envelope(payload, "draft")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -524,7 +616,7 @@ async def task_breakdown(
         deterministic = v1_engine.breakdown_task(
             payload, count=int(count) if isinstance(count, int) else 3
         )
-        model = _resolve_polish_model(runtime, "task-drafting-agent")
+        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
             body = deterministic
         else:
@@ -583,10 +675,15 @@ async def estimate(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-estimate"
-    payload = _unwrap_envelope(payload, "estimate")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -603,7 +700,7 @@ async def estimate(
         )
         enforce_request_limits(payload)
         deterministic = v1_engine.estimate(payload)
-        model = _resolve_polish_model(runtime, "task-estimation-agent")
+        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
             body = deterministic
         else:
@@ -636,10 +733,15 @@ async def readiness(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-readiness"
-    payload = _unwrap_envelope(payload, "readiness")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -659,7 +761,7 @@ async def readiness(
         if not deterministic.get("issues"):
             body: Any = deterministic
         else:
-            model = _resolve_polish_model(runtime, "task-estimation-agent")
+            model = _resolve_polish_model(runtime, meta.catalog_agent_name)
             if is_stub_model(model):
                 body = deterministic
             else:
@@ -689,10 +791,15 @@ async def board_brief(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-board-brief"
-    payload = _unwrap_envelope(payload, "brief")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -736,7 +843,7 @@ async def board_brief(
                         quote=col.get("name") or col.get("_id") or "",
                     )
                 )
-        model = _resolve_polish_model(runtime, "board-brief-agent")
+        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
             base_brief: Any = deterministic
         else:
@@ -778,10 +885,15 @@ async def search(
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "v1-search"
-    payload = _unwrap_envelope(payload, "search")
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -811,7 +923,7 @@ async def search(
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
         deterministic = v1_engine.semantic_search(kind, redacted_query, context)
-        model = _resolve_polish_model(runtime, "search-agent")
+        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
         if is_stub_model(model):
             body: Any = deterministic
         else:
@@ -980,9 +1092,15 @@ async def chat(
 
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
-    agent_label = "chat-agent"
+    meta = _legacy_ai_route_meta(route_path)
+    agent_label = meta.agent_label
+    payload = _maybe_unwrap_legacy_payload(payload, meta)
     idem = await check_idempotency_with_metrics(
-        request, payload, auth_subject=user_id, route=route_path
+        request,
+        payload,
+        auth_subject=user_id,
+        route=route_path,
+        operation_id=meta.idempotency_operation,
     )
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
@@ -991,7 +1109,7 @@ async def chat(
     budget_reconciled = False
     project_id: Optional[str] = None
     try:
-        chat_metadata = runtime.get("chat-agent").metadata
+        chat_metadata = runtime.get(meta.catalog_agent_name).metadata
         project_id = _project_id_from_payload(payload)
         # Use reserve-based gate (not read-only can_spend) to prevent TOCTOU
         # budget overrun under concurrent requests; other v1 routes use stubs
@@ -1022,7 +1140,7 @@ async def chat(
         try:
             result = await asyncio.wait_for(
                 runtime.ainvoke(
-                    "chat-agent",
+                    meta.catalog_agent_name,
                     inputs,
                     user_id=user_id,
                 ),

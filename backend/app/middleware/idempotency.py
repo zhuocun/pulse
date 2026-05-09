@@ -4,7 +4,8 @@ Without an idempotency layer a naive client retry (FE timeout, network
 blip, browser auto-retry) silently re-runs the agent and double-debits
 the per-project monthly token budget enforced by
 :mod:`app.middleware.budget`. The cache short-circuits a duplicate
-request -- same caller, same path, same key, same body fingerprint --
+request -- same caller, same canonical route identity (see
+:func:`canonical_idempotency_path`), same key, same body fingerprint --
 straight to the original response, skipping every gate and the agent
 run so the original call's spend is the only one that lands.
 
@@ -47,8 +48,25 @@ from typing import Any, Dict, Literal, Optional, Protocol, Tuple, runtime_checka
 DEFAULT_TTL_SECONDS = 86_400
 
 
+def canonical_idempotency_path(url_path: str) -> str:
+    """Return the stable path segment used in fingerprints and cache keys.
+
+    The AI router mounts twice (``/api/v1/ai`` and ``/api/ai``); requests to
+    either prefix must collide on the same idempotency slot. Everything else
+    keeps the request path (with trailing slashes stripped) so existing
+    fingerprints stay aligned with historical behaviour for non-AI routes.
+    """
+
+    path = url_path.split("?", 1)[0]
+    if len(path) > 1 and path.endswith("/"):
+        path = path.rstrip("/")
+    if path.startswith("/api/v1/ai/"):
+        return "/api/ai/" + path.removeprefix("/api/v1/ai/")
+    return path
+
+
 def fingerprint_request(method: str, path: str, body: Any) -> str:
-    """Return a stable SHA-256 fingerprint for ``(method, path, body)``.
+    """Return a stable SHA-256 fingerprint for ``(method, canonical_path, body)``.
 
     ``json.dumps(..., sort_keys=True, default=str, separators=...)``
     canonicalises the body so two semantically-identical payloads (key
@@ -60,8 +78,9 @@ def fingerprint_request(method: str, path: str, body: Any) -> str:
     the handler accepted.
     """
 
+    logical_path = canonical_idempotency_path(path)
     canonical = json.dumps(
-        {"method": method, "path": path, "body": body},
+        {"method": method, "path": logical_path, "body": body},
         sort_keys=True,
         default=str,
         separators=(",", ":"),
@@ -70,15 +89,15 @@ def fingerprint_request(method: str, path: str, body: Any) -> str:
 
 
 def cache_key(scope: str, path: str, key: str) -> str:
-    """Compose the per-(subject, path, key) cache slot identifier.
+    """Compose the per-(subject, canonical_path, client-key) cache slot identifier.
 
-    Scoping by ``scope`` (the auth subject) and ``path`` means two
-    users sharing the same key cannot read each other's cached
-    responses, and the same key on a different route is a fresh slot
-    rather than a fingerprint mismatch.
+    Scoping by ``scope`` (the auth subject) and the canonical path means two
+    users sharing the same key cannot read each other's cached responses,
+    and the same key on a different logical handler is a fresh slot rather
+    than a fingerprint mismatch.
     """
 
-    return f"{scope}:{path}:{key}"
+    return f"{scope}:{canonical_idempotency_path(path)}:{key}"
 
 
 @dataclass(frozen=True)
@@ -98,7 +117,7 @@ class CachedResponse:
 
 @runtime_checkable
 class IdempotencyBackend(Protocol):
-    """Per-(subject, path, key) request cache.
+    """Per-(subject, canonical route, client-key) request cache.
 
     Both the in-process implementation below and the Redis
     implementation in :mod:`app.middleware.redis_backends` satisfy
