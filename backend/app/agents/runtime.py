@@ -191,6 +191,13 @@ class AgentRuntime:
                 "Postgres-backed agent persistence requires async setup; use "
                 "AgentRuntime.from_settings_async(settings, stack=stack) instead.",
             )
+        # Populate the registry with catalog agents if the caller did not
+        # supply a pre-populated one. Using replace=True (via register_all)
+        # makes repeated startups (e.g. test suite) idempotent.
+        if registry is None:
+            from app.agents.catalog import register_all as _register_all
+
+            _register_all(default_registry)
         return cls(
             checkpointer=checkpointer,
             store=store,
@@ -244,6 +251,13 @@ class AgentRuntime:
             settings=settings,
             pool=shared_pool,
         )
+        # Populate the registry with catalog agents if the caller did not
+        # supply a pre-populated one. Using replace=True (via register_all)
+        # makes repeated startups (e.g. test suite) idempotent.
+        if registry is None:
+            from app.agents.catalog import register_all as _register_all
+
+            _register_all(default_registry)
         return cls(
             checkpointer=checkpointer,
             store=store,

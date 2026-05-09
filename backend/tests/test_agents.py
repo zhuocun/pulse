@@ -1222,6 +1222,17 @@ def test_agent_runtime_from_settings_uses_factories(
     assert runtime.recursion_limit == settings.agent_recursion_limit
 
 
+def test_agent_runtime_from_settings_auto_populates_catalog_when_no_registry() -> None:
+    """``from_settings`` without an explicit registry registers catalog agents into
+    ``default_registry`` so the default-registry path (lines 198-200) is covered."""
+    # Use the global registry which from_settings will populate via register_all.
+    runtime = AgentRuntime.from_settings(settings)
+    # Catalog agents must be present (populated by register_all inside from_settings).
+    agent_names = set(runtime.registry.names())
+    assert "board-brief-agent" in agent_names
+    assert "chat-agent" in agent_names
+
+
 def test_agent_runtime_build_config_namespaces_thread_and_caps_recursion(
     fresh_registry: AgentRegistry,
 ) -> None:
