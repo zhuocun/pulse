@@ -50,7 +50,7 @@ from app.agents.errors import (
 from app.agents.context import ChatContext
 from app.agents.instrumentation import start_run_span
 from app.agents.llm import extract_token_usage, resolved_chat_model_id
-from app.agents.registry import AgentRegistry
+from app.agents.registry import AgentRegistry, ChainedAgentRegistry
 from app.agents.registry import registry as default_registry
 from app.agents.stores import (
     PostgresStoreSpec,
@@ -332,6 +332,32 @@ class AgentRuntime:
         self._model_id: str = resolved_chat_model_id()
 
     @classmethod
+    def _build_isolated_registry(cls) -> AgentRegistry:
+        """Build a fresh per-app registry chained off ``default_registry``.
+
+        Production callers (FastAPI lifespan via :meth:`from_settings_async`)
+        get a runtime whose registry is independent of the module-level
+        :data:`default_registry` for *writes*, so two app instances in the
+        same process cannot mutate each other's agent set.
+
+        Reads fall through to ``default_registry`` via
+        :class:`~app.agents.registry.ChainedAgentRegistry` so existing
+        test patterns that register test-only agents into the module
+        global *after* the FastAPI lifespan has built the runtime
+        continue to work without ~70 fixture migrations.
+
+        The catalog manifest is registered on the local layer so a deploy
+        with a deliberately broken module fails the lifespan rather than
+        silently degrading.
+        """
+
+        from app.agents.catalog import register_all as _register_all
+
+        new_registry = ChainedAgentRegistry(default_registry)
+        _register_all(new_registry)
+        return new_registry
+
+    @classmethod
     def from_settings(
         cls,
         settings: Any,
@@ -349,13 +375,8 @@ class AgentRuntime:
                 "Postgres-backed agent persistence requires async setup; use "
                 "AgentRuntime.from_settings_async(settings, stack=stack) instead.",
             )
-        # Populate the registry with catalog agents if the caller did not
-        # supply a pre-populated one. Using replace=True (via register_all)
-        # makes repeated startups (e.g. test suite) idempotent.
         if registry is None:
-            from app.agents.catalog import register_all as _register_all
-
-            _register_all(default_registry)
+            registry = cls._build_isolated_registry()
         return cls(
             checkpointer=checkpointer,
             store=store,
@@ -409,13 +430,8 @@ class AgentRuntime:
             settings=settings,
             pool=shared_pool,
         )
-        # Populate the registry with catalog agents if the caller did not
-        # supply a pre-populated one. Using replace=True (via register_all)
-        # makes repeated startups (e.g. test suite) idempotent.
         if registry is None:
-            from app.agents.catalog import register_all as _register_all
-
-            _register_all(default_registry)
+            registry = cls._build_isolated_registry()
         return cls(
             checkpointer=checkpointer,
             store=store,

@@ -437,6 +437,109 @@ def test_registry_get_missing_raises(fresh_registry: AgentRegistry) -> None:
         fresh_registry.get("nope")
 
 
+# ---------------------------------------------------------------------------
+# ChainedAgentRegistry
+# ---------------------------------------------------------------------------
+
+
+class _ChainedAgentA(BaseAgent):
+    metadata = AgentMetadata(name="chain-a", description="A", version="1.0.0")
+
+    def build(self, *, checkpointer=None, store=None):  # noqa: ARG002
+        raise NotImplementedError
+
+
+class _ChainedAgentB(BaseAgent):
+    metadata = AgentMetadata(name="chain-b", description="B", version="1.0.0")
+
+    def build(self, *, checkpointer=None, store=None):  # noqa: ARG002
+        raise NotImplementedError
+
+
+def test_chained_registry_reads_fall_through_to_parent() -> None:
+    """A ``ChainedAgentRegistry`` reads from its parent when the local
+    layer is empty, so test fixtures that pre-register in the global
+    keep working after the runtime switches to per-app isolation."""
+    from app.agents.registry import ChainedAgentRegistry
+
+    parent = AgentRegistry()
+    parent.register(_ChainedAgentA())
+    chained = ChainedAgentRegistry(parent)
+
+    # Reads delegate to the parent.
+    assert chained.get("chain-a") is parent.get("chain-a")
+    assert "chain-a" in chained
+    assert chained.names() == ["chain-a"]
+    assert [m.name for m in chained.metadata()] == ["chain-a"]
+    assert [a.name for a in chained] == ["chain-a"]
+    assert len(chained) == 1
+
+
+def test_chained_registry_writes_isolated_from_parent() -> None:
+    """``register`` mutates only the local layer; the parent stays
+    untouched, so two apps in the same process don't see each other's
+    test-only agents."""
+    from app.agents.registry import ChainedAgentRegistry
+
+    parent = AgentRegistry()
+    chained = ChainedAgentRegistry(parent)
+
+    chained.register(_ChainedAgentA())
+    assert "chain-a" in chained
+    assert "chain-a" not in parent  # Isolation: parent untouched.
+
+
+def test_chained_registry_local_overrides_parent_on_read() -> None:
+    """When both layers carry an agent with the same name, the local
+    instance wins on read (last-write-wins via ``register(replace=True)``
+    is not needed because the chained read short-circuits)."""
+    from app.agents.registry import ChainedAgentRegistry
+
+    parent = AgentRegistry()
+    parent_agent = _ChainedAgentA()
+    parent.register(parent_agent)
+
+    local_agent = _ChainedAgentA()
+    chained = ChainedAgentRegistry(parent)
+    chained.register(local_agent)
+
+    assert chained.get("chain-a") is local_agent
+    # iteration / metadata / names dedupe by name, local wins.
+    iterated = list(chained)
+    assert len(iterated) == 1
+    assert iterated[0] is local_agent
+    metas = chained.metadata()
+    assert len(metas) == 1
+
+
+def test_chained_registry_union_across_layers() -> None:
+    """``names`` / ``metadata`` / ``__iter__`` / ``__contains__`` /
+    ``__len__`` see the union of both layers."""
+    from app.agents.registry import ChainedAgentRegistry
+
+    parent = AgentRegistry()
+    parent.register(_ChainedAgentA())
+    chained = ChainedAgentRegistry(parent)
+    chained.register(_ChainedAgentB())
+
+    assert chained.names() == ["chain-a", "chain-b"]
+    assert {m.name for m in chained.metadata()} == {"chain-a", "chain-b"}
+    assert "chain-a" in chained and "chain-b" in chained
+    assert "missing-agent" not in chained
+    assert {a.name for a in chained} == {"chain-a", "chain-b"}
+    assert len(chained) == 2
+
+
+def test_chained_registry_get_missing_raises() -> None:
+    """A name absent from both layers still raises ``AgentNotFoundError``."""
+    from app.agents.registry import ChainedAgentRegistry
+
+    parent = AgentRegistry()
+    chained = ChainedAgentRegistry(parent)
+    with pytest.raises(AgentNotFoundError):
+        chained.get("nope")
+
+
 class _ShadowEchoAgent(BaseAgent):
     metadata = AgentMetadata(name="shadow-echo", status="shadow")
 
@@ -450,6 +553,38 @@ class _ShadowEchoAgent(BaseAgent):
         graph.add_edge(START, "noop")
         graph.add_edge("noop", END)
         return graph.compile(checkpointer=checkpointer, store=store)
+
+
+def test_compile_double_check_returns_cached_when_other_thread_won_the_race() -> None:
+    """The slow path's inner cache check returns the cached graph when a
+    second caller wins the lock after the cache was populated.
+
+    Simulates the race by holding ``_build_lock`` from outside, waiting
+    inside the helper to populate ``_compiled`` directly, then letting
+    ``compile()`` proceed — its inner ``_cache_hit`` check now succeeds.
+    """
+
+    agent = EchoAgent()
+    sentinel = object()
+
+    real_cache_hit = agent._cache_hit  # noqa: SLF001
+    calls = {"n": 0}
+
+    def fake_cache_hit(*args, **kwargs):
+        calls["n"] += 1
+        # First call (fast path before lock) returns False; second call
+        # (after acquiring the lock) returns True so the inner branch fires.
+        if calls["n"] == 1:
+            return False
+        agent._compiled = sentinel  # noqa: SLF001
+        return True
+
+    agent._cache_hit = fake_cache_hit  # type: ignore[assignment]
+    try:
+        result = agent.compile()
+    finally:
+        agent._cache_hit = real_cache_hit  # type: ignore[assignment]
+    assert result is sentinel
 
 
 def test_set_chat_model_after_compile_logs_rebuild_warning(
@@ -2199,9 +2334,22 @@ def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(
 
 
 def test_lifespan_attaches_runtime(client: TestClient) -> None:
+    """The runtime owns a per-app registry chained off the module-level
+    default, not the default registry directly.
+
+    Mutations to the runtime's local layer (writes via
+    ``runtime.registry.register(...)``) do not bleed into the module
+    global, but reads still fall through to the global so test fixtures
+    that pre-register there continue to be visible.
+    """
+    from app.agents.registry import ChainedAgentRegistry
+
     runtime = main.app.state.agent_runtime
     assert isinstance(runtime, AgentRuntime)
-    assert runtime.registry is global_registry
+    assert isinstance(runtime.registry, ChainedAgentRegistry)
+    # The chained registry's parent is the module-level global, so the
+    # production runtime shares read visibility with global_registry.
+    assert runtime.registry._parent is global_registry  # noqa: SLF001
 
 
 def test_router_lists_agents(
