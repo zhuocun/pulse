@@ -153,7 +153,7 @@ def _strength_to_score(strength: str) -> float:
     return 0.0
 
 
-async def polish_search(
+async def _polish_search(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     query: str,
@@ -245,8 +245,13 @@ async def polish_search(
     )
 
 
+# Backward-compatible public alias kept for tests that import ``polish_search``
+# directly.  Internal callers use the private ``_polish_search`` name.
+polish_search = _polish_search
+
+
 class SearchAgent(BaseAgent):
-    """Embedding-rerank search agent.  The v1 shim still uses :func:`polish_search`
+    """Embedding-rerank search agent.  Internal callers use ``_polish_search``
     and ``runtime.get("search-agent").chat_model`` -- both remain stable.
 
     The v2.1 graph implements:
@@ -342,6 +347,11 @@ class SearchAgent(BaseAgent):
         async def rank(state: SearchState) -> dict[str, Any]:
             """Embed query + candidates; rank by cosine similarity.
 
+            Short-circuits when ``ranking`` is already on state -- the v1 shim
+            pre-populates it with the ``v1_engine.semantic_search`` result so
+            the agent skips embedding-based computation and goes straight to
+            ``polish``.
+
             When the candidate list is empty we skip embedding (no work to do)
             and return ``{ids: [], rationale: "..."}`` so downstream nodes
             have a safe, non-None value to work with.
@@ -351,6 +361,8 @@ class SearchAgent(BaseAgent):
             carries the corresponding strength bucket so the FE
             ``AiMatchStrengthBadge`` can render a coloured chip per result.
             """
+            if state.get("ranking") is not None:
+                return {}
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             n = len(candidates)
@@ -396,7 +408,7 @@ class SearchAgent(BaseAgent):
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}
-            polished, tokens_in, tokens_out = await polish_search(
+            polished, tokens_in, tokens_out = await _polish_search(
                 chat_model, deterministic, query, candidates
             )
             emit_usage(tokens_in, tokens_out)

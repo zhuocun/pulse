@@ -82,7 +82,7 @@ class ReadinessPolish(BaseModel):
     issues: list[ReadinessIssuePolish] = Field(default_factory=list)
 
 
-async def polish_readiness(
+async def _polish_readiness(
     model: BaseChatModel,
     deterministic: dict[str, Any],
     draft: dict[str, Any],
@@ -131,7 +131,7 @@ async def polish_readiness(
     )
 
 
-async def polish_rationale(
+async def _polish_rationale(
     model: BaseChatModel,
     deterministic: str,
     draft: dict[str, Any],
@@ -165,6 +165,12 @@ async def polish_rationale(
         fallback=deterministic,
         merge_fn=_merge,
     )
+
+
+# Backward-compatible public aliases kept for tests that import these helpers
+# directly.  Internal callers use the private ``_polish_*`` names.
+polish_readiness = _polish_readiness
+polish_rationale = _polish_rationale
 
 
 def _estimate_for(task_draft: dict[str, Any], neighbours: list[dict[str, Any]]) -> int:
@@ -281,11 +287,34 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def estimate(state: TaskEstimationState) -> dict[str, Any]:
+            pre_estimate = state.get("estimate")
+            if isinstance(pre_estimate, dict):
+                # v1 shim pre-populated ``estimate`` with the v1_engine deterministic
+                # result.  Polish the rationale field and return the updated estimate;
+                # all other fields (storyPoints, confidence, similar) come from
+                # the v1_engine result unchanged so the wire shape stays byte-identical
+                # on the stub path and gains only a polished rationale on the real path.
+                #
+                # The ``_skip_polish`` sentinel is set by the ``/readiness`` shim route
+                # so that running the shared estimation graph from that route does NOT
+                # charge the estimate's rationale polish against the project budget.
+                # Only the readiness node's polish tokens are attributable to that route.
+                if pre_estimate.get("_skip_polish"):
+                    return {}
+                draft = state.get("task_draft") or {}
+                neighbours = state.get("embedding_neighbors") or []
+                points = pre_estimate.get("storyPoints") or 0
+                deterministic_rationale = pre_estimate.get("rationale") or ""
+                rationale, tokens_in, tokens_out = await _polish_rationale(
+                    chat_model, deterministic_rationale, draft, points, neighbours
+                )
+                emit_usage(tokens_in, tokens_out)
+                return {"estimate": {**pre_estimate, "rationale": rationale}}
             draft = state.get("task_draft") or {}
             neighbours = state.get("embedding_neighbors") or []
             points = _estimate_for(draft, neighbours)
             deterministic = "Derived from prompt length + grounded neighbours."
-            rationale, tokens_in, tokens_out = await polish_rationale(
+            rationale, tokens_in, tokens_out = await _polish_rationale(
                 chat_model, deterministic, draft, points, neighbours
             )
             emit_usage(tokens_in, tokens_out)
@@ -298,18 +327,34 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
+            pre_readiness = state.get("readiness")
+            if isinstance(pre_readiness, dict):
+                # v1 shim pre-populated ``readiness`` with the v1_engine deterministic
+                # result.  Polish the issue messages/suggestions and return; the
+                # v1_engine shape ``{issues: [...]}`` is preserved so the parity test
+                # and the FE validator both pass byte-identically on the stub path.
+                draft = state.get("task_draft") or {}
+                polished, tokens_in, tokens_out = await _polish_readiness(
+                    chat_model, pre_readiness, draft
+                )
+                emit_usage(tokens_in, tokens_out)
+                return {"readiness": polished}
             draft = state.get("task_draft") or {}
             deterministic = _readiness(draft)
-            polished, tokens_in, tokens_out = await polish_readiness(
+            polished, tokens_in, tokens_out = await _polish_readiness(
                 chat_model, deterministic, draft
             )
             emit_usage(tokens_in, tokens_out)
             return {"readiness": polished}
 
         def emit_citations(state: TaskEstimationState) -> dict[str, Any]:
+            est_payload = state.get("estimate")
+            read_payload = state.get("readiness")
+            # Combined v2.1 surface: ``{estimate, readiness}`` for the streaming
+            # SSE consumer and for any caller that wants both in one event.
             payload = {
-                "estimate": state.get("estimate"),
-                "readiness": state.get("readiness"),
+                "estimate": est_payload,
+                "readiness": read_payload,
             }
             similar = state.get("similar_tasks") or []
             emit_citation_refs(similar, "task")
@@ -320,6 +365,25 @@ class TaskEstimationAgent(BaseAgent):
                     "payload": payload,
                 }
             )
+            # Additional v1-shim-compatible surfaces so ``/api/ai/estimate`` and
+            # ``/api/ai/readiness`` can each extract exactly the payload they need
+            # without projecting the combined event.
+            if est_payload is not None:
+                emit_custom(
+                    {
+                        "kind": "suggestion",
+                        "surface": "estimate_v1",
+                        "payload": est_payload,
+                    }
+                )
+            if read_payload is not None:
+                emit_custom(
+                    {
+                        "kind": "suggestion",
+                        "surface": "readiness_v1",
+                        "payload": read_payload,
+                    }
+                )
             return {"messages": [AIMessage(content=json.dumps(payload))]}
 
         graph: StateGraph = StateGraph(TaskEstimationState)

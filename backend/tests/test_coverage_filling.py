@@ -1896,7 +1896,7 @@ def test_v1_chat_returns_504_on_timeout(
     async def _hang(*args: Any, **kwargs: Any) -> Any:
         await asyncio.sleep(5)
 
-    monkeypatch.setattr(client.app.state.agent_runtime, "ainvoke", _hang, raising=False)
+    monkeypatch.setattr(client.app.state.agent_runtime, "arun_with_events", _hang, raising=False)
 
     from dataclasses import replace
 

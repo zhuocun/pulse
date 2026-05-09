@@ -385,7 +385,7 @@ def test_chat_returns_502_on_agent_error(
     async def boom(*args: Any, **kwargs: Any) -> Any:
         raise AgentExecutionError("chat-agent", cause=RuntimeError("nope"))
 
-    monkeypatch.setattr(client.app.state.agent_runtime, "ainvoke", boom, raising=False)
+    monkeypatch.setattr(client.app.state.agent_runtime, "arun_with_events", boom, raising=False)
     response = client.post(
         "/api/ai/chat",
         headers=auth_headers,
@@ -422,10 +422,10 @@ def test_chat_preserves_assistant_messages_for_multi_turn(
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["name"] = name
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -465,10 +465,10 @@ def test_chat_drops_tool_messages(
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["name"] = name
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -507,10 +507,10 @@ def test_chat_drops_messages_with_non_string_content(
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["name"] = name
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1541,24 +1541,27 @@ def test_chat_returns_tool_calls_when_model_picks_a_tool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
-        return {
-            "messages": [
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "id": "call_1",
-                            "name": "listTasks",
-                            "args": {"projectId": "p-1"},
-                            "type": "tool_call",
-                        }
-                    ],
-                )
-            ]
-        }
+        return (
+            {
+                "messages": [
+                    AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "id": "call_1",
+                                "name": "listTasks",
+                                "args": {"projectId": "p-1"},
+                                "type": "tool_call",
+                            }
+                        ],
+                    )
+                ]
+            },
+            [],
+        )
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1596,10 +1599,10 @@ def test_chat_forwards_assistant_tool_calls_and_tool_result(
 
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="found 3 tasks")]}
+        return ({"messages": [AIMessage(content="found 3 tasks")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1659,10 +1662,10 @@ def test_chat_drops_orphan_tool_message(
 
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1691,10 +1694,10 @@ def test_chat_skips_assistant_with_no_content_and_no_tool_calls(
 
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1724,10 +1727,10 @@ def test_chat_normalize_tool_calls_drops_malformed_entries(
 
     async def capture(name: str, inputs: Any, **kwargs: Any) -> Any:
         captured["inputs"] = inputs
-        return {"messages": [AIMessage(content="ok")]}
+        return ({"messages": [AIMessage(content="ok")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1789,10 +1792,10 @@ def test_chat_extract_response_handles_non_dict_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def capture(*_args: Any, **_kwargs: Any) -> Any:
-        return "not a dict"
+        return ("not a dict", [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1814,10 +1817,10 @@ def test_chat_extract_response_handles_empty_messages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def capture(*_args: Any, **_kwargs: Any) -> Any:
-        return {"messages": []}
+        return ({"messages": []}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1836,10 +1839,10 @@ def test_chat_extract_response_handles_non_aimessage_tail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def capture(*_args: Any, **_kwargs: Any) -> Any:
-        return {"messages": [HumanMessage(content="oops")]}
+        return ({"messages": [HumanMessage(content="oops")]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -1898,10 +1901,10 @@ def test_chat_extract_response_filters_malformed_tool_call_dicts(
                 },
             ],
         )
-        return {"messages": [message]}
+        return ({"messages": [message]}, [])
 
     monkeypatch.setattr(
-        client.app.state.agent_runtime, "ainvoke", capture, raising=False
+        client.app.state.agent_runtime, "arun_with_events", capture, raising=False
     )
     response = client.post(
         "/api/ai/chat",
@@ -2308,7 +2311,7 @@ def test_chat_refunds_reservation_on_ainvoke_failure(
         raise RuntimeError("forced failure")
 
     runtime = client.app.state.agent_runtime
-    monkeypatch.setattr(runtime, "ainvoke", explode, raising=False)
+    monkeypatch.setattr(runtime, "arun_with_events", explode, raising=False)
 
     lax = TestClient(client.app, raise_server_exceptions=False)
     lax.post(
@@ -2335,21 +2338,24 @@ def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
     before = ai_budget_backend.remaining(project_id)
 
     async def scripted_ainvoke(*args: Any, **kwargs: Any) -> Any:
-        return {
-            "messages": [
-                AIMessage(
-                    content="hello",
-                    usage_metadata={
-                        "input_tokens": 10,
-                        "output_tokens": 5,
-                        "total_tokens": 15,
-                    },
-                )
-            ]
-        }
+        return (
+            {
+                "messages": [
+                    AIMessage(
+                        content="hello",
+                        usage_metadata={
+                            "input_tokens": 10,
+                            "output_tokens": 5,
+                            "total_tokens": 15,
+                        },
+                    )
+                ]
+            },
+            [],
+        )
 
     runtime = client.app.state.agent_runtime
-    monkeypatch.setattr(runtime, "ainvoke", scripted_ainvoke, raising=False)
+    monkeypatch.setattr(runtime, "arun_with_events", scripted_ainvoke, raising=False)
 
     response = client.post(
         "/api/ai/chat",

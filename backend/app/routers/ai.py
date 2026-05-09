@@ -11,14 +11,13 @@ by:
 1. Authenticating with the same JWT used elsewhere.
 2. Running the redaction / project-access / rate-limit / budget gates
    that the v2.1 router enforces.
-3. Delegating to deterministic implementations in
-   :mod:`app.services.v1_engine` for the structured routes, then
-   handing the result through the catalog agents' ``polish_*``
-   helpers so a configured ``ANTHROPIC_API_KEY`` /
-   ``OPENAI_API_KEY`` actually flips the FE-visible output. The
-   helpers internally short-circuit on the deterministic stub or on
-   any provider exception, so the wire shape stays byte-identical
-   when no key is set.
+3. Calling :meth:`~app.agents.AgentRuntime.arun_with_events` for all
+   structured routes so the catalog agents drive both the deterministic
+   baseline (via pre-populated state that short-circuits interrupt nodes)
+   and the optional LLM polish step in a single graph run. The agents'
+   custom ``{"kind": "suggestion"}`` events carry the final payload; the
+   routes extract the right surface and return it as plain JSON. The wire
+   shape stays byte-identical with the old ``polish_*``-based path.
 4. Forwarding ``chat`` to the ``chat-agent`` runtime so the LLM is
    shared. The chat agent binds the FE-executed tool catalogue (see
    :mod:`app.agents.catalog._chat_tools`) when a real model is
@@ -26,13 +25,10 @@ by:
    whenever the model picks a tool and the FE drives the multi-round
    loop until the model returns text.
 
-Polish helpers are async (``with_structured_output(...).ainvoke(...)``),
-so the route handlers ``await`` them directly. The event loop suspends at
-the provider I/O boundary and yields control back to uvicorn while the
-LLM responds, keeping concurrent requests progressing. With the
-deterministic stub the helpers short-circuit before any I/O, so the
-coroutine overhead is negligible; with a real key set, throughput on a
-single uvicorn worker no longer collapses to one request at a time.
+All agent calls run through :func:`asyncio.wait_for` (chat) or the
+agent's own timeout / retry logic (structured routes) so a hung
+provider call surfaces as an error rather than blocking the worker
+indefinitely.
 """
 
 from __future__ import annotations
@@ -40,25 +36,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Final, List, Optional, Tuple
+from typing import Any, Dict, Final, List, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents import AgentRuntime
 from app.agents.base import AgentMetadata
 from app.agents.limits import enforce_request_limits
-from app.agents.catalog.search import polish_search
-from app.agents.catalog.task_drafting import polish_draft
-from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
 from app.agents.errors import AgentError
-from app.agents.llm import (
-    is_stub_model,
-    make_stub_chat_model,
-    result_token_usage_from_graph_result,
-)
+from app.agents.llm import result_token_usage_from_graph_result
 from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
 from app.middleware.budget import BudgetBackend, get_budget_tracker
@@ -339,6 +327,54 @@ def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _token_usage_from_events(custom_events: List[Any]) -> Tuple[int, int]:
+    """Sum ``(tokens_in, tokens_out)`` from ``{"kind": "usage"}`` custom events.
+
+    Catalog agents emit token usage via :func:`app.agents.catalog._shared.emit_usage`
+    rather than writing it into AIMessage.usage_metadata on the graph state.
+    Routes that pre-populate state (task-draft, estimate, readiness, search)
+    collect those events here as a fallback when
+    :func:`~app.agents.llm.result_token_usage_from_graph_result` returns ``(0, 0)``.
+    """
+
+    tokens_in = 0
+    tokens_out = 0
+    for event in custom_events:
+        if isinstance(event, dict) and event.get("kind") == "usage":
+            tokens_in += int(event.get("tokensIn") or 0)
+            tokens_out += int(event.get("tokensOut") or 0)
+    return tokens_in, tokens_out
+
+
+def _reconcile_token_budget(
+    project_id: Optional[str],
+    budget_tracker: BudgetBackend,
+    final_state: Any,
+    custom_events: List[Any],
+) -> None:
+    """True-up the project token budget after an agent run.
+
+    Tries :func:`~app.agents.llm.result_token_usage_from_graph_result` first
+    (populated by chat-agent and board-brief-agent which store AIMessages with
+    usage_metadata); falls back to the ``{"kind": "usage"}`` custom events
+    emitted by catalog agents that short-circuit onto pre-populated state
+    (task-draft, estimate, readiness, search).
+
+    The gate already debited 1 token at entry, so we top-up by
+    ``max(0, total - 1)``.
+    """
+
+    if not project_id:
+        return
+    tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
+    if tokens_in == 0 and tokens_out == 0:
+        tokens_in, tokens_out = _token_usage_from_events(custom_events)
+    actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
+    delta = max(0, actual - 1)
+    if delta > 0:
+        budget_tracker.record(project_id, tokens=delta)
+
+
 def _redact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for message in messages:
@@ -353,53 +389,6 @@ def _redact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _resolve_polish_model(runtime: AgentRuntime, agent_name: str) -> BaseChatModel:
-    """Return ``agent_name``'s configured chat model, or a stub on lookup miss.
-
-    The shim's _gate already enforces project access / rate limit /
-    budget regardless of which provider is wired up, so a missing
-    catalog agent should not 5xx the route -- it should just fall back
-    to the deterministic Python path. ``polish_*`` helpers detect the
-    stub via :func:`is_stub_model` and skip the LLM call entirely.
-    """
-
-    try:
-        return runtime.get(agent_name).chat_model
-    except AgentError:
-        return make_stub_chat_model()
-
-
-async def _polish_and_record(
-    project_id: Optional[str],
-    budget_tracker: BudgetBackend,
-    polish: Callable[..., Any],
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Invoke ``polish`` and true-up the project budget.
-
-    The polish helpers are async (LangChain ``with_structured_output``
-    + ``.ainvoke``) and are awaited directly here since the route handlers
-    are already ``async def``. This keeps the event loop free for concurrent
-    requests: the coroutine suspends at the provider I/O boundary and yields
-    control back to uvicorn while the LLM responds.
-
-    The :func:`_gate` step already debited 1 token at entry to the route
-    (so a runaway provider can't burst past the cap before we see usage).
-    Real usage is reported by the polish helper as
-    ``(value, tokens_in, tokens_out)``; we top-up by the delta
-    ``max(0, total - 1)`` so the budget tracker reflects what the
-    provider charged. A stubbed call reports ``(0, 0)`` and produces no
-    top-up.
-    """
-
-    polished, tokens_in, tokens_out = await polish(*args, **kwargs)
-    if project_id:
-        actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-        delta = max(0, actual - 1)
-        if delta > 0:
-            budget_tracker.record(project_id, tokens=delta)
-    return polished
 
 
 def _idempotent_replay(
@@ -551,19 +540,46 @@ async def task_draft(
         if isinstance(payload.get("prompt"), str):
             payload["prompt"] = _redact(payload["prompt"])
         deterministic = v1_engine.draft_task(payload)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            body = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_draft,
-                model,
-                deterministic,
-                payload.get("prompt") or "",
-                _similar_from_context(payload.get("context")),
+        context = payload.get("context") or {}
+        inputs: Dict[str, Any] = {
+            "draft": deterministic,
+            "prompt": payload.get("prompt") or "",
+            "similar_tasks": _similar_from_context(context),
+            # Pre-populate board_snapshot to short-circuit the fetch_snapshot
+            # interrupt node (same pattern as board-brief route).
+            "board_snapshot": context if isinstance(context, dict) else {},
+        }
+        if project_id:
+            inputs["project_id"] = project_id
+
+        try:
+            final_state, custom_events = await runtime.arun_with_events(
+                meta.catalog_agent_name,
+                inputs,
+                user_id=user_id,
             )
+            suggestion = next(
+                (
+                    e for e in custom_events
+                    if isinstance(e, dict)
+                    and e.get("kind") == "suggestion"
+                    and e.get("surface") == "draft"
+                ),
+                None,
+            )
+            if suggestion is None:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a draft."}},
+                )
+            body = suggestion["payload"]
+            _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
+        except AgentError:
+            # Agent not registered or agent execution failed; fall back to the
+            # deterministic result so a misconfigured catalog doesn't 5xx the
+            # route.
+            body = deterministic
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
@@ -613,47 +629,50 @@ async def task_breakdown(
         deterministic = v1_engine.breakdown_task(
             payload, count=int(count) if isinstance(count, int) else 3
         )
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            items = list(deterministic.get("items") or [])
-            # Polish the shared base draft once (without the per-item ``(part i)``
-            # suffix), then re-apply each item's deterministic suffix on top of
-            # the polished prefix. Mirrors what ``task_drafting.py`` does at
-            # lines 166-171 and keeps cost flat with the task-draft route.
-            base_draft = v1_engine.draft_task(payload)
-            polished_base = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_draft,
-                model,
-                dict(base_draft),
-                payload.get("prompt") or "",
-                _similar_from_context(payload.get("context")),
+        # For the polished path, the agent needs the base draft + suffix info.
+        # Pre-populate ``draft`` with the breakdown result so the agent emits
+        # it on the ``"breakdown"`` surface.  For the polished path the agent
+        # would need to know the base draft; pass it via ``_breakdown_base`` so
+        # the generate_draft node can reconstruct the per-item suffix pattern.
+        context_bd = payload.get("context") or {}
+        base_draft = v1_engine.draft_task(payload)
+        inputs: Dict[str, Any] = {
+            "draft": {
+                **deterministic,
+                "_breakdown_base": base_draft,
+                "_prompt": payload.get("prompt") or "",
+                "_similar": _similar_from_context(context_bd),
+            },
+            "similar_tasks": _similar_from_context(context_bd),
+            "prompt": payload.get("prompt") or "",
+            "board_snapshot": context_bd if isinstance(context_bd, dict) else {},
+        }
+        if project_id:
+            inputs["project_id"] = project_id
+
+        final_state, custom_events = await runtime.arun_with_events(
+            meta.catalog_agent_name,
+            inputs,
+            user_id=user_id,
+        )
+
+        suggestion = next(
+            (
+                e for e in custom_events
+                if isinstance(e, dict)
+                and e.get("kind") == "suggestion"
+                and e.get("surface") == "breakdown"
+            ),
+            None,
+        )
+        if suggestion is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a breakdown."}},
             )
-            polished_taskName = polished_base.get("taskName") or ""
-            polished_note = polished_base.get("note") or ""
-            polished_rationale = polished_base.get("rationale")
-            base_taskName = base_draft.get("taskName") or ""
-            polished_items: List[Dict[str, Any]] = []
-            for item in items:
-                merged = dict(item)
-                # ``v1_engine.breakdown_task`` always builds each item's
-                # taskName as ``f"{base_taskName} (part {i})"`` -- strip the
-                # shared base to recover the suffix and apply it on top of the
-                # polished prefix. Trusting the upstream invariant keeps this
-                # code path simple and 100% coverable.
-                item_taskName = item.get("taskName") or ""
-                suffix = item_taskName[len(base_taskName) :]
-                merged["taskName"] = polished_taskName + suffix
-                merged["note"] = polished_note
-                # Each piece keeps its v1_engine ``Slice i of...`` deterministic
-                # rationale unless polish produced a non-blank shared rationale.
-                if isinstance(polished_rationale, str) and polished_rationale.strip():
-                    merged["rationale"] = polished_rationale
-                polished_items.append(merged)
-            body = {**deterministic, "items": polished_items}
+        body = suggestion["payload"]
+        _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
@@ -697,21 +716,38 @@ async def estimate(
         )
         enforce_request_limits(payload, request=request)
         deterministic = v1_engine.estimate(payload)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body = deterministic
-        else:
-            rationale = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_rationale,
-                model,
-                deterministic.get("rationale") or "",
-                redact_task_fields(_draft_from_payload(payload, _ESTIMATE_DRAFT_FIELDS)),
-                int(deterministic.get("storyPoints") or 0),
-                deterministic.get("similar") or [],
+        task_draft = redact_task_fields(_draft_from_payload(payload, _ESTIMATE_DRAFT_FIELDS))
+        inputs: Dict[str, Any] = {
+            "estimate": deterministic,
+            "task_draft": task_draft,
+            "similar_tasks": [],
+        }
+        if project_id:
+            inputs["project_id"] = project_id
+
+        final_state, custom_events = await runtime.arun_with_events(
+            meta.catalog_agent_name,
+            inputs,
+            user_id=user_id,
+        )
+
+        suggestion = next(
+            (
+                e for e in custom_events
+                if isinstance(e, dict)
+                and e.get("kind") == "suggestion"
+                and e.get("surface") == "estimate_v1"
+            ),
+            None,
+        )
+        if suggestion is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit an estimate."}},
             )
-            body = {**deterministic, "rationale": rationale}
+        body = suggestion["payload"]
+        _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
@@ -755,21 +791,41 @@ async def readiness(
         )
         enforce_request_limits(payload, request=request)
         deterministic = v1_engine.readiness(payload)
-        if not deterministic.get("issues"):
-            body: Any = deterministic
-        else:
-            model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-            if is_stub_model(model):
-                body = deterministic
-            else:
-                body = await _polish_and_record(
-                    project_id,
-                    budget_tracker,
-                    polish_readiness,
-                    model,
-                    deterministic,
-                    redact_task_fields(_draft_from_payload(payload, _READINESS_DRAFT_FIELDS)),
-                )
+        task_draft = redact_task_fields(_draft_from_payload(payload, _READINESS_DRAFT_FIELDS))
+        inputs: Dict[str, Any] = {
+            "readiness": deterministic,
+            "task_draft": task_draft,
+            "similar_tasks": [],
+            # Pass a sentinel estimate so the estimate node short-circuits without an
+            # LLM call.  Only the readiness polish tokens are attributable to this route.
+            "estimate": {"_skip_polish": True},
+        }
+        if project_id:
+            inputs["project_id"] = project_id
+
+        final_state, custom_events = await runtime.arun_with_events(
+            meta.catalog_agent_name,
+            inputs,
+            user_id=user_id,
+        )
+
+        suggestion = next(
+            (
+                e for e in custom_events
+                if isinstance(e, dict)
+                and e.get("kind") == "suggestion"
+                and e.get("surface") == "readiness_v1"
+            ),
+            None,
+        )
+        if suggestion is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a readiness report."}},
+            )
+        body: Any = suggestion["payload"]
+        _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
@@ -844,15 +900,8 @@ async def board_brief(
                 detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a brief."}},
             )
         body = suggestion["payload"]
-
-        # Reconcile budget against actual provider usage (same logic as
-        # _polish_and_record but on the full agent run, not a single polish call).
-        if project_id:
-            tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
-            actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-            delta = max(0, actual - 1)  # _gate already debited 1 token
-            if delta > 0:
-                budget_tracker.record(project_id, tokens=delta)
+        # Reconcile budget against actual provider usage.
+        _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
 
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
@@ -910,19 +959,39 @@ async def search(
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
         deterministic = v1_engine.semantic_search(kind, redacted_query, context)
-        model = _resolve_polish_model(runtime, meta.catalog_agent_name)
-        if is_stub_model(model):
-            body: Any = deterministic
-        else:
-            body = await _polish_and_record(
-                project_id,
-                budget_tracker,
-                polish_search,
-                model,
-                deterministic,
-                redacted_query,
-                _candidates_from_context(kind, context),
+        candidates = _candidates_from_context(kind, context)
+        inputs: Dict[str, Any] = {
+            "query": redacted_query,
+            "kind": kind,
+            "candidates": candidates,
+            "ranking": deterministic,
+        }
+        if project_id:
+            inputs["project_id"] = project_id
+
+        final_state, custom_events = await runtime.arun_with_events(
+            meta.catalog_agent_name,
+            inputs,
+            user_id=user_id,
+        )
+
+        suggestion = next(
+            (
+                e for e in custom_events
+                if isinstance(e, dict)
+                and e.get("kind") == "suggestion"
+                and e.get("surface") == "search"
+            ),
+            None,
+        )
+        if suggestion is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": {"code": "agent_unavailable", "message": "Agent did not emit a search result."}},
             )
+        body: Any = suggestion["payload"]
+        _reconcile_token_budget(project_id, budget_tracker, final_state, custom_events)
+
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
@@ -1125,8 +1194,8 @@ async def chat(
 
         timeout = settings.agent_request_timeout_seconds
         try:
-            result = await asyncio.wait_for(
-                runtime.ainvoke(
+            result, _chat_events = await asyncio.wait_for(
+                runtime.arun_with_events(
                     meta.catalog_agent_name,
                     inputs,
                     user_id=user_id,

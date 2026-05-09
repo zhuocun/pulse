@@ -1354,8 +1354,8 @@ def test_ai_chat_handler_crash_releases_reservation(
         raise AgentExecutionError("chat-agent", cause=RuntimeError("nope"))
 
     runtime = client.app.state.agent_runtime
-    original_ainvoke = runtime.ainvoke
-    monkeypatch.setattr(runtime, "ainvoke", boom, raising=False)
+    original_arun = runtime.arun_with_events
+    monkeypatch.setattr(runtime, "arun_with_events", boom, raising=False)
     headers = {**auth_headers, "Idempotency-Key": "ai-crash"}
     payload = {
         "messages": [{"role": "user", "content": "x"}],
@@ -1363,7 +1363,7 @@ def test_ai_chat_handler_crash_releases_reservation(
     }
     crashed = client.post("/api/ai/chat", json=payload, headers=headers)
     assert crashed.status_code == HTTPStatus.BAD_GATEWAY
-    monkeypatch.setattr(runtime, "ainvoke", original_ainvoke, raising=False)
+    monkeypatch.setattr(runtime, "arun_with_events", original_arun, raising=False)
     retry = client.post("/api/ai/chat", json=payload, headers=headers)
     assert retry.status_code == HTTPStatus.OK
     assert "Idempotent-Replay" not in retry.headers
