@@ -2395,12 +2395,11 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     echo_in_global_registry: EchoAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_rate_limit_backend,
 ) -> None:
     from dataclasses import replace
 
-    from app.middleware import rate_limit as rate_limit_module
-
-    rate_limit_module.rate_limiter.reset()
+    ai_rate_limit_backend.reset()
     # Lower the per-agent limit on the registered metadata directly --
     # the limiter reads from registry metadata as the single source of
     # truth, so the test patches that one place.
@@ -2422,7 +2421,7 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     assert second.status_code == HTTPStatus.TOO_MANY_REQUESTS
     assert "Retry-After" in second.headers
     assert int(second.headers["Retry-After"]) >= 1
-    rate_limit_module.rate_limiter.reset()
+    ai_rate_limit_backend.reset()
 
 
 def test_router_invoke_returns_402_when_budget_exhausted(
@@ -2430,11 +2429,12 @@ def test_router_invoke_returns_402_when_budget_exhausted(
     echo_in_global_registry: EchoAgent,
     auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend,
 ) -> None:
-    from app.middleware import budget as budget_module
+    from app.middleware.budget import DEFAULT_MONTHLY_TOKEN_CAP
 
-    budget_module.budget_tracker.reset()
-    monkeypatch.setattr(budget_module.budget_tracker, "monthly_cap", 0)
+    ai_budget_backend.reset()
+    monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
 
     response = client.post(
         "/api/v1/agents/echo/invoke",
@@ -2444,21 +2444,22 @@ def test_router_invoke_returns_402_when_budget_exhausted(
     assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
     assert response.headers.get("X-Reason") == "budget"
     monkeypatch.setattr(
-        budget_module.budget_tracker,
+        ai_budget_backend,
         "monthly_cap",
-        budget_module.DEFAULT_MONTHLY_TOKEN_CAP,
+        DEFAULT_MONTHLY_TOKEN_CAP,
     )
-    budget_module.budget_tracker.reset()
+    ai_budget_backend.reset()
 
 
 def test_router_records_usage_on_successful_invoke(
     client: TestClient,
     echo_in_global_registry: EchoAgent,
     auth_headers: dict[str, str],
+    ai_budget_backend,
 ) -> None:
-    from app.middleware import budget as budget_module
+    from app.middleware.budget import DEFAULT_MONTHLY_TOKEN_CAP
 
-    budget_module.budget_tracker.reset()
+    ai_budget_backend.reset()
     response = client.post(
         "/api/v1/agents/echo/invoke",
         json={"inputs": {"text": "x", "project_id": "p-record"}},
@@ -2466,20 +2467,20 @@ def test_router_records_usage_on_successful_invoke(
     )
     assert response.status_code == HTTPStatus.OK
     assert (
-        budget_module.budget_tracker.remaining("p-record")
-        < budget_module.DEFAULT_MONTHLY_TOKEN_CAP
+        ai_budget_backend.remaining("p-record") < DEFAULT_MONTHLY_TOKEN_CAP
     )
-    budget_module.budget_tracker.reset()
+    ai_budget_backend.reset()
 
 
 def test_router_records_usage_after_stream_completes(
     client: TestClient,
     echo_in_global_registry: EchoAgent,
     auth_headers: dict[str, str],
+    ai_budget_backend,
 ) -> None:
-    from app.middleware import budget as budget_module
+    from app.middleware.budget import DEFAULT_MONTHLY_TOKEN_CAP
 
-    budget_module.budget_tracker.reset()
+    ai_budget_backend.reset()
     with client.stream(
         "POST",
         "/api/v1/agents/echo/stream",
@@ -2490,10 +2491,10 @@ def test_router_records_usage_after_stream_completes(
         body = b"".join(response.iter_bytes()).decode("utf-8")
     assert "[DONE]" in body
     assert (
-        budget_module.budget_tracker.remaining("p-stream-record")
-        < budget_module.DEFAULT_MONTHLY_TOKEN_CAP
+        ai_budget_backend.remaining("p-stream-record")
+        < DEFAULT_MONTHLY_TOKEN_CAP
     )
-    budget_module.budget_tracker.reset()
+    ai_budget_backend.reset()
 
 
 def test_router_returns_403_when_project_ai_is_disabled(

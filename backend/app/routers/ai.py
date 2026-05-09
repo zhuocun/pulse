@@ -61,9 +61,12 @@ from app.agents.llm import (
 )
 from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
-from app.middleware import budget as _budget
-from app.middleware import rate_limit as _rate_limit
-from app.middleware.rate_limit import DEFAULT_LIMIT
+from app.middleware.budget import BudgetBackend, get_budget_tracker
+from app.middleware.rate_limit import (
+    DEFAULT_LIMIT,
+    RateLimitBackend,
+    get_rate_limiter,
+)
 from app.middleware.idempotency_guard import IdempotencyContext
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
@@ -134,6 +137,8 @@ def _gate(
     user_id: str,
     project_id: Optional[str],
     *,
+    rate_limiter: RateLimitBackend,
+    budget_tracker: BudgetBackend,
     metadata: Optional[AgentMetadata] = None,
     agent_label: str = "v1-shim",
 ) -> None:
@@ -162,9 +167,7 @@ def _gate(
             detail={"code": "forbidden", "message": "Forbidden"},
         )
     limits = metadata.rate_limit if metadata is not None else DEFAULT_LIMIT
-    allowed, retry_after = _rate_limit.rate_limiter.check(
-        agent_label, user_id, limits=limits
-    )
+    allowed, retry_after = rate_limiter.check(agent_label, user_id, limits=limits)
     if not allowed:
         record_invocation(agent_label, "rate_limited")
         raise HTTPException(
@@ -172,7 +175,7 @@ def _gate(
             detail={"error": "rate limit exceeded"},
             headers={"Retry-After": str(retry_after)},
         )
-    if project_id and not _budget.budget_tracker.can_spend(project_id, tokens=1):
+    if project_id and not budget_tracker.can_spend(project_id, tokens=1):
         record_invocation(agent_label, "budget_exhausted")
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -187,6 +190,8 @@ def _gate_with_reservation(
     user_id: str,
     project_id: Optional[str],
     *,
+    rate_limiter: RateLimitBackend,
+    budget_tracker: BudgetBackend,
     metadata: Optional[AgentMetadata] = None,
     agent_label: str = "v1-shim",
 ) -> int:
@@ -196,8 +201,8 @@ def _gate_with_reservation(
     actual usage afterwards; the other v1 routes use deterministic stubs so
     the TOCTOU window in ``_gate`` is not exploitable there.
 
-    Returns the reservation amount (1 when project_id is set, 0 otherwise)
-    so the caller can pass it to ``_budget.budget_tracker.refund`` on failure
+    Returns the     reservation amount (1 when project_id is set, 0 otherwise)
+    so the caller can pass it to ``budget_tracker.refund`` on failure
     or top-up via ``record`` on success.
     """
 
@@ -212,9 +217,7 @@ def _gate_with_reservation(
             detail={"code": "forbidden", "message": "Forbidden"},
         )
     limits = metadata.rate_limit if metadata is not None else DEFAULT_LIMIT
-    allowed, retry_after = _rate_limit.rate_limiter.check(
-        agent_label, user_id, limits=limits
-    )
+    allowed, retry_after = rate_limiter.check(agent_label, user_id, limits=limits)
     if not allowed:
         record_invocation(agent_label, "rate_limited")
         raise HTTPException(
@@ -223,7 +226,7 @@ def _gate_with_reservation(
             headers={"Retry-After": str(retry_after)},
         )
     if project_id:
-        if not _budget.budget_tracker.reserve(project_id, tokens=1):
+        if not budget_tracker.reserve(project_id, tokens=1):
             record_invocation(agent_label, "budget_exhausted")
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -289,6 +292,7 @@ def _resolve_polish_model(runtime: AgentRuntime, agent_name: str) -> BaseChatMod
 
 async def _polish_and_record(
     project_id: Optional[str],
+    budget_tracker: BudgetBackend,
     polish: Callable[..., Any],
     *args: Any,
     **kwargs: Any,
@@ -315,7 +319,7 @@ async def _polish_and_record(
         actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
         delta = max(0, actual - 1)
         if delta > 0:
-            _budget.budget_tracker.record(project_id, tokens=delta)
+            budget_tracker.record(project_id, tokens=delta)
     return polished
 
 
@@ -435,6 +439,8 @@ async def task_draft(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -448,7 +454,14 @@ async def task_draft(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         payload = dict(payload)
         if isinstance(payload.get("prompt"), str):
@@ -460,6 +473,7 @@ async def task_draft(
         else:
             body = await _polish_and_record(
                 project_id,
+                budget_tracker,
                 polish_draft,
                 model,
                 deterministic,
@@ -479,6 +493,8 @@ async def task_breakdown(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -492,7 +508,14 @@ async def task_breakdown(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         payload = dict(payload)
         if isinstance(payload.get("prompt"), str):
@@ -513,6 +536,7 @@ async def task_breakdown(
             base_draft = v1_engine.draft_task(payload)
             polished_base = await _polish_and_record(
                 project_id,
+                budget_tracker,
                 polish_draft,
                 model,
                 dict(base_draft),
@@ -554,6 +578,8 @@ async def estimate(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -567,7 +593,14 @@ async def estimate(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         deterministic = v1_engine.estimate(payload)
         model = _resolve_polish_model(runtime, "task-estimation-agent")
@@ -576,6 +609,7 @@ async def estimate(
         else:
             rationale = await _polish_and_record(
                 project_id,
+                budget_tracker,
                 polish_rationale,
                 model,
                 deterministic.get("rationale") or "",
@@ -597,6 +631,8 @@ async def readiness(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -610,7 +646,14 @@ async def readiness(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         deterministic = v1_engine.readiness(payload)
         if not deterministic.get("issues"):
@@ -622,6 +665,7 @@ async def readiness(
             else:
                 body = await _polish_and_record(
                     project_id,
+                    budget_tracker,
                     polish_readiness,
                     model,
                     deterministic,
@@ -640,6 +684,8 @@ async def board_brief(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -653,7 +699,14 @@ async def board_brief(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         context = payload.get("context") or {}
         if not isinstance(context, dict):
@@ -698,6 +751,7 @@ async def board_brief(
             }
             headline = await _polish_and_record(
                 project_id,
+                budget_tracker,
                 polish_headline,
                 model,
                 deterministic.get("headline") or "",
@@ -719,6 +773,8 @@ async def search(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     route_path = request.url.path
@@ -732,7 +788,14 @@ async def search(
         return replay
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(request, user_id, project_id, agent_label=agent_label)
+        _gate(
+            request,
+            user_id,
+            project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
+            agent_label=agent_label,
+        )
         enforce_request_limits(payload)
         kind = payload.get("kind")
         if kind not in {"tasks", "projects"}:
@@ -754,6 +817,7 @@ async def search(
         else:
             body = await _polish_and_record(
                 project_id,
+                budget_tracker,
                 polish_search,
                 model,
                 deterministic,
@@ -894,6 +958,8 @@ async def chat(
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
     runtime: AgentRuntime = Depends(_get_runtime),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Dict[str, Any]:
     """Forward chat to the ``chat-agent`` runtime so the LLM is shared.
 
@@ -934,6 +1000,8 @@ async def chat(
             request,
             user_id,
             project_id,
+            rate_limiter=rate_limiter,
+            budget_tracker=budget_tracker,
             metadata=chat_metadata,
             agent_label=agent_label,
         )
@@ -991,7 +1059,7 @@ async def chat(
             actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
             delta = max(0, max(1, actual) - reserved_budget)
             if delta > 0:
-                _budget.budget_tracker.record(project_id, tokens=delta)
+                budget_tracker.record(project_id, tokens=delta)
         budget_reconciled = True
         if tool_calls:
             body: Dict[str, Any] = {"kind": "tool_calls", "toolCalls": tool_calls}
@@ -1002,5 +1070,5 @@ async def chat(
         return body
     except BaseException as exc:
         if not budget_reconciled and reserved_budget and project_id:
-            _budget.budget_tracker.refund(project_id, tokens=reserved_budget)
+            budget_tracker.refund(project_id, tokens=reserved_budget)
         _idem_fail(idem, exc)

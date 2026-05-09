@@ -51,8 +51,8 @@ from app.agents.sse import (
 )
 from app.auth.project_access import is_project_ai_enabled
 from app.config import settings
-from app.middleware import budget as _budget
-from app.middleware import rate_limit as _rate_limit
+from app.middleware.budget import BudgetBackend, get_budget_tracker
+from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
 from app.security import current_user_id, current_user_payload
@@ -277,16 +277,19 @@ def _request_context(
     return _coerce_context(schema, payload.get("context"))
 
 
-def _enforce_rate_limit(name: str, user_id: str, metadata: AgentMetadata) -> None:
+def _enforce_rate_limit(
+    name: str,
+    user_id: str,
+    metadata: AgentMetadata,
+    rate_limiter: RateLimitBackend,
+) -> None:
     """Raise 429 with ``Retry-After`` when the per-agent quota is exhausted.
 
     Limits come from :attr:`AgentMetadata.rate_limit` -- one source of
     truth. The middleware no longer keeps a duplicate constant table.
     """
 
-    allowed, retry_after = _rate_limit.rate_limiter.check(
-        name, user_id, limits=metadata.rate_limit
-    )
+    allowed, retry_after = rate_limiter.check(name, user_id, limits=metadata.rate_limit)
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -295,7 +298,11 @@ def _enforce_rate_limit(name: str, user_id: str, metadata: AgentMetadata) -> Non
         )
 
 
-def _enforce_budget(project_id: Optional[str], tokens: int = 1) -> int:
+def _enforce_budget(
+    project_id: Optional[str],
+    tokens: int,
+    budget_tracker: BudgetBackend,
+) -> int:
     """Reserve ``tokens`` against the project budget; raise 402 if full.
 
     Returns the amount actually reserved (``0`` when no project is in
@@ -307,7 +314,7 @@ def _enforce_budget(project_id: Optional[str], tokens: int = 1) -> int:
     if not project_id:
         return 0
     requested = max(1, tokens)
-    if not _budget.budget_tracker.reserve(project_id, requested):
+    if not budget_tracker.reserve(project_id, requested):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={"error": "project budget exhausted"},
@@ -417,6 +424,7 @@ def _record_real_usage(
     tokens_in: int,
     tokens_out: int,
     *,
+    budget_tracker: BudgetBackend,
     prebooked: int = 0,
     failure: bool = False,
 ) -> int:
@@ -444,11 +452,11 @@ def _record_real_usage(
     if not project_id:
         return actual
     if actual > prebooked:
-        _budget.budget_tracker.record(project_id, tokens=actual - prebooked)
+        budget_tracker.record(project_id, tokens=actual - prebooked)
     elif actual and actual < prebooked:
-        _budget.budget_tracker.refund(project_id, tokens=prebooked - actual)
+        budget_tracker.refund(project_id, tokens=prebooked - actual)
     elif failure and actual == 0 and prebooked:
-        _budget.budget_tracker.refund(project_id, tokens=prebooked)
+        budget_tracker.refund(project_id, tokens=prebooked)
     # Success with actual == prebooked, or success with actual == 0 -- no further change.
     return actual
 
@@ -576,6 +584,8 @@ async def invoke_agent(
     payload: Dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     payload = _normalize_payload(payload)
@@ -617,14 +627,14 @@ async def invoke_agent(
         _enforce_project_access(project_id)
         _require_project_manager(project_id, user_id)
         try:
-            _enforce_rate_limit(name, user_id, metadata)
+            _enforce_rate_limit(name, user_id, metadata, rate_limiter)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
                 record_invocation(name, "rate_limited")
             raise
         prebooked = max(1, _input_token_estimate(inputs))
         try:
-            reserved_budget = _enforce_budget(project_id, tokens=prebooked)
+            reserved_budget = _enforce_budget(project_id, prebooked, budget_tracker)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_402_PAYMENT_REQUIRED:
                 record_invocation(name, "budget_exhausted")
@@ -654,6 +664,7 @@ async def invoke_agent(
             project_id,
             tokens_in,
             tokens_out,
+            budget_tracker=budget_tracker,
             prebooked=reserved_budget,
             failure=False,
         )
@@ -675,6 +686,7 @@ async def invoke_agent(
                 project_id,
                 0,
                 0,
+                budget_tracker=budget_tracker,
                 prebooked=reserved_budget,
                 failure=True,
             )
@@ -692,6 +704,8 @@ async def stream_agent(
     payload: Dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
     auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
+    budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
     user_id = current_user_id(auth_payload)
     payload = _normalize_payload(payload)
@@ -746,14 +760,14 @@ async def stream_agent(
         _enforce_project_access(project_id)
         _require_project_manager(project_id, user_id)
         try:
-            _enforce_rate_limit(name, user_id, metadata)
+            _enforce_rate_limit(name, user_id, metadata, rate_limiter)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
                 record_invocation(name, "rate_limited")
             raise
         prebooked = max(1, _input_token_estimate(inputs))
         try:
-            reserved_budget = _enforce_budget(project_id, tokens=prebooked)
+            reserved_budget = _enforce_budget(project_id, prebooked, budget_tracker)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_402_PAYMENT_REQUIRED:
                 record_invocation(name, "budget_exhausted")
@@ -777,6 +791,7 @@ async def stream_agent(
                     project_id,
                     tokens_in_total,
                     tokens_out_total,
+                    budget_tracker=budget_tracker,
                     prebooked=reserved_budget,
                     failure=True,
                 )
@@ -835,6 +850,7 @@ async def stream_agent(
                     project_id,
                     tokens_in_total,
                     tokens_out_total,
+                    budget_tracker=budget_tracker,
                     prebooked=reserved_budget,
                     failure=False,
                 )
@@ -869,6 +885,7 @@ async def stream_agent(
                 project_id,
                 0,
                 0,
+                budget_tracker=budget_tracker,
                 prebooked=reserved_budget,
                 failure=True,
             )

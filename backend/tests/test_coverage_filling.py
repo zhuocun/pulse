@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Iterable
+from typing import Any, AsyncIterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,8 +30,7 @@ from app.agents.llm import (
 )
 from app.agents.runtime import AgentRuntime
 from app.agents.sse import _interrupt_data, translate_event
-from app.middleware import budget as budget_module
-from app.middleware import rate_limit as rate_limit_module
+from app.middleware.budget import BudgetTracker
 from app.security import create_token
 from tests.conftest import is_not_stub, structured_model
 
@@ -45,15 +44,6 @@ def auth_headers() -> dict[str, str]:
     )
     token = create_token("fill-user")
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def reset_state() -> Iterable[None]:
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
-    yield
-    rate_limit_module.rate_limiter.reset()
-    budget_module.budget_tracker.reset()
 
 
 # ---------------------------------------------------------------------------
@@ -1068,13 +1058,10 @@ def test_record_real_usage_with_zero_actual_keeps_prebooked() -> None:
 
     from app.routers.agents import _record_real_usage
 
-    budget_module.budget_tracker.reset()
-    budget_module.budget_tracker.reserve("p-zero", 4)
-    _record_real_usage("p-zero", 0, 0, prebooked=4)
-    assert (
-        budget_module.budget_tracker.remaining("p-zero")
-        == budget_module.budget_tracker.monthly_cap - 4
-    )
+    tracker = BudgetTracker()
+    tracker.reserve("p-zero", 4)
+    _record_real_usage("p-zero", 0, 0, budget_tracker=tracker, prebooked=4)
+    assert tracker.remaining("p-zero") == tracker.monthly_cap - 4
 
 
 def test_input_token_estimate_with_non_mapping() -> None:
@@ -1206,13 +1193,12 @@ def test_record_real_usage_delta_branch_records_total() -> None:
 
     from app.routers.agents import _record_real_usage
 
-    budget_module.budget_tracker.reset()
-    budget_module.budget_tracker.reserve("p-delta", 2)
-    _record_real_usage("p-delta", tokens_in=8, tokens_out=4, prebooked=2)
-    spent = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-delta")
+    tracker = BudgetTracker()
+    tracker.reserve("p-delta", 2)
+    _record_real_usage(
+        "p-delta", tokens_in=8, tokens_out=4, budget_tracker=tracker, prebooked=2
     )
+    spent = tracker.monthly_cap - tracker.remaining("p-delta")
     assert spent == 12
 
 
@@ -1221,13 +1207,12 @@ def test_record_real_usage_actual_under_prebook_refunds_difference() -> None:
 
     from app.routers.agents import _record_real_usage
 
-    budget_module.budget_tracker.reset()
-    budget_module.budget_tracker.reserve("p-under", 10)
-    _record_real_usage("p-under", tokens_in=2, tokens_out=1, prebooked=10)
-    spent = (
-        budget_module.budget_tracker.monthly_cap
-        - budget_module.budget_tracker.remaining("p-under")
+    tracker = BudgetTracker()
+    tracker.reserve("p-under", 10)
+    _record_real_usage(
+        "p-under", tokens_in=2, tokens_out=1, budget_tracker=tracker, prebooked=10
     )
+    spent = tracker.monthly_cap - tracker.remaining("p-under")
     assert spent == 3
 
 
@@ -1538,7 +1523,7 @@ def test_task_reorder_cross_column_after_inserts_below_reference() -> None:
 def test_budget_tracker_rejects_negative_inputs() -> None:
     """Reserve / record / refund all reject negative tokens explicitly."""
 
-    tracker = budget_module.BudgetTracker(monthly_cap=100)
+    tracker = BudgetTracker(monthly_cap=100)
     with pytest.raises(ValueError):
         tracker.reserve("p", -1)
     with pytest.raises(ValueError):
@@ -1550,7 +1535,7 @@ def test_budget_tracker_rejects_negative_inputs() -> None:
 def test_budget_tracker_reserve_returns_false_when_cap_would_be_exceeded() -> None:
     """``reserve`` is atomic-or-nothing: never partially debits."""
 
-    tracker = budget_module.BudgetTracker(monthly_cap=10)
+    tracker = BudgetTracker(monthly_cap=10)
     assert tracker.reserve("p", 8) is True
     assert tracker.reserve("p", 5) is False
     # Spend stayed at the original successful reservation.
