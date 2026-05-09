@@ -35,10 +35,12 @@ from app.agents.catalog._shared import (
     fetch_similar_node,
     merge_keyed_string_updates,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TaskEstimationState
+from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.redaction import redact_dict, redact_task_fields
@@ -453,7 +455,7 @@ class TaskEstimationAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Shared node body from _shared.py (same logic as task-drafting-agent).
         fetch_similar = fetch_similar_node
@@ -482,6 +484,11 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def estimate(state: TaskEstimationState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             pre_estimate = state.get("estimate")
             # ------------------------------------------------------------------
             # v1-shim path: route passes raw ``context_tasks`` (and the task
@@ -541,6 +548,11 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             pre_readiness = state.get("readiness")
             # ------------------------------------------------------------------
             # v1-shim path: route passes raw ``context_tasks`` and the task
@@ -629,7 +641,7 @@ class TaskEstimationAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(TaskEstimationState)
+        graph: StateGraph = StateGraph(TaskEstimationState, context_schema=ChatContext)
         graph.add_node("fetch_similar", fetch_similar)
         graph.add_node("fetch_embeddings", fetch_embeddings)
         graph.add_node("estimate", estimate)

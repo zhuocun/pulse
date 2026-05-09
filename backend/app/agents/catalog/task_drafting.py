@@ -36,10 +36,12 @@ from app.agents.catalog._shared import (
     fetch_similar_node,
     fetch_snapshot_node,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TaskDraftingState
+from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
@@ -379,13 +381,18 @@ class TaskDraftingAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Shared node bodies from _shared.py (same logic as board_brief / triage).
         fetch_snapshot = fetch_snapshot_node
         fetch_similar = fetch_similar_node
 
         async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             prompt = state.get("prompt") or ""
             similar = state.get("similar_tasks") or []
             pre_draft = state.get("draft")
@@ -516,7 +523,7 @@ class TaskDraftingAgent(BaseAgent):
                 "events": [{"kind": "suggestion", "surface": "draft", "payload": draft}],
             }
 
-        graph: StateGraph = StateGraph(TaskDraftingState)
+        graph: StateGraph = StateGraph(TaskDraftingState, context_schema=ChatContext)
         graph.add_node("fetch_snapshot", fetch_snapshot)
         graph.add_node("fetch_similar", fetch_similar)
         graph.add_node("generate_draft", generate_draft)

@@ -32,12 +32,15 @@ from app.agents.catalog._shared import (
     detect_drift_node,
     fetch_snapshot_node,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import BoardBriefState
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
+
+from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -407,7 +410,7 @@ class BoardBriefAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Both bodies are shared with triage-agent (same state keys, same
         # logic).  See ``app.agents.catalog._shared`` for the implementations.
@@ -415,6 +418,12 @@ class BoardBriefAgent(BaseAgent):
         detect_drift = detect_drift_node
 
         async def generate_brief(state: BoardBriefState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default
+            # captured at build time for callers that don't inject a context.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             snapshot = state.get("board_snapshot") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             tasks = snapshot.get("tasks") or []
@@ -507,7 +516,7 @@ class BoardBriefAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(BoardBriefState)
+        graph: StateGraph = StateGraph(BoardBriefState, context_schema=ChatContext)
         graph.add_node("fetch_snapshot", fetch_snapshot)
         graph.add_node("detect_drift", detect_drift)
         graph.add_node("generate_brief", generate_brief)

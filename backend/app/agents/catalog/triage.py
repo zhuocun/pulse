@@ -34,10 +34,12 @@ from app.agents.catalog._shared import (
     fetch_snapshot_node,
     merge_keyed_string_updates,
 )
+from app.agents.context import ChatContext
 from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import TriageState
 from app.tools.redaction import redact_dict
+from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +266,7 @@ class TriageAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         # Both bodies are shared with board-brief-agent (same state keys,
         # same logic).  See ``app.agents.catalog._shared`` for the
@@ -273,6 +275,11 @@ class TriageAgent(BaseAgent):
         detect_drift = detect_drift_node
 
         async def generate_nudges(state: TriageState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
@@ -312,7 +319,7 @@ class TriageAgent(BaseAgent):
                 "events": new_events,
             }
 
-        graph: StateGraph = StateGraph(TriageState)
+        graph: StateGraph = StateGraph(TriageState, context_schema=ChatContext)
         graph.add_node("fetch_snapshot", fetch_snapshot)
         graph.add_node("detect_drift", detect_drift)
         graph.add_node("generate_nudges", generate_nudges)

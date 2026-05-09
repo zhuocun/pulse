@@ -49,10 +49,12 @@ from app.agents.catalog._shared import (
     cap_polished_text,
     filter_to_allowed_ids,
 )
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.registry import registry
 from app.agents.state import SearchState
+from langgraph.runtime import get_runtime
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
@@ -419,11 +421,11 @@ class SearchAgent(BaseAgent):
     ) -> Pregel:
         """Compile the v2.1 search graph.
 
-        The chat model is captured at build time (standard catalog pattern)
-        so the graph closure holds a single model reference for the lifetime
-        of the compiled graph -- identical to how task-estimation-agent works.
+        The default chat model is captured at build time as a fallback; nodes
+        prefer the per-call context model injected by the runtime so
+        per-request overrides work without rebuilding the graph.
         """
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         def fetch_candidates(state: SearchState) -> dict[str, Any]:
             """Interrupt to the FE requesting the candidate set.
@@ -519,6 +521,11 @@ class SearchAgent(BaseAgent):
 
         async def polish(state: SearchState) -> dict[str, Any]:
             """LLM-polish the deterministic ranking."""
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}
@@ -559,7 +566,7 @@ class SearchAgent(BaseAgent):
                 ],
             }
 
-        graph: StateGraph = StateGraph(SearchState)
+        graph: StateGraph = StateGraph(SearchState, context_schema=ChatContext)
         graph.add_node("fetch_candidates", fetch_candidates)
         graph.add_node("rank", rank)
         graph.add_node("polish", polish)

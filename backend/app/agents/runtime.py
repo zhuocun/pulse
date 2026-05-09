@@ -43,6 +43,7 @@ from app.agents.errors import (
     AgentExecutionError,
     AgentRecursionError,
 )
+from app.agents.context import ChatContext
 from app.agents.instrumentation import start_run_span
 from app.agents.llm import extract_token_usage, resolved_chat_model_id
 from app.agents.registry import AgentRegistry
@@ -239,6 +240,68 @@ class AgentRuntime:
     def _resolved_recursion_limit(self, agent: BaseAgent) -> int:
         return min(agent.metadata.recursion_limit, self._recursion_limit)
 
+    def set_chat_model(self, name: str, model: Any) -> None:
+        """Set the default chat model for the named agent.
+
+        The model is stored on the agent instance via
+        :meth:`~app.agents.base.BaseAgent.set_chat_model` and then propagated
+        onto the per-call context by :meth:`_build_context` so every
+        subsequent invocation uses the new default.
+
+        This is the primary injection point for tests: calling
+        ``runtime.set_chat_model("board-brief-agent", fake_model)`` is
+        equivalent to the old pattern of ``agent.set_chat_model(fake_model)``
+        but also ensures the context carries the model for the new per-call
+        context path.
+        """
+        self.get(name).set_chat_model(model)
+
+    def _build_context(
+        self,
+        agent: BaseAgent,
+        caller_context: Any,
+        *,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> Any:
+        """Resolve a context object for one agent call.
+
+        For catalog agents that declare ``context_schema=ChatContext`` (or
+        no context_schema at all), the runtime builds and returns a
+        :class:`~app.agents.context.ChatContext` dict with the resolved
+        ``chat_model``.  Resolution order:
+
+        1. ``caller_context["chat_model"]`` — enables per-request overrides;
+           TODO wire to ``X-Pulse-Model`` header / tenant config in Phase 5.
+        2. Agent's own ``chat_model`` property (resolved lazily from settings
+           on first access).
+
+        For agents with a *different* ``context_schema`` (e.g. test-only
+        agents, or future agents with specialised contexts), the caller's
+        context is returned unchanged so LangGraph can coerce it against the
+        declared schema without a ``KeyError``.
+
+        ``user_id`` and ``project_id`` are informational fields mirrored from
+        ``configurable``.
+        """
+        schema = agent.metadata.context_schema
+        if schema is not None and schema is not ChatContext:
+            # Non-ChatContext agent: pass caller's context through unchanged.
+            return caller_context
+
+        # ChatContext agent (or no declared schema): inject the resolved model.
+        ctx_model: Any = None
+        if isinstance(caller_context, dict):
+            ctx_model = caller_context.get("chat_model")
+        if ctx_model is None:
+            ctx_model = agent.chat_model
+        ctx: ChatContext = {"chat_model": ctx_model}
+        if user_id is not None:
+            ctx["user_id"] = user_id
+        if project_id is not None:
+            ctx["project_id"] = project_id
+        return ctx
+
     def build_config(
         self,
         agent: BaseAgent,
@@ -295,11 +358,14 @@ class AgentRuntime:
             assistant_id=assistant_id,
             tags=tags,
         )
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         try:
             return agent.invoke(
                 inputs,
                 config=config,
-                context=context,
+                context=resolved_context,
                 checkpointer=self._checkpointer,
                 store=self._store,
             )
@@ -367,6 +433,9 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         with start_run_span(
             operation="invoke_agent",
             agent_name=name,
@@ -378,7 +447,7 @@ class AgentRuntime:
                 result = await agent.ainvoke(
                     graph_input,
                     config=config,
-                    context=context,
+                    context=resolved_context,
                     checkpointer=self._checkpointer,
                     store=self._store,
                 )
@@ -428,6 +497,9 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         final_state: Any = None
         with start_run_span(
             operation="run_agent_with_events",
@@ -440,7 +512,7 @@ class AgentRuntime:
                 async for mode, payload in agent.astream(
                     graph_input,
                     config=config,
-                    context=context,
+                    context=resolved_context,
                     stream_mode=("values", "custom"),
                     checkpointer=self._checkpointer,
                     store=self._store,
@@ -490,6 +562,9 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        resolved_context = self._build_context(
+            agent, context, user_id=user_id, project_id=_project_id(inputs)
+        )
         # Track how many events we have already surfaced as ``custom`` chunks
         # so we can emit exactly the new ones after each superstep.
         _emitted_event_count = 0
@@ -511,7 +586,7 @@ class AgentRuntime:
                 async for event in agent.astream(
                     graph_input,
                     config=config,
-                    context=context,
+                    context=resolved_context,
                     stream_mode=_request_modes,
                     checkpointer=self._checkpointer,
                     store=self._store,

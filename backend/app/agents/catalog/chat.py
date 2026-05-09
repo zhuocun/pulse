@@ -28,10 +28,12 @@ from langgraph.store.base import BaseStore
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._chat_tools import CHAT_TOOLS
+from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model
 from app.agents.registry import registry
 from app.agents.state import ChatState
 from app.tools import be_tools
+from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +106,14 @@ class ChatAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver],
         store: Optional[BaseStore],
     ) -> Pregel:
-        chat_model: BaseChatModel = self.chat_model
+        _default_model = self.chat_model  # captured for fallback
 
         async def respond(state: ChatState) -> dict[str, Any]:
+            # Prefer the per-call context model; fall back to the default.
+            _rt = get_runtime(ChatContext)
+            chat_model: BaseChatModel = (
+                (_rt.context or {}).get("chat_model") or _default_model
+            )
             # Keep _last_user_text reading the full (un-trimmed) history so
             # the stub-fallback summary still picks up the actual last user input.
             user_text = _last_user_text(state)
@@ -171,7 +178,7 @@ class ChatAgent(BaseAgent):
             # Token usage is aggregated end-of-run from AIMessage.usage_metadata.
             return {"messages": [response]}
 
-        graph: StateGraph = StateGraph(ChatState)
+        graph: StateGraph = StateGraph(ChatState, context_schema=ChatContext)
         graph.add_node("respond", respond)
         graph.add_edge(START, "respond")
         graph.add_edge("respond", END)
