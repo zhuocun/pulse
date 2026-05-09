@@ -99,4 +99,69 @@ class AgentRegistry:
             return len(self._agents)
 
 
+class ChainedAgentRegistry(AgentRegistry):
+    """Per-app registry that falls through to a parent on reads.
+
+    Writes (``register`` / ``unregister`` / ``clear``) only mutate the
+    *local* dict; reads (``get`` / ``names`` / ``metadata`` / ``__iter__``
+    / ``__contains__`` / ``__len__``) check the local dict first, then
+    fall through to the parent registry.
+
+    Use case: production wants per-app isolation (each ``AgentRuntime``
+    should not be able to mutate another's agent set), but the test
+    harness registers test-only agents into the module-level
+    :data:`registry` *after* the FastAPI lifespan has built the runtime.
+    Falling through to that parent on reads keeps those existing test
+    patterns working without requiring all ~70 fixtures to migrate.
+    """
+
+    def __init__(self, parent: "AgentRegistry") -> None:
+        super().__init__()
+        self._parent = parent
+
+    def register(
+        self, agent: BaseAgent, *, replace: bool = False
+    ) -> BaseAgent:
+        """Register ``agent`` locally only; the parent is left untouched."""
+        return super().register(agent, replace=replace)
+
+    def get(self, name: str, *, include_shadow: bool = False) -> BaseAgent:
+        try:
+            return super().get(name, include_shadow=include_shadow)
+        except AgentNotFoundError:
+            return self._parent.get(name, include_shadow=include_shadow)
+
+    def names(self, *, include_shadow: bool = False) -> list[str]:
+        local = set(super().names(include_shadow=include_shadow))
+        parent = set(self._parent.names(include_shadow=include_shadow))
+        return sorted(local | parent)
+
+    def metadata(self, *, include_shadow: bool = False) -> list[AgentMetadata]:
+        # ``metadata`` is sorted by name in the base class; merging two
+        # sorted iterables and de-duplicating by ``name`` (local wins)
+        # keeps the contract identical to a flat registry.
+        seen: dict[str, AgentMetadata] = {}
+        for meta in super().metadata(include_shadow=include_shadow):
+            seen[meta.name] = meta
+        for meta in self._parent.metadata(include_shadow=include_shadow):
+            seen.setdefault(meta.name, meta)
+        return [seen[name] for name in sorted(seen)]
+
+    def __contains__(self, name: object) -> bool:
+        if super().__contains__(name):
+            return True
+        return self._parent.__contains__(name)
+
+    def __iter__(self) -> Iterator[BaseAgent]:
+        seen: dict[str, BaseAgent] = {}
+        for agent in super().__iter__():
+            seen[agent.name] = agent
+        for agent in self._parent:
+            seen.setdefault(agent.name, agent)
+        return iter(seen[name] for name in sorted(seen))
+
+    def __len__(self) -> int:
+        return len({agent.name for agent in self})
+
+
 registry = AgentRegistry()

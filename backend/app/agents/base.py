@@ -173,14 +173,20 @@ class BaseAgent(ABC):
         self._compiled: Optional[Pregel] = None
         self._compiled_checkpointer: Any = None
         self._compiled_store: Any = None
-        # Single threading.Lock guards ALL writes to the compile-cache fields
-        # (_compiled, _compiled_checkpointer, _compiled_store).  Using one
-        # lock for both sync and async paths prevents cross-path races where
-        # sync invoke() (running in a threadpool) and async astream() (running
-        # in the event loop) both observe a stale cache and both call build().
-        # acompile() acquires this lock via asyncio.to_thread so the event
-        # loop is never blocked during graph compilation.
+        # ``threading.Lock`` guards cache-field writes from sync ``compile()``
+        # and from the cache-update step of async ``acompile()``; this keeps
+        # cross-path consistency when sync ``invoke()`` (in a threadpool) and
+        # async ``astream()`` (on the event loop) race the first build.  The
+        # critical section is brief — only the three field assignments — so
+        # holding it from an async path doesn't block the loop meaningfully.
         self._build_lock = threading.Lock()
+        # ``asyncio.Lock`` serialises concurrent async waiters during a cache
+        # miss, replacing the prior pattern of dispatching the entire compile
+        # via ``asyncio.to_thread`` so that all waiters could share one
+        # ``threading.Lock``.  The fast (cache-hit) path takes neither lock —
+        # an attribute read is atomic enough for one-shot graph compilation
+        # whose result, once cached, never changes for the life of the agent.
+        self._async_build_lock = asyncio.Lock()
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -252,6 +258,32 @@ class BaseAgent(ABC):
             self._compiled_checkpointer = None
             self._compiled_store = None
 
+    def _cache_hit(
+        self,
+        checkpointer: Optional[BaseCheckpointSaver],
+        store: Optional[BaseStore],
+        force: bool,
+    ) -> bool:
+        """Return ``True`` when the cached compile matches the supplied
+        ``(checkpointer, store)`` pair and ``force`` is not set.
+
+        Identity (``is``) comparison is intentional: ``id()`` recycling
+        cannot short-circuit a rebuild to a stale graph because the
+        runtime hands a single pair to every agent for its lifetime,
+        so cache hits dominate in production.  Reading ``self._compiled``
+        without a lock is safe — Python attribute reads are atomic and
+        the cache fields are only ever transitioned ``None → built``
+        (never invalidated mid-flight outside :meth:`set_chat_model`,
+        which is documented as test-only).
+        """
+
+        return (
+            not force
+            and self._compiled is not None
+            and self._compiled_checkpointer is checkpointer
+            and self._compiled_store is store
+        )
+
     def compile(
         self,
         *,
@@ -261,30 +293,21 @@ class BaseAgent(ABC):
     ) -> Pregel:
         """Return the compiled graph, building it on first access.
 
-        The cache holds strong references to the (checkpointer, store)
-        pair the graph was compiled against; comparison uses ``is`` so
-        ``id()`` recycling cannot short-circuit a rebuild to a stale
-        graph (review F-4). The runtime hands a single pair to every
-        agent for its lifetime, so cache hits dominate in production.
-
-        ``self._build_lock`` serialises concurrent callers; without
-        it, two tasks racing the cache-miss path could both invoke
-        ``self.build()`` and the second-write-wins semantic would
-        discard one freshly-built graph that may already be executing.
+        Double-checked locking: a fast path exits without acquiring any
+        lock when the cache is warm, and the slow path takes
+        :attr:`_build_lock` (a ``threading.Lock``) so that two threads
+        racing the cache-miss path produce only one ``self.build()``
+        call.
         """
 
+        if self._cache_hit(checkpointer, store, force):
+            return self._compiled
         with self._build_lock:
-            same_checkpointer = self._compiled_checkpointer is checkpointer
-            same_store = self._compiled_store is store
-            if (
-                self._compiled is None
-                or not same_checkpointer
-                or not same_store
-                or force
-            ):
-                self._compiled = self.build(checkpointer=checkpointer, store=store)
-                self._compiled_checkpointer = checkpointer
-                self._compiled_store = store
+            if self._cache_hit(checkpointer, store, force):
+                return self._compiled
+            self._compiled = self.build(checkpointer=checkpointer, store=store)
+            self._compiled_checkpointer = checkpointer
+            self._compiled_store = store
             return self._compiled
 
     async def acompile(
@@ -296,32 +319,36 @@ class BaseAgent(ABC):
     ) -> Pregel:
         """Async variant of :meth:`compile`; preferred in async contexts.
 
-        Uses the shared :attr:`_build_lock` (a :class:`threading.Lock`) for
-        serialisation, acquired via :func:`asyncio.to_thread` so the event
-        loop is never blocked.  Dispatching the entire critical section to a
-        thread also means async and sync paths compete on the same lock, which
-        prevents cross-path races where ``invoke()`` (in a threadpool) and
-        ``astream()`` (in the event loop) both observe a stale cache and both
-        call ``self.build()``.  The compiled graph is cached with the same
-        ``(checkpointer, store)`` identity semantics as the sync path.
+        Double-checked locking with two layers:
+
+        - :attr:`_async_build_lock` (an ``asyncio.Lock``) serialises
+          concurrent async waiters on a cache miss without blocking the
+          event loop.  This replaces the prior pattern of routing the
+          entire compile through :func:`asyncio.to_thread` purely so all
+          waiters could share one ``threading.Lock``.
+        - :attr:`_build_lock` (a ``threading.Lock``) is held briefly only
+          for the three cache-field writes, keeping cross-path
+          consistency with sync :meth:`compile` from a threadpool.
+
+        The actual ``self.build()`` call is dispatched to
+        :func:`asyncio.to_thread` because graph compilation is CPU-bound
+        and the prior contract did not block the event loop.  Cache hits
+        take *neither* lock and return immediately.
         """
 
-        def _compile_sync() -> Pregel:
-            with self._build_lock:
-                if (
-                    self._compiled is None
-                    or self._compiled_checkpointer is not checkpointer
-                    or self._compiled_store is not store
-                    or force
-                ):
-                    self._compiled = self.build(
-                        checkpointer=checkpointer, store=store
-                    )
-                    self._compiled_checkpointer = checkpointer
-                    self._compiled_store = store
+        if self._cache_hit(checkpointer, store, force):
+            return self._compiled
+        async with self._async_build_lock:
+            if self._cache_hit(checkpointer, store, force):
                 return self._compiled
-
-        return await asyncio.to_thread(_compile_sync)
+            compiled = await asyncio.to_thread(
+                self.build, checkpointer=checkpointer, store=store
+            )
+            with self._build_lock:
+                self._compiled = compiled
+                self._compiled_checkpointer = checkpointer
+                self._compiled_store = store
+            return self._compiled
 
     @staticmethod
     def _normalize_input(inputs: Any) -> Any:

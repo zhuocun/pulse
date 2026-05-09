@@ -134,20 +134,25 @@ doesn't repeat the archaeology.
 
 ### Architectural follow-ups
 
-- **Per-app registry isolation (Phase 6D residual)**: the module-level
-  `app.agents.registry.registry` singleton is still the runtime's
-  backing store. Moving to a fully per-app `Registry` would require
-  updating ~40 test fixtures that register test-only agents directly
-  into the module global. Tracked in commit `d9d2983` notes. **Status: open.**
-- **Build-cache invalidation race (Phase 4 residual)**: `BaseAgent.set_chat_model`
-  still triggers a full `Pregel` rebuild and the `threading.Lock` /
-  `asyncio.to_thread` trampoline in `app/agents/base.py:308-324`
-  remains. Phase 4's stated goal — "drop the build-cache invalidation
-  race" — was only partially met (the per-call context path no longer
-  needs the rebuild, but the rebuild path itself was kept for
-  test-fixture compatibility). Migration: simplify to `asyncio.Lock`
-  once all sync `invoke()` callers (~14 test sites) are migrated.
-  **Status: open** — gated on a separate test-suite migration.
+- ~~**Per-app registry isolation (Phase 6D residual)**~~: **Resolved.**
+  `AgentRuntime.from_settings*` now constructs a per-app
+  `ChainedAgentRegistry` (writes go local; reads fall through to the
+  module-level `default_registry`).  Two app instances in the same
+  process can no longer mutate each other's agent set, while existing
+  test fixtures that register test-only agents into the global *after*
+  the FastAPI lifespan has built the runtime continue to work because
+  reads still fall through.  No fixture migration needed.
+- ~~**Build-cache invalidation race (Phase 4 residual)**~~: **Resolved.**
+  `BaseAgent.compile` / `acompile` now use double-checked locking
+  with two layers: an `asyncio.Lock` serialises concurrent async
+  waiters during a cache miss (no more `asyncio.to_thread` trampoline
+  for lock acquisition), and the existing `threading.Lock` is held
+  briefly only for the three cache-field writes so cross-path
+  consistency between sync `invoke()` (in a threadpool) and async
+  `astream()` (on the event loop) is preserved.  Cache hits — the
+  dominant path post-warmup — take *neither* lock.  The actual
+  `self.build()` call is still dispatched via `asyncio.to_thread`
+  because graph compilation is CPU-bound.
 - **`_chat_tools.py` partial single-source (Phase 6B residual)**:
   ~~`build_chat_tools()` iterates `CHAT_TOOL_SCHEMAS` but the body is
   an `if/elif` chain.~~ **Resolved** by commit `ad2817a`: the function
