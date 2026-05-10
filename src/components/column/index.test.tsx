@@ -246,6 +246,26 @@ describe("Column", () => {
         );
     });
 
+    it("marks task type icons as decorative beside the visible type label", () => {
+        renderColumn();
+
+        const taskCard = screen.getByRole("button", {
+            name: /open task build task/i
+        });
+        const imgs = taskCard.querySelectorAll("img");
+        expect(imgs).toHaveLength(1);
+        expect(imgs[0]).toHaveAttribute("alt", "");
+        expect(imgs[0]).toHaveAttribute("aria-hidden", "true");
+
+        const bugCard = screen.getByRole("button", {
+            name: /open task fix bug/i
+        });
+        const bugImgs = bugCard.querySelectorAll("img");
+        expect(bugImgs).toHaveLength(1);
+        expect(bugImgs[0]).toHaveAttribute("alt", "");
+        expect(bugImgs[0]).toHaveAttribute("aria-hidden", "true");
+    });
+
     it("starts editing non-mock tasks but ignores mock tasks", () => {
         renderColumn();
 
