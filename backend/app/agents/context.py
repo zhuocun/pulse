@@ -12,9 +12,11 @@ alternative model via ``context=ChatContext(chat_model=other_model, ...)``
 for per-request overrides (e.g. ``X-Pulse-Model`` header, tenant config) —
 the wiring point is clear but the routing logic is deferred (Phase 5+).
 
-``user_id`` and ``project_id`` are carried as optional informational fields;
-they are already present in the LangGraph ``configurable`` dict but also live
-here so nodes that need them do not have to reach into the config.
+``user_id``, ``project_id``, and ``autonomy_level`` are static run-scoped
+fields that belong in context rather than state (F-43): they never mutate
+across a run, so checkpointing them in state bloats snapshots and makes
+time-travel replays unsafe.  Nodes read them from context via
+:func:`langgraph.runtime.get_runtime` alongside ``chat_model``.
 """
 
 from __future__ import annotations
@@ -38,9 +40,16 @@ class ChatContext(TypedDict, total=False):
         user_id: Authenticated user id, mirrored from ``configurable`` for
             nodes that need it without accessing the raw config.
         project_id: Active project id for the request, used by budget/audit
-            nodes without passing it through state.
+            nodes without passing it through state.  Moved from
+            ``BaseAgentState`` (F-43: static run-scoped data belongs in
+            context, not state).
+        autonomy_level: Validated autonomy level for the run (``"suggest"``,
+            ``"plan"``, or ``"auto"``).  Moved from ``BaseAgentState``
+            (F-43).  Free string (not a ``Literal``) so forward-compatible
+            additions don't require schema changes in catalog agents.
     """
 
     chat_model: Any  # BaseChatModel | StubChatModel — Any avoids Pydantic friction
     user_id: str | None
     project_id: str | None
+    autonomy_level: str | None

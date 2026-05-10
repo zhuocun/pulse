@@ -4,6 +4,16 @@
 **Grounding:** structural backlog in [`backend/docs/AI_ARCHITECTURE_REVIEW.md`](../backend/docs/AI_ARCHITECTURE_REVIEW.md), operational items in [`backend/docs/AI_REMAINING_WORK.md`](../backend/docs/AI_REMAINING_WORK.md), product contract in [`docs/prd/board-copilot-v2.1-agent.md`](prd/board-copilot-v2.1-agent.md).  
 **Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`docs/ui-ux-optimization-plan.md`](ui-ux-optimization-plan.md)).
 
+## Status — 2026-05-10 (PR #177)
+
+The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/complete-subagent-orchestrator-fUazo`. Specifically:
+
+- **Theme 1:** per-surface Pydantic schemas with `extra="forbid"`, validation hook in the runtime, and golden SSE transcript tests for all six agents.
+- **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
+- **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)`; F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
+
+Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See `backend/docs/AI_REMAINING_WORK.md` for per-item detail.
+
 ---
 
 ## Priority stack (do this order)

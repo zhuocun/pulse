@@ -16,6 +16,7 @@ import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
 import {
     AgentBudgetError,
     AgentForbiddenError,
+    AgentRateLimitError,
     AgentTransportError
 } from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
@@ -56,6 +57,23 @@ interface StartOptions {
     autoResume?: boolean;
 }
 
+/**
+ * Normalised lifecycle status for the hook (Theme 2). Derived from existing
+ * state — no new state machine introduced.
+ *
+ *   idle        — never started, or after reset().
+ *   connecting  — POST in flight, no message chunks received yet.
+ *   streaming   — chunks are flowing.
+ *   interrupted — pendingInterrupt !== null (waiting for human or FE tool).
+ *   terminal    — last run ended in completed / error / cancelled.
+ */
+export type AgentStatus =
+    | "idle"
+    | "connecting"
+    | "streaming"
+    | "interrupted"
+    | "terminal";
+
 export interface UseAgentResult {
     start: (input: unknown, options?: StartOptions) => Promise<void>;
     resume: (resumeValue: unknown) => Promise<void>;
@@ -67,6 +85,11 @@ export interface UseAgentResult {
      */
     seedMessages: (initial: AgentMessage[]) => void;
     isStreaming: boolean;
+    /**
+     * Normalised lifecycle status (Theme 2). `isStreaming` is kept for
+     * backwards compatibility; `status` is the preferred surface going forward.
+     */
+    status: AgentStatus;
     state: UseAgentState;
     pendingInterrupt: InterruptPayload | null;
     pendingProposal: MutationProposal | null;
@@ -157,6 +180,47 @@ const generateThreadId = (): string => {
     return `t_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
 };
 
+// ─── sessionStorage helpers (Theme 4) ────────────────────────────────────────
+
+/**
+ * Build the sessionStorage key for a given (agentName, projectId) pair so
+ * LangGraph checkpoint threads survive page refresh.
+ */
+const threadStorageKey = (agentName: string, projectId?: string): string =>
+    `pulse.agentThread.${agentName}.${projectId ?? "none"}`;
+
+/** Read back a persisted thread id. Returns undefined on SSR or storage error. */
+const readPersistedThread = (key: string): string | undefined => {
+    if (typeof window === "undefined") return undefined;
+    try {
+        return sessionStorage.getItem(key) ?? undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/** Write a thread id to sessionStorage. No-ops on SSR or storage errors. */
+const writePersistedThread = (key: string, threadId: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.setItem(key, threadId);
+    } catch {
+        // Private-mode / quota exceeded — silently ignore.
+    }
+};
+
+/** Erase a persisted thread id from sessionStorage. */
+const clearPersistedThreadStorage = (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.removeItem(key);
+    } catch {
+        // ignore
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface ApplyStreamPartHandlers {
     setState: (updater: (prev: UseAgentState) => UseAgentState) => void;
     setPendingInterrupt: (payload: InterruptPayload | null) => void;
@@ -194,6 +258,9 @@ const hookErrorFromAgentStreamErrorData = (
         code === "permission_denied"
     ) {
         return new AgentForbiddenError(message, code);
+    }
+    if (code === "rateLimit" || code === "rate_limit") {
+        return new AgentRateLimitError(0, message);
     }
 
     return new AgentTransportError(message, undefined, code);
@@ -365,6 +432,19 @@ const useAgent = (
     const [state, setState] = useState<UseAgentState>({ messages: [] });
     const [error, setError] = useState<Error | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
+    /**
+     * `firstChunkReceived` is an internal flag used to derive `status`.
+     * It flips from false→true on the first `messages` chunk of each turn
+     * and is reset to false at the start of every `runStream` call so the
+     * "connecting" window is correctly gated per turn.
+     */
+    const [firstChunkReceived, setFirstChunkReceived] = useState(false);
+    /**
+     * `hasEverStarted` tracks whether `start()` was called at least once
+     * (or if the hook has been reset back to idle). Used to distinguish
+     * "idle" from "terminal".
+     */
+    const [hasEverStarted, setHasEverStarted] = useState(false);
     const [pendingInterrupt, setPendingInterrupt] =
         useState<InterruptPayload | null>(null);
     const [pendingProposal, setPendingProposal] =
@@ -373,9 +453,26 @@ const useAgent = (
     const [nudgeEntries, setNudgeEntries] = useState<NudgeEntry[]>([]);
     const [lastSuggestion, setLastSuggestion] =
         useState<AgentSuggestion | null>(null);
-    const [threadId, setThreadId] = useState<string>(
-        options.initialThreadId ?? generateThreadId()
+
+    // Thread ID — prefer caller-supplied override, then sessionStorage, then generate fresh.
+    // Keep the key in a ref so closures in reset() always read the current value.
+    const storageKeyRef = useRef<string>(
+        threadStorageKey(name, options.projectId)
     );
+    storageKeyRef.current = threadStorageKey(name, options.projectId);
+    const storageKey = storageKeyRef.current;
+    const [threadId, setThreadId] = useState<string>(() => {
+        if (options.initialThreadId) {
+            writePersistedThread(storageKey, options.initialThreadId);
+            return options.initialThreadId;
+        }
+        const persisted = readPersistedThread(storageKey);
+        if (persisted) return persisted;
+        const fresh = generateThreadId();
+        writePersistedThread(storageKey, fresh);
+        return fresh;
+    });
+
     const [ttftMs, setTtftMs] = useState<number | null>(null);
     const controllerRef = useRef<AbortController | null>(null);
     const threadIdRef = useRef<string>(threadId);
@@ -469,6 +566,7 @@ const useAgent = (
                         streamStartRef.current !== null
                     ) {
                         ttftSeenRef.current = true;
+                        if (mountedRef.current) setFirstChunkReceived(true);
                         const elapsed = Math.max(
                             0,
                             Math.round(
@@ -539,6 +637,8 @@ const useAgent = (
             controllerRef.current = controller;
             setError(null);
             setIsStreaming(true);
+            setFirstChunkReceived(false);
+            setHasEverStarted(true);
             // Reset TTFT bookkeeping for the new turn (UA-R2).
             streamStartRef.current = performance.now();
             ttftSeenRef.current = false;
@@ -779,8 +879,12 @@ const useAgent = (
         setLastSuggestion(null);
         setError(null);
         setIsStreaming(false);
+        setFirstChunkReceived(false);
+        setHasEverStarted(false);
         setTtftMs(null);
+        clearPersistedThreadStorage(storageKeyRef.current);
         const next = generateThreadId();
+        writePersistedThread(storageKeyRef.current, next);
         threadIdRef.current = next;
         setThreadId(next);
         ttftSeenRef.current = false;
@@ -838,6 +942,24 @@ const useAgent = (
         [nudgeEntries]
     );
 
+    /**
+     * Derived `status` — computed from existing state, no new state machine.
+     *
+     *   idle        — never started (or reset() since last start).
+     *   connecting  — stream in flight but no message chunk yet.
+     *   streaming   — at least one message chunk received and still running.
+     *   interrupted — pendingInterrupt is set (awaiting human / FE tool).
+     *   terminal    — last run finished (completed, error, or cancelled).
+     */
+    const status = useMemo<AgentStatus>(() => {
+        if (pendingInterrupt !== null) return "interrupted";
+        if (isStreaming) {
+            return firstChunkReceived ? "streaming" : "connecting";
+        }
+        if (!hasEverStarted) return "idle";
+        return "terminal";
+    }, [pendingInterrupt, isStreaming, firstChunkReceived, hasEverStarted]);
+
     return useMemo(
         () => ({
             start,
@@ -845,6 +967,7 @@ const useAgent = (
             abort,
             seedMessages,
             isStreaming,
+            status,
             state,
             pendingInterrupt,
             pendingProposal,
@@ -868,6 +991,7 @@ const useAgent = (
             dismissNudge,
             error,
             isStreaming,
+            status,
             lastSuggestion,
             nudges,
             pendingInterrupt,

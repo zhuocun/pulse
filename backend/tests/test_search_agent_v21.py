@@ -92,22 +92,29 @@ def test_graph_builds_without_error() -> None:
 
 
 def test_graph_interrupts_with_correct_tool_name_and_args() -> None:
-    """First invoke must raise an interrupt for ``fe.searchCandidates``."""
+    """First invoke must raise an interrupt for ``fe.searchCandidates``.
+
+    F-43: ``project_id`` is no longer in state; it is injected via context
+    so the ``fetch_candidates`` node reads it from the runtime context.
+    """
+
+    from app.agents.context import ChatContext  # noqa: PLC0415
 
     agent = SearchAgent()
     checkpointer, store = _persistence()
     graph = agent.build(checkpointer=checkpointer, store=store)
     cfg = {"configurable": {"thread_id": "interrupt-test-1"}}
+    ctx: ChatContext = {"project_id": "p1"}
 
     async def run() -> dict[str, Any]:
         return await graph.ainvoke(
             {
                 "messages": [],
                 "query": "auth bug",
-                "project_id": "p1",
                 "kind": "tasks",
             },
             config=cfg,
+            context=ctx,
         )
 
     result = asyncio.run(run())

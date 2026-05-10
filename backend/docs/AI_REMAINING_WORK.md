@@ -15,6 +15,20 @@ The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,sear
 
 For background on what already exists, see `AI_ARCHITECTURE_REVIEW.md`.
 
+## Audit follow-up — 2026-05-10 (`claude/complete-subagent-orchestrator-fUazo`, PR #177)
+
+Surgical Phase-A / Theme-1, -2, -4 items from `docs/agent-architecture-optimization-plan.md` landed on this branch. Multi-week items (mutation lifecycle, provider gateway, vector store, MCP, supervisor) remain deferred — see open items 7, 8, 12, 14 below.
+
+- **Per-surface payload schemas (Theme 1, F-10).** New Pydantic models in `app/agents/events.py` (`IBoardBriefPayload`, `ITaskDraftPayload`, `IEstimatePayload`, `ISearchPayload`, `INudgePayload`, all `extra="forbid"`). `validate_suggestion_payload` dispatches on `Suggestion.surface`; on validation failure it logs a warning and passes the payload through so a schema bug never breaks a streaming response. Wired into `runtime.arun_with_events` and `astream` re-emission.
+- **Golden SSE transcripts (Theme 1).** New `tests/test_agent_sse_transcripts.py` asserts deterministic `(kind, surface)` sequences for all six agents driven through the stub model. Drift fails CI without flaky LLM calls.
+- **Stream error normalization (Theme 2).** FE hook now exposes `status: "idle" | "connecting" | "streaming" | "interrupted" | "terminal"` derived from existing state (no new state machine). Mid-stream `rateLimit`/`rate_limit` envelopes now map to `AgentRateLimitError` (previously fell through to `AgentTransportError`).
+- **Durable resume (Theme 4).** `useAgent` persists `threadId` in `sessionStorage` keyed by `(agent, projectId)` so the Postgres checkpoint is reachable after page refresh; `reset()` rotates and rewrites the key; `initialThreadId` option still wins.
+- **F-43 — context migration (Theme 4).** `project_id`, `user_id`, `autonomy_level` removed from `BaseAgentState` and added to `ChatContext`. Catalog nodes (`chat`, `triage`, `search`) read from `get_runtime(ChatContext).context`; routers thread fields via `context=` instead of inputs. Smaller checkpoints; safer time-travel.
+
+Test counts after this work: BE 914 passing (redis-backed tests deselected for env-only reasons; pre-existing); FE 33 useAgent tests passing including 8 new (status, sessionStorage persistence, rateLimit mapping). `ruff check` clean; `tsc --noEmit` clean.
+
+Companion items still open from the optimization plan: Theme 3 (FE surface simplification — hook stabilization sweep, shared SSE adapter), Theme 5 (full mutation lifecycle — see item 12), Theme 6 (provider gateway / vector store / ReAct migration / supervisor / MCP — see items 7, 8, 14).
+
 ## Audit follow-up — 2026-05-05 (`claude/v2.1-ai-readiness-review-0w9BG`, commit `0e990e4`)
 
 Three hardening fixes landed on this branch:

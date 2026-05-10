@@ -48,6 +48,7 @@ from app.agents.errors import (
     InvalidThreadKeyError,
 )
 from app.agents.context import ChatContext
+from app.agents.events import validate_suggestion_payload
 from app.agents.instrumentation import start_run_span
 from app.agents.llm import extract_token_usage, resolved_chat_model_id
 from app.agents.registry import AgentRegistry, ChainedAgentRegistry
@@ -837,9 +838,18 @@ class AgentRuntime:
             run_span.set_result(final_state)
             # Source events from state (Phase 2); fall back to empty list when
             # the agent pre-dates the ``events`` field (e.g. test-only agents).
-            events: list[Any] = list(
+            raw_events: list[Any] = list(
                 (final_state or {}).get("events") or []
             )
+            # Validate suggestion payloads at the emit boundary (Task 1).
+            # Pass-through semantics: validation errors are logged but never
+            # drop events so a schema bug cannot break a streaming response.
+            events = [
+                validate_suggestion_payload(evt, agent=name)
+                if isinstance(evt, dict) and evt.get("kind") == "suggestion"
+                else evt
+                for evt in raw_events
+            ]
             return final_state, events
 
     async def astream(
@@ -903,6 +913,11 @@ class AgentRuntime:
                             (payload or {}).get("events") or []
                         )
                         for evt in current_events[_emitted_event_count:]:
+                            # Validate suggestion payloads at the re-emission
+                            # boundary (Task 1). Pass-through: validation errors
+                            # are logged but never drop events.
+                            if isinstance(evt, dict) and evt.get("kind") == "suggestion":
+                                evt = validate_suggestion_payload(evt, agent=name)
                             yield ("custom", evt)
                         _emitted_event_count = len(current_events)
                         if _need_values:
