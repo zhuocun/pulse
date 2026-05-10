@@ -147,12 +147,12 @@
       "handoffPath": "handoffs/dockerfile-redis-backend-hints.md",
       "startedAt": "2026-05-10T12:03:04.429Z",
       "finishedAt": "2026-05-10T12:04:38.005Z",
-      "lastUpdate": "2026-05-10T12:04:38.005Z",
+      "lastUpdate": "2026-05-10T12:04:47.373Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "not-verified",
       "attempts": 1
     },
     {
@@ -164,12 +164,12 @@
       "agentId": "bc-4647fe75-2d92-4e92-9e0d-aa591f47664b",
       "runId": "run-7042e62e-962f-474d-a2d0-8165aa8dd86a",
       "parentAgentId": "bc-ef458bd7-de29-4d59-a77f-43f2b0cdb654",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/column-decorative-svg-a11y.md",
       "startedAt": "2026-05-10T12:03:06.797Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T12:03:09.287Z",
+      "finishedAt": "2026-05-10T12:05:07.776Z",
+      "lastUpdate": "2026-05-10T12:05:07.776Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -178,5 +178,10 @@
       "attempts": 1
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-10T12:04:47.375Z",
+      "message": "dockerfile-redis-backend-hints: verification self-reported (not-verified)"
+    }
+  ]
 }
