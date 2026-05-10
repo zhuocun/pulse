@@ -18,12 +18,14 @@ from app.agents import AgentRuntime
 from app.agents.registry import AgentRegistry
 from app.config import Settings
 
+POSTGRES_URI = os.getenv("PYTEST_AGENT_POSTGRES_URI", "").strip()
+pytestmark = pytest.mark.skipif(
+    not POSTGRES_URI,
+    reason="set PYTEST_AGENT_POSTGRES_URI to run the live Postgres smoke test",
+)
+
 
 def test_live_postgres_runtime_uses_one_pool_for_checkpoint_and_store() -> None:
-    conn_string = os.getenv("PYTEST_AGENT_POSTGRES_URI", "").strip()
-    if not conn_string:
-        pytest.skip("set PYTEST_AGENT_POSTGRES_URI to run the live Postgres smoke test")
-
     psycopg_pool = pytest.importorskip("psycopg_pool")
     pytest.importorskip("langgraph.checkpoint.postgres.aio")
     pytest.importorskip("langgraph.store.postgres.aio")
@@ -36,7 +38,7 @@ def test_live_postgres_runtime_uses_one_pool_for_checkpoint_and_store() -> None:
                 Settings(
                     agent_checkpoint_backend="postgres",
                     agent_store_backend="postgres",
-                    agent_postgres_uri=conn_string,
+                    agent_postgres_uri=POSTGRES_URI,
                     agent_pg_pool_size=1,
                 ),
                 stack=stack,
