@@ -84,14 +84,14 @@
       "resultStatus": "finished",
       "handoffPath": "handoffs/flaky-audit-synthesis.md",
       "startedAt": "2026-05-10T01:43:49.813Z",
-      "finishedAt": "2026-05-10T01:50:31.729Z",
-      "lastUpdate": "2026-05-10T01:50:31.729Z",
+      "finishedAt": "2026-05-10T01:50:31.689Z",
+      "lastUpdate": "2026-05-10T01:50:31.689Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 179,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-flaky-audit-synthesis",
@@ -107,9 +107,9 @@
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": "2026-05-10T01:50:32.585Z",
+      "startedAt": "2026-05-10T01:50:32.999Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-10T01:50:32.585Z",
+      "lastUpdate": "2026-05-10T01:50:32.999Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -178,10 +178,6 @@
     {
       "at": "2026-05-10T01:43:46.833Z",
       "message": "frontend-jest-flaky-audit: verification self-reported (unit-test-verified)"
-    },
-    {
-      "at": "2026-05-10T01:50:31.754Z",
-      "message": "git-sync failed (flaky-audit-synthesis running -> handed-off): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit flaky-audit-synthesis running -> handed-off\nfatal: cannot lock ref 'HEAD': is at a983da07d4499121799f671c66a9a972…"
     }
   ]
 }
