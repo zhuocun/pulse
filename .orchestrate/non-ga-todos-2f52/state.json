@@ -455,36 +455,37 @@
       "handoffPath": "handoffs/close-non-ga-release-todo-items.md",
       "startedAt": "2026-05-10T14:59:48.183Z",
       "finishedAt": "2026-05-10T15:57:48.769Z",
-      "lastUpdate": "2026-05-10T15:57:48.770Z",
+      "lastUpdate": "2026-05-10T15:57:49.779Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
       "name": "verify-non-ga-release-todo-closure",
       "type": "verifier",
       "branch": "orch/non-ga-todos-2f52/verify-non-ga-release-todo-closure",
-      "startingRef": "orch/non-ga-todos-2f52/close-non-ga-release-todo-items",
+      "startingRef": "`orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`)",
       "dependsOn": [
         "close-non-ga-release-todo-items"
       ],
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "error",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": null,
-      "note": null,
+      "lastUpdate": "2026-05-10T15:57:57.588Z",
+      "note": "spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…",
       "slackTs": null,
       "prNumber": null,
-      "failureMode": null,
-      "verification": null
+      "failureMode": "unknown",
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
@@ -603,6 +604,14 @@
     {
       "at": "2026-05-10T14:29:04.088Z",
       "message": "aitaskassistpanel-suggested-by-copilot-badge: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T15:57:49.778Z",
+      "message": "verify-non-ga-release-todo-closure: startingRef reconciled orch/non-ga-todos-2f52/close-non-ga-release-todo-items -> `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`) (target close-non-ga-release-todo-items handed off on actual branch)"
+    },
+    {
+      "at": "2026-05-10T15:57:49.779Z",
+      "message": "close-non-ga-release-todo-items: verification self-reported (unit-test-verified)"
     }
   ]
 }
