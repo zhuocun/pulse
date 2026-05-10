@@ -82,7 +82,9 @@ class _CapturingModel:
         self._rationale = response_rationale
         self.received_prompts: list[str] = []
 
-    def with_structured_output(self, schema: Any, *, include_raw: bool = False) -> Any:
+    def with_structured_output(
+        self, schema: Any, *, include_raw: bool = False, **_: Any
+    ) -> Any:
         from app.agents.catalog.task_estimation import (
             EstimationRationale,
             ReadinessPolish,
@@ -254,7 +256,9 @@ class _SearchCapturingModel:
     def __init__(self) -> None:
         self.received_prompts: list[str] = []
 
-    def with_structured_output(self, schema: Any, *, include_raw: bool = False) -> Any:
+    def with_structured_output(
+        self, schema: Any, *, include_raw: bool = False, **_: Any
+    ) -> Any:
         from app.agents.catalog.search import SearchRanking
 
         model_self = self

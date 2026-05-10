@@ -440,6 +440,148 @@
       "prNumber": null,
       "failureMode": null,
       "verification": "live-ui-verified"
+    },
+    {
+      "name": "close-non-ga-release-todo-items",
+      "type": "worker",
+      "branch": "orch/non-ga-todos-2f52/close-non-ga-release-todo-items",
+      "startingRef": "main",
+      "dependsOn": [],
+      "agentId": "bc-3a3d12c5-1a33-4328-96fe-90fb54dad49c",
+      "runId": "run-ffa6137c-4aca-4921-9265-443875ce1309",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/close-non-ga-release-todo-items.md",
+      "startedAt": "2026-05-10T14:59:48.183Z",
+      "finishedAt": "2026-05-10T15:57:48.759Z",
+      "lastUpdate": "2026-05-10T15:57:48.780Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": "unit-test-verified"
+    },
+    {
+      "name": "verify-non-ga-release-todo-closure",
+      "type": "verifier",
+      "branch": "`orch/non-ga-todos-2f52/close-non-ga-release-todo-items` @ `9cf7045` (verifier-added log only atop worker `49f6eb5`)",
+      "startingRef": "orch/non-ga-todos-2f52/close-non-ga-release-todo-items",
+      "dependsOn": [
+        "close-non-ga-release-todo-items"
+      ],
+      "agentId": "bc-9d1e35aa-a73a-446e-abb9-790c17c3a870",
+      "runId": "run-fd68b602-d3ca-4c78-8692-c8f45a89ddfe",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-non-ga-release-todo-closure.md",
+      "startedAt": "2026-05-10T15:59:03.061Z",
+      "finishedAt": "2026-05-10T16:03:20.789Z",
+      "lastUpdate": "2026-05-10T16:03:20.789Z",
+      "note": "respawned by local-cli (was error; attempts=1)",
+      "attempts": 2,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "release-todo-doc-hygiene-closeout",
+      "type": "worker",
+      "branch": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-non-ga-release-todo-closure"
+      ],
+      "agentId": "bc-2ff6a07b-498d-41b4-b9b1-9951a703bc74",
+      "runId": "run-e260e956-e8a7-4cb3-a66c-ca53933bcfcd",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/release-todo-doc-hygiene-closeout.md",
+      "startedAt": "2026-05-10T16:04:37.177Z",
+      "finishedAt": "2026-05-10T16:07:59.655Z",
+      "lastUpdate": "2026-05-10T16:12:37.610Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": "verifier-failed"
+    },
+    {
+      "name": "verify-release-todo-doc-hygiene-closeout",
+      "type": "verifier",
+      "branch": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)",
+      "startingRef": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
+      "dependsOn": [
+        "release-todo-doc-hygiene-closeout"
+      ],
+      "agentId": "bc-b86205d5-239c-4917-a085-fe0e1a140009",
+      "runId": "run-04cbba5a-5c63-47dc-8839-2ff4f01cd9cf",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-release-todo-doc-hygiene-closeout.md",
+      "startedAt": "2026-05-10T16:08:39.114Z",
+      "finishedAt": "2026-05-10T16:12:36.635Z",
+      "lastUpdate": "2026-05-10T16:12:36.636Z",
+      "note": "respawned by local-cli (was error; attempts=1)",
+      "attempts": 2,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "integrate-non-ga-closeout-and-doc-hygiene",
+      "type": "worker",
+      "branch": "orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-release-todo-doc-hygiene-closeout"
+      ],
+      "agentId": "bc-75b96c1b-76cc-4d0f-a4cf-ccf0a998c1c7",
+      "runId": "run-39c3430e-20d3-4fd7-a668-680a6f0c3fc1",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/integrate-non-ga-closeout-and-doc-hygiene.md",
+      "startedAt": "2026-05-10T16:13:19.614Z",
+      "finishedAt": "2026-05-10T16:18:16.176Z",
+      "lastUpdate": "2026-05-10T16:18:16.177Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "verify-integrated-non-ga-closeout",
+      "type": "verifier",
+      "branch": "`orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)",
+      "startingRef": "orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene",
+      "dependsOn": [
+        "integrate-non-ga-closeout-and-doc-hygiene"
+      ],
+      "agentId": "bc-0e60ff42-965b-4d52-9d41-b1689652417c",
+      "runId": "run-fe240bc3-106b-41cc-bdc2-bed99e37b66b",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-integrated-non-ga-closeout.md",
+      "startedAt": "2026-05-10T16:18:22.180Z",
+      "finishedAt": "2026-05-10T16:21:43.919Z",
+      "lastUpdate": "2026-05-10T16:21:43.919Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
     }
   ],
   "attention": [
@@ -558,6 +700,46 @@
     {
       "at": "2026-05-10T14:29:04.088Z",
       "message": "aitaskassistpanel-suggested-by-copilot-badge: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T15:57:48.776Z",
+      "message": "git-sync failed (close-non-ga-release-todo-items running -> handed-off): Command failed: git -C /workspace/.orchestrate/non-ga-todos-2f52 commit -m orch: non-ga-todos-2f52 close-non-ga-release-todo-items running -> handed-off\nfatal: Unable to create '/workspace/.git/index.…"
+    },
+    {
+      "at": "2026-05-10T15:57:48.779Z",
+      "message": "verify-non-ga-release-todo-closure: startingRef reconciled orch/non-ga-todos-2f52/close-non-ga-release-todo-items -> `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`) (target close-non-ga-release-todo-items handed off on actual branch)"
+    },
+    {
+      "at": "2026-05-10T15:57:48.781Z",
+      "message": "close-non-ga-release-todo-items: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-10T15:58:04.702Z",
+      "message": "verify-non-ga-release-todo-closure: spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…"
+    },
+    {
+      "at": "2026-05-10T15:58:58.474Z",
+      "message": "verify-non-ga-release-todo-closure: respawned by local-cli (was error)"
+    },
+    {
+      "at": "2026-05-10T16:04:38.813Z",
+      "message": "release-todo-doc-hygiene-closeout: transient-retry succeeded on sub-attempt 2"
+    },
+    {
+      "at": "2026-05-10T16:08:00.591Z",
+      "message": "verify-release-todo-doc-hygiene-closeout: startingRef reconciled orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout -> `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083` (target release-todo-doc-hygiene-closeout handed off on actual branch)"
+    },
+    {
+      "at": "2026-05-10T16:08:15.811Z",
+      "message": "verify-release-todo-doc-hygiene-closeout: spawn failed after 3 transient sub-attempts: Error: release-todo-doc-hygiene-closeout: branch must be orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout, got `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`"
+    },
+    {
+      "at": "2026-05-10T16:08:34.623Z",
+      "message": "verify-release-todo-doc-hygiene-closeout: respawned by local-cli (was error)"
+    },
+    {
+      "at": "2026-05-10T16:12:37.610Z",
+      "message": "release-todo-doc-hygiene-closeout: verification recorded (verifier-failed) by verifier verify-release-todo-doc-hygiene-closeout"
     }
   ]
 }

@@ -24,7 +24,7 @@ import re
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence, get_args
+from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence, get_args, get_type_hints
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.pregel import Pregel
@@ -123,18 +123,10 @@ class AgentMetadata:
                 )
 
     def as_dict(self) -> dict[str, Any]:
-        """Return the wire-shape the FE consumes for the agent picker.
-
-        ``tags``, ``recursion_limit`` and ``context_schema`` are kept on
-        the dataclass because the runtime / router still read them
-        internally (recursion-limit clamp, context-schema introspection
-        on the streaming endpoint), but they are deliberately *not*
-        emitted here -- trim metadata fields the FE never reads from the
-        wire payload.
-        """
+        """Return the wire-shape the FE consumes for the agent picker."""
 
         per_minute, per_hour = self.rate_limit
-        return {
+        out: dict[str, Any] = {
             "name": self.name,
             "description": self.description,
             "version": self.version,
@@ -142,7 +134,21 @@ class AgentMetadata:
             "rate_limit": {"per_minute": per_minute, "per_hour": per_hour},
             "allowed_autonomy": list(self.allowed_autonomy),
             "tools": list(self.tools),
+            "recursion_limit": self.recursion_limit,
+            "tags": list(self.tags),
         }
+        schema = self.context_schema
+        if schema is not None and hasattr(schema, "__annotations__"):
+            try:
+                hints = get_type_hints(schema, include_extras=True)
+                out["context_schema"] = {
+                    k: getattr(v, "__name__", str(v)) for k, v in hints.items()
+                }
+            except (TypeError, NameError):
+                out["context_schema"] = {}
+        else:
+            out["context_schema"] = None
+        return out
 
 
 class BaseAgent(ABC):

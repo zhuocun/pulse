@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings, parse_project_chat_model_map, settings as default_settings
 
 
 def test_default_agent_chat_model_max_retries() -> None:
@@ -41,3 +41,8 @@ def test_settings_replace_preserves_new_fields() -> None:
     s = replace(default_settings, agent_chat_model_max_retries=3, agent_chat_model_timeout_seconds=10.0)
     assert s.agent_chat_model_max_retries == 3
     assert s.agent_chat_model_timeout_seconds == 10.0
+
+
+def test_parse_project_chat_model_map() -> None:
+    raw = "p1:model-a, p2 : model-b ,,, bad, nocolon"
+    assert parse_project_chat_model_map(raw) == {"p1": "model-a", "p2": "model-b"}

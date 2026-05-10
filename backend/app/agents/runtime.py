@@ -574,8 +574,9 @@ class AgentRuntime:
         :class:`~app.agents.context.ChatContext` dict with the resolved
         ``chat_model``.  Resolution order:
 
-        1. ``caller_context["chat_model"]`` — enables per-request overrides;
-           TODO wire to ``X-Pulse-Model`` header / tenant config in Phase 5.
+        1. ``caller_context["chat_model"]`` — per-request override from
+           :func:`~app.routers._dispatch.chat_model_override_from_request`
+           (``X-Pulse-Model`` header + ``AGENT_CHAT_MODEL_ALLOWLIST``).
         2. Agent's own ``chat_model`` property (resolved lazily from settings
            on first access).
 

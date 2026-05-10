@@ -85,4 +85,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # --workers 1: see header for Redis middleware env vars before raising.
 # --proxy-headers + --forwarded-allow-ips=* trust X-Forwarded-* from Fly/Render/ECS
 # load balancers so request.client and request.url.scheme reflect the real caller.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["/bin/sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1} --proxy-headers --forwarded-allow-ips='*'"]

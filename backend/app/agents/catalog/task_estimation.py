@@ -449,9 +449,31 @@ class TaskEstimationAgent(BaseAgent):
         async def fetch_embeddings(state: TaskEstimationState) -> dict[str, Any]:
             similar = state.get("similar_tasks") or []
             draft = state.get("task_draft") or {}
+            query_text = draft.get("taskName", "")
+            from app.config import settings as app_settings
+            from app.agents.task_vector_pg import (
+                fetch_vector_neighbours_for_project,
+                merge_similar_with_vector_hits,
+            )
+
+            if app_settings.agent_vector_search_enabled:
+                try:
+                    qvecs = await be_tools.embed_async([query_text])
+                    qv = qvecs[0] if qvecs else []
+                    pid = str(state.get("project_id") or "")
+                    hits = fetch_vector_neighbours_for_project(
+                        project_id=pid,
+                        query_embedding=list(qv),
+                        settings=app_settings,
+                    )
+                    similar = merge_similar_with_vector_hits(similar, hits)
+                except Exception:
+                    logger.warning(
+                        "Vector-augmented similar merge failed; using FE list only.",
+                        exc_info=True,
+                    )
             corpus_texts = [item.get("text", "") for item in similar]
             corpus_ids = [item.get("id", str(idx)) for idx, item in enumerate(similar)]
-            query_text = draft.get("taskName", "")
             # Embed query and corpus in a single batched call so a load-
             # balanced provider can't drift between two HTTP round-trips
             # and produce vectors in slightly different embedding spaces

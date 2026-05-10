@@ -267,9 +267,15 @@ class PolishStep(Generic[_SchemaT]):
             messages = raw_prompt
 
         try:
-            response = await model.with_structured_output(
-                self._schema, include_raw=True
-            ).ainvoke(messages)
+            try:
+                structured = model.with_structured_output(
+                    self._schema, include_raw=True, method="json_schema"
+                )
+            except TypeError:
+                structured = model.with_structured_output(
+                    self._schema, include_raw=True
+                )
+            response = await structured.ainvoke(messages)
         except Exception:  # noqa: BLE001
             logger.warning(
                 "PolishStep(%s) provider call raised; falling back to deterministic.",

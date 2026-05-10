@@ -96,13 +96,27 @@ const CopilotAboutPopover: React.FC = () => {
                 allowed_autonomy: levels,
                 recursion_limit: recursionLimit,
                 tags,
-                context_schema: contextSchema
+                context_schema: contextSchema,
+                monthly_token_budget_cap: budgetCap
             } = chatMeta.data;
+            const budgetLine =
+                typeof budgetCap === "number" &&
+                Number.isFinite(budgetCap) &&
+                budgetCap > 0
+                    ? microcopy.about.monthlyBudgetCapLine.replace(
+                          "{cap}",
+                          String(budgetCap)
+                      )
+                    : null;
             const rateLine =
                 rate &&
-                microcopy.about.rateLimitLine
-                    .replace("{perMinute}", String(rate.per_minute))
-                    .replace("{perHour}", String(rate.per_hour));
+                typeof rate === "object" &&
+                typeof rate.per_minute === "number" &&
+                typeof rate.per_hour === "number"
+                    ? microcopy.about.rateLimitLine
+                          .replace("{perMinute}", String(rate.per_minute))
+                          .replace("{perHour}", String(rate.per_hour))
+                    : null;
             const recursionLine =
                 typeof recursionLimit === "number" &&
                 Number.isFinite(recursionLimit)
@@ -124,6 +138,7 @@ const CopilotAboutPopover: React.FC = () => {
                     : null;
             const hasDisclosedField =
                 Boolean(rateLine) ||
+                Boolean(budgetLine) ||
                 levels.length > 0 ||
                 Boolean(recursionLine) ||
                 normalizedTags.length > 0 ||
@@ -150,6 +165,17 @@ const CopilotAboutPopover: React.FC = () => {
                             type="secondary"
                         >
                             {rateLine}
+                        </Typography.Paragraph>
+                    ) : null}
+                    {budgetLine ? (
+                        <Typography.Paragraph
+                            style={{
+                                marginBottom: space.xxs,
+                                marginTop: 0
+                            }}
+                            type="secondary"
+                        >
+                            {budgetLine}
                         </Typography.Paragraph>
                     ) : null}
                     {recursionLine ? (

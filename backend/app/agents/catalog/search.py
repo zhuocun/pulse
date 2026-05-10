@@ -482,8 +482,36 @@ class SearchAgent(BaseAgent):
             """
             if state.get("ranking") is not None:
                 return {}
-            candidates = state.get("candidates") or []
+            candidates = list(state.get("candidates") or [])
             query = state.get("query") or ""
+            from app.config import settings as app_settings
+            from app.agents.task_vector_pg import (
+                fetch_vector_neighbours_for_project,
+                merge_similar_with_vector_hits,
+            )
+
+            if (
+                app_settings.agent_vector_search_enabled
+                and (state.get("kind") or "tasks") == "tasks"
+            ):
+                try:
+                    qvecs = await be_tools.embed_async([query])
+                    qv = qvecs[0] if qvecs else []
+                    _rt = get_runtime(ChatContext)
+                    pid = str((_rt.context or {}).get("project_id") or "")
+                    hits = fetch_vector_neighbours_for_project(
+                        project_id=pid,
+                        query_embedding=list(qv),
+                        settings=app_settings,
+                    )
+                    candidates = merge_similar_with_vector_hits(
+                        candidates, hits, max_total=40
+                    )
+                except Exception:
+                    logger.warning(
+                        "Vector-augmented search candidates failed; using FE list only.",
+                        exc_info=True,
+                    )
             n = len(candidates)
             if not candidates:
                 return {

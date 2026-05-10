@@ -3,11 +3,18 @@ import { getStoredBearerAuthHeader } from "./aiAuthHeader";
 describe("getStoredBearerAuthHeader", () => {
     afterEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
     });
 
     it("returns Bearer when a token exists", () => {
         localStorage.setItem("Token", "abc");
         expect(getStoredBearerAuthHeader()).toBe("Bearer abc");
+    });
+
+    it("prefers the narrow AI proxy token when present", () => {
+        localStorage.setItem("Token", "rest-wide");
+        sessionStorage.setItem("AiProxyJwt", "narrow-ai");
+        expect(getStoredBearerAuthHeader()).toBe("Bearer narrow-ai");
     });
 
     it("returns an empty string when no token is stored", () => {

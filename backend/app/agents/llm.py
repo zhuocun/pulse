@@ -230,9 +230,20 @@ def make_chat_model(
     Real providers raise :class:`RuntimeError` if the matching LangChain
     integration package is not installed -- importing inside the branch
     keeps optional dependencies optional.
+
+    When ``AGENT_CHAT_MODEL_FAILOVER`` is ``auto`` (default) and
+    credentials for a second provider exist, the primary model is wrapped
+    with a cross-provider :meth:`~langchain_core.language_models.BaseChatModel.with_fallbacks`
+    chain so transport / 5xx errors on one vendor retry on the other.
     """
 
     resolved = spec if spec is not None else resolve_chat_model_spec(settings)
+    cfg = settings if settings is not None else default_settings
+    primary = _instantiate_chat_model(resolved)
+    return _wrap_cross_provider_failover(primary, resolved, cfg)
+
+
+def _instantiate_chat_model(resolved: ChatModelSpec) -> BaseChatModel:
     _require_integration(resolved.provider)
     if resolved.provider == PROVIDER_ANTHROPIC:
         from langchain_anthropic import ChatAnthropic
@@ -256,6 +267,115 @@ def make_chat_model(
         )
     logger.debug("Chat model factory returning deterministic stub.")
     return make_stub_chat_model()
+
+
+def _failover_exception_types() -> tuple[type[BaseException], ...]:
+    types_list: list[type[BaseException]] = []
+    try:
+        import anthropic
+
+        types_list.extend(
+            (
+                anthropic.InternalServerError,
+                anthropic.APIConnectionError,
+                anthropic.APITimeoutError,
+            )
+        )
+    except ImportError:
+        pass
+    try:
+        import openai
+
+        types_list.extend(
+            (
+                openai.InternalServerError,
+                openai.APIConnectionError,
+                openai.APITimeoutError,
+            )
+        )
+    except ImportError:
+        pass
+    if types_list:
+        return tuple(types_list)
+    return (Exception,)
+
+
+def _failover_secondary_spec(
+    primary: ChatModelSpec, cfg: Settings
+) -> Optional[ChatModelSpec]:
+    mode = (cfg.agent_chat_model_failover or "auto").strip().lower()
+    if mode in {"", "none", "off", "false", "0"}:
+        return None
+    if primary.provider == PROVIDER_STUB:
+        return None
+    if primary.provider == PROVIDER_ANTHROPIC:
+        if not cfg.openai_api_key:
+            return None
+        return ChatModelSpec(
+            provider=PROVIDER_OPENAI,
+            model=cfg.agent_chat_model_id or DEFAULT_OPENAI_MODEL,
+            temperature=primary.temperature,
+            api_key=cfg.openai_api_key,
+            max_retries=primary.max_retries,
+            timeout_seconds=primary.timeout_seconds,
+        )
+    if primary.provider == PROVIDER_OPENAI:
+        if not cfg.anthropic_api_key:
+            return None
+        return ChatModelSpec(
+            provider=PROVIDER_ANTHROPIC,
+            model=cfg.agent_chat_model_id or DEFAULT_ANTHROPIC_MODEL,
+            temperature=primary.temperature,
+            api_key=cfg.anthropic_api_key,
+            max_retries=primary.max_retries,
+            timeout_seconds=primary.timeout_seconds,
+        )
+    return None
+
+
+def _wrap_cross_provider_failover(
+    primary: BaseChatModel,
+    resolved: ChatModelSpec,
+    cfg: Settings,
+) -> BaseChatModel:
+    if is_stub_model(primary):
+        return primary
+    secondary_spec = _failover_secondary_spec(resolved, cfg)
+    if secondary_spec is None:
+        return primary
+    secondary = _instantiate_chat_model(secondary_spec)
+    if is_stub_model(secondary):
+        return primary
+    fb_label = f"{resolved.provider}→{secondary_spec.provider}"
+    logger.info(
+        "Chat model cross-provider failover enabled (%s); secondary=%s",
+        fb_label,
+        secondary_spec.model,
+    )
+
+    wrapped = primary.with_fallbacks(
+        [secondary],
+        exceptions_to_handle=_failover_exception_types(),
+    )
+    if cfg.otel_tracing:
+        try:
+            from opentelemetry import trace
+
+            span = trace.get_current_span()
+            if span.is_recording():
+                span.set_attribute("ai.chat_failover.enabled", True)
+                span.set_attribute(
+                    "ai.chat_failover.primary_provider", resolved.provider
+                )
+                span.set_attribute(
+                    "ai.chat_failover.secondary_provider", secondary_spec.provider
+                )
+                span.set_attribute(
+                    "ai.chat_failover.secondary_model", secondary_spec.model
+                )
+        except Exception:
+            pass
+    return wrapped
 
 
 # Env vars that indicate a hosted / production-shaped deploy. Mirrors the

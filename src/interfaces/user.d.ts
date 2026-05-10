@@ -10,4 +10,10 @@ interface IUser extends IMember {
      * `localStorage.getItem("Token")` (this is what `useApi` does).
      */
     jwt?: string;
+    /**
+     * Optional Board Copilot proxy JWT (`scp=ai_proxy`, short TTL).
+     * Stored in `sessionStorage` separately from the REST bearer; XSS
+     * cannot lift both in a single `localStorage` read.
+     */
+    ai_jwt?: string;
 }
