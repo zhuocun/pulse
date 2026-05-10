@@ -1,0 +1,33 @@
+[2026-05-10T01:30:48.796Z] git-sync failed (frontend-jest-flaky-audit pending -> running): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit frontend-jest-flaky-audit pending -> running
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && np…
+[2026-05-10T01:31:11.110Z] git-sync failed (frontend-jest-flaky-audit running -> error): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit frontend-jest-flaky-audit running -> error
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && npm …
+[2026-05-10T01:31:11.111Z] frontend-jest-flaky-audit: spawn failed after 3 transient sub-attempts: l: [invalid_model] Model 'gpt-5.5' does not match a known variant. Call GET /v1/models to list valid id+params combinations. run `bun cli.ts models --check` to re-probe the catalog against /v1/agents.
+[2026-05-10T01:31:27.466Z] git-sync failed (backend-pytest-flaky-audit pending -> running): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit backend-pytest-flaky-audit pending -> running
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && n…
+[2026-05-10T01:31:49.618Z] git-sync failed (backend-pytest-flaky-audit running -> error): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit backend-pytest-flaky-audit running -> error
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && npm…
+[2026-05-10T01:31:49.619Z] backend-pytest-flaky-audit: spawn failed after 3 transient sub-attempts: l: [invalid_model] Model 'gpt-5.5' does not match a known variant. Call GET /v1/models to list valid id+params combinations. run `bun cli.ts models --check` to re-probe the catalog against /v1/agents.
+[2026-05-10T01:32:05.186Z] git-sync failed (test-infra-flaky-audit pending -> running): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit test-infra-flaky-audit pending -> running
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && npm r…
+[2026-05-10T01:32:28.008Z] git-sync failed (test-infra-flaky-audit running -> error): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit test-infra-flaky-audit running -> error
+
+> pulse@0.1.0 pre-commit
+> npm run prettier && npm run eslint && npm run…
+[2026-05-10T01:32:28.009Z] test-infra-flaky-audit: spawn failed after 3 transient sub-attempts: l: [invalid_model] Model 'gpt-5.5' does not match a known variant. Call GET /v1/models to list valid id+params combinations. run `bun cli.ts models --check` to re-probe the catalog against /v1/agents.
+[2026-05-10T01:32:43.957Z] git-sync failed (exit-on-error: frontend-jest-flaky-audit, backend-pytest-flaky-audit, test-infra-flaky-audit): Command failed: git -C /workspace/.orchestrate/flaky-audit commit -m orch: flaky-audit exit-on-error: frontend-jest-flaky-audit, backend-pytest-flaky-audit, test-infra-flaky-audit
+
+> pulse@0.1.0 pre-c…
+[2026-05-10T01:34:42.344Z] frontend-jest-flaky-audit: respawned by self-planner (was error)
+[2026-05-10T01:34:43.537Z] backend-pytest-flaky-audit: respawned by self-planner (was error)
+[2026-05-10T01:34:44.750Z] test-infra-flaky-audit: respawned by self-planner (was error)
