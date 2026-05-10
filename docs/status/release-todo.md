@@ -246,10 +246,14 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
 `.github/workflows/backend-ci.yml` ships two jobs (`test-full` with
 `.[dev,ai]` + full pytest, and `test-slim` with `.[dev]` only +
-`python -c "import app.main"`) scoped to `backend/**` (lines 4–17).
+`python -c "import app.main"`) with unchanged `paths` filters on
+`push` / `pull_request`.
 GHA execution against `main` has not been verified end-to-end; status
 of the first run on this branch is still unknown.
 
+- Evidence without a path-filter push: GitHub → Actions → **Backend CI**
+  → **Run workflow**, pick the branch, optionally set **mode** (`both`,
+  `test-full`, `test-slim`), then paste the green run URL here.
 - Scope: trigger the workflow on a PR/main run, capture the first green
   run, and update this section with the CI evidence.
 
