@@ -345,12 +345,12 @@
       "handoffPath": "handoffs/board-error-empty-states.md",
       "startedAt": "2026-05-10T13:21:02.322Z",
       "finishedAt": "2026-05-10T13:59:21.310Z",
-      "lastUpdate": "2026-05-10T13:59:21.310Z",
+      "lastUpdate": "2026-05-10T13:59:24.286Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -550,6 +550,10 @@
     {
       "at": "2026-05-10T13:48:14.985Z",
       "message": "header-logo-and-ai-live-regions-a11y: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T13:59:24.287Z",
+      "message": "board-error-empty-states: verification self-reported (unit-test-verified)"
     }
   ]
 }
