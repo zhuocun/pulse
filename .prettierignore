@@ -4,6 +4,10 @@
 .cursor/skills/
 .agents/skills/
 
+# Orchestrate planner workspaces (plan.json, state.json, handoffs) — keep Prettier
+# out of machine/tool-generated JSON so `prettier --check .` matches Frontend CI.
+.orchestrate/
+
 # Python backend has its own formatter (ruff); skip from FE Prettier sweep.
 backend/
 
