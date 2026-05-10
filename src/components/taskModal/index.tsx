@@ -35,6 +35,26 @@ const STORY_POINT_OPTIONS = [1, 2, 3, 5, 8, 13].map((value) => ({
     value
 }));
 
+type TaskModalField =
+    | "coordinatorId"
+    | "epic"
+    | "note"
+    | "storyPoints"
+    | "taskName"
+    | "type";
+
+const TASK_MODAL_FIELDS: readonly TaskModalField[] = [
+    "taskName",
+    "note",
+    "type",
+    "epic",
+    "coordinatorId",
+    "storyPoints"
+];
+
+const isTaskModalField = (field: string): field is TaskModalField =>
+    TASK_MODAL_FIELDS.includes(field as TaskModalField);
+
 const TaskModal: React.FC<{
     tasks: ITask[] | undefined;
     boardAiOn?: boolean;
@@ -46,6 +66,9 @@ const TaskModal: React.FC<{
     const screens = Grid.useBreakpoint();
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
+    const [appliedFieldOrigin, setAppliedFieldOrigin] = useState<
+        Partial<Record<TaskModalField, "copilot">>
+    >({});
     const { mutateAsync: update, isLoading: uLoading } = useReactMutation(
         "tasks",
         "PUT",
@@ -69,8 +92,38 @@ const TaskModal: React.FC<{
     const onClose = useCallback(() => {
         form.resetFields();
         setSaveError(null);
+        setAppliedFieldOrigin({});
         closeModal();
     }, [closeModal, form]);
+
+    const markFieldAsCopilotApplied = useCallback((field: TaskModalField) => {
+        setAppliedFieldOrigin((prev) => ({ ...prev, [field]: "copilot" }));
+    }, []);
+
+    const clearOriginOnManualEdits = useCallback(
+        (changedValues: Record<string, unknown>) => {
+            const changedFields =
+                Object.keys(changedValues).filter(isTaskModalField);
+            if (changedFields.length === 0) return;
+            setAppliedFieldOrigin((prev) => {
+                let next = prev;
+                changedFields.forEach((field) => {
+                    if (!prev[field]) return;
+                    if (next === prev) next = { ...prev };
+                    delete next[field];
+                });
+                if (
+                    prev.storyPoints &&
+                    changedFields.some((field) => field !== "storyPoints")
+                ) {
+                    if (next === prev) next = { ...prev };
+                    delete next.storyPoints;
+                }
+                return next;
+            });
+        },
+        []
+    );
 
     const onOk = async () => {
         try {
@@ -160,6 +213,7 @@ const TaskModal: React.FC<{
     // previous error referred to the prior payload and would mislead.
     useEffect(() => {
         setSaveError(null);
+        setAppliedFieldOrigin({});
     }, [editingTaskId]);
 
     const liveValues = (() => {
@@ -325,9 +379,10 @@ const TaskModal: React.FC<{
                 form={form}
                 initialValues={editingTask}
                 layout="vertical"
-                onValuesChange={() => {
+                onValuesChange={(changedValues) => {
                     setFormTick((tick) => tick + 1);
                     if (saveError) setSaveError(null);
+                    clearOriginOnManualEdits(changedValues);
                 }}
             >
                 <Form.Item
@@ -391,10 +446,36 @@ const TaskModal: React.FC<{
                     />
                 </Form.Item>
                 <Form.Item
-                    label={microcopy.fields.storyPoints}
+                    label={
+                        <span
+                            style={{
+                                alignItems: "center",
+                                display: "inline-flex",
+                                gap: space.xs
+                            }}
+                        >
+                            {microcopy.fields.storyPoints}
+                            {appliedFieldOrigin.storyPoints === "copilot" ? (
+                                <Tag
+                                    color="purple"
+                                    style={{ marginInlineEnd: 0 }}
+                                >
+                                    {microcopy.ai.suggestedByCopilot}
+                                </Tag>
+                            ) : null}
+                        </span>
+                    }
                     name="storyPoints"
                 >
                     <Select
+                        onChange={() => {
+                            setAppliedFieldOrigin((prev) => {
+                                if (!prev.storyPoints) return prev;
+                                const next = { ...prev };
+                                delete next.storyPoints;
+                                return next;
+                            });
+                        }}
                         options={STORY_POINT_OPTIONS}
                         placeholder={`Select ${microcopy.fields.storyPoints.toLowerCase()}`}
                     />
@@ -418,10 +499,18 @@ const TaskModal: React.FC<{
                     <AiTaskAssistPanel
                         excludeTaskId={editingTaskId}
                         onApplyStoryPoints={(value) => {
+                            markFieldAsCopilotApplied("storyPoints");
                             form.setFieldsValue({ storyPoints: value });
                             setFormTick((tick) => tick + 1);
                         }}
                         onApplySuggestion={(field, suggestion, options) => {
+                            if (
+                                !options?.replace &&
+                                suggestion !== undefined &&
+                                isTaskModalField(field)
+                            ) {
+                                markFieldAsCopilotApplied(field);
+                            }
                             const current = form.getFieldValue(field) ?? "";
                             if (options?.replace) {
                                 form.setFieldValue(field, suggestion);

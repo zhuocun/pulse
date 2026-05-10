@@ -479,6 +479,7 @@ export const enSource = {
             moderate: "Moderate",
             low: "Low"
         },
+        suggestedByCopilot: "Suggested by Copilot",
         appliedSuggestion: "Suggested by Copilot",
         appliedSuggestionShort: "AI",
         suggestionPopover:
