@@ -1,0 +1,66 @@
+name: Frontend CI
+
+on:
+    push:
+        branches:
+            - main
+            - "claude/**"
+        paths:
+            - "src/**"
+            - "public/**"
+            - "__json_server_mock__/**"
+            - "scripts/**"
+            - "package.json"
+            - "package-lock.json"
+            - "index.html"
+            - "vite.config.ts"
+            - "jest.config.cjs"
+            - "babel.config.cjs"
+            - "eslint.config.mjs"
+            - "commitlint.config.js"
+            - "tsconfig.json"
+            - ".prettierrc"
+            - ".prettierignore"
+            - ".nvmrc"
+            - ".npmrc"
+            - ".github/workflows/frontend-ci.yml"
+    pull_request:
+        branches:
+            - main
+            - "claude/**"
+        paths:
+            - "src/**"
+            - "public/**"
+            - "__json_server_mock__/**"
+            - "scripts/**"
+            - "package.json"
+            - "package-lock.json"
+            - "index.html"
+            - "vite.config.ts"
+            - "jest.config.cjs"
+            - "babel.config.cjs"
+            - "eslint.config.mjs"
+            - "commitlint.config.js"
+            - "tsconfig.json"
+            - ".prettierrc"
+            - ".prettierignore"
+            - ".nvmrc"
+            - ".npmrc"
+            - ".github/workflows/frontend-ci.yml"
+
+jobs:
+    ci:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: npm
+            - run: npm ci
+            - run: npm run prettier
+            - name: ESLint (check only)
+              run: npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js
+            - run: npm run typecheck
+            - run: CI=true npm test -- --watchAll=false --runInBand
+            - run: npm run build
