@@ -362,12 +362,12 @@
       "agentId": "bc-105f9f94-b39c-4374-bd66-56e7b134c7a0",
       "runId": "run-195d478f-1390-4cf6-a437-6b64af7e7a8a",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/taskmodal-canonical-types.md",
       "startedAt": "2026-05-10T13:21:04.982Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T13:21:07.425Z",
+      "finishedAt": "2026-05-10T13:37:22.948Z",
+      "lastUpdate": "2026-05-10T13:37:22.948Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -389,12 +389,12 @@
       "handoffPath": "handoffs/useagent-tool-resolver-extract.md",
       "startedAt": "2026-05-10T13:21:07.426Z",
       "finishedAt": "2026-05-10T13:31:40.510Z",
-      "lastUpdate": "2026-05-10T13:31:40.510Z",
+      "lastUpdate": "2026-05-10T13:31:43.519Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -518,6 +518,26 @@
     {
       "at": "2026-05-10T13:31:08.417Z",
       "message": "taskmodal-canonical-types: tool_call idle 347381ms; last=2026-05-10T13:25:21.036Z"
+    },
+    {
+      "at": "2026-05-10T13:31:43.520Z",
+      "message": "useagent-tool-resolver-extract: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-10T13:35:03.753Z",
+      "message": "header-logo-and-ai-live-regions-a11y: SSE idle 344078ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T13:35:03.754Z",
+      "message": "header-logo-and-ai-live-regions-a11y: tool_call idle 344079ms; last=2026-05-10T13:29:19.675Z"
+    },
+    {
+      "at": "2026-05-10T13:37:14.387Z",
+      "message": "aitaskassistpanel-suggested-by-copilot-badge: SSE idle 354981ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T13:37:14.388Z",
+      "message": "aitaskassistpanel-suggested-by-copilot-badge: tool_call idle 354982ms; last=2026-05-10T13:31:19.406Z"
     }
   ]
 }
