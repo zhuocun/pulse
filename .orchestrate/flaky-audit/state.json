@@ -85,13 +85,13 @@
       "handoffPath": "handoffs/flaky-audit-synthesis.md",
       "startedAt": "2026-05-10T01:43:49.813Z",
       "finishedAt": "2026-05-10T01:50:31.689Z",
-      "lastUpdate": "2026-05-10T01:50:31.689Z",
+      "lastUpdate": "2026-05-10T01:55:55.868Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": 179,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-flaky-audit-synthesis",
@@ -111,11 +111,11 @@
       "finishedAt": "2026-05-10T01:55:52.951Z",
       "lastUpdate": "2026-05-10T01:55:52.952Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 179,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
@@ -182,6 +182,10 @@
     {
       "at": "2026-05-10T01:50:33.821Z",
       "message": "git-sync failed (verify-flaky-audit-synthesis pending -> running): Command failed: git -C /workspace/.orchestrate/flaky-audit push\nTo https://github.com/zhuocun/pulse\n ! [remote rejected] cursor/flaky-test-audit-orchestrator-b175 -> cursor/flaky-test-audit-orchestrat…"
+    },
+    {
+      "at": "2026-05-10T01:55:55.868Z",
+      "message": "flaky-audit-synthesis: verification recorded (unit-test-verified) by verifier verify-flaky-audit-synthesis"
     }
   ]
 }
