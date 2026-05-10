@@ -21,6 +21,17 @@ Excluded from this sprint (remain open / future workers): Beta §2/§3/§6, Soft
 | `docs/status/release-todo.md` §16d | Dockerfile lacks explicit Redis-backed middleware env guidance next to `workers=1` pin | `dockerfile-redis-backend-hints` |
 | `docs/status/ui-todo.md` §21 | Decorative task-type SVGs on cards | `column-decorative-svg-a11y` |
 
+## Wave 3 — 2026-05-10 (planner `bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b`, model `gpt-5.3-codex-high-fast`)
+
+| Source | Item | Worker task |
+|--------|------|-------------|
+| `docs/status/release-todo.md` §16b / `architecture-todo.md` Theme 3 | `useAgent.ts` is a 1,010-line monolith; nudge-inbox already has an exported reducer; finish the move | `useagent-nudge-inbox-extract` |
+| `docs/status/ui-todo.md` §14 + §19 remaining | Members popover refetches on open and lacks avatars / count | `members-popover-avatars-cache` |
+| `docs/status/ui-todo.md` Phase 3.5 / 2.A.7 | AI surfaces flash spinners on fast local-engine responses | `throttled-spinners-hook` |
+| `docs/status/ui-todo.md` Phase 3.1 / §17 | Microcopy / casing inconsistencies (`Login`/`Register` etc.) | `microcopy-casing-sweep` |
+| `docs/status/release-todo.md` §14 polish extension | Other `AgentMetadata` fields still unsurfaced (`recursion_limit`, `tags`) | `agent-metadata-recursion-tags-about` |
+| `docs/status/ui-todo.md` Phase 3.4 / 2.A.9 (WCAG 2.5.7) | Drag-and-drop keyboard alternative is undiscoverable on task cards | `drag-keyboard-affordance-hint` |
+
 ## Status hygiene
 
 After closing an item referenced in `docs/status/*`, follow repo root **`AGENTS.md`**: strike or edit the `-todo.md` row and append a shipped line under `docs/status/product-done.md`.

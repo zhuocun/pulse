@@ -1,8 +1,8 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "Implement to-do items with Composer 2 until the docs/status non-GA backlog is cleared. Non-GA means open items in docs/status/* excluding GA Blocker §1 (MutationProposal accept/undo). Tranche by tranche: merge handoffs, extend plan for the next scoped slice, keep AGENTS.md status hygiene (strike todos + product-done rows).",
-  "summary": "Wave 2: document backend CI manual dispatch, Dockerfile Redis-backend hints for §16d, decorative task-type icon a11y on column cards.",
-  "selfAgentId": "bc-ef458bd7-de29-4d59-a77f-43f2b0cdb654",
+  "goal": "Implement to-do items with Codex 5.3 until the docs/status non-GA backlog is cleared. Non-GA means open items in docs/status/* excluding GA Blocker §1 (MutationProposal accept/undo). Tranche by tranche: merge handoffs, extend plan for the next scoped slice, keep AGENTS.md status hygiene (strike todos + product-done rows).",
+  "summary": "Wave 3 (Codex 5.3): useAgent nudge-inbox extract, members popover avatars + shared cache, throttled spinners, microcopy casing sweep, About popover metadata extension, drag keyboard hint.",
+  "selfAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
   "rootSlug": "non-ga-todos-2f52",
   "baseBranch": "main",
   "prBase": "main",
@@ -15,175 +15,179 @@
   ],
   "tasks": [
     {
-      "name": "compose-idempotency-redis",
+      "name": "useagent-nudge-inbox-extract",
       "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Add IDEMPOTENCY_BACKEND=redis to backend docker-compose server env alongside existing RATE_LIMIT_BACKEND and BUDGET_BACKEND so local docker matches multi-worker prelude per release-todo §16d; refresh header comment about Redis backends.",
-      "brief": "Read `.orchestrate/non-ga-todos-2f52/bootstrap/BACKLOG_OPEN_NON_GA.md` and `PATHS_AND_VERIFICATION.md`. Touch only backend/docker-compose.yml for the env vars; optionally tighten docs/status/release-todo.md §16d wording if compose parity is achieved (strike docker-compose caveat if accurate). Branch `cursor/non-ga-todos-2f52` or worker branch merge target — do not regress GA §1 mutation work.",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Close part of release-todo §16b / architecture-todo Theme 3: extract the AC-V14 nudge-inbox state and `reduceNudgeInbox` reducer out of `src/utils/hooks/useAgent.ts` into a dedicated `src/utils/hooks/useNudgeInbox.ts` (or `src/utils/agent/nudgeInbox.ts`). `useAgent` re-exports the existing public surface (`reduceNudgeInbox`, `NUDGE_INBOX_MAX`, `NUDGE_EXPIRY_MS`, `nudges`, `dismissNudge`) so callers and tests do not break.",
+      "brief": "Read `.orchestrate/non-ga-todos-2f52/bootstrap/BACKLOG_OPEN_NON_GA.md` Wave-3 row. Goal: shrink useAgent.ts (currently 1010 lines) by lifting nudge-inbox concerns. The reducer is already exported as `reduceNudgeInbox` for unit tests — finish the move. Keep the periodic prune (60s) and 4h expiry semantics. Re-export from `useAgent.ts` for backwards compatibility so `src/__tests__/useAgent.nudgeInbox.test.ts` (or wherever the unit tests live) keep working without churn. Update repo `AGENTS.md` only if the cited line ranges become stale because of this move; do not restate blockers inline. Update docs/status/release-todo.md §16b sub-bullet to reflect partial completion (nudge-inbox lifted; SSE adapter + tool resolver still pending).",
       "pathsAllowed": [
-        "backend/docker-compose.yml",
-        "docs/status/release-todo.md"
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useNudgeInbox.ts",
+        "src/utils/agent/**",
+        "src/__tests__/**",
+        "src/**/*test.ts",
+        "src/**/*test.tsx",
+        "AGENTS.md",
+        "docs/status/release-todo.md",
+        "docs/status/architecture-todo.md"
       ],
       "pathsForbidden": [
-        "**/src/**",
-        "backend/app/**",
-        "backend/tests/**"
+        "backend/**",
+        "src/components/**"
       ],
       "acceptance": [
-        "`IDEMPOTENCY_BACKEND=redis` appears next to REDIS_URI in backend/docker-compose.yml",
-        "Compose comment mentions idempotency + rate-limit + budget on Redis where applicable",
-        "If release-todo changed, backlog note matches AGENTS.md truth"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "fly-app-placeholder",
-      "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Close release-todo polish §16e: replace misleading Fly app placeholder with a repo-owned default name and explicit operator-override comment, or document removal path per that section.",
-      "brief": "See bootstrap BACKLOG_OPEN_NON_GA.md. Prefer `app = \"pulse-backend\"` (or similar) with header comment: operators must rename to their Fly app. If you delete fly.toml instead, update backend README or docs/operations/deployment.md fallback path so no silent wrong-app deploy. Update docs/status/release-todo.md §16e to resolved or narrowed per AGENTS.md.",
-      "pathsAllowed": [
-        "backend/fly.toml",
-        "backend/README.md",
-        "docs/operations/deployment.md",
-        "docs/status/release-todo.md"
-      ],
-      "pathsForbidden": [
-        "**/src/**"
-      ],
-      "acceptance": [
-        "No literal jira-python-server remains as the implied production app name without operator warning",
-        "release-todo §16e reflects the chosen resolution"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "copilot-shell-i18n",
-      "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Internationalize CopilotShell per ui-todo §20f: replace hardcoded tab labels, title, placeholder bodies, and CTA strings with microcopy keys in en + zh-CN.",
-      "brief": "Read bootstrap PATHS_AND_VERIFICATION.md for FE checks. Add keys under a sensible `microcopy.copilotShell.*` (or extend existing namespace) in English and Chinese locale files; wire `src/components/copilotShell/index.tsx`. Keep a11y (no raw English in user-visible nodes). Update ui-todo.md §20f if the i18n debt for this file is cleared.",
-      "pathsAllowed": [
-        "src/components/copilotShell/**",
-        "src/locales/**",
-        "src/constants/microcopy.ts",
-        "docs/status/ui-todo.md"
-      ],
-      "pathsForbidden": [
-        "backend/**"
-      ],
-      "acceptance": [
-        "No user-visible English literals remain in copilotShell except brand name if product decision",
-        "zh-CN entries exist for every new key",
+        "`reduceNudgeInbox`, `NUDGE_INBOX_MAX`, `NUDGE_EXPIRY_MS`, `dismissNudge`, and `nudges` keep their public behavior end-to-end",
+        "useAgent.ts no longer owns the nudge inbox reducer state internally; new module is the source of truth",
+        "Existing nudge-inbox unit tests pass without import-path churn beyond targeted updates",
         "eslint + tsc + CI=true jest + vite build pass"
       ],
       "openPR": false
     },
     {
-      "name": "fe-agent-metadata-surface",
+      "name": "members-popover-avatars-cache",
       "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Partially close release-todo §14: consume at least one backend AgentMetadata field (e.g. rate_limit or allowed_autonomy) in the FE and show it in an existing AI surface (header health area, chat drawer, or Copilot settings tab) with graceful loading/empty states.",
-      "brief": "Use `getAgentMetadata` from `src/utils/ai/agentClient.ts` for a relevant agent (e.g. chat-agent). Minimize new network chatter (cache per session). Extend or add tests alongside existing aiAccessibility.strict or component tests. Update docs/status/release-todo.md §14 only if behaviour materially addresses the polish item (partial vs done). Follow AGENTS.md dual-mount/useAgent patterns if touching hooks consumers.",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Address ui-todo §14 + §19 remaining: render member avatars and a count badge inside `MembersPopover`, share the `users/members` React Query so it isn't refetched per popover open, and stop the unconditional refetch on `onOpenChange`.",
+      "brief": "Add a `useMembersList()` hook (under `src/utils/hooks/`) that wraps `useReactQuery<IMember[]>('users/members')` with shared key + reasonable staleTime. Migrate `memberPopover`, `board`, `project`, and `taskModal` to consume it. Keep accessibility (focusable trigger, aria-label). Tests should cover the no-refetch-on-open behavior and the rendered count badge / avatar group. Update ui-todo.md §14 + §19 remaining lines once shipped.",
       "pathsAllowed": [
-        "src/components/header/**",
+        "src/components/memberPopover/**",
+        "src/utils/hooks/useMembersList.ts",
+        "src/utils/hooks/**",
+        "src/pages/board.tsx",
+        "src/pages/project.tsx",
+        "src/components/taskModal/**",
+        "src/__tests__/**",
+        "src/**/*test.ts",
+        "src/**/*test.tsx",
+        "docs/status/ui-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**",
         "src/components/aiChatDrawer/**",
-        "src/components/copilotShell/**",
+        "src/components/boardBriefDrawer/**",
+        "src/utils/hooks/useAgent.ts"
+      ],
+      "acceptance": [
+        "MembersPopover renders avatars + count and does not re-fetch on every open; cached query hit is the default",
+        "All consumers use the shared hook (no duplicate `useReactQuery('users/members')` across components)",
+        "ui-todo §14 + §19 remaining row reflects the shipped state",
+        "eslint + tsc + CI=true jest + vite build pass"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "throttled-spinners-hook",
+      "type": "worker",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Address ui-todo Phase 3.5 + 2.A.7: introduce `useDelayedFlag(active, delayMs)` (default 250ms) and apply it to the spinner / loading affordances on `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer` so fast local-engine responses don't flash a spinner.",
+      "brief": "Create `src/utils/hooks/useDelayedFlag.ts` with thorough JSDoc + tests. Wrap visible spinner branches in those AI surfaces with the hook so the spinner only renders after 250ms of sustained loading. Do not change the underlying loading state or analytics. Update ui-todo.md to strike the throttled-spinner items.",
+      "pathsAllowed": [
+        "src/utils/hooks/useDelayedFlag.ts",
+        "src/utils/hooks/**",
+        "src/components/aiTaskAssistPanel/**",
+        "src/components/aiChatDrawer/**",
+        "src/components/boardBriefDrawer/**",
+        "src/__tests__/**",
+        "src/**/*test.ts",
+        "src/**/*test.tsx",
+        "docs/status/ui-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**",
+        "src/components/memberPopover/**",
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useNudgeInbox.ts"
+      ],
+      "acceptance": [
+        "`useDelayedFlag` exported with unit tests covering immediate-clear and delayed-on transitions",
+        "Three AI surfaces (assist panel, chat drawer, brief drawer) wrap their spinner with the hook",
+        "ui-todo Phase 3.5 / 2.A.7 throttled-spinner reference reflects shipped state",
+        "eslint + tsc + CI=true jest + vite build pass"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "microcopy-casing-sweep",
+      "type": "worker",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Address ui-todo Phase 3.1 microcopy / casing standardization: sweep `src/i18n/locales/en.ts` and `src/i18n/locales/zh-CN.ts` plus `src/constants/microcopy.ts` so user-facing button copy uses sentence case and consistent verbs (e.g. `Login` → `Log in`, `Register` → `Sign up`, `Create Project` → `Create project`, `Submit` → `Save`). Do not add new translation keys; rephrase existing values only.",
+      "brief": "Mechanical pass on existing keys. Keep zh-CN parity (Chinese values may be unchanged where casing doesn't apply, but if the English string changes meaning the Chinese should follow). Skip strings that are i18n-correct already. Update ui-todo §17 + Phase 3.1 lines with the resolution. Verify FE tests still pass — many tests assert on visible labels.",
+      "pathsAllowed": [
+        "src/i18n/locales/en.ts",
+        "src/i18n/locales/zh-CN.ts",
+        "src/i18n/locales/**",
+        "src/constants/microcopy.ts",
+        "src/__tests__/**",
+        "src/**/*test.ts",
+        "src/**/*test.tsx",
+        "docs/status/ui-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**",
+        "src/components/**"
+      ],
+      "acceptance": [
+        "No new translation keys added; only values updated for casing / verb consistency",
+        "Tests that rely on labels updated to the new strings (no test removed without replacement)",
+        "ui-todo §17 / Phase 3.1 row updated to reflect the sweep",
+        "eslint + tsc + CI=true jest + vite build pass"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "agent-metadata-recursion-tags-about",
+      "type": "worker",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Extend release-todo §14 closeout: surface additional `AgentMetadata` fields (`recursion_limit`, `tags`, optionally `context_schema` shape) for `chat-agent` inside `CopilotAboutPopover`, alongside the existing rate-limit + autonomy disclosure. Keep remote-only gating and graceful empty states.",
+      "brief": "Reuse the session-cached `getAgentMetadata` flow that today renders `rate_limit` / `allowed_autonomy`. Add additional rows or chips for `recursion_limit` (single integer line) and `tags` (chip list) when present. Skip entirely when `aiUseLocalEngine` is true or the AI base URL is empty. Add or extend tests near `aiAccessibility.strict.test.tsx` / `copilotAboutPopover` test files. Update release-todo §14 partial line with new shipped fields.",
+      "pathsAllowed": [
+        "src/components/copilotAboutPopover/**",
         "src/utils/ai/**",
         "src/interfaces/**",
         "src/__tests__/**",
+        "src/**/*test.ts",
         "src/**/*test.tsx",
         "docs/status/release-todo.md"
       ],
       "pathsForbidden": [
         "backend/**",
-        "**/agents/*.py",
-        "**/routers/*.py"
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useNudgeInbox.ts",
+        "src/components/memberPopover/**"
       ],
       "acceptance": [
-        "At least one AgentMetadata-backed UI affordance ships with tests",
-        "Remote-mode-only code paths gated when aiUseLocalEngine / empty base URL",
-        "eslint + tsc + CI jest + vite build pass"
+        "`recursion_limit` and `tags` (when provided) render in `CopilotAboutPopover` for `chat-agent` with safe empty states",
+        "Local-engine / empty-base-URL paths render no metadata rows",
+        "Tests assert presence of new disclosures and absence under local-engine gating",
+        "eslint + tsc + CI=true jest + vite build pass"
       ],
       "openPR": false
     },
     {
-      "name": "backend-ci-dispatch",
+      "name": "drag-keyboard-affordance-hint",
       "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Reduce release-todo §7 friction: add workflow_dispatch to .github/workflows/backend-ci.yml so maintainers can trigger test-full/test-slim on demand without a path-filter push.",
-      "brief": "Preserve existing pull_request/push path filters; add concurrency-friendly workflow_dispatch defaults. Optionally add a one-line note in docs/status/release-todo.md §7 describing how to capture evidence via manual dispatch.",
-      "pathsAllowed": [
-        ".github/workflows/backend-ci.yml",
-        "docs/status/release-todo.md"
-      ],
-      "pathsForbidden": [
-        "**/src/**",
-        ".github/workflows/frontend-ci.yml"
-      ],
-      "acceptance": [
-        "YAML validates; workflow_dispatch is present with documented inputs or default branch",
-        "Existing triggers unchanged aside from additive dispatch"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "release-ci7-dispatch-documentation",
-      "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Bring docs/status/release-todo.md §7 in sync with shipped workflow_dispatch on backend-ci: describe manual run path and mode input without claiming a green run exists until a URL is pasted.",
-      "brief": "Read `.orchestrate/non-ga-todos-2f52/bootstrap/BACKLOG_OPEN_NON_GA.md` wave-2 table. Match `.github/workflows/backend-ci.yml` inputs (`both` / `test-full` / `test-slim`). Ops still paste first green run URL when available.",
-      "pathsAllowed": [
-        "docs/status/release-todo.md"
-      ],
-      "pathsForbidden": [
-        "**/src/**",
-        "backend/app/**",
-        ".github/workflows/frontend-ci.yml"
-      ],
-      "acceptance": [
-        "§7 references manual workflow dispatch and mode choices consistent with YAML",
-        "No false statement that GHA has been verified on main without evidence"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "dockerfile-redis-backend-hints",
-      "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Support release-todo §16d: add operator-facing comments in backend/Dockerfile near the uvicorn worker pin that lifting workers>1 requires RATE_LIMIT_BACKEND, BUDGET_BACKEND, IDEMPOTENCY_BACKEND=redis plus REDIS_URI (compose already models this).",
-      "brief": "Docs-only in Dockerfile comments unless a one-line release-todo §16d cross-reference is needed. Do not change worker count or entrypoint behavior.",
-      "pathsAllowed": [
-        "backend/Dockerfile",
-        "docs/status/release-todo.md"
-      ],
-      "pathsForbidden": [
-        "**/src/**",
-        "backend/app/**",
-        "backend/tests/**"
-      ],
-      "acceptance": [
-        "Dockerfile comments name the three Redis-backed middleware env vars tied to multi-worker safety",
-        "No functional change to image build or default CMD unless required for accuracy"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "column-decorative-svg-a11y",
-      "type": "worker",
-      "model": "composer-2-fast",
-      "scopedGoal": "Address ui-todo §21 decorative SVG note for board task cards: ensure bug/task imagery is aria-hidden when redundant with visible type text in TaskTypeBadge.",
-      "brief": "Read bootstrap PATHS_AND_VERIFICATION.md. Keep existing screen-reader labels on type; run eslint, tsc, CI=true jest subset if column tests exist, vite build.",
+      "model": "gpt-5.3-codex-high-fast",
+      "scopedGoal": "Address ui-todo Phase 3.4 / WCAG 2.5.7: surface a non-mouse drag affordance — add a tooltip or `aria-keyshortcuts` hint on task cards documenting `Space` to lift, arrows to move, `Space` to drop, `Esc` to cancel. Keyboard sensor in `@hello-pangea/dnd` already supports this; this slice is about discoverability.",
+      "brief": "Smallest viable change: add an AntD `Tooltip` (or `title` + `aria-keyshortcuts`) on the task-card button advertising the keyboard drag controls. Use existing microcopy keys or add minimal new entries (e.g. `microcopy.dragHints.taskCardKeyboard`) with zh-CN parity. Avoid regressions to the column drag click target. Update ui-todo Phase 3.4 / 2.A.9 references when shipped.",
       "pathsAllowed": [
         "src/components/column/**",
+        "src/i18n/locales/**",
+        "src/constants/microcopy.ts",
+        "src/__tests__/**",
+        "src/**/*test.ts",
+        "src/**/*test.tsx",
         "docs/status/ui-todo.md"
       ],
       "pathsForbidden": [
-        "backend/**"
+        "backend/**",
+        "src/components/aiChatDrawer/**",
+        "src/components/aiTaskAssistPanel/**",
+        "src/utils/hooks/useAgent.ts"
       ],
       "acceptance": [
-        "Decorative icons do not double-announce type next to explicit text/badge",
-        "ui-todo §21 row updated if this slice closes the cited gap",
+        "Task cards expose a discoverable keyboard-drag affordance (tooltip or `aria-keyshortcuts`) with i18n parity",
+        "Existing column tests still pass; a new test asserts the hint text or aria attribute",
+        "ui-todo Phase 3.4 row updated to reflect keyboard-affordance hint",
         "eslint + tsc + CI=true jest + vite build pass"
       ],
       "openPR": false
