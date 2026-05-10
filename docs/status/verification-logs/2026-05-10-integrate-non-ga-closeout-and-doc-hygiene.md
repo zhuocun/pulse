@@ -1,7 +1,7 @@
 # Verification — integrate non-GA closeout + doc hygiene
 
 - **Branch:** `orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene`
-- **Commit:** `033d4de`
+- **Commit for this snapshot:** run `git log -1 --format=%H -- docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md`
 
 ## Purpose
 
