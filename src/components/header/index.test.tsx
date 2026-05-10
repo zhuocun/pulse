@@ -158,7 +158,7 @@ describe("Header", () => {
         renderHeader();
 
         expect(
-            screen.getByRole("button", { name: /go to projects/i })
+            screen.getByRole("button", { name: /pulse home/i })
         ).toBeInTheDocument();
         expect(screen.getByText("Members")).toBeInTheDocument();
         expect(accountTrigger()).toBeInTheDocument();
@@ -168,9 +168,7 @@ describe("Header", () => {
     it("navigates to projects with viewTransition when the logo is clicked outside the projects list", () => {
         const { navigate } = renderHeader("/projects/p1/board");
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /go to projects/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /pulse home/i }));
 
         expect(navigate).toHaveBeenCalledWith("/projects", {
             viewTransition: true
@@ -180,9 +178,7 @@ describe("Header", () => {
     it("does not navigate when already on the projects list", () => {
         const { navigate } = renderHeader("/projects");
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /go to projects/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /pulse home/i }));
 
         expect(navigate).not.toHaveBeenCalled();
     });

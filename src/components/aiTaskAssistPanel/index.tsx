@@ -36,6 +36,16 @@ import EngineModeTag from "../engineModeTag";
 const EMPTY_TASKS: ITask[] = [];
 const EMPTY_MEMBERS: IMember[] = [];
 const EMPTY_COLUMNS: IColumn[] = [];
+const LIVE_REGION_STYLE = {
+    border: 0,
+    clip: "rect(0 0 0 0)",
+    height: 1,
+    margin: -1,
+    overflow: "hidden",
+    padding: 0,
+    position: "absolute" as const,
+    width: 1
+};
 
 type WireEstimateSuggestion = Omit<
     IEstimateSuggestion,
@@ -446,6 +456,27 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
 
     const band = estimateData ? confidenceBand(estimateData.confidence) : "Low";
     const lowConfidence = estimateData && band === "Low";
+    const suggestionStatusAnnouncement = useMemo(() => {
+        if (!trimmedName) return "";
+        if (estimateError || readinessError) {
+            return microcopy.ai.suggestionStatusError;
+        }
+        if (estimateData || readinessData) {
+            return microcopy.ai.suggestionStatusReady;
+        }
+        if (estimateIsLoading || readinessIsLoading) {
+            return microcopy.ai.suggestionStatusLoading;
+        }
+        return "";
+    }, [
+        trimmedName,
+        estimateError,
+        readinessError,
+        estimateData,
+        readinessData,
+        estimateIsLoading,
+        readinessIsLoading
+    ]);
 
     return (
         <Card
@@ -473,6 +504,14 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             }
         >
             <CopilotRemoteConsentNotice route="estimate" />
+            <div
+                aria-atomic="true"
+                aria-live="polite"
+                role="status"
+                style={LIVE_REGION_STYLE}
+            >
+                {suggestionStatusAnnouncement}
+            </div>
             <SectionHeading
                 right={
                     estimateData ? (

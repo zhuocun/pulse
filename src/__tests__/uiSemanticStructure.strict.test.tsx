@@ -240,14 +240,14 @@ describe("UI quality :: Header landmarks and labels", () => {
         expect(banners.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("Header brand link has an accessible name pointing to projects", () => {
+    it("Header brand link has an accessible name distinct from nearby controls", () => {
         render(
             <BrowserRouter>
                 <Header />
             </BrowserRouter>
         );
 
-        const link = screen.getByRole("button", { name: /go to projects/i });
+        const link = screen.getByRole("button", { name: /pulse home/i });
         expect(link).toBeInTheDocument();
     });
 

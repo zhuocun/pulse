@@ -318,14 +318,14 @@ describe("UI quality :: Header on mobile (iPhone SE)", () => {
         expect(trigger).toBeInTheDocument();
     });
 
-    it("Header brand link target is reachable on narrow viewports (still labeled 'Go to projects')", () => {
+    it("Header brand link target is reachable on narrow viewports (labeled 'Pulse home')", () => {
         render(
             <BrowserRouter>
                 <Header />
             </BrowserRouter>
         );
 
-        const brand = screen.getByRole("button", { name: /go to projects/i });
+        const brand = screen.getByRole("button", { name: /pulse home/i });
         expect(brand).toBeInTheDocument();
     });
 
@@ -703,7 +703,7 @@ describe("UI quality :: tablet-edge (sm) behavior", () => {
         );
 
         expect(
-            screen.getByRole("button", { name: /go to projects/i })
+            screen.getByRole("button", { name: /pulse home/i })
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: /switch to (dark|light) mode/i })

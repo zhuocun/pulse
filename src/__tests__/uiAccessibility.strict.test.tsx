@@ -308,4 +308,17 @@ describe("UI quality :: header user fallbacks", () => {
         const label = trigger.getAttribute("aria-label") ?? "";
         expect(label).not.toMatch(/undefined|null/i);
     });
+
+    it("Header logo button uses a distinct accessible label and title", () => {
+        render(
+            <BrowserRouter>
+                <Header />
+            </BrowserRouter>
+        );
+
+        const logoButton = screen.getByRole("button", {
+            name: new RegExp(microcopy.header.logoLabel, "i")
+        });
+        expect(logoButton).toHaveAttribute("title", microcopy.header.logoLabel);
+    });
 });

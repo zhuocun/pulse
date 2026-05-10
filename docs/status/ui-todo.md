@@ -134,8 +134,8 @@ Every recommendation in this plan is anchored to one or more of these external r
     - ~~Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).~~ **[Complete: `taskCreator`, `columnCreator`, and `column` now use real `<button type="button">` elements (`CreateLink`, `AddColumnButton`, `TaskCard`/`NoPaddingButton`); a repo-wide grep confirms no `<a onClick>` patterns remain in production components.]**
     - ~~Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).~~ **[Complete: `TaskTypeBadge` renders bug/task imagery as `<img alt="" aria-hidden />` beside visible `microcopy.options.taskTypes.*` labels so type is not double-announced.]**
     - Color contrast on muted text (`rgba(0,0,0,0.5)` on white) probably fails WCAG AA.
-    - The header logo button has no accessible label distinguishing it from "Members".
-    - Live regions on the chat drawer (`aria-live="polite"`) are good — extend the same to the AI assist and brief drawers.
+    - ~~The header logo button has no accessible label distinguishing it from "Members".~~ **[Complete: header brand button now uses localized `microcopy.header.logoLabel` (`Pulse home`) as both `aria-label` and `title`, with `zh-CN` parity.]**
+    - ~~Live regions on the chat drawer (`aria-live="polite"`) are good — extend the same to the AI assist and brief drawers.~~ **[Complete: `AiTaskAssistPanel` and `BoardBriefDrawer` now each include a discrete `role="status" aria-live="polite"` region that announces short status copy (`suggestion ready` / `couldn't load brief`) without exposing payload content.]**
 
 ---
 
@@ -251,7 +251,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - **1.4.1 Use of Color (color-blind safety).** The bug/task icon is currently the only signal of type, and the breakdown modal uses red Tag for `Bug` and blue Tag for `Task` (`src/components/aiTaskDraftModal/index.tsx:316–318`). Add a text label inside every Tag (`Bug` / `Task`) and prefer shape (icon outline vs. filled) over hue. Status alerts must not rely on color alone — keep AntD's icon prefix.
     - **1.4.10 Reflow / 1.4.4 Resize Text.** Phase 1.1 (kill the rem hack) and Phase 1.3 (responsive layout) together satisfy 1.4.10; manually verify reflow at 320 CSS px width and 200 % zoom.
     - **1.4.12 Text Spacing.** No CSS rule may break when users override `line-height: 1.5`, `letter-spacing: 0.12em`, `word-spacing: 0.16em`, `paragraph-spacing: 2em`. Test once per surface.
-    - **4.1.3 Status Messages.** Add `aria-live="polite"` to: filter result counts ("12 tasks match"), optimistic mutation feedback ("Task created"), AI suggestion arrival, and the chat drawer (already present at `aiChatDrawer:124–133`).
+    - **4.1.3 Status Messages.** Add `aria-live="polite"` to: filter result counts ("12 tasks match"), optimistic mutation feedback ("Task created"), and AI suggestion arrival. **[Update: chat drawer already had this; AI suggestion arrival is now covered in `aiChatDrawer`, `aiTaskAssistPanel`, and `boardBriefDrawer` via dedicated `role="status"` live regions.]**
     - **`forced-colors` / Windows High Contrast.** Replace background-image-based affordances (drop hints, gradient scroll fade) with `border` and `background-color` so they survive forced-colors mode; use `forced-color-adjust: none` only where unavoidable (the brand logo).
     - **`prefers-reduced-motion`.** Wrap every motion (drag lift, modal slide, skeleton-to-content cross-fade, toast slide) in `@media (prefers-reduced-motion: no-preference) { … }` or use AntD's `motion` token set to none when the media query matches.
     - **Decorative SVGs.** Set `alt=""` (or `aria-hidden="true"` on inline SVG) on `bug.svg`, `task.svg`, the auth `left.svg` / `right.svg` decorations, and the brand sparkle when next to a visible label.

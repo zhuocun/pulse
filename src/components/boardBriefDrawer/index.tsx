@@ -90,6 +90,16 @@ const WorkloadBar = styled.div<{ overloaded: boolean }>`
     transition: transform 320ms ease-out;
     width: 100%;
 `;
+const LIVE_REGION_STYLE = {
+    border: 0,
+    clip: "rect(0 0 0 0)",
+    height: 1,
+    margin: -1,
+    overflow: "hidden",
+    padding: 0,
+    position: "absolute" as const,
+    width: 1
+};
 
 interface BoardBriefDrawerProps {
     open: boolean;
@@ -509,6 +519,13 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         error,
         microcopy.feedback.couldntGenerateBrief
     );
+    const briefStatusAnnouncement = useMemo(() => {
+        if (!open) return "";
+        if (error && !briefData) return microcopy.ai.briefStatusError;
+        if (briefData) return microcopy.ai.briefStatusReady;
+        if (activeIsLoading) return microcopy.ai.briefStatusLoading;
+        return "";
+    }, [open, error, briefData, activeIsLoading]);
 
     /** Compute "what changed" headline (B-R3) when we have a baseline. */
     const headline = useMemo(() => {
@@ -628,6 +645,14 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
             size={drawerWidth}
         >
             <CopilotRemoteConsentNotice route="board-brief" />
+            <div
+                aria-atomic="true"
+                aria-live="polite"
+                role="status"
+                style={LIVE_REGION_STYLE}
+            >
+                {briefStatusAnnouncement}
+            </div>
             {showBriefLoadingSkeleton && (
                 <div
                     aria-label={microcopy.a11y.generatingBrief}
