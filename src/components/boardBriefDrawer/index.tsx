@@ -28,6 +28,7 @@ import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
+import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import AiSparkleIcon from "../aiSparkleIcon";
 import CitationChip from "../citationChip";
@@ -500,6 +501,10 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     const cached = cacheKey ? BRIEF_CACHE.get(cacheKey) : undefined;
     const briefData: IBoardBrief | undefined = data ?? cached?.data;
     const generatedAt = cachedAt ?? cached?.generatedAt ?? null;
+    const showBriefLoadingSkeleton = useDelayedFlag(
+        activeIsLoading && !briefData,
+        250
+    );
     const errorView = aiErrorView(
         error,
         microcopy.feedback.couldntGenerateBrief
@@ -623,7 +628,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
             size={drawerWidth}
         >
             <CopilotRemoteConsentNotice route="board-brief" />
-            {activeIsLoading && !briefData && (
+            {showBriefLoadingSkeleton && (
                 <div
                     aria-label={microcopy.a11y.generatingBrief}
                     aria-busy="true"

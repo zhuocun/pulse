@@ -197,13 +197,21 @@ describe("BoardBriefDrawer — remote agent path", () => {
         ).toBeInTheDocument();
     });
 
-    it("shows skeleton while agent is streaming and no suggestion yet", () => {
+    it("shows skeleton after streaming persists beyond the delay", () => {
+        jest.useFakeTimers();
         renderDrawer(true, {
             isStreaming: true,
             lastSuggestion: null
         });
 
+        expect(screen.queryByLabelText(/Generating brief/i)).toBeNull();
+
+        act(() => {
+            jest.advanceTimersByTime(260);
+        });
+
         expect(screen.getByLabelText(/Generating brief/i)).toBeInTheDocument();
+        jest.useRealTimers();
     });
 
     it("does not show skeleton once a suggestion has arrived", async () => {

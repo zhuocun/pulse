@@ -146,19 +146,29 @@ describe("AiChatDrawer UI branches (mocked chat hook)", () => {
     });
 
     it("renders the chat-bubble skeleton (not a Spin) while loading with no streaming text", () => {
+        jest.useFakeTimers();
         mockedUseAiChat.mockReturnValue({
             ...baseChat(),
             isLoading: true,
             streamingText: ""
         });
         renderDrawer();
-        // P1-3: loading swaps the legacy Spin for an AntD Skeleton inside an
-        // assistant-shaped bubble plus a static "thinking" stage label.
+
+        // The delayed spinner should suppress immediate loading flash.
+        expect(document.querySelector(".ant-skeleton")).toBeNull();
+        expect(screen.queryByText(microcopy.ai.thinkingDefault)).toBeNull();
+
+        act(() => {
+            jest.advanceTimersByTime(260);
+        });
+
+        // After the delay, loading UI appears as the assistant skeleton bubble.
         expect(document.querySelector(".ant-skeleton")).toBeTruthy();
         expect(document.querySelector(".ant-spin")).toBeNull();
         expect(
             screen.getByText(microcopy.ai.thinkingDefault)
         ).toBeInTheDocument();
+        jest.useRealTimers();
     });
 
     it("renders streamingText inside the bubble with a blinking cursor while loading", () => {
