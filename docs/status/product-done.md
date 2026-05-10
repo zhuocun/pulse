@@ -56,6 +56,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Edit Task modal — footer-slot delete + dynamic title | UX (ui-todo §10, Phase 2.6) | ✅ `Delete` in real `Modal.footer` slot (Delete-left tablet+, stacked phone); title reads `${editTask} · ${taskName}` with type tag |
 | Auth forms — `Form.Item label`, autoComplete, show-password, caps-lock | UX (ui-todo §11, Phase 2.7) | ✅ Both `loginForm` and `registerForm` use `<Form.Item label>` with i18n labels, proper `autoComplete` attrs (`email`, `current-password`, `new-password`, `username`), show/hide password toggle, caps-lock hint, `aria-live="polite"` error region |
 | `taskSearchPanel` side-effect-in-render fix | UX (ui-todo §9) | ✅ `coordinators` and `types` derived through `useMemo` with `Set`-based deduping; no more `tasks?.map(... return null)` for side effects |
+| Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
 
 ---
