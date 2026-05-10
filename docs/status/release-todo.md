@@ -378,10 +378,12 @@ simplification).
   `src/utils/hooks/useNudgeInbox.ts`; `useAgent.ts` re-exports
   `reduceNudgeInbox`, `NUDGE_INBOX_MAX`, and `NUDGE_EXPIRY_MS` for
   compatibility with existing tests/callers.
+- Partial (2026-05-10, continued): FE-tool registry lookup + tool execution
+  + 8-round auto-resume sequencing moved out of `useAgent.ts` into
+  `src/utils/hooks/useAgentToolResolver.ts` and consumed by `useAgent`
+  without changing autonomy handling or resume timing semantics.
 - Action when prioritised: extract the SSE-parsing layer into a thin
-  adapter (architecture-todo Theme 3 calls this out), and move the
-  FE-tool registry / auto-resume loop into a separate hook
-  (`useAgentToolResolver`).
+  adapter (architecture-todo Theme 3 calls this out).
 - Quality-of-life, not GA-gating.
 
 ### 🟡 16c. `X-Pulse-Model` header / per-tenant model config  *(BE)*
