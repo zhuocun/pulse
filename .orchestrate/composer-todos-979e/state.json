@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-10T10:20:59.226Z",
       "lastUpdate": "2026-05-10T10:28:49.868Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 193,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fe-ci",
@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-10T10:28:46.921Z",
       "lastUpdate": "2026-05-10T10:28:46.922Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "copilot-about-popover",
@@ -63,11 +63,11 @@
       "finishedAt": "2026-05-10T10:19:10.024Z",
       "lastUpdate": "2026-05-10T10:19:11.833Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 192,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-copilot-about",
@@ -87,11 +87,11 @@
       "finishedAt": "2026-05-10T10:22:56.071Z",
       "lastUpdate": "2026-05-10T10:22:56.071Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "design-tokens-doc",
@@ -107,13 +107,13 @@
       "handoffPath": "handoffs/design-tokens-doc.md",
       "startedAt": "2026-05-10T10:16:25.448Z",
       "finishedAt": "2026-05-10T10:17:36.368Z",
-      "lastUpdate": "2026-05-10T10:17:36.369Z",
+      "lastUpdate": "2026-05-10T10:31:42.000Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 191,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": "type-check-only"
     },
     {
       "name": "verify-design-tokens-doc",
@@ -133,11 +133,11 @@
       "finishedAt": "2026-05-10T10:31:41.089Z",
       "lastUpdate": "2026-05-10T10:31:41.089Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
@@ -156,6 +156,10 @@
     {
       "at": "2026-05-10T10:28:49.868Z",
       "message": "fe-ci-workflow: verification recorded (unit-test-verified) by verifier verify-fe-ci"
+    },
+    {
+      "at": "2026-05-10T10:31:42.001Z",
+      "message": "design-tokens-doc: verification recorded (type-check-only) by verifier verify-design-tokens-doc"
     }
   ]
 }
