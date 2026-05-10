@@ -103,9 +103,9 @@ sees the card vanish but no mutation is applied.
 - Emission from any write-capable agent — most naturally `chat-agent`
   for tool-driven mutations and a future `board-coach-agent` for
   proactive mutations.
-- A resume-accept handler that, on `command.resume = {choice:
-"accept"}`, raises `interrupt(interrupt_payload("fe.applyMutation",
-{diff}))` so the FE applies the change against `useReactMutation`.
+- A resume-accept handler that treats an accepted resume choice as a
+  request to raise a `fe.applyMutation` interrupt, so the FE applies the
+  diff through `useReactMutation`.
   On `{choice: "reject"}` the agent terminates the proposal cycle.
 - An undo endpoint (or a structured undo payload re-triggered by a
   follow-up `mutation_proposal`) so the FE 10-second undo toast
@@ -229,8 +229,8 @@ validation failure, a warning is logged and the payload passes
 through (so a schema bug never breaks a streaming response). Golden
 SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
-- Remaining work: migrate to `create_react_agent(...,
-response_format=...)` for the LLM-polish path so the contract is
+- Remaining work: migrate the LLM-polish path to provider-level
+  `response_format` support so the contract is
   enforced at provider call time, not just at FE emission. Detail:
   F-10 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Scope: provider-level structured-output calls, fallback behaviour on
@@ -267,10 +267,9 @@ expansion needs a real CI gate so a regression cannot ship via a
 self-merged or skip-reviewed PR.
 
 - Action when prioritised: add `.github/workflows/frontend-ci.yml`
-  scoped to FE paths (mirror the `backend-ci.yml` shape) running
-  `npm ci && npm run eslint && npx tsc --noEmit && CI=true npm test
--- --watchAll=false --runInBand && npx vite build`. Reuse the
-  existing pre-commit step list in `package.json` so the gate cannot
+  scoped to FE paths (mirror the `backend-ci.yml` shape) running the
+  package install, eslint, typecheck, Jest, and Vite build gates. Reuse
+  the existing pre-commit step list in `package.json` so the gate cannot
   drift from local.
 - Scope: single workflow file, dependency cache, lint/typecheck/Jest/build
   jobs, and first green run evidence.
