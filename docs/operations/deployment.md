@@ -198,7 +198,7 @@ Set these in the Vercel FE project (or whichever host serves the SPA):
 | Variable                                  | Notes                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REACT_APP_AI_BASE_URL`                   | Optional. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead.          |
-| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See [`production-readiness.md`](production-readiness.md) §1 for the GA-blocker status.                  |
+| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See [`../status/production-readiness.md`](../status/production-readiness.md) §1 for the GA-blocker status.                  |
 | `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
 | `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
 
@@ -227,7 +227,7 @@ browsers fetch the new bundle reference. Subsequent deploys are clean.
 
 ### Security considerations
 
-The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as Hard Blocker §3 in [`production-readiness.md`](production-readiness.md).
+The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as Hard Blocker §3 in [`../status/production-readiness.md`](../status/production-readiness.md).
 
 ---
 
@@ -289,5 +289,5 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 ## See also
 
 - [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — historical structural reviews (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps).
-- [`production-readiness.md`](production-readiness.md) — current GA blockers, soft blockers, and operational backlog.
+- [`../status/production-readiness.md`](../status/production-readiness.md) — current GA blockers, soft blockers, and operational backlog.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

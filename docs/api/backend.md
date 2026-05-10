@@ -1936,7 +1936,7 @@ Mid-stream errors arrive as `{"type": "error", ...}` SSE frames followed by `[DO
 
 The MCP (Model Context Protocol) transport mount point does not exist. The tool schemas (`app/tools/fe_tool_schemas.py`) and per-agent `tools` tuples on `AgentMetadata` are present, but `langchain-mcp-adapters` is not in any dependency group and no `/mcp` route is registered.
 
-See [`../operations/production-readiness.md`](../operations/production-readiness.md) §15 for the planned scope when this is prioritised (Streamable HTTP transport at `/mcp`, exposing the read-only FE tools).
+See [`../status/production-readiness.md`](../status/production-readiness.md) §15 for the planned scope when this is prioritised (Streamable HTTP transport at `/mcp`, exposing the read-only FE tools).
 
 ### search-agent v2.1 graph
 

@@ -10,7 +10,7 @@ when a fix is non-obvious from the code alone.
   conditionally calling either hook breaks React's hook-ordering rule. See
   `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
 - Migration progress for the six structured routes lives in
-  `docs/prd/changelog.md`. As of 2026-05-05, all six are on the
+  `docs/status/changelog.md`. As of 2026-05-05, all six are on the
   v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
   alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
   remains the local-engine fallback path.
@@ -61,7 +61,7 @@ For required env vars, CDN cache-purge guidance, FE smoke tests after
 deploy, and the BE companion-server prerequisites, see
 [`docs/operations/deployment.md`](docs/operations/deployment.md). Per-tier
 GA blockers and ship sequence live in
-[`docs/operations/production-readiness.md`](docs/operations/production-readiness.md).
+[`docs/status/production-readiness.md`](docs/status/production-readiness.md).
 
 ## Cursor Cloud
 

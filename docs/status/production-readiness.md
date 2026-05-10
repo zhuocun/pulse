@@ -2,8 +2,8 @@
 
 Consolidated GA status and open backlog across the FastAPI agent server
 (`backend/`) and the React client (`src/`). For per-feature inventory
-see [`../prd/changelog.md`](../prd/changelog.md); for deployment
-configuration see [`deployment.md`](deployment.md).
+see [`changelog.md`](changelog.md); for deployment
+configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
 Last updated: 2026-05-10 (BE re-verification) / 2026-05-08 (FE).
 

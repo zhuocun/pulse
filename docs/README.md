@@ -19,21 +19,27 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
   calling via interrupts.
 - [`prd/v3-ai-ux.md`](prd/v3-ai-ux.md) — UX layer on top of v2.1:
   trust calibration, citations, command palette, mutation previews.
-- [`prd/changelog.md`](prd/changelog.md) — what has shipped, the
-  per-feature inventory, acceptance-criteria status.
 
-## Architecture
+## Status — what's done, what's next
 
-- [`architecture/roadmap.md`](architecture/roadmap.md) —
+The four tracking docs that describe open work and shipped milestones
+live together in `status/` so engineers and PMs can survey the whole
+backlog without folder-hopping.
+
+- [`status/production-readiness.md`](status/production-readiness.md)
+  — single source for GA blockers, soft blockers, polish, and the
+  recommended internal-beta → design-partner → public ship sequence.
+- [`status/roadmap.md`](status/roadmap.md) —
   forward-looking themes (contract hardening, stream errors,
   mutation lifecycle, durable resume, FE simplification, BE
   intelligence/resilience) with phased execution.
+- [`status/changelog.md`](status/changelog.md) — what has shipped,
+  the per-feature inventory, acceptance-criteria status.
+- [`status/ui-plan.md`](status/ui-plan.md) — phased UI plan
+  (foundations, surfaces, polish, stretch).
 
 ## Operations
 
-- [`operations/production-readiness.md`](operations/production-readiness.md)
-  — single source for GA blockers, soft blockers, polish, and the
-  recommended internal-beta → design-partner → public ship sequence.
 - [`operations/deployment.md`](operations/deployment.md) — production
   deployment guide (Vercel limits, Fly.io, Render, ECS / Cloud Run /
   Container Apps, dedicated uvicorn behind nginx, FE env vars, CDN
@@ -48,8 +54,6 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
 
 ## Design
 
-- [`design/ui-ux-optimization-plan.md`](design/ui-ux-optimization-plan.md)
-  — phased UI plan (foundations, surfaces, polish, stretch).
 - [`design/ai-ux-best-practices.md`](design/ai-ux-best-practices.md)
   — research reference (Google PAIR, Microsoft HAX, NN/g, NIST AI
   RMF, etc.).
