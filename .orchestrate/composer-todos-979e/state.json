@@ -15,12 +15,12 @@
       "handoffPath": "handoffs/fe-ci-workflow.md",
       "startedAt": "2026-05-10T10:16:20.155Z",
       "finishedAt": "2026-05-10T10:20:59.226Z",
-      "lastUpdate": "2026-05-10T10:20:59.227Z",
+      "lastUpdate": "2026-05-10T10:28:49.868Z",
       "note": null,
       "slackTs": null,
       "prNumber": 193,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -118,7 +118,7 @@
     {
       "name": "verify-design-tokens-doc",
       "type": "verifier",
-      "branch": "orch/composer-todos-979e/verify-design-tokens-doc",
+      "branch": "(no branch) — verifier did not commit any artifacts; the change under review is documentation-only and the working tree was already clean.",
       "startingRef": "orch/composer-todos-979e/design-tokens-doc",
       "dependsOn": [
         "design-tokens-doc"
@@ -126,12 +126,12 @@
       "agentId": "bc-90f9a25f-1303-42a9-9e59-7db8da236f18",
       "runId": "run-9ca120d3-232a-4111-93a5-d05ba3c2e2c2",
       "parentAgentId": "bc-8982741d-63f7-4d26-ba3a-c37f9a00979e",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-design-tokens-doc.md",
       "startedAt": "2026-05-10T10:17:37.817Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T10:17:40.265Z",
+      "finishedAt": "2026-05-10T10:31:41.089Z",
+      "lastUpdate": "2026-05-10T10:31:41.089Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -152,6 +152,10 @@
     {
       "at": "2026-05-10T10:25:40.890Z",
       "message": "verify-design-tokens-doc: tool_call idle 330307ms; last=2026-05-10T10:20:10.583Z"
+    },
+    {
+      "at": "2026-05-10T10:28:49.868Z",
+      "message": "fe-ci-workflow: verification recorded (unit-test-verified) by verifier verify-fe-ci"
     }
   ]
 }
