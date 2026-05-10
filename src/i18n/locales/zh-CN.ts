@@ -457,6 +457,7 @@ const zhCN: Dictionary = {
             moderate: "中",
             low: "低"
         },
+        suggestedByCopilot: "由 Copilot 建议",
         appliedSuggestion: "由 Copilot 建议",
         appliedSuggestionShort: "AI",
         suggestionPopover: "看板 Copilot 已为您填写。可编辑或恢复至原值。",

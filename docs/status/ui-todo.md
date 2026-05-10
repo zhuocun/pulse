@@ -395,7 +395,7 @@ The point of these is that they are _felt_ by the user even if no benchmark move
 
 The PRD already enforces validation; the UI should make the provenance obvious.
 
-- After a user clicks **Apply** on an AI suggestion, mark the affected field with a small `Suggested by Copilot` badge until the user edits it. This satisfies "match between system and the real world" and gives users a hook to retract.
+- ~~After a user clicks **Apply** on an AI suggestion, mark the affected field with a small `Suggested by Copilot` badge until the user edits it.~~ **[Partially complete: the story-points apply path in `TaskModal` now renders a `Suggested by Copilot` badge and clears it on user edit (from `AiTaskAssistPanel`); remaining follow-through is to extend the same visible badge treatment to the other AI-applied fields.]** This satisfies "match between system and the real world" and gives users a hook to retract.
 - Every AI write must be undoable via the same toast/Undo pattern (see 2.A.4). Tasks created by Draft with AI carry a hidden `meta.source = "ai"` for analytics and easy bulk-rollback.
 - The chat drawer must hide raw tool-call payloads from end users (`src/components/aiChatDrawer/index.tsx:141–166`) and surface them only behind a "Show details" toggle. This is both a UX concern (clutter) and a safety concern (do not paint internal ids in front of users).
 - Confidence percentages must be paired with a plain-language band ("Low / Moderate / High") so users without a probability intuition can act.

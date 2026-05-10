@@ -3,7 +3,8 @@ import {
     fireEvent,
     render,
     screen,
-    waitFor
+    waitFor,
+    within
 } from "@testing-library/react";
 import { Modal } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -476,6 +477,42 @@ describe("TaskModal", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    it("shows a story-points copilot badge after Apply and clears it after editing the field", async () => {
+        renderModal();
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            await screen.findByLabelText("Apply suggested story points")
+        );
+
+        const storyPointsLabel = screen
+            .getByText("Story points")
+            .closest("label");
+        expect(storyPointsLabel).not.toBeNull();
+        expect(
+            within(storyPointsLabel as HTMLLabelElement).getByText(
+                "Suggested by Copilot"
+            )
+        ).toBeInTheDocument();
+
+        const storyPointsCombobox = screen.getByRole("combobox", {
+            name: /Story points/i
+        });
+        expect(storyPointsCombobox).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText("Task name"), {
+            target: { value: "Build task updated" }
+        });
+
+        await waitFor(() =>
+            expect(
+                within(storyPointsLabel as HTMLLabelElement).queryByText(
+                    "Suggested by Copilot"
+                )
+            ).not.toBeInTheDocument()
+        );
     });
 
     it("restores the previous field value when undoing a readiness suggestion", async () => {
