@@ -1,6 +1,6 @@
 # UI todo — phased UI / UX plan
 
-**Status as of 2026-05-10:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker, `eslint-plugin-jsx-a11y`) are complete. Phase 4 command palette is shipped. Newly surfaced gaps from the 2026-05-10 sweep — autonomy metadata / settings follow-through (§1.2 item 20a), feedback parity outside chat (20b), `CopilotAboutPopover` config TODO (20c), no FE CI workflow (20d), and missing design-token reference docs (20e) — are tracked under §1.2. Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
+**Status as of 2026-05-10:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker, `eslint-plugin-jsx-a11y`) are complete. Phase 4 command palette is shipped. Newly surfaced gaps from the 2026-05-10 sweep — autonomy metadata / settings follow-through (§1.2 item 20a), feedback parity outside chat (20b), `CopilotAboutPopover` config TODO (20c), no FE CI workflow (20d), missing design-token reference docs (20e), and unified `CopilotShell` follow-through (20f) — are tracked under §1.2. Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 
 **Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
 
@@ -43,12 +43,11 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 ### 1.2 Component-level problems
 
-6. **Project list table.**
-   `src/components/projectList/index.tsx`:
-    - The "Like" column uses `<Rate count={1} />` (`src/components/projectList/index.tsx:86–102`) — a 1-star rating control is a confusing proxy for a like/favorite. A heart toggle (or AntD's `StarFilled` icon button) would communicate the action immediately.
-    - Optimistic state is faked with `currentProjectId` plus three nested ternaries in the render (`:91–98`); the visual flips to "off" while the mutation is in flight, then snaps back when it completes. This is the inverse of a real optimistic update.
-    - The actions menu trigger is the literal string `"..."` rendered as text inside a `link`-typed button (`:170–172`). It should be `<MoreOutlined />` inside an icon button.
-    - There is no pagination, no row hover state, no empty state ("Create your first project"), and no avatar/initials for the manager (`:120–129`). When the manager id is missing the cell shows the literal word `unknown`.
+6. **Project list follow-through.**
+   `src/components/projectList/index.tsx` and `src/components/projectCard/index.tsx` already replaced the old AntD table with responsive cards, a real heart toggle, `MoreOutlined` actions, skeletons, and an empty state. The remaining gaps are narrower:
+    - Cards surface the manager only; there is still no member-count / avatar-group context for quickly judging project scale.
+    - The grid renders the whole list; larger workspaces still need pagination or virtualization.
+    - AI search and structured filters now share one shell, but the information architecture still blurs "semantic search mode" versus ordinary filtering.
 
 7. **Board page — toolbar overload.**
    `src/pages/board.tsx:104–152` renders, in one flex row: project name H1, a "Project AI" switch with explanatory tooltip, a "Brief" button, and an "Ask" button — all when the global AI toggle is also on. This is on top of the search panel rendered immediately below (`:153–178`). At ~1024 px width these wrap unpredictably. The H1 also reads "..." while loading (`:107–110`) instead of using a `Skeleton` line.
@@ -66,7 +65,7 @@ Every recommendation in this plan is anchored to one or more of these external r
     - `tasks?.map(... return null)` is used for its side-effect of populating `types` and `coordinators` arrays on every render (`:35–44`); the lists then survive across renders unfiltered. This both leaks memory if the dataset changes and breaks deduping.
     - The AI search slot is injected as the form's first child with `flexBasis: 100%` so it visually wraps above the inline filters (`src/pages/board.tsx:159–177`). The wrap is fragile — anything else inserted into the form will break the layout.
     - "Reset filter" is a plain text button, not visually grouped with the filters it resets.
-    - On the project list (`src/components/projectSearchPanel/index.tsx:19–69`) the "Search this list" input has no debounce indicator and the Manager `Select` has no clear button.
+    - On the project list (`src/components/projectSearchPanel/index.tsx:19–69`) the Manager `Select` now has `allowClear`, but the "Search this list" input still gives no debounce / loading feedback when the list is large.
 
 10. **Edit Task modal.**
     `src/components/taskModal/index.tsx`:
@@ -100,10 +99,8 @@ Every recommendation in this plan is anchored to one or more of these external r
     `src/utils/hooks/useDragEnd.ts` (referenced from `src/pages/board.tsx:72–73`) handles the data side, but the visual side is bare: there is no drop placeholder styling, no card "lift" shadow during drag, no drag-handle on columns (the entire column is a drag target), and no keyboard alternative for moving cards.
 
 16. **Loading, empty, and error states.**
-    - `BoardSpin` uses hand-calculated margins (`margin-left: calc(0.5 * (100vw - 16rem - 26.4rem))`) at `src/pages/board.tsx:32–36` — fragile and breaks at any other viewport.
-    - Empty board state: zero columns shows just `ColumnCreator`. Should be an illustrated empty state.
-    - Empty project list: AntD `<Table>` falls back to "No data" text only; no CTA.
-    - Network error on the project list shows a single red sentence (`src/pages/project.tsx:90–94`); on the board it does not show at all.
+    - Board loading now uses a shape-matched skeleton, but the zero-column state still collapses to `ColumnCreator` rather than a stronger illustrated empty state.
+    - Project list empty/error states are much healthier now (`EmptyState`, page-level `Alert` + Retry). The remaining gap is consistency: bring the board's fetch-failure and empty-board treatments up to the same standard.
 
 17. **Microcopy and casing.**
     Mixed throughout: "Log in" vs "Login", "Create Project" vs "+ Create task" (different casing and different verb form), "Confirm" / "Cancel" vs "Submit" / "Cancel" across modals, "Coordinators" / "Managers" plural-as-placeholder vs "Coordinator" / "Manager" singular as labels. Buttons are sometimes verbs ("Search", "Apply"), sometimes nouns ("Brief", "Ask").
@@ -131,6 +128,9 @@ Every recommendation in this plan is anchored to one or more of these external r
 20e. **Design-token reference docs missing.**
     `src/theme/tokens.ts` and `src/theme/antdTheme.ts` are the implementation source of truth, but `docs/design-tokens.md` does not exist even though Section 2.C tells contributors to use it. Add a concise token reference (spacing, color, typography, motion, AntD mapping) or change Section 2.C to point only at the code modules.
 
+20f. **Unified `CopilotShell` is only a scaffold.**
+    `src/components/copilotShell/index.tsx` now ships a real tabbed drawer (`chat`, `brief`, `activity`, `settings`), but `chat` and `brief` still bounce the user into the legacy drawers while `activity` and `settings` are placeholder copy. This is now a visible product surface on `src/pages/board.tsx`, so it needs either full in-shell content + i18n coverage or a tighter rollout gate until phase 2 is ready. Fold the autonomy/privacy/per-project controls from item 20a into the real Settings tab instead of leaving the shell half-owned.
+
 21. **Accessibility gaps.**
     - Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).
     - Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).
@@ -154,8 +154,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - Define a `src/theme/tokens.ts` exporting `colorPrimary` (the brand `#2684FF`), `borderRadius`, `fontFamily`, `fontSize`, and a numeric `space` scale (4, 8, 12, 16, 24, 32). Re-export named constants so styled components use `${space.md}` instead of magic rems.
     - Mass-replace `1.4rem`, `1.6rem`, `2rem`, `3.2rem`, etc. with the equivalent token / px value. The replacement is mostly mechanical and preserves visual sizes (1 rem = 10 px today maps cleanly to multiples of 8 px after the switch).
 
-2. **Add a dark-mode-ready palette.**
-   Once tokens exist, plug AntD's `theme.darkAlgorithm` behind a header switch. Persist the choice in `localStorage` next to the existing `boardCopilot:enabled` key.
+2. ~~**Add a dark-mode-ready palette.**
+   Once tokens exist, plug AntD's `theme.darkAlgorithm` behind a header switch. Persist the choice in `localStorage` next to the existing `boardCopilot:enabled` key.~~ **[Complete: `useColorScheme` persists `light` / `dark` / `system`, `buildAntdTheme` switches `defaultAlgorithm` / `darkAlgorithm`, and `ThemedShell` applies the choice app-wide.]**
 
 3. **Make the layout responsive.**
     - In `src/layouts/mainLayout.tsx:7–18`, drop `min-width: 1024px` and `max-height: 1440px`; switch the grid to `grid-template-rows: auto 1fr`; remove `overflow: scroll` from `<main>` (let inner regions own scroll).
@@ -182,13 +182,11 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - Move the "Board Copilot" master switch into the avatar dropdown (Settings → AI features) so it stops competing with the user's name.
 
 2. **Project list page (`src/pages/project.tsx`, `src/components/projectList`, `src/components/projectSearchPanel`).**
-    - Replace the abused `Rate count={1}` with a `HeartFilled` / `HeartOutlined` toggle button and make the optimistic update real (flip the cache, not a transient `currentProjectId` flag).
-    - Replace the `...` text trigger with `<Button type="text" icon={<MoreOutlined />} />`.
-    - Add an avatar + name cell for the manager (`Avatar` + initials + name) and a "Members" avatar group column (using `Avatar.Group`).
-    - Add pagination + a sensible default sort (Liked desc, then `Created At` desc).
-    - Add an empty state with an illustration and a "Create your first project" primary button.
-    - Move the AI search input out of the inline form and into its own row above the filter form (it is logically a different mode of search). A small `RobotOutlined` toggle on the regular search input is another option.
-    - Add a global "+ New project" primary button next to the page title; demote the existing "Create Project" link.
+    - Keep the new card/grid treatment; do not regress back to a table-based layout just to add metadata.
+    - Add member-count / avatar-group context to each card so project scale is scannable without opening the board.
+    - Add pagination or virtualization once project counts exceed a single screenful.
+    - Decide whether AI search stays inside the same filter shell or becomes a clearer dedicated search mode / row.
+    - Preserve the shipped empty/loading/error states and the real optimistic heart toggle while iterating.
 
 3. **Board page (`src/pages/board.tsx`).**
     - Split the H1 row into a two-tier header: top tier = project name + breadcrumb + "Project AI" switch (only when needed); bottom tier = filters + AI buttons.
@@ -225,6 +223,11 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - Replace the "Register for an account" `NoPaddingButton` with a regular AntD `Link` and add the inverse on the register page.
     - Make the card width adapt to viewport (`max-width: 40rem; width: min(40rem, 100% - 2rem)`).
     - Replace the absolutely positioned background SVGs with a single subtle gradient or blurred shape that scales with the viewport — the current `calc()` math collapses on small screens.
+
+8. **Unified Copilot shell (`src/components/copilotShell/index.tsx`).**
+    - Replace the placeholder tab bodies with actual in-shell chat, brief, activity, and settings content, or keep the shell behind a tighter rollout gate until the phase-2 surface is real.
+    - Move autonomy/privacy/per-project controls into the real Settings tab (see §1.2 item 20a) instead of leaving them split across drawer-local state and placeholder copy.
+    - Route triage/activity state into the Activity tab and move hardcoded English strings into `microcopy.ai.*` before the shell becomes canonical.
 
 ### Phase 3 — Polish, accessibility, microcopy
 
@@ -472,16 +475,16 @@ To keep the design from drifting after these phases ship:
 
 The order below batches changes that share files so we do not churn the same area twice. Cross-cutting rules (Section 2.A) and the heuristics map (Section 2.B) are applied within each Phase, not as a separate pass.
 
-1. **Tooling first.** Add `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one. **[Partially complete: `jest-axe` in place (31 tests in `src/__tests__/aiAccessibility.strict.test.tsx`); `eslint-plugin-jsx-a11y` installed/configured; design tokens shipped at `src/theme/tokens.ts`; code splitting via `lazy()` shipped (`src/routes/index.tsx`); service worker shipped (`public/sw.js`). Still open: Storybook scaffolding, `rollup-plugin-visualizer`, `docs/design-tokens.md` reference doc, FE CI workflow (see §1.2 item 20d), and stricter CI treatment for jsx-a11y warnings.]**
-2. Phase 1.1, 1.2, 1.4, 1.5 — theme tokens + ConfigProvider + remove the rem hack + `prefers-color-scheme` wiring (2.A.3). Ship behind the existing visual tests; expect a thin pass of pixel adjustments.
+1. **Tooling first.** Add `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one. **[Partially complete: `jest-axe` in place (31 tests across `src/__tests__/aiAccessibility.strict.test.tsx` + `src/__tests__/uiAccessibility.strict.test.tsx`); `eslint-plugin-jsx-a11y` installed/configured; design tokens shipped at `src/theme/tokens.ts`; code splitting via `lazy()` shipped (`src/routes/index.tsx`); service worker shipped (`public/sw.js`). Still open: Storybook scaffolding, `rollup-plugin-visualizer`, `docs/design-tokens.md` reference doc, FE CI workflow (see §1.2 item 20d), and stricter CI treatment for jsx-a11y warnings.]**
+2. Phase 1 follow-through — finish the remaining typography/token adoption work (1.4, 1.5) and keep the shipped color-scheme system aligned with 2.A.3.
 3. Phase 1.3, 1.6 — responsive layout + tasks-by-column grouping. Land 2.A.2 (touch targets, safe-area-inset) at the same time.
 4. Phase 2.1, 2.5 — header + project detail shell collapse (both touch the global chrome). Land 2.A.11 (breadcrumbs, `aria-current`, `ScrollRestoration`) here.
-5. Phase 2.2 — project list redesign + 2.A.7 (route-level code splitting + prefetch on hover) since both touch the same files.
-6. Phase 2.3, 2.4 — board page + task card redesign (single thread because they share `Column`). Land 2.A.4 (toast + Undo for column/task deletes), 2.A.9 (board shortcuts), and the 2.5.7 keyboard drag-and-drop.
+5. Phase 2.2 — project list follow-through (member context, large-list scaling, AI-search IA) + 2.A.7 (route-level code splitting + prefetch on hover) since both touch the same files.
+6. Phase 2.3, 2.4, 2.8 — board page + task card redesign + unified Copilot shell follow-through (single thread because they share the board AI chrome). Land 2.A.4 (toast + Undo for column/task deletes), 2.A.9 (board shortcuts), and the 2.5.7 keyboard drag-and-drop.
 7. Phase 2.6 — task modal split-pane + 2.A.8 ("Suggested by Copilot" badge, "Why?" affordance) + 2.A.1 (unsaved-changes guard, error summary).
 8. Phase 2.7 — auth screens with the full 2.A.1 / WCAG 3.3.7 / 3.3.8 contract.
 9. Phase 3 — polish, accessibility, microcopy in one pass per surface; this is also when `jest-axe` assertions and visual regression baselines get added per component.
-10. Phase 4 — pick the highest-leverage stretch item (likely the command palette, since it reuses Board Copilot infrastructure and shortcut catalog from 2.A.9).
+10. Phase 4 — pick the highest-leverage remaining stretch item (likely per-user preferences or the activity drawer).
 
 ---
 

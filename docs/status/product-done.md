@@ -31,6 +31,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | — | ✅ |
 | v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode) | — | ✅ |
 | v2.1 UI surface — agent health badge, chat-drawer cards | — | ✅ |
+| Unified Copilot shell scaffold (`CopilotShell`) | — | ✅ Shipped as a phase-1 drawer scaffold; in-shell tab content remains deferred |
 | v2.1 chat path migrated to SSE streaming | — | ✅ |
 | v2.1 triage nudges mounted in board page | — | ✅ |
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
@@ -132,7 +133,8 @@ JSON shim remains for local/fallback compatibility.
 
 - `src/components/aiSearchInput/index.tsx` — "Ask in natural
   language" + Search / Clear AI search; local engine or remote
-  `POST …/api/ai/search`.
+  `useAgent("search-agent")` over
+  `POST …/api/v1/agents/search-agent/stream`.
 - `src/components/{taskSearchPanel,projectSearchPanel}/index.tsx` —
   optional `aiSearchSlot`; `semanticIds` filter.
 - `src/pages/{board,project}.tsx` — `semanticIds` in URL; client-side
@@ -147,6 +149,10 @@ JSON shim remains for local/fallback compatibility.
   `useAgentHealth` status dot in remote mode.
 - `src/components/aiSparkleIcon/index.tsx` — single shared "AI"
   affordance.
+- `src/components/copilotShell/index.tsx` — unified right-rail
+  scaffold with `chat`, `brief`, `activity`, and `settings` tabs.
+  Current board-page wiring opens the shell, but the tab bodies still
+  delegate to the existing drawers or render placeholder copy.
 
 ### AI UX Phase 1 — trust and privacy corrections
 
@@ -183,9 +189,10 @@ field value.
   not-found, server errors with `retryable` flags;
   `disabledForSeconds` for rate-limit errors with
   `setInterval` countdown disabling the retry button.
-- `aiAccessibility.strict.test.tsx` — 31 jest-axe tests across
-  every AI surface. `AiMatchStrengthBadge` compact-mode WCAG 4.1.2
-  fix.
+- `src/__tests__/aiAccessibility.strict.test.tsx` +
+  `src/__tests__/uiAccessibility.strict.test.tsx` — 31 jest-axe tests
+  across the AI surfaces and the shared UI scaffolding they depend on.
+  `AiMatchStrengthBadge` compact-mode WCAG 4.1.2 fix.
 
 ### v2.1 streaming infra
 
