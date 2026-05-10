@@ -1,6 +1,6 @@
 # UI todo — phased UI / UX plan
 
-**Status as of 2026-05-10:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Newly surfaced gaps from the 2026-05-10 sweep — autonomy selector with no UI (§1.2 item 20a), unwired `AiFeedbackPopover` (20b), `CopilotAboutPopover` config TODO (20c), no FE CI workflow (20d) — are tracked under §1.2. Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, `eslint-plugin-jsx-a11y`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
+**Status as of 2026-05-10:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker, `eslint-plugin-jsx-a11y`) are complete. Phase 4 command palette is shipped. Newly surfaced gaps from the 2026-05-10 sweep — autonomy metadata / settings follow-through (§1.2 item 20a), feedback parity outside chat (20b), `CopilotAboutPopover` config TODO (20c), no FE CI workflow (20d), and missing design-token reference docs (20e) — are tracked under §1.2. Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 
 **Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
 
@@ -108,19 +108,19 @@ Every recommendation in this plan is anchored to one or more of these external r
 17. **Microcopy and casing.**
     Mixed throughout: "Log in" vs "Login", "Create Project" vs "+ Create task" (different casing and different verb form), "Confirm" / "Cancel" vs "Submit" / "Cancel" across modals, "Coordinators" / "Managers" plural-as-placeholder vs "Coordinator" / "Manager" singular as labels. Buttons are sometimes verbs ("Search", "Apply"), sometimes nouns ("Brief", "Ask").
 
-18. **Routing UX.**
-    `src/routes/index.tsx:14–48` always redirects `/` to `/login` and then `HomePage` redirects authenticated users back to `/projects` (`src/pages/home.tsx:11–18`). This causes a brief login-screen flash for already-signed-in users. Combine the checks at the route level.
+18. ~~**Routing UX.**
+    `src/routes/index.tsx:14–48` always redirects `/` to `/login` and then `HomePage` redirects authenticated users back to `/projects` (`src/pages/home.tsx:11–18`). This causes a brief login-screen flash for already-signed-in users. Combine the checks at the route level.~~ **[Complete: `RootRedirect` now sends authenticated users directly to `/projects` from the index route.]**
 
 19. **Performance smells that show up as UI jank.**
-    - `tasks?.filter(...)` in the column render (`src/pages/board.tsx:200–203`) plus the per-card filter in `Column` (`src/components/column/index.tsx:126–137`) are O(N×M) every render. Pre-bucket tasks by `columnId` once.
+    - ~~`tasks?.filter(...)` in the column render (`src/pages/board.tsx:200–203`) plus the per-card filter in `Column` (`src/components/column/index.tsx:126–137`) are O(N×M) every render. Pre-bucket tasks by `columnId` once.~~ **[Complete: `BoardPage` now builds a `tasksByColumn` `Map` with `useMemo` and passes column-specific tasks into `Column`.]**
     - `AiTaskAssistPanel` re-fires both estimate + readiness AI calls on every value change after a 600 ms debounce (`src/components/aiTaskAssistPanel/index.tsx:58–104`). With the local engine that is cheap, but the visible spinner cycling looks unstable. Throttle the spinner (only show it after 250 ms).
     - `useReactQuery<IMember[]>("users/members")` is called from at least four components (`board.tsx`, `project.tsx`, `taskModal`, `memberPopover`); ensure it is a single shared key and cached, and stop refetching on popover open.
 
-20a. **Autonomy selector has no UI.**
-    `src/utils/hooks/useAiEnabled.ts` exports `useAutonomyLevel` with full localStorage persistence + cross-window sync, and `src/utils/hooks/useAgent.ts` reads it via `autonomyRef`. There is **no visible picker anywhere** — the chat drawer's hard-disabled "Auto" pill (`AiChatDrawer`) is the only surface that even mentions autonomy, and it cannot change the value. Users cannot move from the default `plan` level to `suggest` without editing localStorage by hand. Either expose a chip/segmented-control next to the chat send box (preferred — pairs with v3 PRD trust patterns) or strip the hook plumbing. Tracked architecturally in [`architecture-todo.md`](architecture-todo.md) Theme 3.
+20a. **Autonomy metadata / settings follow-through.**
+    `AiChatDrawer` now exposes a visible autonomy selector for `suggest` / `plan`, with `auto` present but disabled until preapproved tools ship. Remaining UX work is to move the control into the broader Board Copilot settings surface from the v3 PRD, self-gate options from backend `AgentMetadata.allowed_autonomy`, and explain per-project defaults instead of relying only on chat-drawer localStorage state. Tracked architecturally in [`architecture-todo.md`](architecture-todo.md) Theme 3 and operationally in [`release-todo.md`](release-todo.md) §14 / §8.
 
-20b. **`AiFeedbackPopover` is built but unwired.**
-    `src/components/aiFeedbackPopover/index.tsx` exists with full thumbs/text UI but no consumer renders it. Wire it into `AiChatDrawer` (per-message), `AiTaskAssistPanel` (per-suggestion), and `BoardBriefDrawer` (per-recommendation) so the `COPILOT_*` analytics events have a real source — or remove the component until v3 PRD §11 ships.
+20b. **Feedback parity outside chat.**
+    `AiFeedbackPopover` is wired into `AiChatDrawer` for assistant turns, so the old "no consumer" claim is stale. Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations, plus a decision on whether the feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
 
 20c. **`CopilotAboutPopover` content TODO.**
     `src/components/copilotAboutPopover/index.tsx:114` carries `{/* TODO: drive from config */}`. The popover's body is hardcoded English; it does not pass through the i18n module that the rest of `microcopy.ai.*` uses. Lift to `microcopy.ai.about.*` so the zh-CN translations apply.
@@ -128,7 +128,10 @@ Every recommendation in this plan is anchored to one or more of these external r
 20d. **No FE CI workflow.**
     `.github/workflows/` ships only `backend-ci.yml`. There is no GitHub Action that runs `eslint`, `tsc --noEmit`, or `jest` on a PR — Vercel's deploy build (`vite build` only) is the entire post-pre-commit gate. A PR with broken Jest tests can land on `main`. Tracked operationally in [`release-todo.md`](release-todo.md) §7b. Surfaced here because every UI item in this plan ships behind tests; the gate has to exist for "ship behind the existing tests" to mean anything.
 
-20. **Accessibility gaps.**
+20e. **Design-token reference docs missing.**
+    `src/theme/tokens.ts` and `src/theme/antdTheme.ts` are the implementation source of truth, but `docs/design-tokens.md` does not exist even though Section 2.C tells contributors to use it. Add a concise token reference (spacing, color, typography, motion, AntD mapping) or change Section 2.C to point only at the code modules.
+
+21. **Accessibility gaps.**
     - Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).
     - Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).
     - Color contrast on muted text (`rgba(0,0,0,0.5)` on white) probably fails WCAG AA.
@@ -165,8 +168,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 5. **Single source for the brand logo color.**
    Replace `<Logo color="rgb(38, 132, 255)" />` (`src/components/header/index.tsx:62`) with `<Logo color={token.colorPrimary} />` so a theme change re-skins the logo automatically.
 
-6. **Pre-bucket tasks by `columnId`.**
-   In `src/pages/board.tsx`, build `const tasksByColumn = useMemo(() => groupBy(visibleTasks, "columnId"), [visibleTasks])` and pass `tasksByColumn[column._id] ?? []` to `<Column>` so the column filter loop becomes O(M) per render. Move the filter logic from `src/components/column/index.tsx:126–137` up to a `useFilteredTasks(tasks, param)` hook.
+6. ~~**Pre-bucket tasks by `columnId`.**
+   In `src/pages/board.tsx`, build `const tasksByColumn = useMemo(() => groupBy(visibleTasks, "columnId"), [visibleTasks])` and pass `tasksByColumn[column._id] ?? []` to `<Column>` so the column filter loop becomes O(M) per render. Move the filter logic from `src/components/column/index.tsx:126–137` up to a `useFilteredTasks(tasks, param)` hook.~~ **[Complete: `BoardPage` now computes `tasksByColumn` once per task list.]**
 
 ### Phase 2 — High-traffic surfaces
 
@@ -250,7 +253,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - **`forced-colors` / Windows High Contrast.** Replace background-image-based affordances (drop hints, gradient scroll fade) with `border` and `background-color` so they survive forced-colors mode; use `forced-color-adjust: none` only where unavoidable (the brand logo).
     - **`prefers-reduced-motion`.** Wrap every motion (drag lift, modal slide, skeleton-to-content cross-fade, toast slide) in `@media (prefers-reduced-motion: no-preference) { … }` or use AntD's `motion` token set to none when the media query matches.
     - **Decorative SVGs.** Set `alt=""` (or `aria-hidden="true"` on inline SVG) on `bug.svg`, `task.svg`, the auth `left.svg` / `right.svg` decorations, and the brand sparkle when next to a visible label.
-    - **Tooling.** Add `jest-axe` to the test suite and assert zero violations on every page render in `App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`. Add `eslint-plugin-jsx-a11y` to `eslint.config.mjs` so regressions are caught at lint time.
+    - **Tooling.** `jest-axe` and `eslint-plugin-jsx-a11y` are in place for the AI-heavy surfaces; extend axe coverage to the remaining page/modal tests and tighten the current jsx-a11y warnings into a FE CI gate once [`release-todo.md`](release-todo.md) §7b lands.
 
 5. **Loading states.**
     - Replace bare `<Spin>` blocks with `<Skeleton.Input>` / `<Skeleton.Avatar>` / `<Skeleton.Paragraph>` matching the eventual layout for: project list rows, board columns, task cards, brief drawer sections, chat drawer initial load, AI assist panel.
@@ -457,8 +460,8 @@ To keep the design from drifting after these phases ship:
 - **Storybook** for every component in `src/components/**`. Each story documents `default`, `loading`, `empty`, `error`, `disabled`, and `with content overflow` states.
 - **Visual regression** via `@storybook/test-runner` + Playwright snapshots, run in CI on every PR.
 - **`jest-axe`** assertion in every page and modal test (`App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`, `aiTaskDraftModal/index.test.tsx`, etc.). The `jira-react-test-development` skill already targets 100 % coverage; the same gate enforces zero a11y violations. **[In place: 31 axe tests in `src/__tests__/aiAccessibility.strict.test.tsx` covering AiChatDrawer, AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput, NudgeCard, MutationProposalCard, CommandPalette, EngineModeTag, CitationChip, AiMatchStrengthBadge.]**
-- **`eslint-plugin-jsx-a11y`** added to `eslint.config.mjs`; failures block CI.
-- **Design tokens documented** at `docs/design-tokens.md` (single source for spacing, color, type, motion). Storybook reads from the same module.
+- **`eslint-plugin-jsx-a11y`** is installed and configured in `eslint.config.mjs`; promote its current warnings to CI-blocking failures when the FE CI workflow lands.
+- **Design tokens documented** at `docs/design-tokens.md` (single source for spacing, color, type, motion). Storybook reads from the same module. **[Missing as of 2026-05-10: implementation tokens exist in `src/theme/`, but the reference doc has not been created.]**
 - **Component contribution checklist** in `CONTRIBUTING.md`: passes a11y, ships story, supports keyboard, supports `prefers-reduced-motion`, has loading/empty/error states, ships tests.
 - **Analytics hooks (privacy-respecting).** Wrap mutations in a `track(event, payload)` no-op today (no third-party endpoint), so the AI surfaces and the new toasts have a single instrumentation point we can wire up later.
 - **Dependency hygiene.** `lodash` is currently imported in full at `src/components/taskModal/index.tsx:3`; after Phase 1, replace with `lodash-es` named imports or native equivalents to keep the bundle budget honest.
@@ -469,7 +472,7 @@ To keep the design from drifting after these phases ship:
 
 The order below batches changes that share files so we do not churn the same area twice. Cross-cutting rules (Section 2.A) and the heuristics map (Section 2.B) are applied within each Phase, not as a separate pass.
 
-1. **Tooling first.** Add `eslint-plugin-jsx-a11y`, `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one. **[Partially complete: `jest-axe` in place (31 tests in `src/__tests__/aiAccessibility.strict.test.tsx`); design tokens shipped at `src/theme/tokens.ts`; code splitting via `lazy()` shipped (`src/routes/index.tsx`); service worker shipped (`public/sw.js`). Still open: Storybook scaffolding, `rollup-plugin-visualizer`, `eslint-plugin-jsx-a11y`, `docs/design-tokens.md` reference doc, FE CI workflow (see §1.2 item 20d).]**
+1. **Tooling first.** Add `jest-axe`, `rollup-plugin-visualizer`, and the design-tokens doc skeleton (Section 2.C). Ship Storybook scaffolding so all subsequent components land with stories from day one. **[Partially complete: `jest-axe` in place (31 tests in `src/__tests__/aiAccessibility.strict.test.tsx`); `eslint-plugin-jsx-a11y` installed/configured; design tokens shipped at `src/theme/tokens.ts`; code splitting via `lazy()` shipped (`src/routes/index.tsx`); service worker shipped (`public/sw.js`). Still open: Storybook scaffolding, `rollup-plugin-visualizer`, `docs/design-tokens.md` reference doc, FE CI workflow (see §1.2 item 20d), and stricter CI treatment for jsx-a11y warnings.]**
 2. Phase 1.1, 1.2, 1.4, 1.5 — theme tokens + ConfigProvider + remove the rem hack + `prefers-color-scheme` wiring (2.A.3). Ship behind the existing visual tests; expect a thin pass of pixel adjustments.
 3. Phase 1.3, 1.6 — responsive layout + tasks-by-column grouping. Land 2.A.2 (touch targets, safe-area-inset) at the same time.
 4. Phase 2.1, 2.5 — header + project detail shell collapse (both touch the global chrome). Land 2.A.11 (breadcrumbs, `aria-current`, `ScrollRestoration`) here.

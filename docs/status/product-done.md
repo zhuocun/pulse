@@ -7,7 +7,7 @@ open. Per-PR history lives in git log.
 
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); production-readiness sweep landed; observability sinks wired; PRD AC-V14 nudge inbox enforced; typed error envelope honoured FE-side. |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); release-readiness sweep landed; observability sinks wired; PRD AC-V14 nudge inbox enforced; typed error envelope honoured FE-side. |
 | Last updated | 2026-05-10                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
@@ -36,7 +36,8 @@ For the live GA / blocker / soft-blocker / polish status see
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
 | Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
-| Backend (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped; mutation lifecycle, JWT-XSS, provider fallback, MCP open — see [production-readiness.md](release-todo.md) |
+| Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
+| Backend release gates | — | ⏳ Open: mutation lifecycle, JWT-XSS, provider fallback, MCP — see [`release-todo.md`](release-todo.md) |
 | `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
 | Autonomy selector UI in `AiChatDrawer` (Suggest / Plan / Auto-disabled) | — | ✅ |
 | `autonomyRef` wired to `useAutonomyLevel` | — | ✅ |
@@ -44,7 +45,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Triage-nudge inbox rules (PRD AC-V14: cap-5, dedup, 4h expiry, dismiss) | — | ✅ |
 | `mapErrorResponse` honors typed `{code, message}` envelope | — | ✅ |
 | `useAgentChat.dismissNudge` propagates to `useAgent` inbox | — | ✅ |
-| Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [production-readiness.md §3](release-todo.md)) |
+| Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [`release-todo.md` §3](release-todo.md)) |
 | `AGENT_PROPOSAL_UNDONE` end-to-end Undo flow | — | ⏳ Deferred (BE mutation lifecycle blocks it) |
 | Triage-agent on `/projects` list page | — | ⏳ Skipped (no `project_id`; rate-limit risk) |
 
@@ -272,8 +273,10 @@ first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
 
 ## Test coverage
 
-Full FE suite: **142 suites / 1000 tests, all green** (as of
-2026-05-05). Coverage on the runtime AI scope: **97% statements /
+Full FE suite: last recorded full coverage run was **142 suites / 1000
+tests, all green** (2026-05-05). The canonical current suite count for
+release verification lives in [`release-todo.md`](release-todo.md).
+Coverage on the runtime AI scope: **97% statements /
 92.37% branches / 97% functions / 97.84% lines**.
 
 Backend: **914+ tests passing, 100% coverage gate**.

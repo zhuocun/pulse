@@ -52,8 +52,8 @@ cards gated off on the FE** (see GA Blocker §1 mitigation).
 - **No public marketing, no design-partner expansion, no removal of
   the FE proposal-card gate** until the corresponding blockers show
   ✅ in this doc.
-- **Re-audit weekly** until ✅. If a blocker is reclassified, justify
-  it in this file with file:line evidence.
+- **Re-audit during release-readiness reviews** until ✅. If a blocker
+  is reclassified, justify it in this file with file:line evidence.
 
 The Recommended ship sequence at the bottom of this doc is the
 contract: internal beta → design-partner beta → public GA, gated on
@@ -103,19 +103,18 @@ sees the card vanish but no mutation is applied.
 - Emission from any write-capable agent — most naturally `chat-agent`
   for tool-driven mutations and a future `board-coach-agent` for
   proactive mutations.
-- A resume-accept handler that, on `command.resume = {choice:
-  "accept"}`, raises `interrupt(interrupt_payload("fe.applyMutation",
-  {diff}))` so the FE applies the change against `useReactMutation`.
+- A resume-accept handler that treats an accepted resume choice as a
+  request to raise a `fe.applyMutation` interrupt, so the FE applies the
+  diff through `useReactMutation`.
   On `{choice: "reject"}` the agent terminates the proposal cycle.
 - An undo endpoint (or a structured undo payload re-triggered by a
   follow-up `mutation_proposal`) so the FE 10-second undo toast
-  (PRD AC-V4) has something to call. Without this,
-  `AGENT_PROPOSAL_UNDONE` analytics on the FE side stays unfired.
+  (PRD AC-V4) has something to call after accept.
 
-This is multi-week work that touches the agent runtime, the tool
-registry (a new `fe.applyMutation` interrupt), the BE-internal
-mutation execution path, and the spec for `auto`-autonomy preapproved
-tools (PRD AC-V5: `assignTask`, in-column `moveTask`, `renameColumn`).
+This is cross-cutting work across the agent runtime, the tool registry
+(a new `fe.applyMutation` interrupt), the BE-internal mutation
+execution path, and the spec for `auto`-autonomy preapproved tools
+(PRD AC-V5: `assignTask`, in-column `moveTask`, `renameColumn`).
 
 - **FE polish already shipped (2026-05-05):** `MutationProposalCard`
   accepts `onUndo` and fires `AGENT_PROPOSAL_UNDONE`; full 10-second
@@ -156,9 +155,9 @@ relying on uptime cannot. Closes design-partner gate.
   attributes so dashboards distinguish "Anthropic 5xx, retried OpenAI"
   from a real outage.
 - Detail: F-9 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Effort: ~1 week to wire LiteLLM behind `make_chat_model`
-  (`ChatOpenAI(base_url=...)` is sufficient since LiteLLM is
-  OpenAI-compatible).
+- Scope: gateway selection, `make_chat_model` integration, failover
+  policy, OTel attributes, and failure-mode tests. `ChatOpenAI(base_url=...)`
+  is sufficient for LiteLLM because it is OpenAI-compatible.
 
 ### 🚧 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
 
@@ -177,7 +176,8 @@ not an acceptable XSS surface. Closes design-partner gate.
 - Mitigation path: proxy-scoped token with a narrow claim set, or
   httpOnly cookie. Cross-repo work (BE token issuance + FE storage
   migration + middleware updates).
-- Effort: ~1 week.
+- Scope: BE token issuance, FE storage migration, and middleware
+  updates across REST + agent requests.
 
 ### 🚧 6. Synthetic 100% coverage — no integration tests  *(BE-only)*
 
@@ -193,8 +193,8 @@ provider/SDK regression breaks user-facing flows with no detection.
 Closes design-partner gate.
 
 - Detail: F-42 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Effort: ~1 week to add an `integration` pytest marker, a CI job
-  behind a secret-gated flag, and Redis/Postgres service containers.
+- Scope: `integration` pytest marker, a secret-gated CI job, real
+  provider smoke coverage, and Redis/Postgres service containers.
 
 ## Soft blockers — ship-able with documented caveats
 
@@ -213,7 +213,8 @@ tool tops out at 50 candidates per kind — no FE-side fix.
   backfill job that indexes existing tasks, and add a `vector_search`
   tool to `task-estimation-agent` and to a real `search-agent` graph.
 - Detail: F-18 / F-19 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Effort: multi-week (pgvector + backfill job + `vector_search` tool).
+- Scope: pgvector (or managed vector store), backfill job,
+  `vector_search` tool, and migration / rollback plan.
 - **Acceptable scope:** suggestion-grade search and estimation, not
   retrieval-grade. Disclose in product copy.
 
@@ -228,11 +229,12 @@ validation failure, a warning is logged and the payload passes
 through (so a schema bug never breaks a streaming response). Golden
 SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
-- Remaining work: migrate to `create_react_agent(...,
-  response_format=...)` for the LLM-polish path so the contract is
+- Remaining work: migrate the LLM-polish path to provider-level
+  `response_format` support so the contract is
   enforced at provider call time, not just at FE emission. Detail:
   F-10 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Effort: ~3 days.
+- Scope: provider-level structured-output calls, fallback behaviour on
+  schema rejection, and companion transcript tests.
 - **Mitigation now:** the FE validates every payload (`validateDraft`,
   `validateEstimate`, `validateBoardBrief`, `validateSearch`) and
   drops unknown ids. A schema regression degrades but does not
@@ -246,7 +248,8 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 GHA execution against `main` has not been verified end-to-end; status
 of the first run on this branch is still unknown.
 
-- Effort: open a PR to trigger the first run; iterate until green.
+- Scope: trigger the workflow on a PR/main run, capture the first green
+  run, and update this section with the CI evidence.
 
 ### ⚠️ 7b. No FE CI workflow  *(FE-only)*
 
@@ -264,12 +267,12 @@ expansion needs a real CI gate so a regression cannot ship via a
 self-merged or skip-reviewed PR.
 
 - Action when prioritised: add `.github/workflows/frontend-ci.yml`
-  scoped to FE paths (mirror the `backend-ci.yml` shape) running
-  `npm ci && npm run eslint && npx tsc --noEmit && CI=true npm test
-  -- --watchAll=false --runInBand && npx vite build`. Reuse the
-  existing pre-commit step list in `package.json` so the gate cannot
+  scoped to FE paths (mirror the `backend-ci.yml` shape) running the
+  package install, eslint, typecheck, Jest, and Vite build gates. Reuse
+  the existing pre-commit step list in `package.json` so the gate cannot
   drift from local.
-- Effort: ~2 hours (single workflow file + first green run).
+- Scope: single workflow file, dependency cache, lint/typecheck/Jest/build
+  jobs, and first green run evidence.
 
 ### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
 
@@ -280,7 +283,7 @@ in v3."). The metadata-driven gating against
 `AgentMetadata.allowed_autonomy` remains V3 work — see
 [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md).
 
-### ✅ 9. `AGENT_PROPOSAL_UNDONE` analytics defined but unfired  *(FE — Resolved 2026-05-05)*
+### ✅ 9. `AGENT_PROPOSAL_UNDONE` analytics wired FE-side  *(FE — Resolved 2026-05-05)*
 
 `MutationProposalCard` now accepts an optional `onUndo` prop and fires
 `AGENT_PROPOSAL_UNDONE` from the click handler. The end-to-end Undo
@@ -379,7 +382,8 @@ the only choice is a process-wide env var.
 - Action when prioritised: replace the runtime TODO with either a
   per-project / per-tenant model setting (read from project metadata),
   or document the deferred decision and remove the TODO.
-- Effort: ~1–2 days for a per-project setting + migration.
+- Scope: per-project setting, migration/defaulting, allowlist semantics,
+  and request/stream tests.
 
 ### 🟡 16d. Single-worker uvicorn lock-in  *(BE)*
 
@@ -391,12 +395,14 @@ default to in-memory backends. Capacity ceiling is per-process today;
 horizontal scaling is blocked by this implicit invariant. Cross-ref:
 architecture-todo Theme 4.
 
-- Action when prioritised: configure `RATE_LIMIT_BACKEND=redis` and
-  `BUDGET_BACKEND=redis` in the production Vercel env (already
-  supported in `app/main.py:253–330`), then document the multi-worker
-  guarantee and remove the `workers=1` pin.
-- Effort: ~1 day (env wiring + smoke test against the existing Redis
-  backend in `app/middleware/redis_backends.py`).
+- Action when prioritised: configure `RATE_LIMIT_BACKEND=redis`,
+  `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` wherever the
+  app may run multiple workers. `docker-compose.yml` currently sets the
+  first two but not `IDEMPOTENCY_BACKEND`, so its "production-like" stack
+  still falls back to in-memory idempotency. After env parity is proven,
+  document the multi-worker guarantee and remove the `workers=1` pin.
+- Scope: env wiring, compose parity, smoke tests against
+  `app/middleware/redis_backends.py`, and duplicate-request replay tests.
 
 ### 🟡 16e. `fly.toml` placeholder app name  *(BE)*
 
@@ -410,7 +416,9 @@ or collide with the wrong Fly app the moment that path is used.
   `backend/Dockerfile` (Vercel is the only active deploy path) and
   update the README's "fallback" mention, or update the placeholder
   to a documented owner-controlled value.
-- Effort: ~30 minutes.
+- Scope: choose the active fallback-host story, then either remove the
+  unused Fly files or replace the placeholder app name with a documented
+  owner-controlled value.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 
@@ -528,12 +536,12 @@ migration, multi-agent orchestration, store/memory layer).
    gated off (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false`,
    default). Use the v2.1 surface for read-only / suggestion flows.
    Document the search/estimation quality ceiling in product copy.
-2. **Design-partner beta (~3 weeks).** Close every 🚧 Beta blocker:
+2. **Design-partner beta.** Close every 🚧 Beta blocker:
    §2 (LiteLLM gateway / provider fallback), §3 (proxy-scoped token
    migration), and §6 (real-backend integration tests). Add a real
    FE CI gate (§7b) so a regression cannot land via a self-merged PR.
    Keep proposal cards hidden.
-3. **Public GA (~6–8 weeks).** Close the 🛑 GA blocker §1 (full
+3. **Public GA.** Close the 🛑 GA blocker §1 (full
    `MutationProposal` lifecycle + undo) and the public-GA quality
    gate §4 (real RAG with pgvector). Surface proposal cards.
 
