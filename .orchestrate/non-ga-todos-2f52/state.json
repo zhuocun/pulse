@@ -325,11 +325,11 @@
       "finishedAt": "2026-05-10T13:48:12.024Z",
       "lastUpdate": "2026-05-10T13:48:14.985Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     },
     {
       "name": "board-error-empty-states",
@@ -347,11 +347,11 @@
       "finishedAt": "2026-05-10T13:59:21.310Z",
       "lastUpdate": "2026-05-10T13:59:24.286Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "taskmodal-canonical-types",
@@ -369,11 +369,11 @@
       "finishedAt": "2026-05-10T13:37:22.948Z",
       "lastUpdate": "2026-05-10T13:37:25.873Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "useagent-tool-resolver-extract",
@@ -391,11 +391,11 @@
       "finishedAt": "2026-05-10T13:31:40.510Z",
       "lastUpdate": "2026-05-10T13:31:43.519Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "aitaskassistpanel-suggested-by-copilot-badge",
@@ -406,18 +406,18 @@
       "agentId": "bc-de91456c-9e6e-464c-bd8a-def4d3e3ae85",
       "runId": "run-b8812ffc-cb87-4535-9dfd-8a01075d9dc0",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/aitaskassistpanel-suggested-by-copilot-badge.md",
       "startedAt": "2026-05-10T13:21:09.800Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T13:21:12.152Z",
+      "finishedAt": "2026-05-10T14:29:03.165Z",
+      "lastUpdate": "2026-05-10T14:29:03.166Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "forgot-password-link-stub",
@@ -435,11 +435,11 @@
       "finishedAt": "2026-05-10T13:38:20.655Z",
       "lastUpdate": "2026-05-10T13:38:21.576Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     }
   ],
   "attention": [
