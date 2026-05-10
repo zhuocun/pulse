@@ -609,6 +609,10 @@ const zhCN: Dictionary = {
     auth: {
         loginTitle: "登录账号",
         loginSubtitle: "输入邮箱和密码以继续。",
+        forgotPassword: "忘记密码?",
+        forgotPasswordPlaceholderTitle: "重置密码",
+        forgotPasswordPlaceholderBody:
+            "密码重置功能即将上线。如果您需要立即恢复访问权限，请联系工作区管理员。",
         registerTitle: "注册账号",
         registerSubtitle: "创建账号,开始追踪工作。",
         switchToRegister: "还没有账号?",

@@ -645,6 +645,10 @@ export const enSource = {
     auth: {
         loginTitle: "Log in to your account",
         loginSubtitle: "Enter your email and password to continue.",
+        forgotPassword: "Forgot password?",
+        forgotPasswordPlaceholderTitle: "Reset your password",
+        forgotPasswordPlaceholderBody:
+            "Password reset is coming soon. Please contact your workspace admin if you need immediate access.",
         registerTitle: "Sign up for an account",
         registerSubtitle: "Create your account to start tracking work.",
         switchToRegister: "Don't have an account?",
