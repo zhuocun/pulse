@@ -27,6 +27,14 @@ import {
 } from "../ai/projectAiStorage";
 import type { FeToolContext } from "../ai/feTools";
 import { useAutonomyLevel } from "./useAiEnabled";
+import { useNudgeInbox } from "./useNudgeInbox";
+
+export {
+    NUDGE_EXPIRY_MS,
+    NUDGE_INBOX_MAX,
+    NUDGE_PRUNE_INTERVAL_MS,
+    reduceNudgeInbox
+} from "./useNudgeInbox";
 
 export interface AgentMessage {
     role: "user" | "assistant" | "tool" | "system";
@@ -266,53 +274,8 @@ const hookErrorFromAgentStreamErrorData = (
     return new AgentTransportError(message, undefined, code);
 };
 
-/**
- * Triage-nudge inbox rules per PRD AC-V14. A nudge entry carries its
- * receipt timestamp so the inbox can apply expiry and dedup-by-kind
- * deterministically without leaking timing into UI components.
- */
-interface NudgeEntry {
-    nudge: TriageNudge;
-    receivedAt: number;
-}
-
 /** TTFT SLO threshold in ms (P2-I). Turns exceeding this emit AGENT_TTFT_SLOW. */
 const TTFT_SLO_MS = 1500;
-
-/** Maximum active nudges per board (PRD AC-V14). */
-export const NUDGE_INBOX_MAX = 5;
-/** Auto-expire entries older than 4 hours (PRD AC-V14). */
-export const NUDGE_EXPIRY_MS = 4 * 60 * 60 * 1000;
-/** Periodic prune cadence; bounded so a stale entry can't linger past a minute. */
-export const NUDGE_PRUNE_INTERVAL_MS = 60 * 1000;
-
-/**
- * Apply inbox rules when a new nudge arrives:
- *   1. drop expired entries;
- *   2. drop any prior entry matching `(kind, project_id)` so the newer
- *      one supersedes it;
- *   3. prepend the incoming entry (newest first);
- *   4. cap at {@link NUDGE_INBOX_MAX}.
- * Pure for unit-testability.
- */
-export const reduceNudgeInbox = (
-    prev: NudgeEntry[],
-    incoming: TriageNudge,
-    now: number = Date.now()
-): NudgeEntry[] => {
-    const fresh = prev.filter(
-        (entry) =>
-            now - entry.receivedAt < NUDGE_EXPIRY_MS &&
-            !(
-                entry.nudge.kind === incoming.kind &&
-                entry.nudge.project_id === incoming.project_id
-            )
-    );
-    return [{ nudge: incoming, receivedAt: now }, ...fresh].slice(
-        0,
-        NUDGE_INBOX_MAX
-    );
-};
 
 /**
  * Reduce a single StreamPart into hook state. Returns a value when the part
@@ -450,7 +413,7 @@ const useAgent = (
     const [pendingProposal, setPendingProposal] =
         useState<MutationProposal | null>(null);
     const [citations, setCitations] = useState<CitationRef[]>([]);
-    const [nudgeEntries, setNudgeEntries] = useState<NudgeEntry[]>([]);
+    const { nudges, pushNudge, dismissNudge, resetNudges } = useNudgeInbox();
     const [lastSuggestion, setLastSuggestion] =
         useState<AgentSuggestion | null>(null);
 
@@ -594,11 +557,7 @@ const useAgent = (
                         setCitations: (refs) =>
                             mountedRef.current &&
                             setCitations((prev) => [...prev, ...refs]),
-                        setNudges: (n) =>
-                            mountedRef.current &&
-                            setNudgeEntries((prev) =>
-                                reduceNudgeInbox(prev, n)
-                            ),
+                        setNudges: (n) => mountedRef.current && pushNudge(n),
                         setLastSuggestion: (s) =>
                             mountedRef.current && setLastSuggestion(s),
                         setLastUsageRef: (usage) => {
@@ -627,7 +586,7 @@ const useAgent = (
             }
             return { pendingResume, streamFailed: false };
         },
-        [baseUrl, clearWatchdog, name, safeSetState]
+        [baseUrl, clearWatchdog, name, pushNudge, safeSetState]
     );
 
     const runStream = useCallback(
@@ -795,7 +754,7 @@ const useAgent = (
             // inside `consumeStream` so the agent can stream multiple citations
             // for a single answer.
             setCitations([]);
-            setNudgeEntries([]);
+            resetNudges();
             setLastSuggestion(null);
             const inputPayload =
                 typeof input === "string"
@@ -836,7 +795,7 @@ const useAgent = (
                 version: "v2"
             });
         },
-        [options.projectId, runStream, safeSetState]
+        [options.projectId, resetNudges, runStream, safeSetState]
     );
 
     const resume = useCallback(
@@ -875,7 +834,7 @@ const useAgent = (
         setPendingInterrupt(null);
         setPendingProposal(null);
         setCitations([]);
-        setNudgeEntries([]);
+        resetNudges();
         setLastSuggestion(null);
         setError(null);
         setIsStreaming(false);
@@ -889,7 +848,7 @@ const useAgent = (
         setThreadId(next);
         ttftSeenRef.current = false;
         streamStartRef.current = null;
-    }, [clearWatchdog]);
+    }, [clearWatchdog, resetNudges]);
 
     const clearPendingProposal = useCallback(() => {
         if (mountedRef.current) setPendingProposal(null);
@@ -906,41 +865,6 @@ const useAgent = (
             return { ...prev, messages: initial };
         });
     }, []);
-
-    const dismissNudge = useCallback((nudgeId: string) => {
-        if (!mountedRef.current) return;
-        setNudgeEntries((prev) => {
-            const next = prev.filter(
-                (entry) => entry.nudge.nudge_id !== nudgeId
-            );
-            return next.length === prev.length ? prev : next;
-        });
-    }, []);
-
-    /**
-     * Periodic expiry sweep (PRD AC-V14: 4-hour rolling window). Without
-     * this, an entry that aged past the cutoff between turns would remain
-     * visible until the next inbox mutation. The interval is cheap because
-     * it short-circuits when nothing changes.
-     */
-    useEffect(() => {
-        const tick = () => {
-            const now = Date.now();
-            setNudgeEntries((prev) => {
-                const fresh = prev.filter(
-                    (entry) => now - entry.receivedAt < NUDGE_EXPIRY_MS
-                );
-                return fresh.length === prev.length ? prev : fresh;
-            });
-        };
-        const id = setInterval(tick, NUDGE_PRUNE_INTERVAL_MS);
-        return () => clearInterval(id);
-    }, []);
-
-    const nudges = useMemo<TriageNudge[]>(
-        () => nudgeEntries.map((entry) => entry.nudge),
-        [nudgeEntries]
-    );
 
     /**
      * Derived `status` — computed from existing state, no new state machine.

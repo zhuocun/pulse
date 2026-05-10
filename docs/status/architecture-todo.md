@@ -21,7 +21,7 @@ The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/comp
 
 Re-audit added 2026-05-10 (first sweep, on `claude/review-project-todos-8d5Oo`):
 
-- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (1,010 lines today; verified `wc -l`) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
+- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (935 lines after the nudge-inbox extraction; verified `wc -l`) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
 - **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget / idempotency paths exist in `backend/app/middleware/redis_backends.py`, but env parity must be proven before the single-worker pin in `backend/Dockerfile:84` and `backend/fly.toml:38` is removed).
 - **Theme 6** now tracks per-tenant model selection (the `X-Pulse-Model` runtime TODO at `backend/app/agents/runtime.py:578` — the only TODO left in the BE source tree).
 
@@ -81,7 +81,7 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 
 | Action                                                                                                                            | Rationale                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Decompose `useAgent.ts` (1,010 lines).** Extract the SSE adapter, the FE-tool auto-resume loop, and the AC-V14 nudge inbox into separate hooks. | Single file owns SSE parsing, thread-id persistence, FE-tool resolution, TTFT, nudges, autonomy gate, and AI-disable guard — every change risks unrelated regressions. The nudge reducer is already exported as `reduceNudgeInbox`; finish the move. |
+| **Decompose `useAgent.ts` (935 lines after partial split).** Remaining scope: extract the SSE adapter and FE-tool auto-resume loop into separate hooks/modules. | AC-V14 nudge inbox extraction shipped to `useNudgeInbox` with compatibility re-exports from `useAgent`; the file still owns SSE parsing, thread-id persistence, FE-tool resolution, TTFT, autonomy gate, and AI-disable guard, so further decomposition is still needed. |
 | **Isolate stable callbacks** from streaming identity churn in `useAgent` consumers (effects must not depend on whole hook return) | Documented anti-pattern in repo `AGENTS.md`; sweep chat, brief, assist panel, search.      |
 | **Thin adapter layer** over SSE parser → domain events → UI state                                                                 | Limits duplicated parsing between `useAgent`, `useAgentChat`, and future shells.           |
 | Reduce **`useAi` vs `useAgent`** divergence where behavior is identical (keep local-engine fallback, centralize switching)        | Lowers duplicate validators and bug surface; preserves `REACT_APP_AI_USE_LOCAL`.           |
