@@ -21,7 +21,10 @@ const useReactQuery = <D>(
     specialQueryKey?: string,
     onSuccess?: (data: D) => void,
     onError?: (err: Error) => void,
-    enabled = true
+    enabled = true,
+    options?: {
+        staleTime?: number;
+    }
 ) => {
     const api = useApi();
     const successUpdatedAt = useRef(0);
@@ -34,7 +37,8 @@ const useReactQuery = <D>(
                 data: filterRequest(queryParam || {}),
                 method: "GET"
             })) as D,
-        enabled
+        enabled,
+        staleTime: options?.staleTime
     });
 
     useEffect(() => {

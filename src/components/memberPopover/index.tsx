@@ -1,6 +1,6 @@
 import { CaretDownOutlined, TeamOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { List, Popover, Typography } from "antd";
+import { Avatar, List, Popover, Typography } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import {
@@ -11,7 +11,7 @@ import {
     radius,
     space
 } from "../../theme/tokens";
-import useReactQuery from "../../utils/hooks/useReactQuery";
+import useMembersList from "../../utils/hooks/useMembersList";
 import EmptyState from "../emptyState";
 import UserAvatar from "../userAvatar";
 
@@ -69,11 +69,37 @@ const TriggerButton = styled.button`
     }
 `;
 
+const TriggerMeta = styled.span`
+    align-items: center;
+    display: inline-flex;
+    gap: ${space.xs}px;
+`;
+
+const TriggerAvatarGroup = styled(Avatar.Group)`
+    .ant-avatar {
+        border-color: var(--ant-color-bg-elevated, #fff);
+    }
+`;
+
+const TriggerCountBadge = styled.span`
+    align-items: center;
+    background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.08));
+    border-radius: ${radius.pill}px;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.7));
+    display: inline-flex;
+    font-size: ${fontSize.xs}px;
+    font-weight: ${fontWeight.semibold};
+    justify-content: center;
+    line-height: 1;
+    min-width: 24px;
+    padding: 2px ${space.xs}px;
+`;
+
 const MemberPopover: React.FC = () => {
-    const { data: members, refetch } =
-        useReactQuery<IMember[]>("users/members");
+    const { data: members } = useMembersList();
 
     const list = members ?? [];
+    const previewMembers = list.slice(0, 3);
 
     const content = (
         <ContentContainer>
@@ -109,19 +135,26 @@ const MemberPopover: React.FC = () => {
     );
 
     return (
-        <Popover
-            onOpenChange={(open) => {
-                if (open) refetch();
-            }}
-            placement="bottomLeft"
-            content={content}
-        >
+        <Popover placement="bottomLeft" content={content}>
             <TriggerButton
                 aria-label={microcopy.a11y.viewTeamMembers}
                 type="button"
             >
                 <TeamOutlined aria-hidden />
                 <TriggerLabel>{microcopy.labels.members}</TriggerLabel>
+                <TriggerMeta aria-hidden>
+                    <TriggerAvatarGroup max={{ count: 3 }} size="small">
+                        {previewMembers.map((member) => (
+                            <UserAvatar
+                                id={member._id}
+                                key={member._id}
+                                name={member.username}
+                                size="small"
+                            />
+                        ))}
+                    </TriggerAvatarGroup>
+                    <TriggerCountBadge>{list.length}</TriggerCountBadge>
+                </TriggerMeta>
                 <CaretDownOutlined
                     aria-hidden
                     style={{ fontSize: 10, opacity: 0.6 }}

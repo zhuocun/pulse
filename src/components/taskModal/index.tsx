@@ -17,7 +17,7 @@ import { useParams } from "react-router-dom";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
-import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
+import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
@@ -63,7 +63,8 @@ const TaskModal: React.FC<{
         () => {}
     );
     const editingTask = tasks?.find((task) => task._id === editingTaskId);
-    const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
+    const { data: membersData } = useMembersList();
+    const members = membersData ?? [];
 
     const onClose = useCallback(() => {
         form.resetFields();
