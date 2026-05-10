@@ -1,7 +1,7 @@
 # AI Web App UX Best Practices — Research Reference
 
 **Created:** 2026-05-05  
-**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements `AI_UX_OPTIMIZATION_PLAN.md` (implementation audit) and `docs/ui-ux-optimization-plan.md` (general UX plan).  
+**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements `ai-ux-optimization-plan.md` (implementation audit) and `docs/ui-ux-optimization-plan.md` (general UX plan).  
 **Primary sources:** Google PAIR Guidebook, Microsoft HAX Toolkit, Nielsen Norman Group AI UX research, NIST AI RMF, Anthropic model card & safety guidance, IBM Design for AI, OpenAI product design guidance, W3C accessibility, Apple ML/privacy design.
 
 ---
@@ -441,11 +441,11 @@ Never log tool output content or the data payloads sent to the AI.
 
 ## 13. Board Copilot — Principle-to-Implementation Mapping
 
-This table maps the principles above to the current implementation state and the `AI_UX_OPTIMIZATION_PLAN.md` items for traceability.
+This table maps the principles above to the current implementation state and the `ai-ux-optimization-plan.md` items for traceability.
 
 | Principle area              | Implementation state                                  | See also                          |
 | --------------------------- | ----------------------------------------------------- | --------------------------------- |
-| AI attribution              | Strong — sparkle icon + "Board Copilot" label present | `AI_UX_OPTIMIZATION_PLAN.md` §3.1 |
+| AI attribution              | Strong — sparkle icon + "Board Copilot" label present | `ai-ux-optimization-plan.md` §3.1 |
 | Streaming UI                | Present in chat                                       | §2.2 above                        |
 | Confidence indicators       | Partial — draft and estimate only                     | P2-1 in optimization plan         |
 | Citations                   | Partial — chat only, not claim-level                  | P0-3 in optimization plan         |

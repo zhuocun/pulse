@@ -122,7 +122,7 @@ The following routes honour the `Idempotency-Key` header (Stripe-style deduplica
 - If the **same key is reused with a different body**, the server returns `422` with `{"error": "idempotency_key_reused", "message": "..."}`.
 - If a **sibling request with the same key is still in flight**, the server returns `409` with `{"error": "idempotency_key_in_progress", "message": "..."}`.
 
-Cache TTL is controlled by `IDEMPOTENCY_TTL_SECONDS` (default: `86400`). The idempotency backend (`memory` or `redis`) is selected by `IDEMPOTENCY_BACKEND`; see `docs/AI_REMAINING_WORK.md` §2 for multi-worker caveats.
+Cache TTL is controlled by `IDEMPOTENCY_TTL_SECONDS` (default: `86400`). The idempotency backend (`memory` or `redis`) is selected by `IDEMPOTENCY_BACKEND`; see `docs/ai-remaining-work.md` §2 for multi-worker caveats.
 
 ---
 
@@ -1936,7 +1936,7 @@ Mid-stream errors arrive as `{"type": "error", ...}` SSE frames followed by `[DO
 
 The MCP (Model Context Protocol) transport mount point does not exist. The tool schemas (`app/tools/fe_tool_schemas.py`) and per-agent `tools` tuples on `AgentMetadata` are present, but `langchain-mcp-adapters` is not in any dependency group and no `/mcp` route is registered.
 
-See `docs/AI_REMAINING_WORK.md` §7 for the planned scope when this is prioritised (Streamable HTTP transport at `/mcp`, exposing the read-only FE tools).
+See `docs/ai-remaining-work.md` §7 for the planned scope when this is prioritised (Streamable HTTP transport at `/mcp`, exposing the read-only FE tools).
 
 ### search-agent v2.1 graph
 
@@ -1951,4 +1951,4 @@ See `docs/AI_REMAINING_WORK.md` §7 for the planned scope when this is prioritis
 
 ### triage-agent LLM integration
 
-The rules engine in `app/tools/be_tools.detect_drift` remains the source of truth for *which* signals fire and at what severity. With `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, `polish_triage` (in `app/agents/catalog/triage.py`) rewrites each nudge `summary` field with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic "WIP overflow"); without a key the deterministic `_NUDGE_TITLES` string is used. Token usage flows through the standard `emit_custom({"kind": "usage", ...})` event. See `docs/AI_REMAINING_WORK.md` §5 for the still-open product call on whether the polish path stays.
+The rules engine in `app/tools/be_tools.detect_drift` remains the source of truth for *which* signals fire and at what severity. With `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, `polish_triage` (in `app/agents/catalog/triage.py`) rewrites each nudge `summary` field with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic "WIP overflow"); without a key the deterministic `_NUDGE_TITLES` string is used. Token usage flows through the standard `emit_custom({"kind": "usage", ...})` event. See `docs/ai-remaining-work.md` §5 for the still-open product call on whether the polish path stays.

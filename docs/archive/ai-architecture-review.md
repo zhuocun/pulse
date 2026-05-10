@@ -12,7 +12,7 @@
 > This file retains only the **still-open structural concerns**; do not act on
 > any finding here without first verifying it has not shipped.
 >
-> For the operational, prioritized backlog, see `AI_REMAINING_WORK.md` items
+> For the operational, prioritized backlog, see `../../backend/docs/ai-remaining-work.md` items
 > 7–12. This file is the structural counterpart.
 
 **Original date**: 2026-05-01 — updated 2026-05-05
@@ -66,7 +66,7 @@ The store namespaces (`app/store/namespaces.py`) define `user_preferences`, `pro
 
 The catalog has tool schemas in `app/tools/fe_tool_schemas.py` and per-agent `tools` tuples on `AgentMetadata`, but `langchain-mcp-adapters` is not in any dependency group and the `/mcp` mount point does not exist. In 2026, MCP-over-streamable-HTTP is table stakes for external client integration.
 
-*Fix*: add `app/mcp.py` using `langchain-mcp-adapters`; mount a Streamable HTTP transport at `/mcp`; expose the read-only FE tools. Authenticate with OAuth 2.1 + PKCE + RFC 8707 Resource Indicators. See `AI_REMAINING_WORK.md` §7 for planned scope.
+*Fix*: add `app/mcp.py` using `langchain-mcp-adapters`; mount a Streamable HTTP transport at `/mcp`; expose the read-only FE tools. Authenticate with OAuth 2.1 + PKCE + RFC 8707 Resource Indicators. See `../../backend/docs/ai-remaining-work.md` §7 for planned scope.
 
 ---
 
@@ -74,7 +74,7 @@ The catalog has tool schemas in `app/tools/fe_tool_schemas.py` and per-agent `to
 
 `app/tools/be_tools.py` `summarize` is a length-trim, not a semantic summary. Embeddings are SHA-256 hashes — two near-duplicate texts produce uncorrelated vectors. No persistent embedding store exists; `task-estimation-agent` ranks only on FE-supplied candidates. ~~The OpenAI embedding branch is hard-pinned to 16 dimensions for backward compat with the stub~~ — the 16-dim pin was lifted in `0e990e4` via `EMBEDDINGS_DIMENSIONS` (`app/config.py`); `app/agents/embeddings.py` passes it through to `OpenAIEmbeddings(dimensions=...)`. **The vector store / real RAG gap (F-19) remains open.**
 
-*Fix*: define an `Embedder` protocol; rename `summarize` → `truncate_with_ellipsis`; add a real `summarize` backed by a `BaseChatModel`. Pick a vector store (`pgvector` is lowest-friction); `EMBEDDINGS_DIMENSIONS` is now configurable. See `AI_REMAINING_WORK.md` §8 for planned scope.
+*Fix*: define an `Embedder` protocol; rename `summarize` → `truncate_with_ellipsis`; add a real `summarize` backed by a `BaseChatModel`. Pick a vector store (`pgvector` is lowest-friction); `EMBEDDINGS_DIMENSIONS` is now configurable. See `../../backend/docs/ai-remaining-work.md` §8 for planned scope.
 
 ---
 
@@ -90,4 +90,4 @@ The catalog has tool schemas in `app/tools/fe_tool_schemas.py` and per-agent `to
 
 `pyproject.toml` `--cov-fail-under=100` is a strong signal — but a 100%-coverage suite that does not exercise real LLMs, real Redis, or real Postgres is a synthetic guarantee.
 
-*Fix*: split into `unit` (100% gate, deterministic) and `integration` (real backends, must pass on PR but no coverage gate). Run integration in CI behind a feature flag. See `AI_REMAINING_WORK.md` §11 for planned scope.
+*Fix*: split into `unit` (100% gate, deterministic) and `integration` (real backends, must pass on PR but no coverage gate). Run integration in CI behind a feature flag. See `../../backend/docs/ai-remaining-work.md` §11 for planned scope.

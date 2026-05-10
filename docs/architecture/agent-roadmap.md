@@ -1,8 +1,12 @@
-# Agent architecture — optimization plan
+# Agent architecture — roadmap
 
 **Audience:** engineers extending Board Copilot v2.1 (FastAPI + LangGraph + React SSE).  
-**Grounding:** structural backlog in [`backend/docs/AI_ARCHITECTURE_REVIEW.md`](../backend/docs/AI_ARCHITECTURE_REVIEW.md), operational items in [`backend/docs/AI_REMAINING_WORK.md`](../backend/docs/AI_REMAINING_WORK.md), product contract in [`docs/prd/board-copilot-v2.1-agent.md`](prd/board-copilot-v2.1-agent.md).  
-**Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`docs/ui-ux-optimization-plan.md`](ui-ux-optimization-plan.md)).
+**Grounding:** structural backlog in [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md), operational items in [`../operations/remaining-work.md`](../operations/remaining-work.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
+**Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`../design/ui-ux-optimization-plan.md`](../design/ui-ux-optimization-plan.md)).
+
+## Current architecture (2026-05-10)
+
+The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-review-2026-05-09.md`](../archive/agent-architecture-review-2026-05-09.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. Outstanding architectural gaps tracked below as Themes 5–6 (mutation lifecycle, provider gateway, real RAG, supervisor / shared subgraph, MCP) and operationally in [`../operations/remaining-work.md`](../operations/remaining-work.md) items 7, 8, 12, 14.
 
 ## Status — 2026-05-10 (PR #177)
 
@@ -12,7 +16,7 @@ The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/comp
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
 - **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)`; F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
 
-Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See `backend/docs/AI_REMAINING_WORK.md` for per-item detail.
+Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See [`../operations/remaining-work.md`](../operations/remaining-work.md) for per-item detail.
 
 ---
 
@@ -83,7 +87,7 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 | Action                                                                                                                             | Rationale                                                                                                  |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in `AI_REMAINING_WORK.md`.                                            |
+| Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in [`../operations/remaining-work.md`](../operations/remaining-work.md).                                            |
 | Wire **accept/reject** to LangGraph **`Command(resume=…)`** with persisted proposal ids                                            | Ensures graph continues after human decision.                                                              |
 | Add **audit log / analytics** for accepted mutations; define **undo** semantics (10s toast vs server undo endpoint)                | Progress doc notes missing `AGENT_PROPOSAL_UNDONE` path — pick one product rule and implement both halves. |
 | **Autonomy gates:** Suggest / Plan / Auto must map to enforceable server checks, not UI-only                                       | Aligns with PRD §6 and shadow-mode story.                                                                  |
@@ -132,6 +136,6 @@ Workstreams **D** and parts of **E** can proceed in parallel once **A** lands; *
 
 ## References
 
-- [`backend/docs/AI_ARCHITECTURE_REVIEW.md`](../backend/docs/AI_ARCHITECTURE_REVIEW.md) — structural findings **F-9–F-15**, **F-42–F-43**.
-- [`backend/docs/AI_REMAINING_WORK.md`](../backend/docs/AI_REMAINING_WORK.md) — GA blockers, tiers, open items **7–13**.
-- [`docs/prd/board-copilot-progress.md`](prd/board-copilot-progress.md) — shipped vs deferred FE/BE features.
+- [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md) — structural findings **F-9–F-15**, **F-42–F-43**.
+- [`../operations/remaining-work.md`](../operations/remaining-work.md) — GA blockers, tiers, open items **7–13**.
+- [`../prd/progress.md`](../prd/progress.md) — shipped vs deferred FE/BE features.

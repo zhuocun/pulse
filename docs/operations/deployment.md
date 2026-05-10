@@ -193,7 +193,7 @@ live.
 
 ### Security considerations
 
-The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as a follow-up in `docs/AI_REMAINING_WORK.md`.
+The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as a follow-up in `../backend/docs/ai-remaining-work.md`.
 
 ---
 
@@ -254,6 +254,6 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 
 ## See also
 
-- `docs/AI_ARCHITECTURE_REVIEW.md` — still-open structural concerns (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps); cross-references `AI_REMAINING_WORK.md` as the operational backlog.
-- `docs/AI_REMAINING_WORK.md` — prioritised operational backlog; items 7–12 are open.
+- `archive/ai-architecture-review.md` — still-open structural concerns (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps); cross-references `ai-remaining-work.md` as the operational backlog.
+- `../backend/docs/ai-remaining-work.md` — prioritised operational backlog; items 7–12 are open.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

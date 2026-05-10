@@ -74,7 +74,7 @@ def test_sse_function_has_max_duration(vercel_config: dict) -> None:
     SSE streams from multi-interrupt agent flows (board-brief,
     task-drafting) exceed Vercel's default 10s (Hobby) / 60s (Pro)
     function timeout and get silently truncated without this setting.
-    See `docs/AI_REMAINING_WORK.md` item 4.
+    See `docs/ai-remaining-work.md` item 4.
     """
     functions = vercel_config.get("functions", {})
     api_entry = functions.get("api/index.py")
