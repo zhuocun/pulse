@@ -463,7 +463,41 @@ describe("BoardPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("renders an empty board with the column creator", async () => {
+    it("shows a board error alert and retries the board query", async () => {
+        fetchMock.mockImplementation((input) => {
+            const url = String(input);
+
+            if (url.includes("users/members")) {
+                return Promise.resolve(response(members));
+            }
+            if (url.includes("projects")) {
+                return Promise.resolve(response(project()));
+            }
+            if (url.includes("boards")) {
+                return Promise.resolve(response({}, false));
+            }
+            if (url.includes("tasks")) {
+                return Promise.resolve(response(defaultTasks));
+            }
+
+            return Promise.resolve(response({}));
+        });
+        renderBoard();
+
+        expect(
+            await screen.findByText("Couldn't load. Please try again.")
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+        await waitFor(() => {
+            const boardRequests = fetchMock.mock.calls.filter(([request]) =>
+                String(request).includes("boards")
+            );
+            expect(boardRequests).toHaveLength(2);
+        });
+    });
+
+    it("renders an empty board with a first-column CTA and fallback creator", async () => {
         fetchMock.mockImplementation((input) => {
             const url = String(input);
 
@@ -485,8 +519,18 @@ describe("BoardPage", () => {
         renderBoard();
 
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(screen.getByText("Add your first column")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Create your first column" })
+        ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "Add column" })
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Create your first column" })
+        );
+        expect(
+            await screen.findByLabelText("New column name")
         ).toBeInTheDocument();
         expect(
             screen.queryByRole("heading", { level: 4 })
