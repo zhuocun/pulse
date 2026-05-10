@@ -490,20 +490,20 @@
     {
       "name": "release-todo-doc-hygiene-closeout",
       "type": "worker",
-      "branch": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
+      "branch": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
       "startingRef": "main",
       "dependsOn": [
         "verify-non-ga-release-todo-closure"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
-      "startedAt": "2026-05-10T16:04:03.304Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T16:04:03.304Z",
+      "agentId": "bc-2ff6a07b-498d-41b4-b9b1-9951a703bc74",
+      "runId": "run-e260e956-e8a7-4cb3-a66c-ca53933bcfcd",
+      "parentAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/release-todo-doc-hygiene-closeout.md",
+      "startedAt": "2026-05-10T16:04:37.177Z",
+      "finishedAt": "2026-05-10T16:07:59.655Z",
+      "lastUpdate": "2026-05-10T16:07:59.656Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -671,6 +671,10 @@
     {
       "at": "2026-05-10T15:58:58.474Z",
       "message": "verify-non-ga-release-todo-closure: respawned by local-cli (was error)"
+    },
+    {
+      "at": "2026-05-10T16:04:38.813Z",
+      "message": "release-todo-doc-hygiene-closeout: transient-retry succeeded on sub-attempt 2"
     }
   ]
 }
