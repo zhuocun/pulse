@@ -52,6 +52,7 @@ import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useDragEnd from "../utils/hooks/useDragEnd";
+import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTaskModal from "../utils/hooks/useTaskModal";
 import useTitle from "../utils/hooks/useTitle";
@@ -365,8 +366,7 @@ const BoardPage = () => {
     } = useReactQuery<IColumn[]>("boards", {
         projectId
     });
-    const { isLoading: mLoading, data: members } =
-        useReactQuery<IMember[]>("users/members");
+    const { isLoading: mLoading, data: members } = useMembersList();
 
     const {
         data: tasks,

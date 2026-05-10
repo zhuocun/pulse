@@ -28,6 +28,7 @@ import {
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useDebounce from "../utils/hooks/useDebounce";
+import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
@@ -285,7 +286,7 @@ const ProjectPage = () => {
         error: mError,
         data: members,
         refetch: refetchMembers
-    } = useReactQuery<IMember[]>("users/members");
+    } = useMembersList();
 
     const stats = useMemo(() => {
         const total = projects?.length ?? 0;

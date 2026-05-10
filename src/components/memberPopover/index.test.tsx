@@ -1,13 +1,19 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 
-import useReactQuery from "../../utils/hooks/useReactQuery";
+import useMembersList from "../../utils/hooks/useMembersList";
 
 import MemberPopover from ".";
 
-jest.mock("../../utils/hooks/useReactQuery");
+jest.mock("../../utils/hooks/useMembersList");
 
-const mockedUseReactQuery = useReactQuery as jest.MockedFunction<
-    typeof useReactQuery
+const mockedUseMembersList = useMembersList as jest.MockedFunction<
+    typeof useMembersList
 >;
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
@@ -49,10 +55,10 @@ const installAntdBrowserMocks = () => {
 const renderMemberPopover = (members: IMember[] = [member()]) => {
     const refetch = jest.fn();
 
-    mockedUseReactQuery.mockReturnValue({
+    mockedUseMembersList.mockReturnValue({
         data: members,
         refetch
-    } as unknown as ReturnType<typeof useReactQuery<IMember[]>>);
+    } as unknown as ReturnType<typeof useMembersList>);
 
     render(<MemberPopover />);
 
@@ -68,7 +74,7 @@ describe("MemberPopover", () => {
         jest.clearAllMocks();
     });
 
-    it("fetches members and shows their names when opened", async () => {
+    it("renders member avatars and count without refetching when opened", async () => {
         const { refetch } = renderMemberPopover([
             member(),
             member({
@@ -77,21 +83,33 @@ describe("MemberPopover", () => {
                 username: "Bob"
             })
         ]);
+        const trigger = screen.getByRole("button", {
+            name: "View team members"
+        });
 
-        fireEvent.mouseEnter(screen.getByText("Members"));
+        expect(within(trigger).getByText("2")).toBeInTheDocument();
+        expect(within(trigger).getByText("A")).toBeInTheDocument();
+        expect(within(trigger).getByText("B")).toBeInTheDocument();
+
+        fireEvent.mouseEnter(trigger);
 
         expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.getByText("Alice")).toBeInTheDocument();
         expect(screen.getByText("Bob")).toBeInTheDocument();
         await waitFor(() => {
-            expect(refetch).toHaveBeenCalledTimes(1);
+            expect(refetch).not.toHaveBeenCalled();
         });
     });
 
     it("renders an empty members list without failing", async () => {
         renderMemberPopover([]);
 
-        fireEvent.mouseEnter(screen.getByText("Members"));
+        const trigger = screen.getByRole("button", {
+            name: "View team members"
+        });
+        expect(within(trigger).getByText("0")).toBeInTheDocument();
+
+        fireEvent.mouseEnter(trigger);
 
         expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.queryByText("Alice")).not.toBeInTheDocument();
