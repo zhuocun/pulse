@@ -58,7 +58,9 @@ export const useNudgeInbox = (): UseNudgeInboxResult => {
 
     const dismissNudge = useCallback((nudgeId: string) => {
         setNudgeEntries((prev) => {
-            const next = prev.filter((entry) => entry.nudge.nudge_id !== nudgeId);
+            const next = prev.filter(
+                (entry) => entry.nudge.nudge_id !== nudgeId
+            );
             return next.length === prev.length ? prev : next;
         });
     }, []);

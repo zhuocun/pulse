@@ -557,8 +557,7 @@ const useAgent = (
                         setCitations: (refs) =>
                             mountedRef.current &&
                             setCitations((prev) => [...prev, ...refs]),
-                        setNudges: (n) =>
-                            mountedRef.current && pushNudge(n),
+                        setNudges: (n) => mountedRef.current && pushNudge(n),
                         setLastSuggestion: (s) =>
                             mountedRef.current && setLastSuggestion(s),
                         setLastUsageRef: (usage) => {
