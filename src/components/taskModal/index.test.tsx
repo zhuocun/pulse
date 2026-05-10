@@ -264,33 +264,35 @@ describe("TaskModal", () => {
                     update: jest.fn()
                 } as ReturnType<typeof Modal.confirm>;
             });
-        renderModal();
+        try {
+            renderModal();
 
-        expect(
-            await screen.findByDisplayValue("Build task")
-        ).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete build task$/i })
-        );
+            expect(
+                await screen.findByDisplayValue("Build task")
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole("button", { name: /^delete build task$/i })
+            );
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-        expect(confirmSpy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                content: "This action cannot be undone.",
-                title: "Delete this task?"
-            })
-        );
-        expect(fetchMock.mock.calls[0][0]).toContain(
-            "/api/v1/tasks?taskId=task-1"
-        );
-        expect(fetchMock.mock.calls[0][1]).toEqual(
-            expect.objectContaining({ method: "DELETE" })
-        );
-        await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("")
-        );
-
-        confirmSpy.mockRestore();
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+            expect(confirmSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    content: "This action cannot be undone.",
+                    title: "Delete this task?"
+                })
+            );
+            expect(fetchMock.mock.calls[0][0]).toContain(
+                "/api/v1/tasks?taskId=task-1"
+            );
+            expect(fetchMock.mock.calls[0][1]).toEqual(
+                expect.objectContaining({ method: "DELETE" })
+            );
+            await waitFor(() =>
+                expect(screen.getByTestId("location")).toHaveTextContent("")
+            );
+        } finally {
+            confirmSpy.mockRestore();
+        }
     });
 
     it("keeps the modal open when task deletion is cancelled", async () => {
@@ -302,23 +304,25 @@ describe("TaskModal", () => {
                     update: jest.fn()
                 } as ReturnType<typeof Modal.confirm>;
             });
-        renderModal();
+        try {
+            renderModal();
 
-        expect(
-            await screen.findByDisplayValue("Build task")
-        ).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete build task$/i })
-        );
+            expect(
+                await screen.findByDisplayValue("Build task")
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole("button", { name: /^delete build task$/i })
+            );
 
-        expect(confirmSpy).toHaveBeenCalled();
-        expect(fetchMock).not.toHaveBeenCalled();
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=task-1"
-        );
-        expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
-
-        confirmSpy.mockRestore();
+            expect(confirmSpy).toHaveBeenCalled();
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(screen.getByTestId("location")).toHaveTextContent(
+                "editingTaskId=task-1"
+            );
+            expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
+        } finally {
+            confirmSpy.mockRestore();
+        }
     });
 
     it("keeps the modal open if deleting the task fails", async () => {
@@ -334,21 +338,23 @@ describe("TaskModal", () => {
         fetchMock.mockResolvedValue(
             response({ error: "Delete failed on server" }, false)
         );
-        renderModal();
+        try {
+            renderModal();
 
-        expect(
-            await screen.findByDisplayValue("Build task")
-        ).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete build task$/i })
-        );
+            expect(
+                await screen.findByDisplayValue("Build task")
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole("button", { name: /^delete build task$/i })
+            );
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=task-1"
-        );
-
-        confirmSpy.mockRestore();
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+            expect(screen.getByTestId("location")).toHaveTextContent(
+                "editingTaskId=task-1"
+            );
+        } finally {
+            confirmSpy.mockRestore();
+        }
     });
 
     it("allows deleting the last saved task but still disables delete for optimistic tasks", async () => {
