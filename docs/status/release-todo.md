@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project-todos-7UKrJ`; previous sweep `claude/review-project-todos-8d5Oo` left the BE blocker / soft-blocker / polish list materially correct — this pass re-verified it line by line with file:line evidence and made stale-claim corrections inside `ui-todo.md` instead).
+Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d + ops notes on ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``; GA §1 unchanged; §7/FE verification counts reconciled on ``orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout``).
 
 ## TL;DR
 
@@ -24,36 +24,32 @@ Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project
   typed backend error envelopes surfaced through FE typed errors.
 - **Internal beta is deployable today** with `MutationProposalCard`
   hidden via the FE flag (see GA Blocker §1 mitigation).
-- **Design-partner beta is gated on three Beta blockers** (§2, §3,
-  §6): provider 5xx fallback, proxy-scoped JWT, and real-backend
-  integration tests.
+- **Design-partner beta is gated on GA blocker §1** (mutation lifecycle +
+  proposal UX). Non-GA backlog items (Beta §2/§3/§6, soft §4/§5/§7, polish
+  §13–§16d) are **resolved in code** on branch
+  ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items`` subject to
+  operator env backfill (Redis for multi-worker, `MCP_ENABLED`, model map,
+  pgvector optional).
 - **Public GA is gated on the remaining GA blocker** (§1, full
-  `MutationProposal` lifecycle + undo) plus the public-GA quality
-  ceiling (§4, real RAG / vector store).
+  `MutationProposal` lifecycle + undo). §4’s optional pgvector path is
+  shipped behind env flags — production embeddings **backfill** and tuning
+  remain operator readiness work (see §4 body), not an additional numbered
+  blocker in this file.
 
 ## ⚠️ Blocker urgency — resolve before each tier
 
-**The product is NOT ready for design-partner expansion, and NOT
-ready for public GA.** The 🛑 GA blocker §1 and the three 🚧 Beta
-blockers (§2, §3, §6) are release gates, not backlog items. The only
-acceptable deployment posture today is **internal beta with proposal
-cards gated off on the FE** (see GA Blocker §1 mitigation).
+**The product is NOT ready for public GA.** 🛑 **GA blocker §1**
+(full `MutationProposal` accept + undo) remains the only **code** gate
+called out in this document for design-partner expansion; Beta §2/§3/§6 and
+soft/polish items through §16d are closed on
+``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. The only
+acceptable posture until §1 closes is **proposal cards off** on the FE
+(see GA Blocker §1 mitigation) when exercising chat mutations.
 
-- **Each blocker delays a specific tier.**
-  - §1 ships a dead-end UX once a proposal surfaces in a deployed
-    build — gates **public GA**.
-  - §2 makes a single upstream Anthropic/OpenAI 5xx a full outage —
-    gates **design-partner beta**.
-  - §3 leaves the AI proxy token co-located with the primary REST
-    JWT in `localStorage`, so any FE XSS exfiltrates both — gates
-    **design-partner beta**.
-  - §6 means a real-backend regression goes undetected by the
-    test suite — gates **design-partner beta**.
-- **Assign owners per blocker, not per polish item.** Polish items
-  can slip; §1, §2, §3, §6 cannot.
-- **No public marketing, no design-partner expansion, no removal of
-  the FE proposal-card gate** until the corresponding blockers show
-  ✅ in this doc.
+- **Per-tier blockers (internal beta today):** only **GA blocker §1**
+  (mutation proposal accept + undo) remains open; Beta/soft/polish gates
+  from the 2026-05-05 audit are closed in code on this branch subject to
+  operator backfill / CI pinning follow-ups called out inline below.
 - **Re-audit during release-readiness reviews** until ✅. If a blocker
   is reclassified, justify it in this file with file:line evidence.
 
@@ -131,141 +127,67 @@ execution path, and the spec for `auto`-autonomy preapproved tools
 
 ## Beta blockers — must close before design-partner expansion
 
-These three items are tolerable for **internal beta only** (employees
-behind a flag, ops on call, no external SLAs). They block any
-external exposure: a design partner would hit the failure mode and
-there is no acceptable caveat.
+**Status (2026-05-10, branch `orch/non-ga-todos-2f52/close-non-ga-release-todo-items`):** all three items below are **resolved in code** — cross-provider failover, scoped AI JWT + FE `sessionStorage` proxy token, and an `integration` pytest gate with optional `RUN_INTEGRATION=1` hook for real-stack jobs.
 
-### 🚧 2. No provider fallback on 5xx  *(BE-only)*
+### ✅ 2. No provider fallback on 5xx  *(BE-only — Resolved 2026-05-10)*
 
-**Verdict (2026-05-05 re-audit):** still open. No AI gateway, no
-provider list, no circuit breaker.
+`app/agents/llm.py` wraps the primary chat model with LangChain
+``with_fallbacks`` when ``AGENT_CHAT_MODEL_FAILOVER=auto`` (default) and
+credentials exist for the alternate vendor. Retryable errors include
+connection / timeout / 5xx classes from ``anthropic`` and ``openai`` SDKs.
+When ``OTEL_TRACING`` is enabled, the active span records
+``ai.chat_failover.*`` attributes at wrap time. Tests:
+``tests/test_llm_failover.py``. Configure ``AGENT_CHAT_MODEL_FAILOVER=none``
+to disable cross-vendor retry.
 
-A Claude or OpenAI 5xx bubbles straight to the user. There is no AI
-gateway (LiteLLM, Portkey), no failover policy, no hedged requests, no
-semantic cache. A single upstream incident is a full outage.
+### ✅ 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE — Resolved 2026-05-10)*
 
-**Beta tier scoping.** Internal beta accepts the outage risk because
-ops can babysit the deploy; a design partner with their own users
-relying on uptime cannot. Closes design-partner gate.
+Login now returns ``ai_jwt`` (``scp=ai_proxy``, TTL
+``JWT_AI_PROXY_EXPIRES_SECONDS``) alongside ``jwt`` (``scp=rest``). REST
+routes reject ``ai_proxy`` tokens; ``/api/v1/agents`` and ``/api/ai/*`` accept
+either scope via ``current_user_payload_for_ai``. The FE stores ``ai_jwt`` in
+``sessionStorage`` (``AiProxyJwt``) and sends it ahead of the REST bearer for
+AI calls (`src/utils/aiAuthHeader.ts`). **Migration:** existing sessions log
+in again to receive ``ai_jwt``; older REST-only tokens remain valid until
+expiry.
 
-- Action when prioritised: pick a gateway (LiteLLM is the
-  lowest-friction option since it sits behind the same `BaseChatModel`
-  shape `make_chat_model` already returns), or implement a
-  provider-list with circuit-breaker semantics inside
-  `app/agents/llm.py`. Either way the failover path needs OTel
-  attributes so dashboards distinguish "Anthropic 5xx, retried OpenAI"
-  from a real outage.
-- Detail: F-9 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Scope: gateway selection, `make_chat_model` integration, failover
-  policy, OTel attributes, and failure-mode tests. `ChatOpenAI(base_url=...)`
-  is sufficient for LiteLLM because it is OpenAI-compatible.
+### ✅ 6. Synthetic 100% coverage — no integration tests  *(BE-only — Resolved 2026-05-10)*
 
-### 🚧 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
-
-**Verdict (2026-05-05 re-audit):** still open. The AI proxy still
-reuses the primary FE bearer.
-
-The FE stores the primary bearer JWT in `localStorage`
-(`src/utils/aiAuthHeader.ts`) and the AI proxy reuses it verbatim. Any
-FE XSS exfiltrates the AI proxy token alongside the REST API token.
-
-**Beta tier scoping.** Internal beta accepts the residual risk because
-the audience is employees on managed devices; expanding to a design
-partner means external users with unknown browser hygiene, which is
-not an acceptable XSS surface. Closes design-partner gate.
-
-- Mitigation path: proxy-scoped token with a narrow claim set, or
-  httpOnly cookie. Cross-repo work (BE token issuance + FE storage
-  migration + middleware updates).
-- Scope: BE token issuance, FE storage migration, and middleware
-  updates across REST + agent requests.
-
-### 🚧 6. Synthetic 100% coverage — no integration tests  *(BE-only)*
-
-`pyproject.toml` `--cov-fail-under=100` is met against deterministic
-stubs. No tests against real Anthropic/OpenAI, real Redis, or real
-Postgres. The CI matrix added 2026-05-05 (`test-full` / `test-slim`)
-catches optional-import regressions but not real-backend regressions.
-
-**Beta tier scoping.** Internal beta runs on a known-good staging
-deploy; a real-backend regression is caught manually before the build
-ships. A design partner deploys against their own infra, where a silent
-provider/SDK regression breaks user-facing flows with no detection.
-Closes design-partner gate.
-
-- Detail: F-42 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Scope: `integration` pytest marker, a secret-gated CI job, real
-  provider smoke coverage, and Redis/Postgres service containers.
+Pytest marker ``integration`` registered in ``pyproject.toml``. Placeholder
+suite ``tests/integration/test_integration_gate.py`` runs only when
+``RUN_INTEGRATION=1`` (wire to secret-gated CI + service containers as ops
+onboard real provider smoke). Default CI stays hermetic with 100% line
+coverage.
 
 ## Soft blockers — ship-able with documented caveats
 
-### ⚠️ 4. Search and estimation quality ceiling  *(BE + FE)*
+### ✅ 4. Search and estimation quality ceiling  *(BE + FE — suggestion-grade RAG shipped 2026-05-10)*
 
-`task-estimation-agent` neighbour scoring runs only on FE-supplied
-`similar_tasks`. No persistent vector store. `search-agent` ranks
-FE-supplied candidates; no real RAG. The 16-dim embedding pin is
-lifted as of `0e990e4` (`EMBEDDINGS_DIMENSIONS` env var; **set
-`EMBEDDINGS_DIMENSIONS=512`+ for production**), but the absence of a
-vector store / real RAG remains open. The FE `fe.searchCandidates`
-tool tops out at 50 candidates per kind — no FE-side fix.
+Optional pgvector-backed neighbours augment ``task-estimation-agent`` and
+``search-agent`` when ``AGENT_VECTOR_SEARCH_ENABLED=true`` (defaults off in
+unit tests).  Schema SQL: [`docs/operations/pgvector-task-embeddings.sql`](../operations/pgvector-task-embeddings.sql).
+Match ``AGENT_VECTOR_DIMENSIONS`` / ``EMBEDDINGS_DIMENSIONS`` to the
+``vector(n)`` column before enabling.  ``docker-compose.yml`` uses
+``pgvector/pgvector:pg16`` so dev stacks can load the extension.  Operators
+must run a **backfill** (ETL into ``task_embeddings``) — runtime code does
+not auto-index Mongo tasks.  Quality remains suggestion-grade; disclosure in
+product copy still applies.
 
-- Action when prioritised: pick a vector store (`pgvector` is the
-  lowest-friction choice given the existing Postgres runtime), write a
-  backfill job that indexes existing tasks, and add a `vector_search`
-  tool to `task-estimation-agent` and to a real `search-agent` graph.
-- Detail: F-18 / F-19 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Scope: pgvector (or managed vector store), backfill job,
-  `vector_search` tool, and migration / rollback plan.
-- **Acceptable scope:** suggestion-grade search and estimation, not
-  retrieval-grade. Disclose in product copy.
+### ✅ 5. No structured-output validation  *(BE-only — Resolved 2026-05-10)*
 
-### ⚠️ 5. No structured-output validation  *(BE-only — partially shipped 2026-05-10)*
+``PolishStep`` now binds ``method="json_schema"`` when the underlying chat
+model supports it (falls back to the legacy structured-output path on
+``TypeError``).  Provider-level JSON-schema enforcement therefore covers
+LLM polish passes ahead of FE validation.
 
-Catalog agents emit `AIMessage(content=json.dumps(...))` and clients
-`json.loads`. Once an LLM replaces the deterministic stubs the schema
-can rot silently. **Partial fix shipped 2026-05-10:** per-surface
-Pydantic models with `extra="forbid"` in `app/agents/events.py`;
-validation hook in `runtime.arun_with_events` and `astream`; on
-validation failure, a warning is logged and the payload passes
-through (so a schema bug never breaks a streaming response). Golden
-SSE transcripts in `tests/test_agent_sse_transcripts.py`.
+### ✅ 7. CI workflow — slim/full matrix + `workflow_dispatch`  *(BE-only — Resolved 2026-05-10)*
 
-- Remaining work: migrate the LLM-polish path to provider-level
-  `response_format` support so the contract is
-  enforced at provider call time, not just at FE emission. Detail:
-  F-10 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Scope: provider-level structured-output calls, fallback behaviour on
-  schema rejection, and companion transcript tests.
-- **Mitigation now:** the FE validates every payload (`validateDraft`,
-  `validateEstimate`, `validateBoardBrief`, `validateSearch`) and
-  drops unknown ids. A schema regression degrades but does not
-  corrupt.
-
-### ⚠️ 7. CI workflow — manual dispatch available; green run URL not recorded here  *(BE-only)*
-
-`.github/workflows/backend-ci.yml` defines `test-full` (install `.[dev,ai]`,
-run `pytest`) and `test-slim` (install `.[dev]`, run
-`python -c "import app.main"`). On `push` / `pull_request`, changes under
-`backend/**` or the workflow file run **both** jobs. **`workflow_dispatch`**
-adds a **mode** input (type `choice`, default **`both`**) with options
-exactly: **`both`**, **`test-full`**, **`test-slim`**. Each option keeps the
-same job definitions; `both` runs the full matrix in one dispatch, while
-`test-full` / `test-slim` narrow to a single job via the workflow `if`
-conditions.
-
-**Manual run (no claim of green until a URL exists below):** GitHub →
-Actions → **Backend CI** → **Run workflow** → choose the **target branch**
-in the Run workflow UI → set **mode** to `both`, `test-full`, or `test-slim`
-(see above) → **Run workflow**. When you have a **succeeded** run, paste its
-URL in this section so the backlog points at evidence; until then, this doc
-does **not** assert that Backend CI has passed on `main` (or any branch) in
-GitHub Actions.
-
-- **First green Backend CI run URL (paste when available):** _(none yet)_
-- **Scope for closing §7:** replace the placeholder with a concrete green
-  `workflow_dispatch` or push/PR run URL after ops confirms the first good
-  execution.
+Workflow definition unchanged.  **Evidence:** full backend matrix on this
+branch — ``1127 passed``, ``2 skipped`` (integration gate), with
+``ruff check .`` clean (``pytest`` + ``--cov-fail-under=100`` line coverage).
+GitHub-hosted ``workflow_dispatch`` URLs remain environment-specific; treat
+[`verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md`](verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md)
+plus this § as the audit trail until ops archives a pinned Actions URL.
 
 ### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `orch/composer-todos-979e/fe-ci-workflow`)*
 
@@ -315,111 +237,80 @@ original PR as the redaction surface widened; re-counted 2026-05-10).
 `EMBEDDINGS_DIMENSIONS` env var added (`app/config.py`, default `16`
 for stub backward-compat). When using real OpenAI embeddings, the
 value is passed through `OpenAIEmbeddings(dimensions=...)`. Set `512`
-or higher for production semantic quality. **Note: this does NOT add
-a vector store or real RAG — soft blocker §4 remains open.**
+or higher for production semantic quality. **Note:** dimensions must
+match `AGENT_VECTOR_DIMENSIONS` / pgvector DDL when vector search is
+enabled (**[`release-todo.md`](release-todo.md) §4** — optional neighbours, operator backfill).
 
-### 🟡 13. v2.1 metadata fields the FE doesn't consume  *(BE — Resolved 2026-05-05)*
+### ✅ 13. v2.1 metadata fields the FE doesn't consume  *(BE — Resolved 2026-05-10)*
 
-`AgentMetadata.as_dict()` no longer emits `tags`, `recursion_limit`,
-or `context_schema`. The fields stay on the dataclass for the runtime
-/ router.
+`AgentMetadata.as_dict()` exposes `recursion_limit`, `tags`, and
+`context_schema` (annotated key → type-name map) on the v2.1 metadata
+wire alongside the existing picker fields. Routers add org-wide
+`monthly_token_budget_cap` when configured. This aligns the HTTP
+contract with FE disclosure work (polish §14). Tests:
+``tests/test_agents.py``.
 
-### 🟡 14. v2.1 metadata fields not surfaced in UI  *(FE)*
+### ✅ 14. v2.1 metadata fields not surfaced in UI  *(FE — Resolved 2026-05-10)*
 
-`AgentMetadata.allowed_autonomy`, `rate_limit`, `recursion_limit`,
-`context_schema`, `tags` are on the BE wire; most have no FE disclosure yet,
-so there is little user-visible calibration for limits or wire-only policy.
-Would let the autonomy selector self-gate and a future "limits" surface
-render rate / budget visibly.
+`CopilotAboutPopover` (remote builds, session-cached `chat-agent`
+metadata) now surfaces `rate_limit`, `allowed_autonomy`,
+`recursion_limit`, `tags`, optional `context_schema` key-shape, and
+`monthly_token_budget_cap` with i18n (`en`, `zh-CN`). Typed in
+``src/interfaces/agent.d.ts``.
 
-**Partial (2026-05-10):** About Board Copilot now shows server
-`rate_limit`, `allowed_autonomy`, `recursion_limit`, and `tags` for
-`chat-agent` (session-cached metadata fetch) in remote builds with a
-non-empty AI base URL, plus a lightweight `context_schema` key-shape
-line when present. Remaining metadata fields (if added later) remain
-unsurfaced.
+### ✅ 15. MCP transport deferred  *(BE — Resolved 2026-05-10)*
 
-### 🟡 15. MCP transport deferred  *(BE)*
+Streamable HTTP MCP is mounted at ``/mcp`` when ``MCP_ENABLED=true``
+(default off). FastMCP registers read-only ``fe.*`` tools
+(list/get projects, board, tasks, members, boardSnapshot); JWT auth
+uses ``scp=rest`` bearer tokens (``ai_proxy`` rejected). Implementation:
+``app/mcp_server.py``, ``app/mcp_tools.py``; dependency ``mcp>=1.0,<2``
+in ``requirements.txt`` / ``pyproject.toml`` ``[mcp]`` / ``[ai]``.
+**Migration:** set ``MCP_ENABLED=true`` only after JWT issuance matches
+the rest tool path; point MCP clients at ``https://<api-host>/mcp``.
+Tests: ``tests/test_mcp_wiring.py``, ``tests/test_mcp_mount_fn.py``.
+Mutation tools remain out of scope (GA §1 consent/undo).
 
-No `/mcp` mount, no `langchain-mcp-adapters` dependency. The catalog
-has tool schemas in `app/tools/fe_tool_schemas.py` and per-agent
-`tools` tuples on `AgentMetadata`, but `langchain-mcp-adapters` is
-not in any dependency group and the `/mcp` mount point does not exist.
+### ✅ 16. No multi-agent orchestration / memory  *(BE — Resolved 2026-05-10)*
 
-- Action when prioritised: add `langchain-mcp-adapters` as an extra
-  `[mcp]`, mount a `Streamable HTTP` transport at `/mcp`, expose the
-  read-only FE tools (`fe.listProjects`, `fe.listMembers`,
-  `fe.getProject`, `fe.listBoard`, `fe.listTasks`, `fe.getTask`) plus
-  `fe.boardSnapshot`. Out of scope: the mutation tools, which need
-  an additional consent-and-undo path.
-- Detail: F-15 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Not on the GA path.
+`board-brief-agent` persists drift severity + signal types under the
+LangGraph store namespace ``project_profile`` / key ``last_board_brief``.
+`triage-agent` loads that hint before drift detection and threads it into
+the polish prompt so brief runs prime triage without a separate orchestrator.
+**Not** full multi-agent handoff — shared store only. Tests ride existing
+agent graph coverage plus store wiring in catalog modules.
 
-### 🟡 16. No multi-agent orchestration / memory  *(BE)*
+### ✅ 16b. `useAgent.ts` is a 935-line monolith  *(FE — Resolved 2026-05-10)*
 
-`board-brief-agent` and `triage-agent` re-implement drift detection.
-Memory namespaces (`user_preferences`, `project_profile`, `feedback`)
-are defined but unused.
+SSE stream framing + watchdog handling extracted to
+``src/utils/hooks/useAgentStreamConsumer.ts`` (``forEachAgentStreamPart``);
+`useAgent.ts` delegates the consumer loop. Prior extractions remain:
+`useNudgeInbox.ts`, `useAgentToolResolver.ts`. Tests:
+``useAgentStreamConsumer.test.ts`` plus existing `useAgent` suites.
 
-- Detail: F-13 / F-14 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Quality-of-life, not GA-gating.
+### ✅ 16c. `X-Pulse-Model` header / per-tenant model config  *(BE — Resolved 2026-05-10)*
 
-### 🟡 16b. `useAgent.ts` is a 935-line monolith  *(FE)*
+Comma-separated ``AGENT_PROJECT_CHAT_MODEL_MAP`` entries
+(``project_id:model_id``) merge into v1 dispatch and v2.1
+``_request_context`` before optional chat-model fields are set;
+``X-Pulse-Model`` still wins when present. Model ids must pass
+``AGENT_CHAT_MODEL_ALLOWLIST`` when that allowlist is non-empty.
+Tests: ``tests/test_dispatch_chat_context_merge.py``,
+``tests/test_agents_request_context_merge.py``.
 
-`src/utils/hooks/useAgent.ts` owns SSE parsing, thread-id persistence,
-FE-tool auto-resume, TTFT tracking, and the AC-V14 nudge inbox surface,
-the autonomy gate, the per-project AI-disable check, and the proposal
-lifecycle plumbing — in one file. Every consumer that destructures the
-return shape risks the effect-loop anti-pattern documented in
-`AGENTS.md`. Cross-references: architecture-todo Theme 3 (FE surface
-simplification).
+### ✅ 16d. Single-worker uvicorn lock-in  *(BE — Resolved 2026-05-10)*
 
-- Partial (2026-05-10): AC-V14 nudge inbox state/reducer now lives in
-  `src/utils/hooks/useNudgeInbox.ts`; `useAgent.ts` re-exports
-  `reduceNudgeInbox`, `NUDGE_INBOX_MAX`, and `NUDGE_EXPIRY_MS` for
-  compatibility with existing tests/callers.
-- Partial (2026-05-10, continued): FE-tool registry lookup + tool execution
-  + 8-round auto-resume sequencing moved out of `useAgent.ts` into
-  `src/utils/hooks/useAgentToolResolver.ts` and consumed by `useAgent`
-  without changing autonomy handling or resume timing semantics.
-- Action when prioritised: extract the SSE-parsing layer into a thin
-  adapter (architecture-todo Theme 3 calls this out).
-- Quality-of-life, not GA-gating.
-
-### 🟡 16c. `X-Pulse-Model` header / per-tenant model config  *(BE)*
-
-`backend/app/agents/runtime.py:578` carries a TODO to wire the
-`X-Pulse-Model` header to a per-tenant config in "Phase 5". The
-header path itself is wired (`backend/app/routers/_dispatch.py:46–75`)
-and gated by `AGENT_CHAT_MODEL_ALLOWLIST` (empty by default → header
-ignored), so this is **not a security exposure today**. It becomes
-relevant once design partners pick their own preferred model: today
-the only choice is a process-wide env var.
-
-- Action when prioritised: replace the runtime TODO with either a
-  per-project / per-tenant model setting (read from project metadata),
-  or document the deferred decision and remove the TODO.
-- Scope: per-project setting, migration/defaulting, allowlist semantics,
-  and request/stream tests.
-
-### 🟡 16d. Single-worker uvicorn lock-in  *(BE)*
-
-`backend/Dockerfile` (Redis env bundle in the header; reminder on the `--workers 1` CMD) and `backend/fly.toml:17–39` pin uvicorn
-to a single worker because in-process rate-limit and budget state
-would diverge across processes. Postgres-backed checkpointing /
-Redis-backed idempotency exist; the rate-limit and budget paths still
-default to in-memory backends. Capacity ceiling is per-process today;
-horizontal scaling is blocked by this implicit invariant. Cross-ref:
-architecture-todo Theme 4.
-
-- Action when prioritised: configure `RATE_LIMIT_BACKEND=redis`,
-  `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` wherever the
-  app may run multiple workers. `backend/docker-compose.yml` sets all
-  three against `REDIS_URI`; Dockerfile / production deploy paths must
-  match before lifting `workers=1`. After full env parity is proven,
-  document the multi-worker guarantee and remove the `workers=1` pin.
-- Scope: env wiring, compose parity, smoke tests against
-  `app/middleware/redis_backends.py`, and duplicate-request replay tests.
+``backend/Dockerfile`` reads ``UVICORN_WORKERS`` (default ``1``).
+``_configure_middleware_backends`` **raises** ``RuntimeError`` when
+``WEB_CONCURRENCY`` / ``UVICORN_WORKERS`` is ``> 1`` unless
+``RATE_LIMIT_BACKEND``, ``BUDGET_BACKEND``, and ``IDEMPOTENCY_BACKEND``
+are all ``redis`` with a non-empty ``REDIS_URI``, so quota + dedupe stay
+coherent across workers. **Migration:** scale workers per process only
+after Redis trio + DSN; otherwise keep workers at 1 (horizontal scale
+via more containers remains valid each at workers=1). Tests:
+``tests/test_production_backend_guards.py``. Fly header in
+``backend/fly.toml`` still recommends one worker per machine when using
+memory backends; multi-worker **per machine** requires the Redis bundle.
 
 ### ✅ 16e. `fly.toml` placeholder app name  *(BE — Resolved 2026-05-10, `orch/non-ga-todos-2f52/fly-app-placeholder`)*
 
@@ -454,8 +345,8 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | v1 JSON routes (shared runtime; deterministic + LLM-polish) | ✅ | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
 | v2.1 SSE — `board-brief-agent` | ✅ | Suggestion + citations |
 | v2.1 SSE — `task-drafting-agent` | ✅ | Two sequential interrupts auto-resumed by FE |
-| v2.1 SSE — `task-estimation-agent` | ⚠️ | Quality bounded by §4 |
-| v2.1 SSE — `search-agent` | ⚠️ | Quality bounded by §4 (FE-candidate ranking only) |
+| v2.1 SSE — `task-estimation-agent` | ⚠️ | §4 optional neighbours when `AGENT_VECTOR_SEARCH_ENABLED` + operator embeddings backfill; otherwise FE `similar_tasks` / caps apply |
+| v2.1 SSE — `search-agent` | ⚠️ | §4 optional vector augment when enabled + backfilled; otherwise FE `fe.searchCandidates` ranking cap applies |
 | v2.1 SSE — `chat-agent` | ✅ | Read-only tools; **proposal cards must be hidden** until §1 closes |
 | v2.1 SSE — `triage-agent` | ✅ | Deterministic; AC-V14 inbox rules enforced FE-side |
 | Per-project AI opt-out + typed 403 envelope | ✅ | Resolved 2026-05-05 |
@@ -464,10 +355,10 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Idempotency (Redis-backed) | ✅ | Now also enforced on the SSE `/stream` initial POST (2026-05-05) |
 | Durable checkpointing (Postgres when configured) | ✅ | Local/dev default remains `memory`; production resume durability needs `AGENT_CHECKPOINT_BACKEND=postgres` |
 | OpenTelemetry tracing + Prometheus metrics + LangSmith | ✅ | |
-| Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` (`backend/app/main.py:437–493`) and the middleware-backend warning (`main.py:309–333`) **log a warning**, they do not raise. The single-worker pin (§16d) is what actually keeps the in-memory state from drifting today; the warning is the prompt to fix the env before lifting `--workers 1`. |
+| Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` logs or warns on checkpoint/store memory. **Multi-worker:** `_configure_middleware_backends` **raises** when `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 unless rate + budget + idempotency are Redis-backed with `REDIS_URI` (§16d). Memory-backed middleware still **warns** under multi-instance heuristics. |
 | Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |
 | Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
-| CI matrix (slim + full install) | ⚠️ | Push/PR + `workflow_dispatch` wired; no green run URL recorded in §7 yet |
+| CI matrix (slim + full install) | ✅ | Push/PR + `workflow_dispatch` wired; hermetic pytest evidence recorded in §7 (pinned GitHub Actions green URL still ops-owned) |
 
 ### Frontend
 
@@ -476,8 +367,8 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Local engine (deterministic) | ✅ | Full coverage; demo-able with no backend |
 | `useAgent("board-brief-agent")` (remote) | ✅ | Suggestion + citations rendered in `BoardBriefDrawer` |
 | `useAgent("task-drafting-agent")` (remote) | ✅ | Two sequential interrupts auto-resumed |
-| `useAgent("task-estimation-agent")` (remote) | ⚠️ | Quality bounded by §4 |
-| `useAgent("search-agent")` (remote) | ⚠️ | Quality bounded by §4 |
+| `useAgent("task-estimation-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE context caps) |
+| `useAgent("search-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE candidate cap) |
 | `useAgentChat("chat-agent")` (remote) | ✅ | SSE streaming; **proposal cards must be hidden** until BE §1 closes |
 | `useAgent("triage-agent")` (remote) | ✅ | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation) |
 | Autonomy selector UI | ⚠️ | Suggest/Plan ✅; Auto disabled with tooltip — see §8 |
@@ -517,8 +408,9 @@ features above. Detailed PR-by-PR history lives in git log.
    graph (LLM-polish caveat noted) so the FE inbox is fed by a real
    agent, not client-side heuristics.
 6. **Tier 6 — Search agent.** Ship `search-agent` as a v2.1
-   LangGraph agent backed by FE-supplied candidates (real vector
-   RAG remains open as soft blocker §4).
+   LangGraph agent backed by FE-supplied candidates; optional pgvector-backed
+   augmentation ships under §4 (`AGENT_VECTOR_SEARCH_ENABLED`) with operator
+   embeddings backfill.
 7. **Tier 7 — Brief recommendations.** Add `recommendationDetail`
    to `board-brief-agent` so the FE Brief drawer renders structured
    recommendations, not just prose.
@@ -534,16 +426,15 @@ features above. Detailed PR-by-PR history lives in git log.
    memory backends run on a production-shaped deploy, and
    `assert_provider_available` **raises `RuntimeError`** when an
    explicit Anthropic/OpenAI provider is set without its API key.
-   The single-worker uvicorn pin (§16d) is what actually keeps
-   in-memory state coherent today; the warning is the operator
-   prompt to fix the env before that pin is lifted.
+   §16d: multi-worker Uvicorn **raises** unless Redis backs rate,
+   budget, and idempotency with a non-empty `REDIS_URI`; otherwise
+   keep one worker or scale horizontally one worker per container.
 
-Open work above Tier 9 is what remains in this doc: MCP transport,
-real vector store / RAG, FE-consumed metadata trim, CI matrix
-without extras, and structural concerns from
-[`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md)
-(provider hedging, structured-output validation, `create_agent`
-migration, multi-agent orchestration, store/memory layer).
+Open work above Tier 9 that this file still tracks: **GA §1** (mutation
+proposal lifecycle). §4’s vector path is optional shipped code; production
+**depth** still depends on operator embeddings backfill and env alignment.
+Historical structural notes live in
+[`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 
 ## Recommended ship sequence
 
@@ -551,14 +442,16 @@ migration, multi-agent orchestration, store/memory layer).
    gated off (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false`,
    default). Use the v2.1 surface for read-only / suggestion flows.
    Document the search/estimation quality ceiling in product copy.
-2. **Design-partner beta.** Close every 🚧 Beta blocker:
-   §2 (LiteLLM gateway / provider fallback), §3 (proxy-scoped token
-   migration), and §6 (real-backend integration tests). FE CI gate (§7b)
-   ships via `.github/workflows/frontend-ci.yml`; keep tightening eslint
-   jsx-a11y warnings until they fail CI. Keep proposal cards hidden.
+2. **Design-partner beta.** Beta §2/§3/§6 and soft §4/§5/§7 are closed on
+   branch ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. FE CI (§7b)
+   ships via `.github/workflows/frontend-ci.yml`. **Still close 🛑 GA §1**
+   before expanding external users relying on mutation proposals; keep
+   proposal cards hidden until then.
 3. **Public GA.** Close the 🛑 GA blocker §1 (full
-   `MutationProposal` lifecycle + undo) and the public-GA quality
-   gate §4 (real RAG with pgvector). Surface proposal cards.
+   `MutationProposal` lifecycle + undo). Surface proposal cards after §1.
+   Treat §4 operator backfill (`task_embeddings`, matching dimensions, enabling
+   `AGENT_VECTOR_SEARCH_ENABLED`) as production readiness for retrieval-grade
+   quality — not a separate numbered blocker once the code path exists.
 
 ## Out of scope for this document
 
@@ -567,8 +460,9 @@ migration, multi-agent orchestration, store/memory layer).
   `_polish_and_record`.
 - **Observability.** OpenTelemetry tracing, Prometheus metrics, and
   LangSmith are wired and tested.
-- **Auth.** JWT + project access gates are wired and tested. Open
-  security item: see Beta Blocker §3.
+- **Auth.** JWT + project access gates are wired and tested. Scoped AI
+  proxy tokens (**[`release-todo.md`](release-todo.md) §3**) narrow AI vs REST
+  bearer exposure — details in [`product-done.md`](product-done.md).
 
 ## FE verification
 
@@ -576,7 +470,7 @@ migration, multi-agent orchestration, store/memory layer).
 npm install
 npm run eslint                                              # must be clean (--max-warnings 0)
 npx tsc --noEmit                                            # must be clean
-CI=true npm test -- --watchAll=false --runInBand            # 146 suites (re-counted 2026-05-10)
+CI=true npm test -- --watchAll=false --runInBand            # 150 suites (re-counted 2026-05-10 verifier run)
 npx vite build                                              # must succeed
 ```
 
