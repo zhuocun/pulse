@@ -73,7 +73,7 @@ Every recommendation in this plan is anchored to one or more of these external r
     - ~~The delete button sits **below** the form, outside the modal footer, styled as a small dashed danger button.~~ **[Complete: `Delete` is now rendered inside the AntD `Modal` footer slot via `footer={(_orig, { OkBtn, CancelBtn }) => …}` (`:228–284`), arranged Delete-left / Save-Cancel-right on tablet+, stacked Save → Cancel → Delete on phone widths so the destructive control sits last for thumb safety.]**
     - The AI assist panel renders inside the same modal body (`:187–212`), causing a tall scrollable area; nothing visually separates the form from the suggestions; and any user keystroke triggers the panel's two debounced AI calls.
     - ~~The modal title is the static string `"Edit Task"` — it could read `Edit · {taskName}` for context.~~ **[Complete: `titleText = '${microcopy.actions.editTask} · ${editingTask.taskName}'` (`:180–182`); the title node also renders the `Bug` / `Task` type tag.]**
-    - The Type select silently rebuilds its options from the existing task list (`:35–41, :149–166`) — if there is exactly one type in the dataset the user is forced into a hardcoded `Task / Bug` fallback list instead of seeing the canonical choices.
+    - ~~The Type select silently rebuilds its options from the existing task list (`:35–41, :149–166`) — if there is exactly one type in the dataset the user is forced into a hardcoded `Task / Bug` fallback list instead of seeing the canonical choices.~~ **[Complete: `TaskModal` now uses a canonical `TASK_TYPE_OPTIONS` constant (`Task` / `Bug`) localized through `microcopy.options.taskTypes.*`; dataset shape no longer affects which options render.]**
 
 11. **Auth screens.** **[Phase 2.7 partially complete; remaining items below.]**
     `src/components/loginForm/index.tsx`, `src/components/registerForm/index.tsx`, `src/layouts/authLayout.tsx`:
@@ -209,7 +209,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - Move the form into a two-column layout at ≥ 768 px: left = the form, right = the AI assist panel. Below 768 px, stack and put the AI panel inside an `<Collapse>` so it does not push the form off-screen.
     - ~~Move `Delete` into a proper `Modal.footer` slot.~~ **[Complete.]**
     - ~~Replace `"Edit Task"` with `"Edit · {taskName}"`.~~ **[Complete.]**
-    - Hard-code the canonical `Task` / `Bug` options instead of inferring them from the dataset (`:35–41`); the only correct list is the one the schema allows.
+    - ~~Hard-code the canonical `Task` / `Bug` options instead of inferring them from the dataset (`:35–41`); the only correct list is the one the schema allows.~~ **[Complete.]**
     - Show validation errors inline next to fields instead of relying on `Form.Item.message` toasts.
 
 7. **Auth screens (`src/layouts/authLayout.tsx`, `loginForm`, `registerForm`).** **[Partially complete; see §1.2 item 11.]**
