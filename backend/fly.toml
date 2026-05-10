@@ -1,8 +1,10 @@
-# Fly.io launch config for jira-python-server.
+# Fly.io launch config for `backend/` (pulse backend).
 #
-# `app` and `primary_region` are placeholders -- operators should
-# rename to match their Fly org and pick a region close to the
-# Postgres/Mongo cluster they front.
+# Operators MUST rename `app` below to their Fly.io application name
+# before deploy. `pulse-backend` is the repo-owned default only.
+#
+# `primary_region` is a starting point — pick a region close to the
+# Postgres/Mongo cluster you front.
 #
 # Why min_machines_running >= 1 and a single worker:
 #   The agent surface keeps state in-process -- the per-agent rate
@@ -14,7 +16,7 @@
 #   same invariants. Scale by adding more machines (each with one
 #   uvicorn worker) and switching the agent backends to postgres.
 
-app = "jira-python-server"
+app = "pulse-backend"
 
 # Change before deploying. Pick the region nearest your Postgres/Mongo
 # cluster -- Fly egress between regions is metered.
