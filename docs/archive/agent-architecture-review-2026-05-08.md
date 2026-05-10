@@ -4,7 +4,7 @@
 
 **Companion docs**:
 - `ai-architecture-review.md` — earlier still-open structural concerns (provider gateway, ReAct prebuilt, multi-agent orchestration). Items there are *not* superseded by this review.
-- `../../backend/docs/ai-remaining-work.md` — operational backlog.
+- [`../operations/remaining-work.md`](../operations/remaining-work.md) — operational backlog.
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.
 

@@ -11,13 +11,13 @@ Status as of the merge of `Accept FE envelope on v1 AI routes; add latencyMs to 
 - `task-estimation-agent` via `useAgent("task-estimation-agent")` in `AiTaskAssistPanel` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). Consumes the bundled `surface: "estimate"` payload `{estimate, readiness}` in a single suggestion event.
 - `search-agent` via `useAgent("search-agent")` in `AiSearchInput` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). The FE registers a new `fe.searchCandidates` tool in `FE_TOOL_REGISTRY` that resolves the search-agent interrupt from the React Query cache (up to 50 `{id, text}` candidates per kind).
 
-The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in `docs/prd/board-copilot-progress.md`.
+The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in [`../prd/progress.md`](../prd/progress.md).
 
-For background on what already exists, see `ai-architecture-review.md`.
+For background on what already exists, see [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md).
 
 ## Audit follow-up — 2026-05-10 (`claude/complete-subagent-orchestrator-fUazo`, PR #177)
 
-Surgical Phase-A / Theme-1, -2, -4 items from `docs/agent-architecture-optimization-plan.md` landed on this branch. Multi-week items (mutation lifecycle, provider gateway, vector store, MCP, supervisor) remain deferred — see open items 7, 8, 12, 14 below.
+Surgical Phase-A / Theme-1, -2, -4 items from [`../architecture/agent-roadmap.md`](../architecture/agent-roadmap.md) landed on this branch. Multi-week items (mutation lifecycle, provider gateway, vector store, MCP, supervisor) remain deferred — see open items 7, 8, 12, 14 below.
 
 - **Per-surface payload schemas (Theme 1, F-10).** New Pydantic models in `app/agents/events.py` (`IBoardBriefPayload`, `ITaskDraftPayload`, `IEstimatePayload`, `ISearchPayload`, `INudgePayload`, all `extra="forbid"`). `validate_suggestion_payload` dispatches on `Suggestion.surface`; on validation failure it logs a warning and passes the payload through so a schema bug never breaks a streaming response. Wired into `runtime.arun_with_events` and `astream` re-emission.
 - **Golden SSE transcripts (Theme 1).** New `tests/test_agent_sse_transcripts.py` asserts deterministic `(kind, surface)` sequences for all six agents driven through the stub model. Drift fails CI without flaky LLM calls.

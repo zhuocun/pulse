@@ -116,7 +116,7 @@ Remote proxy (optional): `POST ${REACT_APP_AI_BASE_URL}/api/ai/search` with JSON
 
 ### AI UX Phase 1 — trust and privacy corrections
 
-Tracked by [`ai-ux-optimization-plan.md`](../design/ai-ux-optimization-plan.md).
+Tracked by [`ai-ux-optimization-plan.md`](../archive/design/ai-ux-optimization-plan.md) (archived 2026-05-10; superseded by [`v3-ai-ux.md`](v3-ai-ux.md)).
 Merged from `cursor/ai-ux-current-audit-da9f`.
 
 - `ai-ux-optimization-plan.md` — refreshed the audit to reflect the current
@@ -475,7 +475,7 @@ Not started — **no `api/` routes in this repo** yet. The client posts to `${RE
 - **Chat write-tools** (PRD §5.4 follow-up): out of scope until a later version.
 - **BE companion items**: the Python server has its own open work (Redis/Postgres
   backends, multi-worker deployment, rate-limit counters). See
-  `../backend/docs/ai-remaining-work.md` for that list.
+  [`../operations/remaining-work.md`](../operations/remaining-work.md) for that list.
 
 ### Optional polish
 

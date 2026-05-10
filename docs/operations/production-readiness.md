@@ -96,7 +96,7 @@ Catalog agents emit `AIMessage(content=json.dumps(...))` and clients `json.loads
 
 ### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
 
-Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling the "Auto" option in `AiChatDrawer` with an explanatory i18n tooltip ("Auto requires an agent that supports preapproved tools. Available in v3."). The metadata-driven gating against `AgentMetadata.allowed_autonomy` remains V3 work — see [`../prd/v3.md`](../prd/v3.md).
+Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling the "Auto" option in `AiChatDrawer` with an explanatory i18n tooltip ("Auto requires an agent that supports preapproved tools. Available in v3."). The metadata-driven gating against `AgentMetadata.allowed_autonomy` remains V3 work — see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md).
 
 ### ✅ 9. `AGENT_PROPOSAL_UNDONE` analytics defined but unfired  *(FE — Resolved 2026-05-05)*
 

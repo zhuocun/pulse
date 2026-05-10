@@ -1,5 +1,9 @@
 # Board Copilot AI UX Audit and Optimization Plan
 
+> **Archived 2026-05-10.** All five phases below shipped; the forward-looking
+> spec is now [`../../prd/v3-ai-ux.md`](../../prd/v3-ai-ux.md). This audit is
+> kept for historical traceability and resolved-items log.
+
 Updated: 2026-05-04
 
 This document audits the current `pulse` Board Copilot implementation
@@ -39,9 +43,9 @@ been fixed in the codebase. This version reflects the current implementation.
     - `src/utils/ai/validate.ts`
     - `src/utils/ai/projectAiStorage.ts`
 - Planning and reference docs:
-    - `docs/prd/board-copilot-v3.md`
-    - `docs/prd/board-copilot-progress.md`
-    - `docs/ui-ux-optimization-plan.md`
+    - `docs/prd/v3-ai-ux.md`
+    - `docs/prd/progress.md`
+    - `docs/design/ui-ux-optimization-plan.md`
     - `AI_UX_BEST_PRACTICES.md` _(removed — generic research compilation; actionable content absorbed into this document)_
     - `AI_UX_PATTERNS_REPORT.md` _(removed — generic AI interaction patterns; actionable content absorbed into this document)_
 
@@ -564,7 +568,7 @@ feature-dump onboarding.
 - Command palette has a separate AI mode in
   `src/components/commandPalette/index.tsx:571-578`.
 - The PRD already recommends unified AI surface architecture in
-  `docs/prd/board-copilot-v3.md:26-34`.
+  `docs/prd/v3-ai-ux.md:26-34`.
 
 **Impact**
 

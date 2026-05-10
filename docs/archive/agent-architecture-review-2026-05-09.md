@@ -13,7 +13,7 @@ structural review and forward-looking restructuring plan.
 - `ai-architecture-review.md` — earlier structural concerns (provider
   gateway, ReAct prebuilt, multi-agent orchestration). Several items
   there map onto the phases below.
-- `../../backend/docs/ai-remaining-work.md` — operational backlog.
+- [`../operations/remaining-work.md`](../operations/remaining-work.md) — operational backlog.
 
 The 2026-05-08 review's deferred items F-G2 (per-node observability seam)
 and F-S5 (stub-branching unification) are subsumed by Phase 2 and
