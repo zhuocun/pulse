@@ -34,12 +34,12 @@
       "agentId": "bc-371b0d99-d2fe-4293-b87b-de17d65cba93",
       "runId": "run-5d962c3f-6da3-46c6-9be4-2ad38cd17dce",
       "parentAgentId": "bc-8982741d-63f7-4d26-ba3a-c37f9a00979e",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fe-ci.md",
       "startedAt": "2026-05-10T10:21:03.419Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T10:21:05.757Z",
+      "finishedAt": "2026-05-10T10:28:46.921Z",
+      "lastUpdate": "2026-05-10T10:28:46.922Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -144,6 +144,14 @@
     {
       "at": "2026-05-10T10:19:11.833Z",
       "message": "copilot-about-popover: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-10T10:25:40.890Z",
+      "message": "verify-design-tokens-doc: SSE idle 330306ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T10:25:40.890Z",
+      "message": "verify-design-tokens-doc: tool_call idle 330307ms; last=2026-05-10T10:20:10.583Z"
     }
   ]
 }
