@@ -503,13 +503,13 @@
       "handoffPath": "handoffs/release-todo-doc-hygiene-closeout.md",
       "startedAt": "2026-05-10T16:04:37.177Z",
       "finishedAt": "2026-05-10T16:07:59.655Z",
-      "lastUpdate": "2026-05-10T16:07:59.656Z",
+      "lastUpdate": "2026-05-10T16:12:37.610Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": "verifier-failed"
     },
     {
       "name": "verify-release-todo-doc-hygiene-closeout",
@@ -530,6 +530,53 @@
       "lastUpdate": "2026-05-10T16:12:36.636Z",
       "note": "respawned by local-cli (was error; attempts=1)",
       "attempts": 2,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "integrate-non-ga-closeout-and-doc-hygiene",
+      "type": "worker",
+      "branch": "orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-release-todo-doc-hygiene-closeout"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "running",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": "2026-05-10T16:13:19.614Z",
+      "finishedAt": null,
+      "lastUpdate": "2026-05-10T16:13:19.614Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "verify-integrated-non-ga-closeout",
+      "type": "verifier",
+      "branch": "orch/non-ga-todos-2f52/verify-integrated-non-ga-closeout",
+      "startingRef": "orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene",
+      "dependsOn": [
+        "integrate-non-ga-closeout-and-doc-hygiene"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
@@ -688,6 +735,10 @@
     {
       "at": "2026-05-10T16:08:34.623Z",
       "message": "verify-release-todo-doc-hygiene-closeout: respawned by local-cli (was error)"
+    },
+    {
+      "at": "2026-05-10T16:12:37.610Z",
+      "message": "release-todo-doc-hygiene-closeout: verification recorded (verifier-failed) by verifier verify-release-todo-doc-hygiene-closeout"
     }
   ]
 }

@@ -98,6 +98,46 @@
         "Only GA blocker §1 remains open in release-todo"
       ],
       "maxAttempts": 2
+    },
+    {
+      "name": "integrate-non-ga-closeout-and-doc-hygiene",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": [
+        "verify-release-todo-doc-hygiene-closeout"
+      ],
+      "scopedGoal": "Integrate the non-GA implementation branch and doc-hygiene branch into one branch, reconcile any conflicts, and make release-todo/product-done evidence truthful on the integrated baseline.",
+      "brief": "Start from the implementation branch (close-non-ga-release-todo-items) and integrate the follow-up doc-hygiene branch commits. Ensure release-todo/product-done represent the integrated branch truthfully: if test totals are volatile across environments, replace brittle hard-coded totals with references to dated verification logs + command recipes. Keep AGENTS hygiene satisfied and preserve the 'only GA §1 open' invariant.",
+      "pathsAllowed": [
+        "backend/**",
+        "src/**",
+        "docs/status/**",
+        "docs/operations/**",
+        ".github/workflows/**"
+      ],
+      "acceptance": [
+        "Integrated branch contains both implementation closeout and doc-hygiene updates without contradictions",
+        "release-todo and product-done remain aligned and only GA §1 is open",
+        "Validation evidence on the integrated branch is captured in docs/status/verification-logs with no stale hard-coded totals"
+      ],
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-integrated-non-ga-closeout",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "integrate-non-ga-closeout-and-doc-hygiene",
+      "dependsOn": [
+        "integrate-non-ga-closeout-and-doc-hygiene"
+      ],
+      "scopedGoal": "Final independent verification that non-GA release-todo closure is truthful and stable on the integrated branch.",
+      "brief": "Re-audit docs/status/release-todo.md + docs/status/product-done.md and run the key quality gates needed to support claims. Fail if any non-GA backlog item remains open, if AGENTS closure hygiene is incomplete, or if docs contain stale test counters that conflict with fresh runs.",
+      "acceptance": [
+        "Verifier confirms only GA §1 remains open and all non-GA closure hygiene requirements are met",
+        "Verifier confirms no stale/contradictory evidence remains in status docs"
+      ],
+      "maxAttempts": 2
     }
   ]
 }
