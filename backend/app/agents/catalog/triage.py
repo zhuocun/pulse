@@ -39,6 +39,7 @@ from app.agents.context import ChatContext
 from app.agents.polish import PolishStep
 from app.agents.state import TriageState
 from app.tools.redaction import redact_dict
+from app.store import namespaces
 from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,22 @@ def _nudges_for(drift: dict[str, Any]) -> list[dict[str, Any]]:
     return nudges
 
 
+def load_profile_hint_node(state: TriageState) -> dict[str, Any]:
+    rt = get_runtime(ChatContext)
+    store = rt.store
+    ctx = rt.context or {}
+    pid = ctx.get("project_id")
+    if store is None or not isinstance(pid, str) or not pid.strip():
+        return {}
+    item = store.get(namespaces.project_profile(pid.strip()), "last_board_brief")
+    if item is None:
+        return {}
+    value = getattr(item, "value", None)
+    if isinstance(value, dict):
+        return {"profile_hint": dict(value)}
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # LLM polish schemas
 # ---------------------------------------------------------------------------
@@ -160,6 +177,13 @@ def _build_triage_prompt(state: dict[str, Any]) -> str:
     ]
     safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
     safe_nudges = redact_dict(nudge_summaries)
+    hint = state.get("_profile_hint")
+    hint_suffix = ""
+    if isinstance(hint, dict) and hint:
+        hint_suffix = (
+            f"\nPrior brief drift profile: "
+            f"{json.dumps(redact_dict(hint))}\n"
+        )
     return (
         "Rewrite the summary for each board-triage nudge below so it is "
         "specific and actionable, incorporating the signal details (e.g. "
@@ -168,6 +192,7 @@ def _build_triage_prompt(state: dict[str, Any]) -> str:
         "verbatim; do not invent new nudges. Return JSON matching the schema.\n\n"
         f"Board snapshot: {json.dumps(safe_snapshot)}\n"
         f"Nudges: {json.dumps(safe_nudges)}"
+        f"{hint_suffix}"
     )
 
 
@@ -208,6 +233,8 @@ async def _polish_triage(
     model: BaseChatModel,
     deterministic_nudges: list[dict[str, Any]],
     board_snapshot: dict[str, Any],
+    *,
+    profile_hint: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], Optional[AIMessage], int, int]:
     """4-tuple variant: returns ``(nudges, raw_msg, tokens_in, tokens_out)``.
 
@@ -216,7 +243,12 @@ async def _polish_triage(
     """
     if not deterministic_nudges:
         return deterministic_nudges, None, 0, 0
-    _state = {"_nudges": deterministic_nudges, "_snapshot": board_snapshot}
+    _state: dict[str, Any] = {
+        "_nudges": deterministic_nudges,
+        "_snapshot": board_snapshot,
+    }
+    if profile_hint:
+        _state["_profile_hint"] = profile_hint
     update, tokens_in, tokens_out = await _triage_step.run(_state, model)
     raw_msg: Optional[AIMessage] = (
         AIMessage(
@@ -303,7 +335,10 @@ class TriageAgent(BaseAgent):
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
             polished_nudges, raw_msg, _tokens_in, _tokens_out = await _polish_triage(
-                chat_model, nudges, board_snapshot
+                chat_model,
+                nudges,
+                board_snapshot,
+                profile_hint=state.get("profile_hint"),
             )
             # F-43: project_id is now in context, not state.
             project_id = _ctx.get("project_id") or ""
@@ -347,6 +382,7 @@ class TriageAgent(BaseAgent):
             TriageState,
             [
                 ("fetch_snapshot", fetch_snapshot),
+                ("load_profile_hint", load_profile_hint_node),
                 ("detect_drift", detect_drift),
                 ("generate_nudges", generate_nudges),
             ],

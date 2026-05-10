@@ -58,14 +58,14 @@ from app.middleware.rate_limit import (
 from app.middleware.idempotency_guard import IdempotencyContext
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
-from app.security import current_user_id, current_user_payload
+from app.security import current_user_id, current_user_payload_for_ai
 from app.services.project_service import is_project_manager
 from app.agents.catalog.search import semantic_search as _semantic_search
 from app.tools.redaction import redact, redact_task_fields
 from app.validation import api_error
 from app.routers._dispatch import (
     _find_suggestion,
-    chat_model_override_from_request,
+    merged_v1_chat_context,
     run_v1_route,
 )
 
@@ -511,7 +511,7 @@ def _candidates_from_context(
 async def task_draft(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -559,7 +559,7 @@ async def task_draft(
 async def task_breakdown(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -604,7 +604,7 @@ async def task_breakdown(
 async def estimate(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -641,7 +641,7 @@ async def estimate(
 async def readiness(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -680,7 +680,7 @@ async def readiness(
 async def board_brief(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -713,7 +713,7 @@ async def board_brief(
 async def search(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -882,7 +882,7 @@ def _extract_chat_response(
 async def chat(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
@@ -950,7 +950,7 @@ async def chat(
         if project_id:
             inputs["project_id"] = project_id
 
-        chat_override = chat_model_override_from_request(request)
+        chat_override = merged_v1_chat_context(project_id=project_id, request=request)
         timeout = settings.agent_request_timeout_seconds
         try:
             result, _chat_events = await asyncio.wait_for(

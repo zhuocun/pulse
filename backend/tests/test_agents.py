@@ -263,30 +263,24 @@ def test_agent_metadata_as_dict_default() -> None:
         "rate_limit": {"per_minute": 60, "per_hour": 600},
         "allowed_autonomy": ["suggest", "plan"],
         "tools": [],
+        "recursion_limit": 25,
+        "tags": [],
+        "context_schema": None,
     }
 
 
-def test_agent_metadata_as_dict_omits_internal_fields() -> None:
-    """``tags`` / ``recursion_limit`` / ``context_schema`` stay on the
-    dataclass for the runtime + router but are not emitted on the wire
-    -- the FE ignores them."""
-
+def test_agent_metadata_as_dict_exposes_catalog_fields() -> None:
     meta = AgentMetadata(
         name="x",
         context_schema=EchoContext,
-        tags=("a",),
+        tags=("a", "b"),
         recursion_limit=7,
     )
     payload = meta.as_dict()
-    assert "context_schema" not in payload
-    assert "tags" not in payload
-    assert "recursion_limit" not in payload
-    # The fields themselves are still present on the dataclass, since the
-    # runtime clamps recursion_limit and the router reads context_schema.
+    assert payload["tags"] == ["a", "b"]
+    assert payload["recursion_limit"] == 7
+    assert "suffix" in payload["context_schema"]
     assert meta.context_schema is EchoContext
-    assert meta.tags == ("a",)
-    assert meta.recursion_limit == 7
-
 
 def test_agent_metadata_as_dict_exposes_v21_fields() -> None:
     meta = AgentMetadata(
@@ -301,6 +295,24 @@ def test_agent_metadata_as_dict_exposes_v21_fields() -> None:
     assert payload["rate_limit"] == {"per_minute": 5, "per_hour": 60}
     assert payload["allowed_autonomy"] == ["suggest", "auto"]
     assert payload["tools"] == ["fe.boardSnapshot", "be.summarize"]
+    assert payload["recursion_limit"] == 25
+    assert payload["tags"] == []
+    assert payload["context_schema"] is None
+
+
+def test_agent_metadata_as_dict_context_schema_handles_hint_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Sch:
+        __annotations__ = {"q": int}
+
+    meta = AgentMetadata(name="x", context_schema=_Sch)
+
+    def _boom(*_a: object, **_k: object) -> dict[str, object]:  # noqa: ANN401
+        raise TypeError("unusable hints")
+
+    monkeypatch.setattr("app.agents.base.get_type_hints", _boom)
+    assert meta.as_dict()["context_schema"] == {}
 
 
 def test_agent_metadata_rejects_invalid_identity_and_limits() -> None:
@@ -2374,9 +2386,8 @@ def test_router_gets_agent_metadata(
     body = response.json()
     assert body["name"] == "echo"
     assert body["version"] == "1.0.0"
-    # recursion_limit / tags / context_schema are intentionally omitted
-    # from the wire shape (audit follow-up, item 9).
-    assert "recursion_limit" not in body
+    assert "recursion_limit" in body
+    assert isinstance(body.get("monthly_token_budget_cap"), int)
 
 
 def test_router_gets_unknown_agent_returns_404(

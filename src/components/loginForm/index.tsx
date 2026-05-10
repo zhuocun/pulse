@@ -8,7 +8,7 @@ import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
-import { writeAuthToken } from "../../utils/tokenStorage";
+import { writeAiProxyToken, writeAuthToken } from "../../utils/tokenStorage";
 
 const inputSize = "large" as const;
 
@@ -59,6 +59,9 @@ const LoginForm: React.FC<{
                 throw new Error(microcopy.feedback.loginFailedNoToken);
             }
             writeAuthToken(res.jwt);
+            if (typeof res.ai_jwt === "string" && res.ai_jwt.length > 0) {
+                writeAiProxyToken(res.ai_jwt);
+            }
             message.success(microcopy.feedback.welcomeBack);
             navigate("/projects", { viewTransition: true });
         } catch {

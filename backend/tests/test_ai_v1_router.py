@@ -1043,7 +1043,7 @@ def test_readiness_prompt_excludes_unrelated_context_tasks(
 
     class _RecordingModel:
         def with_structured_output(
-            self, _schema: Any, *, include_raw: bool = False
+            self, _schema: Any, *, include_raw: bool = False, **__: Any
         ) -> Any:
             assert include_raw
 

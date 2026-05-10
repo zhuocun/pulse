@@ -298,11 +298,11 @@ def test_configure_middleware_backends_no_raise_for_local_dev_all_memory(
     main._configure_middleware_backends(cfg)
 
 
-def test_configure_middleware_backends_warns_on_web_concurrency_2(
+def test_configure_middleware_backends_raises_on_web_concurrency_without_redis(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """WEB_CONCURRENCY=2 triggers the WARNING for memory backends."""
+    """WEB_CONCURRENCY>1 with memory backends is a hard misconfiguration."""
+
     for var in main._PRODUCTION_SHAPED_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("WEB_CONCURRENCY", "2")
@@ -316,7 +316,35 @@ def test_configure_middleware_backends_warns_on_web_concurrency_2(
         redis_uri="",
     )
 
-    with caplog.at_level(logging.WARNING, logger="app.main"):
-        main._configure_middleware_backends(cfg)  # must not raise
+    with pytest.raises(RuntimeError, match="WEB_CONCURRENCY"):
+        main._configure_middleware_backends(cfg)
 
-    assert any("WEB_CONCURRENCY" in r.getMessage() for r in caplog.records)
+
+def test_configure_middleware_backends_allows_web_concurrency_with_full_redis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Multi-worker env vars are safe when all three middleware backends use Redis."""
+
+    import fakeredis
+
+    from app.middleware import redis_backends
+
+    for var in main._PRODUCTION_SHAPED_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("WEB_CONCURRENCY", "2")
+    monkeypatch.delenv("UVICORN_WORKERS", raising=False)
+
+    cfg = replace(
+        app_settings,
+        rate_limit_backend="redis",
+        budget_backend="redis",
+        idempotency_backend="redis",
+        redis_uri="redis://127.0.0.1:1/0",
+    )
+
+    fake = fakeredis.FakeRedis()
+    monkeypatch.setattr(redis_backends, "build_redis_client", lambda _uri: fake)
+
+    backends = main._configure_middleware_backends(cfg)
+
+    assert isinstance(backends.rate_limiter, redis_backends.RedisRateLimitBackend)

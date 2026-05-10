@@ -6,15 +6,19 @@
 # `primary_region` is a starting point — pick a region close to the
 # Postgres/Mongo cluster you front.
 #
-# Why min_machines_running >= 1 and a single worker:
+# Why min_machines_running >= 1 and usually a single worker:
 #   The agent surface keeps state in-process -- the per-agent rate
 #   limiter (app/middleware/rate_limit.py), the per-project monthly
 #   budget tracker (app/middleware/budget.py), and the default
 #   in-memory LangGraph checkpointer/store all live on the heap.
 #   Letting Fly stop the only machine drops every paused agent
-#   thread on the floor, and running multi-worker uvicorn breaks the
-#   same invariants. Scale by adding more machines (each with one
-#   uvicorn worker) and switching the agent backends to postgres.
+#   thread on the floor. Raising uvicorn `--workers` above 1 on a
+#   single machine **requires** `RATE_LIMIT_BACKEND=redis`,
+#   `BUDGET_BACKEND=redis`, `IDEMPOTENCY_BACKEND=redis`, and
+#   `REDIS_URI` — otherwise `app.main` raises at startup. Scale by
+#   adding Fly machines with one worker each (in-memory middleware
+#   still splits per machine), or by proving the full Redis trio
+#   before multi-worker-per-machine.
 
 app = "pulse-backend"
 

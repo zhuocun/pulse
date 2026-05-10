@@ -55,8 +55,11 @@ from app.middleware.budget import BudgetBackend, get_budget_tracker
 from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
-from app.routers._dispatch import chat_model_override_from_request
-from app.security import current_user_id, current_user_payload
+from app.routers._dispatch import (
+    chat_model_override_from_request,
+    project_chat_model_from_map,
+)
+from app.security import current_user_id, current_user_payload_for_ai
 from app.services.project_service import is_project_manager
 from app.tools.fe_tool_schemas import fe_tool_definitions
 from app.tools.redaction import redact, redact_dict
@@ -264,6 +267,24 @@ def _coerce_context(schema: type[Any], payload: Any) -> Any:
     )
 
 
+def _project_id_from_agent_payload(payload: Mapping[str, Any]) -> Optional[str]:
+    """Best-effort ``project_id`` for per-project model routing (budget + context)."""
+
+    inputs = payload.get("inputs")
+    if isinstance(inputs, dict):
+        raw = inputs.get("project_id")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    cfg = payload.get("config")
+    if isinstance(cfg, dict):
+        conf = cfg.get("configurable")
+        if isinstance(conf, dict):
+            raw2 = conf.get("project_id")
+            if isinstance(raw2, str) and raw2.strip():
+                return raw2.strip()
+    return None
+
+
 def _request_context(
     name: str,
     payload: Mapping[str, Any],
@@ -272,16 +293,16 @@ def _request_context(
 ) -> Any:
     """Resolve the per-call context for an agent invocation.
 
-    Two sources are merged:
+    Sources are merged in order:
 
     - the ``context`` key in the JSON request body (validated against the
-      agent's declared ``context_schema``), and
-    - the ``X-Pulse-Model`` request header (only when the allowlist
-      authorises the model id).
+      agent's declared ``context_schema``),
+    - :func:`~app.routers._dispatch.project_chat_model_from_map` when
+      ``AGENT_PROJECT_CHAT_MODEL_MAP`` lists the request's ``project_id``,
+    - the ``X-Pulse-Model`` header when the allowlist authorises the id.
 
-    The header override wins on the ``chat_model`` field so an operator
-    A/B-testing a model never has it silently overridden by stale
-    payload state.  Returns ``None`` when neither source contributes.
+    Later sources win on overlapping keys; the header is last so support
+    can override tenant defaults per request.
     """
 
     body_context: Any = None
@@ -294,25 +315,54 @@ def _request_context(
             )
         body_context = _coerce_context(schema, payload.get("context"))
 
+    project_model = project_chat_model_from_map(
+        _project_id_from_agent_payload(payload),
+        settings=settings,
+    )
+
+    def _merge_chat_overlay(base: Any, overlay: Optional[Dict[str, Any]]) -> Any:
+        if overlay is None:
+            return base
+        if base is None:
+            return overlay
+        if isinstance(base, dict):
+            merged = dict(base)
+            merged.update(overlay)
+            return merged
+        try:
+            for key, value in overlay.items():
+                setattr(base, key, value)
+            return base
+        except (AttributeError, TypeError):
+            return overlay
+
+    merged_context = _merge_chat_overlay(body_context, project_model)
+
     header_override = (
         chat_model_override_from_request(request) if request is not None else None
     )
     if header_override is None:
-        return body_context
-    if body_context is None:
+        return merged_context
+    if merged_context is None:
         return header_override
-    if isinstance(body_context, dict):
-        merged = dict(body_context)
+    if isinstance(merged_context, dict):
+        merged = dict(merged_context)
         merged.update(header_override)
         return merged
-    # Pydantic / dataclass body context: assign chat_model where supported,
-    # otherwise the header override wins outright.
     try:
         for key, value in header_override.items():
-            setattr(body_context, key, value)
-        return body_context
+            setattr(merged_context, key, value)
+        return merged_context
     except (AttributeError, TypeError):
         return header_override
+
+
+def _metadata_on_wire(meta: AgentMetadata) -> dict[str, Any]:
+    """Agent metadata for public JSON, including org-wide budget disclosure."""
+
+    wire = meta.as_dict()
+    wire["monthly_token_budget_cap"] = settings.agent_budget_monthly_token_cap
+    return wire
 
 
 def _enforce_rate_limit(
@@ -554,17 +604,17 @@ def _input_token_estimate(inputs: Mapping[str, Any]) -> int:
 @router.get("", status_code=status.HTTP_200_OK)
 def list_agents(
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
 ) -> Dict[str, Any]:
     """List active and deprecated agents; ``shadow`` agents are hidden."""
 
     current_user_id(auth_payload)
-    return {"agents": [meta.as_dict() for meta in runtime.list_metadata()]}
+    return {"agents": [_metadata_on_wire(meta) for meta in runtime.list_metadata()]}
 
 
 @router.get("/_tools", status_code=status.HTTP_200_OK)
 def list_fe_tools(
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
 ) -> Dict[str, Any]:
     """Expose the FE-tool catalogue (PRD §5.4.1).
 
@@ -592,10 +642,10 @@ def list_fe_tools(
 def get_agent(
     name: str,
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
 ) -> Dict[str, Any]:
     current_user_id(auth_payload)
-    return runtime.get(name).metadata.as_dict()
+    return _metadata_on_wire(runtime.get(name).metadata)
 
 
 def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> None:
@@ -623,7 +673,7 @@ async def invoke_agent(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
@@ -747,7 +797,7 @@ async def stream_agent(
     request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload),
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:

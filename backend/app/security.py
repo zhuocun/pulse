@@ -14,6 +14,10 @@ PASSWORD_HASH_PREFIX = "pbkdf2_sha256"
 PASSWORD_HASH_ITERATIONS = 600_000
 JWT_SECRET_MIN_LENGTH = 32
 
+# Narrow scopes keep XSS from stealing a single vault that authorises REST.
+JWT_SCOPE_REST = "rest"
+JWT_SCOPE_AI_PROXY = "ai_proxy"
+
 # Stable hash a constant-time login compares against when the email
 # does not exist. Computed once at import so every code path performs
 # the same amount of work regardless of whether the user is real.
@@ -82,6 +86,20 @@ def create_token(user_id: str) -> str:
         "sub": user_id,
         "iat": issued_at,
         "exp": issued_at + timedelta(seconds=settings.jwt_expires_seconds),
+        "scp": JWT_SCOPE_REST,
+    }
+    return jwt.encode(payload, jwt_secret(), algorithm="HS256")
+
+
+def create_ai_proxy_token(user_id: str) -> str:
+    """Short-lived JWT accepted only by AI/agent routes."""
+
+    issued_at = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "iat": issued_at,
+        "exp": issued_at + timedelta(seconds=settings.jwt_ai_proxy_expires_seconds),
+        "scp": JWT_SCOPE_AI_PROXY,
     }
     return jwt.encode(payload, jwt_secret(), algorithm="HS256")
 
@@ -93,6 +111,15 @@ def decode_token(token: str) -> Dict[str, Any]:
         algorithms=["HS256"],
         options={"require": ["exp", "iat", "sub"]},
     )
+
+
+def token_scope(payload: Dict[str, Any]) -> str:
+    """Return scope; missing ``scp`` means a pre-scope token (full REST access)."""
+
+    raw = payload.get("scp")
+    if not isinstance(raw, str) or not raw.strip():
+        return JWT_SCOPE_REST
+    return raw.strip()
 
 
 def current_user_payload(authorization: str = Header(default="")) -> Dict[str, Any]:
@@ -111,6 +138,38 @@ def current_user_payload(authorization: str = Header(default="")) -> Dict[str, A
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": "invalid JWT"},
         ) from exc
+    if token_scope(payload) == JWT_SCOPE_AI_PROXY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "ai_proxy token cannot access this route"},
+        )
+    return payload
+
+
+def current_user_payload_for_ai(authorization: str = Header(default="")) -> Dict[str, Any]:
+    """Accept primary REST tokens and narrow ``ai_proxy`` tokens."""
+
+    prefix = "Bearer "
+    if not authorization or not authorization.startswith(prefix):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "empty JWT"},
+        )
+
+    token = authorization[len(prefix) :]
+    try:
+        payload = decode_token(token)
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "invalid JWT"},
+        ) from exc
+    scope = token_scope(payload)
+    if scope not in (JWT_SCOPE_REST, JWT_SCOPE_AI_PROXY):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "invalid JWT scope"},
+        )
     return payload
 
 

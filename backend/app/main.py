@@ -38,6 +38,14 @@ from app.validation import unwrap_error_detail
 logger = logging.getLogger(__name__)
 
 
+def _mount_mcp_if_enabled(application: FastAPI, cfg: Settings) -> None:
+    if not cfg.mcp_enabled:
+        return
+    from app.mcp_server import build_mcp_asgi_stack
+
+    application.mount("/mcp", build_mcp_asgi_stack())
+
+
 def _validate_cors_origin_regex(pattern: str) -> None:
     """Reject obviously-permissive CORS regexes at boot.
 
@@ -301,6 +309,20 @@ def _configure_middleware_backends(cfg: Settings) -> MiddlewareBackends:
             f"expected one of {', '.join(_SUPPORTED_IDEMPOTENCY_BACKENDS)}."
         )
 
+    worker_count = _declared_uvicorn_worker_count()
+    if worker_count > 1 and (
+        rate_backend != "redis"
+        or budget_backend != "redis"
+        or idempotency_backend != "redis"
+        or not (cfg.redis_uri or "").strip()
+    ):
+        raise RuntimeError(
+            "UVICORN_WORKERS / WEB_CONCURRENCY > 1 requires "
+            "RATE_LIMIT_BACKEND=redis, BUDGET_BACKEND=redis, "
+            "IDEMPOTENCY_BACKEND=redis, and a non-empty REDIS_URI so "
+            "quota and dedupe stay coherent across workers."
+        )
+
     rate_limiter: _rate_limit.RateLimitBackend = _rate_limit.InMemoryRateLimitBackend()
     budget_tracker: _budget.BudgetBackend = _budget.InMemoryBudgetBackend(
         monthly_cap=cfg.agent_budget_monthly_token_cap
@@ -432,6 +454,21 @@ def _is_multi_worker_or_multi_instance() -> tuple[bool, str]:
             return True, f"{var}={count} indicates multiple workers"
 
     return False, ""
+
+
+def _declared_uvicorn_worker_count() -> int:
+    """Return process uvicorn/gunicorn worker count from env, or ``1``."""
+
+    highest = 1
+    for var in ("UVICORN_WORKERS", "WEB_CONCURRENCY"):
+        raw = (os.getenv(var) or "").strip()
+        try:
+            count = int(raw)
+        except ValueError:
+            continue
+        if count > highest:
+            highest = count
+    return highest
 
 
 def _validate_memory_agent_backends(cfg: Settings) -> None:
@@ -609,3 +646,5 @@ app.include_router(ai_router.router, prefix="/api/v1/ai", tags=["ai-v1"])
 # prefixes serve identical routes; once the FE migrates we can drop it.
 app.include_router(ai_router.router, prefix="/api/ai", include_in_schema=False)
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+
+_mount_mcp_if_enabled(app, settings)

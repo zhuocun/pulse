@@ -68,6 +68,21 @@ def env_csv(name: str, default: str = "") -> tuple[str, ...]:
     return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
+def parse_project_chat_model_map(raw: str) -> dict[str, str]:
+    """Parse ``AGENT_PROJECT_CHAT_MODEL_MAP`` — comma-separated ``project_id:model_id`` segments."""
+
+    out: dict[str, str] = {}
+    for segment in raw.split(","):
+        segment = segment.strip()
+        if not segment or ":" not in segment:
+            continue
+        left, right = segment.split(":", 1)
+        project_id, model_id = left.strip(), right.strip()
+        if project_id and model_id:
+            out[project_id] = model_id
+    return out
+
+
 @dataclass(frozen=True)
 class Settings:
     database: str = os.getenv("DATABASE", "mongoDB")
@@ -87,6 +102,7 @@ class Settings:
     agent_pg_pool_size: int = env_positive_int("AGENT_PG_POOL_SIZE", "10")
     jwt_secret: str = _DEFAULT_JWT_SECRET
     jwt_expires_seconds: int = env_int("JWT_EXPIRES_SECONDS", "86400")
+    jwt_ai_proxy_expires_seconds: int = env_int("JWT_AI_PROXY_EXPIRES_SECONDS", "3600")
     cors_origins: tuple[str, ...] = env_csv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000,https://pulse-react-app.vercel.app",
@@ -124,6 +140,10 @@ class Settings:
     )
     redis_uri: str = os.getenv("REDIS_URI", "")
     agent_chat_model_provider: str = os.getenv("AGENT_CHAT_MODEL_PROVIDER", "auto")
+    # none | auto — auto enables a second provider when credentials exist.
+    agent_chat_model_failover: str = os.getenv(
+        "AGENT_CHAT_MODEL_FAILOVER", "auto"
+    ).strip().lower()
     agent_chat_model_id: str = os.getenv("AGENT_CHAT_MODEL_ID", "")
     agent_chat_model_temperature: float = env_float(
         "AGENT_CHAT_MODEL_TEMPERATURE", "0.2"
@@ -178,6 +198,17 @@ class Settings:
         "OTEL_EXPORTER_OTLP_ENDPOINT", ""
     )
     prometheus_metrics: bool = env_bool("PROMETHEUS_METRICS")
+    # When true with Postgres + pgvector, neighbours augment estimation/search.
+    agent_vector_search_enabled: bool = env_bool("AGENT_VECTOR_SEARCH_ENABLED")
+    agent_vector_dimensions: int = env_int("AGENT_VECTOR_DIMENSIONS", "16")
+    # ``project_id:model_id`` pairs; model ids must also appear in
+    # ``AGENT_CHAT_MODEL_ALLOWLIST`` when that allowlist is non-empty.
+    agent_project_chat_model_map: dict[str, str] = field(
+        default_factory=lambda: parse_project_chat_model_map(
+            _env_value("AGENT_PROJECT_CHAT_MODEL_MAP", "")
+        )
+    )
+    mcp_enabled: bool = env_bool("MCP_ENABLED")
 
 
 settings = Settings()
