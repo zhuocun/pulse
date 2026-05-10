@@ -39,6 +39,11 @@ For the live GA / blocker / soft-blocker / polish status see
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
 | Backend release gates | — | ⏳ Open for **GA §1** only (`MutationProposal` accept + undo — see [`release-todo.md`](release-todo.md)); Beta/soft/polish through §16d closed on orchestrator branch |
+| Cross-provider chat failover (`with_fallbacks`, `AGENT_CHAT_MODEL_FAILOVER`) | [`release-todo.md`](release-todo.md) §2 | ✅ Anthropic/OpenAI retryable-error failover with OTel hooks; `tests/test_llm_failover.py` |
+| Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; operator embeddings backfill remains |
+| Polish-step JSON schema (`PolishStep`, `method="json_schema"` when supported) | [`release-todo.md`](release-todo.md) §5 | ✅ Provider-level polish validation ahead of FE validators |
+| Hermetic vs real-stack tests (`integration` marker, `RUN_INTEGRATION=1`) | [`release-todo.md`](release-todo.md) §6 | ✅ Default CI stays 100%-coverage hermetic; integration suite opt-in for ops |
+| Backend CI matrix + `workflow_dispatch` modes | [`release-todo.md`](release-todo.md) §7 | ✅ Workflow definitions; numeric evidence via reruns + [`verification-logs/`](verification-logs/) (not inline totals in status docs) |
 | Fly.io default `app` in `backend/fly.toml` | [`release-todo.md`](release-todo.md) §16e | ✅ Repo default `pulse-backend` with explicit rename-before-deploy header; deployment guide + `backend/README.md` aligned |
 | Frontend CI (Prettier, ESLint check, tsc, Jest, Vite build on FE paths) | [`release-todo.md`](release-todo.md) §7b | ✅ `.github/workflows/frontend-ci.yml` |
 | `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
@@ -220,9 +225,9 @@ field value.
   `disabledForSeconds` for rate-limit errors with
   `setInterval` countdown disabling the retry button.
 - `src/__tests__/aiAccessibility.strict.test.tsx` +
-  `src/__tests__/uiAccessibility.strict.test.tsx` — 31 jest-axe tests
-  across the AI surfaces and the shared UI scaffolding they depend on.
-  `AiMatchStrengthBadge` compact-mode WCAG 4.1.2 fix.
+  `src/__tests__/uiAccessibility.strict.test.tsx` — jest-axe coverage across
+  the AI surfaces and shared UI scaffolding they depend on (re-count via
+  `npm test`). `AiMatchStrengthBadge` compact-mode WCAG 4.1.2 fix.
 
 ### v2.1 streaming infra
 
@@ -310,13 +315,15 @@ first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
 
 ## Test coverage
 
-Full FE suite: last recorded full coverage run was **142 suites / 1000
-tests, all green** (2026-05-05). The canonical current suite count for
-release verification lives in [`release-todo.md`](release-todo.md).
-Coverage on the runtime AI scope: **97% statements /
-92.37% branches / 97% functions / 97.84% lines**.
+Do **not** treat narrative counts in this section as authoritative — they go
+stale quickly. Use [`release-todo.md`](release-todo.md) (**FE verification**
+and **BE verification** snippets), the latest run in
+[`verification-logs/`](verification-logs/), and local `npm test` /
+`pytest --cov` output for current suite sizes and coverage percentages.
 
-Backend: **914+ tests passing, 100% coverage gate**.
+Coverage on the runtime AI scope from the last archived summary still reads
+**~97% statements / ~92% branches / ~97% functions / ~98% lines** on the AI
+surfaces — rerun with `--coverage` to refresh.
 
 ---
 
@@ -376,9 +383,10 @@ REACT_APP_AI_USE_LOCAL=true npm run build
 
 ## What is open
 
-For the live blocker / soft-blocker / polish list see
-[`release-todo.md`](release-todo.md).
-The mutation-lifecycle GA blocker gates public ship; the three Beta
-blockers (provider 5xx fallback, proxy-scoped JWT, real-backend
-integration tests) gate design-partner expansion; the search /
-estimation quality ceiling is the public-GA quality gate.
+For the live numbered backlog see [`release-todo.md`](release-todo.md): **only
+🛑 GA §1** (`MutationProposal` accept + undo / `fe.applyMutation` path)
+remains an open **code** gate in that file. Beta §2/§3/§6 and soft §4/§5/§7
+are ✅ there (with operator caveats: Redis bundle for multi-worker,
+`MCP_ENABLED`, pgvector backfill, pinned Actions URLs, etc.). Proposal cards
+stay gated off by default until §1 closes (see §1 mitigation in
+[`release-todo.md`](release-todo.md)).

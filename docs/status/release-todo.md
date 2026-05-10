@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (non-GA backlog closures §13–§16d + ops notes on ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``; GA §1 unchanged).
+Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integrated on ``orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene``; only 🛑 GA §1 remains open; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + command recipes below).
 
 ## TL;DR
 
@@ -31,8 +31,10 @@ Last updated: 2026-05-10 (non-GA backlog closures §13–§16d + ops notes on ``
   operator env backfill (Redis for multi-worker, `MCP_ENABLED`, model map,
   pgvector optional).
 - **Public GA is gated on the remaining GA blocker** (§1, full
-  `MutationProposal` lifecycle + undo) plus the public-GA quality
-  ceiling (§4, real RAG / vector store).
+  `MutationProposal` lifecycle + undo). §4’s optional pgvector path is
+  shipped behind env flags — production embeddings **backfill** and tuning
+  remain operator readiness work (see §4 body), not an additional numbered
+  blocker in this file.
 
 ## ⚠️ Blocker urgency — resolve before each tier
 
@@ -178,13 +180,27 @@ model supports it (falls back to the legacy structured-output path on
 ``TypeError``).  Provider-level JSON-schema enforcement therefore covers
 LLM polish passes ahead of FE validation.
 
-### ✅ 7. CI workflow — manual dispatch available; green run URL not recorded here  *(BE-only — Resolved 2026-05-10)*
+### ✅ 7. CI workflow — slim/full matrix + `workflow_dispatch`  *(BE-only — Resolved 2026-05-10)*
 
-Workflow definition unchanged.  **Evidence:** full backend matrix on this
-branch — ``1075 passed`` with ``ruff check .`` clean (``pytest`` +
-``--cov-fail-under=100``).  GitHub-hosted ``workflow_dispatch`` URLs remain
-environment-specific; treat the branch verification log as the audit trail
-until a pinned Actions URL is archived by ops.
+`.github/workflows/backend-ci.yml`: on `push` / `pull_request`, changes under
+`backend/**` (or the workflow file) run **both** `test-full` (install
+`.[dev,ai]`, `pytest` with `--cov-fail-under=100`) and `test-slim` (install
+`.[dev]`, import smoke). `workflow_dispatch` adds **mode**
+`both` \| `test-full` \| `test-slim` (default `both`).
+
+**Evidence:** Re-run the **BE verification** recipe below. **Do not treat
+fixed pass / skip / warning integers in this file as contracts** — totals
+move when tests, markers, or installed extras change (for example a venv
+without `[ai]` / `mcp` runs fewer modules than CI `test-full`). For dated
+snapshots see [`verification-logs/`](verification-logs/), including
+[`2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md`](verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md)
+and the independent slim-venv audit
+[`2026-05-10-release-todo-doc-hygiene-indep-verifier.md`](verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md).
+Use `python -m pytest -q -rs --tb=no` after a `test-full`-equivalent install
+to list opt-in skips (`RUN_INTEGRATION=1`, `PYTEST_AGENT_POSTGRES_URI`).
+
+GitHub-hosted green run URLs remain environment-specific; paste a succeeded
+`workflow_dispatch` or branch push run here when ops pins one.
 
 ### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `orch/composer-todos-979e/fe-ci-workflow`)*
 
@@ -236,7 +252,7 @@ for stub backward-compat). When using real OpenAI embeddings, the
 value is passed through `OpenAIEmbeddings(dimensions=...)`. Set `512`
 or higher for production semantic quality. **Note:** dimensions must
 match `AGENT_VECTOR_DIMENSIONS` / pgvector DDL when vector search is
-enabled (soft blocker §4 — optional neighbours, operator backfill).
+enabled (**[`release-todo.md`](release-todo.md) §4** — optional neighbours, operator backfill).
 
 ### ✅ 13. v2.1 metadata fields the FE doesn't consume  *(BE — Resolved 2026-05-10)*
 
@@ -342,8 +358,8 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | v1 JSON routes (shared runtime; deterministic + LLM-polish) | ✅ | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
 | v2.1 SSE — `board-brief-agent` | ✅ | Suggestion + citations |
 | v2.1 SSE — `task-drafting-agent` | ✅ | Two sequential interrupts auto-resumed by FE |
-| v2.1 SSE — `task-estimation-agent` | ⚠️ | Quality bounded by §4 |
-| v2.1 SSE — `search-agent` | ⚠️ | Quality bounded by §4 (FE-candidate ranking only) |
+| v2.1 SSE — `task-estimation-agent` | ⚠️ | §4 optional neighbours when `AGENT_VECTOR_SEARCH_ENABLED` + operator embeddings backfill; otherwise FE `similar_tasks` / caps apply |
+| v2.1 SSE — `search-agent` | ⚠️ | §4 optional vector augment when enabled + backfilled; otherwise FE `fe.searchCandidates` ranking cap applies |
 | v2.1 SSE — `chat-agent` | ✅ | Read-only tools; **proposal cards must be hidden** until §1 closes |
 | v2.1 SSE — `triage-agent` | ✅ | Deterministic; AC-V14 inbox rules enforced FE-side |
 | Per-project AI opt-out + typed 403 envelope | ✅ | Resolved 2026-05-05 |
@@ -355,7 +371,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` logs or warns on checkpoint/store memory. **Multi-worker:** `_configure_middleware_backends` **raises** when `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 unless rate + budget + idempotency are Redis-backed with `REDIS_URI` (§16d). Memory-backed middleware still **warns** under multi-instance heuristics. |
 | Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |
 | Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
-| CI matrix (slim + full install) | ⚠️ | Push/PR + `workflow_dispatch` wired; no green run URL recorded in §7 yet |
+| CI matrix (slim + full install) | ✅ | Push/PR + `workflow_dispatch` wired; rerun BE verification + see §7 / [`verification-logs/`](verification-logs/) (pinned Actions URL ops-owned) |
 
 ### Frontend
 
@@ -364,8 +380,8 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Local engine (deterministic) | ✅ | Full coverage; demo-able with no backend |
 | `useAgent("board-brief-agent")` (remote) | ✅ | Suggestion + citations rendered in `BoardBriefDrawer` |
 | `useAgent("task-drafting-agent")` (remote) | ✅ | Two sequential interrupts auto-resumed |
-| `useAgent("task-estimation-agent")` (remote) | ⚠️ | Quality bounded by §4 |
-| `useAgent("search-agent")` (remote) | ⚠️ | Quality bounded by §4 |
+| `useAgent("task-estimation-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE context caps) |
+| `useAgent("search-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE candidate cap) |
 | `useAgentChat("chat-agent")` (remote) | ✅ | SSE streaming; **proposal cards must be hidden** until BE §1 closes |
 | `useAgent("triage-agent")` (remote) | ✅ | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation) |
 | Autonomy selector UI | ⚠️ | Suggest/Plan ✅; Auto disabled with tooltip — see §8 |
@@ -375,7 +391,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` observability | ✅ | TTFT, durationMs, tokensIn/Out |
 | `Idempotency-Key` header on all AI requests | ✅ | |
 | i18n (`en`, `zh-CN`) for AI surfaces | ✅ | Including autonomy selector keys |
-| jest-axe a11y coverage | ✅ | 31 tests across all AI surfaces |
+| jest-axe a11y coverage | ✅ | Covered across AI surfaces (re-count via `npm test`) |
 | `REACT_APP_AI_BASE_URL` validation (rejects `javascript:` / `data:` / `file:`) | ✅ | |
 | `Disable AI for this project` switch | ✅ | `boardCopilot:disabledProjectIds` |
 | `Board Copilot` runtime toggle | ✅ | `boardCopilot:enabled` |
@@ -405,8 +421,9 @@ features above. Detailed PR-by-PR history lives in git log.
    graph (LLM-polish caveat noted) so the FE inbox is fed by a real
    agent, not client-side heuristics.
 6. **Tier 6 — Search agent.** Ship `search-agent` as a v2.1
-   LangGraph agent backed by FE-supplied candidates (real vector
-   RAG remains open as soft blocker §4).
+   LangGraph agent backed by FE-supplied candidates; optional pgvector-backed
+   augmentation ships under §4 (`AGENT_VECTOR_SEARCH_ENABLED`) with operator
+   embeddings backfill.
 7. **Tier 7 — Brief recommendations.** Add `recommendationDetail`
    to `board-brief-agent` so the FE Brief drawer renders structured
    recommendations, not just prose.
@@ -427,9 +444,9 @@ features above. Detailed PR-by-PR history lives in git log.
    keep one worker or scale horizontally one worker per container.
 
 Open work above Tier 9 that this file still tracks: **GA §1** (mutation
-proposal lifecycle) and the **public-GA** quality ceiling (**§4** / vector
-RAG depth — optional pgvector is shipped; production embeddings backfill
-remains operator work). Historical structural notes live in
+proposal lifecycle). **§4** optional pgvector path is shipped; production
+retrieval **depth** still depends on operator embeddings backfill and env
+alignment — not a separate numbered blocker. Historical structural notes live in
 [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 
 ## Recommended ship sequence
@@ -444,8 +461,10 @@ remains operator work). Historical structural notes live in
    before expanding external users relying on mutation proposals; keep
    proposal cards hidden until then.
 3. **Public GA.** Close the 🛑 GA blocker §1 (full
-   `MutationProposal` lifecycle + undo) and the public-GA quality
-   gate §4 (real RAG with pgvector). Surface proposal cards.
+   `MutationProposal` lifecycle + undo). Surface proposal cards after §1.
+   Treat §4 operator backfill (`task_embeddings`, matching dimensions, enabling
+   `AGENT_VECTOR_SEARCH_ENABLED`) as production readiness for retrieval-grade
+   quality — not a separate numbered blocker once the code path exists.
 
 ## Out of scope for this document
 
@@ -454,8 +473,9 @@ remains operator work). Historical structural notes live in
   `_polish_and_record`.
 - **Observability.** OpenTelemetry tracing, Prometheus metrics, and
   LangSmith are wired and tested.
-- **Auth.** JWT + project access gates are wired and tested. Open
-  security item: see Beta Blocker §3.
+- **Auth.** JWT + project access gates are wired and tested. Scoped AI
+  proxy tokens (**[`release-todo.md`](release-todo.md) §3**) narrow AI vs REST
+  bearer exposure — details in [`product-done.md`](product-done.md).
 
 ## FE verification
 
@@ -463,7 +483,7 @@ remains operator work). Historical structural notes live in
 npm install
 npm run eslint                                              # must be clean (--max-warnings 0)
 npx tsc --noEmit                                            # must be clean
-CI=true npm test -- --watchAll=false --runInBand            # 146 suites (re-counted 2026-05-10)
+CI=true npm test -- --watchAll=false --runInBand            # Jest prints suite + test totals at end; compare to verification-logs/
 npx vite build                                              # must succeed
 ```
 
@@ -471,6 +491,7 @@ npx vite build                                              # must succeed
 
 ```bash
 cd backend
-python -m pytest                                            # full suite, 100% coverage gate
+python -m pip install -e '.[dev,ai]'                        # matches CI test-full dependency surface
+python -m pytest                                            # full suite, 100% coverage gate (add -q -rs for skip reasons)
 ruff check .                                                # must be clean
 ```
