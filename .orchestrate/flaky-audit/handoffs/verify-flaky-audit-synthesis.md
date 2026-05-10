@@ -1,13 +1,13 @@
 <!-- orchestrate handoff
 task: verify-flaky-audit-synthesis
-branch: `orch/flaky-audit/flaky-audit-synthesis` (no verifier-only commits added; the synthesis branch was already complete)
-agentId: bc-5fc876f1-bae7-493e-8604-320f941ddc86
-runId: run-8bc1cc61-5d70-492f-828f-8555f00fb53a
+branch: `orch/flaky-audit/flaky-audit-synthesis` (verifier did not commit; nothing was modified, per branch discipline)
+agentId: bc-1f9f0fd7-0822-4fa7-b302-8d9c8d879872
+runId: run-a1be9e2f-71fd-46b0-8e3f-5099395de50e
 resultStatus: finished
-finishedAt: 2026-05-10T01:55:44.960Z
+finishedAt: 2026-05-10T01:55:52.951Z
 -->
 
-All checks complete. Both suites pass cleanly, all docs are well-formed, all citations resolve, and the draft PR is open. Let me write the verifier handoff.
+All 7 required sections present. The PR is open as #179 against `main`, draft, with the executive summary and a link to `docs/test-flakiness-audit.md` in the body. Verification complete.
 
 ## Verification
 unit-test-verified
@@ -16,41 +16,44 @@ unit-test-verified
 `flaky-audit-synthesis` on branch `orch/flaky-audit/flaky-audit-synthesis`
 
 ## Branch
-`orch/flaky-audit/flaky-audit-synthesis` (no verifier-only commits added; the synthesis branch was already complete)
+`orch/flaky-audit/flaky-audit-synthesis` (verifier did not commit; nothing was modified, per branch discipline)
 
 ## Execution
-- `git status && git log --oneline -20` → clean tree on `orch/flaky-audit/flaky-audit-synthesis`; `c1324b8` (consolidated doc) sits on top of three `--no-ff` merges (`7baf5c1` frontend, `6678992` backend, `ef658d5` test-infra) onto `main` at `3068065`.
-- `ls docs/ && ls docs/test-flakiness/` → confirmed `docs/test-flakiness-audit.md` plus `docs/test-flakiness/{frontend,backend,infra}.md` all exist.
-- Read `docs/test-flakiness-audit.md` end-to-end → all seven required sections present (`# Test Flakiness Audit — 2026-05-10`, `## Executive summary` with 10 bullets, `## Frontend Jest`, `## Backend pytest`, `## Shared test infrastructure`, `## Fixes shipped in this PR` table, `## Recommended follow-ups (not in this PR)` ranked S/M/L list of 12, `## How to detect future flakes`).
-- Read each per-area doc → counts of ranked suspects: frontend 6, backend 7, infra 10 (each ≥ 5, all with file:line citations).
-- Spot-check 1 (frontend): `src/components/aiTaskAssistPanel/index.test.tsx:149` → resolves to the new `advanceBy` helper (`act(() => jest.advanceTimersByTime(ms))`) introduced by `c9941a9`.
-- Spot-check 2 (backend): `backend/tests/test_agents_router_v21.py:427` → resolves to `test_invoke_returns_504_on_timeout`, which now uses `await asyncio.Event().wait()` and `_settings_with_timeout(0.1)` per the audit's claimed fix.
-- Spot-check 3 (infra): `jest.config.cjs` → contains `clearMocks: true` (line 2) and `restoreMocks: true` (line 3).
-- `nvm use 24 && NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` → **`Test Suites: 146 passed, 146 total` / `Tests: 1055 passed, 1055 total`** in 109.263 s, exit code 0.
-- `cd backend && pip install -e ".[dev,ai]" && python -m pytest` → **`1042 passed, 1 skipped, 40 warnings in 20.37s`**, `Required test coverage of 100% reached. Total coverage: 100.00%`, exit code 0. Single skip is `test_agents_postgres_live.py` (env-gated on `PYTEST_AGENT_POSTGRES_URI`, expected).
-- `gh pr view 179 --json ...` → draft PR #179 open, base `main`, head `orch/flaky-audit/flaky-audit-synthesis`, title `test(flaky-audit): consolidated flaky-test audit + initial fixes`, body opens with a link to `docs/test-flakiness-audit.md` and includes the executive summary verbatim plus the fixes table.
-- Baseline comparison: `main` (HEAD `3068065`) does not include any of the test-only fixes; AGENTS.md still documents the older envelope of "142 suites / ~980 tests" for Jest. Synthesis branch shows `146 / 1055` passing with `clearMocks/restoreMocks` enabled — i.e. the stricter mock hygiene and the new suites all stay green. No regressions introduced.
+- `git status && git log --oneline -20` → clean tree on `orch/flaky-audit/flaky-audit-synthesis`; three `--no-ff` merge commits (`ef658d5` test-infra, `6678992` backend-pytest, `7baf5c1` frontend-jest) precede the synthesis doc commit `c1324b8`.
+- `ls docs/ docs/test-flakiness/` → `docs/test-flakiness-audit.md`, `docs/test-flakiness/{frontend,backend,infra}.md` all present.
+- `grep '^## ' docs/test-flakiness-audit.md` → `Executive summary`, `Frontend Jest`, `Backend pytest`, `Shared test infrastructure`, `Fixes shipped in this PR`, `Recommended follow-ups (not in this PR)`, `How to detect future flakes` (all 7 required sections present).
+- Ranked-suspect count: frontend area doc → **6** (≥5 ✓), backend area doc → **7** rows in suspect table (≥5 ✓), infra area doc → **10** numbered items (≥5 ✓).
+- Spot-check citations resolve to real artifacts on this branch:
+  - Frontend `src/components/aiTaskAssistPanel/index.test.tsx:149` → `const advanceBy = (ms: number) => { act(() => { jest.advanceTimersByTime(ms); }); };` (per-test fake-timer helper). ✓
+  - Backend `backend/tests/test_agents_router_v21.py:427` → `def test_invoke_returns_504_on_timeout(...)` using `await asyncio.Event().wait()` with `_settings_with_timeout(0.1)`. ✓
+  - Infra `jest.config.cjs:2-3` → `clearMocks: true, restoreMocks: true`. ✓
+- `nvm use 24 && NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` (run via tmux on synthesis branch) → `Test Suites: 146 passed, 146 total` / `Tests: 1055 passed, 1055 total` / `Time: 106.044 s` / `JEST_EXIT_CODE=0`.
+- `cd backend && /workspace/.venv/bin/pip install -e ".[dev,ai]" && /workspace/.venv/bin/python -m pytest` → `1042 passed, 1 skipped, 40 warnings in 19.00s` / `Required test coverage of 100% reached. Total coverage: 100.00%` / `PYTEST_EXIT_CODE=0`. Single skip is the env-gated `test_agents_postgres_live.py` (gated on `PYTEST_AGENT_POSTGRES_URI`, unset in this VM — expected).
+- `gh pr view --json ...` → PR **#179** `test(flaky-audit): consolidated flaky-test audit + initial fixes`, state `OPEN`, base `main`, head `orch/flaky-audit/flaky-audit-synthesis`, body contains the executive-summary bullets verbatim and links to `docs/test-flakiness-audit.md` plus the three per-area docs. URL: <https://github.com/zhuocun/pulse/pull/179>.
+
+Both totals match the synthesis worker's claim exactly (1055 frontend tests / 1042+1 backend), so there is no introduced regression vs. the upstream baseline.
 
 ## Findings
-Per plan-level acceptance criterion:
-- [x] All three sibling branches merged into the synthesis branch with no unresolved conflicts: met. `git log --oneline` shows three `--no-ff` merge commits in the documented order (`ef658d5` infra → `6678992` backend → `7baf5c1` frontend), and the upstream handoff explicitly reports zero conflicts; tree is clean.
-- [x] `docs/test-flakiness-audit.md` exists with all required sections: met. All seven sections present and populated; cross-links to the three per-area docs render to real files.
-- [x] `npm test` (Jest, with documented flags) and `cd backend && pytest` both run on the synthesis branch; results captured: met. Jest 146/146 suites, 1055/1055 tests pass; pytest 1042 pass / 1 env-gated skip / 0 fail at 100 % coverage. Both exit 0.
-- [x] Draft PR opened against `main` with consolidated audit referenced in the body: met. PR #179 (`isDraft: true`, `state: OPEN`, base `main`) — body contains `docs/test-flakiness-audit.md` link and full executive summary verbatim.
-- [x] Handoff includes `## Branch` line naming the synthesis branch: met. Upstream handoff body has `## Branch` block reading `orch/flaky-audit/flaky-audit-synthesis`.
+Per acceptance criterion:
+- [x] All three sibling branches merged into the synthesis branch with no unresolved conflicts: three `--no-ff` merges visible in `git log` (`ef658d5`, `6678992`, `7baf5c1`); working tree clean. Met.
+- [x] `docs/test-flakiness-audit.md` exists with all required sections: 7/7 required `##` headings present (executive summary, frontend, backend, infra, fixes shipped, follow-ups, detection). Met.
+- [x] `docs/test-flakiness/{frontend,backend,infra}.md` exist, each with ≥5 ranked suspects + file:line citations: 6 / 7 / 10 ranked items respectively; spot-checked one citation per area resolved to real test code on this branch. Met.
+- [x] Jest + pytest both run on the synthesis branch with totals captured: `146 suites / 1055 tests passed` (jest, exit 0, 106 s) and `1042 passed, 1 skipped` (pytest, exit 0, 19 s, 100% coverage). Met.
+- [x] Draft PR opened against `main` with the consolidated audit referenced in the body: PR #179, base `main`, body contains executive summary verbatim and a link to `docs/test-flakiness-audit.md`. Met.
+- [x] Handoff includes `## Branch` line naming the synthesis branch: upstream handoff shows `## Branch ` orch/flaky-audit/flaky-audit-synthesis``. Met.
 
-Verifier-specific acceptance criteria:
-- [x] `## Verification` section emits one of the allowed verdicts: met (`unit-test-verified`).
-- [x] `## Findings` lists each plan-level acceptance criterion as met / not met with cited evidence: met.
-- [x] Numerical pass/fail counts quoted for both Jest and pytest: met (`146 suites / 1055 tests` Jest; `1042 passed, 1 skipped, 0 failed` pytest).
+Verifier-specific:
+- [x] `## Verification` emits one of the allowed verdicts (`unit-test-verified`).
+- [x] `## Findings` lists each plan-level acceptance criterion as met / not met with cited evidence.
+- [x] Numerical pass/fail counts are quoted for both Jest (`146/146 suites`, `1055/1055 tests`) and pytest (`1042 passed, 1 skipped`).
 
 Other findings (severity-ordered):
-- (low) The three frontend follow-ups in the audit doc (`aiTaskAssistPanel/agent.test.tsx`, `useAgentHealth.test.tsx` `act` wrap, `aiTaskDraftModal/agent.test.tsx` `waitFor` tightening) are explicitly out-of-scope for this PR but well-cited; planner may want to spawn an S-effort follow-up worker to land #2 (the easiest mirror of an already-shipped fix).
-- (low) Synthesis merge commits used `git commit --no-verify` to bypass commitlint on the bare merge subjects; the per-area worker commits remain conventional-commit conformant. Reasonable trade-off and disclosed in the upstream handoff, but worth keeping in mind if the team later turns on a server-side commit-lint check.
-- (low) Backend pytest run produced 40 deprecation warnings (unchanged from baseline behaviour). Not flake-inducing but a hygiene item independent of this audit.
+- (low) PR is correctly draft and uses base `main`. The draft state matches the synthesis worker's intent and the cloud-agent default — no action needed.
+- (low) The single backend skip (`test_agents_postgres_live.py`) is a deliberate, module-level `pytest.mark.skipif` keyed on `PYTEST_AGENT_POSTGRES_URI`; it is exactly the change the audit advertises as a fix. Confirmed not a regression.
+- (low) Husky `commit-msg` rejects the brief's literal merge subjects; the synthesis worker correctly used `git commit --no-verify` for *only* the three merge commits and documented this in the upstream handoff. Per-area worker commits remain conventional. Worth keeping in mind for future synthesis tasks but does not affect this verdict.
 
 ## Notes & suggestions
-- Verification reproduced the upstream handoff's numbers exactly (146/1055 Jest, 1042/1 pytest) on a fresh run from the synthesis branch — synthesis is reproducible, not a one-shot lucky pass.
-- No verifier-only commits were pushed; the branch already carried the consolidated artifact and an open draft PR. Per branch discipline ("Do NOT modify target source files"; "Do not create or rename a branch solely to match a planned branch name"), I left the tree untouched.
-- The audit doc explicitly does not enable any flake-detection tooling itself; everything in `## How to detect future flakes` is a recommendation. If the planner wants to land any of those next (e.g. `pytest-randomly`, frontend GitHub Actions workflow), they are well-scoped S/M follow-ups and could be parallelized cleanly given the per-area boundaries this audit established.
-- Single skipped pytest (`test_agents_postgres_live.py`) is a true env-gated skip (`PYTEST_AGENT_POSTGRES_URI` unset on this VM) and is the post-audit improvement (module-level `pytestmark` instead of in-body `pytest.skip`); not a regression and not a flaky-test signal.
+- Jest run wall time on this VM is ~106 s end-to-end with the documented `NODE_OPTIONS`; consistent with the AGENTS.md envelope. Pytest is ~19 s. Both well within reasonable CI ceilings.
+- Synthesis branch is doc-only on top of the three inherited test-only diffs (verified by `git log` — final commit `c1324b8` adds `docs/test-flakiness-audit.md` only). No `src/**` or `backend/app/**` source code was touched in the synthesis step itself, matching the brief's "do not regenerate" rule.
+- The audit's recommended follow-ups are well scoped and small (`agent.test.tsx` per-test timers, `useAgentHealth` `act` wrap, SSE subsequence assertions, freeze `time.time` in `test_redis_backends.py`); each is a single-file, single-PR worker task if the planner wants to chase the long tail.
+- Suggested next worker task: "land a `frontend-ci.yml` with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`" — currently the only CI workflow is `backend-ci.yml`, so today's frontend flakes only surface locally / in Husky. The audit doc lists this as the #1 follow-up (M).
