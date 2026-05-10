@@ -2,6 +2,8 @@
 
 **Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 
+**Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
+
 This document is a critical review of the current `pulse` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
 
 The plan is intentionally pragmatic: Phase 1 ("Foundations") removes the worst structural debt that everything else inherits, Phase 2 ("Surfaces") rebuilds the high-traffic screens, Phase 3 ("Polish & Accessibility") hardens the experience, and Phase 4 ("Stretch") adds nice-to-have UX.
@@ -328,6 +330,8 @@ Form-level rules:
 
 ### 2.A.4 Feedback & destructive actions
 
+**Gates:** GA Blocker [§1](release-todo.md) for the AI mutation Undo path only — the 10-second toast Undo is the FE half of the mutation lifecycle (already shipped on `MutationProposalCard`, see [§18](release-todo.md)); the BE accept/undo wiring is what §1 still tracks. The non-AI Undo work in this section has no release-tier dependency.
+
 - **Toasts (`message` / `notification`)** for non-blocking outcomes ("Task created", "Couldn't save — retry"). Place top-right, auto-dismiss after 4 s, persist on hover. Each destructive toast carries an **Undo** action for at least 5 s; on click, replay the inverse mutation against the React Query cache (covers create, update, delete on tasks/columns/projects).
 - **Modal.confirm** only for irreversible operations that cannot be undone (e.g. permanent project deletion). For reversible ones (delete column with no tasks, archive task), use a toast with Undo instead — far better than the current `Modal.confirm` everywhere pattern at `src/components/projectList/index.tsx:71–81`, `src/components/column/index.tsx:57–67`, `src/components/taskModal/index.tsx:62–72`.
 - **Inline alerts** for state that persists with the surface (e.g. "Board Copilot disabled for this project"); never blocks input.
@@ -369,6 +373,8 @@ The point of these is that they are _felt_ by the user even if no benchmark move
 - **Bundle budget.** Keep the initial JS bundle below 200 KB gzipped after Phase 1; add `rollup-plugin-visualizer` to `vite.config.ts` so regressions are visible in PRs.
 
 ### 2.A.8 AI provenance, transparency, and undo
+
+**Gates:** GA Blocker [§1](release-todo.md) for the "every AI write must be undoable" rule — the FE Undo toast / `Suggested by Copilot` badge is wired, but a real BE accept/apply/undo lifecycle is what §1 still tracks. The provenance / "Why?" rationale items have no release-tier dependency and ship as v3 UX polish (see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md)).
 
 The PRD already enforces validation; the UI should make the provenance obvious.
 

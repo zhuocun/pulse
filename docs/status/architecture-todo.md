@@ -36,6 +36,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 1 — Contract hardening
 
+**Gates:** Soft Blocker [§5](release-todo.md) (structured-output validation; partial fix shipped 2026-05-10, `create_react_agent(response_format=...)` migration remains).
+
 | Action                                                                                                                                        | Rationale                                                                                                        |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Define **Pydantic wire schemas** per agent output (`IBoardBrief`, drafts, estimate/readiness bundle, nudges) and validate before SSE emission | Matches review **F-10**; prevents silent JSON drift when LLMs replace stubs.                                     |
@@ -48,6 +50,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 2 — Stream error handling
+
+**Gates:** — (engineering quality; no direct release-tier dependency).
 
 | Action                                                                                                                     | Rationale                                                                          |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -62,6 +66,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 3 — Frontend surface simplification
 
+**Gates:** GA Blocker [§1](release-todo.md) for the `MutationProposalCard` rollout-gate row only (FE flag stays off until §1 closes); the rest is FE engineering hygiene.
+
 | Action                                                                                                                            | Rationale                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Isolate stable callbacks** from streaming identity churn in `useAgent` consumers (effects must not depend on whole hook return) | Documented anti-pattern in repo `AGENTS.md`; sweep chat, brief, assist panel, search.      |
@@ -74,6 +80,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 4 — Durable resume / state
+
+**Gates:** — (engineering quality; the F-43 sub-item already closed [§17](release-todo.md), the rest is reliability hygiene with no direct release-tier dependency).
 
 | Action                                                                                                                   | Rationale                                                                |
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
@@ -88,6 +96,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 5 — Mutation lifecycle closure
 
+**Gates:** GA Blocker [§1](release-todo.md) — this theme is the architectural plan that closes §1.
+
 | Action                                                                                                                             | Rationale                                                                                                  |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in [`release-todo.md`](release-todo.md).                                            |
@@ -100,6 +110,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 6 — Backend intelligence & resilience
+
+**Gates:** Beta Blocker [§2](release-todo.md) (provider gateway / failover), Soft Blocker [§4](release-todo.md) (real embeddings + vector store), Polish [§15](release-todo.md) (MCP mount). The remaining sub-items (`create_react_agent` migration, supervisor / shared subgraph, memory namespaces) have no release-tier dependency.
 
 | Action                                                                                                                        | Rationale                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
