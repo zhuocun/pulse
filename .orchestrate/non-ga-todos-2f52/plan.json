@@ -60,6 +60,44 @@
         "Verifier confirms AGENTS.md backlog hygiene is satisfied for all newly closed items"
       ],
       "maxAttempts": 2
+    },
+    {
+      "name": "release-todo-doc-hygiene-closeout",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": [
+        "verify-non-ga-release-todo-closure"
+      ],
+      "scopedGoal": "Apply verifier findings so AGENTS backlog hygiene is fully satisfied for non-GA release-todo closure: add explicit product-done one-liners for closed §2/§4/§5/§6/§7 work and reconcile stale open/counter text in status docs.",
+      "brief": "Use handoff findings from verify-non-ga-release-todo-closure as the source of truth for remaining cleanup. Update docs/status/product-done.md so each newly closed release-todo section from this sweep has an explicit one-line shipped entry with a release-todo pointer. Reconcile contradictory text (e.g. 'What is open' / auth section references to now-closed §3) and stale numeric evidence counts in release-todo verification snippets. Keep this task docs-only; do not reopen implementation scope unless documentation cannot be made truthful without code changes.",
+      "pathsAllowed": [
+        "docs/status/release-todo.md",
+        "docs/status/product-done.md",
+        "docs/status/verification-logs/**"
+      ],
+      "acceptance": [
+        "product-done has explicit one-line closure entries for §2, §4, §5, §6, and §7 from this sweep",
+        "release-todo and product-done no longer contradict each other about what remains open (except GA §1)",
+        "Updated docs reference current test/suite counts or avoid stale hard-coded counts"
+      ],
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-release-todo-doc-hygiene-closeout",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "release-todo-doc-hygiene-closeout",
+      "dependsOn": [
+        "release-todo-doc-hygiene-closeout"
+      ],
+      "scopedGoal": "Verify AGENTS backlog hygiene is fully met after docs closeout and no non-GA release-todo backlog remains open.",
+      "brief": "Audit docs/status/release-todo.md and docs/status/product-done.md only. Confirm that all non-GA open items are closed and each newly closed item has explicit product-done tracking entries; fail with exact missing bullets if not.",
+      "acceptance": [
+        "Verifier confirms AGENTS doc-close requirements are met for this sweep",
+        "Only GA blocker §1 remains open in release-todo"
+      ],
+      "maxAttempts": 2
     }
   ]
 }
