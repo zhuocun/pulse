@@ -11,19 +11,24 @@ Forward-looking themes for the Board Copilot agent runtime
 
 The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. Outstanding architectural gaps tracked below as Themes 5–6 (mutation lifecycle, provider gateway, real RAG, supervisor / shared subgraph, MCP) and operationally in [`release-todo.md`](release-todo.md) (GA Blocker §1, Beta Blockers §2/§3/§6, Soft Blocker §4, Polish §15–§16).
 
-## Status — 2026-05-10 (PR #177 + sweep re-audit)
+## Status — 2026-05-10 (PR #177 + two sweep re-audits)
 
 The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/complete-subagent-orchestrator-fUazo`. Specifically:
 
 - **Theme 1:** per-surface Pydantic schemas with `extra="forbid"` (`backend/app/agents/events.py:48–155`), validation hook in the runtime (`validate_suggestion_payload` at `events.py:207–249`), and golden SSE transcript tests for all six agents (`backend/tests/test_agent_sse_transcripts.py`).
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
-- **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)`; F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
+- **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)` (`src/utils/hooks/useAgent.ts:203–206`); F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
 
-Re-audit added 2026-05-10:
+Re-audit added 2026-05-10 (first sweep, on `claude/review-project-todos-8d5Oo`):
 
-- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (1,010 lines today) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
-- **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget / idempotency paths exist, but env parity must be proven before the single-worker pin is removed).
-- **Theme 6** now tracks per-tenant model selection (the `X-Pulse-Model` runtime TODO at `backend/app/agents/runtime.py:578`).
+- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (1,010 lines today; verified `wc -l`) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
+- **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget / idempotency paths exist in `backend/app/middleware/redis_backends.py`, but env parity must be proven before the single-worker pin in `backend/Dockerfile:84` and `backend/fly.toml:38` is removed).
+- **Theme 6** now tracks per-tenant model selection (the `X-Pulse-Model` runtime TODO at `backend/app/agents/runtime.py:578` — the only TODO left in the BE source tree).
+
+Re-audit added 2026-05-10 (second sweep, on `claude/review-project-todos-7UKrJ`):
+
+- All Theme 1–6 framings still match the implementation; the changes from this pass landed in [`ui-todo.md`](ui-todo.md) (stale `<a onClick>` and `CopilotAboutPopover` claims corrected) and in [`product-done.md`](product-done.md) (`taskCreator` / `columnCreator` accessibility shipped).
+- BE TODO inventory: exactly one (`runtime.py:578`). FE TODO inventory: exactly two (`copilotAboutPopover/index.tsx:114` knowledge-cutoff config source; `aiChatDrawer/index.tsx:312` v3 autonomy gate). All three are tracked here or in `release-todo.md`.
 
 Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autonomy capability gating / settings placement), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP, per-tenant model). See [`release-todo.md`](release-todo.md) for the per-item severity / status.
 

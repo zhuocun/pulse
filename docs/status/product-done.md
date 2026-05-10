@@ -49,6 +49,12 @@ For the live GA / blocker / soft-blocker / polish status see
 | Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [`release-todo.md` §3](release-todo.md)) |
 | `AGENT_PROPOSAL_UNDONE` end-to-end Undo flow | — | ⏳ Deferred (BE mutation lifecycle blocks it) |
 | Triage-agent on `/projects` list page | — | ⏳ Skipped (no `project_id`; rate-limit risk) |
+| `taskCreator` / `columnCreator` keyboard + a11y rebuild | UX (ui-todo §13) | ✅ `CreateLink` and `AddColumnButton` ship as real `<button type="button">` with focus-visible styling; the always-on faux empty column is gone (collapsed-button → input on click) |
+| `column` task card + dropdown actions a11y | UX (ui-todo §21) | ✅ `TaskCard` is a real `<button type="button">` with `aria-label`; dropdown menu uses AntD `<Dropdown>` + `NoPaddingButton` |
+| Board task-card visual rebuild (Phase 2.4 partial) | UX (ui-todo §8) | ✅ `EpicTag`, `TaskTypeBadge` (with explicit `Bug` / `Task` text), `StoryPointsTag`, `UserAvatar` for coordinator, count `<Badge>` on column header, `MoreOutlined` dropdown trigger, `overflow-y: auto` (native scrollbar) |
+| Edit Task modal — footer-slot delete + dynamic title | UX (ui-todo §10, Phase 2.6) | ✅ `Delete` in real `Modal.footer` slot (Delete-left tablet+, stacked phone); title reads `${editTask} · ${taskName}` with type tag |
+| Auth forms — `Form.Item label`, autoComplete, show-password, caps-lock | UX (ui-todo §11, Phase 2.7) | ✅ Both `loginForm` and `registerForm` use `<Form.Item label>` with i18n labels, proper `autoComplete` attrs (`email`, `current-password`, `new-password`, `username`), show/hide password toggle, caps-lock hint, `aria-live="polite"` error region |
+| `taskSearchPanel` side-effect-in-render fix | UX (ui-todo §9) | ✅ `coordinators` and `types` derived through `useMemo` with `Set`-based deduping; no more `tasks?.map(... return null)` for side effects |
 
 ---
 
