@@ -38,6 +38,9 @@ const Section = styled.div`
     margin-top: ${space.xs}px;
 `;
 
+const SERVER_METADATA_EMPTY =
+    "Server did not publish additional limit details.";
+
 const CopilotAboutPopover: React.FC = () => {
     const isRemote = !environment.aiUseLocalEngine;
     const showServerLimits =
@@ -88,15 +91,56 @@ const CopilotAboutPopover: React.FC = () => {
                     </Typography.Paragraph>
                 );
             }
-            const { rate_limit: rate, allowed_autonomy: levels } =
-                chatMeta.data;
+            const {
+                rate_limit: rate,
+                allowed_autonomy: levels,
+                recursion_limit: recursionLimit,
+                tags,
+                context_schema: contextSchema
+            } = chatMeta.data;
             const rateLine =
                 rate &&
                 microcopy.about.rateLimitLine
                     .replace("{perMinute}", String(rate.per_minute))
                     .replace("{perHour}", String(rate.per_hour));
+            const recursionLine =
+                typeof recursionLimit === "number" &&
+                Number.isFinite(recursionLimit)
+                    ? `Recursion limit: ${recursionLimit}`
+                    : null;
+            const normalizedTags =
+                tags
+                    ?.map((tag) => tag.trim())
+                    .filter((tag) => tag.length > 0) ?? [];
+            const contextSchemaLine =
+                contextSchema &&
+                typeof contextSchema === "object" &&
+                !Array.isArray(contextSchema)
+                    ? (() => {
+                          const keys = Object.keys(contextSchema);
+                          if (keys.length === 0) return null;
+                          return `Context schema keys: ${keys.join(", ")}`;
+                      })()
+                    : null;
+            const hasDisclosedField =
+                Boolean(rateLine) ||
+                levels.length > 0 ||
+                Boolean(recursionLine) ||
+                normalizedTags.length > 0 ||
+                Boolean(contextSchemaLine);
             return (
                 <>
+                    {!hasDisclosedField ? (
+                        <Typography.Paragraph
+                            style={{
+                                marginBottom: 0,
+                                marginTop: space.xs
+                            }}
+                            type="secondary"
+                        >
+                            {SERVER_METADATA_EMPTY}
+                        </Typography.Paragraph>
+                    ) : null}
                     {rateLine ? (
                         <Typography.Paragraph
                             style={{
@@ -106,6 +150,17 @@ const CopilotAboutPopover: React.FC = () => {
                             type="secondary"
                         >
                             {rateLine}
+                        </Typography.Paragraph>
+                    ) : null}
+                    {recursionLine ? (
+                        <Typography.Paragraph
+                            style={{
+                                marginBottom: space.xxs,
+                                marginTop: 0
+                            }}
+                            type="secondary"
+                        >
+                            {recursionLine}
                         </Typography.Paragraph>
                     ) : null}
                     {levels.length > 0 ? (
@@ -132,6 +187,42 @@ const CopilotAboutPopover: React.FC = () => {
                                 ))}
                             </div>
                         </>
+                    ) : null}
+                    {normalizedTags.length > 0 ? (
+                        <>
+                            <Typography.Paragraph
+                                style={{
+                                    marginBottom: space.xxs,
+                                    marginTop: 0
+                                }}
+                                type="secondary"
+                            >
+                                Tags:
+                            </Typography.Paragraph>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 6,
+                                    marginBottom: space.xs
+                                }}
+                            >
+                                {normalizedTags.map((tag) => (
+                                    <Tag key={tag}>{tag}</Tag>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
+                    {contextSchemaLine ? (
+                        <Typography.Paragraph
+                            style={{
+                                marginBottom: space.xs,
+                                marginTop: 0
+                            }}
+                            type="secondary"
+                        >
+                            {contextSchemaLine}
+                        </Typography.Paragraph>
                     ) : null}
                 </>
             );

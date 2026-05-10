@@ -332,10 +332,12 @@ so there is little user-visible calibration for limits or wire-only policy.
 Would let the autonomy selector self-gate and a future "limits" surface
 render rate / budget visibly.
 
-**Partial (2026-05-10):** About Board Copilot now shows server `rate_limit`
-and `allowed_autonomy` for `chat-agent` (session-cached metadata fetch)
-in remote builds with a non-empty AI base URL. Other metadata fields
-remain unsurfaced.
+**Partial (2026-05-10):** About Board Copilot now shows server
+`rate_limit`, `allowed_autonomy`, `recursion_limit`, and `tags` for
+`chat-agent` (session-cached metadata fetch) in remote builds with a
+non-empty AI base URL, plus a lightweight `context_schema` key-shape
+line when present. Remaining metadata fields (if added later) remain
+unsurfaced.
 
 ### 🟡 15. MCP transport deferred  *(BE)*
 

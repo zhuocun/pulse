@@ -115,6 +115,40 @@ describe("CopilotAboutPopover", () => {
         ).toBeInTheDocument();
     });
 
+    it("does not render server metadata section in local mode", () => {
+        const getMetadataSpy = jest.spyOn(
+            agentClient,
+            "getSessionCachedAgentMetadata"
+        );
+        setLocal(true);
+        setAiBaseUrl("https://agents.example");
+        render(<CopilotAboutPopover />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "About Board Copilot" })
+        );
+        expect(
+            screen.queryByText("Server-advertised limits")
+        ).not.toBeInTheDocument();
+        expect(getMetadataSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not render server metadata section when remote base URL is empty", () => {
+        const getMetadataSpy = jest.spyOn(
+            agentClient,
+            "getSessionCachedAgentMetadata"
+        );
+        setLocal(false);
+        setAiBaseUrl("");
+        render(<CopilotAboutPopover />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "About Board Copilot" })
+        );
+        expect(
+            screen.queryByText("Server-advertised limits")
+        ).not.toBeInTheDocument();
+        expect(getMetadataSpy).not.toHaveBeenCalled();
+    });
+
     it("shows server limits from chat-agent metadata when remote with base URL", async () => {
         jest.spyOn(
             agentClient,
@@ -125,7 +159,13 @@ describe("CopilotAboutPopover", () => {
             description: "chat",
             status: "active",
             allowed_autonomy: ["suggest", "plan"] as AutonomyLevel[],
-            rate_limit: { per_minute: 20, per_hour: 200 }
+            rate_limit: { per_minute: 20, per_hour: 200 },
+            recursion_limit: 12,
+            tags: ["stable", "fast-path"],
+            context_schema: {
+                project_id: "string",
+                thread_id: "string"
+            }
         });
         setLocal(false);
         setAiBaseUrl("https://agents.example");
@@ -141,7 +181,40 @@ describe("CopilotAboutPopover", () => {
                 screen.getByText("Rate limit: 20 / min · 200 / hour")
             ).toBeInTheDocument();
         });
+        expect(screen.getByText("Recursion limit: 12")).toBeInTheDocument();
+        expect(screen.getByText("Tags:")).toBeInTheDocument();
+        expect(screen.getByText("stable")).toBeInTheDocument();
+        expect(screen.getByText("fast-path")).toBeInTheDocument();
+        expect(
+            screen.getByText("Context schema keys: project_id, thread_id")
+        ).toBeInTheDocument();
         expect(screen.getByText("suggest")).toBeInTheDocument();
         expect(screen.getByText("plan")).toBeInTheDocument();
+    });
+
+    it("shows a graceful empty state when metadata has no disclosed limits", async () => {
+        jest.spyOn(
+            agentClient,
+            "getSessionCachedAgentMetadata"
+        ).mockResolvedValue({
+            name: "chat-agent",
+            version: "1.1.0",
+            description: "chat",
+            status: "active",
+            allowed_autonomy: []
+        });
+        setLocal(false);
+        setAiBaseUrl("https://agents.example");
+        render(<CopilotAboutPopover />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "About Board Copilot" })
+        );
+        await waitFor(() => {
+            expect(
+                screen.getByText(
+                    "Server did not publish additional limit details."
+                )
+            ).toBeInTheDocument();
+        });
     });
 });

@@ -19,6 +19,9 @@ export interface AgentMetadata {
     allowed_autonomy: AutonomyLevel[];
     tools?: string[];
     rate_limit?: { per_minute: number; per_hour: number };
+    recursion_limit?: number;
+    context_schema?: Record<string, unknown>;
+    tags?: string[];
     /** When set on the wire, overrides `REACT_APP_AI_KNOWLEDGE_CUTOFF` in UI disclosure. */
     knowledge_cutoff?: string;
 }
