@@ -32,10 +32,6 @@ Both apps deploy through Vercel's GitHub integration on every push to the tracke
 
 `backend/Dockerfile` and `backend/fly.toml` are kept as a fallback — anyone can `cd backend && fly deploy` from a Fly-authenticated machine — but they're not on the active deploy path.
 
-### Manual steps after merging this branch
-
-The only step that can't be done in the repo is repointing the BE Vercel project; see [`migration-todo-list.md`](./migration-todo-list.md) for the full handoff.
-
 ### Post-merge verification checklist
 
 - [ ] FE Vercel project still builds and serves the app at its existing URL.
@@ -106,11 +102,11 @@ The runtime toggle (per browser) overrides nothing about availability — it onl
 
 ### Validation and safety
 
-Every model-supplied identifier (`columnId`, `coordinatorId`, similar `taskId`s) is cross-checked against the React Query cache before any UI action; unknown ids are dropped or replaced with safe defaults. Story points are clamped to `1/2/3/5/8/13`. AI suggestions are advisory only — every write to the board still goes through the user clicking Submit and the existing `useReactMutation` plumbing. Note: there is an open privacy-copy alignment item — several routes (estimate, search, chat) include `task.note` in their payloads while the UI currently displays "no notes shared"; see `AI_UX_OPTIMIZATION_PLAN.md §P0-1` for the remediation plan.
+Every model-supplied identifier (`columnId`, `coordinatorId`, similar `taskId`s) is cross-checked against the React Query cache before any UI action; unknown ids are dropped or replaced with safe defaults. Story points are clamped to `1/2/3/5/8/13`. AI suggestions are advisory only — every write to the board still goes through the user clicking Submit and the existing `useReactMutation` plumbing. Note: there is an open privacy-copy alignment item — several routes (estimate, search, chat) include `task.note` in their payloads while the UI currently displays "no notes shared"; see `docs/ai-ux-optimization-plan.md §P0-1` for the remediation plan.
 
-For the full design, see [docs/prd/board-copilot.md](docs/prd/board-copilot.md). For what has shipped vs what is still open, see [docs/prd/board-copilot-progress.md](docs/prd/board-copilot-progress.md).
+For the full design, see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md) (the original v1 design has been archived to [docs/archive/prd/board-copilot-v1.md](docs/archive/prd/board-copilot-v1.md)). For what has shipped vs what is still open, see [docs/prd/board-copilot-progress.md](docs/prd/board-copilot-progress.md).
 
-For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility (deferred — see `backend/docs/AI_REMAINING_WORK.md`), and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The v1 local engine remains the read-only fallback when the agent server is unreachable.
+For the **v2.1 redesign** of the AI features — named LangGraph agents over the existing `POST /api/v1/agents/{name}/stream` endpoint, a simplified autonomy dial, Action History + toast Undo, a triage Inbox, a `Cmd/Ctrl+K` palette, MCP compatibility (deferred — see `backend/docs/ai-remaining-work.md`), and server-side redaction — see [docs/prd/board-copilot-v2.1-agent.md](docs/prd/board-copilot-v2.1-agent.md). The v1 local engine remains the read-only fallback when the agent server is unreachable.
 
 ## Board Copilot v2.1 (Phase A scaffolding)
 

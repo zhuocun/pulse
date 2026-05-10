@@ -5,15 +5,15 @@
 structural review and forward-looking restructuring plan.
 
 **Companion docs**:
-- `AGENT_ARCHITECTURE_REVIEW_2026_05_08.md` — granular findings catalogue
+- `agent-architecture-review-2026-05-08.md` — granular findings catalogue
   for fixes that shipped on `claude/review-agent-architecture-o0U5x`.
   This document does not duplicate those entries; it is a complement that
   steps back to the layer-coupling and duplication patterns the
   per-finding pass left in place.
-- `AI_ARCHITECTURE_REVIEW.md` — earlier structural concerns (provider
+- `ai-architecture-review.md` — earlier structural concerns (provider
   gateway, ReAct prebuilt, multi-agent orchestration). Several items
   there map onto the phases below.
-- `AI_REMAINING_WORK.md` — operational backlog.
+- `../../backend/docs/ai-remaining-work.md` — operational backlog.
 
 The 2026-05-08 review's deferred items F-G2 (per-node observability seam)
 and F-S5 (stub-branching unification) are subsumed by Phase 2 and
