@@ -362,21 +362,24 @@ are defined but unused.
 - Detail: F-13 / F-14 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Quality-of-life, not GA-gating.
 
-### 🟡 16b. `useAgent.ts` is a 1,010-line monolith  *(FE)*
+### 🟡 16b. `useAgent.ts` is a 935-line monolith  *(FE)*
 
 `src/utils/hooks/useAgent.ts` owns SSE parsing, thread-id persistence,
-FE-tool auto-resume, TTFT tracking, the AC-V14 nudge inbox reducer,
+FE-tool auto-resume, TTFT tracking, and the AC-V14 nudge inbox surface,
 the autonomy gate, the per-project AI-disable check, and the proposal
 lifecycle plumbing — in one file. Every consumer that destructures the
 return shape risks the effect-loop anti-pattern documented in
 `AGENTS.md`. Cross-references: architecture-todo Theme 3 (FE surface
 simplification).
 
+- Partial (2026-05-10): AC-V14 nudge inbox state/reducer now lives in
+  `src/utils/hooks/useNudgeInbox.ts`; `useAgent.ts` re-exports
+  `reduceNudgeInbox`, `NUDGE_INBOX_MAX`, and `NUDGE_EXPIRY_MS` for
+  compatibility with existing tests/callers.
 - Action when prioritised: extract the SSE-parsing layer into a thin
-  adapter (architecture-todo Theme 3 calls this out), the nudge-inbox
-  reducer into its own module (already exported as `reduceNudgeInbox`
-  for tests — finish the move), and the FE-tool registry / auto-resume
-  loop into a separate hook (`useAgentToolResolver`).
+  adapter (architecture-todo Theme 3 calls this out), and move the
+  FE-tool registry / auto-resume loop into a separate hook
+  (`useAgentToolResolver`).
 - Quality-of-life, not GA-gating.
 
 ### 🟡 16c. `X-Pulse-Model` header / per-tenant model config  *(BE)*
