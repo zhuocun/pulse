@@ -754,7 +754,7 @@ export const enSource = {
             "Powered by a remote AI model. Your data is processed according to your privacy settings.",
         localModeDescription:
             "Running on a local AI engine. Your data stays on this device.",
-        knowledgeCutoff: "Knowledge cutoff: January 2025"
+        knowledgeCutoffTemplate: "Knowledge cutoff: {date}"
     },
     mutation: {
         riskHigh: "High risk",

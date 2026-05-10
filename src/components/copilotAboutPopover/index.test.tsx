@@ -69,7 +69,7 @@ describe("CopilotAboutPopover", () => {
             screen.getByRole("button", { name: "About Board Copilot" })
         );
         expect(
-            screen.getByText("Knowledge cutoff: January 2025")
+            screen.getByText("Knowledge cutoff: January 2026")
         ).toBeInTheDocument();
     });
 

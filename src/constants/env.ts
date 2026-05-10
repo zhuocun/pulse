@@ -14,6 +14,11 @@
  *                                Set this to "true" in .env.development and .env.test to
  *                                preserve the local-engine behavior in dev and CI.
  *   REACT_APP_AI_ENABLED       — Set to "false" to disable AI features entirely.
+ *   REACT_APP_AI_KNOWLEDGE_CUTOFF — Human-readable knowledge-cutoff label shown in
+ *                                `CopilotAboutPopover` (e.g. "January 2026").
+ *                                Single ops-controlled source when the deployed
+ *                                model changes; see also optional wire field
+ *                                `AgentMetadata.knowledge_cutoff` (preferred when present).
  *   VITE_ANALYTICS_ENDPOINT    — Full URL for analytics event batches (POST).
  *   VITE_ERROR_REPORT_ENDPOINT — Full URL for error event reports (POST).
  */
@@ -100,6 +105,11 @@ const aiMutationProposalsEnabledFlag = readEnv(
     "REACT_APP_AI_MUTATION_PROPOSALS_ENABLED"
 );
 
+const DEFAULT_AI_KNOWLEDGE_CUTOFF = "January 2026";
+const aiKnowledgeCutoff =
+    readEnv("REACT_APP_AI_KNOWLEDGE_CUTOFF")?.trim() ||
+    DEFAULT_AI_KNOWLEDGE_CUTOFF;
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -112,7 +122,9 @@ const environment = {
      * `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=true` to opt in.
      */
     aiMutationProposalsEnabled:
-        aiMutationProposalsEnabledFlag === "true" ? true : false
+        aiMutationProposalsEnabledFlag === "true" ? true : false,
+    /** Override via `REACT_APP_AI_KNOWLEDGE_CUTOFF` (see file header). */
+    aiKnowledgeCutoff
 };
 
 export default environment;
