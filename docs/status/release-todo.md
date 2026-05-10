@@ -288,14 +288,17 @@ flow remains gated on GA Blocker §1.
 `enforce_request_limits` added to every v1 (`POST /api/ai/*`) and v2.1
 (`POST /api/v1/agents/*/{invoke,stream}`) endpoint. Defaults: 64 KiB
 total body, 8 KiB prompt, 50 messages, 8 KiB per-message content.
-Returns HTTP 413 on violation. 13 new tests in `tests/test_ai_limits.py`.
+Returns HTTP 413 on violation. **18 tests in `tests/test_ai_limits.py`**
+(grew past the 13 cited in the original PR as edge cases were added;
+re-counted 2026-05-10).
 
 ### 🟡 11. PII leak from `/estimate` and `/readiness` task fields  *(BE — Resolved 2026-05-05, `0e990e4`)*
 
 `taskName`, `note`, `epic`, and `coordinatorId` on `/estimate` and
 `/readiness` requests now run through `redact_task_fields` before the
-LLM polish call. Closes the leak documented in PRD §5A.10. 9 new
-tests in `tests/test_ai_redaction.py`.
+LLM polish call. Closes the leak documented in PRD §5A.10. **20 tests
+in `tests/test_ai_redaction.py`** (grew past the 9 cited in the
+original PR as the redaction surface widened; re-counted 2026-05-10).
 
 ### 🟡 12. Embedding dimensions hard-pinned to 16  *(BE — Resolved 2026-05-05, `0e990e4`)*
 
@@ -444,8 +447,8 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Idempotency (Redis-backed) | ✅ | Now also enforced on the SSE `/stream` initial POST (2026-05-05) |
 | Durable checkpointing (Postgres when configured) | ✅ | Local/dev default remains `memory`; production resume durability needs `AGENT_CHECKPOINT_BACKEND=postgres` |
 | OpenTelemetry tracing + Prometheus metrics + LangSmith | ✅ | |
-| Boot-time prod guard (refuses `memory` backends) | ✅ | |
-| Boot-time prod guard (explicit provider without API key) | ✅ | Added 2026-05-05 |
+| Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` (`backend/app/main.py:437–493`) and the middleware-backend warning (`main.py:309–333`) **log a warning**, they do not raise. The single-worker pin (§16d) is what actually keeps the in-memory state from drifting today; the warning is the prompt to fix the env before lifting `--workers 1`. |
+| Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |
 | Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
 | CI matrix (slim + full install) | ⚠️ | Wired but not yet run — see §7 |
 
@@ -509,9 +512,14 @@ features above. Detailed PR-by-PR history lives in git log.
 9. **Tier 9 — Production middleware and observability.** Per-project
    AI-disable flag, per-agent rate limiting, per-project monthly
    token budget, Stripe-style idempotency dedup, OpenTelemetry
-   tracing, Prometheus metrics, LangSmith tracing — plus the
-   boot-time `RuntimeError` that refuses to start production with
-   any middleware backend left at `memory`.
+   tracing, Prometheus metrics, LangSmith tracing — plus boot-time
+   guards: `_validate_memory_agent_backends` **logs a warning** when
+   memory backends run on a production-shaped deploy, and
+   `assert_provider_available` **raises `RuntimeError`** when an
+   explicit Anthropic/OpenAI provider is set without its API key.
+   The single-worker uvicorn pin (§16d) is what actually keeps
+   in-memory state coherent today; the warning is the operator
+   prompt to fix the env before that pin is lifted.
 
 Open work above Tier 9 is what remains in this doc: MCP transport,
 real vector store / RAG, FE-consumed metadata trim, CI matrix
