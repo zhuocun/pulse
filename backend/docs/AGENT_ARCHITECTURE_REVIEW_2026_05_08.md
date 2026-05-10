@@ -10,6 +10,8 @@ This document is a structural complement: it catalogues the issues found in this
 
 **Current status (2026-05-09)**: the actionable follow-up work from this pass is complete. The follow-up on `cursor/finish-agent-architecture-review-14d2` added shared v1 route metadata, logical idempotency-operation keys for v1 and v2.1 agent calls, and an opt-in live Postgres smoke test. `cursor/finish-agent-architecture-review-b59f` re-verified this status against the current code and tightened the decision log. F-G2 (`RunContext`) and F-S5 (stub-branching unification) remain deliberately deferred until a catalog agent needs those seams.
 
+**Re-verified 2026-05-10** (`claude/complete-subagent-orchestrator-bswBw`): grepped `backend/app/agents/`, `backend/app/routers/agents.py`, `backend/app/routers/ai.py` for `TODO` / `FIXME` / `XXX` / `F-G2` / `F-S5` / `review-agent-architecture` and confirmed no residue from this review remains in code. F-G2 still has zero catalog-node consumers (no node imports `logging` for span-like attribute emission), and `chat-agent` is still the only `bind_tools` agent, so both deferrals continue to apply.
+
 ---
 
 ## Findings catalogue
@@ -227,7 +229,7 @@ Step 1 (introduce DI getters with the singleton as default) shipped on `claude/f
 
 ## Pickup checklist for the next pass
 
-After the `cursor/finish-agent-architecture-review-b59f` re-check, no code work remains from this review. The remaining items are conditional design seams:
+After the `cursor/finish-agent-architecture-review-b59f` re-check (and the 2026-05-10 re-verification on `claude/complete-subagent-orchestrator-bswBw`), no code work remains from this review. The remaining items are conditional design seams:
 
 1. **F-G2 (RunContext)** — schedule when a catalog agent first asks for a tracing seam. Ship it with an actual node-level span attribute or metric so the context propagation design is exercised end-to-end.
 2. **F-S5 (stub-branching unification)** — revisit if a second non-structured agent appears (e.g. a multi-turn planning agent) with the same `bind_tools`, cancellation, and stub-fallback shape as `chat`.

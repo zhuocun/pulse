@@ -53,6 +53,13 @@ preserve.
 Implementation tracked on `claude/review-agent-architecture-drvY9`,
 continued on `claude/complete-subagent-orchestrator-fbQHj`.
 
+**Re-verified 2026-05-10** (`claude/complete-subagent-orchestrator-bswBw`):
+every Phase 1–6 row, every architectural follow-up, and every latent
+defect listed below is still marked Resolved against the current code.
+No new residue has appeared since the last re-check. F-G2 and F-S5
+remain conditional and have no waiting consumer (see the 2026-05-08
+companion doc for the deferral rationale).
+
 ### Phase 1 — Collapse the v1 shim onto the agent runtime — **complete**
 
 | Item | Status | Commit |
