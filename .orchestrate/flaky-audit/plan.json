@@ -37,7 +37,7 @@
         "Handoff includes a `## Branch` line and a `## Suggested follow-ups` section."
       ],
       "verify": "## Setup\n- `nvm use 24` from repo root.\n- `npm ci` if `node_modules/` is missing on the cloned worker branch.\n\n## Automated\n- `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` from repo root. Capture pass/fail counts.\n\n## Manual\n- Spot-check the audit doc references actually point at lines that exist in the cited test file on the worker branch.\n\n## Gotchas\n- `--forceExit` is required; without it the suite hangs on open handles and exit codes are unreliable.\n- React 19 batching means waitFor + act ordering can hide races; verify any waitFor changes survive a few re-runs.",
-      "model": "gpt-5.5-high-fast",
+      "model": "gpt-5.3-codex-high-fast",
       "maxAttempts": 2,
       "openPR": false
     },
@@ -64,7 +64,7 @@
         "Handoff includes `## Branch` and `## Suggested follow-ups` sections."
       ],
       "verify": "## Setup\n- `cd backend && pip install -e \".[dev,ai]\"`.\n\n## Automated\n- `cd backend && pytest`. Capture pass/fail counts and failing-test names.\n\n## Manual\n- Verify cited file:line references actually point at the tests claimed.\n\n## Gotchas\n- `test_agents_postgres_live.py` and `test_redis_backends.py` need real services; if they collect-only or are skipped on this VM, mark them inconclusive rather than passed.",
-      "model": "gpt-5.5-high-fast",
+      "model": "gpt-5.3-codex-high-fast",
       "maxAttempts": 2,
       "openPR": false
     },
@@ -92,7 +92,7 @@
         "Handoff includes `## Branch` and `## Verification` (a sentence saying whether you ran tests and what they reported)."
       ],
       "verify": "## Setup\n- `nvm use 24` and `npm ci` if needed.\n\n## Automated\n- `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` (only if you actually changed Jest config or setup files).\n\n## Manual\n- Spot-check that the audit's claims about config files point at real lines.\n\n## Gotchas\n- Modifying `setupTests.ts` is high-blast-radius; treat any change there with extreme caution.",
-      "model": "gpt-5.5-high-fast",
+      "model": "composer-2-fast",
       "maxAttempts": 2,
       "openPR": false
     },
