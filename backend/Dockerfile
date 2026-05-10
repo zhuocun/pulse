@@ -9,14 +9,18 @@
 #      image with only libpq5 (the runtime dep for psycopg) so the final
 #      image stays small and free of compilers.
 #
-# Workers are pinned to 1 on purpose. The agent surface relies on
-# in-process state -- the per-user/agent token-bucket rate limiter
-# (app/middleware/rate_limit.py), the per-project monthly budget
-# tracker (app/middleware/budget.py), and the default in-memory
-# LangGraph checkpointer/store -- which cannot be coordinated across
-# uvicorn workers. Scale horizontally by running multiple containers
-# with sticky session routing (or a Postgres-backed checkpointer/store
-# plus a shared rate-limit/budget store) instead of raising --workers.
+# Workers are pinned to 1 on purpose: rate limiting
+# (app/middleware/rate_limit.py), budgeting (app/middleware/budget.py),
+# and default in-memory LangGraph checkpoint/store are process-local unless
+# replaced with shared backends.
+#
+# Raising --workers above 1 needs Redis-backed middleware: set
+# RATE_LIMIT_BACKEND=redis, BUDGET_BACKEND=redis, IDEMPOTENCY_BACKEND=redis,
+# and REDIS_URI (same pattern as backend/docker-compose.yml). Without that,
+# per-worker state diverges.
+#
+# Still prefer multiple containers plus sticky routing unless the full Redis
+# wiring (and durable checkpointing where required) is intentional.
 
 # -------- Stage 1: build the venv --------
 FROM python:3.12-slim AS builder
@@ -78,7 +82,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)" || exit 1
 
-# --workers 1: see header comment. --proxy-headers + --forwarded-allow-ips=*
-# trust the X-Forwarded-* set by Fly/Render/ECS load balancers so request.client
-# and request.url.scheme reflect the real caller.
+# --workers 1: see header for Redis middleware env vars before raising.
+# --proxy-headers + --forwarded-allow-ips=* trust X-Forwarded-* from Fly/Render/ECS
+# load balancers so request.client and request.url.scheme reflect the real caller.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
