@@ -1,0 +1,96 @@
+{
+    "$schema": "../../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+    "goal": "Implement the to-do items with Composer 2: ship docs/status release and UI backlog slices (FE CI workflow, CopilotAboutPopover i18n + knowledge-cutoff sourcing, docs/design-tokens.md) using cloud workers on model composer-2-fast. Follow .orchestrate/composer-todos-979e/bootstrap-context.md; on closure update docs/status per AGENTS.md (remove/strike todo lines + one-liner in product-done.md).",
+    "summary": "Composer 2 workers: FE CI workflow, CopilotAbout i18n/cutoff, design-tokens doc (docs/status 7b, 20c, 20e).",
+    "selfAgentId": "bc-8982741d-63f7-4d26-ba3a-c37f9a00979e",
+    "rootSlug": "composer-todos-979e",
+    "baseBranch": "main",
+    "repoUrl": "https://github.com/zhuocun/pulse",
+    "tasks": [
+        {
+            "name": "fe-ci-workflow",
+            "type": "worker",
+            "model": "composer-2-fast",
+            "openPR": true,
+            "scopedGoal": "Add .github/workflows/frontend-ci.yml for FE path triggers; run prettier --check, non-fix eslint, typecheck, Jest, and vite build at repo root. Align structure with backend-ci.yml. Update docs/status (release-todo §7b, ui-todo §20d, product-done) per AGENTS.md when done.",
+            "brief": "Read .orchestrate/composer-todos-979e/bootstrap-context.md FE CI section. Reference .github/workflows/backend-ci.yml. Do not use eslint --fix in CI.",
+            "pathsAllowed": [
+                ".github/workflows/**",
+                "docs/status/**"
+            ],
+            "acceptance": [
+                "workflow file exists and paths filters cover FE",
+                "CI runs install + prettier check + eslint check + typecheck + jest + build without mutating sources",
+                "docs/status updated if the item is fully closed"
+            ]
+        },
+        {
+            "name": "verify-fe-ci",
+            "type": "verifier",
+            "verifies": "fe-ci-workflow",
+            "scopedGoal": "Confirm frontend-ci.yml is valid GHA YAML, path filters are sensible, and commands match package.json scripts intent; confirm status docs reflect closure only if true.",
+            "dependsOn": ["fe-ci-workflow"],
+            "acceptance": [
+                "Workflow would catch a broken Jest or tsc on a PR touching src/",
+                "No secret tokens required for the workflow file itself"
+            ]
+        },
+        {
+            "name": "copilot-about-popover",
+            "type": "worker",
+            "model": "composer-2-fast",
+            "openPR": true,
+            "scopedGoal": "Close ui-todo §20c: i18n mode tags in CopilotAboutPopover; replace static knowledge-cutoff TODO with config- or metadata-driven value. Update en/zh-CN microcopy and tests. Update docs/status if fully resolved.",
+            "brief": "Read .orchestrate/composer-todos-979e/bootstrap-context.md CopilotAbout section. Files: src/components/copilotAboutPopover/index.tsx, src/constants/microcopy.ts, src/i18n/locales/*.ts, src/interfaces/agent.d.ts if needed.",
+            "pathsAllowed": [
+                "src/components/copilotAboutPopover/**",
+                "src/constants/microcopy.ts",
+                "src/i18n/locales/**",
+                "src/interfaces/agent.d.ts",
+                "src/utils/ai/agentClient.ts",
+                "docs/status/**",
+                "src/__tests__/**"
+            ],
+            "acceptance": [
+                "No raw English mode strings in JSX for Remote/Local labels",
+                "Knowledge cutoff not a stale one-off string without a single documented source",
+                "Tests pass"
+            ]
+        },
+        {
+            "name": "verify-copilot-about",
+            "type": "verifier",
+            "verifies": "copilot-about-popover",
+            "scopedGoal": "Verify i18n keys exist in en and zh-CN; verify knowledge cutoff wiring is coherent; spot-check a11y strings.",
+            "dependsOn": ["copilot-about-popover"],
+            "acceptance": [
+                "Both locales define new keys",
+                "Popover still renders without throwing when offline/local engine"
+            ]
+        },
+        {
+            "name": "design-tokens-doc",
+            "type": "worker",
+            "model": "composer-2-fast",
+            "openPR": true,
+            "scopedGoal": "Create docs/design-tokens.md as the contributor reference for src/theme/tokens.ts and antdTheme.ts per ui-todo §20e / §2.C. Update docs/status when done.",
+            "brief": "Read .orchestrate/composer-todos-979e/bootstrap-context.md. Summarize scales (space, palette, typography, motion) and how antdTheme maps them; keep concise.",
+            "pathsAllowed": ["docs/design-tokens.md", "docs/status/**"],
+            "acceptance": [
+                "docs/design-tokens.md exists and points to the real modules",
+                "docs/status reflects the doc landing"
+            ]
+        },
+        {
+            "name": "verify-design-tokens-doc",
+            "type": "verifier",
+            "verifies": "design-tokens-doc",
+            "scopedGoal": "Confirm docs/design-tokens.md references real exports/paths and ui-todo §20e can be struck if workers updated status accurately.",
+            "dependsOn": ["design-tokens-doc"],
+            "acceptance": [
+                "Doc links match files under src/theme/",
+                "No obvious copy-paste drift from tokens.ts"
+            ]
+        }
+    ]
+}
