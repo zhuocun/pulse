@@ -2,6 +2,7 @@ import { ArrowRightOutlined } from "@ant-design/icons";
 import { Button, Drawer, Grid, Space, Tabs, Typography } from "antd";
 import { type FC, useEffect, useState } from "react";
 
+import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 import AiSparkleIcon from "../aiSparkleIcon";
 
@@ -98,7 +99,7 @@ const CopilotShell: FC<CopilotShellProps> = ({
         <Space align="center" size={space.xs}>
             <AiSparkleIcon aria-hidden size="sm" />
             <span style={{ fontWeight: fontWeight.semibold }}>
-                Board Copilot
+                {microcopy.copilotShell.title}
             </span>
         </Space>
     );
@@ -106,36 +107,38 @@ const CopilotShell: FC<CopilotShellProps> = ({
     const tabItems = [
         {
             key: "chat",
-            label: "Chat",
+            label: microcopy.copilotShell.tabs.chat,
             children: (
                 <PlaceholderTab
-                    description="Ask Board Copilot anything about your board — tasks, blockers, priorities, and more."
-                    ctaLabel="Open Chat"
+                    description={microcopy.copilotShell.placeholders.chat}
+                    ctaLabel={microcopy.copilotShell.ctaOpenChat}
                     onCta={onOpenChat}
                 />
             )
         },
         {
             key: "brief",
-            label: "Brief",
+            label: microcopy.copilotShell.tabs.brief,
             children: (
                 <PlaceholderTab
-                    description="Get an AI-generated summary of board health, blockers, and workload distribution."
-                    ctaLabel="Open Brief"
+                    description={microcopy.copilotShell.placeholders.brief}
+                    ctaLabel={microcopy.copilotShell.ctaOpenBrief}
                     onCta={onOpenBrief}
                 />
             )
         },
         {
             key: "activity",
-            label: "Activity",
+            label: microcopy.copilotShell.tabs.activity,
             children: (
-                <PlaceholderTab description="Agent activity and triage nudges will appear here." />
+                <PlaceholderTab
+                    description={microcopy.copilotShell.placeholders.activity}
+                />
             )
         },
         {
             key: "settings",
-            label: "Settings",
+            label: microcopy.copilotShell.tabs.settings,
             children: (
                 <div
                     style={{
@@ -146,9 +149,7 @@ const CopilotShell: FC<CopilotShellProps> = ({
                         style={{ fontSize: fontSize.sm }}
                         type="secondary"
                     >
-                        Copilot settings — autonomy level, privacy, and
-                        per-project controls — are managed via the board
-                        settings menu.
+                        {microcopy.copilotShell.settingsBody}
                     </Typography.Text>
                 </div>
             )
