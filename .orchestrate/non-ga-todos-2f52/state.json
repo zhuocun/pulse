@@ -454,14 +454,14 @@
       "resultStatus": "finished",
       "handoffPath": "handoffs/close-non-ga-release-todo-items.md",
       "startedAt": "2026-05-10T14:59:48.183Z",
-      "finishedAt": "2026-05-10T15:57:48.769Z",
-      "lastUpdate": "2026-05-10T15:57:49.779Z",
+      "finishedAt": "2026-05-10T15:57:48.759Z",
+      "lastUpdate": "2026-05-10T15:57:48.780Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-non-ga-release-todo-closure",
@@ -479,7 +479,7 @@
       "handoffPath": null,
       "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": "2026-05-10T15:57:57.588Z",
+      "lastUpdate": "2026-05-10T15:58:03.820Z",
       "note": "spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…",
       "slackTs": null,
       "prNumber": null,
@@ -606,16 +606,16 @@
       "message": "aitaskassistpanel-suggested-by-copilot-badge: verification self-reported (live-ui-verified)"
     },
     {
-      "at": "2026-05-10T15:57:49.778Z",
+      "at": "2026-05-10T15:57:48.776Z",
+      "message": "git-sync failed (close-non-ga-release-todo-items running -> handed-off): Command failed: git -C /workspace/.orchestrate/non-ga-todos-2f52 commit -m orch: non-ga-todos-2f52 close-non-ga-release-todo-items running -> handed-off\nfatal: Unable to create '/workspace/.git/index.…"
+    },
+    {
+      "at": "2026-05-10T15:57:48.779Z",
       "message": "verify-non-ga-release-todo-closure: startingRef reconciled orch/non-ga-todos-2f52/close-non-ga-release-todo-items -> `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`) (target close-non-ga-release-todo-items handed off on actual branch)"
     },
     {
-      "at": "2026-05-10T15:57:49.779Z",
+      "at": "2026-05-10T15:57:48.781Z",
       "message": "close-non-ga-release-todo-items: verification self-reported (unit-test-verified)"
-    },
-    {
-      "at": "2026-05-10T15:57:58.529Z",
-      "message": "verify-non-ga-release-todo-closure: spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…"
     }
   ]
 }
