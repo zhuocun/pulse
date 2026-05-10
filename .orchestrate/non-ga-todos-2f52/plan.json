@@ -1,8 +1,8 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "Implement to-do items with Composer 2, run until all non-GA to-do items are complete. Non-GA means every open item in docs/status/* except GA Blocker §1 (MutationProposal accept/undo). Work from committed handoffs; follow repo AGENTS.md when closing backlog lines.",
-  "summary": "Parallel Composer-2 workers on non-GA backlog: compose idempotency Redis, Fly placeholder, CopilotShell i18n, agent metadata surfacing, backend CI dispatch hook.",
-  "selfAgentId": "bc-6ddc1f12-04bb-49da-9ddc-efe4bfef2f52",
+  "goal": "Implement to-do items with Composer 2 until the docs/status non-GA backlog is cleared. Non-GA means open items in docs/status/* excluding GA Blocker §1 (MutationProposal accept/undo). Tranche by tranche: merge handoffs, extend plan for the next scoped slice, keep AGENTS.md status hygiene (strike todos + product-done rows).",
+  "summary": "Wave 2: document backend CI manual dispatch, Dockerfile Redis-backend hints for §16d, decorative task-type icon a11y on column cards.",
+  "selfAgentId": "bc-ef458bd7-de29-4d59-a77f-43f2b0cdb654",
   "rootSlug": "non-ga-todos-2f52",
   "baseBranch": "main",
   "prBase": "main",
@@ -124,6 +124,67 @@
       "acceptance": [
         "YAML validates; workflow_dispatch is present with documented inputs or default branch",
         "Existing triggers unchanged aside from additive dispatch"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "release-ci7-dispatch-documentation",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Bring docs/status/release-todo.md §7 in sync with shipped workflow_dispatch on backend-ci: describe manual run path and mode input without claiming a green run exists until a URL is pasted.",
+      "brief": "Read `.orchestrate/non-ga-todos-2f52/bootstrap/BACKLOG_OPEN_NON_GA.md` wave-2 table. Match `.github/workflows/backend-ci.yml` inputs (`both` / `test-full` / `test-slim`). Ops still paste first green run URL when available.",
+      "pathsAllowed": [
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "**/src/**",
+        "backend/app/**",
+        ".github/workflows/frontend-ci.yml"
+      ],
+      "acceptance": [
+        "§7 references manual workflow dispatch and mode choices consistent with YAML",
+        "No false statement that GHA has been verified on main without evidence"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "dockerfile-redis-backend-hints",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Support release-todo §16d: add operator-facing comments in backend/Dockerfile near the uvicorn worker pin that lifting workers>1 requires RATE_LIMIT_BACKEND, BUDGET_BACKEND, IDEMPOTENCY_BACKEND=redis plus REDIS_URI (compose already models this).",
+      "brief": "Docs-only in Dockerfile comments unless a one-line release-todo §16d cross-reference is needed. Do not change worker count or entrypoint behavior.",
+      "pathsAllowed": [
+        "backend/Dockerfile",
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "**/src/**",
+        "backend/app/**",
+        "backend/tests/**"
+      ],
+      "acceptance": [
+        "Dockerfile comments name the three Redis-backed middleware env vars tied to multi-worker safety",
+        "No functional change to image build or default CMD unless required for accuracy"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "column-decorative-svg-a11y",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Address ui-todo §21 decorative SVG note for board task cards: ensure bug/task imagery is aria-hidden when redundant with visible type text in TaskTypeBadge.",
+      "brief": "Read bootstrap PATHS_AND_VERIFICATION.md. Keep existing screen-reader labels on type; run eslint, tsc, CI=true jest subset if column tests exist, vite build.",
+      "pathsAllowed": [
+        "src/components/column/**",
+        "docs/status/ui-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**"
+      ],
+      "acceptance": [
+        "Decorative icons do not double-announce type next to explicit text/badge",
+        "ui-todo §21 row updated if this slice closes the cited gap",
+        "eslint + tsc + CI=true jest + vite build pass"
       ],
       "openPR": false
     }
