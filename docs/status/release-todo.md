@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (BE re-verification) / 2026-05-08 (FE).
+Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project-todos-8d5Oo`).
 
 ## TL;DR
 
@@ -240,12 +240,36 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
 ### ⚠️ 7. CI workflow not yet validated against GitHub Actions  *(BE-only)*
 
-`.github/workflows/ci.yml` landed on `claude/v2.1-ai-features-vjZSA`
-(2026-05-05) but no GHA run has executed yet. The slim job
-(`pip install -e ".[dev]"` + `python -c "import app.main"`) is
-untested in the GHA environment.
+`.github/workflows/backend-ci.yml` ships two jobs (`test-full` with
+`.[dev,ai]` + full pytest, and `test-slim` with `.[dev]` only +
+`python -c "import app.main"`) scoped to `backend/**` (lines 4–17).
+GHA execution against `main` has not been verified end-to-end; status
+of the first run on this branch is still unknown.
 
 - Effort: open a PR to trigger the first run; iterate until green.
+
+### ⚠️ 7b. No FE CI workflow  *(FE-only)*
+
+`.github/workflows/` contains exactly one file: `backend-ci.yml`.
+There is **no GitHub Action that runs the FE lint, typecheck, or
+Jest suite on a PR.** Today's FE quality gate is (a) the local
+`pre-commit` hook (prettier + eslint + tsc — no Jest) and (b)
+Vercel's deploy build (`vite build` only — succeeds even if Jest
+would fail). A PR with broken Jest tests can land on `main` with no
+CI signal.
+
+**Beta tier scoping.** Internal beta accepts the gap because reviews
+catch most regressions and pre-commit catches the rest. Design-partner
+expansion needs a real CI gate so a regression cannot ship via a
+self-merged or skip-reviewed PR.
+
+- Action when prioritised: add `.github/workflows/frontend-ci.yml`
+  scoped to FE paths (mirror the `backend-ci.yml` shape) running
+  `npm ci && npm run eslint && npx tsc --noEmit && CI=true npm test
+  -- --watchAll=false --runInBand && npx vite build`. Reuse the
+  existing pre-commit step list in `package.json` so the gate cannot
+  drift from local.
+- Effort: ~2 hours (single workflow file + first green run).
 
 ### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
 
@@ -324,6 +348,69 @@ are defined but unused.
 
 - Detail: F-13 / F-14 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Quality-of-life, not GA-gating.
+
+### 🟡 16b. `useAgent.ts` is a 1,010-line monolith  *(FE)*
+
+`src/utils/hooks/useAgent.ts` owns SSE parsing, thread-id persistence,
+FE-tool auto-resume, TTFT tracking, the AC-V14 nudge inbox reducer,
+the autonomy gate, the per-project AI-disable check, and the proposal
+lifecycle plumbing — in one file. Every consumer that destructures the
+return shape risks the effect-loop anti-pattern documented in
+`AGENTS.md`. Cross-references: architecture-todo Theme 3 (FE surface
+simplification).
+
+- Action when prioritised: extract the SSE-parsing layer into a thin
+  adapter (architecture-todo Theme 3 calls this out), the nudge-inbox
+  reducer into its own module (already exported as `reduceNudgeInbox`
+  for tests — finish the move), and the FE-tool registry / auto-resume
+  loop into a separate hook (`useAgentToolResolver`).
+- Quality-of-life, not GA-gating.
+
+### 🟡 16c. `X-Pulse-Model` header / per-tenant model config  *(BE)*
+
+`backend/app/agents/runtime.py:578` carries a TODO to wire the
+`X-Pulse-Model` header to a per-tenant config in "Phase 5". The
+header path itself is wired (`backend/app/routers/_dispatch.py:46–75`)
+and gated by `AGENT_CHAT_MODEL_ALLOWLIST` (empty by default → header
+ignored), so this is **not a security exposure today**. It becomes
+relevant once design partners pick their own preferred model: today
+the only choice is a process-wide env var.
+
+- Action when prioritised: replace the runtime TODO with either a
+  per-project / per-tenant model setting (read from project metadata),
+  or document the deferred decision and remove the TODO.
+- Effort: ~1–2 days for a per-project setting + migration.
+
+### 🟡 16d. Single-worker uvicorn lock-in  *(BE)*
+
+`backend/Dockerfile:81–84` and `backend/fly.toml:17–39` pin uvicorn
+to a single worker because in-process rate-limit and budget state
+would diverge across processes. Postgres-backed checkpointing /
+Redis-backed idempotency exist; the rate-limit and budget paths still
+default to in-memory backends. Capacity ceiling is per-process today;
+horizontal scaling is blocked by this implicit invariant. Cross-ref:
+architecture-todo Theme 4.
+
+- Action when prioritised: configure `RATE_LIMIT_BACKEND=redis` and
+  `BUDGET_BACKEND=redis` in the production Vercel env (already
+  supported in `app/main.py:253–330`), then document the multi-worker
+  guarantee and remove the `workers=1` pin.
+- Effort: ~1 day (env wiring + smoke test against the existing Redis
+  backend in `app/middleware/redis_backends.py`).
+
+### 🟡 16e. `fly.toml` placeholder app name  *(BE)*
+
+`backend/fly.toml:17` ships with `app = "jira-python-server"` —
+literally a placeholder from the pre-monorepo split. The file is on
+the documented fallback path (anyone can `cd backend && fly deploy`
+from a Fly-authenticated machine) so a stale placeholder will create
+or collide with the wrong Fly app the moment that path is used.
+
+- Action when prioritised: either delete `backend/fly.toml` and
+  `backend/Dockerfile` (Vercel is the only active deploy path) and
+  update the README's "fallback" mention, or update the placeholder
+  to a documented owner-controlled value.
+- Effort: ~30 minutes.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 
@@ -443,8 +530,9 @@ migration, multi-agent orchestration, store/memory layer).
    Document the search/estimation quality ceiling in product copy.
 2. **Design-partner beta (~3 weeks).** Close every 🚧 Beta blocker:
    §2 (LiteLLM gateway / provider fallback), §3 (proxy-scoped token
-   migration), and §6 (real-backend integration tests). Keep
-   proposal cards hidden.
+   migration), and §6 (real-backend integration tests). Add a real
+   FE CI gate (§7b) so a regression cannot land via a self-merged PR.
+   Keep proposal cards hidden.
 3. **Public GA (~6–8 weeks).** Close the 🛑 GA blocker §1 (full
    `MutationProposal` lifecycle + undo) and the public-GA quality
    gate §4 (real RAG with pgvector). Surface proposal cards.
@@ -465,7 +553,7 @@ migration, multi-agent orchestration, store/memory layer).
 npm install
 npm run eslint                                              # must be clean (--max-warnings 0)
 npx tsc --noEmit                                            # must be clean
-CI=true npm test -- --watchAll=false --runInBand            # 142 suites / 1000 tests
+CI=true npm test -- --watchAll=false --runInBand            # 146 suites (re-counted 2026-05-10)
 npx vite build                                              # must succeed
 ```
 
