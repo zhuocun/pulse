@@ -207,6 +207,9 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         expect(
             screen.getByText(/Similar to other medium authentication tasks\./)
         ).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            /Suggestion ready\./i
+        );
     });
 
     it("renders readiness issues from the same surface:estimate suggestion payload", async () => {
@@ -417,6 +420,9 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         expect(
             screen.getByText(/Board Copilot hit an error/i)
         ).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            /Couldn't load suggestions\./i
+        );
     });
 
     it("does not call streamAgent directly (goes through useAgent)", () => {

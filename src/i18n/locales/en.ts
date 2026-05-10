@@ -308,6 +308,9 @@ export const enSource = {
      * lets translators reorder the noun and the verb per locale.
      */
     greeting: "Hi, {name}",
+    header: {
+        logoLabel: "Pulse home"
+    },
     board: {
         title: "Board",
         titleWithName: "{name} board",
@@ -445,6 +448,12 @@ export const enSource = {
         readinessCheck: "Readiness check",
         runningReadiness: "Running readiness check",
         readinessReady: "Looks ready to work on.",
+        suggestionStatusLoading: "Updating suggestions.",
+        suggestionStatusReady: "Suggestion ready.",
+        suggestionStatusError: "Couldn't load suggestions.",
+        briefStatusLoading: "Generating brief.",
+        briefStatusReady: "Brief ready.",
+        briefStatusError: "Couldn't load brief.",
         dismissNudge: "Dismiss",
         agentDegraded: "AI backend is slow (degraded)",
         agentOffline: "AI backend is offline",

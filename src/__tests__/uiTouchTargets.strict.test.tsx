@@ -546,7 +546,7 @@ describe("UI quality :: Header brand link size", () => {
             </BrowserRouter>
         );
 
-        const btn = screen.getByRole("button", { name: /go to projects/i });
+        const btn = screen.getByRole("button", { name: /pulse home/i });
         const decls = collectSizeDecls(btn);
         const heightPx = Math.max(
             maxPxDeclared(decls, "height"),

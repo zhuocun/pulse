@@ -299,6 +299,9 @@ const zhCN: Dictionary = {
         boardEmpty: "此看板暂无任务。"
     },
     greeting: "你好，{name}",
+    header: {
+        logoLabel: "Pulse 首页"
+    },
     board: {
         title: "看板",
         titleWithName: "{name} 看板",
@@ -422,6 +425,12 @@ const zhCN: Dictionary = {
         readinessCheck: "就绪检查",
         runningReadiness: "正在运行就绪检查",
         readinessReady: "看起来已准备就绪。",
+        suggestionStatusLoading: "正在更新建议。",
+        suggestionStatusReady: "建议已就绪。",
+        suggestionStatusError: "无法加载建议。",
+        briefStatusLoading: "正在生成简报。",
+        briefStatusReady: "简报已就绪。",
+        briefStatusError: "无法加载简报。",
         dismissNudge: "关闭",
         agentDegraded: "AI 后端响应缓慢（降级）",
         agentOffline: "AI 后端离线",

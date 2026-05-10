@@ -195,6 +195,7 @@ describe("BoardBriefDrawer — remote agent path", () => {
         expect(
             screen.getByText(/Focus on the biggest unstarted task first/)
         ).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(/Brief ready\./i);
     });
 
     it("shows skeleton after streaming persists beyond the delay", () => {
@@ -356,6 +357,9 @@ describe("BoardBriefDrawer — remote agent path", () => {
         expect(
             screen.getByText(/Couldn't generate the brief/)
         ).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            /Couldn't load brief\./i
+        );
     });
 
     it("ignores suggestion events with surface other than 'brief'", () => {

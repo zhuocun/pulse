@@ -436,7 +436,8 @@ const Header: React.FC = () => {
         <PageHeader ref={headerRef}>
             <LeftCluster>
                 <BrandLink
-                    aria-label={microcopy.a11y.goToProjects}
+                    aria-label={microcopy.header.logoLabel}
+                    title={microcopy.header.logoLabel}
                     type="link"
                     onClick={
                         path !== "/projects"
