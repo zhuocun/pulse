@@ -1,9 +1,9 @@
-# Production Readiness — Board Copilot
+# Release todo — Board Copilot production readiness
 
 Consolidated GA status and open backlog across the FastAPI agent server
 (`backend/`) and the React client (`src/`). For per-feature inventory
-see [`../prd/changelog.md`](../prd/changelog.md); for deployment
-configuration see [`deployment.md`](deployment.md).
+see [`product-done.md`](product-done.md); for deployment
+configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
 Last updated: 2026-05-10 (BE re-verification) / 2026-05-08 (FE).
 
@@ -20,44 +20,59 @@ Last updated: 2026-05-10 (BE re-verification) / 2026-05-08 (FE).
   local-engine fallback under `aiUseLocalEngine`; PRD AC-V14 nudge
   inbox; autonomy selector; observability; jest-axe a11y coverage;
   typed backend error envelopes surfaced through FE typed errors.
-- **Internal beta only.** Anything that surfaces `MutationProposalCard`
-  to the user — see Hard Blocker §1.
-- **Blocks public GA.** Three hard blockers below; the rest is
-  degraded-quality polish.
+- **Internal beta is deployable today** with `MutationProposalCard`
+  hidden via the FE flag (see GA Blocker §1 mitigation).
+- **Design-partner beta is gated on three Beta blockers** (§2, §3,
+  §6): provider 5xx fallback, proxy-scoped JWT, and real-backend
+  integration tests.
+- **Public GA is gated on the remaining GA blocker** (§1, full
+  `MutationProposal` lifecycle + undo) plus the public-GA quality
+  ceiling (§4, real RAG / vector store).
 
-## ⚠️ GA blocker urgency — resolve ASAP
+## ⚠️ Blocker urgency — resolve before each tier
 
-**The product is NOT ready for public GA.** The three 🛑 hard blockers
-below are release gates, not backlog items. Until each is closed, the
-only acceptable deployment posture is **internal beta with proposal
-cards gated off on the FE** (see Hard Blocker §1 mitigation).
+**The product is NOT ready for design-partner expansion, and NOT
+ready for public GA.** The 🛑 GA blocker §1 and the three 🚧 Beta
+blockers (§2, §3, §6) are release gates, not backlog items. The only
+acceptable deployment posture today is **internal beta with proposal
+cards gated off on the FE** (see GA Blocker §1 mitigation).
 
-- **Every day each hard blocker stays open is risk.** §1 ships a
-  dead-end UX once a proposal slips into a deployed build; §2 makes
-  a single upstream Anthropic/OpenAI 5xx a full outage with no
-  fallback; §3 leaves the AI proxy token co-located with the primary
-  REST JWT in `localStorage`, so any FE XSS exfiltrates both.
+- **Each blocker delays a specific tier.**
+  - §1 ships a dead-end UX once a proposal surfaces in a deployed
+    build — gates **public GA**.
+  - §2 makes a single upstream Anthropic/OpenAI 5xx a full outage —
+    gates **design-partner beta**.
+  - §3 leaves the AI proxy token co-located with the primary REST
+    JWT in `localStorage`, so any FE XSS exfiltrates both — gates
+    **design-partner beta**.
+  - §6 means a real-backend regression goes undetected by the
+    test suite — gates **design-partner beta**.
 - **Assign owners per blocker, not per polish item.** Polish items
-  can slip; §1–§3 cannot.
+  can slip; §1, §2, §3, §6 cannot.
 - **No public marketing, no design-partner expansion, no removal of
-  the FE proposal-card gate** until §1, §2, §3 all show ✅ in this
-  doc.
+  the FE proposal-card gate** until the corresponding blockers show
+  ✅ in this doc.
 - **Re-audit weekly** until ✅. If a blocker is reclassified, justify
   it in this file with file:line evidence.
 
 The Recommended ship sequence at the bottom of this doc is the
-contract: internal beta → design-partner GA → public GA, gated on the
-explicit blocker closures listed there.
+contract: internal beta → design-partner beta → public GA, gated on
+the explicit blocker closures listed there.
 
 ## Severity tags
 
-- **🛑 GA-blocker.** Customer-visible failure or material security
-  risk. Must close before public ship.
+- **🛑 GA blocker.** Customer-visible failure that cannot be hidden
+  behind a feature flag without breaking the user-visible surface.
+  Must close before public ship.
+- **🚧 Beta blocker.** Blocks design-partner expansion: external
+  users would hit the failure mode and there is no acceptable
+  caveat. Tolerable for **internal beta only** (employees, ops on
+  call, no external SLAs).
 - **⚠️ Soft blocker.** Quality or reliability ceiling that limits
-  scope; ship-able with documented caveats.
+  scope but ships through every tier with documented caveats.
 - **🟡 Polish.** Internal hygiene; no customer impact.
 
-## Hard blockers — must close before public GA
+## GA blockers — must close before public ship
 
 ### 🛑 1. `MutationProposal` accept path is dead in remote mode  *(BE + FE)*
 
@@ -113,7 +128,14 @@ tools (PRD AC-V5: `assignTask`, in-column `moveTask`, `renameColumn`).
   `pendingProposal`. Set the env var to `true` only in internal
   environments where the dead-end UX is acceptable.
 
-### 🛑 2. No provider fallback on 5xx  *(BE-only)*
+## Beta blockers — must close before design-partner expansion
+
+These three items are tolerable for **internal beta only** (employees
+behind a flag, ops on call, no external SLAs). They block any
+external exposure: a design partner would hit the failure mode and
+there is no acceptable caveat.
+
+### 🚧 2. No provider fallback on 5xx  *(BE-only)*
 
 **Verdict (2026-05-05 re-audit):** still open. No AI gateway, no
 provider list, no circuit breaker.
@@ -121,6 +143,10 @@ provider list, no circuit breaker.
 A Claude or OpenAI 5xx bubbles straight to the user. There is no AI
 gateway (LiteLLM, Portkey), no failover policy, no hedged requests, no
 semantic cache. A single upstream incident is a full outage.
+
+**Beta tier scoping.** Internal beta accepts the outage risk because
+ops can babysit the deploy; a design partner with their own users
+relying on uptime cannot. Closes design-partner gate.
 
 - Action when prioritised: pick a gateway (LiteLLM is the
   lowest-friction option since it sits behind the same `BaseChatModel`
@@ -134,7 +160,7 @@ semantic cache. A single upstream incident is a full outage.
   (`ChatOpenAI(base_url=...)` is sufficient since LiteLLM is
   OpenAI-compatible).
 
-### 🛑 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
+### 🚧 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
 
 **Verdict (2026-05-05 re-audit):** still open. The AI proxy still
 reuses the primary FE bearer.
@@ -143,10 +169,32 @@ The FE stores the primary bearer JWT in `localStorage`
 (`src/utils/aiAuthHeader.ts`) and the AI proxy reuses it verbatim. Any
 FE XSS exfiltrates the AI proxy token alongside the REST API token.
 
+**Beta tier scoping.** Internal beta accepts the residual risk because
+the audience is employees on managed devices; expanding to a design
+partner means external users with unknown browser hygiene, which is
+not an acceptable XSS surface. Closes design-partner gate.
+
 - Mitigation path: proxy-scoped token with a narrow claim set, or
   httpOnly cookie. Cross-repo work (BE token issuance + FE storage
   migration + middleware updates).
 - Effort: ~1 week.
+
+### 🚧 6. Synthetic 100% coverage — no integration tests  *(BE-only)*
+
+`pyproject.toml` `--cov-fail-under=100` is met against deterministic
+stubs. No tests against real Anthropic/OpenAI, real Redis, or real
+Postgres. The CI matrix added 2026-05-05 (`test-full` / `test-slim`)
+catches optional-import regressions but not real-backend regressions.
+
+**Beta tier scoping.** Internal beta runs on a known-good staging
+deploy; a real-backend regression is caught manually before the build
+ships. A design partner deploys against their own infra, where a silent
+provider/SDK regression breaks user-facing flows with no detection.
+Closes design-partner gate.
+
+- Detail: F-42 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
+- Effort: ~1 week to add an `integration` pytest marker, a CI job
+  behind a secret-gated flag, and Redis/Postgres service containers.
 
 ## Soft blockers — ship-able with documented caveats
 
@@ -190,17 +238,6 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
   drops unknown ids. A schema regression degrades but does not
   corrupt.
 
-### ⚠️ 6. Synthetic 100% coverage — no integration tests  *(BE-only)*
-
-`pyproject.toml` `--cov-fail-under=100` is met against deterministic
-stubs. No tests against real Anthropic/OpenAI, real Redis, or real
-Postgres. The CI matrix added 2026-05-05 (`test-full` / `test-slim`)
-catches optional-import regressions but not real-backend regressions.
-
-- Detail: F-42 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
-- Effort: ~1 week to add an `integration` pytest marker, a CI job
-  behind a secret-gated flag, and Redis/Postgres service containers.
-
 ### ⚠️ 7. CI workflow not yet validated against GitHub Actions  *(BE-only)*
 
 `.github/workflows/ci.yml` landed on `claude/v2.1-ai-features-vjZSA`
@@ -223,7 +260,7 @@ in v3."). The metadata-driven gating against
 
 `MutationProposalCard` now accepts an optional `onUndo` prop and fires
 `AGENT_PROPOSAL_UNDONE` from the click handler. The end-to-end Undo
-flow remains gated on Hard Blocker §1.
+flow remains gated on GA Blocker §1.
 
 ## Polish — no customer impact
 
@@ -404,12 +441,13 @@ migration, multi-agent orchestration, store/memory layer).
    gated off (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false`,
    default). Use the v2.1 surface for read-only / suggestion flows.
    Document the search/estimation quality ceiling in product copy.
-2. **Design-partner GA (~3 weeks).** Close hard blocker §3
-   (proxy-scoped token migration), §2 (LiteLLM gateway), and §6
-   (real-backend integration tests). Keep proposal cards hidden.
-3. **Public GA (~6–8 weeks).** Close hard blocker §1 (full
-   `MutationProposal` lifecycle + undo) and §4 (real RAG with
-   pgvector). Surface proposal cards.
+2. **Design-partner beta (~3 weeks).** Close every 🚧 Beta blocker:
+   §2 (LiteLLM gateway / provider fallback), §3 (proxy-scoped token
+   migration), and §6 (real-backend integration tests). Keep
+   proposal cards hidden.
+3. **Public GA (~6–8 weeks).** Close the 🛑 GA blocker §1 (full
+   `MutationProposal` lifecycle + undo) and the public-GA quality
+   gate §4 (real RAG with pgvector). Surface proposal cards.
 
 ## Out of scope for this document
 
@@ -419,7 +457,7 @@ migration, multi-agent orchestration, store/memory layer).
 - **Observability.** OpenTelemetry tracing, Prometheus metrics, and
   LangSmith are wired and tested.
 - **Auth.** JWT + project access gates are wired and tested. Open
-  security item: see Hard Blocker §3.
+  security item: see Beta Blocker §3.
 
 ## FE verification
 

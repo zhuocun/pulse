@@ -1,12 +1,15 @@
-# Agent architecture — roadmap
+# Architecture todo — agent runtime roadmap
+
+Forward-looking themes for the Board Copilot agent runtime
+(FastAPI + LangGraph + React SSE).
 
 **Audience:** engineers extending Board Copilot v2.1 (FastAPI + LangGraph + React SSE).  
-**Grounding:** structural backlog in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md), operational items in [`../operations/production-readiness.md`](../operations/production-readiness.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
-**Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`../design/ui-ux-optimization-plan.md`](../design/ui-ux-optimization-plan.md)).
+**Grounding:** structural backlog in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md), operational items in [`release-todo.md`](release-todo.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
+**Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`ui-todo.md`](ui-todo.md)).
 
 ## Current architecture (2026-05-10)
 
-The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. Outstanding architectural gaps tracked below as Themes 5–6 (mutation lifecycle, provider gateway, real RAG, supervisor / shared subgraph, MCP) and operationally in [`../operations/production-readiness.md`](../operations/production-readiness.md) (Hard Blockers §1–§3, Soft Blocker §4, Polish §15–§16).
+The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. Outstanding architectural gaps tracked below as Themes 5–6 (mutation lifecycle, provider gateway, real RAG, supervisor / shared subgraph, MCP) and operationally in [`release-todo.md`](release-todo.md) (GA Blocker §1, Beta Blockers §2/§3/§6, Soft Blocker §4, Polish §15–§16).
 
 ## Status — 2026-05-10 (PR #177)
 
@@ -16,7 +19,7 @@ The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/comp
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
 - **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)`; F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
 
-Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See [`../operations/production-readiness.md`](../operations/production-readiness.md) for the per-item severity / status.
+Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See [`release-todo.md`](release-todo.md) for the per-item severity / status.
 
 ---
 
@@ -33,6 +36,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 1 — Contract hardening
 
+**Gates:** Soft Blocker [§5](release-todo.md) (structured-output validation; partial fix shipped 2026-05-10, `create_react_agent(response_format=...)` migration remains).
+
 | Action                                                                                                                                        | Rationale                                                                                                        |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Define **Pydantic wire schemas** per agent output (`IBoardBrief`, drafts, estimate/readiness bundle, nudges) and validate before SSE emission | Matches review **F-10**; prevents silent JSON drift when LLMs replace stubs.                                     |
@@ -45,6 +50,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 2 — Stream error handling
+
+**Gates:** — (engineering quality; no direct release-tier dependency).
 
 | Action                                                                                                                     | Rationale                                                                          |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -59,6 +66,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 3 — Frontend surface simplification
 
+**Gates:** GA Blocker [§1](release-todo.md) for the `MutationProposalCard` rollout-gate row only (FE flag stays off until §1 closes); the rest is FE engineering hygiene.
+
 | Action                                                                                                                            | Rationale                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Isolate stable callbacks** from streaming identity churn in `useAgent` consumers (effects must not depend on whole hook return) | Documented anti-pattern in repo `AGENTS.md`; sweep chat, brief, assist panel, search.      |
@@ -71,6 +80,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 4 — Durable resume / state
+
+**Gates:** — (engineering quality; the F-43 sub-item already closed [§17](release-todo.md), the rest is reliability hygiene with no direct release-tier dependency).
 
 | Action                                                                                                                   | Rationale                                                                |
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
@@ -85,9 +96,11 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 5 — Mutation lifecycle closure
 
+**Gates:** GA Blocker [§1](release-todo.md) — this theme is the architectural plan that closes §1.
+
 | Action                                                                                                                             | Rationale                                                                                                  |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in [`../operations/production-readiness.md`](../operations/production-readiness.md).                                            |
+| Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in [`release-todo.md`](release-todo.md).                                            |
 | Wire **accept/reject** to LangGraph **`Command(resume=…)`** with persisted proposal ids                                            | Ensures graph continues after human decision.                                                              |
 | Add **audit log / analytics** for accepted mutations; define **undo** semantics (10s toast vs server undo endpoint)                | Progress doc notes missing `AGENT_PROPOSAL_UNDONE` path — pick one product rule and implement both halves. |
 | **Autonomy gates:** Suggest / Plan / Auto must map to enforceable server checks, not UI-only                                       | Aligns with PRD §6 and shadow-mode story.                                                                  |
@@ -97,6 +110,8 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 ---
 
 ## Theme 6 — Backend intelligence & resilience
+
+**Gates:** Beta Blocker [§2](release-todo.md) (provider gateway / failover), Soft Blocker [§4](release-todo.md) (real embeddings + vector store), Polish [§15](release-todo.md) (MCP mount). The remaining sub-items (`create_react_agent` migration, supervisor / shared subgraph, memory namespaces) have no release-tier dependency.
 
 | Action                                                                                                                        | Rationale                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -137,5 +152,5 @@ Workstreams **D** and parts of **E** can proceed in parallel once **A** lands; *
 ## References
 
 - [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — structural findings **F-9–F-15**, **F-42–F-43**.
-- [`../operations/production-readiness.md`](../operations/production-readiness.md) — GA blockers, soft blockers, polish, readiness tiers.
-- [`../prd/changelog.md`](../prd/changelog.md) — shipped vs deferred FE/BE features.
+- [`release-todo.md`](release-todo.md) — GA blockers, soft blockers, polish, readiness tiers.
+- [`product-done.md`](product-done.md) — shipped vs deferred FE/BE features.

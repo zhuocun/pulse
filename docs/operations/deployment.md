@@ -191,9 +191,43 @@ live.
 - [ ] **Memory-backend warning awareness:** if `AGENT_CHECKPOINT_BACKEND`, `AGENT_STORE_BACKEND`, `IDEMPOTENCY_BACKEND`, `RATE_LIMIT_BACKEND`, or `BUDGET_BACKEND` is left at the `memory` default, the server logs WARNINGs at lifespan startup on any production-shaped host (Vercel / Render / Fly / Railway / Kubernetes) and on any process where `WEB_CONCURRENCY` or `UVICORN_WORKERS` parses to an integer > 1. These warnings do not block boot by themselves, but they identify production-unsafe split state: interrupt checkpoints, idempotency keys, rate limits, and budgets stay process-local. Set the corresponding `=postgres` / `=redis` env vars (and the matching connection strings) before the deploy completes, or — only if you knowingly want a single-worker deploy — keep `WEB_CONCURRENCY` unset. The code still hard-fails for actual invalid backend configuration, such as unsupported backend names or selecting `postgres` / `redis` without a usable connection string.
 - [ ] (Optional) `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT` for trace export. The server re-exports both `LANGSMITH_*` and `LANGCHAIN_*` env vars at startup so LangChain 0.3.x picks them up regardless of subpackage.
 
+### Frontend env vars (production)
+
+Set these in the Vercel FE project (or whichever host serves the SPA):
+
+| Variable                                  | Notes                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REACT_APP_AI_BASE_URL`                   | Optional. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead.          |
+| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See [`../status/release-todo.md`](../status/release-todo.md) §1 for the GA blocker status.                  |
+| `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
+| `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
+
+### CDN cache-purge — required for the deploy that landed `a59539f`
+
+Commit `a59539f` migrated FE tool args from camelCase to snake_case
+(`task_id`, `project_id`). This is a **breaking change** for any user
+holding a pre-merge bundle: the agent will send snake_case args that
+the old FE tool registry does not recognise, causing silent `useAgent`
+interrupt failures.
+
+Vite asset hashing handles JS chunks automatically. However, proxies
+and CDNs (Cloudflare, CloudFront, etc.) cache `index.html` separately.
+**Explicitly purge `index.html`** on the CDN after that deploy so
+browsers fetch the new bundle reference. Subsequent deploys are clean.
+
+### FE smoke tests after deploy
+
+- Force a `402` response from the AI proxy → browser renders a `budget` typed error with no retry button.
+- Force `403` → `forbidden` typed error.
+- Force `429` → `rateLimit` typed error with countdown-disabled retry button.
+- Force `5xx` → `server` typed error with retry available.
+- Open the board brief while connected to the agent server → SSE stream completes; citation chips show the correct source label (`task` or `column`).
+- Open network tab → every AI request carries an `Idempotency-Key` header.
+- Call `POST /api/v1/ai/readiness` with a minimal valid JSON body (e.g. `{"task": {"title": "test"}, "project_id": "proj_x"}`) → response JSON contains an `issues` array where no entry has a `null` value for its `suggestion` field.
+
 ### Security considerations
 
-The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as Hard Blocker §3 in [`production-readiness.md`](production-readiness.md).
+The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as Beta Blocker §3 in [`../status/release-todo.md`](../status/release-todo.md).
 
 ---
 
@@ -255,5 +289,5 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 ## See also
 
 - [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — historical structural reviews (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps).
-- [`production-readiness.md`](production-readiness.md) — current GA blockers, soft blockers, and operational backlog.
+- [`../status/release-todo.md`](../status/release-todo.md) — current GA blockers, soft blockers, and operational backlog.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

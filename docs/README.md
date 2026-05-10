@@ -19,33 +19,42 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
   calling via interrupts.
 - [`prd/v3-ai-ux.md`](prd/v3-ai-ux.md) — UX layer on top of v2.1:
   trust calibration, citations, command palette, mutation previews.
-- [`prd/changelog.md`](prd/changelog.md) — what has shipped, the
-  per-feature inventory, acceptance-criteria status.
+
+## Status — what's done, what's next
+
+Tracking docs grouped under `status/`. Forward-looking docs follow
+`<scope>-todo.md`; the shipped-work doc is `<scope>-done.md`. Survey
+the whole backlog without folder-hopping.
+
+- [`status/release-todo.md`](status/release-todo.md) — GA blockers,
+  soft blockers, polish, and the recommended internal-beta →
+  design-partner → public ship sequence.
+- [`status/architecture-todo.md`](status/architecture-todo.md) —
+  agent-runtime themes (contract hardening, stream errors, mutation
+  lifecycle, durable resume, FE simplification, BE
+  intelligence/resilience) with phased execution.
+- [`status/ui-todo.md`](status/ui-todo.md) — phased UI plan
+  (foundations, surfaces, polish, stretch).
+- [`status/product-done.md`](status/product-done.md) — implementation
+  changelog: what has shipped, per-feature inventory,
+  acceptance-criteria status.
 
 ## Operations
 
-- [`operations/production-readiness.md`](operations/production-readiness.md)
-  — single source for GA blockers, soft blockers, polish, and the
-  recommended internal-beta → design-partner → public ship sequence.
 - [`operations/deployment.md`](operations/deployment.md) — production
   deployment guide (Vercel limits, Fly.io, Render, ECS / Cloud Run /
-  Container Apps, dedicated uvicorn behind nginx, security
-  considerations, post-deploy verification, boot-log signals).
-
-## Architecture
-
-- [`architecture/agent-roadmap.md`](architecture/agent-roadmap.md) —
-  forward-looking themes (contract hardening, stream errors,
-  mutation lifecycle, durable resume, FE simplification, BE
-  intelligence/resilience) with phased execution.
-- [`architecture/test-flakiness.md`](architecture/test-flakiness.md)
-  — consolidated FE Jest / BE pytest / shared infra audit; ranked
-  flaky-test suspects and recommended follow-ups.
+  Container Apps, dedicated uvicorn behind nginx, FE env vars, CDN
+  cache-purge, FE smoke tests, security considerations, post-deploy
+  verification, boot-log signals).
+- [`operations/testing.md`](operations/testing.md) — consolidated FE
+  Jest / BE pytest / shared infra audit; ranked flaky-test suspects
+  and recommended follow-ups.
+- [`operations/cursor-cloud.md`](operations/cursor-cloud.md) — VM
+  setup notes for Cursor Cloud (mongod, NVM, Jest heap bump,
+  vendored `cursor-sdk` / `orchestrate` skills).
 
 ## Design
 
-- [`design/ui-ux-optimization-plan.md`](design/ui-ux-optimization-plan.md)
-  — phased UI plan (foundations, surfaces, polish, stretch).
 - [`design/ai-ux-best-practices.md`](design/ai-ux-best-practices.md)
   — research reference (Google PAIR, Microsoft HAX, NN/g, NIST AI
   RMF, etc.).
