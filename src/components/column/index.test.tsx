@@ -3,6 +3,7 @@ import { Modal } from "antd";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import { TaskSearchParam } from "../taskSearchPanel";
@@ -264,6 +265,22 @@ describe("Column", () => {
         expect(bugImgs).toHaveLength(1);
         expect(bugImgs[0]).toHaveAttribute("alt", "");
         expect(bugImgs[0]).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("adds a keyboard drag hint and shortcut metadata to task cards", () => {
+        renderColumn();
+
+        const taskCard = screen.getByRole("button", {
+            name: /open task build task/i
+        });
+        expect(taskCard).toHaveAttribute(
+            "title",
+            microcopy.dragHints.taskCardKeyboard
+        );
+        expect(taskCard).toHaveAttribute(
+            "aria-keyshortcuts",
+            "Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
+        );
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {

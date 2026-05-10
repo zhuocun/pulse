@@ -140,6 +140,10 @@ export const enSource = {
         unlikeProject: "Unlike {name}",
         applyReadinessSuggestion: "Apply readiness suggestion for {field}"
     },
+    dragHints: {
+        taskCardKeyboard:
+            "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel."
+    },
     settings: {
         darkMode: "Dark mode",
         toggleDarkMode: "Toggle dark mode",
