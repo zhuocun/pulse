@@ -4,15 +4,30 @@
 **Grounding:** structural backlog in [`backend/docs/AI_ARCHITECTURE_REVIEW.md`](../backend/docs/AI_ARCHITECTURE_REVIEW.md), operational items in [`backend/docs/AI_REMAINING_WORK.md`](../backend/docs/AI_REMAINING_WORK.md), product contract in [`docs/prd/board-copilot-v2.1-agent.md`](prd/board-copilot-v2.1-agent.md).  
 **Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`docs/ui-ux-optimization-plan.md`](ui-ux-optimization-plan.md)).
 
-## Status — 2026-05-10 (PR #177)
+## Status — 2026-05-10
 
-The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/complete-subagent-orchestrator-fUazo`. Specifically:
+### Shipped with PR #177 (`claude/complete-subagent-orchestrator-fUazo`)
+
+The tractable single-day items across Themes 1, 2, and 4 landed there:
 
 - **Theme 1:** per-surface Pydantic schemas with `extra="forbid"`, validation hook in the runtime, and golden SSE transcript tests for all six agents.
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
 - **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)`; F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
 
-Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See `backend/docs/AI_REMAINING_WORK.md` for per-item detail.
+### Theme 3 follow-up (this repo, post–PR #177)
+
+- **`useAgentChat`:** destructures stable `useAgent` methods (`start`, `resume`, `reset`, `abort`, `seedMessages`, `dismissNudge`, `clearPendingProposal`) and primitives for effects, so `send` / `reset` / `dismissNudge` / `seedMessages` no longer close over the whole hook return object (which changes identity while streaming). Aligns with the anti-pattern called out in repo `AGENTS.md`.
+- **Other structured surfaces** (`BoardBriefDrawer`, `AiTaskAssistPanel`, `AiTaskDraftModal`, `AiSearchInput`, board `triage-agent` effect) already depended only on stable methods in `useEffect` dependency lists.
+- **`MutationProposalCard`:** remains gated behind `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` / `environment.aiMutationProposalsEnabled` (default off) per production readiness notes.
+- **Still open for Theme 3:** a shared thin SSE adapter over duplicated parsing, and deeper consolidation of `useAi` vs `useAgent` where behaviour is identical.
+
+### Theme 4 documentation
+
+- **Idempotency replay vs fresh stream vs resume:** operator-facing semantics live in [`backend/docs/BACKEND_API.md`](../backend/docs/BACKEND_API.md) (SSE `/stream` and `Idempotency-Key`) and [`backend/README.md`](../backend/README.md); no duplicate decision tree is maintained in this file.
+
+### Still open (multi-track)
+
+Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP). See `backend/docs/AI_REMAINING_WORK.md` for per-item detail.
 
 ---
 
@@ -68,12 +83,12 @@ Open: Theme 3 (FE surface simplification sweep), Theme 5 (full mutation lifecycl
 
 ## Theme 4 — Durable resume / state
 
-| Action                                                                                                                   | Rationale                                                                |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Thread **`thread_id` / checkpoint** continuity across refresh and optional multi-tab policy (single writer vs broadcast) | Postgres checkpointing is useless if the FE always mints a fresh thread. |
-| FE **persist minimal resume handles** (e.g., thread id, last interrupt id) scoped per project/user session               | Enables “Continue last agent turn” after accidental reload.              |
-| Migrate **static run context** out of `BaseAgentState` into **`Runtime[Context]`**                                       | Review **F-43** — smaller checkpoints, safer replay.                     |
-| Document **idempotency replay** vs **fresh stream** decision tree for support tooling                                    | Clarifies 409/422/`stream_completed` responses already on `/stream`.     |
+| Action                                                                                                                   | Rationale                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thread **`thread_id` / checkpoint** continuity across refresh and optional multi-tab policy (single writer vs broadcast) | Postgres checkpointing is useless if the FE always mints a fresh thread.                                                                                                                                             |
+| FE **persist minimal resume handles** (e.g., thread id, last interrupt id) scoped per project/user session               | Enables “Continue last agent turn” after accidental reload.                                                                                                                                                          |
+| Migrate **static run context** out of `BaseAgentState` into **`Runtime[Context]`**                                       | Review **F-43** — smaller checkpoints, safer replay.                                                                                                                                                                 |
+| Document **idempotency replay** vs **fresh stream** decision tree for support tooling                                    | **Pointer:** [`backend/docs/BACKEND_API.md`](../backend/docs/BACKEND_API.md) (SSE `/stream`, `Idempotency-Key`) and [`backend/README.md`](../backend/README.md) — 409/422, `stream_completed` replay, resume bypass. |
 
 **Exit criteria:** User can reload mid-interrupt and either resume cleanly or see an explicit “session expired” with recovery steps — never silent loss or duplicate apply.
 

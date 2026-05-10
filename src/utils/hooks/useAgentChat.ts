@@ -162,7 +162,22 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
     // Note: useAgent already calls useQueryClient() internally and provides
     // it in the baseCtx for FE tools. We only need to pass projectId in
     // feToolContext to scope tool queries to the current project.
-    const agent = useAgent("chat-agent", {
+    const {
+        start,
+        resume,
+        reset: resetAgent,
+        abort,
+        seedMessages: seedAgentMessages,
+        dismissNudge: dismissAgentNudge,
+        clearPendingProposal,
+        isStreaming,
+        error: agentError,
+        pendingProposal,
+        pendingInterrupt,
+        nudges,
+        citations,
+        state
+    } = useAgent("chat-agent", {
         projectId: ctx?.execution.projectId,
         feToolContext: {
             projectId: ctx?.execution.projectId
@@ -193,12 +208,11 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
     );
 
     // Fresh id for resumeProposal closure (avoid deps on transient proposal objects).
-    pendingProposalIdRef.current = agent.pendingProposal?.proposal_id;
+    pendingProposalIdRef.current = pendingProposal?.proposal_id;
 
     // Synthesize a tool-trace bubble for each distinct (tool + args)
     // interrupt within a turn. useAgent clears the interrupt after FE-tool
     // execution; we observe each payload before it's cleared.
-    const { pendingInterrupt } = agent;
     useEffect(() => {
         if (!pendingInterrupt) return;
         const interruptKey = `${pendingInterrupt.tool}:${JSON.stringify(
@@ -215,38 +229,35 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         setToolTraceMessages((prev) => [...prev, traceMsg]);
     }, [pendingInterrupt]);
 
+    const pendingProposalId = pendingProposal?.proposal_id;
+
     /** When a proposal resume settles the stream successfully, dismiss the proposal card. */
     useEffect(() => {
         const draft = proposalClearAfterResumeRef.current;
         if (!draft) return;
-        if (agent.isStreaming) return;
-        if (agent.error) {
+        if (isStreaming) return;
+        if (agentError) {
             proposalClearAfterResumeRef.current = null;
             return;
         }
-        if (agent.pendingProposal?.proposal_id !== draft.proposal_id) {
+        if (pendingProposalId !== draft.proposal_id) {
             proposalClearAfterResumeRef.current = null;
             return;
         }
         proposalClearAfterResumeRef.current = null;
-        agent.clearPendingProposal();
-    }, [
-        agent.isStreaming,
-        agent.error,
-        agent.pendingProposal,
-        agent.clearPendingProposal
-    ]);
+        clearPendingProposal();
+    }, [isStreaming, agentError, pendingProposalId, clearPendingProposal]);
 
     // Derive displayed messages and streamingText from agent state.
     const { messages, streamingText } = deriveMessagesAndStreaming(
-        agent.state.messages,
+        state.messages,
         toolTraceMessages,
-        agent.isStreaming,
-        agent.citations
+        isStreaming,
+        citations
     );
 
     // Effective error (null if dismissed).
-    const effectiveError = agent.error && !errorDismissed ? agent.error : null;
+    const effectiveError = agentError && !errorDismissed ? agentError : null;
 
     const dismissError = useCallback(() => {
         setErrorDismissed(true);
@@ -254,10 +265,10 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
 
     // Reset the dismissed flag when a new error comes in.
     useEffect(() => {
-        if (agent.error) {
+        if (agentError) {
             setErrorDismissed(false);
         }
-    }, [agent.error]);
+    }, [agentError]);
 
     const send = useCallback(
         async (text: string) => {
@@ -267,37 +278,37 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
             setToolTraceMessages([]);
             lastInterruptSignatureRef.current = null;
             try {
-                await agent.start({
+                await start({
                     messages: [{ role: "user", content: trimmed }]
                 });
             } catch (err) {
-                // AgentForbiddenError and others are surfaced via agent.error.
+                // AgentForbiddenError and others surface via `agentError`.
                 // We swallow here so callers don't need to catch.
                 void err;
             }
         },
-        [agent, ctx]
+        [start, ctx]
     );
 
     const reset = useCallback(() => {
         proposalClearAfterResumeRef.current = null;
-        agent.reset();
+        resetAgent();
         setToolTraceMessages([]);
         lastInterruptSignatureRef.current = null;
         setDismissedNudgeIds(new Set());
         setErrorDismissed(false);
-    }, [agent]);
+    }, [resetAgent]);
 
     const resumeProposal = useCallback(
         (accepted: boolean) => {
             const pid = pendingProposalIdRef.current;
             if (!pid) return;
             proposalClearAfterResumeRef.current = { proposal_id: pid };
-            void agent.resume({ accepted }).catch(() => {
+            void resume({ accepted }).catch(() => {
                 proposalClearAfterResumeRef.current = null;
             });
         },
-        [agent.resume]
+        [resume]
     );
 
     const dismissNudge = useCallback(
@@ -305,7 +316,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
             // Propagate to the underlying useAgent inbox so the entry is
             // removed from nudgeEntries — prevents the nudge from
             // resurrecting after reset() or a new turn.
-            agent.dismissNudge(nudgeId);
+            dismissAgentNudge(nudgeId);
             // Also update the local filter set to dedupe within a single
             // render cycle (the inbox update is async-batched).
             setDismissedNudgeIds((prev) => {
@@ -315,17 +326,17 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
                 return next;
             });
         },
-        [agent]
+        [dismissAgentNudge]
     );
 
-    const pendingNudges = agent.nudges.filter(
+    const pendingNudges = nudges.filter(
         (n) => !dismissedNudgeIds.has(n.nudge_id)
     );
 
     const seedMessages = useCallback(
         (initial: AiChatMessage[]) => {
             // Map AiChatMessage roles to AgentMessage roles for the underlying store.
-            agent.seedMessages(
+            seedAgentMessages(
                 initial.map((m) => ({
                     role:
                         m.role === "tool"
@@ -337,24 +348,24 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
                 }))
             );
         },
-        [agent]
+        [seedAgentMessages]
     );
 
     return {
         // useAiChat-compatible fields:
-        abort: agent.abort,
+        abort,
         dismissError,
         error: effectiveError,
-        isLoading: agent.isStreaming,
+        isLoading: isStreaming,
         messages,
         reset,
         seedMessages,
         send,
         streamingText,
         // v2.1 additions:
-        pendingProposal: agent.pendingProposal,
+        pendingProposal,
         pendingNudges,
-        citations: agent.citations,
+        citations,
         resumeProposal,
         dismissNudge
     };
