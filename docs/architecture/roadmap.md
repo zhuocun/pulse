@@ -1,4 +1,7 @@
-# Agent architecture — roadmap
+# Architecture roadmap
+
+Forward-looking themes for the Board Copilot agent runtime
+(FastAPI + LangGraph + React SSE).
 
 **Audience:** engineers extending Board Copilot v2.1 (FastAPI + LangGraph + React SSE).  
 **Grounding:** structural backlog in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md), operational items in [`../operations/production-readiness.md`](../operations/production-readiness.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  

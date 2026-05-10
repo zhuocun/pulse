@@ -8,7 +8,7 @@ that are now mirrored in the active operational backlog.
 
 | Review | Status (2026-05-10 re-verification) | Source of truth for open items |
 |---|---|---|
-| [2026-05-01](#review-1-2026-05-01--still-has-open-structural-concerns) | Partially superseded; remaining open items map to operations backlog | [`../operations/production-readiness.md`](../operations/production-readiness.md) items 7/8/12/14, [`../architecture/agent-roadmap.md`](../architecture/agent-roadmap.md) Themes 5–6 |
+| [2026-05-01](#review-1-2026-05-01--still-has-open-structural-concerns) | Partially superseded; remaining open items map to operations backlog | [`../operations/production-readiness.md`](../operations/production-readiness.md) items 7/8/12/14, [`../architecture/roadmap.md`](../architecture/roadmap.md) Themes 5–6 |
 | [2026-05-08](#review-2-2026-05-08--shipped-in-full) | Shipped (re-verified 2026-05-10); F-G2 and F-S5 deliberately deferred until consumers exist | n/a |
 | [2026-05-09](#review-3-2026-05-09--shipped-in-full) | Phases 1–6 shipped (re-verified 2026-05-10); architectural follow-ups all resolved | n/a |
 

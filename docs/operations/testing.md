@@ -1,9 +1,8 @@
-# Test Flakiness Audit — 2026-05-10
+# Testing — flakiness audit and follow-ups
 
-Consolidated audit across the frontend Jest suite, the backend pytest
-suite, and the shared Jest / CI infrastructure. The earlier per-area
-docs (`frontend.md`, `backend.md`, `infra.md`) have been folded into
-this single file.
+Last consolidated: 2026-05-10. Scope: frontend Jest, backend pytest,
+shared Jest / CI infrastructure. Earlier per-area docs
+(`frontend.md`, `backend.md`, `infra.md`) have been folded in here.
 
 ## Executive summary
 

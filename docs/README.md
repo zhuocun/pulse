@@ -22,6 +22,13 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
 - [`prd/changelog.md`](prd/changelog.md) — what has shipped, the
   per-feature inventory, acceptance-criteria status.
 
+## Architecture
+
+- [`architecture/roadmap.md`](architecture/roadmap.md) —
+  forward-looking themes (contract hardening, stream errors,
+  mutation lifecycle, durable resume, FE simplification, BE
+  intelligence/resilience) with phased execution.
+
 ## Operations
 
 - [`operations/production-readiness.md`](operations/production-readiness.md)
@@ -29,18 +36,15 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
   recommended internal-beta → design-partner → public ship sequence.
 - [`operations/deployment.md`](operations/deployment.md) — production
   deployment guide (Vercel limits, Fly.io, Render, ECS / Cloud Run /
-  Container Apps, dedicated uvicorn behind nginx, security
-  considerations, post-deploy verification, boot-log signals).
-
-## Architecture
-
-- [`architecture/agent-roadmap.md`](architecture/agent-roadmap.md) —
-  forward-looking themes (contract hardening, stream errors,
-  mutation lifecycle, durable resume, FE simplification, BE
-  intelligence/resilience) with phased execution.
-- [`architecture/test-flakiness.md`](architecture/test-flakiness.md)
-  — consolidated FE Jest / BE pytest / shared infra audit; ranked
-  flaky-test suspects and recommended follow-ups.
+  Container Apps, dedicated uvicorn behind nginx, FE env vars, CDN
+  cache-purge, FE smoke tests, security considerations, post-deploy
+  verification, boot-log signals).
+- [`operations/testing.md`](operations/testing.md) — consolidated FE
+  Jest / BE pytest / shared infra audit; ranked flaky-test suspects
+  and recommended follow-ups.
+- [`operations/cursor-cloud.md`](operations/cursor-cloud.md) — VM
+  setup notes for Cursor Cloud (mongod, NVM, Jest heap bump,
+  vendored `cursor-sdk` / `orchestrate` skills).
 
 ## Design
 
