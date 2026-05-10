@@ -3,6 +3,22 @@
 Short, durable gotchas for anyone (human or AI) editing this repo. Add an entry
 when a fix is non-obvious from the code alone.
 
+## Keep the backlog current
+
+`docs/status/` is the single source of truth for open and shipped work. When
+your change closes or opens a backlog item, update `status/` in the same PR:
+
+- **Closing work.** Strike or remove the entry from the matching `*-todo.md`
+  (`release-todo.md` for GA blockers / soft blockers / polish,
+  `architecture-todo.md` for agent-runtime themes, `ui-todo.md` for the UI
+  plan) **and** add a one-liner under the relevant table in
+  [`docs/status/product-done.md`](docs/status/product-done.md).
+- **Opening work.** Add the new item to the matching `*-todo.md`. If nothing
+  fits, ask before creating a new tracking doc.
+- **Don't restate blockers inline** in `README.md`, `backend/README.md`, or
+  PR descriptions — link to the `status/` entry so there's exactly one place
+  to update when the item closes.
+
 ## v2.1 agent surface (`useAgent`)
 
 - Both `useAi` (v1 JSON) and `useAgent` (v2.1 SSE) commonly mount unconditionally
