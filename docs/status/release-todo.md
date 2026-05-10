@@ -246,10 +246,14 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
 `.github/workflows/backend-ci.yml` ships two jobs (`test-full` with
 `.[dev,ai]` + full pytest, and `test-slim` with `.[dev]` only +
-`python -c "import app.main"`) scoped to `backend/**` (lines 4–17).
+`python -c "import app.main"`) with unchanged `paths` filters on
+`push` / `pull_request`.
 GHA execution against `main` has not been verified end-to-end; status
 of the first run on this branch is still unknown.
 
+- Evidence without a path-filter push: GitHub → Actions → **Backend CI**
+  → **Run workflow**, pick the branch, optionally set **mode** (`both`,
+  `test-full`, `test-slim`), then paste the green run URL here.
 - Scope: trigger the workflow on a PR/main run, capture the first green
   run, and update this section with the CI evidence.
 
@@ -310,10 +314,15 @@ or `context_schema`. The fields stay on the dataclass for the runtime
 ### 🟡 14. v2.1 metadata fields not surfaced in UI  *(FE)*
 
 `AgentMetadata.allowed_autonomy`, `rate_limit`, `recursion_limit`,
-`context_schema`, `tags` are all on the BE wire but the FE consumer
-reads none of them. Zero impact on user-visible behaviour today; would
-let the autonomy selector self-gate and a future "limits" surface
+`context_schema`, `tags` are on the BE wire; most have no FE disclosure yet,
+so there is little user-visible calibration for limits or wire-only policy.
+Would let the autonomy selector self-gate and a future "limits" surface
 render rate / budget visibly.
+
+**Partial (2026-05-10):** About Board Copilot now shows server `rate_limit`
+and `allowed_autonomy` for `chat-agent` (session-cached metadata fetch)
+in remote builds with a non-empty AI base URL. Other metadata fields
+remain unsurfaced.
 
 ### 🟡 15. MCP transport deferred  *(BE)*
 
@@ -385,28 +394,21 @@ architecture-todo Theme 4.
 
 - Action when prioritised: configure `RATE_LIMIT_BACKEND=redis`,
   `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` wherever the
-  app may run multiple workers. `docker-compose.yml` currently sets the
-  first two but not `IDEMPOTENCY_BACKEND`, so its "production-like" stack
-  still falls back to in-memory idempotency. After env parity is proven,
+  app may run multiple workers. `backend/docker-compose.yml` sets all
+  three against `REDIS_URI`; Dockerfile / production deploy paths must
+  match before lifting `workers=1`. After full env parity is proven,
   document the multi-worker guarantee and remove the `workers=1` pin.
 - Scope: env wiring, compose parity, smoke tests against
   `app/middleware/redis_backends.py`, and duplicate-request replay tests.
 
-### 🟡 16e. `fly.toml` placeholder app name  *(BE)*
+### ✅ 16e. `fly.toml` placeholder app name  *(BE — Resolved 2026-05-10, `orch/non-ga-todos-2f52/fly-app-placeholder`)*
 
-`backend/fly.toml:17` ships with `app = "jira-python-server"` —
-literally a placeholder from the pre-monorepo split. The file is on
-the documented fallback path (anyone can `cd backend && fly deploy`
-from a Fly-authenticated machine) so a stale placeholder will create
-or collide with the wrong Fly app the moment that path is used.
-
-- Action when prioritised: either delete `backend/fly.toml` and
-  `backend/Dockerfile` (Vercel is the only active deploy path) and
-  update the README's "fallback" mention, or update the placeholder
-  to a documented owner-controlled value.
-- Scope: choose the active fallback-host story, then either remove the
-  unused Fly files or replace the placeholder app name with a documented
-  owner-controlled value.
+`backend/fly.toml` now defaults to `app = "pulse-backend"` with an
+explicit header that operators must rename `app` to their Fly.io
+application before deploy. `docs/operations/deployment.md` and
+`backend/README.md` call out the same rename requirement so the
+`cd backend && fly deploy` fallback path cannot silently inherit the
+pre-monorepo `jira-python-server` name.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 

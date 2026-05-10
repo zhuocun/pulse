@@ -48,7 +48,9 @@ deployment at the edge / FE proxy.
 
 ### Fly.io
 
-The repo ships `fly.toml` ready for `fly launch --copy-config`.
+The repo ships `backend/fly.toml` ready for `fly launch --copy-config`
+from `backend/`. The default `app` name is `pulse-backend`; rename it
+in that file (or pass `--app`) so deploys never target another team's Fly app.
 
 ```bash
 fly launch --copy-config --no-deploy
@@ -74,7 +76,7 @@ What matters for SSE on Fly:
   routinely goes silent for >60s.
 
 Scale by adding more machines with one uvicorn worker each, not by
-raising `--workers`. See the comment block at the top of `fly.toml`.
+raising `--workers`. See the comment block at the top of `backend/fly.toml`.
 
 ### Render
 
@@ -84,7 +86,8 @@ Render's web service runtime accepts the same Dockerfile. A minimal
 ```yaml
 services:
   - type: web
-    name: jira-python-server
+    # Rename to your Render service name (repo default below matches fly.toml).
+    name: pulse-backend
     runtime: docker
     plan: standard
     region: oregon

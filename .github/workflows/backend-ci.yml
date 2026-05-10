@@ -15,6 +15,20 @@ on:
         paths:
             - "backend/**"
             - ".github/workflows/backend-ci.yml"
+    workflow_dispatch:
+        inputs:
+            mode:
+                description: "Jobs to run; target branch is selected in Run workflow. test-full = pytest with .[dev,ai]; test-slim = .[dev] + import app.main."
+                type: choice
+                default: both
+                options:
+                    - both
+                    - test-full
+                    - test-slim
+
+concurrency:
+    group: backend-ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || 'push-pr' }}
+    cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 defaults:
     run:
@@ -22,6 +36,7 @@ defaults:
 
 jobs:
     test-full:
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'both' || github.event.inputs.mode == 'test-full'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
@@ -32,6 +47,7 @@ jobs:
             - run: pytest
 
     test-slim:
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'both' || github.event.inputs.mode == 'test-slim'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4

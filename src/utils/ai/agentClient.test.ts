@@ -7,8 +7,10 @@ import {
     AgentRateLimitError,
     AgentServerError,
     AgentTransportError,
+    clearAgentMetadataSessionCache,
     getAgentHealth,
     getAgentMetadata,
+    getSessionCachedAgentMetadata,
     invokeAgent,
     listAgents,
     resolveAiKnowledgeCutoffForUi,
@@ -492,6 +494,32 @@ describe("agentClient", () => {
                 "https://agents.example/api/v1/agents/board-coach",
                 expect.objectContaining({ method: "GET" })
             );
+        });
+    });
+
+    describe("getSessionCachedAgentMetadata", () => {
+        beforeEach(() => {
+            clearAgentMetadataSessionCache();
+        });
+
+        it("fetches once per session key and reuses the result", async () => {
+            fetchSpy.mockResolvedValue(
+                okJsonResponse({
+                    name: "chat-agent",
+                    version: "1.0.0",
+                    description: "x",
+                    status: "active",
+                    allowed_autonomy: ["plan"]
+                })
+            );
+            const params = {
+                baseUrl: "https://agents.example",
+                name: "chat-agent"
+            };
+            const first = await getSessionCachedAgentMetadata(params);
+            const second = await getSessionCachedAgentMetadata(params);
+            expect(first).toEqual(second);
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
         });
     });
 

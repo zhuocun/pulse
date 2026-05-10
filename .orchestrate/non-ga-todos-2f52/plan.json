@@ -1,0 +1,131 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "Implement to-do items with Composer 2, run until all non-GA to-do items are complete. Non-GA means every open item in docs/status/* except GA Blocker §1 (MutationProposal accept/undo). Work from committed handoffs; follow repo AGENTS.md when closing backlog lines.",
+  "summary": "Parallel Composer-2 workers on non-GA backlog: compose idempotency Redis, Fly placeholder, CopilotShell i18n, agent metadata surfacing, backend CI dispatch hook.",
+  "selfAgentId": "bc-6ddc1f12-04bb-49da-9ddc-efe4bfef2f52",
+  "rootSlug": "non-ga-todos-2f52",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "acceptanceCriteria": [
+    "Each worker branch merges cleanly; backlog docs reflect closed slices per AGENTS.md",
+    "FE workers pass eslint, tsc, CI=true jest, vite build",
+    "BE-affecting workers pass pytest + ruff in backend/"
+  ],
+  "tasks": [
+    {
+      "name": "compose-idempotency-redis",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Add IDEMPOTENCY_BACKEND=redis to backend docker-compose server env alongside existing RATE_LIMIT_BACKEND and BUDGET_BACKEND so local docker matches multi-worker prelude per release-todo §16d; refresh header comment about Redis backends.",
+      "brief": "Read `.orchestrate/non-ga-todos-2f52/bootstrap/BACKLOG_OPEN_NON_GA.md` and `PATHS_AND_VERIFICATION.md`. Touch only backend/docker-compose.yml for the env vars; optionally tighten docs/status/release-todo.md §16d wording if compose parity is achieved (strike docker-compose caveat if accurate). Branch `cursor/non-ga-todos-2f52` or worker branch merge target — do not regress GA §1 mutation work.",
+      "pathsAllowed": [
+        "backend/docker-compose.yml",
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "**/src/**",
+        "backend/app/**",
+        "backend/tests/**"
+      ],
+      "acceptance": [
+        "`IDEMPOTENCY_BACKEND=redis` appears next to REDIS_URI in backend/docker-compose.yml",
+        "Compose comment mentions idempotency + rate-limit + budget on Redis where applicable",
+        "If release-todo changed, backlog note matches AGENTS.md truth"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "fly-app-placeholder",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Close release-todo polish §16e: replace misleading Fly app placeholder with a repo-owned default name and explicit operator-override comment, or document removal path per that section.",
+      "brief": "See bootstrap BACKLOG_OPEN_NON_GA.md. Prefer `app = \"pulse-backend\"` (or similar) with header comment: operators must rename to their Fly app. If you delete fly.toml instead, update backend README or docs/operations/deployment.md fallback path so no silent wrong-app deploy. Update docs/status/release-todo.md §16e to resolved or narrowed per AGENTS.md.",
+      "pathsAllowed": [
+        "backend/fly.toml",
+        "backend/README.md",
+        "docs/operations/deployment.md",
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "**/src/**"
+      ],
+      "acceptance": [
+        "No literal jira-python-server remains as the implied production app name without operator warning",
+        "release-todo §16e reflects the chosen resolution"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "copilot-shell-i18n",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Internationalize CopilotShell per ui-todo §20f: replace hardcoded tab labels, title, placeholder bodies, and CTA strings with microcopy keys in en + zh-CN.",
+      "brief": "Read bootstrap PATHS_AND_VERIFICATION.md for FE checks. Add keys under a sensible `microcopy.copilotShell.*` (or extend existing namespace) in English and Chinese locale files; wire `src/components/copilotShell/index.tsx`. Keep a11y (no raw English in user-visible nodes). Update ui-todo.md §20f if the i18n debt for this file is cleared.",
+      "pathsAllowed": [
+        "src/components/copilotShell/**",
+        "src/locales/**",
+        "src/constants/microcopy.ts",
+        "docs/status/ui-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**"
+      ],
+      "acceptance": [
+        "No user-visible English literals remain in copilotShell except brand name if product decision",
+        "zh-CN entries exist for every new key",
+        "eslint + tsc + CI=true jest + vite build pass"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "fe-agent-metadata-surface",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Partially close release-todo §14: consume at least one backend AgentMetadata field (e.g. rate_limit or allowed_autonomy) in the FE and show it in an existing AI surface (header health area, chat drawer, or Copilot settings tab) with graceful loading/empty states.",
+      "brief": "Use `getAgentMetadata` from `src/utils/ai/agentClient.ts` for a relevant agent (e.g. chat-agent). Minimize new network chatter (cache per session). Extend or add tests alongside existing aiAccessibility.strict or component tests. Update docs/status/release-todo.md §14 only if behaviour materially addresses the polish item (partial vs done). Follow AGENTS.md dual-mount/useAgent patterns if touching hooks consumers.",
+      "pathsAllowed": [
+        "src/components/header/**",
+        "src/components/aiChatDrawer/**",
+        "src/components/copilotShell/**",
+        "src/utils/ai/**",
+        "src/interfaces/**",
+        "src/__tests__/**",
+        "src/**/*test.tsx",
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "backend/**",
+        "**/agents/*.py",
+        "**/routers/*.py"
+      ],
+      "acceptance": [
+        "At least one AgentMetadata-backed UI affordance ships with tests",
+        "Remote-mode-only code paths gated when aiUseLocalEngine / empty base URL",
+        "eslint + tsc + CI jest + vite build pass"
+      ],
+      "openPR": false
+    },
+    {
+      "name": "backend-ci-dispatch",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Reduce release-todo §7 friction: add workflow_dispatch to .github/workflows/backend-ci.yml so maintainers can trigger test-full/test-slim on demand without a path-filter push.",
+      "brief": "Preserve existing pull_request/push path filters; add concurrency-friendly workflow_dispatch defaults. Optionally add a one-line note in docs/status/release-todo.md §7 describing how to capture evidence via manual dispatch.",
+      "pathsAllowed": [
+        ".github/workflows/backend-ci.yml",
+        "docs/status/release-todo.md"
+      ],
+      "pathsForbidden": [
+        "**/src/**",
+        ".github/workflows/frontend-ci.yml"
+      ],
+      "acceptance": [
+        "YAML validates; workflow_dispatch is present with documented inputs or default branch",
+        "Existing triggers unchanged aside from additive dispatch"
+      ],
+      "openPR": false
+    }
+  ]
+}

@@ -3,11 +3,11 @@
 # Brings up the FastAPI server (built from the production Dockerfile)
 # alongside a Postgres 16 instance for the LangGraph checkpointer /
 # store, a Mongo 7 instance for the application repository, and a
-# Redis 7 instance for the rate-limit + budget backends. The defaults
+# Redis 7 instance for rate-limit, budget, and idempotency backends. The defaults
 # match what a Tier-1 production deploy looks like -- real persistence
 # everywhere -- so interrupt-using agents (board-brief, task-drafting,
-# task-estimation, triage) plus the shared rate-limit / budget caps
-# work end-to-end without spinning up managed clusters.
+# task-estimation, triage) share Redis-backed rate limits, budgets, and
+# idempotency end-to-end without spinning up managed clusters.
 #
 # Usage:
 #   docker compose up --build
@@ -32,6 +32,7 @@ services:
       AGENT_POSTGRES_URI: postgresql://jira:jira@postgres:5432/jira
       RATE_LIMIT_BACKEND: redis
       BUDGET_BACKEND: redis
+      IDEMPOTENCY_BACKEND: redis
       REDIS_URI: redis://redis:6379/0
       UUID: dev-only-jwt-secret-change-me-32-bytes-long
       CORS_ORIGINS: http://localhost:3000

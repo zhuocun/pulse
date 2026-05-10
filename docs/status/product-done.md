@@ -39,6 +39,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
 | Backend release gates | — | ⏳ Open: mutation lifecycle, JWT-XSS, provider fallback, MCP — see [`release-todo.md`](release-todo.md) |
+| Fly.io default `app` in `backend/fly.toml` | [`release-todo.md`](release-todo.md) §16e | ✅ Repo default `pulse-backend` with explicit rename-before-deploy header; deployment guide + `backend/README.md` aligned |
 | Frontend CI (Prettier, ESLint check, tsc, Jest, Vite build on FE paths) | [`release-todo.md`](release-todo.md) §7b | ✅ `.github/workflows/frontend-ci.yml` |
 | `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
 | Autonomy selector UI in `AiChatDrawer` (Suggest / Plan / Auto-disabled) | — | ✅ |
@@ -58,6 +59,8 @@ For the live GA / blocker / soft-blocker / polish status see
 | `taskSearchPanel` side-effect-in-render fix | UX (ui-todo §9) | ✅ `coordinators` and `types` derived through `useMemo` with `Set`-based deduping; no more `tasks?.map(... return null)` for side effects |
 | Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
+| Copilot About — `chat-agent` `rate_limit` / `allowed_autonomy` in UI | [`release-todo.md`](release-todo.md) §14 partial | ✅ Remote-only `useChatAgentMetadata` + session `getSessionCachedAgentMetadata`; loading/empty/error handling in `CopilotAboutPopover` |
+| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | ✅ `en` / `zh-CN` keys; component + tests read from `microcopy` |
 
 ---
 

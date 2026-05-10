@@ -667,6 +667,24 @@ export const enSource = {
             "Who has the most open work?"
         ] as readonly string[]
     },
+    copilotShell: {
+        title: "Board Copilot",
+        tabs: {
+            chat: "Chat",
+            brief: "Brief",
+            activity: "Activity",
+            settings: "Settings"
+        },
+        placeholders: {
+            chat: "Ask Board Copilot anything about your board — tasks, blockers, priorities, and more.",
+            brief: "Get an AI-generated summary of board health, blockers, and workload distribution.",
+            activity: "Agent activity and triage nudges will appear here."
+        },
+        settingsBody:
+            "Copilot settings — autonomy level, privacy, and per-project controls — are managed via the board settings menu.",
+        ctaOpenChat: "Open Chat",
+        ctaOpenBrief: "Open Brief"
+    },
     brief: {
         title: "Board Copilot brief",
         headline: "{total} tasks on the board, {inProgress} in progress.",
@@ -754,7 +772,12 @@ export const enSource = {
             "Powered by a remote AI model. Your data is processed according to your privacy settings.",
         localModeDescription:
             "Running on a local AI engine. Your data stays on this device.",
-        knowledgeCutoffTemplate: "Knowledge cutoff: {date}"
+        knowledgeCutoffTemplate: "Knowledge cutoff: {date}",
+        serverLimitsTitle: "Server-advertised limits",
+        serverMetadataLoading: "Loading server details…",
+        serverMetadataUnavailable: "Could not load server limits.",
+        rateLimitLine: "Rate limit: {perMinute} / min · {perHour} / hour",
+        allowedAutonomyLabel: "Allowed autonomy"
     },
     mutation: {
         riskHigh: "High risk",

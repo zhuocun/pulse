@@ -630,6 +630,24 @@ const zhCN: Dictionary = {
             "谁未完成的工作最多?"
         ]
     },
+    copilotShell: {
+        title: "看板 Copilot",
+        tabs: {
+            chat: "聊天",
+            brief: "简报",
+            activity: "动态",
+            settings: "设置"
+        },
+        placeholders: {
+            chat: "向看板 Copilot 提问，了解任务、阻塞、优先级等任何与看板相关的问题。",
+            brief: "获取由 AI 生成的看板健康度、阻塞与工作负载分布摘要。",
+            activity: "智能体活动与分流提醒将显示在此处。"
+        },
+        settingsBody:
+            "Copilot 的设置（自主程度、隐私及按项目控制）请在看板设置菜单中管理。",
+        ctaOpenChat: "打开聊天",
+        ctaOpenBrief: "打开简报"
+    },
     brief: {
         title: "看板 Copilot 简报",
         headline: "看板上共有 {total} 个任务，其中 {inProgress} 个正在进行中。",
@@ -712,7 +730,12 @@ const zhCN: Dictionary = {
         remoteModeDescription:
             "由远程 AI 模型提供支持。您的数据会按照您的隐私设置进行处理。",
         localModeDescription: "运行在本地 AI 引擎上。您的数据保留在此设备上。",
-        knowledgeCutoffTemplate: "知识截止时间：{date}"
+        knowledgeCutoffTemplate: "知识截止时间：{date}",
+        serverLimitsTitle: "服务器公布的限制",
+        serverMetadataLoading: "正在加载服务器信息…",
+        serverMetadataUnavailable: "无法加载服务器限制信息。",
+        rateLimitLine: "速率限制：{perMinute} / 分钟 · {perHour} / 小时",
+        allowedAutonomyLabel: "允许的自主级别"
     },
     mutation: {
         riskHigh: "高风险",
