@@ -367,12 +367,12 @@
       "handoffPath": "handoffs/taskmodal-canonical-types.md",
       "startedAt": "2026-05-10T13:21:04.982Z",
       "finishedAt": "2026-05-10T13:37:22.948Z",
-      "lastUpdate": "2026-05-10T13:37:22.948Z",
+      "lastUpdate": "2026-05-10T13:37:25.873Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -428,12 +428,12 @@
       "agentId": "bc-7b1c5fae-fd83-4209-9003-fe2d7b717f20",
       "runId": "run-3628a48a-16e1-41cf-b0a8-be6e3345a9ab",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/forgot-password-link-stub.md",
       "startedAt": "2026-05-10T13:21:12.153Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T13:21:14.759Z",
+      "finishedAt": "2026-05-10T13:38:20.655Z",
+      "lastUpdate": "2026-05-10T13:38:20.655Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -538,6 +538,10 @@
     {
       "at": "2026-05-10T13:37:14.388Z",
       "message": "aitaskassistpanel-suggested-by-copilot-badge: tool_call idle 354982ms; last=2026-05-10T13:31:19.406Z"
+    },
+    {
+      "at": "2026-05-10T13:37:25.873Z",
+      "message": "taskmodal-canonical-types: verification self-reported (unit-test-verified)"
     }
   ]
 }
