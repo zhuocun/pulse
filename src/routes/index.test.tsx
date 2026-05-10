@@ -14,6 +14,10 @@ jest.mock("../pages/register", () => ({
     __esModule: true,
     default: () => null
 }));
+jest.mock("../pages/forgotPassword", () => ({
+    __esModule: true,
+    default: () => null
+}));
 jest.mock("../pages/project", () => ({
     __esModule: true,
     default: () => null
@@ -58,6 +62,7 @@ describe("routes", () => {
         expect(homeShell?.children?.map((route) => route.path)).toEqual([
             "register",
             "login",
+            "auth/forgot-password",
             "projects",
             "projects/:projectId",
             "*"

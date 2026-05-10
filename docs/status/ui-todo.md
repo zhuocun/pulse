@@ -78,7 +78,7 @@ Every recommendation in this plan is anchored to one or more of these external r
 11. **Auth screens.** **[Phase 2.7 partially complete; remaining items below.]**
     `src/components/loginForm/index.tsx`, `src/components/registerForm/index.tsx`, `src/layouts/authLayout.tsx`:
     - ~~Inputs only carry placeholders, no `<Form.Item label>`.~~ **[Complete: both forms wrap every field in `<Form.Item label={microcopy.fields.*}>` (`loginForm:62–131`, `registerForm:55–135`); `autoComplete="email" / "current-password" / "new-password" / "username"` and `aria-live="polite"` error region are wired.]**
-    - ~~There is no "Show password", no caps-lock hint…~~ **[Partially complete: show/hide password toggle (`loginForm:113–117`, `registerForm:131–135`) and caps-lock hint (`loginForm:31, 94`, `registerForm:24, 108`) are shipped.]** **Remaining:** no "Forgot password" link, no password-strength indicator on register, no terms-of-service link.
+    - ~~There is no "Show password", no caps-lock hint…~~ **[Partially complete: show/hide password toggle (`loginForm:113–117`, `registerForm:131–135`) and caps-lock hint (`loginForm:31, 94`, `registerForm:24, 108`) are shipped.]** ~~No "Forgot password" link~~ **[Complete: login form now exposes `microcopy.auth.forgotPassword` linking to `/auth/forgot-password`, with a placeholder page rendered from `microcopy.auth.forgotPasswordPlaceholderTitle` + `forgotPasswordPlaceholderBody` (en + zh-CN).]** **Remaining:** no password-strength indicator on register, no terms-of-service link.
     - The card is a fixed `40rem` wide / `56rem` tall (`authLayout.tsx:43–51`) on a viewport-locked background, so it looks identical regardless of the form length and floats awkwardly when the page becomes very tall (e.g. with the error box expanded).
     - The "Register for an account" CTA is a `NoPaddingButton type="link"` — the same component reused for the column "..." menu and the header logout, so its semantic role is muddied.
 
@@ -215,7 +215,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 7. **Auth screens (`src/layouts/authLayout.tsx`, `loginForm`, `registerForm`).** **[Partially complete; see §1.2 item 11.]**
     - ~~Add real `<Form.Item label>` to every field.~~ **[Complete.]**
     - ~~Set `autocomplete` properly… `inputMode="email"` … `enterKeyHint="go"` on the submit-row inputs.~~ **[Complete on `autoComplete`; remaining: `inputMode` / `enterKeyHint` audits.]**
-    - ~~Add a "Show password" toggle, a caps-lock hint…~~ **[Complete.]** **Remaining: a "Forgot password" link (route can be a TODO page).**
+    - ~~Add a "Show password" toggle, a caps-lock hint…~~ **[Complete.]** ~~Remaining: a "Forgot password" link (route can be a TODO page).~~ **[Complete: `/auth/forgot-password` placeholder route is wired, with localized link/title/body copy.]**
     - On register: password-strength meter (zxcvbn-equivalent or a deterministic length+class heuristic to avoid the dependency), minimum-length hint inline, plus a "Match" indicator if a confirm-password field is added.
     - Render a top-of-form **error summary** (`role="alert"`) whenever the API returns an error, with anchor links to fields that failed; this satisfies WCAG 3.3.1 / 3.3.3 (see 2.A.1). The forms have an `aria-live="polite"` region today (`loginForm:91`, `registerForm:105`) but no anchor links / `role="alert"` summary.
     - Do not block paste (`onPaste`) on password fields (WCAG 3.3.8).

@@ -5,6 +5,7 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
@@ -207,5 +208,20 @@ describe("LoginForm", () => {
         expect(
             screen.getByRole("button", { name: /log(ging)? in/i })
         ).toHaveClass("ant-btn-loading");
+    });
+
+    it("renders a forgot-password link that is keyboard-focusable", async () => {
+        renderLoginForm();
+        const keyboard = userEvent.setup();
+        const link = screen.getByRole("link", { name: /forgot password\?/i });
+
+        expect(link).toHaveAttribute("href", "/auth/forgot-password");
+
+        for (let i = 0; i < 6; i += 1) {
+            await keyboard.tab();
+            if (document.activeElement === link) break;
+        }
+
+        expect(link).toHaveFocus();
     });
 });

@@ -220,6 +220,22 @@ describe("App integration (full providers + routes)", () => {
         ).toBeInTheDocument();
     });
 
+    it("renders the forgot-password placeholder route for anonymous visitors", async () => {
+        renderAppAt("/auth/forgot-password");
+
+        expect(
+            await screen.findByRole("heading", {
+                name: /reset your password/i
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /password reset is coming soon\. please contact your workspace admin if you need immediate access\./i
+            )
+        ).toBeInTheDocument();
+        expect(window.location.pathname).toBe("/auth/forgot-password");
+    });
+
     it("logs in and navigates to the project list with live data", async () => {
         setupAuthenticatedSessionMocks();
         const user = userEvent.setup();

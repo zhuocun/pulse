@@ -106,4 +106,14 @@ describe("HomePage", () => {
 
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
     });
+
+    it("treats /auth/forgot-password as an auth route", () => {
+        renderHome({
+            path: "/auth/forgot-password",
+            token: null
+        });
+
+        expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
+        expect(window.location.pathname).toBe("/auth/forgot-password");
+    });
 });

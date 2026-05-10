@@ -2,7 +2,7 @@ import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Form, Input, message } from "antd";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
@@ -22,6 +22,15 @@ const CapsLockSlot = styled.span`
     display: inline-block;
     line-height: ${lineHeight.snug};
     min-height: ${lineHeight.snug}em;
+`;
+
+const ForgotPasswordRow = styled.div`
+    margin-block-end: 16px;
+    text-align: right;
+`;
+
+const ForgotPasswordLink = styled(Link)`
+    font-size: 0.875rem;
 `;
 
 const LoginForm: React.FC<{
@@ -129,6 +138,11 @@ const LoginForm: React.FC<{
                     id="password"
                 />
             </Form.Item>
+            <ForgotPasswordRow>
+                <ForgotPasswordLink to="/auth/forgot-password">
+                    {microcopy.auth.forgotPassword}
+                </ForgotPasswordLink>
+            </ForgotPasswordRow>
             <Form.Item>
                 <AuthButton
                     loading={isLoading}
