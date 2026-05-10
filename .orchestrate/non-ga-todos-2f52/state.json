@@ -208,12 +208,12 @@
       "agentId": "bc-8136847d-51c9-4bba-8974-ef3f65fb373b",
       "runId": "run-d16bb639-d220-4271-9a19-bb04c1e4838c",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/members-popover-avatars-cache.md",
       "startedAt": "2026-05-10T12:32:01.883Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T12:32:04.588Z",
+      "finishedAt": "2026-05-10T12:53:17.975Z",
+      "lastUpdate": "2026-05-10T12:53:17.976Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -257,12 +257,12 @@
       "handoffPath": "handoffs/microcopy-casing-sweep.md",
       "startedAt": "2026-05-10T12:32:07.254Z",
       "finishedAt": "2026-05-10T12:40:58.216Z",
-      "lastUpdate": "2026-05-10T12:40:58.217Z",
+      "lastUpdate": "2026-05-10T12:40:59.162Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "live-ui-verified",
       "attempts": 1
     },
     {
@@ -318,6 +318,42 @@
     {
       "at": "2026-05-10T12:38:47.615Z",
       "message": "useagent-nudge-inbox-extract: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-10T12:40:59.162Z",
+      "message": "microcopy-casing-sweep: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T12:42:15.962Z",
+      "message": "drag-keyboard-affordance-hint: SSE idle 328523ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T12:42:15.963Z",
+      "message": "drag-keyboard-affordance-hint: tool_call idle 328525ms; last=2026-05-10T12:36:47.438Z"
+    },
+    {
+      "at": "2026-05-10T12:43:13.455Z",
+      "message": "agent-metadata-recursion-tags-about: SSE idle 313128ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T12:43:13.456Z",
+      "message": "agent-metadata-recursion-tags-about: tool_call idle 313129ms; last=2026-05-10T12:38:00.327Z"
+    },
+    {
+      "at": "2026-05-10T12:44:05.822Z",
+      "message": "members-popover-avatars-cache: SSE idle 342366ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T12:44:05.822Z",
+      "message": "members-popover-avatars-cache: tool_call idle 342367ms; last=2026-05-10T12:38:23.455Z"
+    },
+    {
+      "at": "2026-05-10T12:44:08.501Z",
+      "message": "throttled-spinners-hook: SSE idle 337090ms, polled status=running; watchdog still waiting"
+    },
+    {
+      "at": "2026-05-10T12:44:08.501Z",
+      "message": "throttled-spinners-hook: tool_call idle 337090ms; last=2026-05-10T12:38:31.411Z"
     }
   ]
 }
