@@ -60,6 +60,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
 | Copilot About — `chat-agent` `rate_limit` / `allowed_autonomy` in UI | [`release-todo.md`](release-todo.md) §14 partial | ✅ Remote-only `useChatAgentMetadata` + session `getSessionCachedAgentMetadata`; loading/empty/error handling in `CopilotAboutPopover` |
+| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | ✅ `en` / `zh-CN` keys; component + tests read from `microcopy` |
 
 ---
 
