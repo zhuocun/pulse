@@ -9,12 +9,14 @@ Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project
 
 ## TL;DR
 
-- **GA-ready surfaces — Backend.** All v1 deterministic JSON routes;
+- **GA-ready surfaces — Backend.** All v1 JSON routes
+  (deterministic + LLM-polish);
   v2.1 SSE read-only / suggestion flows for `board-brief`,
   `task-drafting`, `task-estimation`, `search`, `chat` (read-only
   tools only), `triage` nudges; per-project AI opt-out, rate
   limiting, monthly token budgets, OpenTelemetry, Prometheus,
-  idempotency, durable checkpointing, boot-time prod guards.
+  idempotency, Postgres-backed checkpointing when configured,
+  boot-time prod guards.
 - **GA-ready surfaces — Frontend.** All six v2.1 SSE agents consumed
   via `useAgent` / `useAgentChat` in remote builds; deterministic
   local-engine fallback under `aiUseLocalEngine`; PRD AC-V14 nudge
@@ -441,7 +443,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 
 | Surface | Status | Notes |
 |---|---|---|
-| v1 JSON routes (deterministic + LLM-polish) | ✅ | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
+| v1 JSON routes (shared runtime; deterministic + LLM-polish) | ✅ | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
 | v2.1 SSE — `board-brief-agent` | ✅ | Suggestion + citations |
 | v2.1 SSE — `task-drafting-agent` | ✅ | Two sequential interrupts auto-resumed by FE |
 | v2.1 SSE — `task-estimation-agent` | ⚠️ | Quality bounded by §4 |
@@ -452,7 +454,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Rate limiting (per-agent, from metadata) | ✅ | |
 | Monthly token budget (per-project) | ✅ | `AGENT_BUDGET_MONTHLY_TOKEN_CAP` |
 | Idempotency (Redis-backed) | ✅ | Now also enforced on the SSE `/stream` initial POST (2026-05-05) |
-| Durable checkpointing (Postgres) | ✅ | |
+| Durable checkpointing (Postgres when configured) | ✅ | Local/dev default remains `memory`; production resume durability needs `AGENT_CHECKPOINT_BACKEND=postgres` |
 | OpenTelemetry tracing + Prometheus metrics + LangSmith | ✅ | |
 | Boot-time prod guard (refuses `memory` backends) | ✅ | |
 | Boot-time prod guard (explicit provider without API key) | ✅ | Added 2026-05-05 |

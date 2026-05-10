@@ -95,7 +95,6 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Thread **`thread_id` / checkpoint** continuity across refresh and optional multi-tab policy (single writer vs broadcast) | Postgres checkpointing is useless if the FE always mints a fresh thread. |
 | FE **persist minimal resume handles** (e.g., thread id, last interrupt id) scoped per project/user session               | Enables “Continue last agent turn” after accidental reload.              |
-| Migrate **static run context** out of `BaseAgentState` into **`Runtime[Context]`**                                       | Review **F-43** — smaller checkpoints, safer replay.                     |
 | Document **idempotency replay** vs **fresh stream** decision tree for support tooling                                    | Clarifies 409/422/`stream_completed` responses already on `/stream`.     |
 | **Move rate-limit / budget / idempotency backends off in-memory** so uvicorn can run > 1 worker. The Redis backends already exist (`backend/app/middleware/redis_backends.py`); production-like envs must set `RATE_LIMIT_BACKEND=redis`, `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` before the single-worker pin is relaxed. Track in [release-todo §16d](release-todo.md). | Single-worker pin is an implicit scaling ceiling. Removing it requires env parity plus replay smoke tests before anyone bumps the worker count. |
 
@@ -142,7 +141,7 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 | --------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------- |
 | **A — Contract & errors**         | Schemas F-10, SSE/error normalization, golden transcripts, FE typed-error completeness  | None                                          |
 | **B — Mutations & governance**    | Full `MutationProposal` lifecycle, audit, autonomy enforcement hooks                    | Phase A error + resume clarity                |
-| **C — Resume & state hygiene**    | FE thread continuity; **F-43** context migration; refresh/tab policy                    | Phase B for mutation replay safety            |
+| **C — Resume & state hygiene**    | FE thread continuity; resume handles; refresh/tab policy                                | Phase B for mutation replay safety            |
 | **D — FE simplification**         | Hook stabilization sweep, shared SSE adapter, reduce dual-path drift                    | Phases A–C reduce refactor churn              |
 | **E — Intelligence & resilience** | Gateway F-9, vector store F-19, ReAct migration F-12, orchestration F-13/F-14, MCP F-15 | Stable contracts from A; durable state from C |
 
