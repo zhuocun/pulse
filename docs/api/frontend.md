@@ -6,7 +6,7 @@ This document covers three integration layers of the `pulse` React front-end:
 
 **A. HTTP contract** — every REST and AI route the FE calls on the `pulse` backend.
 Backend engineers use this table to verify the shape they must return.
-Server-side route documentation lives in `backend/docs/backend-api.md`.
+Server-side route documentation lives in [`backend.md`](backend.md).
 
 **B. Public hook and utility surface** — every hook in `src/utils/hooks/` and every
 utility in `src/utils/ai/` that component authors call directly.
@@ -88,7 +88,7 @@ All REST routes are relative to `apiBaseUrl` (`${REACT_APP_API_URL}/api/v1`).
 All AI v1 routes are relative to `aiBaseUrl` (only called when `aiUseLocalEngine` is `false`).
 All Agents v2.1 routes are relative to `aiBaseUrl`.
 
-See the server-side docs for request/response schemas: `../backend/docs/backend-api.md`.
+See the server-side docs for request/response schemas: [`backend.md`](backend.md).
 
 ### REST Core (`/api/v1/`)
 
@@ -151,7 +151,7 @@ Non-OK responses from all AI v1 routes are mapped by `mapErrorResponse` (`src/ut
 
 `aiErrorView` (`src/utils/ai/errorTemplate.ts`) maps these to UI copy with explicit `retryable` flags.
 
-The FE always sends the wrapped envelope (e.g. `{ "draft": { ... } }`, `{ "estimate": { ... } }`) — that is `RunPayload` shape verbatim. The server also accepts the equivalent flat body (`{ "prompt": ..., "context": ... }`) for cURL callers and the existing test suite — see `_unwrap_envelope` in `app/routers/ai.py` and the matching note in `../backend/docs/backend-api.md` — but FE callers do not use the flat form.
+The FE always sends the wrapped envelope (e.g. `{ "draft": { ... } }`, `{ "estimate": { ... } }`) — that is `RunPayload` shape verbatim. The server also accepts the equivalent flat body (`{ "prompt": ..., "context": ... }`) for cURL callers and the existing test suite — see `_unwrap_envelope` in `app/routers/ai.py` and the matching note in [`backend.md`](backend.md) — but FE callers do not use the flat form.
 
 ### Agents v2.1 (`/api/v1/agents/`)
 
@@ -1577,7 +1577,7 @@ means the agent is deployed but not yet user-visible. `allowed_autonomy` lists w
 `AutonomyLevel` values the server permits for this agent; the FE gates the autonomy
 selector to this set.
 
-The server response also carries `tags: string[]`, `recursion_limit: number`, and `context_schema: string | null` (see `../backend/docs/backend-api.md` and `app/agents/base.py`). The FE interface above intentionally narrows the surface to the fields it consumes — the additional fields are accepted at runtime and ignored.
+The server response also carries `tags: string[]`, `recursion_limit: number`, and `context_schema: string | null` (see [`backend.md`](backend.md) and `app/agents/base.py`). The FE interface above intentionally narrows the surface to the fields it consumes — the additional fields are accepted at runtime and ignored.
 
 ---
 

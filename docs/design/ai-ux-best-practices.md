@@ -1,7 +1,7 @@
 # AI Web App UX Best Practices — Research Reference
 
 **Created:** 2026-05-05  
-**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements `ai-ux-optimization-plan.md` (implementation audit) and `docs/ui-ux-optimization-plan.md` (general UX plan).  
+**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the active AI UX PRD; the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)) and [`ui-ux-optimization-plan.md`](ui-ux-optimization-plan.md) (general UX plan).  
 **Primary sources:** Google PAIR Guidebook, Microsoft HAX Toolkit, Nielsen Norman Group AI UX research, NIST AI RMF, Anthropic model card & safety guidance, IBM Design for AI, OpenAI product design guidance, W3C accessibility, Apple ML/privacy design.
 
 ---
@@ -441,11 +441,11 @@ Never log tool output content or the data payloads sent to the AI.
 
 ## 13. Board Copilot — Principle-to-Implementation Mapping
 
-This table maps the principles above to the current implementation state and the `ai-ux-optimization-plan.md` items for traceability.
+This table maps the principles above to the current implementation state and the items in the archived [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md) (the audit that informed the v3 PRD) for traceability.
 
-| Principle area              | Implementation state                                  | See also                          |
-| --------------------------- | ----------------------------------------------------- | --------------------------------- |
-| AI attribution              | Strong — sparkle icon + "Board Copilot" label present | `ai-ux-optimization-plan.md` §3.1 |
+| Principle area              | Implementation state                                  | See also                                  |
+| --------------------------- | ----------------------------------------------------- | ----------------------------------------- |
+| AI attribution              | Strong — sparkle icon + "Board Copilot" label present | archived ai-ux-optimization-plan §3.1     |
 | Streaming UI                | Present in chat                                       | §2.2 above                        |
 | Confidence indicators       | Partial — draft and estimate only                     | P2-1 in optimization plan         |
 | Citations                   | Partial — chat only, not claim-level                  | P0-3 in optimization plan         |
