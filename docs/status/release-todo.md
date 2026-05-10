@@ -38,15 +38,15 @@ acceptable deployment posture today is **internal beta with proposal
 cards gated off on the FE** (see GA Blocker §1 mitigation).
 
 - **Each blocker delays a specific tier.**
-  - §1 ships a dead-end UX once a proposal surfaces in a deployed
-    build — gates **public GA**.
-  - §2 makes a single upstream Anthropic/OpenAI 5xx a full outage —
-    gates **design-partner beta**.
-  - §3 leaves the AI proxy token co-located with the primary REST
-    JWT in `localStorage`, so any FE XSS exfiltrates both — gates
-    **design-partner beta**.
-  - §6 means a real-backend regression goes undetected by the
-    test suite — gates **design-partner beta**.
+    - §1 ships a dead-end UX once a proposal surfaces in a deployed
+      build — gates **public GA**.
+    - §2 makes a single upstream Anthropic/OpenAI 5xx a full outage —
+      gates **design-partner beta**.
+    - §3 leaves the AI proxy token co-located with the primary REST
+      JWT in `localStorage`, so any FE XSS exfiltrates both — gates
+      **design-partner beta**.
+    - §6 means a real-backend regression goes undetected by the
+      test suite — gates **design-partner beta**.
 - **Assign owners per blocker, not per polish item.** Polish items
   can slip; §1, §2, §3, §6 cannot.
 - **No public marketing, no design-partner expansion, no removal of
@@ -74,7 +74,7 @@ the explicit blocker closures listed there.
 
 ## GA blockers — must close before public ship
 
-### 🛑 1. `MutationProposal` accept path is dead in remote mode  *(BE + FE)*
+### 🛑 1. `MutationProposal` accept path is dead in remote mode _(BE + FE)_
 
 **Verdict (2026-05-05 re-audit):** still open. No agent emits
 `custom/mutation_proposal`; no `fe.applyMutation` interrupt is
@@ -104,8 +104,8 @@ sees the card vanish but no mutation is applied.
   for tool-driven mutations and a future `board-coach-agent` for
   proactive mutations.
 - A resume-accept handler that, on `command.resume = {choice:
-  "accept"}`, raises `interrupt(interrupt_payload("fe.applyMutation",
-  {diff}))` so the FE applies the change against `useReactMutation`.
+"accept"}`, raises `interrupt(interrupt_payload("fe.applyMutation",
+{diff}))` so the FE applies the change against `useReactMutation`.
   On `{choice: "reject"}` the agent terminates the proposal cycle.
 - An undo endpoint (or a structured undo payload re-triggered by a
   follow-up `mutation_proposal`) so the FE 10-second undo toast
@@ -134,7 +134,7 @@ behind a flag, ops on call, no external SLAs). They block any
 external exposure: a design partner would hit the failure mode and
 there is no acceptable caveat.
 
-### 🚧 2. No provider fallback on 5xx  *(BE-only)*
+### 🚧 2. No provider fallback on 5xx _(BE-only)_
 
 **Verdict (2026-05-05 re-audit):** still open. No AI gateway, no
 provider list, no circuit breaker.
@@ -159,7 +159,7 @@ relying on uptime cannot. Closes design-partner gate.
   policy, OTel attributes, and failure-mode tests. `ChatOpenAI(base_url=...)`
   is sufficient for LiteLLM because it is OpenAI-compatible.
 
-### 🚧 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
+### 🚧 3. JWT-in-localStorage XSS exfiltration surface _(BE + FE)_
 
 **Verdict (2026-05-05 re-audit):** still open. The AI proxy still
 reuses the primary FE bearer.
@@ -179,7 +179,7 @@ not an acceptable XSS surface. Closes design-partner gate.
 - Scope: BE token issuance, FE storage migration, and middleware
   updates across REST + agent requests.
 
-### 🚧 6. Synthetic 100% coverage — no integration tests  *(BE-only)*
+### 🚧 6. Synthetic 100% coverage — no integration tests _(BE-only)_
 
 `pyproject.toml` `--cov-fail-under=100` is met against deterministic
 stubs. No tests against real Anthropic/OpenAI, real Redis, or real
@@ -198,7 +198,7 @@ Closes design-partner gate.
 
 ## Soft blockers — ship-able with documented caveats
 
-### ⚠️ 4. Search and estimation quality ceiling  *(BE + FE)*
+### ⚠️ 4. Search and estimation quality ceiling _(BE + FE)_
 
 `task-estimation-agent` neighbour scoring runs only on FE-supplied
 `similar_tasks`. No persistent vector store. `search-agent` ranks
@@ -218,7 +218,7 @@ tool tops out at 50 candidates per kind — no FE-side fix.
 - **Acceptable scope:** suggestion-grade search and estimation, not
   retrieval-grade. Disclose in product copy.
 
-### ⚠️ 5. No structured-output validation  *(BE-only — partially shipped 2026-05-10)*
+### ⚠️ 5. No structured-output validation _(BE-only — partially shipped 2026-05-10)_
 
 Catalog agents emit `AIMessage(content=json.dumps(...))` and clients
 `json.loads`. Once an LLM replaces the deterministic stubs the schema
@@ -230,7 +230,7 @@ through (so a schema bug never breaks a streaming response). Golden
 SSE transcripts in `tests/test_agent_sse_transcripts.py`.
 
 - Remaining work: migrate to `create_react_agent(...,
-  response_format=...)` for the LLM-polish path so the contract is
+response_format=...)` for the LLM-polish path so the contract is
   enforced at provider call time, not just at FE emission. Detail:
   F-10 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Scope: provider-level structured-output calls, fallback behaviour on
@@ -240,7 +240,7 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
   drops unknown ids. A schema regression degrades but does not
   corrupt.
 
-### ⚠️ 7. CI workflow not yet validated against GitHub Actions  *(BE-only)*
+### ⚠️ 7. CI workflow not yet validated against GitHub Actions _(BE-only)_
 
 `.github/workflows/backend-ci.yml` ships two jobs (`test-full` with
 `.[dev,ai]` + full pytest, and `test-slim` with `.[dev]` only +
@@ -251,7 +251,7 @@ of the first run on this branch is still unknown.
 - Scope: trigger the workflow on a PR/main run, capture the first green
   run, and update this section with the CI evidence.
 
-### ⚠️ 7b. No FE CI workflow  *(FE-only)*
+### ⚠️ 7b. No FE CI workflow _(FE-only)_
 
 `.github/workflows/` contains exactly one file: `backend-ci.yml`.
 There is **no GitHub Action that runs the FE lint, typecheck, or
@@ -269,13 +269,13 @@ self-merged or skip-reviewed PR.
 - Action when prioritised: add `.github/workflows/frontend-ci.yml`
   scoped to FE paths (mirror the `backend-ci.yml` shape) running
   `npm ci && npm run eslint && npx tsc --noEmit && CI=true npm test
-  -- --watchAll=false --runInBand && npx vite build`. Reuse the
+-- --watchAll=false --runInBand && npx vite build`. Reuse the
   existing pre-commit step list in `package.json` so the gate cannot
   drift from local.
 - Scope: single workflow file, dependency cache, lint/typecheck/Jest/build
   jobs, and first green run evidence.
 
-### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
+### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented _(FE — Resolved 2026-05-05)_
 
 Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling
 the "Auto" option in `AiChatDrawer` with an explanatory i18n tooltip
@@ -284,7 +284,7 @@ in v3."). The metadata-driven gating against
 `AgentMetadata.allowed_autonomy` remains V3 work — see
 [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md).
 
-### ✅ 9. `AGENT_PROPOSAL_UNDONE` analytics wired FE-side  *(FE — Resolved 2026-05-05)*
+### ✅ 9. `AGENT_PROPOSAL_UNDONE` analytics wired FE-side _(FE — Resolved 2026-05-05)_
 
 `MutationProposalCard` now accepts an optional `onUndo` prop and fires
 `AGENT_PROPOSAL_UNDONE` from the click handler. The end-to-end Undo
@@ -292,21 +292,21 @@ flow remains gated on GA Blocker §1.
 
 ## Polish — no customer impact
 
-### 🟡 10. Input size limits  *(BE — Resolved 2026-05-05, `0e990e4`)*
+### 🟡 10. Input size limits _(BE — Resolved 2026-05-05, `0e990e4`)_
 
 `enforce_request_limits` added to every v1 (`POST /api/ai/*`) and v2.1
 (`POST /api/v1/agents/*/{invoke,stream}`) endpoint. Defaults: 64 KiB
 total body, 8 KiB prompt, 50 messages, 8 KiB per-message content.
 Returns HTTP 413 on violation. 13 new tests in `tests/test_ai_limits.py`.
 
-### 🟡 11. PII leak from `/estimate` and `/readiness` task fields  *(BE — Resolved 2026-05-05, `0e990e4`)*
+### 🟡 11. PII leak from `/estimate` and `/readiness` task fields _(BE — Resolved 2026-05-05, `0e990e4`)_
 
 `taskName`, `note`, `epic`, and `coordinatorId` on `/estimate` and
 `/readiness` requests now run through `redact_task_fields` before the
 LLM polish call. Closes the leak documented in PRD §5A.10. 9 new
 tests in `tests/test_ai_redaction.py`.
 
-### 🟡 12. Embedding dimensions hard-pinned to 16  *(BE — Resolved 2026-05-05, `0e990e4`)*
+### 🟡 12. Embedding dimensions hard-pinned to 16 _(BE — Resolved 2026-05-05, `0e990e4`)_
 
 `EMBEDDINGS_DIMENSIONS` env var added (`app/config.py`, default `16`
 for stub backward-compat). When using real OpenAI embeddings, the
@@ -314,13 +314,13 @@ value is passed through `OpenAIEmbeddings(dimensions=...)`. Set `512`
 or higher for production semantic quality. **Note: this does NOT add
 a vector store or real RAG — soft blocker §4 remains open.**
 
-### 🟡 13. v2.1 metadata fields the FE doesn't consume  *(BE — Resolved 2026-05-05)*
+### 🟡 13. v2.1 metadata fields the FE doesn't consume _(BE — Resolved 2026-05-05)_
 
 `AgentMetadata.as_dict()` no longer emits `tags`, `recursion_limit`,
 or `context_schema`. The fields stay on the dataclass for the runtime
 / router.
 
-### 🟡 14. v2.1 metadata fields not surfaced in UI  *(FE)*
+### 🟡 14. v2.1 metadata fields not surfaced in UI _(FE)_
 
 `AgentMetadata.allowed_autonomy`, `rate_limit`, `recursion_limit`,
 `context_schema`, `tags` are all on the BE wire but the FE consumer
@@ -328,7 +328,7 @@ reads none of them. Zero impact on user-visible behaviour today; would
 let the autonomy selector self-gate and a future "limits" surface
 render rate / budget visibly.
 
-### 🟡 15. MCP transport deferred  *(BE)*
+### 🟡 15. MCP transport deferred _(BE)_
 
 No `/mcp` mount, no `langchain-mcp-adapters` dependency. The catalog
 has tool schemas in `app/tools/fe_tool_schemas.py` and per-agent
@@ -344,7 +344,7 @@ not in any dependency group and the `/mcp` mount point does not exist.
 - Detail: F-15 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Not on the GA path.
 
-### 🟡 16. No multi-agent orchestration / memory  *(BE)*
+### 🟡 16. No multi-agent orchestration / memory _(BE)_
 
 `board-brief-agent` and `triage-agent` re-implement drift detection.
 Memory namespaces (`user_preferences`, `project_profile`, `feedback`)
@@ -353,7 +353,7 @@ are defined but unused.
 - Detail: F-13 / F-14 in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
 - Quality-of-life, not GA-gating.
 
-### 🟡 16b. `useAgent.ts` is a 1,010-line monolith  *(FE)*
+### 🟡 16b. `useAgent.ts` is a 1,010-line monolith _(FE)_
 
 `src/utils/hooks/useAgent.ts` owns SSE parsing, thread-id persistence,
 FE-tool auto-resume, TTFT tracking, the AC-V14 nudge inbox reducer,
@@ -370,7 +370,7 @@ simplification).
   loop into a separate hook (`useAgentToolResolver`).
 - Quality-of-life, not GA-gating.
 
-### 🟡 16c. `X-Pulse-Model` header / per-tenant model config  *(BE)*
+### 🟡 16c. `X-Pulse-Model` header / per-tenant model config _(BE)_
 
 `backend/app/agents/runtime.py:578` carries a TODO to wire the
 `X-Pulse-Model` header to a per-tenant config in "Phase 5". The
@@ -386,7 +386,7 @@ the only choice is a process-wide env var.
 - Scope: per-project setting, migration/defaulting, allowlist semantics,
   and request/stream tests.
 
-### 🟡 16d. Single-worker uvicorn lock-in  *(BE)*
+### 🟡 16d. Single-worker uvicorn lock-in _(BE)_
 
 `backend/Dockerfile:81–84` and `backend/fly.toml:17–39` pin uvicorn
 to a single worker because in-process rate-limit and budget state
@@ -405,7 +405,7 @@ architecture-todo Theme 4.
 - Scope: env wiring, compose parity, smoke tests against
   `app/middleware/redis_backends.py`, and duplicate-request replay tests.
 
-### 🟡 16e. `fly.toml` placeholder app name  *(BE)*
+### 🟡 16e. `fly.toml` placeholder app name _(BE)_
 
 `backend/fly.toml:17` ships with `app = "jira-python-server"` —
 literally a placeholder from the pre-monorepo split. The file is on
@@ -421,17 +421,17 @@ or collide with the wrong Fly app the moment that path is used.
   unused Fly files or replace the placeholder app name with a documented
   owner-controlled value.
 
-### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
+### ✅ 17. `BaseAgentState` carries static run-scoped data _(BE — Resolved 2026-05-10)_
 
 `project_id`, `user_id`, `autonomy_level` migrated from
 `BaseAgentState` into `Runtime[Context]` per F-43.
 
-### ✅ 18. `MutationProposalCard` undo CTA missing  *(FE — Resolved 2026-05-05)*
+### ✅ 18. `MutationProposalCard` undo CTA missing _(FE — Resolved 2026-05-05)_
 
 `MutationProposalCard` now accepts `onUndo?: () => void` and renders a
 conditional Undo button when `proposal.undoable === true`.
 
-### ✅ 19. `useAi.ts:206` `TODO(v2.x)` comment  *(FE — Resolved 2026-05-05)*
+### ✅ 19. `useAi.ts:206` `TODO(v2.x)` comment _(FE — Resolved 2026-05-05)_
 
 Removed. The surrounding docblock already documents `useAi`'s
 post-v2.1 role as the deterministic local-engine fallback only.
@@ -440,48 +440,48 @@ post-v2.1 role as the deterministic local-engine fallback only.
 
 ### Backend
 
-| Surface | Status | Notes |
-|---|---|---|
-| v1 JSON routes (deterministic + LLM-polish) | ✅ | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
-| v2.1 SSE — `board-brief-agent` | ✅ | Suggestion + citations |
-| v2.1 SSE — `task-drafting-agent` | ✅ | Two sequential interrupts auto-resumed by FE |
-| v2.1 SSE — `task-estimation-agent` | ⚠️ | Quality bounded by §4 |
-| v2.1 SSE — `search-agent` | ⚠️ | Quality bounded by §4 (FE-candidate ranking only) |
-| v2.1 SSE — `chat-agent` | ✅ | Read-only tools; **proposal cards must be hidden** until §1 closes |
-| v2.1 SSE — `triage-agent` | ✅ | Deterministic; AC-V14 inbox rules enforced FE-side |
-| Per-project AI opt-out + typed 403 envelope | ✅ | Resolved 2026-05-05 |
-| Rate limiting (per-agent, from metadata) | ✅ | |
-| Monthly token budget (per-project) | ✅ | `AGENT_BUDGET_MONTHLY_TOKEN_CAP` |
-| Idempotency (Redis-backed) | ✅ | Now also enforced on the SSE `/stream` initial POST (2026-05-05) |
-| Durable checkpointing (Postgres) | ✅ | |
-| OpenTelemetry tracing + Prometheus metrics + LangSmith | ✅ | |
-| Boot-time prod guard (refuses `memory` backends) | ✅ | |
-| Boot-time prod guard (explicit provider without API key) | ✅ | Added 2026-05-05 |
-| Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
-| CI matrix (slim + full install) | ⚠️ | Wired but not yet run — see §7 |
+| Surface                                                  | Status | Notes                                                                                    |
+| -------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
+| v1 JSON routes (deterministic + LLM-polish)              | ✅     | `task-draft`, `task-breakdown`, `estimate`, `readiness`, `search`, `board-brief`, `chat` |
+| v2.1 SSE — `board-brief-agent`                           | ✅     | Suggestion + citations                                                                   |
+| v2.1 SSE — `task-drafting-agent`                         | ✅     | Two sequential interrupts auto-resumed by FE                                             |
+| v2.1 SSE — `task-estimation-agent`                       | ⚠️     | Quality bounded by §4                                                                    |
+| v2.1 SSE — `search-agent`                                | ⚠️     | Quality bounded by §4 (FE-candidate ranking only)                                        |
+| v2.1 SSE — `chat-agent`                                  | ✅     | Read-only tools; **proposal cards must be hidden** until §1 closes                       |
+| v2.1 SSE — `triage-agent`                                | ✅     | Deterministic; AC-V14 inbox rules enforced FE-side                                       |
+| Per-project AI opt-out + typed 403 envelope              | ✅     | Resolved 2026-05-05                                                                      |
+| Rate limiting (per-agent, from metadata)                 | ✅     |                                                                                          |
+| Monthly token budget (per-project)                       | ✅     | `AGENT_BUDGET_MONTHLY_TOKEN_CAP`                                                         |
+| Idempotency (Redis-backed)                               | ✅     | Now also enforced on the SSE `/stream` initial POST (2026-05-05)                         |
+| Durable checkpointing (Postgres)                         | ✅     |                                                                                          |
+| OpenTelemetry tracing + Prometheus metrics + LangSmith   | ✅     |                                                                                          |
+| Boot-time prod guard (refuses `memory` backends)         | ✅     |                                                                                          |
+| Boot-time prod guard (explicit provider without API key) | ✅     | Added 2026-05-05                                                                         |
+| Vercel SSE timeout (`maxDuration: 300`)                  | ✅     | Resolved 2026-05-05                                                                      |
+| CI matrix (slim + full install)                          | ⚠️     | Wired but not yet run — see §7                                                           |
 
 ### Frontend
 
-| Surface | Status | Notes |
-|---|---|---|
-| Local engine (deterministic) | ✅ | Full coverage; demo-able with no backend |
-| `useAgent("board-brief-agent")` (remote) | ✅ | Suggestion + citations rendered in `BoardBriefDrawer` |
-| `useAgent("task-drafting-agent")` (remote) | ✅ | Two sequential interrupts auto-resumed |
-| `useAgent("task-estimation-agent")` (remote) | ⚠️ | Quality bounded by §4 |
-| `useAgent("search-agent")` (remote) | ⚠️ | Quality bounded by §4 |
-| `useAgentChat("chat-agent")` (remote) | ✅ | SSE streaming; **proposal cards must be hidden** until BE §1 closes |
-| `useAgent("triage-agent")` (remote) | ✅ | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation) |
-| Autonomy selector UI | ⚠️ | Suggest/Plan ✅; Auto disabled with tooltip — see §8 |
-| Agent health badge in header | ✅ | Renders only when `degraded`/`offline` and remote mode |
-| `useAgentHealth` + `AGENT_HEALTH_DEGRADED` analytics | ✅ | Deduped per transition |
-| Per-project AI opt-out + typed 403 envelope | ✅ | `mapErrorResponse` honors the backend's typed error envelope, including nested `error.code` (Resolved 2026-05-08) |
-| `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` observability | ✅ | TTFT, durationMs, tokensIn/Out |
-| `Idempotency-Key` header on all AI requests | ✅ | |
-| i18n (`en`, `zh-CN`) for AI surfaces | ✅ | Including autonomy selector keys |
-| jest-axe a11y coverage | ✅ | 31 tests across all AI surfaces |
-| `REACT_APP_AI_BASE_URL` validation (rejects `javascript:` / `data:` / `file:`) | ✅ | |
-| `Disable AI for this project` switch | ✅ | `boardCopilot:disabledProjectIds` |
-| `Board Copilot` runtime toggle | ✅ | `boardCopilot:enabled` |
+| Surface                                                                        | Status | Notes                                                                                                             |
+| ------------------------------------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| Local engine (deterministic)                                                   | ✅     | Full coverage; demo-able with no backend                                                                          |
+| `useAgent("board-brief-agent")` (remote)                                       | ✅     | Suggestion + citations rendered in `BoardBriefDrawer`                                                             |
+| `useAgent("task-drafting-agent")` (remote)                                     | ✅     | Two sequential interrupts auto-resumed                                                                            |
+| `useAgent("task-estimation-agent")` (remote)                                   | ⚠️     | Quality bounded by §4                                                                                             |
+| `useAgent("search-agent")` (remote)                                            | ⚠️     | Quality bounded by §4                                                                                             |
+| `useAgentChat("chat-agent")` (remote)                                          | ✅     | SSE streaming; **proposal cards must be hidden** until BE §1 closes                                               |
+| `useAgent("triage-agent")` (remote)                                            | ✅     | AC-V14 inbox rules (cap-5, dedup, 4-hour expiry, dismiss-propagation)                                             |
+| Autonomy selector UI                                                           | ⚠️     | Suggest/Plan ✅; Auto disabled with tooltip — see §8                                                              |
+| Agent health badge in header                                                   | ✅     | Renders only when `degraded`/`offline` and remote mode                                                            |
+| `useAgentHealth` + `AGENT_HEALTH_DEGRADED` analytics                           | ✅     | Deduped per transition                                                                                            |
+| Per-project AI opt-out + typed 403 envelope                                    | ✅     | `mapErrorResponse` honors the backend's typed error envelope, including nested `error.code` (Resolved 2026-05-08) |
+| `AGENT_TURN_STARTED` / `AGENT_TURN_COMPLETED` observability                    | ✅     | TTFT, durationMs, tokensIn/Out                                                                                    |
+| `Idempotency-Key` header on all AI requests                                    | ✅     |                                                                                                                   |
+| i18n (`en`, `zh-CN`) for AI surfaces                                           | ✅     | Including autonomy selector keys                                                                                  |
+| jest-axe a11y coverage                                                         | ✅     | 31 tests across all AI surfaces                                                                                   |
+| `REACT_APP_AI_BASE_URL` validation (rejects `javascript:` / `data:` / `file:`) | ✅     |                                                                                                                   |
+| `Disable AI for this project` switch                                           | ✅     | `boardCopilot:disabledProjectIds`                                                                                 |
+| `Board Copilot` runtime toggle                                                 | ✅     | `boardCopilot:enabled`                                                                                            |
 
 ## Readiness tiers — what shipped, in what order
 

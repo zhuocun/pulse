@@ -5,11 +5,11 @@ and [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (UX layer). Tracks what has shipp
 to `main`, the per-feature inventory, and pointers to what remains
 open. Per-PR history lives in git log.
 
-| Field        | Value                                                                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field        | Value                                                                                                                                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); release-readiness sweep landed; observability sinks wired; PRD AC-V14 nudge inbox enforced; typed error envelope honoured FE-side. |
-| Last updated | 2026-05-10                                                                                                                                                                       |
-| Owner        | TBD (frontend)                                                                                                                                                                   |
+| Last updated | 2026-05-10                                                                                                                                                                                                                                                                                                               |
+| Owner        | TBD (frontend)                                                                                                                                                                                                                                                                                                           |
 
 For the live GA / blocker / soft-blocker / polish status see
 [`release-todo.md`](release-todo.md).
@@ -18,36 +18,36 @@ For the live GA / blocker / soft-blocker / polish status see
 
 ## At a glance
 
-| Phase / Capability | PRD section | Status |
-| --- | --- | --- |
-| Phase 0 — Plumbing (env, hook, validators, runtime toggle) | §7, §3.5 | ✅ Shipped |
-| Phase 1 — Capability C: Board summary brief | §5.3 | ✅ Shipped |
-| Phase 2A — Capability A: Smart task drafting | §5.1 | ✅ Shipped |
-| Phase 2B — Capability B: AI estimation + readiness | §5.2 | ✅ Shipped |
-| Phase 3 — Capability D: Conversational assistant | §5.4 | ✅ Shipped (PR #3) |
-| Phase 4 — Capability E: Semantic search | §5.5 | ✅ Shipped |
-| AI UX Phase 1 — trust/privacy corrections | v3 §2 P3/P7 | ✅ Merged |
-| Observability sinks (`httpAnalyticsSink`, `httpErrorSink`, `devMemorySink`) | — | ✅ |
-| Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | — | ✅ |
-| v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode) | — | ✅ |
-| v2.1 UI surface — agent health badge, chat-drawer cards | — | ✅ |
-| v2.1 chat path migrated to SSE streaming | — | ✅ |
-| v2.1 triage nudges mounted in board page | — | ✅ |
-| Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
-| Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
-| `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
-| Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
-| Backend release gates | — | ⏳ Open: mutation lifecycle, JWT-XSS, provider fallback, MCP — see [`release-todo.md`](release-todo.md) |
-| `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
-| Autonomy selector UI in `AiChatDrawer` (Suggest / Plan / Auto-disabled) | — | ✅ |
-| `autonomyRef` wired to `useAutonomyLevel` | — | ✅ |
-| v2.1 REST-route migration — all six structured routes on SSE in remote builds | — | ✅ |
-| Triage-nudge inbox rules (PRD AC-V14: cap-5, dedup, 4h expiry, dismiss) | — | ✅ |
-| `mapErrorResponse` honors typed `{code, message}` envelope | — | ✅ |
-| `useAgentChat.dismissNudge` propagates to `useAgent` inbox | — | ✅ |
-| Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [`release-todo.md` §3](release-todo.md)) |
-| `AGENT_PROPOSAL_UNDONE` end-to-end Undo flow | — | ⏳ Deferred (BE mutation lifecycle blocks it) |
-| Triage-agent on `/projects` list page | — | ⏳ Skipped (no `project_id`; rate-limit risk) |
+| Phase / Capability                                                                           | PRD section     | Status                                                                                                  |
+| -------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
+| Phase 0 — Plumbing (env, hook, validators, runtime toggle)                                   | §7, §3.5        | ✅ Shipped                                                                                              |
+| Phase 1 — Capability C: Board summary brief                                                  | §5.3            | ✅ Shipped                                                                                              |
+| Phase 2A — Capability A: Smart task drafting                                                 | §5.1            | ✅ Shipped                                                                                              |
+| Phase 2B — Capability B: AI estimation + readiness                                           | §5.2            | ✅ Shipped                                                                                              |
+| Phase 3 — Capability D: Conversational assistant                                             | §5.4            | ✅ Shipped (PR #3)                                                                                      |
+| Phase 4 — Capability E: Semantic search                                                      | §5.5            | ✅ Shipped                                                                                              |
+| AI UX Phase 1 — trust/privacy corrections                                                    | v3 §2 P3/P7     | ✅ Merged                                                                                               |
+| Observability sinks (`httpAnalyticsSink`, `httpErrorSink`, `devMemorySink`)                  | —               | ✅                                                                                                      |
+| Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | —               | ✅                                                                                                      |
+| v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode)                     | —               | ✅                                                                                                      |
+| v2.1 UI surface — agent health badge, chat-drawer cards                                      | —               | ✅                                                                                                      |
+| v2.1 chat path migrated to SSE streaming                                                     | —               | ✅                                                                                                      |
+| v2.1 triage nudges mounted in board page                                                     | —               | ✅                                                                                                      |
+| Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe)          | —               | ✅                                                                                                      |
+| Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case            | —               | ✅                                                                                                      |
+| `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds)                   | —               | ✅                                                                                                      |
+| Backend core (FastAPI v1 shims + v2.1 LangGraph SSE)                                         | §7.2 / v2.1 §5A | ✅ Shipped                                                                                              |
+| Backend release gates                                                                        | —               | ⏳ Open: mutation lifecycle, JWT-XSS, provider fallback, MCP — see [`release-todo.md`](release-todo.md) |
+| `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`)                     | —               | ✅                                                                                                      |
+| Autonomy selector UI in `AiChatDrawer` (Suggest / Plan / Auto-disabled)                      | —               | ✅                                                                                                      |
+| `autonomyRef` wired to `useAutonomyLevel`                                                    | —               | ✅                                                                                                      |
+| v2.1 REST-route migration — all six structured routes on SSE in remote builds                | —               | ✅                                                                                                      |
+| Triage-nudge inbox rules (PRD AC-V14: cap-5, dedup, 4h expiry, dismiss)                      | —               | ✅                                                                                                      |
+| `mapErrorResponse` honors typed `{code, message}` envelope                                   | —               | ✅                                                                                                      |
+| `useAgentChat.dismissNudge` propagates to `useAgent` inbox                                   | —               | ✅                                                                                                      |
+| Security — JWT-in-localStorage XSS exfiltration                                              | —               | ⏳ Open (see [`release-todo.md` §3](release-todo.md))                                                   |
+| `AGENT_PROPOSAL_UNDONE` end-to-end Undo flow                                                 | —               | ⏳ Deferred (BE mutation lifecycle blocks it)                                                           |
+| Triage-agent on `/projects` list page                                                        | —               | ⏳ Skipped (no `project_id`; rate-limit risk)                                                           |
 
 ---
 
@@ -241,33 +241,33 @@ first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
 
 ## Acceptance-criteria status (against the PRD)
 
-| ID | Acceptance criterion | Status |
-| ----- | ---- | --- |
-| AC-A1 | With AI off, `TaskCreator` is unchanged | ✅ |
-| AC-A2 | Draft button opens the modal with a streaming partial form | ✅ (local engine resolves synchronously; UX scaffold for streaming) |
-| AC-A3 | Submitted task is indistinguishable from a manually created one | ✅ (uses existing `newTaskCallback`) |
-| AC-A4 | Unknown `columnId` is rejected and replaced with the opener column | ✅ (`validateDraft`) |
-| AC-A5 | Unknown `coordinatorId` is rejected and replaced with the current user | ✅ |
-| AC-A6 | Escape / unmount aborts the in-flight request | ✅ (`AbortController`) |
-| AC-A7 | Breakdown posts each subtask via `useReactMutation` | ✅ |
-| AC-B1 | With AI off, the task modal is unchanged | ✅ |
-| AC-B2 | Opening a task triggers exactly one estimation; further estimations are debounced | ✅ (1000 ms `useDebounce`) |
-| AC-B3 | Suggested `storyPoints` is always in `{1,2,3,5,8,13}` | ✅ (`clampToFibonacci`) |
-| AC-B4 | Each `similar[]._id` is present in the project's `tasks` cache | ✅ (`validateEstimate`) |
-| AC-B5 | `Apply suggestion` does not submit the form | ✅ (only `form.setFieldsValue`) |
-| AC-B6 | Closing the modal mid-request aborts the request | ✅ |
-| AC-C1 | With AI off, no Brief button is rendered | ✅ |
-| AC-C2 | Brief opens immediately and renders within ≤2s for ≤200 tasks | ✅ (local engine synchronous; remote SLO measured once proxy ships) |
-| AC-C3 | All `taskId` and `memberId` references in the brief exist in the cache | ✅ (`validateBoardBrief`) |
-| AC-C4 | Brief is read-only except deep-linking into the existing task modal | ✅ |
-| AC-C5 | Drawer's request is aborted when the drawer closes | ✅ |
-| AC-D1 | Only registered read-only tools can run client-side | ✅ (`chatTools.ts` whitelist) |
-| AC-D2 | Tool definitions not supplied from user thread (remote must own tools) | ✅ |
-| AC-D3 | Closing the chat drawer aborts in-flight work | ✅ |
-| AC-D4 | Conversation cleared on hard reload | ✅ (in-memory state only) |
-| AC-E1 | Returned `ids` intersected with cache | ✅ (`validateSearch`) |
-| AC-E2 | Empty semantic search restores list + hint | ✅ |
-| AC-E3 | Clearing AI search restores prior filters | ✅ |
+| ID    | Acceptance criterion                                                              | Status                                                              |
+| ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| AC-A1 | With AI off, `TaskCreator` is unchanged                                           | ✅                                                                  |
+| AC-A2 | Draft button opens the modal with a streaming partial form                        | ✅ (local engine resolves synchronously; UX scaffold for streaming) |
+| AC-A3 | Submitted task is indistinguishable from a manually created one                   | ✅ (uses existing `newTaskCallback`)                                |
+| AC-A4 | Unknown `columnId` is rejected and replaced with the opener column                | ✅ (`validateDraft`)                                                |
+| AC-A5 | Unknown `coordinatorId` is rejected and replaced with the current user            | ✅                                                                  |
+| AC-A6 | Escape / unmount aborts the in-flight request                                     | ✅ (`AbortController`)                                              |
+| AC-A7 | Breakdown posts each subtask via `useReactMutation`                               | ✅                                                                  |
+| AC-B1 | With AI off, the task modal is unchanged                                          | ✅                                                                  |
+| AC-B2 | Opening a task triggers exactly one estimation; further estimations are debounced | ✅ (1000 ms `useDebounce`)                                          |
+| AC-B3 | Suggested `storyPoints` is always in `{1,2,3,5,8,13}`                             | ✅ (`clampToFibonacci`)                                             |
+| AC-B4 | Each `similar[]._id` is present in the project's `tasks` cache                    | ✅ (`validateEstimate`)                                             |
+| AC-B5 | `Apply suggestion` does not submit the form                                       | ✅ (only `form.setFieldsValue`)                                     |
+| AC-B6 | Closing the modal mid-request aborts the request                                  | ✅                                                                  |
+| AC-C1 | With AI off, no Brief button is rendered                                          | ✅                                                                  |
+| AC-C2 | Brief opens immediately and renders within ≤2s for ≤200 tasks                     | ✅ (local engine synchronous; remote SLO measured once proxy ships) |
+| AC-C3 | All `taskId` and `memberId` references in the brief exist in the cache            | ✅ (`validateBoardBrief`)                                           |
+| AC-C4 | Brief is read-only except deep-linking into the existing task modal               | ✅                                                                  |
+| AC-C5 | Drawer's request is aborted when the drawer closes                                | ✅                                                                  |
+| AC-D1 | Only registered read-only tools can run client-side                               | ✅ (`chatTools.ts` whitelist)                                       |
+| AC-D2 | Tool definitions not supplied from user thread (remote must own tools)            | ✅                                                                  |
+| AC-D3 | Closing the chat drawer aborts in-flight work                                     | ✅                                                                  |
+| AC-D4 | Conversation cleared on hard reload                                               | ✅ (in-memory state only)                                           |
+| AC-E1 | Returned `ids` intersected with cache                                             | ✅ (`validateSearch`)                                               |
+| AC-E2 | Empty semantic search restores list + hint                                        | ✅                                                                  |
+| AC-E3 | Clearing AI search restores prior filters                                         | ✅                                                                  |
 
 ---
 

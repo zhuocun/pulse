@@ -117,19 +117,19 @@ Every recommendation in this plan is anchored to one or more of these external r
     - `useReactQuery<IMember[]>("users/members")` is called from at least four components (`board.tsx`, `project.tsx`, `taskModal`, `memberPopover`); ensure it is a single shared key and cached, and stop refetching on popover open.
 
 20a. **Autonomy metadata / settings follow-through.**
-    `AiChatDrawer` now exposes a visible autonomy selector for `suggest` / `plan`, with `auto` present but disabled until preapproved tools ship. Remaining UX work is to move the control into the broader Board Copilot settings surface from the v3 PRD, self-gate options from backend `AgentMetadata.allowed_autonomy`, and explain per-project defaults instead of relying only on chat-drawer localStorage state. Tracked architecturally in [`architecture-todo.md`](architecture-todo.md) Theme 3 and operationally in [`release-todo.md`](release-todo.md) §14 / §8.
+`AiChatDrawer` now exposes a visible autonomy selector for `suggest` / `plan`, with `auto` present but disabled until preapproved tools ship. Remaining UX work is to move the control into the broader Board Copilot settings surface from the v3 PRD, self-gate options from backend `AgentMetadata.allowed_autonomy`, and explain per-project defaults instead of relying only on chat-drawer localStorage state. Tracked architecturally in [`architecture-todo.md`](architecture-todo.md) Theme 3 and operationally in [`release-todo.md`](release-todo.md) §14 / §8.
 
 20b. **Feedback parity outside chat.**
-    `AiFeedbackPopover` is wired into `AiChatDrawer` for assistant turns, so the old "no consumer" claim is stale. Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations, plus a decision on whether the feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
+`AiFeedbackPopover` is wired into `AiChatDrawer` for assistant turns, so the old "no consumer" claim is stale. Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations, plus a decision on whether the feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
 
 20c. **`CopilotAboutPopover` content TODO.**
-    `src/components/copilotAboutPopover/index.tsx:114` carries `{/* TODO: drive from config */}`. The popover's body is hardcoded English; it does not pass through the i18n module that the rest of `microcopy.ai.*` uses. Lift to `microcopy.ai.about.*` so the zh-CN translations apply.
+`src/components/copilotAboutPopover/index.tsx:114` carries `{/* TODO: drive from config */}`. The popover's body is hardcoded English; it does not pass through the i18n module that the rest of `microcopy.ai.*` uses. Lift to `microcopy.ai.about.*` so the zh-CN translations apply.
 
 20d. **No FE CI workflow.**
-    `.github/workflows/` ships only `backend-ci.yml`. There is no GitHub Action that runs `eslint`, `tsc --noEmit`, or `jest` on a PR — Vercel's deploy build (`vite build` only) is the entire post-pre-commit gate. A PR with broken Jest tests can land on `main`. Tracked operationally in [`release-todo.md`](release-todo.md) §7b. Surfaced here because every UI item in this plan ships behind tests; the gate has to exist for "ship behind the existing tests" to mean anything.
+`.github/workflows/` ships only `backend-ci.yml`. There is no GitHub Action that runs `eslint`, `tsc --noEmit`, or `jest` on a PR — Vercel's deploy build (`vite build` only) is the entire post-pre-commit gate. A PR with broken Jest tests can land on `main`. Tracked operationally in [`release-todo.md`](release-todo.md) §7b. Surfaced here because every UI item in this plan ships behind tests; the gate has to exist for "ship behind the existing tests" to mean anything.
 
 20e. **Design-token reference docs missing.**
-    `src/theme/tokens.ts` and `src/theme/antdTheme.ts` are the implementation source of truth, but `docs/design-tokens.md` does not exist even though Section 2.C tells contributors to use it. Add a concise token reference (spacing, color, typography, motion, AntD mapping) or change Section 2.C to point only at the code modules.
+`src/theme/tokens.ts` and `src/theme/antdTheme.ts` are the implementation source of truth, but `docs/design-tokens.md` does not exist even though Section 2.C tells contributors to use it. Add a concise token reference (spacing, color, typography, motion, AntD mapping) or change Section 2.C to point only at the code modules.
 
 21. **Accessibility gaps.**
     - Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).
