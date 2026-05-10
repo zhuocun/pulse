@@ -6,3 +6,8 @@
 
 # Python backend has its own formatter (ruff); skip from FE Prettier sweep.
 backend/
+
+# Docs use hand-wrapped Markdown tables and status sections; keep them out of
+# repo-wide Prettier so status/backlog diffs stay reviewable.
+*.md
+docs/
