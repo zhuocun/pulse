@@ -69,8 +69,8 @@ interface MutationProposalCardProps {
      *
      * Wiring `onUndo` to a backend reversal is intentionally out of
      * scope for this branch — there is no FE undo endpoint yet (the BE
-     * undo lifecycle is a separate GA-blocker tracked in
-     * `docs/frontend-production-readiness.md`). Surfaces that want to support
+     * undo lifecycle is a separate GA blocker tracked in
+     * `docs/status/release-todo.md` §1). Surfaces that want to support
      * optimistic local undo can pass a handler today; the analytics
      * event fires either way so usage of the affordance is measurable
      * before the BE half lands.

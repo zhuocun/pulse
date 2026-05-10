@@ -21,11 +21,11 @@ The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/comp
 
 Re-audit added 2026-05-10:
 
-- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (1,010 lines today) and the dead-code `useAutonomyLevel` UI surface decision.
-- **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget already exist, the production env still defaults to in-memory).
+- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (1,010 lines today) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
+- **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget / idempotency paths exist, but env parity must be proven before the single-worker pin is removed).
 - **Theme 6** now tracks per-tenant model selection (the `X-Pulse-Model` runtime TODO at `backend/app/agents/runtime.py:578`).
 
-Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autonomy UI decision), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP, per-tenant model). See [`release-todo.md`](release-todo.md) for the per-item severity / status.
+Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autonomy capability gating / settings placement), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP, per-tenant model). See [`release-todo.md`](release-todo.md) for the per-item severity / status.
 
 ---
 
@@ -80,8 +80,8 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 | **Isolate stable callbacks** from streaming identity churn in `useAgent` consumers (effects must not depend on whole hook return) | Documented anti-pattern in repo `AGENTS.md`; sweep chat, brief, assist panel, search.      |
 | **Thin adapter layer** over SSE parser → domain events → UI state                                                                 | Limits duplicated parsing between `useAgent`, `useAgentChat`, and future shells.           |
 | Reduce **`useAi` vs `useAgent`** divergence where behavior is identical (keep local-engine fallback, centralize switching)        | Lowers duplicate validators and bug surface; preserves `REACT_APP_AI_USE_LOCAL`.           |
-| Guard `MutationProposalCard` and autonomy surfaces behind explicit env/capability checks until the backend lifecycle is real      | Already flagged in `AGENTS.md` / production readiness notes — formalize as a rollout gate. |
-| **Decide the `useAutonomyLevel` surface.** Hook + localStorage + cross-window sync exist (`src/utils/hooks/useAiEnabled.ts`); no UI picker is wired. Either expose in the chat drawer (already has the hard-disabled "Auto" pill) or delete the hook plumbing. | Today the persisted level only changes behaviour in tests — production users have no way to read or change it. Dead code path increases test surface without user value. |
+| Guard `MutationProposalCard` and autonomy surfaces behind explicit env/capability checks until the backend lifecycle is real      | Already flagged in `AGENTS.md` / `release-todo.md` — formalize as a rollout gate. |
+| **Finish autonomy capability gating.** `useAutonomyLevel` has persistence + cross-window sync and `AiChatDrawer` now exposes `suggest` / `plan` with `auto` disabled. Move the control into the broader settings surface when that ships and gate available values from backend `AgentMetadata.allowed_autonomy` instead of hardcoded FE options. | The user-visible picker exists, but the backend metadata that would keep it honest is still unused; future agents could advertise a different autonomy set without the UI adapting. |
 
 **Exit criteria:** No component triggers duplicate agent `start()` loops on benign parent re-renders; structured routes share one parsing/validation path into React state.
 
@@ -97,7 +97,7 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 | FE **persist minimal resume handles** (e.g., thread id, last interrupt id) scoped per project/user session               | Enables “Continue last agent turn” after accidental reload.              |
 | Migrate **static run context** out of `BaseAgentState` into **`Runtime[Context]`**                                       | Review **F-43** — smaller checkpoints, safer replay.                     |
 | Document **idempotency replay** vs **fresh stream** decision tree for support tooling                                    | Clarifies 409/422/`stream_completed` responses already on `/stream`.     |
-| **Move rate-limit / budget backends off in-memory** so uvicorn can run > 1 worker. The Redis backends already exist (`backend/app/middleware/redis_backends.py`); the Vercel deploy still defaults to the in-memory backend, which is why `backend/Dockerfile:81–84` and `backend/fly.toml:17–39` pin `workers=1`. Track in [release-todo §16d](release-todo.md). | Single-worker pin is an implicit scaling ceiling. Removing it requires zero code (just env wiring) but the invariant has to be documented before anyone bumps the worker count. |
+| **Move rate-limit / budget / idempotency backends off in-memory** so uvicorn can run > 1 worker. The Redis backends already exist (`backend/app/middleware/redis_backends.py`); production-like envs must set `RATE_LIMIT_BACKEND=redis`, `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` before the single-worker pin is relaxed. Track in [release-todo §16d](release-todo.md). | Single-worker pin is an implicit scaling ceiling. Removing it requires env parity plus replay smoke tests before anyone bumps the worker count. |
 
 **Exit criteria:** User can reload mid-interrupt and either resume cleanly or see an explicit “session expired” with recovery steps — never silent loss or duplicate apply.
 
@@ -111,7 +111,7 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Implement server **`custom/mutation_proposal`** emission + FE **`fe.applyMutation`** (or equivalent) interrupt contract end-to-end | Backlog explicitly tracks GA blocker in [`release-todo.md`](release-todo.md).                                            |
 | Wire **accept/reject** to LangGraph **`Command(resume=…)`** with persisted proposal ids                                            | Ensures graph continues after human decision.                                                              |
-| Add **audit log / analytics** for accepted mutations; define **undo** semantics (10s toast vs server undo endpoint)                | Progress doc notes missing `AGENT_PROPOSAL_UNDONE` path — pick one product rule and implement both halves. |
+| Add **audit log / analytics** for accepted mutations; define **server undo** semantics behind the 10s toast                       | FE-side `AGENT_PROPOSAL_UNDONE` now fires from `MutationProposalCard`; the open work is the BE accept/apply/undo lifecycle that makes the toast reversible end-to-end. |
 | **Autonomy gates:** Suggest / Plan / Auto must map to enforceable server checks, not UI-only                                       | Aligns with PRD §6 and shadow-mode story.                                                                  |
 
 **Exit criteria:** Acceptance tests cover full loop: proposal → approve → mutation applied → idempotent replay does not re-apply.
