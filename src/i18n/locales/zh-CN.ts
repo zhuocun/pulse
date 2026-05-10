@@ -326,7 +326,8 @@ const zhCN: Dictionary = {
         board: {
             title: "添加您的第一列",
             description:
-                "看板将任务组织到不同的列中。可尝试:待办、进行中、已完成。"
+                "看板将任务组织到不同的列中。可尝试:待办、进行中、已完成。",
+            cta: "创建第一列"
         },
         members: {
             title: "暂无团队成员",

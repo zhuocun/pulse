@@ -336,7 +336,8 @@ export const enSource = {
         board: {
             title: "Add your first column",
             description:
-                "Boards organize tasks into columns. Try Backlog, In progress, Done."
+                "Boards organize tasks into columns. Try Backlog, In progress, Done.",
+            cta: "Create your first column"
         },
         members: {
             title: "No team members",

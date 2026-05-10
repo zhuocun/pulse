@@ -408,6 +408,14 @@ const BoardPage = () => {
             semanticIds: undefined
         });
     }, [setParam]);
+    const emptyColumnCreatorRef = useRef<HTMLDivElement | null>(null);
+    const handleCreateFirstColumn = useCallback(() => {
+        const trigger = emptyColumnCreatorRef.current?.querySelector("button");
+        if (trigger instanceof HTMLButtonElement) {
+            trigger.click();
+            trigger.focus();
+        }
+    }, []);
     const { enabled: aiEnabled } = useAiEnabled();
     const {
         disabled: aiDisabledForProject,
@@ -857,16 +865,23 @@ const BoardPage = () => {
                 </span>
                 {!(bLoading || tLoading) ? (
                     (board?.length ?? 0) === 0 && !(bError || tError) ? (
-                        // When the board has no columns, show only the empty
-                        // hero with a single inline CTA. Previously we also
-                        // rendered the ColumnsViewport with a lone
-                        // <ColumnCreator />, producing a duplicate "Add column"
-                        // tile floating to the left of the centered hero.
-                        <EmptyState
-                            title={microcopy.empty.board.title}
-                            description={microcopy.empty.board.description}
-                            cta={<ColumnCreator />}
-                        />
+                        <>
+                            <EmptyState
+                                title={microcopy.empty.board.title}
+                                description={microcopy.empty.board.description}
+                                cta={
+                                    <Button
+                                        onClick={handleCreateFirstColumn}
+                                        type="primary"
+                                    >
+                                        {microcopy.empty.board.cta}
+                                    </Button>
+                                }
+                            />
+                            <div ref={emptyColumnCreatorRef}>
+                                <ColumnCreator />
+                            </div>
+                        </>
                     ) : (
                         <>
                             {(board?.length ?? 0) > 1 &&
