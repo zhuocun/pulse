@@ -474,14 +474,14 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-10T15:59:03.061Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-10T15:58:57.569Z",
+      "lastUpdate": "2026-05-10T15:59:03.061Z",
       "note": "respawned by local-cli (was error; attempts=1)",
-      "attempts": 1,
+      "attempts": 2,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
@@ -620,6 +620,10 @@
     {
       "at": "2026-05-10T15:58:04.702Z",
       "message": "verify-non-ga-release-todo-closure: spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…"
+    },
+    {
+      "at": "2026-05-10T15:58:58.474Z",
+      "message": "verify-non-ga-release-todo-closure: respawned by local-cli (was error)"
     }
   ]
 }
