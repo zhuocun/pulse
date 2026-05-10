@@ -1,4 +1,4 @@
-# UI / UX Optimization Plan
+# UI todo — phased UI / UX plan
 
 **Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 

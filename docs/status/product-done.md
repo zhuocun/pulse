@@ -1,4 +1,4 @@
-# Board Copilot — implementation changelog
+# Product done — Board Copilot implementation changelog
 
 Companion to [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md) (backend / wire contract)
 and [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (UX layer). Tracks what has shipped
@@ -12,7 +12,7 @@ open. Per-PR history lives in git log.
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
 For the live GA / blocker / soft-blocker / polish status see
-[`production-readiness.md`](production-readiness.md).
+[`release-todo.md`](release-todo.md).
 
 ---
 
@@ -36,7 +36,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
 | Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
-| Backend (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped; mutation lifecycle, JWT-XSS, provider fallback, MCP open — see [production-readiness.md](production-readiness.md) |
+| Backend (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped; mutation lifecycle, JWT-XSS, provider fallback, MCP open — see [production-readiness.md](release-todo.md) |
 | `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
 | Autonomy selector UI in `AiChatDrawer` (Suggest / Plan / Auto-disabled) | — | ✅ |
 | `autonomyRef` wired to `useAutonomyLevel` | — | ✅ |
@@ -44,7 +44,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Triage-nudge inbox rules (PRD AC-V14: cap-5, dedup, 4h expiry, dismiss) | — | ✅ |
 | `mapErrorResponse` honors typed `{code, message}` envelope | — | ✅ |
 | `useAgentChat.dismissNudge` propagates to `useAgent` inbox | — | ✅ |
-| Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [production-readiness.md §3](production-readiness.md)) |
+| Security — JWT-in-localStorage XSS exfiltration | — | ⏳ Open (see [production-readiness.md §3](release-todo.md)) |
 | `AGENT_PROPOSAL_UNDONE` end-to-end Undo flow | — | ⏳ Deferred (BE mutation lifecycle blocks it) |
 | Triage-agent on `/projects` list page | — | ⏳ Skipped (no `project_id`; rate-limit risk) |
 
@@ -115,7 +115,7 @@ For the live GA / blocker / soft-blocker / polish status see
   the deterministic engine. Accepts optional `pendingProposal` /
   `pendingNudges` props that render `MutationProposalCard` and
   `NudgeCard` inline. Proposal card is gated off in production by
-  default (see Hard Blocker §1 in `production-readiness.md`).
+  default (see Hard Blocker §1 in `release-todo.md`).
 - `src/utils/hooks/useAiChat.ts` and
   `src/utils/hooks/useAgentChat.ts` — local and remote orchestrators.
 - `src/utils/ai/chatEngine.ts` — local assistant step
@@ -337,7 +337,7 @@ REACT_APP_AI_USE_LOCAL=true npm run build
 ## What is open
 
 For the live blocker / soft-blocker / polish list see
-[`production-readiness.md`](production-readiness.md).
+[`release-todo.md`](release-todo.md).
 The three GA hard blockers (mutation lifecycle, provider 5xx
 fallback, JWT-in-localStorage XSS) gate public ship; everything else
 is degraded-quality polish.

@@ -22,21 +22,22 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
 
 ## Status — what's done, what's next
 
-The four tracking docs that describe open work and shipped milestones
-live together in `status/` so engineers and PMs can survey the whole
-backlog without folder-hopping.
+Tracking docs grouped under `status/`. Forward-looking docs follow
+`<scope>-todo.md`; the shipped-work doc is `<scope>-done.md`. Survey
+the whole backlog without folder-hopping.
 
-- [`status/production-readiness.md`](status/production-readiness.md)
-  — single source for GA blockers, soft blockers, polish, and the
-  recommended internal-beta → design-partner → public ship sequence.
-- [`status/roadmap.md`](status/roadmap.md) —
-  forward-looking themes (contract hardening, stream errors,
-  mutation lifecycle, durable resume, FE simplification, BE
+- [`status/release-todo.md`](status/release-todo.md) — GA blockers,
+  soft blockers, polish, and the recommended internal-beta →
+  design-partner → public ship sequence.
+- [`status/architecture-todo.md`](status/architecture-todo.md) —
+  agent-runtime themes (contract hardening, stream errors, mutation
+  lifecycle, durable resume, FE simplification, BE
   intelligence/resilience) with phased execution.
-- [`status/changelog.md`](status/changelog.md) — what has shipped,
-  the per-feature inventory, acceptance-criteria status.
-- [`status/ui-plan.md`](status/ui-plan.md) — phased UI plan
+- [`status/ui-todo.md`](status/ui-todo.md) — phased UI plan
   (foundations, surfaces, polish, stretch).
+- [`status/product-done.md`](status/product-done.md) — implementation
+  changelog: what has shipped, per-feature inventory,
+  acceptance-criteria status.
 
 ## Operations
 

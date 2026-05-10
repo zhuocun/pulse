@@ -93,7 +93,7 @@ the production checklist, and post-deploy verification.
 
 GA blockers, soft blockers, and the recommended internal-beta →
 design-partner → public-ship sequence live in
-[`../docs/status/production-readiness.md`](../docs/status/production-readiness.md).
+[`../docs/status/release-todo.md`](../docs/status/release-todo.md).
 
 Local end-to-end against the same persistence stack production uses:
 
@@ -116,9 +116,9 @@ LangSmith), see
 [`../docs/prd/v2.1-agent.md`](../docs/prd/v2.1-agent.md). Open
 architectural work (provider gateway, vector store / RAG, MCP mount,
 mutation lifecycle, supervisor / shared subgraph) is tracked in
-[`../docs/status/roadmap.md`](../docs/status/roadmap.md)
+[`../docs/status/architecture-todo.md`](../docs/status/architecture-todo.md)
 and operationally in
-[`../docs/status/production-readiness.md`](../docs/status/production-readiness.md).
+[`../docs/status/release-todo.md`](../docs/status/release-todo.md).
 
 ### Adding a new agent
 
