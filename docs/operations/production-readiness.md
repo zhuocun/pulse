@@ -51,7 +51,7 @@ The Recommended ship sequence at the bottom of this doc is the contract: interna
 
 A Claude or OpenAI 5xx bubbles straight to the user. There is no AI gateway (LiteLLM, Portkey), no failover policy, no hedged requests, no semantic cache. A single upstream incident is a full outage.
 
-- Detail: [`../archive/ai-architecture-review.md` F-9](../archive/ai-architecture-review.md), [`remaining-work.md` §14](remaining-work.md).
+- Detail: [`../archive/agent-architecture-review-2026-05-01.md` F-9](../archive/agent-architecture-review-2026-05-01.md), [`remaining-work.md` §14](remaining-work.md).
 - Effort: ~1 week to wire LiteLLM behind `make_chat_model` (`ChatOpenAI(base_url=...)` is sufficient since LiteLLM is OpenAI-compatible).
 
 ### 🛑 3. JWT-in-localStorage XSS exfiltration surface  *(BE + FE)*
@@ -69,7 +69,7 @@ The FE stores the primary bearer JWT in `localStorage` (`src/utils/aiAuthHeader.
 
 `task-estimation-agent` neighbour scoring runs only on FE-supplied `similar_tasks`. No persistent vector store. `search-agent` ranks FE-supplied candidates; no real RAG. The 16-dim embedding pin is lifted as of `0e990e4` (`EMBEDDINGS_DIMENSIONS` env var; **set `EMBEDDINGS_DIMENSIONS=512`+ for production**), but the absence of a vector store / real RAG remains open. The FE `fe.searchCandidates` tool tops out at 50 candidates per kind — no FE-side fix.
 
-- Detail: [`remaining-work.md` §8](remaining-work.md), [`../archive/ai-architecture-review.md` F-18 / F-19](../archive/ai-architecture-review.md).
+- Detail: [`remaining-work.md` §8](remaining-work.md), [`../archive/agent-architecture-review-2026-05-01.md` F-18 / F-19](../archive/agent-architecture-review-2026-05-01.md).
 - Effort: multi-week (pgvector + backfill job + `vector_search` tool).
 - **Acceptable scope:** suggestion-grade search and estimation, not retrieval-grade. Disclose in product copy.
 
@@ -77,7 +77,7 @@ The FE stores the primary bearer JWT in `localStorage` (`src/utils/aiAuthHeader.
 
 Catalog agents emit `AIMessage(content=json.dumps(...))` and clients `json.loads`. Once an LLM replaces the deterministic stubs the schema can rot silently — there is no `response_format=Pydantic(...)` contract.
 
-- Detail: [`../archive/ai-architecture-review.md` F-10](../archive/ai-architecture-review.md).
+- Detail: [`../archive/agent-architecture-review-2026-05-01.md` F-10](../archive/agent-architecture-review-2026-05-01.md).
 - Effort: ~3 days to define schemas under `app/agents/schemas/` and migrate to `create_agent(..., response_format=...)`.
 - **Mitigation now:** the FE validates every payload (`validateDraft`, `validateEstimate`, `validateBoardBrief`, `validateSearch`) and drops unknown ids. A schema regression degrades but does not corrupt.
 
@@ -85,7 +85,7 @@ Catalog agents emit `AIMessage(content=json.dumps(...))` and clients `json.loads
 
 `pyproject.toml` `--cov-fail-under=100` is met against deterministic stubs. No tests against real Anthropic/OpenAI, real Redis, or real Postgres. The CI matrix added 2026-05-05 (`test-full` / `test-slim`) catches optional-import regressions but not real-backend regressions.
 
-- Detail: [`../archive/ai-architecture-review.md` F-42](../archive/ai-architecture-review.md).
+- Detail: [`../archive/agent-architecture-review-2026-05-01.md` F-42](../archive/agent-architecture-review-2026-05-01.md).
 - Effort: ~1 week to add an `integration` pytest marker, a CI job behind a secret-gated flag, and Redis/Postgres service containers.
 
 ### ⚠️ 7. CI workflow not yet validated against GitHub Actions  *(BE-only)*
@@ -126,11 +126,11 @@ Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling the "Auto" 
 
 ### 🟡 15. MCP transport deferred  *(BE)*
 
-No `/mcp` mount, no `langchain-mcp-adapters` dependency. Explicitly deferred. Not on the GA path. Detail: [`remaining-work.md` §7](remaining-work.md), [`../archive/ai-architecture-review.md` F-15](../archive/ai-architecture-review.md).
+No `/mcp` mount, no `langchain-mcp-adapters` dependency. Explicitly deferred. Not on the GA path. Detail: [`remaining-work.md` §7](remaining-work.md), [`../archive/agent-architecture-review-2026-05-01.md` F-15](../archive/agent-architecture-review-2026-05-01.md).
 
 ### 🟡 16. No multi-agent orchestration / memory  *(BE)*
 
-`board-brief-agent` and `triage-agent` re-implement drift detection. Memory namespaces (`user_preferences`, `project_profile`, `feedback`) are defined but unused. Detail: [`../archive/ai-architecture-review.md` F-13 / F-14](../archive/ai-architecture-review.md). Quality-of-life, not GA-gating.
+`board-brief-agent` and `triage-agent` re-implement drift detection. Memory namespaces (`user_preferences`, `project_profile`, `feedback`) are defined but unused. Detail: [`../archive/agent-architecture-review-2026-05-01.md` F-13 / F-14](../archive/agent-architecture-review-2026-05-01.md). Quality-of-life, not GA-gating.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 

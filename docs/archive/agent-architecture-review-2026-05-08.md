@@ -3,7 +3,7 @@
 **Scope**: `app/agents/**`, `app/routers/agents.py`, `app/routers/ai.py`, `app/middleware/limits/idempotency`. Staff-engineer-level review focused on smartness (correctness), gracefulness (failure paths), scalability, and maintainability.
 
 **Companion docs**:
-- `ai-architecture-review.md` — earlier still-open structural concerns (provider gateway, ReAct prebuilt, multi-agent orchestration). Items there are *not* superseded by this review.
+- [`agent-architecture-review-2026-05-01.md`](agent-architecture-review-2026-05-01.md) — earlier still-open structural concerns (provider gateway, ReAct prebuilt, multi-agent orchestration). Items there are *not* superseded by this review.
 - [`../operations/remaining-work.md`](../operations/remaining-work.md) — operational backlog.
 
 This document is a structural complement: it catalogues the issues found in this pass, what shipped on `claude/review-agent-architecture-o0U5x`, and what was deliberately deferred (with reasons), so the next author can pick up exactly where this stopped.

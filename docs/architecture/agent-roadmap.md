@@ -1,7 +1,7 @@
 # Agent architecture — roadmap
 
 **Audience:** engineers extending Board Copilot v2.1 (FastAPI + LangGraph + React SSE).  
-**Grounding:** structural backlog in [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md), operational items in [`../operations/remaining-work.md`](../operations/remaining-work.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
+**Grounding:** structural backlog in [`../archive/agent-architecture-review-2026-05-01.md`](../archive/agent-architecture-review-2026-05-01.md), operational items in [`../operations/remaining-work.md`](../operations/remaining-work.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
 **Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`../design/ui-ux-optimization-plan.md`](../design/ui-ux-optimization-plan.md)).
 
 ## Current architecture (2026-05-10)
@@ -136,6 +136,6 @@ Workstreams **D** and parts of **E** can proceed in parallel once **A** lands; *
 
 ## References
 
-- [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md) — structural findings **F-9–F-15**, **F-42–F-43**.
+- [`../archive/agent-architecture-review-2026-05-01.md`](../archive/agent-architecture-review-2026-05-01.md) — structural findings **F-9–F-15**, **F-42–F-43**.
 - [`../operations/remaining-work.md`](../operations/remaining-work.md) — GA blockers, tiers, open items **7–13**.
 - [`../prd/progress.md`](../prd/progress.md) — shipped vs deferred FE/BE features.

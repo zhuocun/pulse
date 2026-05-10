@@ -254,6 +254,6 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 
 ## See also
 
-- [`../archive/ai-architecture-review.md`](../archive/ai-architecture-review.md) — still-open structural concerns (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps); cross-references `remaining-work.md` as the operational backlog.
+- [`../archive/agent-architecture-review-2026-05-01.md`](../archive/agent-architecture-review-2026-05-01.md) — still-open structural concerns (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps); cross-references `remaining-work.md` as the operational backlog.
 - [`remaining-work.md`](remaining-work.md) — prioritised operational backlog; items 7–12 are open.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

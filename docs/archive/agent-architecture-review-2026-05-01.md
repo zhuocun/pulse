@@ -1,4 +1,4 @@
-# AI Architecture Review — Board Copilot Agents
+# Agent Architecture Review — 2026-05-01
 
 > **Status (2026-05-05): partially superseded.** This review was written against
 > Phase A state at 2026-05-01. Most blocking findings from the original review
