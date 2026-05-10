@@ -9,16 +9,10 @@ import type {
     CitationRef,
     InterruptPayload,
     MutationProposal,
-    StreamPart,
     TriageNudge
 } from "../../interfaces/agent";
 import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
-import {
-    AgentBudgetError,
-    AgentForbiddenError,
-    AgentRateLimitError,
-    AgentTransportError
-} from "../ai/agentErrors";
+import { AgentForbiddenError } from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
 import {
@@ -26,9 +20,18 @@ import {
     PROJECT_AI_DISABLED_MESSAGE
 } from "../ai/projectAiStorage";
 import type { FeToolContext } from "../ai/feTools";
+import {
+    applyStreamPart,
+    default as useAgentToolResolver
+} from "./useAgentToolResolver";
 import { useAutonomyLevel } from "./useAiEnabled";
 import { useNudgeInbox } from "./useNudgeInbox";
 
+export type {
+    AgentToolResolverStatus,
+    UseAgentToolResolverResult
+} from "./useAgentToolResolver";
+export { default as useAgentToolResolver } from "./useAgentToolResolver";
 export {
     NUDGE_EXPIRY_MS,
     NUDGE_INBOX_MAX,
@@ -229,152 +232,8 @@ const clearPersistedThreadStorage = (key: string): void => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ApplyStreamPartHandlers {
-    setState: (updater: (prev: UseAgentState) => UseAgentState) => void;
-    setPendingInterrupt: (payload: InterruptPayload | null) => void;
-    setPendingProposal: (proposal: MutationProposal | null) => void;
-    setCitations: (refs: CitationRef[]) => void;
-    setNudges: (nudge: TriageNudge) => void;
-    setLastSuggestion: (suggestion: AgentSuggestion) => void;
-    /** Write the latest token counts into a ref so AGENT_TURN_COMPLETED can read them. */
-    setLastUsageRef: (usage: { tokensIn: number; tokensOut: number }) => void;
-    /** Mid-stream {@link StreamPart} `error` → hook `error` + terminate this SSE read. */
-    onMidStreamErrorEnvelope: (err: Error) => void;
-    autoResume: boolean;
-    ctx: FeToolContext;
-}
-
-/**
- * Map a mid-stream SSE `error` envelope to hook-level errors. Aligns with
- * HTTP-era subclasses when `code` matches known server enums.
- */
-const hookErrorFromAgentStreamErrorData = (
-    data: Extract<StreamPart, { type: "error" }>["data"]
-): Error => {
-    const message = data.message ?? "Agent stream error";
-    const code =
-        typeof data.code === "string" && data.code.length > 0
-            ? data.code
-            : undefined;
-
-    if (code === "budget" || code === "budget_exhausted") {
-        return new AgentBudgetError(message, code);
-    }
-    if (
-        code === "forbidden" ||
-        code === "autonomy_denied" ||
-        code === "permission_denied"
-    ) {
-        return new AgentForbiddenError(message, code);
-    }
-    if (code === "rateLimit" || code === "rate_limit") {
-        return new AgentRateLimitError(0, message);
-    }
-
-    return new AgentTransportError(message, undefined, code);
-};
-
 /** TTFT SLO threshold in ms (P2-I). Turns exceeding this emit AGENT_TTFT_SLOW. */
 const TTFT_SLO_MS = 1500;
-
-/**
- * Reduce a single StreamPart into hook state. Returns a value when the part
- * is an `interrupt` for a known FE tool — the caller uses that to POST a
- * resume body and continue the run without bouncing through the UI.
- */
-const applyStreamPart = async (
-    part: StreamPart,
-    handlers: ApplyStreamPartHandlers
-): Promise<unknown | undefined> => {
-    switch (part.type) {
-        case "updates":
-            handlers.setState((prev) => ({ ...prev, lastUpdate: part.data }));
-            return undefined;
-        case "messages": {
-            const [chunk] = part.data;
-            const content = chunk?.content ?? "";
-            if (!content) return undefined;
-            handlers.setState((prev) => {
-                const last = prev.messages[prev.messages.length - 1];
-                if (last && last.role === "assistant") {
-                    const next = [...prev.messages];
-                    next[next.length - 1] = {
-                        ...last,
-                        content: last.content + content
-                    };
-                    return { ...prev, messages: next };
-                }
-                return {
-                    ...prev,
-                    messages: [...prev.messages, { role: "assistant", content }]
-                };
-            });
-            return undefined;
-        }
-        case "custom": {
-            const event = part.data;
-            switch (event.kind) {
-                case "citation":
-                    handlers.setCitations(event.refs);
-                    return undefined;
-                case "mutation_proposal":
-                    handlers.setPendingProposal(event.proposal);
-                    return undefined;
-                case "usage":
-                    handlers.setState((prev) => ({
-                        ...prev,
-                        lastUsage: {
-                            tokensIn: event.tokensIn,
-                            tokensOut: event.tokensOut
-                        }
-                    }));
-                    handlers.setLastUsageRef({
-                        tokensIn: event.tokensIn,
-                        tokensOut: event.tokensOut
-                    });
-                    return undefined;
-                case "suggestion":
-                    if (event.surface === "nudge") {
-                        handlers.setNudges(event.payload);
-                    } else {
-                        handlers.setLastSuggestion({
-                            surface: event.surface,
-                            payload: event.payload
-                        });
-                    }
-                    return undefined;
-                default:
-                    return undefined;
-            }
-        }
-        case "interrupt": {
-            handlers.setPendingInterrupt(part.data);
-            const tool = FE_TOOL_REGISTRY[part.data.tool];
-            if (handlers.autoResume && tool) {
-                try {
-                    const result = await tool.run(
-                        part.data.args as never,
-                        handlers.ctx
-                    );
-                    return result ?? null;
-                } catch (err) {
-                    return {
-                        error: err instanceof Error ? err.message : String(err)
-                    };
-                }
-            }
-            return undefined;
-        }
-        case "error": {
-            handlers.onMidStreamErrorEnvelope(
-                hookErrorFromAgentStreamErrorData(part.data)
-            );
-            return undefined;
-        }
-        default:
-            return undefined;
-    }
-};
 
 /**
  * Drive a LangGraph v2 agent run end-to-end (PRD §5). Handles SSE parsing,
@@ -442,6 +301,7 @@ const useAgent = (
     const lastInputRef = useRef<unknown>(null);
     const autonomyRef = useRef<AutonomyLevel>("plan");
     const autoResumeRef = useRef<boolean>(true);
+    const lastInterruptRef = useRef<InterruptPayload | null>(null);
 
     // Gap B: sync autonomyRef with the user's persisted autonomy level so
     // start() calls without an explicit `autonomy` option honor the setting.
@@ -489,6 +349,7 @@ const useAgent = (
         },
         []
     );
+    const { resolveInterrupt, runAutoResumeLoop } = useAgentToolResolver();
 
     const consumeStream = useCallback(
         async (
@@ -550,8 +411,10 @@ const useAgent = (
                     }
                     pendingResume = await applyStreamPart(part, {
                         setState: safeSetState,
-                        setPendingInterrupt: (p) =>
-                            mountedRef.current && setPendingInterrupt(p),
+                        setPendingInterrupt: (p) => {
+                            lastInterruptRef.current = p;
+                            if (mountedRef.current) setPendingInterrupt(p);
+                        },
                         setPendingProposal: (p) =>
                             mountedRef.current && setPendingProposal(p),
                         setCitations: (refs) =>
@@ -567,8 +430,16 @@ const useAgent = (
                             terminatedByStreamError = true;
                             if (mountedRef.current) setError(streamErr);
                         },
-                        autoResume: autoResumeRef.current,
-                        ctx
+                        resolveInterrupt: (interrupt) =>
+                            resolveInterrupt({
+                                registry: FE_TOOL_REGISTRY,
+                                autoResume: autoResumeRef.current,
+                                autonomy: autonomyRef.current,
+                                threadId: threadIdRef.current,
+                                lastInterrupt: lastInterruptRef.current,
+                                interrupt,
+                                ctx
+                            })
                     });
                     if (pendingResume !== undefined) break;
                     if (terminatedByStreamError) break;
@@ -586,7 +457,14 @@ const useAgent = (
             }
             return { pendingResume, streamFailed: false };
         },
-        [baseUrl, clearWatchdog, name, pushNudge, safeSetState]
+        [
+            baseUrl,
+            clearWatchdog,
+            name,
+            pushNudge,
+            resolveInterrupt,
+            safeSetState
+        ]
     );
 
     const runStream = useCallback(
@@ -615,39 +493,30 @@ const useAgent = (
                 ...(options.feToolContext ?? {})
             };
 
-            let turnErrored = false;
+            let turnErrored: boolean | undefined;
             try {
-                let nextBody = body;
-                // Auto-resume loop: if the agent interrupts with a known FE
-                // tool, run the tool synchronously and POST a `resume` body.
-                let loopExhausted = false;
-                for (let round = 0; round < 8; round += 1) {
-                    if (controller.signal.aborted) break;
-                    const { pendingResume, streamFailed } = await consumeStream(
-                        nextBody,
-                        controller.signal,
-                        baseCtx
-                    );
-                    if (streamFailed) {
-                        turnErrored = true;
-                        break;
-                    }
-                    if (pendingResume === undefined) break;
-                    nextBody = {
-                        input: null,
-                        command: { resume: pendingResume },
-                        config: nextBody.config,
-                        stream_mode: nextBody.stream_mode,
-                        version: nextBody.version
-                    };
-                    // Clear interrupt state on successful auto-resume.
-                    if (mountedRef.current) setPendingInterrupt(null);
-                    if (round === 7) {
-                        // All 8 rounds consumed and the last still requested
-                        // a resume — the agent never produced a final answer.
-                        loopExhausted = true;
-                    }
-                }
+                const { loopExhausted, turnErrored: autoResumeTurnErrored } =
+                    await runAutoResumeLoop({
+                        initialBody: body,
+                        consumeStreamRound: async (roundBody) => {
+                            if (controller.signal.aborted) {
+                                return {
+                                    pendingResume: undefined,
+                                    streamFailed: false
+                                };
+                            }
+                            return consumeStream(
+                                roundBody,
+                                controller.signal,
+                                baseCtx
+                            );
+                        },
+                        onAutoResumeApplied: () => {
+                            lastInterruptRef.current = null;
+                            if (mountedRef.current) setPendingInterrupt(null);
+                        }
+                    });
+                turnErrored = autoResumeTurnErrored;
                 if (
                     loopExhausted &&
                     !turnErrored &&
@@ -703,7 +572,7 @@ const useAgent = (
                         durationMs,
                         tokensIn,
                         tokensOut,
-                        ...(turnErrored ? { error: true } : {})
+                        ...(turnErrored === true ? { error: true } : {})
                     });
                 }
                 if (
@@ -721,7 +590,8 @@ const useAgent = (
             options.feToolContext,
             options.projectId,
             options.userId,
-            queryClient
+            queryClient,
+            runAutoResumeLoop
         ]
     );
 
@@ -745,6 +615,7 @@ const useAgent = (
             }
 
             lastInputRef.current = input;
+            lastInterruptRef.current = null;
             setPendingInterrupt(null);
             setPendingProposal(null);
             // Per-turn reset (review follow-up #10): citations, nudges, and
@@ -831,6 +702,7 @@ const useAgent = (
         clearWatchdog();
         if (!mountedRef.current) return;
         setState({ messages: [] });
+        lastInterruptRef.current = null;
         setPendingInterrupt(null);
         setPendingProposal(null);
         setCitations([]);
