@@ -515,24 +515,25 @@
       "name": "verify-release-todo-doc-hygiene-closeout",
       "type": "verifier",
       "branch": "orch/non-ga-todos-2f52/verify-release-todo-doc-hygiene-closeout",
-      "startingRef": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
+      "startingRef": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
       "dependsOn": [
         "release-todo-doc-hygiene-closeout"
       ],
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "error",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": null,
-      "note": null,
+      "lastUpdate": "2026-05-10T16:08:14.842Z",
+      "note": "spawn failed after 3 transient sub-attempts: Error: release-todo-doc-hygiene-closeout: branch must be orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout, got `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
       "slackTs": null,
       "prNumber": null,
-      "failureMode": null,
-      "verification": null
+      "failureMode": "unknown",
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
@@ -675,6 +676,10 @@
     {
       "at": "2026-05-10T16:04:38.813Z",
       "message": "release-todo-doc-hygiene-closeout: transient-retry succeeded on sub-attempt 2"
+    },
+    {
+      "at": "2026-05-10T16:08:00.591Z",
+      "message": "verify-release-todo-doc-hygiene-closeout: startingRef reconciled orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout -> `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083` (target release-todo-doc-hygiene-closeout handed off on actual branch)"
     }
   ]
 }
