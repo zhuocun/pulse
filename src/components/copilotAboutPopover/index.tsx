@@ -6,6 +6,7 @@ import React from "react";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { resolveAiKnowledgeCutoffForUi } from "../../utils/ai/agentClient";
 
 /**
  * "About Board Copilot" capabilities / knowledge-cutoff disclosure (P2-F).
@@ -38,6 +39,10 @@ const Section = styled.div`
 
 const CopilotAboutPopover: React.FC = () => {
     const isRemote = !environment.aiUseLocalEngine;
+    const knowledgeCutoffLine = microcopy.about.knowledgeCutoffTemplate.replace(
+        "{date}",
+        resolveAiKnowledgeCutoffForUi()
+    );
 
     const modelInfo = isRemote
         ? microcopy.about.remoteModeDescription
@@ -102,7 +107,9 @@ const CopilotAboutPopover: React.FC = () => {
                     color={isRemote ? "purple" : "default"}
                     style={{ marginInlineEnd: 0 }}
                 >
-                    {isRemote ? "Remote model" : "Local engine"}
+                    {isRemote
+                        ? microcopy.about.remoteModeTag
+                        : microcopy.about.localModeTag}
                 </Tag>
                 <span>{modelInfo}</span>
             </Typography.Paragraph>
@@ -111,8 +118,7 @@ const CopilotAboutPopover: React.FC = () => {
                 style={{ marginBottom: 0, marginTop: 0 }}
                 type="secondary"
             >
-                {/* TODO: drive from config */}
-                {microcopy.about.knowledgeCutoff}
+                {knowledgeCutoffLine}
             </Typography.Paragraph>
         </div>
     );
