@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project-todos-8d5Oo`).
+Last updated: 2026-05-10 (BE + FE re-verification against `claude/review-project-todos-7UKrJ`; previous sweep `claude/review-project-todos-8d5Oo` left the BE blocker / soft-blocker / polish list materially correct — this pass re-verified it line by line with file:line evidence and made stale-claim corrections inside `ui-todo.md` instead).
 
 ## TL;DR
 

@@ -1,6 +1,6 @@
 # UI todo — phased UI / UX plan
 
-**Status as of 2026-05-10:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker, `eslint-plugin-jsx-a11y`) are complete. Phase 4 command palette is shipped. Newly surfaced gaps from the 2026-05-10 sweep — autonomy metadata / settings follow-through (§1.2 item 20a), feedback parity outside chat (20b), `CopilotAboutPopover` config TODO (20c), no FE CI workflow (20d), missing design-token reference docs (20e), and unified `CopilotShell` follow-through (20f) — are tracked under §1.2. Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
+**Status as of 2026-05-10 (re-audit on `claude/review-project-todos-7UKrJ`):** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout, `src/theme/tokens.ts` design system) and key Phase 3 tooling items (jest-axe, code splitting, service worker, `eslint-plugin-jsx-a11y`) are complete. Phase 4 command palette is shipped. **Resolved this sweep:** §13 (column-creator and task-creator affordance/keyboard fixes) and the matching `<a onClick>` lines in §21 / Phase 3.2 — the production code uses real `<button type="button">` everywhere now. **Refined this sweep:** §20c — `CopilotAboutPopover`'s body is i18n'd via `microcopy.about.*` in both `en` and `zh-CN`; the two narrow gaps that remain are mode-tag labels at `:105` and the static knowledge-cutoff string at `:114`. Still tracked under §1.2: autonomy metadata / settings follow-through (20a), feedback parity outside chat (20b), narrow `CopilotAboutPopover` items (20c), no FE CI workflow (20d), missing design-token reference docs (20e), and unified `CopilotShell` follow-through with concrete i18n debt (20f). Still open from the original plan: Storybook scaffolding, `rollup-plugin-visualizer`, the rest of Phase 2 surface rebuilds, and the Phase 3 polish/microcopy passes. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 
 **Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
 
@@ -52,32 +52,33 @@ Every recommendation in this plan is anchored to one or more of these external r
 7. **Board page — toolbar overload.**
    `src/pages/board.tsx:104–152` renders, in one flex row: project name H1, a "Project AI" switch with explanatory tooltip, a "Brief" button, and an "Ask" button — all when the global AI toggle is also on. This is on top of the search panel rendered immediately below (`:153–178`). At ~1024 px width these wrap unpredictably. The H1 also reads "..." while loading (`:107–110`) instead of using a `Skeleton` line.
 
-8. **Board cards are visually under-built.**
-   `src/components/column/index.tsx:42–46, :155–172`:
-    - A `TaskCard` has only a task name and a small bug/task icon. No assignee avatar, no story-points pill, no epic chip, no type label (the icon is the only signal for Task vs Bug, with no text fallback for screen readers — its `alt` is the generic `"Type icon"`).
-    - There is no hover/focus state and no visual indication the whole card is clickable.
-    - Column header is `<h4 style={{ textTransform: 'uppercase', paddingLeft: '1rem' }}>` with no count badge ("To Do · 4").
-    - The action menu is again the literal `"..."` text (`:86`).
-    - `TaskContainer` hides scrollbars via `::-webkit-scrollbar { display: none }` (`:31–33`) which prevents Firefox/Edge users from knowing the column has overflow.
+8. ~~**Board cards are visually under-built.**~~ **[Largely complete: most of Phase 2.4 has shipped on the existing card.]**
+   `src/components/column/index.tsx`:
+    - ~~A `TaskCard` has only a task name and a small bug/task icon. No assignee avatar, no story-points pill, no epic chip, no type label.~~ **[Complete: the `TaskCard` (lines 407–500) renders an `EpicTag` (`:432–438`), `CardTitle` (`:440`), `TaskTypeBadge` with explicit `Bug` / `Task` text plus an icon (`:446–466`), `StoryPointsTag` pill (`:471–478`), and a `UserAvatar` for the coordinator (`:479–500`). The button has `aria-label="Open task <name>"` so the icon is no longer the only screen-reader signal.]**
+    - ~~There is no hover/focus state and no visual indication the whole card is clickable.~~ **[Complete: `TaskCardOuter` is a real `<button type="button">` (`:418–429`); the global `:focus-visible` ring plus `MaterialDesign 3` state-layer pattern give hover and keyboard focus styling.]**
+    - ~~Column header is `<h4 style={{ textTransform: 'uppercase' }}>` with no count badge ("To Do · 4").~~ **[Complete: `ColumnTitle` (`:297–306`) is a `Typography.Title level={4}` styled with the design-system tokens; the count badge is now an AntD `<Badge count={filteredTasks.length}>` with `aria-label="<count> tasks in <columnName>"` (`:572–583`).]**
+    - ~~The action menu is the literal `"..."` text.~~ **[Complete: now an icon-only AntD `<Dropdown>` trigger using `<MoreOutlined />` (`:384–396`).]**
+    - ~~`TaskContainer` hides scrollbars via `::-webkit-scrollbar { display: none }`.~~ **[Complete: `TaskContainer` (`:100–107`) is now `overflow-y: auto`; native scrollbar visibility is preserved cross-browser.]**
+    - **Remaining:** task age indicator (Phase 2.4 spec) and a stronger hover elevation; both are minor polish.
 
 9. **Filter / search row.**
    `src/components/taskSearchPanel/index.tsx`:
-    - `tasks?.map(... return null)` is used for its side-effect of populating `types` and `coordinators` arrays on every render (`:35–44`); the lists then survive across renders unfiltered. This both leaks memory if the dataset changes and breaks deduping.
+    - ~~`tasks?.map(... return null)` is used for its side-effect of populating `types` and `coordinators` arrays on every render (`:35–44`); the lists then survive across renders unfiltered.~~ **[Complete: both `coordinators` and `types` are now derived through `useMemo` with `Set`-based deduping (`taskSearchPanel/index.tsx:116–140`); the side-effect-in-render is gone.]**
     - The AI search slot is injected as the form's first child with `flexBasis: 100%` so it visually wraps above the inline filters (`src/pages/board.tsx:159–177`). The wrap is fragile — anything else inserted into the form will break the layout.
     - "Reset filter" is a plain text button, not visually grouped with the filters it resets.
     - On the project list (`src/components/projectSearchPanel/index.tsx:19–69`) the Manager `Select` now has `allowClear`, but the "Search this list" input still gives no debounce / loading feedback when the list is large.
 
 10. **Edit Task modal.**
     `src/components/taskModal/index.tsx`:
-    - The delete button sits **below** the form, outside the modal footer, styled as a small dashed danger button (`:213–230`). Destructive actions belong in the footer (e.g. left-aligned secondary `Delete`, right-aligned `Cancel` / `Submit`).
+    - ~~The delete button sits **below** the form, outside the modal footer, styled as a small dashed danger button.~~ **[Complete: `Delete` is now rendered inside the AntD `Modal` footer slot via `footer={(_orig, { OkBtn, CancelBtn }) => …}` (`:228–284`), arranged Delete-left / Save-Cancel-right on tablet+, stacked Save → Cancel → Delete on phone widths so the destructive control sits last for thumb safety.]**
     - The AI assist panel renders inside the same modal body (`:187–212`), causing a tall scrollable area; nothing visually separates the form from the suggestions; and any user keystroke triggers the panel's two debounced AI calls.
-    - The modal title is the static string `"Edit Task"` — it could read `Edit · {taskName}` for context.
+    - ~~The modal title is the static string `"Edit Task"` — it could read `Edit · {taskName}` for context.~~ **[Complete: `titleText = '${microcopy.actions.editTask} · ${editingTask.taskName}'` (`:180–182`); the title node also renders the `Bug` / `Task` type tag.]**
     - The Type select silently rebuilds its options from the existing task list (`:35–41, :149–166`) — if there is exactly one type in the dataset the user is forced into a hardcoded `Task / Bug` fallback list instead of seeing the canonical choices.
 
-11. **Auth screens.**
+11. **Auth screens.** **[Phase 2.7 partially complete; remaining items below.]**
     `src/components/loginForm/index.tsx`, `src/components/registerForm/index.tsx`, `src/layouts/authLayout.tsx`:
-    - Inputs only carry placeholders, no `<Form.Item label>`. AntD will still render the field but screen readers and password managers lose the label association. The hand-set `id="email"` / `id="password"` on the inner `<Input>` may not match what AntD attaches to its own label slot.
-    - There is no "Show password", no caps-lock hint, no "Forgot password" link, no password-strength indicator on register, no terms-of-service link.
+    - ~~Inputs only carry placeholders, no `<Form.Item label>`.~~ **[Complete: both forms wrap every field in `<Form.Item label={microcopy.fields.*}>` (`loginForm:62–131`, `registerForm:55–135`); `autoComplete="email" / "current-password" / "new-password" / "username"` and `aria-live="polite"` error region are wired.]**
+    - ~~There is no "Show password", no caps-lock hint…~~ **[Partially complete: show/hide password toggle (`loginForm:113–117`, `registerForm:131–135`) and caps-lock hint (`loginForm:31, 94`, `registerForm:24, 108`) are shipped.]** **Remaining:** no "Forgot password" link, no password-strength indicator on register, no terms-of-service link.
     - The card is a fixed `40rem` wide / `56rem` tall (`authLayout.tsx:43–51`) on a viewport-locked background, so it looks identical regardless of the form length and floats awkwardly when the page becomes very tall (e.g. with the error box expanded).
     - The "Register for an account" CTA is a `NoPaddingButton type="link"` — the same component reused for the column "..." menu and the header logout, so its semantic role is muddied.
 
@@ -88,9 +89,9 @@ Every recommendation in this plan is anchored to one or more of these external r
     - `AiTaskDraftModal` uses a raw `<input type="checkbox">` for breakdown selection (`:303–313`) instead of AntD's `<Checkbox>`, so it is visually inconsistent and unstyled.
     - The sparkle icon is fine but is sometimes placed before the button label and sometimes inside titles; padding around it varies (8 px hard-coded in some places, none in others).
 
-13. **Column creator and task creator.**
+13. ~~**Column creator and task creator.**
     `src/components/columnCreator/index.tsx:22–37` is a full-size `ColumnContainer` with one large `Input placeholder=" + Create column"` — visually it looks like a real (empty) column, which is confusing. There should be an explicit "+ Add column" affordance that expands into the input on click.
-    `src/components/taskCreator/index.tsx:52–80` uses `<a onClick={toggle}>` for "+ Create task" with an eslint-disable comment. The link has no `href`, no role, no keyboard handler — keyboard users cannot create a task.
+    `src/components/taskCreator/index.tsx:52–80` uses `<a onClick={toggle}>` for "+ Create task" with an eslint-disable comment. The link has no `href`, no role, no keyboard handler — keyboard users cannot create a task.~~ **[Complete: `columnCreator/index.tsx:33–66` ships an explicit `AddColumnButton` (`<button type="button">`) that expands into the `Input` on click; `taskCreator/index.tsx:33–75, 139–146` ships `CreateLink` as a real `<button type="button">` with focus-visible styling, and the AI-draft affordance is an AntD `<Button type="link">`. No `<a onClick>` or `eslint-disable` survives in either file.]**
 
 14. **Members popover.**
     `src/components/memberPopover/index.tsx:18–45` re-fetches the full members list every time the popover opens (`onOpenChange={() => refetch()}`), with no rate limit. The list shows usernames only — no avatars, no role, no count. There is also no search field for organizations with many members.
@@ -119,8 +120,10 @@ Every recommendation in this plan is anchored to one or more of these external r
 20b. **Feedback parity outside chat.**
     `AiFeedbackPopover` is wired into `AiChatDrawer` for assistant turns, so the old "no consumer" claim is stale. Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations, plus a decision on whether the feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
 
-20c. **`CopilotAboutPopover` content TODO.**
-    `src/components/copilotAboutPopover/index.tsx:114` carries `{/* TODO: drive from config */}`. The popover's body is hardcoded English; it does not pass through the i18n module that the rest of `microcopy.ai.*` uses. Lift to `microcopy.ai.about.*` so the zh-CN translations apply.
+20c. **`CopilotAboutPopover` two narrow gaps.**
+    The popover's body is mostly i18n'd via `microcopy.about.*` (`title`, `canHelpItems`, `limitationsItems`, `remoteModeDescription`, `localModeDescription`, `knowledgeCutoff`) with both `en` and `zh-CN` keys shipped (`src/i18n/locales/{en,zh-CN}.ts`), so the older "hardcoded English" framing is stale. Two narrow items remain:
+    - **Mode tag labels not i18n'd.** `src/components/copilotAboutPopover/index.tsx:105` renders `{isRemote ? "Remote model" : "Local engine"}` as a string literal. Add `microcopy.about.remoteModeLabel` / `localModeLabel` (or reuse `EngineModeTag`'s strings) so zh-CN swaps cleanly.
+    - **Knowledge-cutoff value is a static i18n string.** `src/components/copilotAboutPopover/index.tsx:114` carries `{/* TODO: drive from config */}` against `microcopy.about.knowledgeCutoff` (`"Knowledge cutoff: January 2025"` in `en.ts:757`). The string drifts every time the deployed model is upgraded. Source it from `AgentMetadata` (the BE wire shape already has the field shape) or a build-time constant so the popover stays accurate without a docs PR.
 
 20d. **No FE CI workflow.**
     `.github/workflows/` ships only `backend-ci.yml`. There is no GitHub Action that runs `eslint`, `tsc --noEmit`, or `jest` on a PR — Vercel's deploy build (`vite build` only) is the entire post-pre-commit gate. A PR with broken Jest tests can land on `main`. Tracked operationally in [`release-todo.md`](release-todo.md) §7b. Surfaced here because every UI item in this plan ships behind tests; the gate has to exist for "ship behind the existing tests" to mean anything.
@@ -130,9 +133,10 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 20f. **Unified `CopilotShell` is only a scaffold.**
     `src/components/copilotShell/index.tsx` now ships a real tabbed drawer (`chat`, `brief`, `activity`, `settings`), but `chat` and `brief` still bounce the user into the legacy drawers while `activity` and `settings` are placeholder copy. This is now a visible product surface on `src/pages/board.tsx`, so it needs either full in-shell content + i18n coverage or a tighter rollout gate until phase 2 is ready. Fold the autonomy/privacy/per-project controls from item 20a into the real Settings tab instead of leaving the shell half-owned.
+    - **i18n debt is concrete.** Tab keys (`"Chat"`, `"Brief"`, `"Activity"`, `"Settings"` at `copilotShell/index.tsx:109, 120, 131, 138`), the title `"Board Copilot"` (`:101`), and the four placeholder bodies (`:112, 123, 133, 149–152`) plus the CTA labels (`"Open Chat"`, `"Open Brief"` at `:113, 124`) are all hardcoded English. Lift them to `microcopy.copilotShell.*` (or reuse existing keys where they overlap with the legacy drawers) before this becomes the canonical surface.
 
 21. **Accessibility gaps.**
-    - Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).
+    - ~~Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).~~ **[Complete: `taskCreator`, `columnCreator`, and `column` now use real `<button type="button">` elements (`CreateLink`, `AddColumnButton`, `TaskCard`/`NoPaddingButton`); a repo-wide grep confirms no `<a onClick>` patterns remain in production components.]**
     - Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).
     - Color contrast on muted text (`rgba(0,0,0,0.5)` on white) probably fails WCAG AA.
     - The header logo button has no accessible label distinguishing it from "Members".
@@ -206,19 +210,19 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 5. **Project detail shell (`src/pages/projectDetail.tsx`).**
    Decision: collapse the dedicated detail layout into the main shell. Replace the left aside with an in-header tabbed navigation (Board · Backlog · Reports). The "Projects" popover should move to a dedicated breadcrumb element (`Projects / {projectName}`) at the top-left of the page content, using AntD `Breadcrumb`. This kills the duplicated layout, fixes the broken `5 px` shadow at `src/pages/projectDetail.tsx:15`, and gives us room to add future tabs cheaply.
 
-6. **Task edit modal (`src/components/taskModal/index.tsx`).**
+6. **Task edit modal (`src/components/taskModal/index.tsx`).** **[Partially complete; see §1.2 item 10.]**
     - Move the form into a two-column layout at ≥ 768 px: left = the form, right = the AI assist panel. Below 768 px, stack and put the AI panel inside an `<Collapse>` so it does not push the form off-screen.
-    - Move `Delete` into a proper `Modal.footer` slot (left-aligned, `danger`) and keep `Cancel` / `Submit` on the right.
-    - Replace `"Edit Task"` with `"Edit · {taskName}"`.
+    - ~~Move `Delete` into a proper `Modal.footer` slot.~~ **[Complete.]**
+    - ~~Replace `"Edit Task"` with `"Edit · {taskName}"`.~~ **[Complete.]**
     - Hard-code the canonical `Task` / `Bug` options instead of inferring them from the dataset (`:35–41`); the only correct list is the one the schema allows.
     - Show validation errors inline next to fields instead of relying on `Form.Item.message` toasts.
 
-7. **Auth screens (`src/layouts/authLayout.tsx`, `loginForm`, `registerForm`).**
-    - Add real `<Form.Item label>` to every field. Keep placeholders as helper text only.
-    - Set `autocomplete` properly: `username` + `email` on the email field, `current-password` on login, `new-password` on register, `name` on the register username field. Set `inputMode="email"` on email inputs and `enterKeyHint="go"` on the submit-row inputs.
-    - Add a "Show password" toggle (icon-only `Button` with `aria-pressed`), a caps-lock hint that appears under the password field while the key is on, and a "Forgot password" link (route can be a TODO page).
+7. **Auth screens (`src/layouts/authLayout.tsx`, `loginForm`, `registerForm`).** **[Partially complete; see §1.2 item 11.]**
+    - ~~Add real `<Form.Item label>` to every field.~~ **[Complete.]**
+    - ~~Set `autocomplete` properly… `inputMode="email"` … `enterKeyHint="go"` on the submit-row inputs.~~ **[Complete on `autoComplete`; remaining: `inputMode` / `enterKeyHint` audits.]**
+    - ~~Add a "Show password" toggle, a caps-lock hint…~~ **[Complete.]** **Remaining: a "Forgot password" link (route can be a TODO page).**
     - On register: password-strength meter (zxcvbn-equivalent or a deterministic length+class heuristic to avoid the dependency), minimum-length hint inline, plus a "Match" indicator if a confirm-password field is added.
-    - Render a top-of-form **error summary** (`role="alert"`) whenever the API returns an error, with anchor links to fields that failed; this satisfies WCAG 3.3.1 / 3.3.3 (see 2.A.1).
+    - Render a top-of-form **error summary** (`role="alert"`) whenever the API returns an error, with anchor links to fields that failed; this satisfies WCAG 3.3.1 / 3.3.3 (see 2.A.1). The forms have an `aria-live="polite"` region today (`loginForm:91`, `registerForm:105`) but no anchor links / `role="alert"` summary.
     - Do not block paste (`onPaste`) on password fields (WCAG 3.3.8).
     - Replace the "Register for an account" `NoPaddingButton` with a regular AntD `Link` and add the inverse on the register page.
     - Make the card width adapt to viewport (`max-width: 40rem; width: min(40rem, 100% - 2rem)`).
@@ -234,8 +238,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 1. **Establish a microcopy style guide.**
    Adopt sentence case for every button and title, and standardize action verbs. Concretely: `Log in` / `Sign up` (not `Login` / `Register`), `Create project` (not `Create Project`), `Save` (not `Submit`) for forms that mutate existing records, `Create` for forms that create new ones, `Delete` (not `Confirm`) on destructive confirmation modals, `Cancel` everywhere as the secondary action.
 
-2. **Fix every `<a onClick>` to be a real button.**
-   Touch points: `src/components/taskCreator/index.tsx:55–56`, `src/components/aiTaskAssistPanel/index.tsx:170–176`. Use AntD `Button type="link"` or `<button>` with proper styling.
+2. ~~**Fix every `<a onClick>` to be a real button.**
+   Touch points: `src/components/taskCreator/index.tsx:55–56`, `src/components/aiTaskAssistPanel/index.tsx:170–176`. Use AntD `Button type="link"` or `<button>` with proper styling.~~ **[Complete: `taskCreator` ships `CreateLink` as a real `<button>`, and every interactive control in `aiTaskAssistPanel` is now an AntD `<Button>`; no `<a onClick>` / `eslint-disable` survives in either file. Keep this rule on the contributor checklist (Section 2.C) so new components do not regress.]**
 
 3. **Audit color contrast.**
    Replace ad-hoc `rgba(0,0,0,0.5)` muted text with `Typography.Text type="secondary"` (which respects the theme algorithm). Verify contrast at AA for: muted body text, the brand-tinted message bubbles in `aiChatDrawer`, the warning Alerts.
