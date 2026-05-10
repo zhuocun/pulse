@@ -490,7 +490,7 @@
     {
       "name": "release-todo-doc-hygiene-closeout",
       "type": "worker",
-      "branch": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
+      "branch": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
       "startingRef": "main",
       "dependsOn": [
         "verify-non-ga-release-todo-closure"
@@ -505,35 +505,35 @@
       "finishedAt": "2026-05-10T16:07:59.655Z",
       "lastUpdate": "2026-05-10T16:07:59.656Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-release-todo-doc-hygiene-closeout",
       "type": "verifier",
       "branch": "orch/non-ga-todos-2f52/verify-release-todo-doc-hygiene-closeout",
-      "startingRef": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
+      "startingRef": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
       "dependsOn": [
         "release-todo-doc-hygiene-closeout"
       ],
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "error",
+      "status": "pending",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": "2026-05-10T16:08:14.842Z",
-      "note": "spawn failed after 3 transient sub-attempts: Error: release-todo-doc-hygiene-closeout: branch must be orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout, got `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`",
+      "lastUpdate": "2026-05-10T16:08:33.654Z",
+      "note": "respawned by local-cli (was error; attempts=1)",
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
-      "failureMode": "unknown",
-      "verification": null,
-      "attempts": 1
+      "failureMode": null,
+      "verification": null
     }
   ],
   "attention": [
