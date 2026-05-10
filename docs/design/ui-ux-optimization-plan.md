@@ -1,6 +1,6 @@
 # UI / UX Optimization Plan
 
-**Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see `ai-ux-optimization-plan.md` in this folder.
+**Status as of 2026-05-05:** Phase 1 foundations (rem-hack removal, ConfigProvider/AntD token wiring, responsive layout) and key Phase 3 tooling items (jest-axe, code splitting, service worker) are complete. Phase 4 command palette is shipped. Storybook scaffolding and rollup-plugin-visualizer remain open. For AI-specific UX issues, see [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)).
 
 This document is a critical review of the current `pulse` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
 

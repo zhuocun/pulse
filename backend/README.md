@@ -56,7 +56,7 @@ uvicorn app.main:app --reload --port 8000
 
 The repo ships a production Dockerfile, a Fly.io launch config, and a
 `docker-compose.yml` that brings up the server alongside Postgres + Mongo
-for parity with a Tier-1 production deploy. See `../docs/deployment.md`
+for parity with a Tier-1 production deploy. See `../docs/operations/deployment.md`
 for the full target-by-target guide (Vercel limits, Fly.io, Render,
 ECS / Cloud Run / Container Apps, dedicated uvicorn behind nginx).
 
@@ -108,10 +108,9 @@ chore(hooks): enforce commit messages
 ## Configuration
 
 > **Operational caveats.** Before wiring this BE up to a customer, skim
-> [`docs/operations/remaining-work.md`](../docs/operations/remaining-work.md) for the
-> Priority 1 production gotchas (durable backends, idempotency,
-> provider-key guard) and the open GA-blockers
-> ([`docs/operations/production-readiness.md`](../docs/operations/production-readiness.md)).
+> [`docs/operations/production-readiness.md`](../docs/operations/production-readiness.md) for the
+> open GA-blockers, soft blockers, and operational caveats
+> (durable backends, idempotency, provider-key guard).
 
 - `DATABASE`: Storage backend. Supported values match the Express app: `mongoDB`, `dynamoDB`, `postgreSQL`. Defaults to `mongoDB`.
 - `MONGO_URI`: MongoDB connection string.
@@ -160,7 +159,7 @@ MongoDB support is installed by default. DynamoDB and PostgreSQL drivers are opt
 python -m pip install ".[databases]"
 ```
 
-`langchain-anthropic` and `langchain-openai` are base dependencies — a plain `pip install .` installs them. Setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is the only step needed to enable real LLM calls in single-worker development. Production-shaped deploys (Vercel, Render, Fly, Railway, Kubernetes) and any process running with `WEB_CONCURRENCY` or `UVICORN_WORKERS` > 1 must additionally swap the memory-backed persistence and middleware to Postgres / Redis for correct cross-worker behavior; the server logs warnings when those defaults are left in place under multi-instance conditions. See [`docs/operations/remaining-work.md`](../docs/operations/remaining-work.md) item #10 for the operational caveats. Optional extras cover persistence, observability, and Redis:
+`langchain-anthropic` and `langchain-openai` are base dependencies — a plain `pip install .` installs them. Setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is the only step needed to enable real LLM calls in single-worker development. Production-shaped deploys (Vercel, Render, Fly, Railway, Kubernetes) and any process running with `WEB_CONCURRENCY` or `UVICORN_WORKERS` > 1 must additionally swap the memory-backed persistence and middleware to Postgres / Redis for correct cross-worker behavior; the server logs warnings when those defaults are left in place under multi-instance conditions. See [`docs/operations/production-readiness.md`](../docs/operations/production-readiness.md) for the operational caveats. Optional extras cover persistence, observability, and Redis:
 
 ```bash
 python -m pip install ".[postgres-agents]"  # AsyncPostgresSaver/Store for AGENT_*_BACKEND=postgres
@@ -256,10 +255,10 @@ Phase A of PRD v2.1 ships six named agents, all registered automatically via `ap
 - `task-drafting-agent` — drafts a single task or a breakdown across an axis, grounded in similar tasks.
 - `task-estimation-agent` — estimates story points and surfaces an `IReadinessReport` for missing inputs. With `OPENAI_API_KEY` set, the `fetch_embeddings` node routes through the real OpenAI embeddings provider so neighbour scoring lives in a learned semantic space; without a key it falls back to the deterministic SHA-256 stub so nothing breaks (see `EMBEDDINGS_PROVIDER`).
 - `chat-agent` — single-turn conversational agent for ad-hoc board questions.
-- `triage-agent` — turns drift signals into actionable nudges (`unowned_bug`, `wip_overflow`, `stale_task`). The rules engine is the source of truth for *which* signals fire and at what severity; with `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, `polish_triage` rewrites each nudge `summary` with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic title). Without a key the deterministic title is used. See `../docs/operations/remaining-work.md` item #5 for the still-open product call on whether the polish path stays.
+- `triage-agent` — turns drift signals into actionable nudges (`unowned_bug`, `wip_overflow`, `stale_task`). The rules engine is the source of truth for *which* signals fire and at what severity; with `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, `polish_triage` rewrites each nudge `summary` with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic title). Without a key the deterministic title is used.
 - `search-agent` — embedding-based search rerank: interrupts to the FE to collect `{id, text}` candidates, embeds query + candidates via `be_tools.embed`, ranks by cosine similarity via `be_tools.embedding_neighbors`, then calls `polish_search` (LLM rerank) if a real model is configured. With a real model set, the LLM may reorder the top-10 hits with a rationale. Also holds the chat model consumed by `polish_search` for the v1 `/api/ai/search` shim. Status is `"active"`; the v2.1 streaming entries (`/invoke` and `/stream`) are now functional.
 
-Each agent accepts a `BaseChatModel` from `app.agents.llm.make_chat_model` (resolved on first compile). When `AGENT_CHAT_MODEL_PROVIDER=auto` (the default) the factory inspects `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in turn and falls back to a deterministic stub when neither is set. The catalog uses `is_stub_model` as a feature flag: with the stub, agents take their hand-written deterministic path; with a real provider, `chat-agent` forwards the conversation to the model, and `board-brief` / `task-drafting` / `task-estimation` polish their text fields via `model.with_structured_output(Schema, include_raw=True)` so the parsed output is a typed Pydantic payload (with token usage still reachable on the raw `AIMessage`). **Adding `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is the only change needed to flip the catalog from stubs to real LLM output in single-worker dev** — `langchain-anthropic` and `langchain-openai` are base dependencies, so no separate extra install is required. With a key set, `polish_triage` is also active, so all six agents now exercise the model on at least one path. Production-shaped deploys (Vercel, Render, Fly, Railway, Kubernetes) and any `WEB_CONCURRENCY` / `UVICORN_WORKERS` > 1 process additionally require Postgres-backed checkpointer/store and Redis-backed idempotency / rate-limit / budget for correct cross-worker behavior; the server warns if memory backends are left in place under those conditions. The remaining open code work (Vercel SSE truncation, MCP transport, vector store) is tracked in [`docs/operations/remaining-work.md`](../docs/operations/remaining-work.md).
+Each agent accepts a `BaseChatModel` from `app.agents.llm.make_chat_model` (resolved on first compile). When `AGENT_CHAT_MODEL_PROVIDER=auto` (the default) the factory inspects `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in turn and falls back to a deterministic stub when neither is set. The catalog uses `is_stub_model` as a feature flag: with the stub, agents take their hand-written deterministic path; with a real provider, `chat-agent` forwards the conversation to the model, and `board-brief` / `task-drafting` / `task-estimation` polish their text fields via `model.with_structured_output(Schema, include_raw=True)` so the parsed output is a typed Pydantic payload (with token usage still reachable on the raw `AIMessage`). **Adding `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is the only change needed to flip the catalog from stubs to real LLM output in single-worker dev** — `langchain-anthropic` and `langchain-openai` are base dependencies, so no separate extra install is required. With a key set, `polish_triage` is also active, so all six agents now exercise the model on at least one path. Production-shaped deploys (Vercel, Render, Fly, Railway, Kubernetes) and any `WEB_CONCURRENCY` / `UVICORN_WORKERS` > 1 process additionally require Postgres-backed checkpointer/store and Redis-backed idempotency / rate-limit / budget for correct cross-worker behavior; the server warns if memory backends are left in place under those conditions. The remaining open code work (MCP transport, vector store, provider fallback, mutation lifecycle) is tracked in [`docs/operations/production-readiness.md`](../docs/operations/production-readiness.md).
 
 Supporting modules:
 
