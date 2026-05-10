@@ -110,7 +110,7 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 19. **Performance smells that show up as UI jank.**
     - ~~`tasks?.filter(...)` in the column render (`src/pages/board.tsx:200–203`) plus the per-card filter in `Column` (`src/components/column/index.tsx:126–137`) are O(N×M) every render. Pre-bucket tasks by `columnId` once.~~ **[Complete: `BoardPage` now builds a `tasksByColumn` `Map` with `useMemo` and passes column-specific tasks into `Column`.]**
-    - `AiTaskAssistPanel` re-fires both estimate + readiness AI calls on every value change after a 600 ms debounce (`src/components/aiTaskAssistPanel/index.tsx:58–104`). With the local engine that is cheap, but the visible spinner cycling looks unstable. Throttle the spinner (only show it after 250 ms).
+    - ~~`AiTaskAssistPanel` re-fires both estimate + readiness AI calls on every value change after a 600 ms debounce (`src/components/aiTaskAssistPanel/index.tsx:58–104`). With the local engine that is cheap, but the visible spinner cycling looks unstable. Throttle the spinner (only show it after 250 ms).~~ **[Complete: `useDelayedFlag(active, 250)` now gates visible loading affordances across `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer`, so fast local responses no longer flash spinners while underlying loading state/analytics remain unchanged.]**
     - ~~`useReactQuery<IMember[]>("users/members")` is called from at least four components (`board.tsx`, `project.tsx`, `taskModal`, `memberPopover`); ensure it is a single shared key and cached, and stop refetching on popover open.~~ **[Complete: all four surfaces now consume `useMembersList()`, which centralizes the key (`["users/members"]`) and applies a shared `staleTime` cache window.]**
 
 20a. **Autonomy metadata / settings follow-through.**
@@ -259,7 +259,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 
 5. **Loading states.**
     - Replace bare `<Spin>` blocks with `<Skeleton.Input>` / `<Skeleton.Avatar>` / `<Skeleton.Paragraph>` matching the eventual layout for: project list rows, board columns, task cards, brief drawer sections, chat drawer initial load, AI assist panel.
-    - Add throttled spinners (only render after 250 ms) so fast local-engine responses do not flash a spinner at all.
+    - ~~Add throttled spinners (only render after 250 ms) so fast local-engine responses do not flash a spinner at all.~~ **[Complete: `useDelayedFlag` now delays spinner rendering by 250 ms on the task-assist panel, chat drawer, and board brief drawer.]**
 
 6. **Empty states.**
    Build a reusable `<EmptyState illustration="…" title="…" description="…" cta={…} />` component and use it on:
@@ -383,7 +383,7 @@ The point of these is that they are _felt_ by the user even if no benchmark move
 
 - **Route-level code splitting.** Convert `src/routes/index.tsx` to use `React.lazy(() => import(...))` per page; wrap each lazy boundary in a route-shaped `Suspense fallback={<Skeleton …/>}`.
 - **Prefetch on hover.** When a user hovers a row in `ProjectList`, prefetch `["boards", { projectId }]` and `["tasks", { projectId }]` via `queryClient.prefetchQuery`. Same for the project switcher popover.
-- **Throttled spinners.** Use a `useDelayedFlag(loading, 250)` hook so spinners only render after 250 ms; this kills the chat/AI panel "flash of spinner" on the local engine.
+- ~~**Throttled spinners.** Use a `useDelayedFlag(loading, 250)` hook so spinners only render after 250 ms; this kills the chat/AI panel "flash of spinner" on the local engine.~~ **[Complete: shipped `useDelayedFlag` and applied it to the visible spinner branches in `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer`.]**
 - **`React.memo` for cards and rows.** `Column` and the project list `<Avatar>` cell re-render every keystroke today; memoize after the bucket-by-column refactor (Phase 1.6).
 - **Image lazy loading.** All `<img>` and `<Avatar src>` get `loading="lazy"` and explicit width/height to avoid CLS.
 - **Skeleton shape match.** Skeletons must match the final element's bounding box to avoid layout shift on resolve. Quantify: target Cumulative Layout Shift (CLS) < 0.1, Interaction to Next Paint (INP) < 200 ms, Largest Contentful Paint (LCP) < 2.5 s on a 4× CPU-throttled run.

@@ -51,6 +51,7 @@ import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
+import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import type {
     AutonomyLevel,
     MutationProposal,
@@ -837,6 +838,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     const remainingChars = microcopy.ai.characterCounterMax - input.length;
     const showCounter = input.length >= microcopy.ai.characterCounterShowAfter;
     const counterIsWarning = remainingChars < 0;
+    const showDelayedLoadingBubble = useDelayedFlag(
+        isLoading && !streamingText,
+        250
+    );
 
     /**
      * Did this assistant turn consult any tools? Used to distinguish a
@@ -1840,84 +1845,87 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 ))}
                         </Space>
                     )}
-                    {isLoading && (
-                        <MessageRow
-                            $isUser={false}
-                            aria-label={`${microcopy.ai.copilotLabel} · ${microcopy.ai.streaming}`}
-                            role="group"
-                        >
-                            <AssistantAttribution>
-                                <AiSparkleIcon aria-hidden />
-                                <span>{microcopy.ai.copilotLabel}</span>
-                                {!streamingText && (
-                                    /* Pre-token stage label sits next to the model
+                    {isLoading &&
+                        (showDelayedLoadingBubble || !!streamingText) && (
+                            <MessageRow
+                                $isUser={false}
+                                aria-label={`${microcopy.ai.copilotLabel} · ${microcopy.ai.streaming}`}
+                                role="group"
+                            >
+                                <AssistantAttribution>
+                                    <AiSparkleIcon aria-hidden />
+                                    <span>{microcopy.ai.copilotLabel}</span>
+                                    {!streamingText && (
+                                        /* Pre-token stage label sits next to the model
                                    name so users see *something* descriptive
                                    before the first character lands. Once the
                                    bubble has its own streaming text, hide
                                    this label to avoid duplicating the same
                                    string in two places. */
-                                    <Text
-                                        style={{
-                                            color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-                                            fontSize: fontSize.xs,
-                                            fontWeight: fontWeight.regular,
-                                            marginInlineStart: 4
-                                        }}
-                                        type="secondary"
-                                    >
-                                        {microcopy.ai.thinkingDefault}
-                                    </Text>
-                                )}
-                            </AssistantAttribution>
-                            {/*
-                             * `aria-live="off"` (AI UX best practices §2.10):
-                             * the streaming bubble updates token-by-token and
-                             * would otherwise drown screen readers in mid-word
-                             * announcements. The visible cursor + text still
-                             * works for sighted users; the dedicated
-                             * `completionAnnouncement` live region above
-                             * announces the final answer once.
-                             */}
-                            <MessageBubble $isUser={false} aria-live="off">
-                                {streamingText ? (
-                                    <>
-                                        {streamingText}
-                                        <StreamingCursor aria-hidden>
-                                            ▍
-                                        </StreamingCursor>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Skeleton
-                                            active
-                                            aria-label={microcopy.ai.streaming}
-                                            paragraph={{
-                                                rows: 2,
-                                                width: ["80%", "55%"]
+                                        <Text
+                                            style={{
+                                                color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+                                                fontSize: fontSize.xs,
+                                                fontWeight: fontWeight.regular,
+                                                marginInlineStart: 4
                                             }}
-                                            title={false}
-                                        />
-                                        {/* P2-I: "Still thinking…" after 3 s in the pre-token phase */}
-                                        {loadingMs >= 3000 && (
-                                            <Text
-                                                style={{
-                                                    display: "block",
-                                                    fontSize: fontSize.xs,
-                                                    marginTop: 4
+                                            type="secondary"
+                                        >
+                                            {microcopy.ai.thinkingDefault}
+                                        </Text>
+                                    )}
+                                </AssistantAttribution>
+                                {/*
+                                 * `aria-live="off"` (AI UX best practices §2.10):
+                                 * the streaming bubble updates token-by-token and
+                                 * would otherwise drown screen readers in mid-word
+                                 * announcements. The visible cursor + text still
+                                 * works for sighted users; the dedicated
+                                 * `completionAnnouncement` live region above
+                                 * announces the final answer once.
+                                 */}
+                                <MessageBubble $isUser={false} aria-live="off">
+                                    {streamingText ? (
+                                        <>
+                                            {streamingText}
+                                            <StreamingCursor aria-hidden>
+                                                ▍
+                                            </StreamingCursor>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Skeleton
+                                                active
+                                                aria-label={
+                                                    microcopy.ai.streaming
+                                                }
+                                                paragraph={{
+                                                    rows: 2,
+                                                    width: ["80%", "55%"]
                                                 }}
-                                                type="secondary"
-                                            >
-                                                {microcopy.ai.stillThinking}
-                                            </Text>
-                                        )}
-                                    </>
-                                )}
-                            </MessageBubble>
-                            <AssistantDisclaimer>
-                                {microcopy.a11y.aiBadge}
-                            </AssistantDisclaimer>
-                        </MessageRow>
-                    )}
+                                                title={false}
+                                            />
+                                            {/* P2-I: "Still thinking…" after 3 s in the pre-token phase */}
+                                            {loadingMs >= 3000 && (
+                                                <Text
+                                                    style={{
+                                                        display: "block",
+                                                        fontSize: fontSize.xs,
+                                                        marginTop: 4
+                                                    }}
+                                                    type="secondary"
+                                                >
+                                                    {microcopy.ai.stillThinking}
+                                                </Text>
+                                            )}
+                                        </>
+                                    )}
+                                </MessageBubble>
+                                <AssistantDisclaimer>
+                                    {microcopy.a11y.aiBadge}
+                                </AssistantDisclaimer>
+                            </MessageRow>
+                        )}
                 </div>
                 {/* P2-D: scroll-to-bottom FAB shown when user scrolls up during streaming */}
                 {showScrollFab && isLoading && (

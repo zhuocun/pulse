@@ -11,7 +11,7 @@ describe("useDelayedFlag", () => {
         jest.useRealTimers();
     });
 
-    it("returns false until the flag stays true past the delay", () => {
+    it("returns false until the flag remains true past the delay", () => {
         const { result, rerender } = renderHook(
             ({ flag }) => useDelayedFlag(flag, 250),
             { initialProps: { flag: false } }
@@ -33,15 +33,34 @@ describe("useDelayedFlag", () => {
         expect(result.current).toBe(true);
     });
 
-    it("resets to false when the flag drops before the delay elapses", () => {
+    it("clears immediately when the source flag drops to false", () => {
         const { result, rerender } = renderHook(
             ({ flag }) => useDelayedFlag(flag, 250),
             { initialProps: { flag: true } }
         );
 
         act(() => {
+            jest.advanceTimersByTime(250);
+        });
+        expect(result.current).toBe(true);
+
+        rerender({ flag: false });
+        expect(result.current).toBe(false);
+    });
+
+    it("never flips true when loading ends before the delay", () => {
+        const { result, rerender } = renderHook(
+            ({ flag }) => useDelayedFlag(flag, 250),
+            { initialProps: { flag: false } }
+        );
+
+        rerender({ flag: true });
+
+        act(() => {
             jest.advanceTimersByTime(100);
         });
+        expect(result.current).toBe(false);
+
         rerender({ flag: false });
         expect(result.current).toBe(false);
 
