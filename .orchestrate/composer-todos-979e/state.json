@@ -79,17 +79,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-10T10:19:10.974Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-10T10:19:10.975Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "design-tokens-doc",
