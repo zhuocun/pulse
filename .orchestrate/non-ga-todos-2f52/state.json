@@ -213,12 +213,12 @@
       "handoffPath": "handoffs/members-popover-avatars-cache.md",
       "startedAt": "2026-05-10T12:32:01.883Z",
       "finishedAt": "2026-05-10T12:53:17.975Z",
-      "lastUpdate": "2026-05-10T12:53:17.976Z",
+      "lastUpdate": "2026-05-10T12:53:20.934Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "live-ui-verified",
       "attempts": 1
     },
     {
@@ -296,12 +296,12 @@
       "agentId": "bc-67a26ed3-5272-468d-8179-363b01f626b5",
       "runId": "run-1a9ccd44-7991-4073-8769-e9ab8ff21c4d",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/drag-keyboard-affordance-hint.md",
       "startedAt": "2026-05-10T12:32:12.553Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T12:32:15.055Z",
+      "finishedAt": "2026-05-10T12:57:12.989Z",
+      "lastUpdate": "2026-05-10T12:57:12.989Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -354,6 +354,10 @@
     {
       "at": "2026-05-10T12:44:08.501Z",
       "message": "throttled-spinners-hook: tool_call idle 337090ms; last=2026-05-10T12:38:31.411Z"
+    },
+    {
+      "at": "2026-05-10T12:53:20.934Z",
+      "message": "members-popover-avatars-cache: verification self-reported (live-ui-verified)"
     }
   ]
 }
