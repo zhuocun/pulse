@@ -1,8 +1,8 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
   "goal": "Implement to-do items with Composer 2, run until all non-GA to-do items are complete. Non-GA means every open item in docs/status/* except GA Blocker §1 (MutationProposal accept/undo). Work from committed handoffs; follow repo AGENTS.md when closing backlog lines.",
-  "summary": "Parallel Composer-2 workers on non-GA backlog: compose idempotency Redis, Fly placeholder, CopilotShell i18n, agent metadata surfacing, backend CI dispatch hook.",
-  "selfAgentId": "bc-6ddc1f12-04bb-49da-9ddc-efe4bfef2f52",
+  "summary": "Draining non-GA polish via orchestrate: merge worker branches for compose Redis idempotency, Fly app naming, CI dispatch, FE agent-metadata + CopilotShell i18n.",
+  "selfAgentId": "bc-eaac5198-77e9-44ac-9821-c7373cadedf6",
   "rootSlug": "non-ga-todos-2f52",
   "baseBranch": "main",
   "prBase": "main",
