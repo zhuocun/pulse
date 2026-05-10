@@ -1,3 +1,4 @@
+import environment from "../../constants/env";
 import {
     AgentAuthError,
     AgentBudgetError,
@@ -10,6 +11,7 @@ import {
     getAgentMetadata,
     invokeAgent,
     listAgents,
+    resolveAiKnowledgeCutoffForUi,
     streamAgent
 } from "./agentClient";
 
@@ -490,6 +492,31 @@ describe("agentClient", () => {
                 "https://agents.example/api/v1/agents/board-coach",
                 expect.objectContaining({ method: "GET" })
             );
+        });
+    });
+
+    describe("resolveAiKnowledgeCutoffForUi", () => {
+        it("prefers non-empty wire metadata", () => {
+            expect(
+                resolveAiKnowledgeCutoffForUi({
+                    knowledge_cutoff: "April 2027"
+                })
+            ).toBe("April 2027");
+        });
+
+        it("trims wire metadata", () => {
+            expect(
+                resolveAiKnowledgeCutoffForUi({ knowledge_cutoff: "  x  " })
+            ).toBe("x");
+        });
+
+        it("falls back to environment when wire is absent or blank", () => {
+            expect(resolveAiKnowledgeCutoffForUi()).toBe(
+                environment.aiKnowledgeCutoff
+            );
+            expect(
+                resolveAiKnowledgeCutoffForUi({ knowledge_cutoff: "  " })
+            ).toBe(environment.aiKnowledgeCutoff);
         });
     });
 
