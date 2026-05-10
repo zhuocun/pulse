@@ -291,6 +291,31 @@ export const getAgentMetadata = async ({
     return (await response.json()) as AgentMetadata;
 };
 
+const metadataSessionCache = new Map<string, AgentMetadata>();
+
+const sessionCacheKey = (baseUrl: string, name: string) =>
+    `${trimSlash(baseUrl)}::${name}`;
+
+/**
+ * Like {@link getAgentMetadata}, but returns a single in-memory result per
+ * `(baseUrl, name)` for the lifetime of the page session (tab reload clears).
+ */
+export const getSessionCachedAgentMetadata = async (
+    params: AgentByNameRequest
+): Promise<AgentMetadata> => {
+    const key = sessionCacheKey(params.baseUrl, params.name);
+    const hit = metadataSessionCache.get(key);
+    if (hit) return hit;
+    const fresh = await getAgentMetadata(params);
+    metadataSessionCache.set(key, fresh);
+    return fresh;
+};
+
+/** Test-only: clears the session metadata cache between cases. */
+export const clearAgentMetadataSessionCache = (): void => {
+    metadataSessionCache.clear();
+};
+
 /**
  * Server health body shape on the wire (`/api/v1/health`). Both
  * snake_case fields (`status`, `agents_loaded`) and camelCase fields

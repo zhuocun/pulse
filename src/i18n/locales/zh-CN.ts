@@ -730,7 +730,12 @@ const zhCN: Dictionary = {
         remoteModeDescription:
             "由远程 AI 模型提供支持。您的数据会按照您的隐私设置进行处理。",
         localModeDescription: "运行在本地 AI 引擎上。您的数据保留在此设备上。",
-        knowledgeCutoffTemplate: "知识截止时间：{date}"
+        knowledgeCutoffTemplate: "知识截止时间：{date}",
+        serverLimitsTitle: "服务器公布的限制",
+        serverMetadataLoading: "正在加载服务器信息…",
+        serverMetadataUnavailable: "无法加载服务器限制信息。",
+        rateLimitLine: "速率限制：{perMinute} / 分钟 · {perHour} / 小时",
+        allowedAutonomyLabel: "允许的自主级别"
     },
     mutation: {
         riskHigh: "高风险",
