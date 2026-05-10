@@ -103,8 +103,8 @@ Every recommendation in this plan is anchored to one or more of these external r
     - Board loading now uses a shape-matched skeleton, but the zero-column state still collapses to `ColumnCreator` rather than a stronger illustrated empty state.
     - Project list empty/error states are much healthier now (`EmptyState`, page-level `Alert` + Retry). The remaining gap is consistency: bring the board's fetch-failure and empty-board treatments up to the same standard.
 
-17. **Microcopy and casing.**
-    Mixed throughout: "Log in" vs "Login", "Create Project" vs "+ Create task" (different casing and different verb form), "Confirm" / "Cancel" vs "Submit" / "Cancel" across modals, "Coordinators" / "Managers" plural-as-placeholder vs "Coordinator" / "Manager" singular as labels. Buttons are sometimes verbs ("Search", "Apply"), sometimes nouns ("Brief", "Ask").
+17. ~~**Microcopy and casing.**
+    Mixed throughout: "Log in" vs "Login", "Create Project" vs "+ Create task" (different casing and different verb form), "Confirm" / "Cancel" vs "Submit" / "Cancel" across modals, "Coordinators" / "Managers" plural-as-placeholder vs "Coordinator" / "Manager" singular as labels. Buttons are sometimes verbs ("Search", "Apply"), sometimes nouns ("Brief", "Ask").~~ **[Complete: mechanical value-only sweep shipped across `src/i18n/locales/en.ts`, `src/i18n/locales/zh-CN.ts`, and `src/constants/microcopy.ts` consumers (no new keys). Existing action labels now follow sentence case + consistent verbs (`Log in`, `Sign up`, `Create project`, `Save`) and aligned casing updates (`Team members`, `Open chat`, `Open brief`, `Board brief`, `Copy as markdown`).]**
 
 18. ~~**Routing UX.**
     `src/routes/index.tsx:14–48` always redirects `/` to `/login` and then `HomePage` redirects authenticated users back to `/projects` (`src/pages/home.tsx:11–18`). This causes a brief login-screen flash for already-signed-in users. Combine the checks at the route level.~~ **[Complete: `RootRedirect` now sends authenticated users directly to `/projects` from the index route.]**
@@ -231,8 +231,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 
 ### Phase 3 — Polish, accessibility, microcopy
 
-1. **Establish a microcopy style guide.**
-   Adopt sentence case for every button and title, and standardize action verbs. Concretely: `Log in` / `Sign up` (not `Login` / `Register`), `Create project` (not `Create Project`), `Save` (not `Submit`) for forms that mutate existing records, `Create` for forms that create new ones, `Delete` (not `Confirm`) on destructive confirmation modals, `Cancel` everywhere as the secondary action.
+1. ~~**Establish a microcopy style guide.**
+   Adopt sentence case for every button and title, and standardize action verbs. Concretely: `Log in` / `Sign up` (not `Login` / `Register`), `Create project` (not `Create Project`), `Save` (not `Submit`) for forms that mutate existing records, `Create` for forms that create new ones, `Delete` (not `Confirm`) on destructive confirmation modals, `Cancel` everywhere as the secondary action.~~ **[Complete: existing locale values now implement this style-guide baseline without introducing new translation keys; tests asserting user-visible labels were updated to the new sentence-case strings.]**
 
 2. ~~**Fix every `<a onClick>` to be a real button.**
    Touch points: `src/components/taskCreator/index.tsx:55–56`, `src/components/aiTaskAssistPanel/index.tsx:170–176`. Use AntD `Button type="link"` or `<button>` with proper styling.~~ **[Complete: `taskCreator` ships `CreateLink` as a real `<button>`, and every interactive control in `aiTaskAssistPanel` is now an AntD `<Button>`; no `<a onClick>` / `eslint-disable` survives in either file. Keep this rule on the contributor checklist (Section 2.C) so new components do not regress.]**

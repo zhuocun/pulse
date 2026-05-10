@@ -79,7 +79,7 @@ describe("LoginPage", () => {
 
         expect(screen.getByText("Login failed")).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: /register for an account/i })
+            screen.getByRole("button", { name: /sign up for an account/i })
         ).toBeInTheDocument();
     });
 
@@ -87,7 +87,7 @@ describe("LoginPage", () => {
         renderLoginPage();
 
         fireEvent.click(
-            screen.getByRole("button", { name: /register for an account/i })
+            screen.getByRole("button", { name: /sign up for an account/i })
         );
 
         expect(window.location.pathname).toBe("/register");

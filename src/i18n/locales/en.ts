@@ -22,7 +22,7 @@ export const enSource = {
         clear: "Clear",
         clearAiSearch: "Clear AI search",
         close: "Close",
-        copyAsMarkdown: "Copy as Markdown",
+        copyAsMarkdown: "Copy as markdown",
         create: "Create",
         createProject: "Create project",
         createTask: "Create task",
@@ -35,7 +35,7 @@ export const enSource = {
         logIn: "Log in",
         loggingIn: "Logging in…",
         logOut: "Log out",
-        registerCta: "Register for an account",
+        registerCta: "Sign up for an account",
         loginCta: "Log in to your account",
         resetFilters: "Reset filters",
         retry: "Retry",
@@ -122,7 +122,7 @@ export const enSource = {
         switchToBoardCopilot: "Switch to Board Copilot",
         boardCopilotModeAnnouncement: "Board Copilot mode. Press Enter to ask.",
         openBoardCopilotBrief: "Open Board Copilot brief",
-        openCopilotPanel: "Open Copilot Panel",
+        openCopilotPanel: "Open Copilot panel",
         editMessage: "Edit message",
         copyResponse: "Copy response",
         regenerateResponse: "Regenerate response",
@@ -154,7 +154,7 @@ export const enSource = {
     },
     labels: {
         members: "Members",
-        teamMembers: "Team Members",
+        teamMembers: "Team members",
         board: "Board",
         project: "Project",
         briefShort: "Brief",
@@ -314,8 +314,8 @@ export const enSource = {
         swipeHint: "Swipe to see more columns",
         enableCopilotOnBoard: "Enable on this board",
         copilotMenuAsk: "Ask Copilot",
-        copilotMenuBrief: "Board Brief",
-        copilotMenuOpenPanel: "Open Copilot Panel",
+        copilotMenuBrief: "Board brief",
+        copilotMenuOpenPanel: "Open Copilot panel",
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project."
     },
@@ -634,7 +634,7 @@ export const enSource = {
     auth: {
         loginTitle: "Log in to your account",
         loginSubtitle: "Enter your email and password to continue.",
-        registerTitle: "Register for an account",
+        registerTitle: "Sign up for an account",
         registerSubtitle: "Create your account to start tracking work.",
         switchToRegister: "Don't have an account?",
         switchToLogin: "Already have an account?",
@@ -686,8 +686,8 @@ export const enSource = {
         },
         settingsBody:
             "Copilot settings — autonomy level, privacy, and per-project controls — are managed via the board settings menu.",
-        ctaOpenChat: "Open Chat",
-        ctaOpenBrief: "Open Brief"
+        ctaOpenChat: "Open chat",
+        ctaOpenBrief: "Open brief"
     },
     brief: {
         title: "Board Copilot brief",

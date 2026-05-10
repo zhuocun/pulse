@@ -80,7 +80,7 @@ describe("MemberPopover", () => {
 
         fireEvent.mouseEnter(screen.getByText("Members"));
 
-        expect(await screen.findByText("Team Members")).toBeInTheDocument();
+        expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.getByText("Alice")).toBeInTheDocument();
         expect(screen.getByText("Bob")).toBeInTheDocument();
         await waitFor(() => {
@@ -93,7 +93,7 @@ describe("MemberPopover", () => {
 
         fireEvent.mouseEnter(screen.getByText("Members"));
 
-        expect(await screen.findByText("Team Members")).toBeInTheDocument();
+        expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.queryByText("Alice")).not.toBeInTheDocument();
     });
 });

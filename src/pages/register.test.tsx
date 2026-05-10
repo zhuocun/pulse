@@ -67,7 +67,7 @@ describe("RegisterPage", () => {
         renderRegisterPage();
 
         expect(
-            screen.getByRole("heading", { name: /register for an account/i })
+            screen.getByRole("heading", { name: /sign up for an account/i })
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: /mock register form/i })
