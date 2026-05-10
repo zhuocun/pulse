@@ -242,20 +242,30 @@ SSE transcripts in `tests/test_agent_sse_transcripts.py`.
   drops unknown ids. A schema regression degrades but does not
   corrupt.
 
-### ⚠️ 7. CI workflow not yet validated against GitHub Actions  *(BE-only)*
+### ⚠️ 7. CI workflow — manual dispatch available; green run URL not recorded here  *(BE-only)*
 
-`.github/workflows/backend-ci.yml` ships two jobs (`test-full` with
-`.[dev,ai]` + full pytest, and `test-slim` with `.[dev]` only +
-`python -c "import app.main"`) with unchanged `paths` filters on
-`push` / `pull_request`.
-GHA execution against `main` has not been verified end-to-end; status
-of the first run on this branch is still unknown.
+`.github/workflows/backend-ci.yml` defines `test-full` (install `.[dev,ai]`,
+run `pytest`) and `test-slim` (install `.[dev]`, run
+`python -c "import app.main"`). On `push` / `pull_request`, changes under
+`backend/**` or the workflow file run **both** jobs. **`workflow_dispatch`**
+adds a **mode** input (type `choice`, default **`both`**) with options
+exactly: **`both`**, **`test-full`**, **`test-slim`**. Each option keeps the
+same job definitions; `both` runs the full matrix in one dispatch, while
+`test-full` / `test-slim` narrow to a single job via the workflow `if`
+conditions.
 
-- Evidence without a path-filter push: GitHub → Actions → **Backend CI**
-  → **Run workflow**, pick the branch, optionally set **mode** (`both`,
-  `test-full`, `test-slim`), then paste the green run URL here.
-- Scope: trigger the workflow on a PR/main run, capture the first green
-  run, and update this section with the CI evidence.
+**Manual run (no claim of green until a URL exists below):** GitHub →
+Actions → **Backend CI** → **Run workflow** → choose the **target branch**
+in the Run workflow UI → set **mode** to `both`, `test-full`, or `test-slim`
+(see above) → **Run workflow**. When you have a **succeeded** run, paste its
+URL in this section so the backlog points at evidence; until then, this doc
+does **not** assert that Backend CI has passed on `main` (or any branch) in
+GitHub Actions.
+
+- **First green Backend CI run URL (paste when available):** _(none yet)_
+- **Scope for closing §7:** replace the placeholder with a concrete green
+  `workflow_dispatch` or push/PR run URL after ops confirms the first good
+  execution.
 
 ### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `orch/composer-todos-979e/fe-ci-workflow`)*
 
@@ -450,7 +460,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` (`backend/app/main.py:437–493`) and the middleware-backend warning (`main.py:309–333`) **log a warning**, they do not raise. The single-worker pin (§16d) is what actually keeps the in-memory state from drifting today; the warning is the prompt to fix the env before lifting `--workers 1`. |
 | Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |
 | Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
-| CI matrix (slim + full install) | ⚠️ | Wired but not yet run — see §7 |
+| CI matrix (slim + full install) | ⚠️ | Push/PR + `workflow_dispatch` wired; no green run URL recorded in §7 yet |
 
 ### Frontend
 
