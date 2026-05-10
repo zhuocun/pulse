@@ -1,209 +1,65 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "Implement to-do items with Codex 5.3 until the docs/status non-GA backlog is cleared. Non-GA means open items in docs/status/* excluding GA Blocker §1 (MutationProposal accept/undo). Tranche by tranche: merge handoffs, extend plan for the next scoped slice, keep AGENTS.md status hygiene (strike todos + product-done rows).",
-  "summary": "Wave 4 (Codex 5.3): header logo + AI live regions a11y, board error/empty states, taskModal canonical types, useAgent tool-resolver extract, suggested-by-copilot badge, forgot-password link stub.",
-  "selfAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
+  "goal": "non-ga-todos: close every still-open backlog item in docs/status/release-todo.md except GA blocker §1 (MutationProposal accept path / public GA), with AGENTS.md status hygiene (close entries in release-todo and add product-done rows for shipped work).",
+  "summary": "Close all non-GA release-todo backlog items in one coordinated sweep.",
+  "selfAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
   "rootSlug": "non-ga-todos-2f52",
   "baseBranch": "main",
   "prBase": "main",
   "repoUrl": "https://github.com/zhuocun/pulse",
   "syncStateToGit": true,
   "acceptanceCriteria": [
-    "Each worker branch merges cleanly; backlog docs reflect closed slices per AGENTS.md",
-    "FE workers pass eslint, tsc, CI=true jest, vite build",
-    "BE-affecting workers pass pytest + ruff in backend/"
+    "Every open release-todo entry except GA blocker §1 is implemented and marked resolved with supporting notes",
+    "docs/status/product-done.md records one-line shipped entries for all backlog items closed in this sweep",
+    "Frontend changes pass eslint + typecheck + CI=true jest + vite build",
+    "Backend changes pass pytest + ruff in backend/"
   ],
   "tasks": [
     {
-      "name": "header-logo-and-ai-live-regions-a11y",
+      "name": "close-non-ga-release-todo-items",
       "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Address ui-todo §21 remaining a11y items: give the header logo button a distinct accessible label (so AT users don't confuse it with the `Members` control next to it) and extend `aria-live=\"polite\"` regions to `AiTaskAssistPanel` and `BoardBriefDrawer` so AT users hear suggestion arrival/error parity with `AiChatDrawer`.",
-      "brief": "Header logo: add `aria-label`/`title` like `microcopy.header.logoLabel` (`Pulse home`, with zh-CN parity) on the existing logo button so it announces distinct from `Members`. AI live regions: add a discrete `<div role=\"status\" aria-live=\"polite\">` (or use AntD `<Spin>` wrappers' aria) inside `AiTaskAssistPanel` and `BoardBriefDrawer` that announces succinct status changes (e.g. `Suggestion ready`, `Couldn't load brief`) without leaking raw payloads. Tests: extend `src/__tests__/uiAccessibility.strict.test.tsx` (or component tests) to assert the new affordances. Update `docs/status/ui-todo.md` §21 + Phase 3.4 4.1.3 lines.",
+      "model": "composer-2-fast",
+      "scopedGoal": "Implement and close every open item in docs/status/release-todo.md except GA blocker §1, including Beta blockers §2/§3/§6, soft blockers §4/§5/§7, and polish items §14/§15/§16/§16b/§16c/§16d, then update docs/status/product-done.md per AGENTS.md.",
+      "brief": "Treat docs/status/release-todo.md as the source of truth for what remains open. Do not touch GA blocker §1 except to keep references accurate. Ship concrete code, tests, and ops/docs updates needed to close each remaining non-GA entry. For each closure, update release-todo status text and add a one-line shipped note in docs/status/product-done.md under the relevant table. Keep behavioral changes production-safe and include migration notes where applicable (especially auth token scope, provider failover, integration test plumbing, and multi-worker backend readiness).",
       "pathsAllowed": [
-        "src/components/header/**",
-        "src/components/aiTaskAssistPanel/**",
-        "src/components/boardBriefDrawer/**",
-        "src/i18n/locales/**",
-        "src/constants/microcopy.ts",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "docs/status/ui-todo.md"
+        "backend/**",
+        "src/**",
+        "docs/status/**",
+        "docs/operations/**",
+        "docs/archive/**",
+        ".github/workflows/**",
+        "README.md",
+        "backend/README.md",
+        "package.json",
+        "package-lock.json"
       ],
       "pathsForbidden": [
-        "backend/**",
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useNudgeInbox.ts"
+        ".orchestrate/**"
       ],
       "acceptance": [
-        "Header logo button exposes a distinct accessible label / title; tests assert it",
-        "AiTaskAssistPanel and BoardBriefDrawer expose a polite live region for status announcements",
-        "ui-todo §21 + Phase 3.4 4.1.3 rows updated to reflect the change",
-        "eslint + tsc + CI=true jest + vite build pass"
+        "release-todo only keeps GA blocker §1 as open; all other previously open entries are marked resolved or explicitly moved out with rationale",
+        "product-done includes one-line entries for each non-GA release-todo closure completed in this task",
+        "All changed FE/BE tests and required quality gates run and pass, with evidence captured in handoff"
       ],
-      "openPR": false
+      "verify": "Run targeted and full-stack checks needed by changed surfaces. Minimum expected when touched: frontend eslint/typecheck/jest/vite build and backend pytest+ruff. Include command outputs and any caveats in handoff.",
+      "openPR": false,
+      "maxAttempts": 2
     },
     {
-      "name": "board-error-empty-states",
-      "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Address ui-todo §16 remaining: bring board page error + empty states up to project-list parity. Add a top-of-board `<Alert>` + Retry button when `useReactQuery(\"boards\" | \"tasks\")` errors; replace the zero-column collapse-to-creator state with a stronger illustrated `<EmptyState>` (reusing the existing component if present, otherwise a minimal one) before falling back to the column creator.",
-      "brief": "Mirror the existing pattern in `src/pages/project.tsx` for fetch-failure Alerts. For the empty-board case, render an `<EmptyState>` (or a minimal helper if the component family doesn't expose a board-shaped variant yet) above the column creator with a clear CTA (`Create your first column`). Update tests under `src/pages/board.test.tsx` (and add a new error-state test) to cover both branches. Update `docs/status/ui-todo.md` §16 row to reflect parity.",
-      "pathsAllowed": [
-        "src/pages/board.tsx",
-        "src/pages/board.test.tsx",
-        "src/components/emptyState/**",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "src/i18n/locales/**",
-        "src/constants/microcopy.ts",
-        "docs/status/ui-todo.md"
+      "name": "verify-non-ga-release-todo-closure",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "close-non-ga-release-todo-items",
+      "dependsOn": [
+        "close-non-ga-release-todo-items"
       ],
-      "pathsForbidden": [
-        "backend/**",
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useNudgeInbox.ts",
-        "src/components/aiChatDrawer/**",
-        "src/components/aiTaskAssistPanel/**"
-      ],
+      "scopedGoal": "Independently verify that docs/status/release-todo.md has no open backlog items except GA blocker §1 and that required docs/test evidence exists.",
+      "brief": "Audit docs/status/release-todo.md headings and status notes after the closeout branch changes. Confirm that each previously open non-GA item is genuinely closed by corresponding implementation evidence in diff + tests. Confirm docs/status/product-done.md has matching one-liners per AGENTS.md. If any item is still open or unjustified, fail verification with exact gaps.",
       "acceptance": [
-        "Board fetch failure renders a top-of-board `<Alert>` with Retry that re-runs the React Query",
-        "Zero-column board renders an EmptyState above (or instead of) the column creator with i18n parity",
-        "Tests cover both happy + error + empty branches",
-        "ui-todo §16 row updated to reflect shipped parity",
-        "eslint + tsc + CI=true jest + vite build pass"
+        "Verifier reports pass only if release-todo open items are limited to GA blocker §1",
+        "Verifier confirms AGENTS.md backlog hygiene is satisfied for all newly closed items"
       ],
-      "openPR": false
-    },
-    {
-      "name": "taskmodal-canonical-types",
-      "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Address ui-todo §10 remaining / Phase 2.6 bullet: hard-code the canonical `Task` / `Bug` options in `TaskModal`'s Type select instead of rebuilding the option list from `tasks?.map(...)`. The schema only allows those two values, so dataset inference is just a footgun.",
-      "brief": "Replace the dataset-derived option list (today around `src/components/taskModal/index.tsx:35–41` / `:149–166`) with a constant that mirrors the schema. Localize via `microcopy.options.taskTypes.*` (already exists per recent column work). Add a test asserting that the select renders both options regardless of dataset shape (including when there are no tasks of one of the types). Update `docs/status/ui-todo.md` §10 / Phase 2.6 row.",
-      "pathsAllowed": [
-        "src/components/taskModal/**",
-        "src/i18n/locales/**",
-        "src/constants/microcopy.ts",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "docs/status/ui-todo.md"
-      ],
-      "pathsForbidden": [
-        "backend/**",
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useNudgeInbox.ts",
-        "src/components/aiChatDrawer/**",
-        "src/components/aiTaskAssistPanel/**",
-        "src/components/header/**"
-      ],
-      "acceptance": [
-        "Task / Bug options always render in the modal Type select regardless of dataset shape",
-        "Tests cover the empty / single-type dataset cases",
-        "ui-todo §10 / Phase 2.6 row updated to reflect the canonical-type fix",
-        "eslint + tsc + CI=true jest + vite build pass"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "useagent-tool-resolver-extract",
-      "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Continue release-todo §16b / architecture-todo Theme 3: extract the FE-tool registry + auto-resume loop from `src/utils/hooks/useAgent.ts` into a dedicated `useAgentToolResolver` hook (or `src/utils/agent/toolResolver.ts` module) so `useAgent` no longer owns tool execution + auto-resume logic.",
-      "brief": "Lift the FE-tool resolution sequence (registry lookup, async invocation, auto-resume call into the agent stream) into a stable hook with explicit inputs (registry, autonomy, threadId, last interrupt) and outputs (status, error). Re-export the public surface from `useAgent.ts` if any callers reference it directly. Keep behavior 1:1 — no semantic changes to autonomy handling, FE-tool execution, or auto-resume timing. Add or extend tests under `src/utils/hooks/useAgent.test.tsx` (or a new `useAgentToolResolver.test.ts`). Update `docs/status/release-todo.md` §16b sub-bullet (continue partial closure) and `docs/status/architecture-todo.md` Theme 3 row.",
-      "pathsAllowed": [
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useAgentToolResolver.ts",
-        "src/utils/agent/**",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "docs/status/release-todo.md",
-        "docs/status/architecture-todo.md"
-      ],
-      "pathsForbidden": [
-        "backend/**",
-        "src/components/**"
-      ],
-      "acceptance": [
-        "FE-tool registry + auto-resume loop is no longer defined inline in useAgent.ts; new module owns it",
-        "useAgent.ts shrinks measurably (target ≥ 50 LOC reduction in the tool-resolver block)",
-        "Existing useAgent tests pass with import-path adjustments only; no behavioral regression",
-        "release-todo §16b sub-bullet + architecture-todo Theme 3 reflect the additional partial closure",
-        "eslint + tsc + CI=true jest + vite build pass"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "aitaskassistpanel-suggested-by-copilot-badge",
-      "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Address ui-todo 2.A.8 partial: after a user clicks Apply on the AI story-point suggestion in `AiTaskAssistPanel`, mark the affected task field with a small `Suggested by Copilot` badge until the user edits the field.",
-      "brief": "Track `appliedFieldOrigin` per field in the modal/parent state (or via local state in the panel for story points specifically). When the user edits the field, drop the badge. Use a small AntD `Tag` or `Tooltip` adjacent to the field with `microcopy.ai.suggestedByCopilot` (en + zh-CN). Add a unit test asserting badge presence after Apply and disappearance on edit. Update `docs/status/ui-todo.md` 2.A.8 row to reflect the partial closure.",
-      "pathsAllowed": [
-        "src/components/aiTaskAssistPanel/**",
-        "src/components/taskModal/**",
-        "src/i18n/locales/**",
-        "src/constants/microcopy.ts",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "docs/status/ui-todo.md"
-      ],
-      "pathsForbidden": [
-        "backend/**",
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useNudgeInbox.ts",
-        "src/components/header/**",
-        "src/components/boardBriefDrawer/**",
-        "src/components/aiChatDrawer/**"
-      ],
-      "acceptance": [
-        "After Apply on the story-point estimate, a `Suggested by Copilot` badge renders next to the field",
-        "Editing the field clears the badge",
-        "i18n keys exist in en + zh-CN",
-        "ui-todo 2.A.8 row updated for the partial closure",
-        "eslint + tsc + CI=true jest + vite build pass"
-      ],
-      "openPR": false
-    },
-    {
-      "name": "forgot-password-link-stub",
-      "type": "worker",
-      "model": "gpt-5.3-codex-high-fast",
-      "scopedGoal": "Address ui-todo §11 remaining: add a `Forgot password?` link on the login form pointing to a placeholder `/auth/forgot-password` route page (TODO copy, no real flow yet). Wire i18n + tests; do not regress the existing show-password / caps-lock / autoComplete behavior.",
-      "brief": "Place the link near the password field (right-aligned). Route the link to `/auth/forgot-password` rendered by a tiny new placeholder page that says `microcopy.auth.forgotPasswordPlaceholderTitle` + body `microcopy.auth.forgotPasswordPlaceholderBody`. zh-CN parity required. Add tests asserting the link renders, focuses, and the placeholder route renders. Update `docs/status/ui-todo.md` §11 + Phase 2.7 row to reflect the partial closure.",
-      "pathsAllowed": [
-        "src/components/loginForm/**",
-        "src/pages/auth/**",
-        "src/pages/forgotPassword/**",
-        "src/routes/**",
-        "src/layouts/authLayout.tsx",
-        "src/i18n/locales/**",
-        "src/constants/microcopy.ts",
-        "src/__tests__/**",
-        "src/**/*test.ts",
-        "src/**/*test.tsx",
-        "docs/status/ui-todo.md"
-      ],
-      "pathsForbidden": [
-        "backend/**",
-        "src/utils/hooks/useAgent.ts",
-        "src/utils/hooks/useNudgeInbox.ts",
-        "src/components/header/**",
-        "src/pages/board.tsx"
-      ],
-      "acceptance": [
-        "Login form shows a `Forgot password?` link with i18n + accessible name",
-        "`/auth/forgot-password` renders a placeholder page (en + zh-CN)",
-        "Tests cover link presence + route render",
-        "ui-todo §11 + Phase 2.7 row updated to reflect partial closure",
-        "eslint + tsc + CI=true jest + vite build pass"
-      ],
-      "openPR": false
+      "maxAttempts": 2
     }
   ]
 }
