@@ -40,3 +40,6 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .vercel
+
+# Cursor orchestrate workspaces (operator-local log)
+.orchestrate/**/attention.log
