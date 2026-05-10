@@ -6,3 +6,6 @@
 
 # Python backend has its own formatter (ruff); skip from FE Prettier sweep.
 backend/
+
+# Orchestrate workspace artifacts — script-managed; do not reformat.
+.orchestrate/

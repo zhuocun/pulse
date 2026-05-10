@@ -1,0 +1,139 @@
+{
+  "$schema": "/home/ubuntu/.cursor/plugins/cache/cursor-public/9333/d1cdb88a9eb33cf392395c87e3fd76419fc1010e/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "audit this repo for flaky tests and propose fixes",
+  "summary": "audit the jira-react/pulse repo for flaky Jest + pytest tests and ship a consolidated audit doc + surgical fixes",
+  "rootSlug": "flaky-audit",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "selfAgentId": "bc-96181ace-ff75-4a39-8470-50dffaa4b175",
+  "syncStateToGit": true,
+  "acceptanceCriteria": [
+    "A consolidated audit document exists at `docs/test-flakiness-audit.md` on the synthesis branch covering frontend Jest, backend pytest, and shared test infra.",
+    "Each area's audit lists at least the top 5 highest-confidence flaky tests/patterns with file:line citations, root-cause hypothesis, and a concrete proposed fix.",
+    "Each audit area lands at least 1 surgical, low-risk fix on its own branch; the synthesis branch merges those fixes cleanly.",
+    "On the synthesis branch, `npm test` (Jest) and `cd backend && pytest` both pass with no new failures vs main.",
+    "The synthesis worker opens a single draft PR against main with the consolidated audit + fixes."
+  ],
+  "tasks": [
+    {
+      "name": "frontend-jest-flaky-audit",
+      "type": "worker",
+      "scopedGoal": "Audit the Jest + React Testing Library suite under `src/**` for flaky tests and ship a written audit + 1-3 surgical fixes.\n\nDeliverables on your worker branch:\n1. `docs/test-flakiness/frontend.md` — sectioned audit doc (see Format below).\n2. 1-3 small, low-risk fixes for the highest-confidence flaky tests you found. Fixes must be self-contained (test file or test helper only), commit message `test(flaky): fix <test name> — <one-line cause>`, and must not break unrelated tests.\n3. A final ## Status: success / partial / blocked, ## Branch line, ## What I did, ## Notes / risks, ## Suggested follow-ups, and ## Verification self-report (run the full Jest suite once on your branch and report pass/fail counts).\n\nFlakiness signals to look for:\n- waitFor() with no explicit `timeout`/`interval` and tight default; race against React 19 batching.\n- act() / async-act misuse around state updates inside hooks (useEffect, microtask vs macrotask ordering).\n- Real timers used for async work that should be on jest.useFakeTimers (microtask-vs-task chains, debounce/throttle/SWR).\n- Implicit ordering between describe/it blocks (state from one test leaking into another via module singletons, react-query caches, redux store, localStorage, MSW handlers, leftover timers/intervals).\n- jest.spyOn / jest.mock setup that depends on module-resolution order (see jest.config.cjs moduleNameMapper for react-router and rc-picker quirks).\n- Tests that depend on Date/Math.random/UUIDs without seeding/freezing.\n- Tests that hit network (fetch/axios) without a fully scoped mock.\n- Hook tests destructuring `useAgent()` whole-object identity (see AGENTS.md note on aiTaskAssistPanel).\n- BoardPage / AiChatDrawer strict tests that partial-mock useAiEnabled but forget useAutonomyLevel (AGENTS.md says missing this crashes useAgent).\n- Any test with `it.skip`, `xit`, `describe.skip`, or `// TODO: flaky` comments.\n\nFormat for `docs/test-flakiness/frontend.md`:\n```\n# Frontend Jest Flakiness Audit\n\n## Suite shape\n- 146 test files / ~980 tests / 142 suites (per AGENTS.md).\n- Setup at `src/setupTests.ts`; uses jsdom + custom MessagePort polyfill.\n- Run command: `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`.\n\n## Top suspects (highest confidence first)\n### 1. <test path>:<line> — <one-line summary>\n- Symptom\n- Root-cause hypothesis (cite specific code)\n- Proposed fix (concrete diff sketch)\n- Risk: low / medium / high\n\n### 2. ...\n(at least 5; up to 15)\n\n## Cross-cutting patterns\n- (each pattern with file count and example file:line)\n\n## Fixes shipped on this branch\n- <commit hash> — <test file> — <one-line cause/fix>\n```\n\nRun the suite at least once on your branch with the AGENTS.md command before handing off.",
+      "brief": "Repo notes (AGENTS.md):\n- Node 24 required; load nvm before npm/node: `export NVM_DIR=\"$HOME/.nvm\"; source \"$NVM_DIR/nvm.sh\"; nvm use`.\n- Full Jest suite runs in ~90-100s with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`. Without those flags it OOMs or hangs.\n- Test setup file is `src/setupTests.ts` (owned by the infra worker — do NOT modify it).\n- moduleNameMapper in `jest.config.cjs` (owned by infra worker).\n- React 19 + RTL 16; jest-dom 6.\n- Notable component AGENTS.md gotcha lists are mandatory reading before proposing fixes.\n\nSibling tasks running in parallel:\n- backend-pytest-flaky-audit owns `backend/**`. Don't touch.\n- test-infra-flaky-audit owns shared infra (`jest.config.cjs`, `src/setupTests.ts`, `src/test/**`, `__json_server_mock__/**`). Don't touch those.\n\nYou are NOT alone in the repo; adapt to concurrent edits, never revert another agent's work, and stay strictly inside `pathsAllowed`.",
+      "pathsAllowed": [
+        "src/**",
+        "docs/test-flakiness/frontend.md"
+      ],
+      "pathsForbidden": [
+        "src/setupTests.ts",
+        "src/test/**",
+        "src/**/__mocks__/**"
+      ],
+      "acceptance": [
+        "`docs/test-flakiness/frontend.md` exists with at least 5 ranked suspects, each citing file:line and proposing a concrete fix.",
+        "At least 1 fix commit lands on the worker branch with message `test(flaky): ...`.",
+        "Running the full Jest suite with `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` on the worker branch produces no new failures vs main; pass/fail counts captured in the handoff under `## Verification`.",
+        "Handoff includes a `## Branch` line and a `## Suggested follow-ups` section."
+      ],
+      "verify": "## Setup\n- `nvm use 24` from repo root.\n- `npm ci` if `node_modules/` is missing on the cloned worker branch.\n\n## Automated\n- `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` from repo root. Capture pass/fail counts.\n\n## Manual\n- Spot-check the audit doc references actually point at lines that exist in the cited test file on the worker branch.\n\n## Gotchas\n- `--forceExit` is required; without it the suite hangs on open handles and exit codes are unreliable.\n- React 19 batching means waitFor + act ordering can hide races; verify any waitFor changes survive a few re-runs.",
+      "model": "gpt-5.5-high-fast",
+      "maxAttempts": 2,
+      "openPR": false
+    },
+    {
+      "name": "backend-pytest-flaky-audit",
+      "type": "worker",
+      "scopedGoal": "Audit the FastAPI / pytest suite under `backend/tests/` for flaky tests and ship a written audit + 1-3 surgical fixes.\n\nDeliverables on your worker branch:\n1. `docs/test-flakiness/backend.md` — sectioned audit doc.\n2. 1-3 small, low-risk fixes for highest-confidence flaky tests you found. Fixes must touch test files (or `backend/tests/conftest.py` is OK if the cause is fixture-shaped). Commit message `test(backend-flaky): fix <test name> — <one-line cause>`.\n3. Final ## Status, ## Branch, ## What I did, ## Notes / risks, ## Suggested follow-ups, ## Verification self-report (run `pytest` on your branch).\n\nFlakiness signals to look for:\n- `asyncio` tests that don't use `pytest.mark.asyncio` consistently or share an event loop unsafely.\n- SSE / streaming tests (`test_sse.py`, `test_agent_sse_transcripts.py`) with timing-dependent assertions on chunk ordering or count.\n- Integration tests touching real Redis/Postgres (`test_redis_backends.py`, `test_agents_postgres_live.py`) that lack `@pytest.mark.skipif` guards when the service is unavailable, or that assume clean schemas.\n- `time.time()`, `datetime.now()`, `datetime.utcnow()` without freezegun/freeze_time.\n- Tests relying on dict ordering, set ordering, or unsorted DB results.\n- Idempotency/retry tests (`test_idempotency.py`) with timing windows.\n- Rate-limit / budget tests (`test_ai_limits.py`) with sleep-based assertions.\n- Missing `await` on coroutines (silent skips that look like passes).\n- Fixture scoping bugs: `scope=\"module\"` or `scope=\"session\"` fixtures mutated by individual tests.\n- TestClient instances that share state across tests via the FastAPI app singleton.\n- `pytest.mark.skipif`, `xfail`, `flaky` markers — list every occurrence and decide whether each is justified.\n- Tests that call random/UUID without seeding.\n- Database fixtures that don't fully reset between tests (look at `conftest.py` `database`, `COLUMNS`, `PROJECTS`, `TASKS`, `USERS` fixtures).\n\nFormat for `docs/test-flakiness/backend.md` mirrors the frontend doc.\n\nRun `pytest` on your branch before handing off and report counts.",
+      "brief": "Repo notes (AGENTS.md):\n- Backend lives at `backend/`. Install with `pip install -e \".[dev,ai]\"` from `backend/`.\n- 801 tests passing per AGENTS.md. Tests use in-memory fakes; do NOT need Mongo.\n- `backend/tests/conftest.py` monkeypatches the repository singleton; respect that pattern.\n- CI runs `pytest` from `backend/` on Python 3.12.\n- Don't run tests that require a live Postgres/Redis unless those services are demonstrably up; treat outputs as inconclusive otherwise.\n\nSibling tasks running in parallel:\n- frontend-jest-flaky-audit owns `src/**`. Don't touch.\n- test-infra-flaky-audit owns Jest infra and shared CI workflow files. Don't touch.\n\nYou are NOT alone in the repo; adapt to concurrent edits and never revert another agent's work. Stay strictly inside `pathsAllowed`.",
+      "pathsAllowed": [
+        "backend/tests/**",
+        "backend/pyproject.toml",
+        "docs/test-flakiness/backend.md"
+      ],
+      "pathsForbidden": [
+        "backend/app/**",
+        "backend/api/**",
+        "backend/scripts/**",
+        ".github/workflows/**"
+      ],
+      "acceptance": [
+        "`docs/test-flakiness/backend.md` exists with at least 5 ranked suspects, each citing file:line and proposing a concrete fix.",
+        "At least 1 fix commit lands on the worker branch with message `test(backend-flaky): ...`.",
+        "Running `pytest` from `backend/` on the worker branch produces no new failures vs main; pass/fail counts captured under `## Verification` in the handoff.",
+        "Handoff includes `## Branch` and `## Suggested follow-ups` sections."
+      ],
+      "verify": "## Setup\n- `cd backend && pip install -e \".[dev,ai]\"`.\n\n## Automated\n- `cd backend && pytest`. Capture pass/fail counts and failing-test names.\n\n## Manual\n- Verify cited file:line references actually point at the tests claimed.\n\n## Gotchas\n- `test_agents_postgres_live.py` and `test_redis_backends.py` need real services; if they collect-only or are skipped on this VM, mark them inconclusive rather than passed.",
+      "model": "gpt-5.5-high-fast",
+      "maxAttempts": 2,
+      "openPR": false
+    },
+    {
+      "name": "test-infra-flaky-audit",
+      "type": "worker",
+      "scopedGoal": "Audit shared test infrastructure for flaky-test root causes and ship 0-2 surgical infra fixes.\n\nFiles you own:\n- `jest.config.cjs`, `babel.config.cjs`\n- `src/setupTests.ts`, `src/test/**` (mocks, helpers)\n- `__json_server_mock__/**`\n- `.github/workflows/**` (CI config)\n- `backend/tests/conftest.py` shared fixtures (read-only context; do NOT modify — that's the backend worker's territory; surface concerns in your audit instead).\n\nDeliverables on your worker branch:\n1. `docs/test-flakiness/infra.md` — sectioned audit.\n2. 0-2 surgical fixes ONLY when you have high confidence the change reduces flakiness without affecting test semantics. If you can't find one, hand off with `## Status: success` and an empty fixes section — that's an acceptable outcome.\n3. Final ## Status, ## Branch, ## What I did, ## Notes / risks, ## Suggested follow-ups, ## Verification self-report.\n\nInfra signals to look for:\n- `src/setupTests.ts` MessagePort polyfill uses `setTimeout(...,0)` — known race substrate. Document, don't necessarily change.\n- `setupTests.ts` ordering: matchMedia mock, TextEncoder/TextDecoder, fake timers, jest mocks all in one file; verify no ordering bug.\n- `jest.config.cjs.moduleNameMapper` rewrites for react-router and rc-picker — verify these point at files that exist in current versions.\n- `jest.config.cjs` missing `testTimeout`, `clearMocks`, `restoreMocks`, `resetModules`. Each can hide flakiness.\n- No `globalSetup`/`globalTeardown` — verify nothing leaks across files (open handles).\n- `babel.config.cjs` preset coverage matches `tsconfig.json` target.\n- `.github/workflows/backend-ci.yml` only runs `pytest` once with no retries; recommend a flaky-detection mode (rerun-failures or `--count=N`) for the audit follow-up but don't necessarily land it.\n- `__json_server_mock__/db.json` staleness vs the v1 contract (AGENTS.md flags it).\n\nFormat for `docs/test-flakiness/infra.md` mirrors the other two audits.",
+      "brief": "Sibling tasks running in parallel:\n- frontend-jest-flaky-audit owns `src/**` excluding `src/setupTests.ts` and `src/test/**`.\n- backend-pytest-flaky-audit owns `backend/tests/**` and `backend/pyproject.toml`.\n\nIf you find a Jest- or pytest-specific issue inside a sibling's territory, surface it in your audit doc as a recommendation; do NOT modify their files.\n\nYou are NOT alone in the repo; adapt to concurrent edits and never revert another agent's work. Stay strictly inside `pathsAllowed`.",
+      "pathsAllowed": [
+        "jest.config.cjs",
+        "babel.config.cjs",
+        "src/setupTests.ts",
+        "src/test/**",
+        "__json_server_mock__/**",
+        ".github/workflows/**",
+        "docs/test-flakiness/infra.md"
+      ],
+      "pathsForbidden": [
+        "src/!(setupTests.ts|test)/**",
+        "backend/**"
+      ],
+      "acceptance": [
+        "`docs/test-flakiness/infra.md` exists with at least 5 patterns/suspects, each with concrete file:line citations and proposed remediation.",
+        "If 1-2 fixes land on the branch, each has a clear commit message and does not break the existing Jest suite (`NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`).",
+        "Handoff includes `## Branch` and `## Verification` (a sentence saying whether you ran tests and what they reported)."
+      ],
+      "verify": "## Setup\n- `nvm use 24` and `npm ci` if needed.\n\n## Automated\n- `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` (only if you actually changed Jest config or setup files).\n\n## Manual\n- Spot-check that the audit's claims about config files point at real lines.\n\n## Gotchas\n- Modifying `setupTests.ts` is high-blast-radius; treat any change there with extreme caution.",
+      "model": "gpt-5.5-high-fast",
+      "maxAttempts": 2,
+      "openPR": false
+    },
+    {
+      "name": "flaky-audit-synthesis",
+      "type": "worker",
+      "scopedGoal": "Synthesize the three audit branches into a single consolidated deliverable, then open a draft PR against main.\n\nUpstream tasks: `frontend-jest-flaky-audit`, `backend-pytest-flaky-audit`, `test-infra-flaky-audit`. Each has handed off; their handoff bodies (with `## Branch` lines naming the actual deliverable branches) are pasted into your prompt. Use those branches verbatim.\n\nSteps:\n1. From your starting branch (a clean clone of main): `git fetch origin <each upstream branch>` then merge each upstream branch into the current branch in this exact order:\n   a. test-infra-flaky-audit (smallest blast radius)\n   b. backend-pytest-flaky-audit\n   c. frontend-jest-flaky-audit\n   For each merge: `git merge --no-ff <branch> -m \"merge <branch> into flaky-audit-synthesis\"`. If there's a conflict, prefer the upstream's version for files inside its `pathsAllowed` and ours for everything else. Document any non-trivial conflict resolution in the handoff.\n2. Write `docs/test-flakiness-audit.md` (top-level consolidated doc). Required sections:\n   - `# Test Flakiness Audit — <ISO date>`\n   - `## Executive summary` — 5-10 bullet points of highest-impact findings across all three areas.\n   - `## Frontend Jest` — pull the top suspects from `docs/test-flakiness/frontend.md`, summarize, and link.\n   - `## Backend pytest` — same for `docs/test-flakiness/backend.md`.\n   - `## Shared test infrastructure` — same for `docs/test-flakiness/infra.md`.\n   - `## Fixes shipped in this PR` — table: branch | test/file | one-line cause | one-line fix.\n   - `## Recommended follow-ups (not in this PR)` — ranked list with effort estimate (S/M/L).\n   - `## How to detect future flakes` — concrete recommendations (e.g. CI rerun-failures plugin, jest-rerunner, pytest-randomly).\n3. Run both test suites once on the merged branch and capture results:\n   - `nvm use 24 && NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`\n   - `cd backend && pip install -e \".[dev,ai]\" && pytest`\n   Quote pass/fail totals in the handoff under `## Verification`.\n4. Open a draft PR against `main` titled `test(flaky-audit): consolidated flaky-test audit + initial fixes`. Body must include the executive summary verbatim and a link to `docs/test-flakiness-audit.md`.\n\nFinal handoff: `## Status: success` if both suites pass and PR opened; `partial` if PR opened but suite has new failures (call them out); `blocked` if a merge conflict is unresolvable.",
+      "brief": "You inherit three sibling branches. The handoff text from each is in your prompt — read the `## Branch` line in each to learn the actual branch name (the script may have updated it from the placeholder).\n\nDo NOT regenerate any of the three area audit docs from scratch — keep them as authored, just consolidate and link to them from `docs/test-flakiness-audit.md`.\n\nThis is the only task that opens a PR.",
+      "pathsAllowed": [
+        "docs/**"
+      ],
+      "dependsOn": [
+        "frontend-jest-flaky-audit",
+        "backend-pytest-flaky-audit",
+        "test-infra-flaky-audit"
+      ],
+      "acceptance": [
+        "All three sibling branches merged into the synthesis branch with no unresolved conflicts.",
+        "`docs/test-flakiness-audit.md` exists with all required sections.",
+        "`npm test` (Jest, with the documented flags) and `cd backend && pytest` both run on the synthesis branch; results captured under `## Verification` in the handoff.",
+        "A draft PR is opened against `main` with the consolidated audit referenced in the body.",
+        "Handoff includes `## Branch` line naming the synthesis branch."
+      ],
+      "verify": "## Setup\n- `nvm use 24` (frontend), `cd backend && pip install -e \".[dev,ai]\"` (backend).\n\n## Automated\n- Frontend: `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles`.\n- Backend: `cd backend && pytest`.\n\n## Manual\n- Open `docs/test-flakiness-audit.md` and verify every section is populated and the cross-links to the three area docs resolve.\n- Confirm the PR exists with `gh pr view`.\n\n## Gotchas\n- Worker branches use the actual branch from each upstream handoff's `## Branch` line, NOT the orch/<rootSlug>/<task> placeholder. Read the handoff bodies carefully.\n- Don't edit the three per-area audit docs after merging; they are upstream artifacts.",
+      "model": "claude-opus-4-7",
+      "maxAttempts": 2,
+      "openPR": true
+    },
+    {
+      "name": "verify-flaky-audit-synthesis",
+      "type": "verifier",
+      "verifies": "flaky-audit-synthesis",
+      "scopedGoal": "Verify the synthesis branch end-to-end against the plan's acceptance criteria.\n\nRun on the synthesis branch:\n1. Confirm `docs/test-flakiness-audit.md` exists and has all required sections (executive summary, frontend, backend, infra, fixes shipped, follow-ups, detection recommendations).\n2. Confirm `docs/test-flakiness/{frontend,backend,infra}.md` all exist and each has at least 5 ranked suspects with file:line citations.\n3. Spot-check 3 random file:line citations (one per area) to confirm they resolve to a real test on the synthesis branch.\n4. Run `nvm use 24 && NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles` and `cd backend && pip install -e \".[dev,ai]\" && pytest`. Capture pass/fail counts; compare against main's baseline if you can quickly grab it (otherwise just report current counts).\n5. Confirm the draft PR is open against main and references the consolidated audit doc.\n\nProduce a `## Verification` line per the verifier prompt format. Use:\n- `unit-test-verified` if both suites pass and the audit docs are well-formed.\n- `verifier-failed` if either suite has new failures introduced by the synthesis branch.\n- `verifier-blocked` if you can't run the suites due to env failures.\n- `type-check-only` only if you literally can't run any tests but the docs and PR are well-formed.",
+      "acceptance": [
+        "`## Verification` section emits one of {unit-test-verified, verifier-failed, verifier-blocked, type-check-only}.",
+        "`## Findings` lists each plan-level acceptance criterion as met / not met with cited evidence.",
+        "Numerical pass/fail counts are quoted for both Jest and pytest where possible."
+      ],
+      "model": "claude-opus-4-7",
+      "maxAttempts": 1,
+      "openPR": false
+    }
+  ]
+}
