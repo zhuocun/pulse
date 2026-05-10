@@ -116,7 +116,7 @@ Remote proxy (optional): `POST ${REACT_APP_AI_BASE_URL}/api/ai/search` with JSON
 
 ### AI UX Phase 1 — trust and privacy corrections
 
-Tracked by [`ai-ux-optimization-plan.md`](../ai-ux-optimization-plan.md).
+Tracked by [`ai-ux-optimization-plan.md`](../design/ai-ux-optimization-plan.md).
 Merged from `cursor/ai-ux-current-audit-da9f`.
 
 - `ai-ux-optimization-plan.md` — refreshed the audit to reflect the current

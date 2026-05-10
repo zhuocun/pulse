@@ -6,9 +6,9 @@ infrastructure. The three per-area docs remain the source of truth for their
 respective scopes; this file links to them and surfaces the highest-impact
 findings in one place.
 
-- Frontend Jest area doc: [`docs/test-flakiness/frontend.md`](./test-flakiness/frontend.md)
-- Backend pytest area doc: [`docs/test-flakiness/backend.md`](./test-flakiness/backend.md)
-- Shared infra area doc: [`docs/test-flakiness/infra.md`](./test-flakiness/infra.md)
+- Frontend Jest area doc: [`docs/test-flakiness/frontend.md`](./frontend.md)
+- Backend pytest area doc: [`docs/test-flakiness/backend.md`](./backend.md)
+- Shared infra area doc: [`docs/test-flakiness/infra.md`](./infra.md)
 
 ## Executive summary
 
@@ -59,7 +59,7 @@ findings in one place.
 
 ## Frontend Jest
 
-Source of truth: [`docs/test-flakiness/frontend.md`](./test-flakiness/frontend.md).
+Source of truth: [`docs/test-flakiness/frontend.md`](./frontend.md).
 
 Run command:
 
@@ -96,7 +96,7 @@ inconsistent); 3 files still use real wall-clock `setTimeout` in tests.
 
 ## Backend pytest
 
-Source of truth: [`docs/test-flakiness/backend.md`](./test-flakiness/backend.md).
+Source of truth: [`docs/test-flakiness/backend.md`](./backend.md).
 
 Run command (from `backend/`):
 
@@ -148,7 +148,7 @@ only `skipif`/`skip`/`importorskip` uses are justified
 
 ## Shared test infrastructure
 
-Source of truth: [`docs/test-flakiness/infra.md`](./test-flakiness/infra.md).
+Source of truth: [`docs/test-flakiness/infra.md`](./infra.md).
 
 Top patterns (ranked, see infra doc for the full ten):
 
