@@ -385,9 +385,9 @@ architecture-todo Theme 4.
 
 - Action when prioritised: configure `RATE_LIMIT_BACKEND=redis`,
   `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` wherever the
-  app may run multiple workers. `docker-compose.yml` currently sets the
-  first two but not `IDEMPOTENCY_BACKEND`, so its "production-like" stack
-  still falls back to in-memory idempotency. After env parity is proven,
+  app may run multiple workers. `backend/docker-compose.yml` sets all
+  three against `REDIS_URI`; Dockerfile / production deploy paths must
+  match before lifting `workers=1`. After full env parity is proven,
   document the multi-worker guarantee and remove the `workers=1` pin.
 - Scope: env wiring, compose parity, smoke tests against
   `app/middleware/redis_backends.py`, and duplicate-request replay tests.
