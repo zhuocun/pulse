@@ -230,12 +230,12 @@
       "agentId": "bc-a471a8bc-688a-4ed9-8440-607d2935369c",
       "runId": "run-c20188fd-e6f3-4753-ac93-08dc040553b0",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/throttled-spinners-hook.md",
       "startedAt": "2026-05-10T12:32:04.589Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T12:32:07.253Z",
+      "finishedAt": "2026-05-10T13:06:19.090Z",
+      "lastUpdate": "2026-05-10T13:06:19.090Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -301,12 +301,12 @@
       "handoffPath": "handoffs/drag-keyboard-affordance-hint.md",
       "startedAt": "2026-05-10T12:32:12.553Z",
       "finishedAt": "2026-05-10T12:57:12.989Z",
-      "lastUpdate": "2026-05-10T12:57:12.989Z",
+      "lastUpdate": "2026-05-10T12:57:13.952Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "live-ui-verified",
       "attempts": 1
     }
   ],
@@ -358,6 +358,10 @@
     {
       "at": "2026-05-10T12:53:20.934Z",
       "message": "members-popover-avatars-cache: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T12:57:13.952Z",
+      "message": "drag-keyboard-affordance-hint: verification self-reported (live-ui-verified)"
     }
   ]
 }
