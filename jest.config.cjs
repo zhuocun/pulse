@@ -18,6 +18,7 @@ module.exports = {
         "\\.(css|less|sass|scss)$": "<rootDir>/src/test/styleMock.cjs"
     },
     setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
+    testPathIgnorePatterns: ["/node_modules/", "\\.cursor/skills/"],
     testEnvironment: "jsdom",
     testEnvironmentOptions: {
         url: "http://localhost/"
