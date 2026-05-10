@@ -11,13 +11,13 @@ Status as of the merge of `Accept FE envelope on v1 AI routes; add latencyMs to 
 - `task-estimation-agent` via `useAgent("task-estimation-agent")` in `AiTaskAssistPanel` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). Consumes the bundled `surface: "estimate"` payload `{estimate, readiness}` in a single suggestion event.
 - `search-agent` via `useAgent("search-agent")` in `AiSearchInput` (2026-05-05, `claude/v2.1-ai-features-NRHhz`). The FE registers a new `fe.searchCandidates` tool in `FE_TOOL_REGISTRY` that resolves the search-agent interrupt from the React Query cache (up to 50 `{id, text}` candidates per kind).
 
-The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in `docs/prd/board-copilot-progress.md`.
+The v1 JSON shims at `/api/ai/{task-draft,task-breakdown,estimate,readiness,search,board-brief,chat}` remain in place — the FE keeps `useAi` mounted as the deterministic local-engine fallback (toggled via `REACT_APP_AI_USE_LOCAL=true` / `aiUseLocalEngine`). FE migration tracked in [`../prd/progress.md`](../prd/progress.md).
 
-For background on what already exists, see `ai-architecture-review.md`.
+For background on what already exists, see [`../archive/agent-architecture-review-2026-05-01.md`](../archive/agent-architecture-review-2026-05-01.md).
 
 ## Audit follow-up — 2026-05-10 (`claude/complete-subagent-orchestrator-fUazo`, PR #177)
 
-Surgical Phase-A / Theme-1, -2, -4 items from `docs/agent-architecture-optimization-plan.md` landed on this branch. Multi-week items (mutation lifecycle, provider gateway, vector store, MCP, supervisor) remain deferred — see open items 7, 8, 12, 14 below.
+Surgical Phase-A / Theme-1, -2, -4 items from [`../architecture/agent-roadmap.md`](../architecture/agent-roadmap.md) landed on this branch. Multi-week items (mutation lifecycle, provider gateway, vector store, MCP, supervisor) remain deferred — see open items 7, 8, 12, 14 below.
 
 - **Per-surface payload schemas (Theme 1, F-10).** New Pydantic models in `app/agents/events.py` (`IBoardBriefPayload`, `ITaskDraftPayload`, `IEstimatePayload`, `ISearchPayload`, `INudgePayload`, all `extra="forbid"`). `validate_suggestion_payload` dispatches on `Suggestion.surface`; on validation failure it logs a warning and passes the payload through so a schema bug never breaks a streaming response. Wired into `runtime.arun_with_events` and `astream` re-emission.
 - **Golden SSE transcripts (Theme 1).** New `tests/test_agent_sse_transcripts.py` asserts deterministic `(kind, surface)` sequences for all six agents driven through the stub model. Drift fails CI without flaky LLM calls.
@@ -85,7 +85,7 @@ The AI server reached its current state through nine sequential readiness tiers.
 8. **Tier 8 — Real LLM wiring.** Move from `make_stub_chat_model` to the `make_chat_model` / `make_embeddings` factories with provider auto-selection (`AGENT_CHAT_MODEL_PROVIDER=auto`), real token counting, and the `is_stub_model` feature flag. Documented in README §"Board Copilot v2.1 — Agent catalog".
 9. **Tier 9 — Production middleware and observability.** Per-project AI-disable flag, per-agent rate limiting, per-project monthly token budget, Stripe-style idempotency dedup, OpenTelemetry tracing, Prometheus metrics, LangSmith tracing — plus the boot-time `RuntimeError` that refuses to start production with any middleware backend left at `memory`. Documented in README §"Configuration" and `docs/deployment.md`.
 
-Open work (items 7–13 below) is the layer above Tier 9: MCP transport, real vector store / RAG, FE-consumed metadata trim, CI matrix without extras, and structural concerns from `ai-architecture-review.md` (provider hedging, structured-output validation, `create_agent` migration, multi-agent orchestration, store/memory layer).
+Open work (items 7–13 below) is the layer above Tier 9: MCP transport, real vector store / RAG, FE-consumed metadata trim, CI matrix without extras, and structural concerns from [`../archive/agent-architecture-review-2026-05-01.md`](../archive/agent-architecture-review-2026-05-01.md) (provider hedging, structured-output validation, `create_agent` migration, multi-agent orchestration, store/memory layer).
 
 ## Priority 1 — Operational defaults that break in production
 

@@ -10,7 +10,7 @@ when a fix is non-obvious from the code alone.
   conditionally calling either hook breaks React's hook-ordering rule. See
   `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
 - Migration progress for the six structured routes lives in
-  `docs/prd/board-copilot-progress.md`. As of 2026-05-05, all six are on the
+  `docs/prd/progress.md`. As of 2026-05-05, all six are on the
   v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
   alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
   remains the local-engine fallback path.
