@@ -318,12 +318,12 @@
       "agentId": "bc-c91a92a9-d29b-43bf-993b-239c858b915f",
       "runId": "run-8781346a-b255-4fed-9346-593a6d2f71e5",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/header-logo-and-ai-live-regions-a11y.md",
       "startedAt": "2026-05-10T13:20:59.779Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T13:21:02.319Z",
+      "finishedAt": "2026-05-10T13:48:12.024Z",
+      "lastUpdate": "2026-05-10T13:48:12.025Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -433,12 +433,12 @@
       "handoffPath": "handoffs/forgot-password-link-stub.md",
       "startedAt": "2026-05-10T13:21:12.153Z",
       "finishedAt": "2026-05-10T13:38:20.655Z",
-      "lastUpdate": "2026-05-10T13:38:20.655Z",
+      "lastUpdate": "2026-05-10T13:38:21.576Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "live-ui-verified",
       "attempts": 1
     }
   ],
@@ -542,6 +542,10 @@
     {
       "at": "2026-05-10T13:37:25.873Z",
       "message": "taskmodal-canonical-types: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-10T13:38:21.577Z",
+      "message": "forgot-password-link-stub: verification self-reported (live-ui-verified)"
     }
   ]
 }
