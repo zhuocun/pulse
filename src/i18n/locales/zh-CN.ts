@@ -143,6 +143,10 @@ const zhCN: Dictionary = {
         unlikeProject: "取消收藏 {name}",
         applyReadinessSuggestion: "应用 {field} 的就绪建议"
     },
+    dragHints: {
+        taskCardKeyboard:
+            "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。"
+    },
     labels: {
         members: "成员",
         teamMembers: "团队成员",

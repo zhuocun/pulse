@@ -423,9 +423,11 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         name: task.taskName
                     })
                 }
+                aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 disabled={isMock}
                 onClick={onOpen}
                 ref={ref}
+                title={microcopy.dragHints.taskCardKeyboard}
                 type="button"
                 {...rest}
             >

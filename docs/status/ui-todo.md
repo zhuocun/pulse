@@ -97,7 +97,7 @@ Every recommendation in this plan is anchored to one or more of these external r
     `src/components/memberPopover/index.tsx:18–45` re-fetches the full members list every time the popover opens (`onOpenChange={() => refetch()}`), with no rate limit. The list shows usernames only — no avatars, no role, no count. There is also no search field for organizations with many members.
 
 15. **Drag-and-drop affordances.**
-    `src/utils/hooks/useDragEnd.ts` (referenced from `src/pages/board.tsx:72–73`) handles the data side, but the visual side is bare: there is no drop placeholder styling, no card "lift" shadow during drag, no drag-handle on columns (the entire column is a drag target), and no keyboard alternative for moving cards.
+    `src/utils/hooks/useDragEnd.ts` (referenced from `src/pages/board.tsx:72–73`) handles the data side, but the visual side is bare: there is no drop placeholder styling, no card "lift" shadow during drag, and no drag-handle on columns (the entire column is a drag target). **Keyboard drag discoverability is now shipped on task cards** via localized hints (`microcopy.dragHints.taskCardKeyboard`) plus `aria-keyshortcuts` in `src/components/column/index.tsx`.
 
 16. **Loading, empty, and error states.**
     - Board loading now uses a shape-matched skeleton, but the zero-column state still collapses to `ColumnCreator` rather than a stronger illustrated empty state.
@@ -244,7 +244,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - **2.4.3 Focus Order / 2.4.7 Focus Visible / 2.4.13 Focus Appearance.** Add a global focus ring using `:focus-visible` (2 px outline in `colorPrimary`, 2 px offset). Audit drawers and modals with `tab` / `shift+tab`; make sure focus is trapped while open and returned to the invoking control on close (today `TaskModal`, `BoardBriefDrawer`, `AiChatDrawer`, `ProjectModal` rely on AntD defaults — verify and add `triggerRef` patterns where AntD does not handle it).
     - **2.4.11 / 2.4.12 Focus Not Obscured.** Sticky elements (the new top-tier header and column headers from Phase 2.3) must not occlude focused controls; add `scroll-padding-top` on the page container equal to the header height.
     - **2.5.5 / 2.5.8 Target Size.** Every interactive element must be at least 24 × 24 CSS px (AA) and ideally 44 × 44 (AAA / mobile guidance). The "..." dropdown trigger in `projectList` and `column` is currently smaller than 24 px — fix when the icon swap happens in Phase 2.2.
-    - **2.5.7 Dragging Movements.** Drag-and-drop on the board must have a non-drag alternative. Wire `@hello-pangea/dnd`'s keyboard sensor (Space to lift, arrows to move, Space to drop, Esc to cancel) and surface those keystrokes in a tooltip on the card and in the help dialog from Phase 4.
+    - ~~**2.5.7 Dragging Movements.** Drag-and-drop on the board must have a non-drag alternative. Wire `@hello-pangea/dnd`'s keyboard sensor (Space to lift, arrows to move, Space to drop, Esc to cancel) and surface those keystrokes in a tooltip on the card and in the help dialog from Phase 4.~~ **[Partially complete: keyboard drag discoverability now ships on task cards via localized hint copy + `aria-keyshortcuts` (`src/components/column/index.tsx`). Follow-up: include the same keystrokes in the global shortcut-help dialog from Phase 4.]**
     - **3.3.1 / 3.3.3 Error Identification & Suggestion.** Replace single-line error toasts with a per-form **error summary** at the top of the form linking to the offending field (GOV.UK pattern). Reuse `<ErrorBox>` as the summary container and add `aria-describedby` from each field to its inline error.
     - **3.3.7 Redundant Entry.** When a user creates a task immediately after creating a column, prefill `coordinatorId` to the current user (already does) and `epic` to the most recently used value in this project. The login form's email should be `autocomplete="username"` so the password manager remembers it.
     - **3.3.8 Accessible Authentication (Minimum).** No CAPTCHA; ensure password fields accept paste (do not block `onPaste`); `autocomplete="current-password"` on login and `autocomplete="new-password"` on register. The "Show password" toggle (Phase 2.7) is required for users who cannot reliably type long passwords.
@@ -415,7 +415,7 @@ Define every shortcut once in `src/constants/shortcuts.ts` and surface them in a
 | `c`                    | Board             | Create task in focused column                 |
 | `Esc`                  | Modal/Drawer      | Close (with unsaved-change guard)             |
 | `e`                    | Focused task card | Open edit modal                               |
-| `Space / arrows / Esc` | Focused task card | Drag with keyboard (delegated to dnd library) |
+| `Space / arrows / Esc` | Focused task card | Drag with keyboard (delegated to dnd library). Discoverability hint is now surfaced on task cards. |
 
 Use a single `useShortcut(combo, handler)` hook so the catalog cannot drift from the implementation.
 
