@@ -253,28 +253,14 @@ of the first run on this branch is still unknown.
 - Scope: trigger the workflow on a PR/main run, capture the first green
   run, and update this section with the CI evidence.
 
-### ⚠️ 7b. No FE CI workflow  *(FE-only)*
+### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `orch/composer-todos-979e/fe-ci-workflow`)*
 
-`.github/workflows/` contains exactly one file: `backend-ci.yml`.
-There is **no GitHub Action that runs the FE lint, typecheck, or
-Jest suite on a PR.** Today's FE quality gate is (a) the local
-`pre-commit` hook (prettier + eslint + tsc — no Jest) and (b)
-Vercel's deploy build (`vite build` only — succeeds even if Jest
-would fail). A PR with broken Jest tests can land on `main` with no
-CI signal.
-
-**Beta tier scoping.** Internal beta accepts the gap because reviews
-catch most regressions and pre-commit catches the rest. Design-partner
-expansion needs a real CI gate so a regression cannot ship via a
-self-merged or skip-reviewed PR.
-
-- Action when prioritised: add `.github/workflows/frontend-ci.yml`
-  scoped to FE paths (mirror the `backend-ci.yml` shape) running the
-  package install, eslint, typecheck, Jest, and Vite build gates. Reuse
-  the existing pre-commit step list in `package.json` so the gate cannot
-  drift from local.
-- Scope: single workflow file, dependency cache, lint/typecheck/Jest/build
-  jobs, and first green run evidence.
+`.github/workflows/frontend-ci.yml` runs on FE path filters for `main`
+/`claude/**` (mirrors `backend-ci.yml` triggers): `npm ci`, `npm run
+prettier`, ESLint **without** `--fix`, `npm run typecheck`,
+`CI=true npm test -- --watchAll=false --runInBand`, and `npm run build`
+at the repo root. Local `pre-commit` still omits Jest; CI closes the PR
+gap versus Vercel-only `vite build`.
 
 ### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
 
@@ -540,9 +526,9 @@ migration, multi-agent orchestration, store/memory layer).
    Document the search/estimation quality ceiling in product copy.
 2. **Design-partner beta.** Close every 🚧 Beta blocker:
    §2 (LiteLLM gateway / provider fallback), §3 (proxy-scoped token
-   migration), and §6 (real-backend integration tests). Add a real
-   FE CI gate (§7b) so a regression cannot land via a self-merged PR.
-   Keep proposal cards hidden.
+   migration), and §6 (real-backend integration tests). FE CI gate (§7b)
+   ships via `.github/workflows/frontend-ci.yml`; keep tightening eslint
+   jsx-a11y warnings until they fail CI. Keep proposal cards hidden.
 3. **Public GA.** Close the 🛑 GA blocker §1 (full
    `MutationProposal` lifecycle + undo) and the public-GA quality
    gate §4 (real RAG with pgvector). Surface proposal cards.
