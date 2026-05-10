@@ -5,6 +5,7 @@ import type {
     AgentStreamRequest,
     StreamPart
 } from "../../interfaces/agent";
+import environment from "../../constants/env";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
 import {
     AgentAuthError,
@@ -249,6 +250,19 @@ export const listAgents = async ({
         throw await mapAgentErrorResponse(response);
     }
     return (await response.json()) as AgentListResponse;
+};
+
+/**
+ * Knowledge-cutoff label for About Copilot and similar disclosures.
+ * Prefers wire `knowledge_cutoff` when present; otherwise
+ * `environment.aiKnowledgeCutoff` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`).
+ */
+export const resolveAiKnowledgeCutoffForUi = (
+    metadata?: Pick<AgentMetadata, "knowledge_cutoff"> | null
+): string => {
+    const wire = metadata?.knowledge_cutoff?.trim();
+    if (wire) return wire;
+    return environment.aiKnowledgeCutoff;
 };
 
 export const getAgentMetadata = async ({
