@@ -387,7 +387,7 @@ the only choice is a process-wide env var.
 
 ### 🟡 16d. Single-worker uvicorn lock-in  *(BE)*
 
-`backend/Dockerfile:81–84` and `backend/fly.toml:17–39` pin uvicorn
+`backend/Dockerfile` (Redis env bundle in the header; reminder on the `--workers 1` CMD) and `backend/fly.toml:17–39` pin uvicorn
 to a single worker because in-process rate-limit and budget state
 would diverge across processes. Postgres-backed checkpointing /
 Redis-backed idempotency exist; the rate-limit and budget paths still
