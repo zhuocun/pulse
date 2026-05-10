@@ -680,6 +680,10 @@
     {
       "at": "2026-05-10T16:08:00.591Z",
       "message": "verify-release-todo-doc-hygiene-closeout: startingRef reconciled orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout -> `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083` (target release-todo-doc-hygiene-closeout handed off on actual branch)"
+    },
+    {
+      "at": "2026-05-10T16:08:15.811Z",
+      "message": "verify-release-todo-doc-hygiene-closeout: spawn failed after 3 transient sub-attempts: Error: release-todo-doc-hygiene-closeout: branch must be orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout, got `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`"
     }
   ]
 }
