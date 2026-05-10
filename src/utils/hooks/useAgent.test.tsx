@@ -27,7 +27,11 @@ jest.mock("../../constants/env", () => ({
 }));
 
 // eslint-disable-next-line simple-import-sort/imports
-import { AgentBudgetError, AgentTransportError } from "../ai/agentErrors";
+import {
+    AgentBudgetError,
+    AgentRateLimitError,
+    AgentTransportError
+} from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import useAgent, {
@@ -1114,6 +1118,148 @@ describe("useAgent", () => {
                 expect(result.current.nudges).toHaveLength(1);
             });
             expect(result.current.nudges[0].nudge_id).toBe("new");
+        });
+    });
+
+    describe("Theme 4: thread persistence", () => {
+        const STORAGE_KEY = "pulse.agentThread.board-coach.p1";
+
+        beforeEach(() => {
+            try {
+                sessionStorage.clear();
+            } catch {
+                // jsdom: ignore
+            }
+        });
+
+        it("persists a fresh thread id to sessionStorage on mount", () => {
+            mockedStream.mockReturnValueOnce(fromParts([]));
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            expect(sessionStorage.getItem(STORAGE_KEY)).toBe(
+                result.current.threadId
+            );
+        });
+
+        it("reuses the persisted thread id across remount", () => {
+            sessionStorage.setItem(STORAGE_KEY, "t_persisted");
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            expect(result.current.threadId).toBe("t_persisted");
+        });
+
+        it("reset() clears storage and writes a fresh thread id", () => {
+            sessionStorage.setItem(STORAGE_KEY, "t_old");
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            const before = result.current.threadId;
+            act(() => {
+                result.current.reset();
+            });
+            const after = result.current.threadId;
+            expect(after).not.toBe(before);
+            expect(sessionStorage.getItem(STORAGE_KEY)).toBe(after);
+        });
+
+        it("initialThreadId option overrides storage", () => {
+            sessionStorage.setItem(STORAGE_KEY, "t_persisted");
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () =>
+                    useAgent("board-coach", {
+                        projectId: "p1",
+                        initialThreadId: "t_override"
+                    }),
+                { wrapper: wrapper(queryClient) }
+            );
+            expect(result.current.threadId).toBe("t_override");
+        });
+    });
+
+    describe("Theme 2: status field", () => {
+        it("starts as 'idle' before any start()", () => {
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            expect(result.current.status).toBe("idle");
+        });
+
+        it("transitions to 'terminal' after a completed run", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "messages",
+                        ns: ["root"],
+                        data: [{ content: "ok" }, {}]
+                    }
+                ])
+            );
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            await act(async () => {
+                await result.current.start("hi");
+            });
+            await waitFor(() => {
+                expect(result.current.isStreaming).toBe(false);
+            });
+            expect(result.current.status).toBe("terminal");
+        });
+
+        it("returns to 'idle' after reset()", async () => {
+            mockedStream.mockReturnValueOnce(fromParts([]));
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            await act(async () => {
+                await result.current.start("hi");
+            });
+            act(() => {
+                result.current.reset();
+            });
+            expect(result.current.status).toBe("idle");
+        });
+    });
+
+    describe("Theme 2: rateLimit error mapping", () => {
+        it("maps mid-stream rateLimit error to AgentRateLimitError", async () => {
+            mockedStream.mockReturnValueOnce(
+                fromParts([
+                    {
+                        type: "error",
+                        ns: ["root"],
+                        data: { code: "rateLimit", message: "Slow down" }
+                    } as unknown as StreamPart
+                ])
+            );
+            const queryClient = new QueryClient();
+            const { result } = renderHook(
+                () => useAgent("board-coach", { projectId: "p1" }),
+                { wrapper: wrapper(queryClient) }
+            );
+            await act(async () => {
+                await result.current.start("hi");
+            });
+            await waitFor(() => {
+                expect(result.current.error).toBeInstanceOf(
+                    AgentRateLimitError
+                );
+            });
         });
     });
 });

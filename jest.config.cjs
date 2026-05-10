@@ -1,4 +1,6 @@
 module.exports = {
+    clearMocks: true,
+    restoreMocks: true,
     collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
     moduleNameMapper: {
         "^@rc-component/picker/(.*)$":

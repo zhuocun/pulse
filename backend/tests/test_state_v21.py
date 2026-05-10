@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import get_type_hints
 
+from app.agents.context import ChatContext
 from app.agents.state import (
     AgentState,
     BaseAgentState,
@@ -16,22 +17,34 @@ from app.agents.state import (
 
 
 def test_base_agent_state_keys() -> None:
+    # F-43: project_id, user_id, autonomy_level moved to ChatContext
     hints = get_type_hints(BaseAgentState, include_extras=True)
-    assert set(hints) == {"messages", "events", "project_id", "user_id", "autonomy_level"}
+    assert set(hints) == {"messages", "events"}
+
+
+def test_base_agent_state_removed_fields_in_context() -> None:
+    """F-43: the three static run-scoped fields must live on ChatContext."""
+    ctx_hints = get_type_hints(ChatContext, include_extras=True)
+    for field in ("project_id", "user_id", "autonomy_level"):
+        assert field in ctx_hints, (
+            f"F-43: {field!r} must be declared on ChatContext, not BaseAgentState"
+        )
 
 
 def test_board_brief_state_keys() -> None:
     hints = get_type_hints(BoardBriefState, include_extras=True)
     assert {
         "messages",
-        "project_id",
-        "user_id",
-        "autonomy_level",
         "board_snapshot",
         "drift_result",
         "brief",
         "last_brief_read_at",
     } <= set(hints)
+    # F-43: these fields must NOT appear on board_snapshot state (they live in context)
+    for field in ("project_id", "user_id", "autonomy_level"):
+        assert field not in hints, (
+            f"F-43: {field!r} must not be in BoardBriefState (belongs in ChatContext)"
+        )
 
 
 def test_task_drafting_state_keys() -> None:

@@ -19,13 +19,140 @@ Usage pattern inside a node::
 
 The :data:`AgentEvent` union and :func:`coerce_event` are convenience
 helpers for downstream code that validates incoming dicts.
+
+Per-surface payload schemas (:class:`IBoardBriefPayload`,
+:class:`ITaskDraftPayload`, :class:`IEstimatePayload`,
+:class:`ISearchPayload`, :class:`INudgePayload`) lock the FE wire shape
+at the SSE emit boundary. :func:`validate_suggestion_payload` dispatches
+on ``surface`` and validates the payload dict against the matching schema.
+On validation failure it **passes the event through unchanged** with a
+warning log so a schema bug never breaks a streaming response in
+production; CI catches drift via the transcript tests.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal, Union
+import logging
+from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Per-surface payload schemas
+# ---------------------------------------------------------------------------
+
+
+class IBoardBriefPayload(BaseModel):
+    """FE wire schema for ``surface="brief"`` suggestions.
+
+    Mirrors the ``IBoardBrief + recommendationDetail`` shape emitted by
+    ``board_brief.emit_citations``.  Fields intentionally accept ``None``
+    so the schema is liberal (existing behaviour preserved).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    headline: Optional[str] = None
+    counts: Optional[list] = None
+    largestUnstarted: Optional[list] = None
+    unowned: Optional[list] = None
+    workload: Optional[list] = None
+    recommendation: Optional[str] = None
+    recommendationDetail: Optional[dict] = None
+
+
+class ITaskDraftPayload(BaseModel):
+    """FE wire schema for ``surface="draft"`` and ``surface="breakdown"`` suggestions.
+
+    Covers both the single-card draft shape and the ``{axis, items}``
+    breakdown variant (``axis`` / ``items`` are optional to accommodate
+    the single-card case).  Fields accept ``None`` to be liberal.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Single-card fields (all optional so breakdown payloads also pass).
+    taskName: Optional[str] = None
+    type: Optional[str] = None
+    epic: Optional[str] = None
+    storyPoints: Optional[Any] = None
+    note: Optional[str] = None
+    columnId: Optional[str] = None
+    coordinatorId: Optional[str] = None
+    confidence: Optional[Any] = None
+    rationale: Optional[str] = None
+    # Breakdown variant fields.
+    axis: Optional[str] = None
+    items: Optional[list] = None
+
+
+class IEstimatePayload(BaseModel):
+    """FE wire schema for ``surface="estimate"`` suggestions.
+
+    Bundles ``{estimate, readiness}`` as emitted by ``task_estimation.emit_citations``.
+    ``estimate_v1`` and ``readiness_v1`` surfaces share the same top-level structure
+    but carry only one sub-object; handled by optional fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    estimate: Optional[dict] = None
+    readiness: Optional[dict] = None
+    # v1-shim pass-through fields (estimate_v1 / readiness_v1 surface payloads
+    # are flat dicts, not nested — validated by the catch-all pass-through).
+    storyPoints: Optional[Any] = None
+    confidence: Optional[Any] = None
+    rationale: Optional[str] = None
+    similar: Optional[list] = None
+    ready: Optional[bool] = None
+    issues: Optional[list] = None
+
+
+class ISearchPayload(BaseModel):
+    """FE wire schema for ``surface="search"`` suggestions.
+
+    Mirrors the ``SearchRanking``-derived dict emitted by ``search.emit``.
+    ``matches`` and ``expandedTerms`` are optional (not present in all paths).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ids: Optional[list] = None
+    rationale: Optional[str] = None
+    matches: Optional[list] = None
+    expandedTerms: Optional[list] = None
+
+
+class INudgePayload(BaseModel):
+    """FE wire schema for ``surface="nudge"`` suggestions.
+
+    Mirrors the ``fe_nudge`` dict emitted by ``triage.generate_nudges``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    nudge_id: Optional[str] = None
+    kind: Optional[str] = None
+    project_id: Optional[str] = None
+    summary: Optional[str] = None
+    target_ids: Optional[list] = None
+    severity: Optional[str] = None
+
+
+# Mapping from ``surface`` value to the corresponding payload schema class.
+_SURFACE_SCHEMAS: dict[str, type[BaseModel]] = {
+    "brief": IBoardBriefPayload,
+    "draft": ITaskDraftPayload,
+    "breakdown": ITaskDraftPayload,
+    "estimate": IEstimatePayload,
+    "estimate_v1": IEstimatePayload,
+    "readiness_v1": IEstimatePayload,
+    "search": ISearchPayload,
+    "nudge": INudgePayload,
+}
 
 
 class Suggestion(BaseModel):
@@ -77,6 +204,51 @@ class Usage(BaseModel):
 AgentEvent = Union[Suggestion, Citation, Usage]
 
 
+def validate_suggestion_payload(
+    suggestion: "dict[str, Any]",
+    *,
+    agent: str = "<unknown>",
+) -> "dict[str, Any]":
+    """Validate the payload of a suggestion event against its surface schema.
+
+    Dispatches on ``suggestion["surface"]`` and runs the matching Pydantic
+    schema from :data:`_SURFACE_SCHEMAS` against ``suggestion["payload"]``.
+
+    **Failure behaviour: pass-through with a warning.**
+    On :class:`~pydantic.ValidationError` this function logs a warning
+    containing ``agent``, ``surface``, and the validation errors, then
+    returns the original ``suggestion`` dict **unchanged** — so a schema
+    bug never breaks a streaming response in production. CI catches drift
+    via the golden transcript tests which assert on top-level payload keys.
+
+    ``suggestion`` must be a plain dict (as stored on ``state["events"]``)
+    with at least ``kind``, ``surface``, and ``payload`` keys. Non-suggestion
+    events (``kind != "suggestion"``) are returned as-is without validation.
+    """
+    if not isinstance(suggestion, dict):
+        return suggestion
+    if suggestion.get("kind") != "suggestion":
+        return suggestion
+    surface = suggestion.get("surface", "")
+    payload = suggestion.get("payload")
+    if not isinstance(payload, dict):
+        return suggestion
+    schema_cls = _SURFACE_SCHEMAS.get(surface)
+    if schema_cls is None:
+        # Unknown surface — forward as-is so future surfaces are not blocked.
+        return suggestion
+    try:
+        schema_cls(**payload)
+    except ValidationError as exc:
+        logger.warning(
+            "Suggestion payload validation failed for agent=%r surface=%r: %s",
+            agent,
+            surface,
+            exc,
+        )
+    return suggestion
+
+
 def as_event_dict(model: AgentEvent) -> dict[str, Any]:
     """Serialise an :data:`AgentEvent` model to a plain dict.
 
@@ -114,8 +286,14 @@ def coerce_event(value: Any) -> dict[str, Any]:
 __all__ = [
     "AgentEvent",
     "Citation",
+    "IBoardBriefPayload",
+    "IEstimatePayload",
+    "INudgePayload",
+    "ISearchPayload",
+    "ITaskDraftPayload",
     "Suggestion",
     "Usage",
     "as_event_dict",
     "coerce_event",
+    "validate_suggestion_payload",
 ]

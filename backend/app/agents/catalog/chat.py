@@ -110,13 +110,13 @@ class ChatAgent(BaseAgent):
         async def respond(state: ChatState) -> dict[str, Any]:
             # Prefer the per-call context model; fall back to the default.
             _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            _ctx = _rt.context or {}
+            chat_model: BaseChatModel = _ctx.get("chat_model") or _default_model
             # Keep _last_user_text reading the full (un-trimmed) history so
             # the stub-fallback summary still picks up the actual last user input.
             user_text = _last_user_text(state)
-            project_id = state.get("project_id") or "unknown"
+            # F-43: project_id is now in context, not state.
+            project_id = _ctx.get("project_id") or "unknown"
             messages = list(state.get("messages") or [])
 
             # Chat is intentionally outside structured_llm_call(): it binds FE
