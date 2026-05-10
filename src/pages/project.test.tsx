@@ -271,37 +271,40 @@ describe("ProjectPage", () => {
     });
 
     it("debounces project search URL params before refetching projects", async () => {
-        renderPage("/projects?projectName=Road");
+        jest.useFakeTimers();
+        try {
+            renderPage("/projects?projectName=Road");
 
-        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
-        fetchMock.mockClear();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+            fetchMock.mockClear();
 
-        fireEvent.change(screen.getByPlaceholderText("Search this list"), {
-            target: { value: "Billing" }
-        });
-
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "projectName=Billing"
-        );
-        expect(
-            fetchMock.mock.calls.some(([url]) =>
-                String(url).includes("projectName=Billing")
-            )
-        ).toBe(false);
-
-        await act(async () => {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 400);
+            fireEvent.change(screen.getByPlaceholderText("Search this list"), {
+                target: { value: "Billing" }
             });
-        });
 
-        await waitFor(() =>
+            expect(screen.getByTestId("location")).toHaveTextContent(
+                "projectName=Billing"
+            );
             expect(
                 fetchMock.mock.calls.some(([url]) =>
                     String(url).includes("projectName=Billing")
                 )
-            ).toBe(true)
-        );
+            ).toBe(false);
+
+            await act(async () => {
+                jest.advanceTimersByTime(400);
+            });
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(([url]) =>
+                        String(url).includes("projectName=Billing")
+                    )
+                ).toBe(true)
+            );
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("opens AI chat drawer on non-board route when boardCopilot:openChat fires (Defect 2 fix)", async () => {

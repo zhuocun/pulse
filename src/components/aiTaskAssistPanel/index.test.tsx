@@ -146,13 +146,23 @@ const Harness = ({
     </QueryClientProvider>
 );
 
+const advanceBy = (ms: number) => {
+    act(() => {
+        jest.advanceTimersByTime(ms);
+    });
+};
+
 describe("AiTaskAssistPanel", () => {
     beforeAll(() => {
         installAntdMocks();
+    });
+
+    beforeEach(() => {
         jest.useFakeTimers();
     });
 
-    afterAll(() => {
+    afterEach(() => {
+        jest.clearAllTimers();
         jest.useRealTimers();
     });
 
@@ -162,7 +172,7 @@ describe("AiTaskAssistPanel", () => {
         await waitFor(() =>
             expect(jest.getTimerCount()).toBeGreaterThanOrEqual(1)
         );
-        jest.advanceTimersByTime(1000);
+        advanceBy(1000);
         const apply = await screen.findByLabelText(
             "Apply suggested story points"
         );
@@ -174,7 +184,7 @@ describe("AiTaskAssistPanel", () => {
         const { onApplySuggestion } = mountPanel({
             values: { taskName: "Hi" }
         });
-        jest.advanceTimersByTime(1000);
+        advanceBy(1000);
         const button = await screen.findByLabelText(
             /Apply readiness suggestion for taskName/
         );
@@ -189,7 +199,7 @@ describe("AiTaskAssistPanel", () => {
         const { onOpenSimilarTask } = mountPanel({
             values: { taskName: "Investigate flaky login bug" }
         });
-        jest.advanceTimersByTime(1000);
+        advanceBy(1000);
         const button = await screen.findByRole("button", {
             name: /Old login bug/i
         });
@@ -207,7 +217,7 @@ describe("AiTaskAssistPanel", () => {
                 coordinatorId: "m1"
             }
         });
-        jest.advanceTimersByTime(1000);
+        advanceBy(1000);
         expect(
             await screen.findByText(/Looks ready to work on/)
         ).toBeInTheDocument();
@@ -227,7 +237,7 @@ describe("AiTaskAssistPanel", () => {
         });
         try {
             mountPanel({ values: { taskName: "Hi" } });
-            jest.advanceTimersByTime(1000);
+            advanceBy(1000);
             const button = await screen.findByLabelText(
                 /Apply readiness suggestion for taskName/
             );
@@ -258,7 +268,7 @@ describe("AiTaskAssistPanel", () => {
                 values: { taskName: "Hi" },
                 excludeTaskId: "task-exclude-1"
             });
-            jest.advanceTimersByTime(1000);
+            advanceBy(1000);
             const button = await screen.findByLabelText(
                 /Apply readiness suggestion for taskName/
             );
@@ -340,9 +350,7 @@ describe("AiTaskAssistPanel", () => {
             </Harness>
         );
 
-        act(() => {
-            jest.advanceTimersByTime(1000);
-        });
+        advanceBy(1000);
 
         await waitFor(() =>
             expect(screen.getByText(/Similar tasks:/)).toBeInTheDocument()

@@ -1252,7 +1252,7 @@ def test_with_disconnect_raises_on_timeout() -> None:
             return False
 
     async def stream() -> Any:
-        await asyncio.sleep(2)
+        await asyncio.Event().wait()
         yield ("updates", {"x": 1})
 
     async def run() -> None:
@@ -1977,7 +1977,7 @@ def test_v1_chat_returns_504_on_timeout(
     import asyncio
 
     async def _hang(*args: Any, **kwargs: Any) -> Any:
-        await asyncio.sleep(5)
+        await asyncio.Event().wait()
 
     monkeypatch.setattr(client.app.state.agent_runtime, "arun_with_events", _hang, raising=False)
 

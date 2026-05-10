@@ -431,12 +431,12 @@ def test_invoke_returns_504_on_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def slow(*args: Any, **kwargs: Any) -> Any:
-        await asyncio.sleep(2)
+        await asyncio.Event().wait()
         return {"text": "never"}
 
     runtime = client.app.state.agent_runtime
     monkeypatch.setattr(runtime, "ainvoke", slow, raising=False)
-    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(1))
+    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(0.1))
 
     response = client.post(
         "/api/v1/agents/noise/invoke",
@@ -456,12 +456,12 @@ def test_invoke_timeout_refunds_reserved_budget(
     """Budget pre-books before the run; timeouts must not strand the reservation."""
 
     async def slow(*args: Any, **kwargs: Any) -> Any:
-        await asyncio.sleep(2)
+        await asyncio.Event().wait()
         return {"text": "never"}
 
     runtime = client.app.state.agent_runtime
     monkeypatch.setattr(runtime, "ainvoke", slow, raising=False)
-    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(1))
+    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(0.1))
 
     project_id = "p-budget-track"
     remaining_before = ai_budget_backend.remaining(project_id)
@@ -477,7 +477,7 @@ def test_invoke_timeout_refunds_reserved_budget(
     assert ai_budget_backend.remaining(project_id) == remaining_before
 
 
-def _settings_with_timeout(seconds: int) -> Any:
+def _settings_with_timeout(seconds: float) -> Any:
     from app.config import settings as cfg
 
     return replace(cfg, agent_request_timeout_seconds=seconds)
@@ -490,12 +490,12 @@ def test_stream_returns_error_envelope_on_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def slow_stream(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
-        await asyncio.sleep(2)
+        await asyncio.Event().wait()
         yield ("updates", {"unreached": True})
 
     runtime = client.app.state.agent_runtime
     monkeypatch.setattr(runtime, "astream", slow_stream, raising=False)
-    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(1))
+    monkeypatch.setattr("app.routers.agents.settings", _settings_with_timeout(0.1))
 
     with client.stream(
         "POST",
@@ -936,9 +936,8 @@ def test_with_disconnect_awaits_cancelled_anext_task_on_timeout() -> None:
             return False
 
     async def slow_stream() -> AsyncIterator[Any]:
-        # Sleep long enough that anext_task is still pending when the
-        # timeout fires, so anext_task.cancel() + await anext_task is exercised.
-        await asyncio.sleep(5)
+        # Keep ``anext_task`` pending so timeout cancellation path is exercised.
+        await asyncio.Event().wait()
         yield ("updates", {"x": 1})  # pragma: no cover
 
     async def run() -> None:
@@ -965,10 +964,10 @@ def test_with_disconnect_awaits_cancelled_anext_task_on_disconnect() -> None:
             return True
 
     async def slow_stream(evt: asyncio.Event) -> AsyncIterator[Any]:
-        # Wait until disconnect has been requested so the stream is still
-        # pending when the disconnect task fires.
+        # Wait until disconnect has been requested, then block indefinitely
+        # so the disconnect cancellation path runs while ``anext_task`` is pending.
         await evt.wait()
-        await asyncio.sleep(5)
+        await asyncio.Event().wait()
         yield ("updates", {"x": 1})  # pragma: no cover
 
     async def run() -> None:
