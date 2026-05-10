@@ -1256,7 +1256,7 @@ def test_with_disconnect_raises_on_timeout() -> None:
         yield ("updates", {"x": 1})
 
     async def run() -> None:
-        async for _ in _with_disconnect(_Req(), stream(), timeout=0.01):
+        async for _ in _with_disconnect(_Req(), stream(), timeout=0):
             pass
 
     with pytest.raises(asyncio.TimeoutError):
