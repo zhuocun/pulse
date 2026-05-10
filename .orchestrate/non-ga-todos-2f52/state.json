@@ -553,11 +553,11 @@
       "finishedAt": "2026-05-10T16:18:16.176Z",
       "lastUpdate": "2026-05-10T16:18:16.177Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-integrated-non-ga-closeout",
@@ -577,11 +577,11 @@
       "finishedAt": "2026-05-10T16:21:43.919Z",
       "lastUpdate": "2026-05-10T16:21:43.919Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
