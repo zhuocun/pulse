@@ -444,7 +444,7 @@
     {
       "name": "close-non-ga-release-todo-items",
       "type": "worker",
-      "branch": "`orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`)",
+      "branch": "orch/non-ga-todos-2f52/close-non-ga-release-todo-items",
       "startingRef": "main",
       "dependsOn": [],
       "agentId": "bc-3a3d12c5-1a33-4328-96fe-90fb54dad49c",
@@ -467,25 +467,25 @@
       "name": "verify-non-ga-release-todo-closure",
       "type": "verifier",
       "branch": "orch/non-ga-todos-2f52/verify-non-ga-release-todo-closure",
-      "startingRef": "`orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`)",
+      "startingRef": "orch/non-ga-todos-2f52/close-non-ga-release-todo-items",
       "dependsOn": [
         "close-non-ga-release-todo-items"
       ],
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "error",
+      "status": "pending",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": "2026-05-10T15:58:03.820Z",
-      "note": "spawn failed after 3 transient sub-attempts: Error: close-non-ga-release-todo-items: branch must be orch/non-ga-todos-2f52/close-non-ga-release-todo-items, got `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to…",
+      "lastUpdate": "2026-05-10T15:58:57.569Z",
+      "note": "respawned by local-cli (was error; attempts=1)",
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
-      "failureMode": "unknown",
-      "verification": null,
-      "attempts": 1
+      "failureMode": null,
+      "verification": null
     }
   ],
   "attention": [
