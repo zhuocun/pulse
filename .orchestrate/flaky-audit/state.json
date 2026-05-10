@@ -10,12 +10,12 @@
       "agentId": "bc-92c4f243-eb76-4ec6-a286-eec4a7f48070",
       "runId": "run-9af13dba-a9ef-47cf-823a-1daf0c6e173d",
       "parentAgentId": "bc-96181ace-ff75-4a39-8470-50dffaa4b175",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/frontend-jest-flaky-audit.md",
       "startedAt": "2026-05-10T01:35:32.505Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T01:35:35.126Z",
+      "finishedAt": "2026-05-10T01:43:45.878Z",
+      "lastUpdate": "2026-05-10T01:43:45.878Z",
       "note": "respawned by self-planner (was error; attempts=1)",
       "attempts": 2,
       "slackTs": null,
@@ -37,13 +37,13 @@
       "handoffPath": "handoffs/backend-pytest-flaky-audit.md",
       "startedAt": "2026-05-10T01:35:35.128Z",
       "finishedAt": "2026-05-10T01:42:45.371Z",
-      "lastUpdate": "2026-05-10T01:42:45.371Z",
+      "lastUpdate": "2026-05-10T01:42:46.277Z",
       "note": "respawned by self-planner (was error; attempts=1)",
       "attempts": 2,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "test-infra-flaky-audit",
@@ -168,6 +168,10 @@
     {
       "at": "2026-05-10T01:34:44.750Z",
       "message": "test-infra-flaky-audit: respawned by self-planner (was error)"
+    },
+    {
+      "at": "2026-05-10T01:42:46.277Z",
+      "message": "backend-pytest-flaky-audit: verification self-reported (unit-test-verified)"
     }
   ]
 }
