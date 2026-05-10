@@ -115,7 +115,7 @@ For the live GA / blocker / soft-blocker / polish status see
   the deterministic engine. Accepts optional `pendingProposal` /
   `pendingNudges` props that render `MutationProposalCard` and
   `NudgeCard` inline. Proposal card is gated off in production by
-  default (see Hard Blocker §1 in `release-todo.md`).
+  default (see GA Blocker §1 in `release-todo.md`).
 - `src/utils/hooks/useAiChat.ts` and
   `src/utils/hooks/useAgentChat.ts` — local and remote orchestrators.
 - `src/utils/ai/chatEngine.ts` — local assistant step
@@ -338,6 +338,7 @@ REACT_APP_AI_USE_LOCAL=true npm run build
 
 For the live blocker / soft-blocker / polish list see
 [`release-todo.md`](release-todo.md).
-The three GA hard blockers (mutation lifecycle, provider 5xx
-fallback, JWT-in-localStorage XSS) gate public ship; everything else
-is degraded-quality polish.
+The mutation-lifecycle GA blocker gates public ship; the three Beta
+blockers (provider 5xx fallback, proxy-scoped JWT, real-backend
+integration tests) gate design-partner expansion; the search /
+estimation quality ceiling is the public-GA quality gate.
