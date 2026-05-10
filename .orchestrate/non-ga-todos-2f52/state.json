@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-10T10:59:44.648Z",
       "lastUpdate": "2026-05-10T10:59:44.648Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fly-app-placeholder",
@@ -39,11 +39,11 @@
       "finishedAt": "2026-05-10T11:00:01.353Z",
       "lastUpdate": "2026-05-10T11:00:01.353Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "copilot-shell-i18n",
@@ -61,11 +61,11 @@
       "finishedAt": "2026-05-10T11:01:24.571Z",
       "lastUpdate": "2026-05-10T11:01:24.572Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fe-agent-metadata-surface",
@@ -83,11 +83,11 @@
       "finishedAt": "2026-05-10T11:03:22.987Z",
       "lastUpdate": "2026-05-10T11:03:22.987Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "backend-ci-dispatch",
@@ -105,11 +105,11 @@
       "finishedAt": "2026-05-10T11:00:28.372Z",
       "lastUpdate": "2026-05-10T11:00:28.372Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": []
