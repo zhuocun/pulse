@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { z } from "zod/v3";
+import type { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 import { PlanSchema, StateSchema } from "../schemas.ts";

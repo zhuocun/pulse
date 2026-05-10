@@ -1,5 +1,5 @@
 import type { Run, SDKAgent } from "@cursor/sdk";
-import { z } from "zod/v3";
+import { z } from "zod";
 
 import { PlanValidationError } from "./errors.ts";
 

@@ -127,11 +127,11 @@
       "finishedAt": "2026-05-10T12:04:11.275Z",
       "lastUpdate": "2026-05-10T12:04:11.275Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "dockerfile-redis-backend-hints",
@@ -149,11 +149,11 @@
       "finishedAt": "2026-05-10T12:04:38.005Z",
       "lastUpdate": "2026-05-10T12:04:47.373Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "not-verified",
-      "attempts": 1
+      "verification": "not-verified"
     },
     {
       "name": "column-decorative-svg-a11y",
@@ -171,11 +171,11 @@
       "finishedAt": "2026-05-10T12:05:07.776Z",
       "lastUpdate": "2026-05-10T12:05:07.776Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [

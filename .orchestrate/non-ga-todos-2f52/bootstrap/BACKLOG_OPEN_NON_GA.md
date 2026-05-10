@@ -13,6 +13,14 @@ Prioritized quick wins wired as worker tasks:
 
 Excluded from this sprint (remain open / future workers): Beta §2/§3/§6, Soft §4/§5 remainder, MCP §15, `useAgent` split §16b, LiteLLM, proxy JWT migration, GA §1.
 
+## Wave 2 — 2026-05-10 (planner `bc-ef458bd7-de29-4d59-a77f-43f2b0cdb654`)
+
+| Source | Item | Worker task |
+|--------|------|-------------|
+| `docs/status/release-todo.md` §7 | Doc still reads as if only path-filter runs exist; `workflow_dispatch` now ships | `release-ci7-dispatch-documentation` |
+| `docs/status/release-todo.md` §16d | Dockerfile lacks explicit Redis-backed middleware env guidance next to `workers=1` pin | `dockerfile-redis-backend-hints` |
+| `docs/status/ui-todo.md` §21 | Decorative task-type SVGs on cards | `column-decorative-svg-a11y` |
+
 ## Status hygiene
 
 After closing an item referenced in `docs/status/*`, follow repo root **`AGENTS.md`**: strike or edit the `-todo.md` row and append a shipped line under `docs/status/product-done.md`.
