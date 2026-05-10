@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
@@ -366,3 +367,85 @@ def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
         assert "summary" in payload
         assert "target_ids" in payload
         assert "severity" in payload
+
+
+def test_load_profile_hint_reads_dict_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from app.agents.catalog.triage import load_profile_hint_node
+
+    store = MagicMock()
+    item = MagicMock()
+    item.value = {"drift_severity": "warn"}
+    store.get.return_value = item
+    rt = MagicMock()
+    rt.store = store
+    rt.context = {"project_id": "p1"}
+    monkeypatch.setattr(
+        "app.agents.catalog.triage.get_runtime",
+        lambda _schema: rt,
+    )
+    assert load_profile_hint_node({}) == {"profile_hint": {"drift_severity": "warn"}}
+
+
+def test_load_profile_hint_skips_non_dict_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from app.agents.catalog.triage import load_profile_hint_node
+
+    store = MagicMock()
+    item = MagicMock()
+    item.value = "nope"
+    store.get.return_value = item
+    rt = MagicMock()
+    rt.store = store
+    rt.context = {"project_id": "p1"}
+    monkeypatch.setattr(
+        "app.agents.catalog.triage.get_runtime",
+        lambda _schema: rt,
+    )
+    assert load_profile_hint_node({}) == {}
+
+
+def test_build_triage_prompt_includes_profile_hint() -> None:
+    from app.agents.catalog.triage import _build_triage_prompt
+
+    state = {
+        "_nudges": [{"type": "triage", "summary": "S", "details": {}}],
+        "_snapshot": {"columns": [], "tasks": []},
+        "_profile_hint": {"severity": "high"},
+    }
+    assert "Prior brief drift profile" in _build_triage_prompt(state)
+
+
+def test_polish_triage_passes_profile_hint_to_polish_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.agents.catalog import triage as triage_mod
+
+    captured: dict[str, Any] = {}
+
+    async def fake_run(
+        state: dict[str, Any],
+        model: Any,
+    ) -> tuple[dict[str, Any], int, int]:
+        captured.clear()
+        captured.update(state)
+        return {"_result": []}, 0, 0
+
+    monkeypatch.setattr(triage_mod._triage_step, "run", fake_run)
+
+    async def _go() -> None:
+        await triage_mod._polish_triage(
+            make_stub_chat_model(),
+            [{"type": "triage", "summary": "x", "details": {}}],
+            {"columns": [], "tasks": []},
+            profile_hint={"k": "v"},
+        )
+
+    asyncio.run(_go())
+    assert captured.get("_profile_hint") == {"k": "v"}

@@ -87,6 +87,54 @@ def chat_model_override_from_request(
     return {"chat_model": make_chat_model_for_id(model_id, settings=cfg)}
 
 
+def project_chat_model_from_map(
+    project_id: Optional[str],
+    *,
+    settings: Any = None,
+) -> Optional[Dict[str, Any]]:
+    """Resolve per-project default chat model from the env map (header still wins in merge)."""
+
+    if not project_id or not str(project_id).strip():
+        return None
+    cfg = settings if settings is not None else default_settings
+    model_id = cfg.agent_project_chat_model_map.get(str(project_id).strip())
+    if not model_id:
+        return None
+    if not is_chat_model_allowed(model_id, cfg):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": "misconfigured_project_chat_model",
+                    "message": (
+                        f"AGENT_PROJECT_CHAT_MODEL_MAP entry for project "
+                        f"{project_id!r} points to {model_id!r}, which is not "
+                        "allowed by AGENT_CHAT_MODEL_ALLOWLIST."
+                    ),
+                }
+            },
+        )
+    return {"chat_model": make_chat_model_for_id(model_id, settings=cfg)}
+
+
+def merged_v1_chat_context(
+    *,
+    project_id: Optional[str],
+    request: Request,
+) -> Optional[Dict[str, Any]]:
+    """Merge ``AGENT_PROJECT_CHAT_MODEL_MAP`` with ``X-Pulse-Model`` (header wins)."""
+
+    mapped = project_chat_model_from_map(project_id)
+    header = chat_model_override_from_request(request)
+    if mapped is None and header is None:
+        return None
+    if mapped is None:
+        return dict(header) if header else None
+    if header is None:
+        return dict(mapped)
+    return {**dict(mapped), **dict(header)}
+
+
 async def run_v1_route(
     *,
     request: Request,
@@ -167,7 +215,7 @@ async def run_v1_route(
         # Per-request chat-model override (``X-Pulse-Model`` header).  When
         # absent or feature is off, ``override`` is ``None`` and the runtime
         # falls back to the agent default.
-        override = chat_model_override_from_request(request)
+        override = merged_v1_chat_context(project_id=project_id, request=request)
 
         body: Any = None
         final_state: Any = None

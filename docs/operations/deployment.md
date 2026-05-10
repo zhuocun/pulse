@@ -75,8 +75,12 @@ What matters for SSE on Fly:
   120s). Interleave a heartbeat custom event from any tool that
   routinely goes silent for >60s.
 
-Scale by adding more machines with one uvicorn worker each, not by
-raising `--workers`. See the comment block at the top of `backend/fly.toml`.
+Scale by adding more Fly machines **or** by raising `UVICORN_WORKERS`
+on a single machine **only after** `RATE_LIMIT_BACKEND`,
+`BUDGET_BACKEND`, and `IDEMPOTENCY_BACKEND` are `redis` with a real
+`REDIS_URI` (otherwise boot fails fast). One worker per machine remains
+the safe default when any of those backends stay `memory`. See the
+comment block at the top of `backend/fly.toml`.
 
 ### Render
 
@@ -127,7 +131,9 @@ What matters for SSE on Render:
 
 ### ECS / Cloud Run / Container Apps
 
-Same Dockerfile, same one-worker rule. Knobs to verify:
+Same Dockerfile. Default **one worker per container**; multiple workers
+per container require the Redis middleware trio + `REDIS_URI` (see
+production checklist). Knobs to verify:
 
 - **AWS ECS Fargate** behind an ALB: set the target group's
   *deregistration delay* lower than `AGENT_REQUEST_TIMEOUT_SECONDS`,
@@ -149,10 +155,14 @@ postgres.
 
 For self-hosted deployments without a managed runtime:
 
+For self-hosted deployments without a managed runtime (default one worker;
+set `UVICORN_WORKERS` only after the Redis trio + `REDIS_URI` checklist
+items above):
+
 ```bash
-uvicorn app.main:app \
+exec uvicorn app.main:app \
     --host 0.0.0.0 --port 8000 \
-    --workers 1 \
+    --workers "${UVICORN_WORKERS:-1}" \
     --proxy-headers --forwarded-allow-ips '*'
 ```
 
@@ -191,8 +201,21 @@ live.
 - [ ] `AGENT_BUDGET_MONTHLY_TOKEN_CAP` reviewed for the deployed tier. The default `1000000` is a placeholder.
 - [ ] `RATE_LIMIT_BACKEND=redis` and `BUDGET_BACKEND=redis` with a reachable `REDIS_URI`. The default `memory` backends keep their state per-process, so multi-worker / serverless deploys enforce `workers × cap` rather than `cap`, and a cold start zeroes the running tally. The Redis backends use server-side Lua scripts so check-and-mutate stays atomic across workers without a separate distributed lock. The published `requirements.txt` includes `redis>=5.0` so the production Dockerfile already has the integration; flip the env vars and provide a connection string.
 - [ ] `IDEMPOTENCY_BACKEND=redis` (same `REDIS_URI`). Without it, the FE's `Idempotency-Key` header is useless across multiple workers — a duplicate request landing on a different worker is not deduplicated, double-charging the budget.
+- [ ] **Multi-worker / `UVICORN_WORKERS`:** default is `1`. The process
+      **raises `RuntimeError` on startup** when `WEB_CONCURRENCY` or
+      `UVICORN_WORKERS` is `> 1` unless rate limit, budget, and
+      idempotency are **all** Redis-backed with a non-empty `REDIS_URI`.
+      Otherwise keep one worker per container and scale out horizontally.
 - [ ] **Memory-backend warning awareness:** if `AGENT_CHECKPOINT_BACKEND`, `AGENT_STORE_BACKEND`, `IDEMPOTENCY_BACKEND`, `RATE_LIMIT_BACKEND`, or `BUDGET_BACKEND` is left at the `memory` default, the server logs WARNINGs at lifespan startup on any production-shaped host (Vercel / Render / Fly / Railway / Kubernetes) and on any process where `WEB_CONCURRENCY` or `UVICORN_WORKERS` parses to an integer > 1. These warnings do not block boot by themselves, but they identify production-unsafe split state: interrupt checkpoints, idempotency keys, rate limits, and budgets stay process-local. Set the corresponding `=postgres` / `=redis` env vars (and the matching connection strings) before the deploy completes, or — only if you knowingly want a single-worker deploy — keep `WEB_CONCURRENCY` unset. The code still hard-fails for actual invalid backend configuration, such as unsupported backend names or selecting `postgres` / `redis` without a usable connection string.
 - [ ] (Optional) `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT` for trace export. The server re-exports both `LANGSMITH_*` and `LANGCHAIN_*` env vars at startup so LangChain 0.3.x picks them up regardless of subpackage.
+- [ ] (Optional) `MCP_ENABLED=true` exposes Streamable HTTP MCP at `/mcp`
+      (read-only `fe.*` tools). Clients must send a **`scp=rest`**
+      bearer JWT — the narrower `ai_proxy` token is rejected on this
+      surface. Leave unset (default) when no MCP client is wired.
+- [ ] (Optional) `AGENT_PROJECT_CHAT_MODEL_MAP=project_id:model_id,...`
+      assigns a default chat model per project on v1 + v2.1 routes;
+      `X-Pulse-Model` still overrides when sent. Entries must satisfy
+      `AGENT_CHAT_MODEL_ALLOWLIST` when that allowlist is non-empty.
 
 ### Frontend env vars (production)
 
@@ -230,7 +253,12 @@ browsers fetch the new bundle reference. Subsequent deploys are clean.
 
 ### Security considerations
 
-The AI proxy validates requests with the same JWT that the React app stores in `localStorage` under the key `"Token"`. Any XSS vector in the FE can exfiltrate that token and call the AI proxy on the user's behalf. This is pre-existing auth architecture, not introduced by the AI surface, but operators deploying the AI server should be aware: a compromised FE token equals a compromised AI proxy token. Consider issuing proxy-scoped tokens with a narrower claim set to limit blast radius — tracked as Beta Blocker §3 in [`../status/release-todo.md`](../status/release-todo.md).
+The AI proxy accepts **`ai_jwt`** (`scp=ai_proxy`, session-oriented TTL)
+from `sessionStorage` for `/api/ai/*` and `/api/v1/agents/*` requests while
+full **`jwt`** (`scp=rest`) remains in `localStorage` for REST CRUD.
+**Direct `/mcp` calls still need the REST-scoped token.** Limit XSS blast
+radius by keeping proxy tokens short-lived and renewing on login — see
+Beta §3 closure in [`../status/release-todo.md`](../status/release-todo.md).
 
 ---
 
@@ -241,7 +269,14 @@ Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_A
 - `POST /api/ai/readiness` with at least one issue → response must contain no `suggestion: null` keys (the key must be omitted entirely when there is no suggestion).
 - `POST /api/v1/agents/board-brief-agent/stream` → SSE citation objects must carry `source: "task"` or `source: "column"`, not `"fe.boardSnapshot"`.
 - Idempotency dedupe: send the same `Idempotency-Key` twice within the dedup window → the second call must return the cached result without re-invoking the LLM (confirm by checking that `/health` budget metrics did not increment twice).
-- Multi-worker rate limiting: start with `--workers 2` and `RATE_LIMIT_BACKEND=memory`, verify the effective cap is doubled — that is the known bug confirming you must set `RATE_LIMIT_BACKEND=redis` for correct enforcement.
+- Multi-worker without Redis: set `UVICORN_WORKERS=2` (or equivalent)
+  with `RATE_LIMIT_BACKEND=memory` → the process **must not start**
+  (`RuntimeError` from `_configure_middleware_backends`). Fix by
+  switching all three middleware backends to `redis` with `REDIS_URI`, or
+  drop back to one worker.
+- Multi-worker rate limiting (legacy check): with `--workers 2` and all
+  Redis backends correctly configured, verify per-key limits are not
+  doubled across workers.
 - Interrupt resume: trigger an agent run that exceeds 2 minutes and crosses an `interrupt()` pause, then send the FE tool reply → confirm the run resumes from the saved checkpoint (validates that `AGENT_CHECKPOINT_BACKEND=postgres` is correctly wired).
 
 ---
@@ -266,7 +301,13 @@ On a production-shaped host (any of `VERCEL`, `VERCEL_URL`, `RENDER_EXTERNAL_HOS
 Unsafe memory backend(s) detected in a multi-worker / multi-instance environment (production-shaped env var <VAR> is set | WEB_CONCURRENCY=<N> indicates multiple workers): AGENT_CHECKPOINT_BACKEND=memory[, AGENT_STORE_BACKEND=memory]. Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes. Fix: set AGENT_CHECKPOINT_BACKEND=postgres, AGENT_STORE_BACKEND=postgres, and AGENT_POSTGRES_URI=<dsn>. Install the required extras: pip install ".[postgres-agents]" (or ".[ai]").
 ```
 
-A parallel guard in `_configure_middleware_backends` logs a single WARNING listing every memory-backed middleware (`RATE_LIMIT_BACKEND=memory`, `BUDGET_BACKEND=memory`, `IDEMPOTENCY_BACKEND=memory`) detected under the same multi-instance condition, with the matching Redis fix.
+A parallel guard in `_configure_middleware_backends` **raises**
+`RuntimeError` when `UVICORN_WORKERS` / `WEB_CONCURRENCY` is `> 1` but
+rate, budget, or idempotency is not fully Redis-backed with `REDIS_URI`.
+It also logs a WARNING listing every memory-backed middleware
+(`RATE_LIMIT_BACKEND=memory`, `BUDGET_BACKEND=memory`,
+`IDEMPOTENCY_BACKEND=memory`) detected under the same multi-instance
+heuristic as the checkpoint guard, with the matching Redis fix.
 
 **Postgres backend with no connection string** (`_validate_agent_postgres_backend`, raises `RuntimeError`, deploy never finishes booting):
 

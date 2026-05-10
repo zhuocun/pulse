@@ -1135,6 +1135,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             <div
                 style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}
             >
+                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- P2-B: Escape refocuses composer from scroll container */}
                 <div
                     aria-busy={isLoading}
                     onKeyDown={(e) => {

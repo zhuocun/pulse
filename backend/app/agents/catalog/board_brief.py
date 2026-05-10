@@ -24,6 +24,8 @@ from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
+from langgraph.runtime import get_runtime
+
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import HEADLINE_MAX
@@ -38,8 +40,7 @@ from app.agents.polish import PolishStep
 from app.agents.state import BoardBriefState
 from app.tools.be_tools import _is_done_column
 from app.tools.redaction import redact_dict
-
-from langgraph.runtime import get_runtime
+from app.store import namespaces
 
 logger = logging.getLogger(__name__)
 
@@ -472,6 +473,29 @@ class BoardBriefAgent(BaseAgent):
         def emit_citations(state: BoardBriefState) -> dict[str, Any]:
             brief = state.get("brief") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
+            severity = drift.get("severity", "info")
+            rt = get_runtime(ChatContext)
+            store = rt.store
+            ctx = rt.context or {}
+            project_id = ctx.get("project_id")
+            if (
+                store is not None
+                and isinstance(project_id, str)
+                and project_id.strip()
+            ):
+                ns = namespaces.project_profile(project_id.strip())
+                store.put(
+                    ns,
+                    "last_board_brief",
+                    {
+                        "drift_severity": severity,
+                        "signal_types": [
+                            s.get("type")
+                            for s in drift.get("signals", [])
+                            if isinstance(s, dict)
+                        ],
+                    },
+                )
             snapshot = state.get("board_snapshot") or {}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []

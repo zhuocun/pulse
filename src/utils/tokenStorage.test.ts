@@ -1,8 +1,16 @@
-import { clearAuthToken, readAuthToken, writeAuthToken } from "./tokenStorage";
+import {
+    clearAiProxyToken,
+    clearAuthToken,
+    readAiProxyToken,
+    readAuthToken,
+    writeAiProxyToken,
+    writeAuthToken
+} from "./tokenStorage";
 
 describe("tokenStorage", () => {
     afterEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
         jest.restoreAllMocks();
     });
 
@@ -14,6 +22,14 @@ describe("tokenStorage", () => {
         clearAuthToken();
 
         expect(readAuthToken()).toBeNull();
+        expect(readAiProxyToken()).toBeNull();
+    });
+
+    it("stores and clears the AI proxy token", () => {
+        expect(writeAiProxyToken("ai-1")).toBe(true);
+        expect(readAiProxyToken()).toBe("ai-1");
+        clearAiProxyToken();
+        expect(readAiProxyToken()).toBeNull();
     });
 
     it("fails closed when storage access throws", () => {

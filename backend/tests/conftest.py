@@ -73,7 +73,7 @@ def structured_model(
 
     class _Model:
         def with_structured_output(
-            self, _schema: Any, *, include_raw: bool = False
+            self, _schema: Any, *, include_raw: bool = False, **_: Any
         ) -> Any:
             assert include_raw, "catalog must request the raw AIMessage"
             if raise_on_call is not None:

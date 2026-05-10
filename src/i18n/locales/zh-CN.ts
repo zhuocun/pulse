@@ -754,6 +754,7 @@ const zhCN: Dictionary = {
         serverMetadataLoading: "正在加载服务器信息…",
         serverMetadataUnavailable: "无法加载服务器限制信息。",
         rateLimitLine: "速率限制：{perMinute} / 分钟 · {perHour} / 小时",
+        monthlyBudgetCapLine: "组织每月 token 预算上限：{cap}（按项目预留）",
         allowedAutonomyLabel: "允许的自主级别"
     },
     mutation: {

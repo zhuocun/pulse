@@ -24,6 +24,7 @@ import {
     applyStreamPart,
     default as useAgentToolResolver
 } from "./useAgentToolResolver";
+import { forEachAgentStreamPart } from "./useAgentStreamConsumer";
 import { useAutonomyLevel } from "./useAiEnabled";
 import { useNudgeInbox } from "./useNudgeInbox";
 
@@ -375,82 +376,128 @@ const useAgent = (
             };
             armWatchdog();
             try {
-                for await (const part of streamAgent({
-                    name,
-                    body,
-                    signal,
-                    baseUrl
-                })) {
-                    if (signal.aborted) break;
-                    armWatchdog();
-                    // TTFT (UA-R2): record on first `messages` chunk only.
-                    if (
-                        !ttftSeenRef.current &&
-                        part.type === "messages" &&
-                        streamStartRef.current !== null
-                    ) {
-                        ttftSeenRef.current = true;
-                        if (mountedRef.current) setFirstChunkReceived(true);
-                        const elapsed = Math.max(
-                            0,
-                            Math.round(
-                                performance.now() - streamStartRef.current
-                            )
-                        );
-                        if (mountedRef.current) setTtftMs(elapsed);
-                        track(ANALYTICS_EVENTS.AGENT_TTFT, {
-                            agent: name,
-                            elapsedMs: elapsed
-                        });
-                        if (elapsed > TTFT_SLO_MS) {
-                            track(ANALYTICS_EVENTS.AGENT_TTFT_SLOW, {
-                                agent: name,
-                                ttftMs: elapsed
-                            });
+                const { pendingResume: pr, streamFailed: transportFailed } =
+                    await forEachAgentStreamPart(
+                        streamAgent({
+                            name,
+                            body,
+                            signal,
+                            baseUrl
+                        }),
+                        {
+                            signal,
+                            armWatchdog,
+                            clearWatchdog,
+                            onNonAbortTransportError: (err) => {
+                                if (mountedRef.current) {
+                                    setError(err as Error);
+                                }
+                            },
+                            onPart: async (part) => {
+                                if (
+                                    !ttftSeenRef.current &&
+                                    part.type === "messages" &&
+                                    streamStartRef.current !== null
+                                ) {
+                                    ttftSeenRef.current = true;
+                                    if (mountedRef.current) {
+                                        setFirstChunkReceived(true);
+                                    }
+                                    const elapsed = Math.max(
+                                        0,
+                                        Math.round(
+                                            performance.now() -
+                                                streamStartRef.current
+                                        )
+                                    );
+                                    if (mountedRef.current) {
+                                        setTtftMs(elapsed);
+                                    }
+                                    track(ANALYTICS_EVENTS.AGENT_TTFT, {
+                                        agent: name,
+                                        elapsedMs: elapsed
+                                    });
+                                    if (elapsed > TTFT_SLO_MS) {
+                                        track(
+                                            ANALYTICS_EVENTS.AGENT_TTFT_SLOW,
+                                            {
+                                                agent: name,
+                                                ttftMs: elapsed
+                                            }
+                                        );
+                                    }
+                                }
+                                const pendingR = await applyStreamPart(part, {
+                                    setState: safeSetState,
+                                    setPendingInterrupt: (p) => {
+                                        lastInterruptRef.current = p;
+                                        if (mountedRef.current) {
+                                            setPendingInterrupt(p);
+                                        }
+                                    },
+                                    setPendingProposal: (p) =>
+                                        mountedRef.current &&
+                                        setPendingProposal(p),
+                                    setCitations: (refs) =>
+                                        mountedRef.current &&
+                                        setCitations((prev) => [
+                                            ...prev,
+                                            ...refs
+                                        ]),
+                                    setNudges: (n) =>
+                                        mountedRef.current && pushNudge(n),
+                                    setLastSuggestion: (s) =>
+                                        mountedRef.current &&
+                                        setLastSuggestion(s),
+                                    setLastUsageRef: (usage) => {
+                                        lastUsageRef.current = usage;
+                                    },
+                                    onMidStreamErrorEnvelope: (streamErr) => {
+                                        terminatedByStreamError = true;
+                                        if (mountedRef.current) {
+                                            setError(streamErr);
+                                        }
+                                    },
+                                    resolveInterrupt: (interrupt) =>
+                                        resolveInterrupt({
+                                            registry: FE_TOOL_REGISTRY,
+                                            autoResume: autoResumeRef.current,
+                                            autonomy: autonomyRef.current,
+                                            threadId: threadIdRef.current,
+                                            lastInterrupt:
+                                                lastInterruptRef.current,
+                                            interrupt,
+                                            ctx
+                                        })
+                                });
+                                if (pendingR !== undefined) {
+                                    return {
+                                        kind: "stop" as const,
+                                        pendingResume: pendingR
+                                    };
+                                }
+                                if (terminatedByStreamError) {
+                                    return {
+                                        kind: "stop" as const,
+                                        streamFailed: true
+                                    };
+                                }
+                                return { kind: "continue" as const };
+                            }
                         }
-                    }
-                    pendingResume = await applyStreamPart(part, {
-                        setState: safeSetState,
-                        setPendingInterrupt: (p) => {
-                            lastInterruptRef.current = p;
-                            if (mountedRef.current) setPendingInterrupt(p);
-                        },
-                        setPendingProposal: (p) =>
-                            mountedRef.current && setPendingProposal(p),
-                        setCitations: (refs) =>
-                            mountedRef.current &&
-                            setCitations((prev) => [...prev, ...refs]),
-                        setNudges: (n) => mountedRef.current && pushNudge(n),
-                        setLastSuggestion: (s) =>
-                            mountedRef.current && setLastSuggestion(s),
-                        setLastUsageRef: (usage) => {
-                            lastUsageRef.current = usage;
-                        },
-                        onMidStreamErrorEnvelope: (streamErr) => {
-                            terminatedByStreamError = true;
-                            if (mountedRef.current) setError(streamErr);
-                        },
-                        resolveInterrupt: (interrupt) =>
-                            resolveInterrupt({
-                                registry: FE_TOOL_REGISTRY,
-                                autoResume: autoResumeRef.current,
-                                autonomy: autonomyRef.current,
-                                threadId: threadIdRef.current,
-                                lastInterrupt: lastInterruptRef.current,
-                                interrupt,
-                                ctx
-                            })
-                    });
-                    if (pendingResume !== undefined) break;
-                    if (terminatedByStreamError) break;
+                    );
+                pendingResume = pr;
+                if (transportFailed) {
+                    return {
+                        pendingResume: undefined,
+                        streamFailed: true
+                    };
                 }
             } catch (err) {
                 if (err instanceof Error && err.name !== "AbortError") {
                     if (mountedRef.current) setError(err);
                     return { pendingResume: undefined, streamFailed: true };
                 }
-            } finally {
-                clearWatchdog();
             }
             if (terminatedByStreamError) {
                 return { pendingResume: undefined, streamFailed: true };

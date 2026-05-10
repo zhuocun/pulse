@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
-from app.security import encrypt_password, legacy_password_hash
+from app.security import encrypt_password, legacy_password_hash, create_token
 from app.services import auth_service, board_service, task_service, user_service
 from app.validation import unwrap_error_detail
 from tests.conftest import FakeStore
@@ -1214,7 +1214,7 @@ def test_cross_project_board_and_task_relationships_are_rejected(
     )
     assert response.status_code == 403
 
-    manager_headers = auth_headers(auth_service.create_token(ids["user_id"]))
+    manager_headers = auth_headers(create_token(ids["user_id"]))
 
     response = client.post(
         "/api/v1/tasks/",
@@ -1413,7 +1413,7 @@ def seed_ordering_data(store: FakeStore) -> Dict[str, str]:
 
 def test_remaining_ordering_branches(client: TestClient, store: FakeStore) -> None:
     ids = seed_ordering_data(store)
-    headers = auth_headers(auth_service.create_token(ids["user_id"]))
+    headers = auth_headers(create_token(ids["user_id"]))
 
     response = client.put(
         "/api/v1/boards/orders",

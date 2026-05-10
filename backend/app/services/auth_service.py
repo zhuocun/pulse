@@ -7,6 +7,7 @@ from app.security import (
     JWT_SECRET_MIN_LENGTH,
     PASSWORD_HASH_ITERATIONS,
     PASSWORD_HASH_PREFIX,
+    create_ai_proxy_token,
     create_token,
     dummy_password_hash,
     encrypt_password,
@@ -130,4 +131,5 @@ def login(data: Dict[str, Any]) -> Dict[str, Any]:
         "likedProjects": user_info.get("likedProjects") or [],
         "email": user_info.get("email"),
         "jwt": create_token(user_info["_id"]),
+        "ai_jwt": create_ai_proxy_token(user_info["_id"]),
     }

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.llm import make_stub_chat_model
 from app.agents.polish import PolishStep
-from tests.conftest import structured_model
+from tests.conftest import StructuredRunnable, structured_model
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +142,35 @@ def test_polish_step_wrong_parsed_type_falls_back() -> None:
     update, tokens_in, tokens_out = asyncio.run(step.run(_STATE, model))
 
     assert update == {"result": _FALLBACK_VALUE}
+
+
+def test_polish_step_typeerror_on_json_schema_falls_back_to_plain_binding() -> None:
+    """Second binding omits ``method`` when the model rejects that kwarg."""
+
+    from langchain_core.messages import AIMessage
+
+    raw = AIMessage(
+        content="{}",
+        usage_metadata={"input_tokens": 2, "output_tokens": 1, "total_tokens": 3},
+    )
+    parsed = _TextSchema(text="from-second-bind")
+
+    class _PickyModel:
+        def with_structured_output(
+            self, _schema: object, *, include_raw: bool = False, **kw: object
+        ) -> object:
+            if kw:
+                raise TypeError("no structured method kw")
+            return StructuredRunnable(
+                {"raw": raw, "parsed": parsed, "parsing_error": None}
+            )
+
+    step = _make_step()
+    update, tokens_in, tokens_out = asyncio.run(
+        step.run(_STATE, _PickyModel())
+    )
+    assert update == {"result": "from-second-bind"}
+    assert (tokens_in, tokens_out) != (0, 0)
 
 
 # ---------------------------------------------------------------------------

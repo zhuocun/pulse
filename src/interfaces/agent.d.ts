@@ -24,6 +24,8 @@ export interface AgentMetadata {
     tags?: string[];
     /** When set on the wire, overrides `REACT_APP_AI_KNOWLEDGE_CUTOFF` in UI disclosure. */
     knowledge_cutoff?: string;
+    /** Mirrors ``AGENT_BUDGET_MONTHLY_TOKEN_CAP`` for UI disclosure. */
+    monthly_token_budget_cap?: number;
 }
 
 export interface AgentListResponse {

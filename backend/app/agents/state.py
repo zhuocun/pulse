@@ -138,6 +138,7 @@ class TriageState(BaseAgentState, WithBoardSnapshot, WithDriftResult):
     """State for ``triage-agent`` (PRD §5A.7)."""
 
     nudges: NotRequired[list[dict[str, Any]]]
+    profile_hint: NotRequired[dict[str, Any] | None]
 
 
 class SearchState(BaseAgentState):

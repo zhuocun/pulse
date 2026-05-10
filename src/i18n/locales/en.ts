@@ -796,6 +796,8 @@ export const enSource = {
         serverMetadataLoading: "Loading server details…",
         serverMetadataUnavailable: "Could not load server limits.",
         rateLimitLine: "Rate limit: {perMinute} / min · {perHour} / hour",
+        monthlyBudgetCapLine:
+            "Org monthly token budget cap: {cap} tokens (shared reservation model)",
         allowedAutonomyLabel: "Allowed autonomy"
     },
     mutation: {
