@@ -32,6 +32,17 @@ Excluded from this sprint (remain open / future workers): Beta §2/§3/§6, Soft
 | `docs/status/release-todo.md` §14 polish extension | Other `AgentMetadata` fields still unsurfaced (`recursion_limit`, `tags`) | `agent-metadata-recursion-tags-about` |
 | `docs/status/ui-todo.md` Phase 3.4 / 2.A.9 (WCAG 2.5.7) | Drag-and-drop keyboard alternative is undiscoverable on task cards | `drag-keyboard-affordance-hint` |
 
+## Wave 4 — 2026-05-10 (planner `bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b`, model `gpt-5.3-codex-high-fast`)
+
+| Source | Item | Worker task |
+|--------|------|-------------|
+| `docs/status/ui-todo.md` §21 remaining + Phase 3.4 4.1.3 | Header logo button has no distinct accessible label; AI assist + brief drawers lack `aria-live` regions | `header-logo-and-ai-live-regions-a11y` |
+| `docs/status/ui-todo.md` §16 remaining | Board lacks parity error/empty states with project list | `board-error-empty-states` |
+| `docs/status/ui-todo.md` §10 remaining / Phase 2.6 | Task modal Type select rebuilds options from dataset rather than schema-canonical | `taskmodal-canonical-types` |
+| `docs/status/release-todo.md` §16b / `architecture-todo.md` Theme 3 (continued) | FE-tool registry + auto-resume loop still inlined in useAgent.ts | `useagent-tool-resolver-extract` |
+| `docs/status/ui-todo.md` 2.A.8 partial | No `Suggested by Copilot` badge after Apply on AI story-points | `aitaskassistpanel-suggested-by-copilot-badge` |
+| `docs/status/ui-todo.md` §11 remaining / Phase 2.7 | Login form lacks a forgot-password affordance | `forgot-password-link-stub` |
+
 ## Status hygiene
 
 After closing an item referenced in `docs/status/*`, follow repo root **`AGENTS.md`**: strike or edit the `-todo.md` row and append a shipped line under `docs/status/product-done.md`.
