@@ -193,11 +193,11 @@
       "finishedAt": "2026-05-10T12:38:44.599Z",
       "lastUpdate": "2026-05-10T12:38:47.614Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "members-popover-avatars-cache",
@@ -215,11 +215,11 @@
       "finishedAt": "2026-05-10T12:53:17.975Z",
       "lastUpdate": "2026-05-10T12:53:20.934Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     },
     {
       "name": "throttled-spinners-hook",
@@ -237,11 +237,11 @@
       "finishedAt": "2026-05-10T13:06:19.090Z",
       "lastUpdate": "2026-05-10T13:06:22.109Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     },
     {
       "name": "microcopy-casing-sweep",
@@ -259,11 +259,11 @@
       "finishedAt": "2026-05-10T12:40:58.216Z",
       "lastUpdate": "2026-05-10T12:40:59.162Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     },
     {
       "name": "agent-metadata-recursion-tags-about",
@@ -279,13 +279,13 @@
       "handoffPath": "handoffs/agent-metadata-recursion-tags-about.md",
       "startedAt": "2026-05-10T12:32:10.022Z",
       "finishedAt": "2026-05-10T13:11:51.711Z",
-      "lastUpdate": "2026-05-10T13:11:51.712Z",
+      "lastUpdate": "2026-05-10T13:11:54.681Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": "live-ui-verified"
     },
     {
       "name": "drag-keyboard-affordance-hint",
@@ -303,11 +303,11 @@
       "finishedAt": "2026-05-10T12:57:12.989Z",
       "lastUpdate": "2026-05-10T12:57:13.952Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "live-ui-verified",
-      "attempts": 1
+      "verification": "live-ui-verified"
     }
   ],
   "attention": [
@@ -366,6 +366,10 @@
     {
       "at": "2026-05-10T13:06:22.109Z",
       "message": "throttled-spinners-hook: verification self-reported (live-ui-verified)"
+    },
+    {
+      "at": "2026-05-10T13:11:54.682Z",
+      "message": "agent-metadata-recursion-tags-about: verification self-reported (live-ui-verified)"
     }
   ]
 }
