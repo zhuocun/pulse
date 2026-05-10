@@ -754,7 +754,12 @@ export const enSource = {
             "Powered by a remote AI model. Your data is processed according to your privacy settings.",
         localModeDescription:
             "Running on a local AI engine. Your data stays on this device.",
-        knowledgeCutoffTemplate: "Knowledge cutoff: {date}"
+        knowledgeCutoffTemplate: "Knowledge cutoff: {date}",
+        serverLimitsTitle: "Server-advertised limits",
+        serverMetadataLoading: "Loading server details…",
+        serverMetadataUnavailable: "Could not load server limits.",
+        rateLimitLine: "Rate limit: {perMinute} / min · {perHour} / hour",
+        allowedAutonomyLabel: "Allowed autonomy"
     },
     mutation: {
         riskHigh: "High risk",

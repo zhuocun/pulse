@@ -310,10 +310,15 @@ or `context_schema`. The fields stay on the dataclass for the runtime
 ### 🟡 14. v2.1 metadata fields not surfaced in UI  *(FE)*
 
 `AgentMetadata.allowed_autonomy`, `rate_limit`, `recursion_limit`,
-`context_schema`, `tags` are all on the BE wire but the FE consumer
-reads none of them. Zero impact on user-visible behaviour today; would
-let the autonomy selector self-gate and a future "limits" surface
+`context_schema`, `tags` are on the BE wire; most have no FE disclosure yet,
+so there is little user-visible calibration for limits or wire-only policy.
+Would let the autonomy selector self-gate and a future "limits" surface
 render rate / budget visibly.
+
+**Partial (2026-05-10):** About Board Copilot now shows server `rate_limit`
+and `allowed_autonomy` for `chat-agent` (session-cached metadata fetch)
+in remote builds with a non-empty AI base URL. Other metadata fields
+remain unsurfaced.
 
 ### 🟡 15. MCP transport deferred  *(BE)*
 

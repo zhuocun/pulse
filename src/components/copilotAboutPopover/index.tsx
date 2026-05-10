@@ -7,6 +7,7 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { resolveAiKnowledgeCutoffForUi } from "../../utils/ai/agentClient";
+import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
 
 /**
  * "About Board Copilot" capabilities / knowledge-cutoff disclosure (P2-F).
@@ -39,14 +40,102 @@ const Section = styled.div`
 
 const CopilotAboutPopover: React.FC = () => {
     const isRemote = !environment.aiUseLocalEngine;
+    const showServerLimits =
+        isRemote && environment.aiEnabled && environment.aiBaseUrl.length > 0;
+    const chatMeta = useChatAgentMetadata();
+
+    const knowledgeWire =
+        chatMeta.status === "ready" ? chatMeta.data : undefined;
     const knowledgeCutoffLine = microcopy.about.knowledgeCutoffTemplate.replace(
         "{date}",
-        resolveAiKnowledgeCutoffForUi()
+        resolveAiKnowledgeCutoffForUi(knowledgeWire)
     );
 
     const modelInfo = isRemote
         ? microcopy.about.remoteModeDescription
         : microcopy.about.localModeDescription;
+
+    const serverLimitsSection =
+        showServerLimits &&
+        (() => {
+            if (chatMeta.status === "idle") {
+                return (
+                    <Typography.Paragraph
+                        style={{ marginBottom: 0, marginTop: space.xs }}
+                        type="secondary"
+                    >
+                        {microcopy.about.serverMetadataLoading}
+                    </Typography.Paragraph>
+                );
+            }
+            if (chatMeta.status === "loading") {
+                return (
+                    <Typography.Paragraph
+                        style={{ marginBottom: 0, marginTop: space.xs }}
+                        type="secondary"
+                    >
+                        {microcopy.about.serverMetadataLoading}
+                    </Typography.Paragraph>
+                );
+            }
+            if (chatMeta.status === "error") {
+                return (
+                    <Typography.Paragraph
+                        style={{ marginBottom: 0, marginTop: space.xs }}
+                        type="secondary"
+                    >
+                        {microcopy.about.serverMetadataUnavailable}
+                    </Typography.Paragraph>
+                );
+            }
+            const { rate_limit: rate, allowed_autonomy: levels } =
+                chatMeta.data;
+            const rateLine =
+                rate &&
+                microcopy.about.rateLimitLine
+                    .replace("{perMinute}", String(rate.per_minute))
+                    .replace("{perHour}", String(rate.per_hour));
+            return (
+                <>
+                    {rateLine ? (
+                        <Typography.Paragraph
+                            style={{
+                                marginBottom: space.xxs,
+                                marginTop: space.xs
+                            }}
+                            type="secondary"
+                        >
+                            {rateLine}
+                        </Typography.Paragraph>
+                    ) : null}
+                    {levels.length > 0 ? (
+                        <>
+                            <Typography.Paragraph
+                                style={{
+                                    marginBottom: space.xxs,
+                                    marginTop: 0
+                                }}
+                                type="secondary"
+                            >
+                                {microcopy.about.allowedAutonomyLabel}:
+                            </Typography.Paragraph>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 6,
+                                    marginBottom: space.xs
+                                }}
+                            >
+                                {levels.map((level) => (
+                                    <Tag key={level}>{level}</Tag>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
+                </>
+            );
+        })();
 
     const content = (
         <div style={{ maxWidth: "22rem" }}>
@@ -91,6 +180,23 @@ const CopilotAboutPopover: React.FC = () => {
                     ))}
                 </List>
             </Section>
+
+            {showServerLimits ? (
+                <Section>
+                    <Typography.Title
+                        level={5}
+                        style={{
+                            fontSize: fontSize.sm,
+                            fontWeight: fontWeight.semibold,
+                            marginBottom: space.xxs,
+                            marginTop: 0
+                        }}
+                    >
+                        {microcopy.about.serverLimitsTitle}
+                    </Typography.Title>
+                    {serverLimitsSection}
+                </Section>
+            ) : null}
 
             <Typography.Paragraph
                 style={{

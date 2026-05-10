@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import environment from "../../constants/env";
+import type { AutonomyLevel } from "../../interfaces/agent";
+import * as agentClient from "../../utils/ai/agentClient";
 import CopilotAboutPopover from "./index";
 
 const setLocal = (value: boolean) => {
@@ -11,11 +13,23 @@ const setLocal = (value: boolean) => {
     });
 };
 
+const setAiBaseUrl = (value: string) => {
+    Object.defineProperty(environment, "aiBaseUrl", {
+        configurable: true,
+        value,
+        writable: true
+    });
+};
+
 describe("CopilotAboutPopover", () => {
     const originalUseLocal = environment.aiUseLocalEngine;
+    const originalAiBaseUrl = environment.aiBaseUrl;
 
     afterEach(() => {
         setLocal(originalUseLocal);
+        setAiBaseUrl(originalAiBaseUrl);
+        agentClient.clearAgentMetadataSessionCache();
+        jest.restoreAllMocks();
     });
 
     it("renders the trigger button with the correct aria-label", () => {
@@ -99,5 +113,35 @@ describe("CopilotAboutPopover", () => {
                 "Running on a local AI engine. Your data stays on this device."
             )
         ).toBeInTheDocument();
+    });
+
+    it("shows server limits from chat-agent metadata when remote with base URL", async () => {
+        jest.spyOn(
+            agentClient,
+            "getSessionCachedAgentMetadata"
+        ).mockResolvedValue({
+            name: "chat-agent",
+            version: "1.1.0",
+            description: "chat",
+            status: "active",
+            allowed_autonomy: ["suggest", "plan"] as AutonomyLevel[],
+            rate_limit: { per_minute: 20, per_hour: 200 }
+        });
+        setLocal(false);
+        setAiBaseUrl("https://agents.example");
+        render(<CopilotAboutPopover />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "About Board Copilot" })
+        );
+        expect(
+            screen.getByText("Server-advertised limits")
+        ).toBeInTheDocument();
+        await waitFor(() => {
+            expect(
+                screen.getByText("Rate limit: 20 / min · 200 / hour")
+            ).toBeInTheDocument();
+        });
+        expect(screen.getByText("suggest")).toBeInTheDocument();
+        expect(screen.getByText("plan")).toBeInTheDocument();
     });
 });
