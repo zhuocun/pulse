@@ -176,6 +176,39 @@ describe("TaskModal", () => {
         expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
     });
 
+    it("renders canonical type options when the dataset only has Task entries", async () => {
+        renderModal({
+            initialTasks: [task({ type: "Task" })]
+        });
+
+        expect(
+            await screen.findByText(/edit task · build task/i)
+        ).toBeInTheDocument();
+        fireEvent.mouseDown(screen.getAllByRole("combobox")[1]);
+
+        expect((await screen.findAllByText("Task")).length).toBeGreaterThan(0);
+        expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
+    });
+
+    it("renders canonical type options when the dataset only has Bug entries", async () => {
+        renderModal({
+            initialTasks: [
+                task({
+                    taskName: "Fix bug",
+                    type: "Bug"
+                })
+            ]
+        });
+
+        expect(
+            await screen.findByText(/edit task · fix bug/i)
+        ).toBeInTheDocument();
+        fireEvent.mouseDown(screen.getAllByRole("combobox")[1]);
+
+        expect((await screen.findAllByText("Task")).length).toBeGreaterThan(0);
+        expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
+    });
+
     it("closes without mutation when submitted values are unchanged", async () => {
         renderModal();
 

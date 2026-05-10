@@ -25,7 +25,7 @@ import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import ErrorBox from "../errorBox";
 
-const buildTypeOptions = () => [
+const TASK_TYPE_OPTIONS = [
     { label: microcopy.options.taskTypes.task, value: "Task" },
     { label: microcopy.options.taskTypes.bug, value: "Bug" }
 ];
@@ -379,7 +379,7 @@ const TaskModal: React.FC<{
                     ]}
                 >
                     <Select
-                        options={buildTypeOptions()}
+                        options={TASK_TYPE_OPTIONS}
                         placeholder={`Select a ${microcopy.fields.type.toLowerCase()}`}
                     />
                 </Form.Item>
