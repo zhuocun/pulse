@@ -133,7 +133,7 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 21. **Accessibility gaps.**
     - ~~Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).~~ **[Complete: `taskCreator`, `columnCreator`, and `column` now use real `<button type="button">` elements (`CreateLink`, `AddColumnButton`, `TaskCard`/`NoPaddingButton`); a repo-wide grep confirms no `<a onClick>` patterns remain in production components.]**
-    - Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).
+    - ~~Decorative SVGs without `alt=""` (the bug/task icons inside `Column`).~~ **[Complete: `TaskTypeBadge` renders bug/task imagery as `<img alt="" aria-hidden />` beside visible `microcopy.options.taskTypes.*` labels so type is not double-announced.]**
     - Color contrast on muted text (`rgba(0,0,0,0.5)` on white) probably fails WCAG AA.
     - The header logo button has no accessible label distinguishing it from "Members".
     - Live regions on the chat drawer (`aria-live="polite"`) are good — extend the same to the AI assist and brief drawers.
