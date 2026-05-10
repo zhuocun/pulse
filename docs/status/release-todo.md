@@ -392,21 +392,14 @@ architecture-todo Theme 4.
 - Scope: env wiring, compose parity, smoke tests against
   `app/middleware/redis_backends.py`, and duplicate-request replay tests.
 
-### 🟡 16e. `fly.toml` placeholder app name  *(BE)*
+### ✅ 16e. `fly.toml` placeholder app name  *(BE — Resolved 2026-05-10, `orch/non-ga-todos-2f52/fly-app-placeholder`)*
 
-`backend/fly.toml:17` ships with `app = "jira-python-server"` —
-literally a placeholder from the pre-monorepo split. The file is on
-the documented fallback path (anyone can `cd backend && fly deploy`
-from a Fly-authenticated machine) so a stale placeholder will create
-or collide with the wrong Fly app the moment that path is used.
-
-- Action when prioritised: either delete `backend/fly.toml` and
-  `backend/Dockerfile` (Vercel is the only active deploy path) and
-  update the README's "fallback" mention, or update the placeholder
-  to a documented owner-controlled value.
-- Scope: choose the active fallback-host story, then either remove the
-  unused Fly files or replace the placeholder app name with a documented
-  owner-controlled value.
+`backend/fly.toml` now defaults to `app = "pulse-backend"` with an
+explicit header that operators must rename `app` to their Fly.io
+application before deploy. `docs/operations/deployment.md` and
+`backend/README.md` call out the same rename requirement so the
+`cd backend && fly deploy` fallback path cannot silently inherit the
+pre-monorepo `jira-python-server` name.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 

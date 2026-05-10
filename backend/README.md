@@ -83,9 +83,10 @@ chore(hooks): enforce commit messages
 
 ## Deployment
 
-The repo ships a production Dockerfile, a Fly.io launch config, and a
-`docker-compose.yml` that brings up the server alongside Postgres +
-Mongo for parity with a Tier-1 production deploy. See
+The repo ships a production Dockerfile, `fly.toml` (default Fly app
+`pulse-backend` — rename before deploy), and a `docker-compose.yml`
+that brings up the server alongside Postgres + Mongo for parity with a
+Tier-1 production deploy. See
 [`../docs/operations/deployment.md`](../docs/operations/deployment.md)
 for the full target-by-target guide (Vercel limits, Fly.io, Render,
 ECS / Cloud Run / Container Apps, dedicated uvicorn behind nginx),
