@@ -191,12 +191,12 @@
       "handoffPath": "handoffs/useagent-nudge-inbox-extract.md",
       "startedAt": "2026-05-10T12:31:59.158Z",
       "finishedAt": "2026-05-10T12:38:44.599Z",
-      "lastUpdate": "2026-05-10T12:38:44.600Z",
+      "lastUpdate": "2026-05-10T12:38:47.614Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -252,12 +252,12 @@
       "agentId": "bc-dec2cbb0-802f-4803-abaa-99a71a9d5e53",
       "runId": "run-86854ff9-ff7a-4bd2-9fe5-ce6fba4d0ef8",
       "parentAgentId": "bc-9bc499b0-ccea-4cf8-a9d2-1b1d925e528b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/microcopy-casing-sweep.md",
       "startedAt": "2026-05-10T12:32:07.254Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-10T12:32:10.021Z",
+      "finishedAt": "2026-05-10T12:40:58.216Z",
+      "lastUpdate": "2026-05-10T12:40:58.217Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -314,6 +314,10 @@
     {
       "at": "2026-05-10T12:04:47.375Z",
       "message": "dockerfile-redis-backend-hints: verification self-reported (not-verified)"
+    },
+    {
+      "at": "2026-05-10T12:38:47.615Z",
+      "message": "useagent-nudge-inbox-extract: verification self-reported (unit-test-verified)"
     }
   ]
 }
