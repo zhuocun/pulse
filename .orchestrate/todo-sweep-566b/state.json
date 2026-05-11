@@ -118,7 +118,7 @@
     {
       "name": "verify-auth-form-completion",
       "type": "verifier",
-      "branch": "orch/todo-sweep-566b/verify-auth-form-completion",
+      "branch": "`orch/todo-sweep-566b/auth-form-completion` (commit `02277ef` adds `.orchestrate/todo-sweep-566b/handoffs/verify-auth-form-completion.md`)",
       "startingRef": "orch/todo-sweep-566b/auth-form-completion",
       "dependsOn": [
         "auth-form-completion"
@@ -126,12 +126,12 @@
       "agentId": "bc-0c5a16c1-3601-4082-8035-854473e249a9",
       "runId": "run-49a4642b-c36f-4502-8990-0a5aed9a2ea0",
       "parentAgentId": "bc-473b0c50-1f61-4c00-886b-0c4f0579566b",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-auth-form-completion.md",
       "startedAt": "2026-05-11T04:57:29.622Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-11T04:57:32.041Z",
+      "finishedAt": "2026-05-11T04:59:32.311Z",
+      "lastUpdate": "2026-05-11T04:59:32.311Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
