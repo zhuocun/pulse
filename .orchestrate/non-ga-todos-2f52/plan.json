@@ -1,6 +1,6 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "non-ga-todos: close every still-open backlog item in docs/status/release-todo.md except GA blocker §1 (MutationProposal accept path / public GA), with AGENTS.md status hygiene (close entries in release-todo and add product-done rows for shipped work).",
+  "goal": "non-ga-todos: close every still-open backlog item in docs/todo/release-todo.md except GA blocker §1 (MutationProposal accept path / public GA), with AGENTS.md status hygiene (close entries in release-todo and add product-done rows for shipped work).",
   "summary": "Close all non-GA release-todo backlog items in one coordinated sweep.",
   "selfAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
   "rootSlug": "non-ga-todos-2f52",
@@ -10,7 +10,7 @@
   "syncStateToGit": true,
   "acceptanceCriteria": [
     "Every open release-todo entry except GA blocker §1 is implemented and marked resolved with supporting notes",
-    "docs/status/product-done.md records one-line shipped entries for all backlog items closed in this sweep",
+    "docs/todo/product-done.md records one-line shipped entries for all backlog items closed in this sweep",
     "Frontend changes pass eslint + typecheck + CI=true jest + vite build",
     "Backend changes pass pytest + ruff in backend/"
   ],
@@ -19,12 +19,12 @@
       "name": "close-non-ga-release-todo-items",
       "type": "worker",
       "model": "composer-2-fast",
-      "scopedGoal": "Implement and close every open item in docs/status/release-todo.md except GA blocker §1, including Beta blockers §2/§3/§6, soft blockers §4/§5/§7, and polish items §14/§15/§16/§16b/§16c/§16d, then update docs/status/product-done.md per AGENTS.md.",
-      "brief": "Treat docs/status/release-todo.md as the source of truth for what remains open. Do not touch GA blocker §1 except to keep references accurate. Ship concrete code, tests, and ops/docs updates needed to close each remaining non-GA entry. For each closure, update release-todo status text and add a one-line shipped note in docs/status/product-done.md under the relevant table. Keep behavioral changes production-safe and include migration notes where applicable (especially auth token scope, provider failover, integration test plumbing, and multi-worker backend readiness).",
+      "scopedGoal": "Implement and close every open item in docs/todo/release-todo.md except GA blocker §1, including Beta blockers §2/§3/§6, soft blockers §4/§5/§7, and polish items §14/§15/§16/§16b/§16c/§16d, then update docs/todo/product-done.md per AGENTS.md.",
+      "brief": "Treat docs/todo/release-todo.md as the source of truth for what remains open. Do not touch GA blocker §1 except to keep references accurate. Ship concrete code, tests, and ops/docs updates needed to close each remaining non-GA entry. For each closure, update release-todo status text and add a one-line shipped note in docs/todo/product-done.md under the relevant table. Keep behavioral changes production-safe and include migration notes where applicable (especially auth token scope, provider failover, integration test plumbing, and multi-worker backend readiness).",
       "pathsAllowed": [
         "backend/**",
         "src/**",
-        "docs/status/**",
+        "docs/todo/**",
         "docs/operations/**",
         "docs/archive/**",
         ".github/workflows/**",
@@ -53,8 +53,8 @@
       "dependsOn": [
         "close-non-ga-release-todo-items"
       ],
-      "scopedGoal": "Independently verify that docs/status/release-todo.md has no open backlog items except GA blocker §1 and that required docs/test evidence exists.",
-      "brief": "Audit docs/status/release-todo.md headings and status notes after the closeout branch changes. Confirm that each previously open non-GA item is genuinely closed by corresponding implementation evidence in diff + tests. Confirm docs/status/product-done.md has matching one-liners per AGENTS.md. If any item is still open or unjustified, fail verification with exact gaps.",
+      "scopedGoal": "Independently verify that docs/todo/release-todo.md has no open backlog items except GA blocker §1 and that required docs/test evidence exists.",
+      "brief": "Audit docs/todo/release-todo.md headings and status notes after the closeout branch changes. Confirm that each previously open non-GA item is genuinely closed by corresponding implementation evidence in diff + tests. Confirm docs/todo/product-done.md has matching one-liners per AGENTS.md. If any item is still open or unjustified, fail verification with exact gaps.",
       "acceptance": [
         "Verifier reports pass only if release-todo open items are limited to GA blocker §1",
         "Verifier confirms AGENTS.md backlog hygiene is satisfied for all newly closed items"
@@ -69,11 +69,11 @@
         "verify-non-ga-release-todo-closure"
       ],
       "scopedGoal": "Apply verifier findings so AGENTS backlog hygiene is fully satisfied for non-GA release-todo closure: add explicit product-done one-liners for closed §2/§4/§5/§6/§7 work and reconcile stale open/counter text in status docs.",
-      "brief": "Use handoff findings from verify-non-ga-release-todo-closure as the source of truth for remaining cleanup. Update docs/status/product-done.md so each newly closed release-todo section from this sweep has an explicit one-line shipped entry with a release-todo pointer. Reconcile contradictory text (e.g. 'What is open' / auth section references to now-closed §3) and stale numeric evidence counts in release-todo verification snippets. Keep this task docs-only; do not reopen implementation scope unless documentation cannot be made truthful without code changes.",
+      "brief": "Use handoff findings from verify-non-ga-release-todo-closure as the source of truth for remaining cleanup. Update docs/todo/product-done.md so each newly closed release-todo section from this sweep has an explicit one-line shipped entry with a release-todo pointer. Reconcile contradictory text (e.g. 'What is open' / auth section references to now-closed §3) and stale numeric evidence counts in release-todo verification snippets. Keep this task docs-only; do not reopen implementation scope unless documentation cannot be made truthful without code changes.",
       "pathsAllowed": [
-        "docs/status/release-todo.md",
-        "docs/status/product-done.md",
-        "docs/status/verification-logs/**"
+        "docs/todo/release-todo.md",
+        "docs/todo/product-done.md",
+        "docs/todo/verification-logs/**"
       ],
       "acceptance": [
         "product-done has explicit one-line closure entries for §2, §4, §5, §6, and §7 from this sweep",
@@ -92,7 +92,7 @@
         "release-todo-doc-hygiene-closeout"
       ],
       "scopedGoal": "Verify AGENTS backlog hygiene is fully met after docs closeout and no non-GA release-todo backlog remains open.",
-      "brief": "Audit docs/status/release-todo.md and docs/status/product-done.md only. Confirm that all non-GA open items are closed and each newly closed item has explicit product-done tracking entries; fail with exact missing bullets if not.",
+      "brief": "Audit docs/todo/release-todo.md and docs/todo/product-done.md only. Confirm that all non-GA open items are closed and each newly closed item has explicit product-done tracking entries; fail with exact missing bullets if not.",
       "acceptance": [
         "Verifier confirms AGENTS doc-close requirements are met for this sweep",
         "Only GA blocker §1 remains open in release-todo"
@@ -111,14 +111,14 @@
       "pathsAllowed": [
         "backend/**",
         "src/**",
-        "docs/status/**",
+        "docs/todo/**",
         "docs/operations/**",
         ".github/workflows/**"
       ],
       "acceptance": [
         "Integrated branch contains both implementation closeout and doc-hygiene updates without contradictions",
         "release-todo and product-done remain aligned and only GA §1 is open",
-        "Validation evidence on the integrated branch is captured in docs/status/verification-logs with no stale hard-coded totals"
+        "Validation evidence on the integrated branch is captured in docs/todo/verification-logs with no stale hard-coded totals"
       ],
       "openPR": false,
       "maxAttempts": 2
@@ -132,7 +132,7 @@
         "integrate-non-ga-closeout-and-doc-hygiene"
       ],
       "scopedGoal": "Final independent verification that non-GA release-todo closure is truthful and stable on the integrated branch.",
-      "brief": "Re-audit docs/status/release-todo.md + docs/status/product-done.md and run the key quality gates needed to support claims. Fail if any non-GA backlog item remains open, if AGENTS closure hygiene is incomplete, or if docs contain stale test counters that conflict with fresh runs.",
+      "brief": "Re-audit docs/todo/release-todo.md + docs/todo/product-done.md and run the key quality gates needed to support claims. Fail if any non-GA backlog item remains open, if AGENTS closure hygiene is incomplete, or if docs contain stale test counters that conflict with fresh runs.",
       "acceptance": [
         "Verifier confirms only GA §1 remains open and all non-GA closure hygiene requirements are met",
         "Verifier confirms no stale/contradictory evidence remains in status docs"

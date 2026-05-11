@@ -32,7 +32,7 @@ success
 - Updated tests in `src/components/memberPopover/index.test.tsx` to cover:
   - avatar initials + count badge rendering in trigger
   - no refetch calls when opening the popover
-- Updated `docs/status/ui-todo.md`:
+- Updated `docs/todo/ui-todo.md`:
   - marked §14 complete for members popover avatars/count + cached behavior
   - marked §19 members-query duplication line complete for shared hook + cache.
 - Ran required verification commands and pushed commits to the required branch.
@@ -58,4 +58,4 @@ live-ui-verified
 
 ## Suggested follow-ups
 - If desired, migrate `src/components/projectModal/index.tsx` to `useMembersList()` as a separate scoped tranche to make members-query usage uniform across remaining surfaces.
-- If backlog hygiene policy requires it for closed items, add a matching `docs/status/product-done.md` row in the orchestrator merge tranche (not edited here due scoped file constraints).
+- If backlog hygiene policy requires it for closed items, add a matching `docs/todo/product-done.md` row in the orchestrator merge tranche (not edited here due scoped file constraints).

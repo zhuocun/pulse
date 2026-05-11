@@ -14,17 +14,17 @@ success
 `orch/status-docs-followup-20ad/audit-status-doc-open-items`
 
 ## What I did
-- Re-read `docs/status/release-todo.md` and treated **GA §1** as the only open *code* gate; kept all cross-links and did **not** reopen any closed non-GA items.
-- Reconciled **`docs/status/architecture-todo.md`** with the repo: removed the stale `runtime.py:578` BE TODO story ( **`rg` finds no `TODO`/`FIXME`/`XXX` under `backend/app/`** ), corrected **§16b / §16d / §16c / §5** gate language to match shipped closures, refreshed **`useAgent.ts` line count (853)**, documented the single FE **`TODO(v3)`** autonomy docblock in `aiChatDrawer` (~303–316), tightened Theme 3/4/6 action rows (SSE consumer already extracted; multi-worker row now matches the §16d Redis guard), and added **immediate vs later** workstreams.
-- Reconciled **`docs/status/ui-todo.md`**: new **2026-05-11** header + **open backlog grouping** (GA-adjacent vs product UX vs later), fixed **§20a** so it does not cite closed **§8/§14** as “operational” blockers, updated Phase **1.5** to the current **`<BrandMark />`** header pattern, and corrected **2.C** `jsx-a11y` text now that **`frontend-ci.yml`** runs ESLint.
-- Logged the same reconciliation in **`docs/status/product-done.md`** (at-a-glance row + **Last updated** bump).
+- Re-read `docs/todo/release-todo.md` and treated **GA §1** as the only open *code* gate; kept all cross-links and did **not** reopen any closed non-GA items.
+- Reconciled **`docs/todo/architecture-todo.md`** with the repo: removed the stale `runtime.py:578` BE TODO story ( **`rg` finds no `TODO`/`FIXME`/`XXX` under `backend/app/`** ), corrected **§16b / §16d / §16c / §5** gate language to match shipped closures, refreshed **`useAgent.ts` line count (853)**, documented the single FE **`TODO(v3)`** autonomy docblock in `aiChatDrawer` (~303–316), tightened Theme 3/4/6 action rows (SSE consumer already extracted; multi-worker row now matches the §16d Redis guard), and added **immediate vs later** workstreams.
+- Reconciled **`docs/todo/ui-todo.md`**: new **2026-05-11** header + **open backlog grouping** (GA-adjacent vs product UX vs later), fixed **§20a** so it does not cite closed **§8/§14** as “operational” blockers, updated Phase **1.5** to the current **`<BrandMark />`** header pattern, and corrected **2.C** `jsx-a11y` text now that **`frontend-ci.yml`** runs ESLint.
+- Logged the same reconciliation in **`docs/todo/product-done.md`** (at-a-glance row + **Last updated** bump).
 - Committed and pushed the branch; **no PR** created per instructions.
 
 ## Measurements
 - `rg TODO|FIXME|XXX backend/app (py): == 0 matches`
 - `rg TODO src (*.{ts,tsx}): == 1 match` (only `src/components/aiChatDrawer/index.tsx` v3 autonomy docblock)
 - `wc -l src/utils/hooks/useAgent.ts: 935 (obsolete doc claim) → 853 lines`
-- `docs/status/*.md files touched for this audit: 3`
+- `docs/todo/*.md files touched for this audit: 3`
 
 ## Verification
 not-verified

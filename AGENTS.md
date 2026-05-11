@@ -5,14 +5,14 @@ when a fix is non-obvious from the code alone.
 
 ## Keep the backlog current
 
-`docs/status/` is the single source of truth for open and shipped work. When
+`docs/todo/` is the single source of truth for open and shipped work. When
 your change closes or opens a backlog item, update `status/` in the same PR:
 
 - **Closing work.** Strike or remove the entry from the matching `*-todo.md`
   (`release-todo.md` for GA blockers / soft blockers / polish,
   `architecture-todo.md` for agent-runtime themes, `ui-todo.md` for the UI
   plan) **and** add a one-liner under the relevant table in
-  [`docs/status/product-done.md`](docs/status/product-done.md).
+  [`docs/todo/product-done.md`](docs/todo/product-done.md).
 - **Opening work.** Add the new item to the matching `*-todo.md`. If nothing
   fits, ask before creating a new tracking doc.
 - **Don't restate blockers inline** in `README.md`, `backend/README.md`, or
@@ -26,7 +26,7 @@ your change closes or opens a backlog item, update `status/` in the same PR:
   conditionally calling either hook breaks React's hook-ordering rule. See
   `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
 - Migration progress for the six structured routes lives in
-  `docs/status/product-done.md`. As of 2026-05-05, all six are on the
+  `docs/todo/product-done.md`. As of 2026-05-05, all six are on the
   v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
   alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
   remains the local-engine fallback path.
@@ -77,7 +77,7 @@ For required env vars, CDN cache-purge guidance, FE smoke tests after
 deploy, and the BE companion-server prerequisites, see
 [`docs/operations/deployment.md`](docs/operations/deployment.md). Per-tier
 GA blockers and ship sequence live in
-[`docs/status/release-todo.md`](docs/status/release-todo.md).
+[`docs/todo/release-todo.md`](docs/todo/release-todo.md).
 
 ## Cursor Cloud
 

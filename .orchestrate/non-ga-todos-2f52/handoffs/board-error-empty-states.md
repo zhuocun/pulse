@@ -23,7 +23,7 @@ partial
 - Expanded `src/pages/board.test.tsx`:
   - Added new error-state test asserting board failure alert appears and Retry re-runs the board query.
   - Updated empty-state test to assert title + new CTA + fallback creator behavior (including opening “New column name” input).
-- Updated `docs/status/ui-todo.md` §16 to mark board loading/empty/error parity as complete.
+- Updated `docs/todo/ui-todo.md` §16 to mark board loading/empty/error parity as complete.
 
 ## Measurements
 - `src/pages/board.test.tsx it() count: 7 → 8`

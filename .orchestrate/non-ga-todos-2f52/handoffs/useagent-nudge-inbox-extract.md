@@ -26,8 +26,8 @@ success
   - `NUDGE_PRUNE_INTERVAL_MS`
   - runtime surface still exposes `nudges` and `dismissNudge` unchanged.
 - Updated backlog docs for partial closure:
-  - `docs/status/release-todo.md` §16b now marks nudge-inbox extraction as partial completion and leaves SSE adapter + tool resolver pending.
-  - `docs/status/architecture-todo.md` Theme 3 updated to reflect the partial split and remaining decomposition scope.
+  - `docs/todo/release-todo.md` §16b now marks nudge-inbox extraction as partial completion and leaves SSE adapter + tool resolver pending.
+  - `docs/todo/architecture-todo.md` Theme 3 updated to reflect the partial split and remaining decomposition scope.
 - Committed and pushed to the required branch (latest: `8be732e5d17e148f3f92ec81e0ceef057c0e8c96`).
 
 ## Measurements

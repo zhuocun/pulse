@@ -14,8 +14,8 @@ success
 `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (commit `49f6eb5`, pushed to `origin`)
 
 ## What I did
-- Treated `docs/status/release-todo.md` as source of truth: marked polish **§13–§16d** resolved with concrete behavior, migrations (`MCP_ENABLED`, `AGENT_PROJECT_CHAT_MODEL_MAP`, multi-worker + full Redis trio, etc.), and reconciled narrative (blocker urgency, Tier 9, ship sequence, §12 note vs §4). **§1 (MutationProposal)** left open and accurate.
-- Updated **`docs/status/product-done.md`** with shipped rows for §13–§16d (and refreshed stale “open” rows for backend gates + JWT §3). Updated **`docs/operations/deployment.md`** and **`backend/fly.toml`** for multi-worker/MCP/model-map ops. No screen recording: changes are contractual/UI copy + hooks, not a reproduced interactive defect.
+- Treated `docs/todo/release-todo.md` as source of truth: marked polish **§13–§16d** resolved with concrete behavior, migrations (`MCP_ENABLED`, `AGENT_PROJECT_CHAT_MODEL_MAP`, multi-worker + full Redis trio, etc.), and reconciled narrative (blocker urgency, Tier 9, ship sequence, §12 note vs §4). **§1 (MutationProposal)** left open and accurate.
+- Updated **`docs/todo/product-done.md`** with shipped rows for §13–§16d (and refreshed stale “open” rows for backend gates + JWT §3). Updated **`docs/operations/deployment.md`** and **`backend/fly.toml`** for multi-worker/MCP/model-map ops. No screen recording: changes are contractual/UI copy + hooks, not a reproduced interactive defect.
 - Finished **coverage and quality gates** after discovering **99.75%** backend coverage: added/extended tests (`test_mcp_wiring.py`, `test_dispatch_chat_context_merge.py`, `test_agents_request_context_merge.py`, `test_triage_polish.py`, `test_agents.py`) and fixed FE issues (`copilotAboutPopover` `rateLine`, `useAgentStreamConsumer` test + `AbortController`, **`aiChatDrawer`** targeted eslint-disable for P2-B Escape handler).
 
 ## Measurements

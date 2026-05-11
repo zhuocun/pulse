@@ -8,7 +8,7 @@ that are now mirrored in the active operational backlog.
 
 | Review | Status (2026-05-10 re-verification) | Source of truth for open items |
 |---|---|---|
-| [2026-05-01](#review-1-2026-05-01--still-has-open-structural-concerns) | Partially superseded; remaining open items map to operations backlog | [`../status/release-todo.md`](../status/release-todo.md) §2, §4–§6, §15–§16; [`../status/architecture-todo.md`](../status/architecture-todo.md) Themes 5–6 |
+| [2026-05-01](#review-1-2026-05-01--still-has-open-structural-concerns) | Partially superseded; remaining open items map to operations backlog | [`../todo/release-todo.md`](../todo/release-todo.md) §2, §4–§6, §15–§16; [`../todo/architecture-todo.md`](../todo/architecture-todo.md) Themes 5–6 |
 | [2026-05-08](#review-2-2026-05-08--shipped-in-full) | Shipped (re-verified 2026-05-10); F-G2 and F-S5 deliberately deferred until consumers exist | n/a |
 | [2026-05-09](#review-3-2026-05-09--shipped-in-full) | Phases 1–6 shipped (re-verified 2026-05-10); architectural follow-ups all resolved | n/a |
 
@@ -42,7 +42,7 @@ client.
 richer budgets); both are OpenAI-compatible so wiring a
 `ChatOpenAI(base_url=...)` is sufficient. Configure failover policies
 for primary/secondary models. Tracked operationally as Beta Blocker §2
-in [`../status/release-todo.md`](../status/release-todo.md).
+in [`../todo/release-todo.md`](../todo/release-todo.md).
 
 ### F-10 — No structured output validation
 
@@ -107,7 +107,7 @@ mount point does not exist.
 Streamable HTTP transport at `/mcp`; expose the read-only FE tools.
 Authenticate with OAuth 2.1 + PKCE + RFC 8707 Resource Indicators.
 Tracked operationally as Polish §15 in
-[`../status/release-todo.md`](../status/release-todo.md).
+[`../todo/release-todo.md`](../todo/release-todo.md).
 
 ### F-18 / F-19 — No real embeddings or vector store
 
@@ -124,7 +124,7 @@ produce uncorrelated vectors. No persistent embedding store exists;
 `truncate_with_ellipsis`; add a real `summarize` backed by a
 `BaseChatModel`. Pick a vector store (`pgvector` is lowest-friction).
 Tracked operationally as Soft Blocker §4 in
-[`../status/release-todo.md`](../status/release-todo.md).
+[`../todo/release-todo.md`](../todo/release-todo.md).
 
 ### F-43 — `BaseAgentState` carries static run-scoped data — **resolved 2026-05-10**
 
@@ -141,7 +141,7 @@ real Postgres is a synthetic guarantee.
 *Fix*: split into `unit` (100% gate, deterministic) and `integration`
 (real backends, must pass on PR but no coverage gate). Run integration
 in CI behind a feature flag. Tracked operationally as Beta Blocker §6
-in [`../status/release-todo.md`](../status/release-todo.md).
+in [`../todo/release-todo.md`](../todo/release-todo.md).
 
 ---
 

@@ -31,7 +31,7 @@ success
   - local-engine path renders no server metadata section and does not fetch metadata
   - empty-base-url path renders no server metadata section and does not fetch metadata
   - graceful empty disclosure message renders when metadata is present but lacks limit fields
-- Updated release backlog status in `docs/status/release-todo.md` §14 partial note to include newly surfaced fields (`recursion_limit`, `tags`, optional `context_schema` key shape).
+- Updated release backlog status in `docs/todo/release-todo.md` §14 partial note to include newly surfaced fields (`recursion_limit`, `tags`, optional `context_schema` key shape).
 
 ## Measurements
 (none)

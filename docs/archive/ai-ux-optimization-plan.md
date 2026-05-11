@@ -44,8 +44,8 @@ been fixed in the codebase. This version reflects the current implementation.
     - `src/utils/ai/projectAiStorage.ts`
 - Planning and reference docs:
     - `docs/prd/v3-ai-ux.md`
-    - `docs/status/product-done.md`
-    - `docs/status/ui-todo.md`
+    - `docs/todo/product-done.md`
+    - `docs/todo/ui-todo.md`
     - `AI_UX_BEST_PRACTICES.md` _(removed — generic research compilation; actionable content absorbed into this document)_
     - `AI_UX_PATTERNS_REPORT.md` _(removed — generic AI interaction patterns; actionable content absorbed into this document)_
 
@@ -610,7 +610,7 @@ future overautomation risk.
 
 **Evidence**
 
-- `MutationProposalCard` is **gated off by default** as of `5d96e16` behind `environment.aiMutationProposalsEnabled` (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, default `false`). The card does not render even when an agent emits a `pendingProposal`. This is a v2.1 mitigation that closes the customer-visible "Accept does nothing" path; the full lifecycle remains unimplemented (see `../status/release-todo.md` §1). `NudgeCard` is unaffected by the flag.
+- `MutationProposalCard` is **gated off by default** as of `5d96e16` behind `environment.aiMutationProposalsEnabled` (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, default `false`). The card does not render even when an agent emits a `pendingProposal`. This is a v2.1 mitigation that closes the customer-visible "Accept does nothing" path; the full lifecycle remains unimplemented (see `../todo/release-todo.md` §1). `NudgeCard` is unaffected by the flag.
 - `MutationProposalCard` and `NudgeCard` are wired into `AiChatDrawer` with
   accept/reject/action/dismiss callbacks; local-dismiss fallback covers the
   case where no owner callback is supplied.

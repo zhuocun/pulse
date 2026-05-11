@@ -23,7 +23,7 @@ success
 - Added a unit test in `src/components/taskModal/index.test.tsx` asserting:
   - badge appears after clicking AI story-points Apply
   - badge disappears after user edit
-- Updated `docs/status/ui-todo.md` (2.A.8 bullet) to reflect partial closure for the story-points path and call out remaining follow-through.
+- Updated `docs/todo/ui-todo.md` (2.A.8 bullet) to reflect partial closure for the story-points path and call out remaining follow-through.
 - Captured UI walkthrough artifact: ``
 
 ## Measurements

@@ -15,7 +15,7 @@ success
 
 ## What I did
 - Extended `backend/Dockerfile` header comments so operators see that raising `--workers` past 1 needs `RATE_LIMIT_BACKEND=redis`, `BUDGET_BACKEND=redis`, `IDEMPOTENCY_BACKEND=redis`, and `REDIS_URI`, with a pointer to `backend/docker-compose.yml`; kept `--workers`, `COPY`, stages, healthcheck, and `CMD` array unchanged aside from tightening the trailing CMD-side comment block.
-- Adjusted §16d’s opening paragraph in `docs/status/release-todo.md` so the Dockerfile citation no longer depended on brittle line numbers and briefly points at the header + CMD comments (aligns backlog text with where operators look).
+- Adjusted §16d’s opening paragraph in `docs/todo/release-todo.md` so the Dockerfile citation no longer depended on brittle line numbers and briefly points at the header + CMD comments (aligns backlog text with where operators look).
 
 ## Measurements
 - `uvicorn CMD --workers` default: unchanged (`"1"` == `"1"`).

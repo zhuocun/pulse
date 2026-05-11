@@ -17,7 +17,7 @@ unit-test-verified
 `(no branch)`
 
 ## Execution
-- → Audited status docs directly: `docs/status/architecture-todo.md`, `docs/status/ui-todo.md`, `docs/status/release-todo.md`, and `docs/status/product-done.md` via file reads.
+- → Audited status docs directly: `docs/todo/architecture-todo.md`, `docs/todo/ui-todo.md`, `docs/todo/release-todo.md`, and `docs/todo/product-done.md` via file reads.
 - → Verified stale-TODO inventory claims against live code:
   - `rg "TODO|FIXME|XXX" /workspace/backend/app --type py` → **No matches found**.
   - `rg "TODO" /workspace/src --glob "*.{ts,tsx}"` → exactly one hit at `src/components/aiChatDrawer/index.tsx` (`TODO(v3)` docblock around lines 303–316).
@@ -34,7 +34,7 @@ unit-test-verified
   - `rg` in `release-todo.md` shows **only GA §1 remains open** and §7b/§8/§14/§16b/§16c/§16d are marked ✅.
   - `architecture-todo.md` includes **“Workstreams — immediate vs later”** and explicitly treats §16b/§16c/§16d as closed.
   - `ui-todo.md` includes **“Open backlog grouping”** with Immediate/Later buckets and explicitly states §8/§14 are closed.
-  - `rg "runtime\\.py:578" /workspace/docs/status` → no stale old reference.
+  - `rg "runtime\\.py:578" /workspace/docs/todo` → no stale old reference.
 
 ## Findings
 Per acceptance criterion:

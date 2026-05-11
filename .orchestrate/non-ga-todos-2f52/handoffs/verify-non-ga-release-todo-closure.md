@@ -24,8 +24,8 @@ finishedAt: 2026-05-10T16:03:20.789Z
 - → `cd /workspace && npm run typecheck` → `tsc --noEmit` exit **0**
 - → `cd //workspace && CI=true npm test -- --watchAll=false --runInBand` → **150** suites / **1085** tests passed
 - → `cd /workspace && npx vite build` → **✓ built** (production client bundle)
-- → Read `docs/status/release-todo.md` and `docs/status/product-done.md` for backlog vs `release-todo` § numbering and AGENTS hygiene
-- → Wrote `docs/status/verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md`, committed **“docs: add verifier evidence log for non-GA release-todo closeout”**, pushed to `origin/orch/non-ga-todos-2f52/close-non-ga-release-todo-items`
+- → Read `docs/todo/release-todo.md` and `docs/todo/product-done.md` for backlog vs `release-todo` § numbering and AGENTS hygiene
+- → Wrote `docs/todo/verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md`, committed **“docs: add verifier evidence log for non-GA release-todo closeout”**, pushed to `origin/orch/non-ga-todos-2f52/close-non-ga-release-todo-items`
 
 ## Findings
 Per acceptance criterion:
@@ -44,6 +44,6 @@ No live-browser UI excursion for these changes (mostly contracts, BE behavior, t
 
 ## Notes & suggestions
 - **Do not treat the closeout docs as planner‑sign‑off‑clean** until `product-done` gains explicit rows for **§2, §4, §5, §6, §7** (and/or a clearly scoped merge of those into dated rows so every closed § in this task maps 1:1), and **`## What is open` + Out-of-scope Auth bullet** align with **`release-todo`**.
-- **Code + default CI posture:** rerun after any planner integration; this run’s Python/JS bits match worker **`49f6eb5`**; verifier commit **`9cf7045`** adds only `docs/status/verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md`.
+- **Code + default CI posture:** rerun after any planner integration; this run’s Python/JS bits match worker **`49f6eb5`**; verifier commit **`9cf7045`** adds only `docs/todo/verification-logs/2026-05-10-close-non-ga-release-todo-items-verifier.md`.
 - **`RUN_INTEGRATION=1`** real-stack path was **not** exercised here; skipped integration tests behaved as upstream described (default hermetic **`1127 passed, 2 skipped`**).
 - **`unit-test-verified`** is grounded in executing **ruff**, **pytest** with **`--cov-fail-under=100`**, **eslint`, **tsc**, **jest**, and **vite build** successfully; **`verifier-failed`** did not apply to the codebase under those commands.

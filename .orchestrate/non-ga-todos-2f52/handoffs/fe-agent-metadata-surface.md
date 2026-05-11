@@ -19,7 +19,7 @@ success
 - Extended `CopilotAboutPopover` to show a **Server-advertised limits** block (loading / error / `rate_limit` line + `allowed_autonomy` tags) when remote is configured, and to pass wire metadata into `resolveAiKnowledgeCutoffForUi` for `knowledge_cutoff` when metadata loads.
 - Added i18n strings in `src/i18n/locales/en.ts` and `zh-CN.ts`.
 - Tests: `agentClient` session-cache case, `useChatAgentMetadata.test.tsx`, and `CopilotAboutPopover` remote mock test.
-- Updated `docs/status/release-todo.md` §14 with a **Partial** note and `docs/status/product-done.md` at-a-glance row per AGENTS.md.
+- Updated `docs/todo/release-todo.md` §14 with a **Partial** note and `docs/todo/product-done.md` at-a-glance row per AGENTS.md.
 
 ## Measurements
 - `npm test` (Jest): 1063 passing == 1063 passing

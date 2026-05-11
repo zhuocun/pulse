@@ -18,7 +18,7 @@ success
 - Left `push` and `pull_request` triggers and their `paths` / `branches` filters unchanged; only added dispatch.
 - Added workflow-level `concurrency`: shared `push-pr` group with `cancel-in-progress: true` for push/PR; per-run `dispatch-{run_id}` group with `cancel-in-progress: false` so manual runs are not cancelled by each other or by each other’s concurrency rule in a surprising way.
 - Gated each job with `if:` using short-circuit `github.event_name != 'workflow_dispatch' || …` so `github.event.inputs.mode` is not evaluated on push/PR.
-- Updated `docs/status/release-todo.md` §7: evidence bullet for manual dispatch + Green run URL; clarified path filters wording (no stale line numbers).
+- Updated `docs/todo/release-todo.md` §7: evidence bullet for manual dispatch + Green run URL; clarified path filters wording (no stale line numbers).
 
 ## Measurements
 - `actionlint` on `.github/workflows/backend-ci.yml`: 0 issues → 0 issues

@@ -20,8 +20,8 @@ success
 - Re-exported resolver public types/hook from `useAgent.ts` for compatibility.
 - Added `src/utils/hooks/useAgentToolResolver.test.ts` (new focused tests for known-tool resume, thrown-tool error envelope, resume-body threading, and 8-round exhaustion behavior).
 - Updated backlog docs for partial closure continuation:
-  - `docs/status/release-todo.md` §16b sub-bullet
-  - `docs/status/architecture-todo.md` Theme 3 row
+  - `docs/todo/release-todo.md` §16b sub-bullet
+  - `docs/todo/architecture-todo.md` Theme 3 row
 
 ## Measurements
 - `LOC(src/utils/hooks/useAgent.ts): 934 → 806`

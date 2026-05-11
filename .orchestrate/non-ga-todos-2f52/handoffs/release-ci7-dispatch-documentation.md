@@ -15,7 +15,7 @@ success
 
 ## What I did
 - Read `.github/workflows/backend-ci.yml` `workflow_dispatch.inputs.mode` (`choice`, default `both`, options `both` / `test-full` / `test-slim`) and job `if` logic so push/PR always runs both jobs; dispatch can narrow to one job.
-- Rewrote `docs/status/release-todo.md` **§7** to describe the manual **Run workflow** path (Actions → Backend CI → branch selector → **mode**), the three mode values and what runs, and an explicit “no GHA green claim until a URL is pasted” rule plus a placeholder line for the first green run URL.
+- Rewrote `docs/todo/release-todo.md` **§7** to describe the manual **Run workflow** path (Actions → Backend CI → branch selector → **mode**), the three mode values and what runs, and an explicit “no GHA green claim until a URL is pasted” rule plus a placeholder line for the first green run URL.
 - Aligned the Backend GA-ready table row for the CI matrix with the same evidence posture (wired; no URL recorded in §7 yet).
 
 ## Measurements

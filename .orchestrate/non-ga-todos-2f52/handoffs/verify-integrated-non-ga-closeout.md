@@ -1,6 +1,6 @@
 <!-- orchestrate handoff
 task: verify-integrated-non-ga-closeout
-branch: `orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)
+branch: `orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)
 agentId: bc-0e60ff42-965b-4d52-9d41-b1689652417c
 runId: run-fe240bc3-106b-41cc-bdc2-bed99e37b66b
 resultStatus: finished
@@ -17,11 +17,11 @@ finishedAt: 2026-05-10T16:21:43.919Z
 
 ## Branch
 
-`orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)
+`orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)
 
 ## Execution
 
-- Read and cross-checked `docs/status/release-todo.md` and `docs/status/product-done.md` for open 🛑 gates vs non-GA closure hygiene; grepped `docs/status` for suite-level totals that could stale against a fresh run.
+- Read and cross-checked `docs/todo/release-todo.md` and `docs/todo/product-done.md` for open 🛑 gates vs non-GA closure hygiene; grepped `docs/todo` for suite-level totals that could stale against a fresh run.
 - Backend: `/workspace/.venv/bin/python -m pip install -e '.[dev,ai]' -q`; `/workspace/.venv/bin/python -m ruff check .` → “All checks passed!”; `/workspace/.venv/bin/python -m pytest -q --tb=no` → **`1127 passed, 2 skipped, 40 warnings in 20.48s`**, **100%** line coverage per pytest output.
 - Frontend: Node 24 via `.nvmrc`; `NODE_OPTIONS=--max-old-space-size=8192 CI=true npm test -- --watchAll=false --runInBand` → **`Test Suites: 150 passed, 150 total`**, **`Tests: 1085 passed, 1085 total`**.
 - Spot-check: counted `def test_` in `backend/tests/test_ai_limits.py` (**18**) and `backend/tests/test_ai_redaction.py` (**20**) against `release-todo.md` §10–§11.
@@ -33,7 +33,7 @@ Per acceptance criterion:
 
 - Integrated branch has implementation closeout + doc hygiene without contradictions in the audited status docs: **[x] met** (merge narrative consistent; §7 points at logs + recipes).
 - `release-todo` / `product-done` aligned and **only GA §1** is the numbered 🛑 open gate in `release-todo.md`: **[x] met**.
-- Validation evidence in `docs/status/verification-logs` with no stale hard-coded **suite** totals in `release-todo.md` §7 / FE block: **[x] met**; integrate log numbers **match** this rerun; prior slim-venv counterexample remains correctly isolated in [`2026-05-10-release-todo-doc-hygiene-indep-verifier.md`](docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md).
+- Validation evidence in `docs/todo/verification-logs` with no stale hard-coded **suite** totals in `release-todo.md` §7 / FE block: **[x] met**; integrate log numbers **match** this rerun; prior slim-venv counterexample remains correctly isolated in [`2026-05-10-release-todo-doc-hygiene-indep-verifier.md`](docs/todo/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md).
 - Verifier: only GA §1 open + closure hygiene: **[x] met**.
 - Verifier: no contradictory evidence in status docs (for counts we exercised): **[x] met**.
 
@@ -44,5 +44,5 @@ Other findings (severity-ordered):
 
 ## Notes & suggestions
 
-- Independent evidence file: [`docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`](docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md) on the pushed tip.
+- Independent evidence file: [`docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`](docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md) on the pushed tip.
 - No PR opened per verifier mandate.

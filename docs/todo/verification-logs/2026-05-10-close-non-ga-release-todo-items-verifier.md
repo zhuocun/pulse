@@ -26,5 +26,5 @@ Frontend (repo root):
 
 ## Doc audit (manual)
 
-- `docs/status/release-todo.md`: numbered backlog items show **🛑 §1** open; **§2–§19** (and §7b) marked resolved with ✅ (or 🟡 resolved for §10–§12).
-- `docs/status/product-done.md`: **`## What is open`** plus “At a glance” align with only GA §1 as the active code gate after the hygiene sweep.
+- `docs/todo/release-todo.md`: numbered backlog items show **🛑 §1** open; **§2–§19** (and §7b) marked resolved with ✅ (or 🟡 resolved for §10–§12).
+- `docs/todo/product-done.md`: **`## What is open`** plus “At a glance” align with only GA §1 as the active code gate after the hygiene sweep.

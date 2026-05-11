@@ -25,7 +25,7 @@ success
 - Updated timing-sensitive tests for those surfaces:
   - `src/components/aiChatDrawer/branches.test.tsx`,
   - `src/components/boardBriefDrawer/agent.test.tsx`.
-- Updated `docs/status/ui-todo.md` to strike throttled-spinner items in:
+- Updated `docs/todo/ui-todo.md` to strike throttled-spinner items in:
   - §1.2 item 19 (AiTaskAssistPanel spinner note),
   - Phase 3.5 loading states bullet,
   - 2.A.7 Performance UX throttled-spinners bullet.

@@ -224,7 +224,7 @@ Set these in the Vercel FE project (or whichever host serves the SPA):
 | Variable                                  | Notes                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REACT_APP_AI_BASE_URL`                   | Optional. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead.          |
-| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See [`../status/release-todo.md`](../status/release-todo.md) §1 for the GA blocker status.                  |
+| `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`false`**. Set to `true` to render `MutationProposalCard` in `AiChatDrawer`. **Do not enable in production until the BE `MutationProposal` lifecycle ships** — with the flag off the card is fully suppressed even if an agent emits a `pendingProposal`. See [`../todo/release-todo.md`](../todo/release-todo.md) §1 for the GA blocker status.                  |
 | `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
 | `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
 
@@ -258,7 +258,7 @@ from `sessionStorage` for `/api/ai/*` and `/api/v1/agents/*` requests while
 full **`jwt`** (`scp=rest`) remains in `localStorage` for REST CRUD.
 **Direct `/mcp` calls still need the REST-scoped token.** Limit XSS blast
 radius by keeping proxy tokens short-lived and renewing on login — see
-Beta §3 closure in [`../status/release-todo.md`](../status/release-todo.md).
+Beta §3 closure in [`../todo/release-todo.md`](../todo/release-todo.md).
 
 ---
 
@@ -333,5 +333,5 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 ## See also
 
 - [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — historical structural reviews (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps).
-- [`../status/release-todo.md`](../status/release-todo.md) — current GA blockers, soft blockers, and operational backlog.
+- [`../todo/release-todo.md`](../todo/release-todo.md) — current GA blockers, soft blockers, and operational backlog.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

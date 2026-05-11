@@ -16,7 +16,7 @@ success
 ## What I did
 - Rebased the status narrative on `origin/orch/non-ga-todos-2f52/close-non-ga-release-todo-items`’s `release-todo.md`, then reconciled verifier deltas: §7 pytest **`1075` → `1127 passed`, `2 skipped`**, FE block **`146` → `150` suites**, Out-of-scope **Auth** bullet aligned with **resolved §3** + `product-done`, Tier 6 / TL;DR / ship sequence / readiness tables / §12 cross-refs so §4 reads as **shipped optional path + operator backfill** (not “still soft-blocker open”), §7 heading + CI matrix row no longer contradict closure.
 - Updated `product-done.md`: added **five explicit “At a glance” rows** with `[release-todo.md](release-todo.md) §2`, **§4**, **§5**, **§6**, **§7**; rewrote **`## What is open`** so only **GA §1** remains the numbered code gate; replaced stale hard-coded FE/backend suite counts in **Test coverage** with pointers to `release-todo` verification snippets + `verification-logs/` + reruns.
-- Added **`docs/status/verification-logs/`**: imported **`2026-05-10-close-non-ga-release-todo-items-verifier.md`**, added **`2026-05-10-release-todo-doc-hygiene-closeout.md`**, and refreshed the verifier log’s doc-audit line to cite the hygiene branch.
+- Added **`docs/todo/verification-logs/`**: imported **`2026-05-10-close-non-ga-release-todo-items-verifier.md`**, added **`2026-05-10-release-todo-doc-hygiene-closeout.md`**, and refreshed the verifier log’s doc-audit line to cite the hygiene branch.
 
 ## Measurements
 - product-done explicit `[release-todo.md](release-todo.md) §§` closure rows for §2/§4/§5/§6/§7 (non-GA sweep): **0 → 5**

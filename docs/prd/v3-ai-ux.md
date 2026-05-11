@@ -7,7 +7,7 @@
 | Last updated      | 2026-05-01                                                                                                                                                                                                                                            |
 | Target repository | `pulse` (frontend, `src/`) + Python agent server at `${REACT_APP_AI_BASE_URL}` (`backend/`)                                                                                                                                                           |
 | Document scope    | AI UX audit (94 component-level issues + 25 product-level issues), competitive analysis, industry best practices, redesigned AI surfaces, implementation requirements, trust & transparency patterns, onboarding, accessibility, and phased rollout.  |
-| Companion docs    | [`v1` (archived)](../archive/prd-v1.md), [`v2.1-agent.md`](v2.1-agent.md) (backend contract), [`../status/product-done.md`](../status/product-done.md), [`../status/ui-todo.md`](../status/ui-todo.md) |
+| Companion docs    | [`v1` (archived)](../archive/prd-v1.md), [`v2.1-agent.md`](v2.1-agent.md) (backend contract), [`../todo/product-done.md`](../todo/product-done.md), [`../todo/ui-todo.md`](../todo/ui-todo.md) |
 
 ---
 

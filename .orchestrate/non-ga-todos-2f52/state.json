@@ -514,7 +514,7 @@
     {
       "name": "verify-release-todo-doc-hygiene-closeout",
       "type": "verifier",
-      "branch": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)",
+      "branch": "`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/todo/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)",
       "startingRef": "orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout",
       "dependsOn": [
         "release-todo-doc-hygiene-closeout"
@@ -562,7 +562,7 @@
     {
       "name": "verify-integrated-non-ga-closeout",
       "type": "verifier",
-      "branch": "`orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)",
+      "branch": "`orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene` @ `34d8f21` (adds `docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene-indep-verifier.md`; pushed to `origin`)",
       "startingRef": "orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene",
       "dependsOn": [
         "integrate-non-ga-closeout-and-doc-hygiene"

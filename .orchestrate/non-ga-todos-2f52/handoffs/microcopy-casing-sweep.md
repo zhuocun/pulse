@@ -26,7 +26,7 @@ success
   - `src/components/memberPopover/index.test.tsx`
   - `src/pages/login.test.tsx`
   - `src/pages/register.test.tsx`
-- Updated backlog tracking in `docs/status/ui-todo.md`:
+- Updated backlog tracking in `docs/todo/ui-todo.md`:
   - Marked §17 “Microcopy and casing” complete with resolution note.
   - Marked Phase 3.1 item 1 complete with resolution note.
 

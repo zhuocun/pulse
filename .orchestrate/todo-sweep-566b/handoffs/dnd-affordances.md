@@ -18,7 +18,7 @@ success
 - Styled **`[data-rfd-placeholder-context-id]`** inside **`TaskContainer`** with **1px dashed `var(--ant-color-primary)`**, **`brand.primaryBg` tint**, **`border-radius`**, and **`transition: none !important`** under **`prefers-reduced-motion: reduce`**.
 - Extended **`Drag`** with **`detachDragHandle`**, **`useDetachedDragHandleProps()`**, and **`data-dragging`** on the cloned child; **board** column **`Drag`** now uses **`detachDragHandle`**, **`disableInteractiveElementBlocking`**, and a header **`HolderOutlined`** grip with **`aria-label`** from **`microcopy.dragHints.columnDragHandle`** (`en` + **`zh-CN`**).
 - Tests: **`column-dnd.test.tsx`** (real `@hello-pangea/dnd` for handle placement), **`index.test.tsx`** lift wiring + updated **`Drag` mock**, **`dragAndDrop/index.test.tsx`** for **`data-dragging`** / **`detachDragHandle`**.
-- Opened **draft PR #200** (`main` ← this branch). No **`docs/status`** edits (forbidden for this worker). No screen recording in this headless run.
+- Opened **draft PR #200** (`main` ← this branch). No **`docs/todo`** edits (forbidden for this worker). No screen recording in this headless run.
 
 ## Measurements
 - `CI=true npm test -- --watchAll=false --runInBand src/components/column src/components/dragAndDrop/index.test.tsx`: 0 failing → 0 failing (27 tests)
@@ -34,7 +34,7 @@ success
 ## Notes, concerns, deviations, findings, thoughts, feedback
 - **`src/components/dragAndDrop/index.tsx`** and **`src/pages/board.tsx`** were updated so **`dragHandleProps`** are not applied to the whole column; this was required for the explicit grip and **`disableInteractiveElementBlocking`** on a **`<button>`** handle.
 - **Before/after drag recording**: not produced here; no artifact path.
-- **`docs/status`** / ui-todo closure text was **not** edited (explicit out-of-scope).
+- **`docs/todo`** / ui-todo closure text was **not** edited (explicit out-of-scope).
 
 ## Suggested follow-ups
 - Optionally mirror **task-style placeholder** treatment on the **horizontal column** `Drop` in **`board.tsx`** so column reorder gaps match the task lane.
