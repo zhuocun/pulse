@@ -1,12 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import ProjectDetailPage from "./projectDetail";
 
-jest.mock("../components/projectPopover", () => ({
-    __esModule: true,
-    default: () => <span>Projects</span>
-}));
 jest.mock("../utils/hooks/useReactQuery", () => ({
     __esModule: true,
     default: () => ({ data: { _id: "project-1", projectName: "Atlas" } })
@@ -77,13 +73,17 @@ describe("ProjectDetailPage", () => {
     });
 
     it("renders breadcrumb, project name, board tab as a link, and the outlet", () => {
-        renderDetail("/projects/project-1/board");
+        const { container } = renderDetail("/projects/project-1/board");
 
         expect(screen.getByRole("link", { name: "Board" })).toHaveAttribute(
             "href",
             "/projects/project-1/board"
         );
-        expect(screen.getByText("Projects")).toBeInTheDocument();
+        const crumb = container.querySelector(".ant-breadcrumb");
+        expect(crumb).toBeTruthy();
+        expect(
+            within(crumb as HTMLElement).getByRole("link", { name: "Projects" })
+        ).toHaveAttribute("href", "/projects");
         expect(screen.getByText("Atlas")).toBeInTheDocument();
         expect(screen.getByText("Board outlet")).toBeInTheDocument();
     });
