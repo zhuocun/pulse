@@ -299,7 +299,13 @@ export const enSource = {
         resultsFiltered: "Results filtered. {rationale}",
         noTasksMatched:
             "No tasks matched your search. Try different words, or clear to see everything.",
-        boardEmpty: "This board has no tasks yet."
+        boardEmpty: "This board has no tasks yet.",
+        /** ARIA grouping for thumbs feedback on Copilot estimate / readiness. */
+        taskAssistTitle:
+            "{section}: Rate this Board Copilot task assist suggestion",
+        /** ARIA grouping for thumbs feedback on the board brief recommendation. */
+        boardBriefTitle:
+            "{section}: Rate this Board Copilot brief recommendation"
     },
     /**
      * ICU-style placeholder greeting. Header reads it as
