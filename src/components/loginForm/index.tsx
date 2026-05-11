@@ -10,6 +10,8 @@ import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import { writeAiProxyToken, writeAuthToken } from "../../utils/tokenStorage";
 
+import { AuthTermsAgreement } from "../registerForm/termsAgreement";
+
 const inputSize = "large" as const;
 
 /**
@@ -146,6 +148,7 @@ const LoginForm: React.FC<{
                     {microcopy.auth.forgotPassword}
                 </ForgotPasswordLink>
             </ForgotPasswordRow>
+            <AuthTermsAgreement variant="login" />
             <Form.Item>
                 <AuthButton
                     loading={isLoading}

@@ -1,0 +1,106 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "status-docs-followup: review docs/status todo docs (excluding the release-todo closeout already handled), identify what is truly left, reconcile stale entries against the current codebase, and start implementation on one concrete open item.",
+  "summary": "Audit /status todo docs, sync stale entries, and start the first open UX item.",
+  "selfAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
+  "rootSlug": "status-docs-followup-20ad",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "acceptanceCriteria": [
+    "docs/status/architecture-todo.md and docs/status/ui-todo.md reflect true open items (stale done items corrected with file evidence)",
+    "A prioritized 'what is left' inventory is captured in status docs without contradicting release-todo",
+    "At least one concrete open non-GA UI todo item is implemented with tests and status-doc hygiene updates"
+  ],
+  "tasks": [
+    {
+      "name": "audit-status-doc-open-items",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Reconcile docs/status/architecture-todo.md and docs/status/ui-todo.md with the current repository so open items are accurate and stale resolved claims are corrected.",
+      "brief": "Audit only docs/status backlog docs and directly related code references they cite. Update architecture-todo/ui-todo wording where items are stale (e.g., TODO references already resolved) and tighten 'what remains' text to concrete unresolved work. Do not reopen release-todo non-GA closures. Keep links to release-todo for GA §1 gating. If an item is now resolved, mark it as complete in-place with concise evidence; if still open, keep it open with a clear next action.",
+      "pathsAllowed": [
+        "docs/status/architecture-todo.md",
+        "docs/status/ui-todo.md",
+        "docs/status/product-done.md",
+        "backend/**",
+        "src/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**"
+      ],
+      "acceptance": [
+        "architecture-todo and ui-todo open-item text no longer points at already-resolved TODOs",
+        "Open work is explicitly identified and grouped as immediate vs later workstreams",
+        "Status docs remain consistent with release-todo's current GA-only blocker posture"
+      ],
+      "verify": "Run targeted checks for any touched code/docs assertions (e.g., rg checks for TODO lines, related unit tests if code changed) and include evidence in handoff.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-audit-status-doc-open-items",
+      "type": "verifier",
+      "model": "gpt-5.3-codex-high-fast",
+      "verifies": "audit-status-doc-open-items",
+      "dependsOn": [
+        "audit-status-doc-open-items"
+      ],
+      "scopedGoal": "Independently verify that status-doc open-item inventory is accurate and free of stale resolved claims.",
+      "brief": "Re-audit docs/status/architecture-todo.md and docs/status/ui-todo.md against referenced code paths. Fail if an item is still mislabeled open/resolved, if contradictory statements remain, or if release-todo linkage is inconsistent.",
+      "acceptance": [
+        "Verifier confirms no obvious stale TODO references remain in architecture/ui status docs",
+        "Verifier confirms remaining work is clearly identified and actionable"
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "start-auth-register-password-strength-and-tos",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": [
+        "verify-audit-status-doc-open-items"
+      ],
+      "scopedGoal": "Start implementation by closing one concrete open UI todo item: add register-form password-strength feedback and a terms-of-service link, with tests and status-doc updates.",
+      "brief": "Implement the open auth-item follow-through tracked in ui-todo item 11 / Phase 2.7: password-strength indicator on register and a terms-of-service link in auth flow copy/UI. Keep implementation i18n-safe (`en` + `zh-CN`), accessible, and compatible with existing validation. Add/update focused tests. Because this closes a tracked ui-todo item subset, update docs/status/ui-todo.md and docs/status/product-done.md per AGENTS.md backlog hygiene.",
+      "pathsAllowed": [
+        "src/components/registerForm/**",
+        "src/components/loginForm/**",
+        "src/pages/**",
+        "src/i18n/locales/**",
+        "src/constants/**",
+        "src/__tests__/**",
+        "docs/status/ui-todo.md",
+        "docs/status/product-done.md"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**"
+      ],
+      "acceptance": [
+        "Register form surfaces password-strength feedback and a terms-of-service link accessibly",
+        "Relevant tests pass for the updated auth UX",
+        "ui-todo/product-done reflect closure progress for this started item"
+      ],
+      "verify": "Run focused frontend tests for modified auth components plus type/lint checks as needed for touched files.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-auth-register-password-strength-and-tos",
+      "type": "verifier",
+      "model": "claude-opus-4-7",
+      "verifies": "start-auth-register-password-strength-and-tos",
+      "dependsOn": [
+        "start-auth-register-password-strength-and-tos"
+      ],
+      "scopedGoal": "Verify the first started open UI item is implemented correctly and status docs were updated truthfully.",
+      "brief": "Check UX behavior, i18n coverage, and tests around register password-strength and terms link. Validate status-doc updates for ui-todo/product-done follow AGENTS.md and do not over-claim closure. Use repo-level code/test evidence only (no GUI/manual recording); treat this as a terminal-driven verification pass to avoid non-essential tool stalls.",
+      "acceptance": [
+        "Verifier confirms behavior/test evidence for password-strength + terms link",
+        "Verifier confirms status docs are truthful and aligned with the partial closure scope"
+      ],
+      "maxAttempts": 2
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
   "goal": "non-ga-todos: close every still-open backlog item in docs/status/release-todo.md except GA blocker §1 (MutationProposal accept path / public GA), with AGENTS.md status hygiene (close entries in release-todo and add product-done rows for shipped work).",
   "summary": "Close all non-GA release-todo backlog items in one coordinated sweep.",
-  "selfAgentId": "bc-aa8c7cd5-3bc1-4d46-9eed-3a0cfa665306",
+  "selfAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
   "rootSlug": "non-ga-todos-2f52",
   "baseBranch": "main",
   "prBase": "main",
@@ -48,7 +48,7 @@
     {
       "name": "verify-non-ga-release-todo-closure",
       "type": "verifier",
-      "model": "composer-2-fast",
+      "model": "gpt-5.3-codex-high-fast",
       "verifies": "close-non-ga-release-todo-items",
       "dependsOn": [
         "close-non-ga-release-todo-items"
@@ -86,7 +86,7 @@
     {
       "name": "verify-release-todo-doc-hygiene-closeout",
       "type": "verifier",
-      "model": "composer-2-fast",
+      "model": "gpt-5.3-codex-high-fast",
       "verifies": "release-todo-doc-hygiene-closeout",
       "dependsOn": [
         "release-todo-doc-hygiene-closeout"
@@ -126,7 +126,7 @@
     {
       "name": "verify-integrated-non-ga-closeout",
       "type": "verifier",
-      "model": "composer-2-fast",
+      "model": "gpt-5.3-codex-high-fast",
       "verifies": "integrate-non-ga-closeout-and-doc-hygiene",
       "dependsOn": [
         "integrate-non-ga-closeout-and-doc-hygiene"

@@ -18,6 +18,10 @@ jest.mock("../pages/forgotPassword", () => ({
     __esModule: true,
     default: () => null
 }));
+jest.mock("../pages/terms", () => ({
+    __esModule: true,
+    default: () => null
+}));
 jest.mock("../pages/project", () => ({
     __esModule: true,
     default: () => null
@@ -63,6 +67,7 @@ describe("routes", () => {
             "register",
             "login",
             "auth/forgot-password",
+            "auth/terms",
             "projects",
             "projects/:projectId",
             "*"

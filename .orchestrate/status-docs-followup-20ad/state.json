@@ -1,0 +1,129 @@
+{
+  "rootSlug": "status-docs-followup-20ad",
+  "tasks": [
+    {
+      "name": "audit-status-doc-open-items",
+      "type": "worker",
+      "branch": "orch/status-docs-followup-20ad/audit-status-doc-open-items",
+      "startingRef": "main",
+      "dependsOn": [],
+      "agentId": "bc-c6cc0a38-ac03-4b36-9804-2de1608155a3",
+      "runId": "run-6c1bd63d-1653-42cb-836e-f8accbdac35b",
+      "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/audit-status-doc-open-items.md",
+      "startedAt": "2026-05-11T01:20:08.294Z",
+      "finishedAt": "2026-05-11T01:22:13.791Z",
+      "lastUpdate": "2026-05-11T01:25:39.753Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": "unit-test-verified"
+    },
+    {
+      "name": "verify-audit-status-doc-open-items",
+      "type": "verifier",
+      "branch": "orch/status-docs-followup-20ad/verify-audit-status-doc-open-items",
+      "startingRef": "orch/status-docs-followup-20ad/audit-status-doc-open-items",
+      "dependsOn": [
+        "audit-status-doc-open-items"
+      ],
+      "agentId": "bc-121aa9b2-c2ec-480d-9ff6-0269b1f900eb",
+      "runId": "run-0c420ee0-13cf-45dc-807d-b98c04d901d0",
+      "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-audit-status-doc-open-items.md",
+      "startedAt": "2026-05-11T01:22:21.175Z",
+      "finishedAt": "2026-05-11T01:25:36.825Z",
+      "lastUpdate": "2026-05-11T01:25:36.826Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "start-auth-register-password-strength-and-tos",
+      "type": "worker",
+      "branch": "orch/status-docs-followup-20ad/start-auth-register-password-strength-and-tos",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-audit-status-doc-open-items"
+      ],
+      "agentId": "bc-024c8221-13d8-4360-bc3c-77acef55d81c",
+      "runId": "run-0c7b8bbd-4a43-41fd-b653-c5cbdd5533cb",
+      "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/start-auth-register-password-strength-and-tos.md",
+      "startedAt": "2026-05-11T01:25:44.405Z",
+      "finishedAt": "2026-05-11T01:31:56.208Z",
+      "lastUpdate": "2026-05-11T01:54:30.770Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": "unit-test-verified"
+    },
+    {
+      "name": "verify-auth-register-password-strength-and-tos",
+      "type": "verifier",
+      "branch": "(no branch — verifier did not modify or push code)",
+      "startingRef": "orch/status-docs-followup-20ad/start-auth-register-password-strength-and-tos",
+      "dependsOn": [
+        "start-auth-register-password-strength-and-tos"
+      ],
+      "agentId": "bc-49395529-fe69-48b1-ae13-75d34d3b3d9a",
+      "runId": "run-e0090ca1-80ed-438a-9881-2e56e5fea9be",
+      "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-auth-register-password-strength-and-tos.md",
+      "startedAt": "2026-05-11T01:49:47.834Z",
+      "finishedAt": "2026-05-11T01:54:29.809Z",
+      "lastUpdate": "2026-05-11T01:54:29.809Z",
+      "note": "respawned by local-cli (was cancelled; attempts=1)",
+      "attempts": 2,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    }
+  ],
+  "attention": [
+    {
+      "at": "2026-05-11T01:22:14.799Z",
+      "message": "audit-status-doc-open-items: verification self-reported (not-verified)"
+    },
+    {
+      "at": "2026-05-11T01:25:39.753Z",
+      "message": "audit-status-doc-open-items: verification recorded (unit-test-verified) by verifier verify-audit-status-doc-open-items"
+    },
+    {
+      "at": "2026-05-11T01:31:56.213Z",
+      "message": "git-sync failed (start-auth-register-password-strength-and-tos running -> handed-off): Command failed: git -C /workspace/.orchestrate/status-docs-followup-20ad add /workspace/.orchestrate/status-docs-followup-20ad/state.json /workspace/.orchestrate/status-docs-followup-20ad/plan.json /w…"
+    },
+    {
+      "at": "2026-05-11T01:31:58.437Z",
+      "message": "git-sync failed (verify-auth-register-password-strength-and-tos pending -> running): Command failed: git -C /workspace/.orchestrate/status-docs-followup-20ad push\nTo https://github.com/zhuocun/pulse\n ! [remote rejected] cursor/non-ga-todos-root-planner-20ad -> cursor/non-ga-todos-root…"
+    },
+    {
+      "at": "2026-05-11T01:49:01.020Z",
+      "message": "verify-auth-register-password-strength-and-tos: cancelled by operator"
+    },
+    {
+      "at": "2026-05-11T01:49:43.347Z",
+      "message": "verify-auth-register-password-strength-and-tos: respawned by local-cli (was cancelled)"
+    },
+    {
+      "at": "2026-05-11T01:54:30.770Z",
+      "message": "start-auth-register-password-strength-and-tos: verification recorded (unit-test-verified) by verifier verify-auth-register-password-strength-and-tos"
+    }
+  ]
+}

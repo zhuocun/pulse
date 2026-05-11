@@ -224,4 +224,11 @@ describe("LoginForm", () => {
 
         expect(link).toHaveFocus();
     });
+
+    it("renders a Terms of Service link in the auth agreement line", () => {
+        renderLoginForm();
+        expect(
+            screen.getByRole("link", { name: /^terms of service$/i })
+        ).toHaveAttribute("href", "/auth/terms");
+    });
 });

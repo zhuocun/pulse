@@ -185,4 +185,26 @@ describe("RegisterForm", () => {
             screen.getByRole("button", { name: /sign(ing)? up/i })
         ).toHaveClass("ant-btn-loading");
     });
+
+    it("surfaces localized password strength feedback after typing", async () => {
+        renderRegisterForm();
+
+        expect(screen.queryByText(/Too short/i)).not.toBeInTheDocument();
+
+        await changeField(/^password$/i, "short");
+        expect(await screen.findByText(/Too short/i)).toBeInTheDocument();
+
+        await changeField(/^password$/i, "Password99");
+        expect(screen.getByText(/Strong password/i)).toBeInTheDocument();
+    });
+
+    it("exposes an accessible Terms of Service link inside the auth copy", async () => {
+        renderRegisterForm();
+
+        expect(
+            screen.getByRole("link", {
+                name: /^terms of service$/i
+            })
+        ).toHaveAttribute("href", "/auth/terms");
+    });
 });
