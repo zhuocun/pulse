@@ -63,13 +63,13 @@
       "handoffPath": "handoffs/start-auth-register-password-strength-and-tos.md",
       "startedAt": "2026-05-11T01:25:44.405Z",
       "finishedAt": "2026-05-11T01:31:56.208Z",
-      "lastUpdate": "2026-05-11T01:31:56.209Z",
+      "lastUpdate": "2026-05-11T01:54:30.770Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-auth-register-password-strength-and-tos",
@@ -120,6 +120,10 @@
     {
       "at": "2026-05-11T01:49:43.347Z",
       "message": "verify-auth-register-password-strength-and-tos: respawned by local-cli (was cancelled)"
+    },
+    {
+      "at": "2026-05-11T01:54:30.770Z",
+      "message": "start-auth-register-password-strength-and-tos: verification recorded (unit-test-verified) by verifier verify-auth-register-password-strength-and-tos"
     }
   ]
 }
