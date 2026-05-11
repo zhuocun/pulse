@@ -660,7 +660,23 @@ export const enSource = {
         heroFeatureDraft: "Draft tasks and standup briefs with AI.",
         heroFeatureDrag: "Drag-and-drop columns and cards.",
         heroFeatureColors: "Light, dark, and system color modes.",
-        heroFinePrint: "Built for teams that ship. Free to try, no credit card."
+        heroFinePrint:
+            "Built for teams that ship. Free to try, no credit card.",
+        passwordStrength: {
+            meterAriaLabel: "Password strength",
+            tooShort: "Too short — use at least 8 characters.",
+            weak: "Weak — mix upper-case, lower-case, numbers, or symbols.",
+            fair: "Fair — add length or another character type for a stronger password.",
+            strong: "Strong password."
+        },
+        termsLink: "Terms of Service",
+        termsLoginPrefix: "By signing in, you agree to our",
+        termsLoginSuffix: ".",
+        termsRegisterPrefix: "By signing up, you agree to our",
+        termsRegisterSuffix: ".",
+        termsPageTitle: "Terms of Service",
+        termsPageBody:
+            "This deployment does not yet host standalone legal text. Ask your administrator or Pulse legal contact for the terms and acceptable-use policy that apply to your workspace."
     },
     commandPalette: {
         title: "Command palette",
