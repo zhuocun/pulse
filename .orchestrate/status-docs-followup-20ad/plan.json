@@ -89,13 +89,13 @@
     {
       "name": "verify-auth-register-password-strength-and-tos",
       "type": "verifier",
-      "model": "gpt-5.3-codex-high-fast",
+      "model": "claude-opus-4-7",
       "verifies": "start-auth-register-password-strength-and-tos",
       "dependsOn": [
         "start-auth-register-password-strength-and-tos"
       ],
       "scopedGoal": "Verify the first started open UI item is implemented correctly and status docs were updated truthfully.",
-      "brief": "Check UX behavior, i18n coverage, and tests around register password-strength and terms link. Validate status-doc updates for ui-todo/product-done follow AGENTS.md and do not over-claim closure.",
+      "brief": "Check UX behavior, i18n coverage, and tests around register password-strength and terms link. Validate status-doc updates for ui-todo/product-done follow AGENTS.md and do not over-claim closure. Use repo-level code/test evidence only (no GUI/manual recording); treat this as a terminal-driven verification pass to avoid non-essential tool stalls.",
       "acceptance": [
         "Verifier confirms behavior/test evidence for password-strength + terms link",
         "Verifier confirms status docs are truthful and aligned with the partial closure scope"
