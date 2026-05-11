@@ -258,6 +258,35 @@
       "prNumber": 203,
       "failureMode": null,
       "verification": null
+    },
+    {
+      "name": "merge-todo-sweep",
+      "type": "worker",
+      "branch": "orch/todo-sweep-566b/todo-sweep",
+      "startingRef": "main",
+      "dependsOn": [
+        "fix-project-detail-shell",
+        "chat-drawer-polish",
+        "auth-form-completion",
+        "dnd-affordances",
+        "feedback-parity",
+        "docs-status-hygiene"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "running",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": "2026-05-11T06:51:43.198Z",
+      "finishedAt": null,
+      "lastUpdate": "2026-05-11T06:51:43.198Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [

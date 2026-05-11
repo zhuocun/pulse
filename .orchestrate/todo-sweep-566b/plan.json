@@ -280,6 +280,46 @@
       "maxAttempts": 2
     },
     {
+      "name": "merge-todo-sweep",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "startingRef": "main",
+      "dependsOn": [
+        "fix-project-detail-shell",
+        "chat-drawer-polish",
+        "auth-form-completion",
+        "dnd-affordances",
+        "feedback-parity",
+        "docs-status-hygiene"
+      ],
+      "scopedGoal": "Consolidate the six todo-sweep worker branches into a single unified integration branch the human operator will merge into `main` themselves. Do NOT open a PR. Push exactly `orch/todo-sweep-566b/merge-todo-sweep` and stop.",
+      "brief": "Operator wants one branch to review / merge into main. Your job is the consolidation, not new code.\n\n## Merge order (use `git merge --no-ff` for each so the audit trail survives)\n\n1. `orch/todo-sweep-566b/fix-project-detail-shell`\n2. `orch/todo-sweep-566b/dnd-affordances`\n3. `orch/todo-sweep-566b/chat-drawer-polish`\n4. `orch/todo-sweep-566b/auth-form-completion`\n5. `orch/todo-sweep-566b/feedback-parity`\n6. `orch/todo-sweep-566b/docs-status-hygiene`\n\nEach branch's full handoff is pasted into this prompt by the orchestrator; read them to learn what files each one touched and any deviations the verifier called out (e.g. feedback-parity's `(no branch)` line in the docs-hygiene handoff is a doc-note inaccuracy, the actual code IS on `orch/todo-sweep-566b/feedback-parity`).\n\n## Conflict-resolution policy\n\nMost conflicts will be in:\n\n- `src/i18n/locales/en.ts` and `src/i18n/locales/zh-CN.ts` — union of additions. Each worker added keys to different sub-objects (`microcopy.breadcrumb.*`, `microcopy.ai.*`, `microcopy.auth.*`, `microcopy.dragHints.*`, `microcopy.feedback.*`). Reconcile by re-reading the object structure and keeping every new key from every side; preserve sentence-case style and the trailing-comma convention used in the surrounding file.\n- `src/constants/microcopy.ts` — same union-of-additions policy as locales.\n- `docs/status/ui-todo.md` and `docs/status/product-done.md` — prefer the `docs-status-hygiene` version. It was authored after seeing all 5 worker handoffs and intentionally encodes the closure annotations. If an earlier worker (against the brief's `pathsForbidden`) snuck a doc edit in, drop that edit in favor of the hygiene worker's text.\n- Any code-file conflict: bias toward keeping both contributions and re-running `tsc --noEmit` to catch incompatibilities. If two workers genuinely contradict each other on the same line and you can't reconcile, prefer the more recent worker in the merge order (later wins) and call out the override in your handoff `## Notes` section.\n\nDo NOT rewrite history (no rebases, no squashes, no `git filter-branch`). Do NOT drop any worker's diff — every closed item must survive.\n\n## Verification (run on the final merged tree)\n\n- `npm install` (lockfile may have drifted across branches; if it did, prefer the most permissive lockfile resolution and re-run to confirm).\n- `npx tsc --noEmit` — must be clean.\n- `npm run eslint -- --max-warnings 0` — must be clean. If a worker introduced an `eslint-disable-next-line` that the surrounding context made redundant, leave it; do not chase lint debt outside this merge.\n- `CI=true npm test -- --watchAll=false --runInBand` — full Jest suite must pass. If a test in one slice breaks because another slice changed the shared surface, fix the test (not the implementation) and note the fix in your handoff.\n- `npx vite build` — must succeed.\n\n## Branch / PR discipline\n\n- Start from `main`.\n- Create branch `orch/todo-sweep-566b/merge-todo-sweep` and push it.\n- `openPR: false` — DO NOT open a PR. The human operator will do the final merge into `main` themselves.\n- In your handoff `## Branch`, report exactly `orch/todo-sweep-566b/merge-todo-sweep`.\n\n## Handoff requirements\n\nIn addition to the standard structure, include in `## What I did`:\n- The 6 merge SHAs (one per `--no-ff` merge commit).\n- Each file that needed manual conflict resolution and the policy you applied.\n- The exact pass/fail counts from the full Jest run, and tsc / eslint / vite-build outcomes.\n\nIf any verification step fails and you cannot resolve it within the merge worker's scope (e.g. the failure indicates a real bug in one of the underlying slices, not a merge collision), STOP merging, leave the branch in its last-known-good state, and emit `Status: blocked` with the specific failure pinned to a slice. The operator can then route a fix to the underlying worker rather than papering over it in the merge.",
+      "pathsAllowed": [
+        "src/**",
+        "backend/**",
+        "docs/status/ui-todo.md",
+        "docs/status/product-done.md",
+        "package.json",
+        "package-lock.json",
+        ".github/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/status/release-todo.md"
+      ],
+      "acceptance": [
+        "Branch `orch/todo-sweep-566b/merge-todo-sweep` exists on origin and contains every commit from each of the six source branches (6 `--no-ff` merge commits visible in `git log --oneline --merges`).",
+        "`npx tsc --noEmit` is clean on the merged tree.",
+        "`npm run eslint -- --max-warnings 0` is clean on the merged tree.",
+        "`CI=true npm test -- --watchAll=false --runInBand` passes the full suite.",
+        "`npx vite build` succeeds.",
+        "No PR is opened (operator will merge into `main` themselves)."
+      ],
+      "verify": "## Setup\n- `npm ci` (use `--legacy-peer-deps` only if `npm ci` fails outright).\n\n## Automated\n- `npx tsc --noEmit`\n- `npm run eslint -- --max-warnings 0`\n- `CI=true npm test -- --watchAll=false --runInBand`\n- `npx vite build`\n- `git log --oneline --merges main..HEAD | wc -l` should be `6`.\n\n## Manual\n- (none — operator will inspect the branch after handoff)\n\n## Gotchas\n- Some workers added keys to `microcopy.ai.*`; some added keys to `microcopy.feedback.*`. Make sure no key is dropped during conflict resolution. Run `node -e \"console.log(Object.keys(require('./src/i18n/locales/en.ts').default || require('./src/i18n/locales/en.ts')).length)\"` (or open the file) to sanity-check the locale shape after merge.\n- `jest-axe` assertions are sensitive to DOM order; if a merge introduces a new violation, it's almost certainly a duplicate live-region or a missing `aria-label` after a refactor crossing slice boundaries. Fix the structural issue rather than relaxing the axe matcher.\n- Don't `git merge --strategy=ours` for any conflicts. The whole point is to preserve every slice's contribution.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
       "name": "docs-status-hygiene",
       "type": "worker",
       "model": "composer-2-fast",
