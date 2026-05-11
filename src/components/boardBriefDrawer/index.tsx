@@ -35,6 +35,7 @@ import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
+import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 /**
  * Brief-drawer list rows are activatable (open the underlying task in
@@ -99,6 +100,23 @@ const LIVE_REGION_STYLE = {
     padding: 0,
     position: "absolute" as const,
     width: 1
+};
+
+const extractSuggestionRunId = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== "object") return null;
+    const record = payload as Record<string, unknown>;
+    for (const key of [
+        "brief_run_id",
+        "run_id",
+        "suggestion_id",
+        "id"
+    ] as const) {
+        const candidate = record[key];
+        if (typeof candidate === "string" && candidate.length > 0) {
+            return candidate;
+        }
+    }
+    return null;
 };
 
 interface BoardBriefDrawerProps {
@@ -363,6 +381,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     const remoteBriefSuggestion = remoteAgent.lastSuggestion;
     const remoteBriefError = remoteAgent.error;
     const remoteBriefIsStreaming = remoteAgent.isStreaming;
+    const remoteBriefThreadId = remoteAgent.threadId;
 
     // Pick the active result.
     const isRemote = !environment.aiUseLocalEngine;
@@ -587,6 +606,30 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         return sum / briefData.workload.length;
     }, [briefData]);
 
+    const boardBriefRecommendationKey = useMemo(() => {
+        if (!briefData?.recommendation) return "";
+        const embedded = extractSuggestionRunId(remoteBriefSuggestion?.payload);
+        if (embedded) return embedded;
+        const baseline = `${briefData.headline}:${briefData.recommendation}:${briefData.recommendationDetail?.text ?? ""}`;
+        const runScoped = isRemote
+            ? remoteBriefThreadId
+            : `${projectId}:${generatedAt ?? 0}`;
+        return `${runScoped}:${baseline}`;
+    }, [
+        briefData,
+        generatedAt,
+        isRemote,
+        projectId,
+        remoteBriefSuggestion,
+        remoteBriefThreadId
+    ]);
+
+    const recommendationFeedbackVisible = Boolean(
+        briefData?.recommendation &&
+        boardBriefRecommendationKey.length > 0 &&
+        !showBriefLoadingSkeleton
+    );
+
     return (
         <Drawer
             extra={
@@ -696,6 +739,30 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                     </Typography.Title>
                     {briefData.recommendation && (
                         <Alert
+                            action={
+                                recommendationFeedbackVisible &&
+                                !activeIsLoading ? (
+                                    <AiCopilotSurfaceFeedback
+                                        ariaGroupLabel={(
+                                            microcopy.feedback
+                                                .boardBriefTitle as string
+                                        ).replace(
+                                            "{section}",
+                                            String(
+                                                microcopy.brief
+                                                    .recommendedNextStep
+                                            )
+                                        )}
+                                        citationCount={
+                                            remoteAgent.citations.length
+                                        }
+                                        suggestionKey={
+                                            boardBriefRecommendationKey
+                                        }
+                                        surface="board-brief"
+                                    />
+                                ) : null
+                            }
                             description={
                                 <BriefRecommendationBody
                                     detail={briefData.recommendationDetail}

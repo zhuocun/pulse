@@ -297,7 +297,9 @@ const zhCN: Dictionary = {
         searchingTag: "搜索中…",
         resultsFiltered: "已筛选结果。{rationale}",
         noTasksMatched: "没有匹配的任务。请换一种说法,或清除以查看全部。",
-        boardEmpty: "此看板暂无任务。"
+        boardEmpty: "此看板暂无任务。",
+        taskAssistTitle: "{section}：对本条任务协助建议评分",
+        boardBriefTitle: "{section}：对本条看板简报建议评分"
     },
     greeting: "你好，{name}",
     header: {
