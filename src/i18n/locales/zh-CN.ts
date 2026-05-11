@@ -770,7 +770,9 @@ const zhCN: Dictionary = {
         serverMetadataUnavailable: "无法加载服务器限制信息。",
         rateLimitLine: "速率限制：{perMinute} / 分钟 · {perHour} / 小时",
         monthlyBudgetCapLine: "组织每月 token 预算上限：{cap}（按项目预留）",
-        allowedAutonomyLabel: "允许的自主级别"
+        allowedAutonomyLabel: "允许的自主级别",
+        recursionLimitLine: "递归上限：{limit}",
+        contextSchemaKeysLine: "上下文结构键：{keys}"
     },
     mutation: {
         riskHigh: "高风险",

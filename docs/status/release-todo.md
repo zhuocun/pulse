@@ -184,9 +184,11 @@ LLM polish passes ahead of FE validation.
 
 `.github/workflows/backend-ci.yml`: on `push` / `pull_request`, changes under
 `backend/**` (or the workflow file) run **both** `test-full` (install
-`.[dev,ai]`, `pytest` with `--cov-fail-under=100`) and `test-slim` (install
-`.[dev]`, import smoke). `workflow_dispatch` adds **mode**
-`both` \| `test-full` \| `test-slim` (default `both`).
+`.[dev,ai]`, then `pytest` — the `--cov-fail-under=100` gate is set in
+`backend/pyproject.toml` `addopts`, so the workflow inherits it without
+re-passing the flag) and `test-slim` (install `.[dev]`, import smoke).
+`workflow_dispatch` adds **mode** `both` \| `test-full` \| `test-slim`
+(default `both`).
 
 **Evidence:** Re-run the **BE verification** recipe below. **Do not treat
 fixed pass / skip / warning integers in this file as contracts** — totals

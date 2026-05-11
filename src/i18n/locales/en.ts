@@ -814,7 +814,9 @@ export const enSource = {
         rateLimitLine: "Rate limit: {perMinute} / min · {perHour} / hour",
         monthlyBudgetCapLine:
             "Org monthly token budget cap: {cap} tokens (shared reservation model)",
-        allowedAutonomyLabel: "Allowed autonomy"
+        allowedAutonomyLabel: "Allowed autonomy",
+        recursionLimitLine: "Recursion limit: {limit}",
+        contextSchemaKeysLine: "Context schema keys: {keys}"
     },
     mutation: {
         riskHigh: "High risk",
