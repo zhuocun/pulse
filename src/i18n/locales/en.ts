@@ -571,6 +571,11 @@ export const enSource = {
         jumpToLatest: "Jump to latest",
         moreSources: "+{count} more",
         copiedShort: "Copied",
+        copyMessage: "Copy message",
+        copyMessageCopied: "Copied to clipboard",
+        toolDetailsToggle: "Show details",
+        toolDetailsHide: "Hide details",
+        characterCountTemplate: "{count}/{max}",
         toolEmptyResult: "empty result",
         toolVerbs: {
             checkedProjects: "Checked projects",
@@ -605,8 +610,7 @@ export const enSource = {
         runBoardTriagePrompt: "Run a triage check on the current board.",
         storyPointsSetTo: "Story points set to {value}.",
         readinessUpdated: "Updated {field}.",
-        characterCounterMax: 2000,
-        characterCounterShowAfter: 500,
+        characterCounterMax: 4000,
         breakdownAxes: {
             by_phase: {
                 label: "By phase",

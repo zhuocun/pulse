@@ -537,6 +537,11 @@ const zhCN: Dictionary = {
         jumpToLatest: "跳转到最新内容",
         moreSources: "+{count} 个更多来源",
         copiedShort: "已复制",
+        copyMessage: "复制消息",
+        copyMessageCopied: "已复制到剪贴板",
+        toolDetailsToggle: "显示详情",
+        toolDetailsHide: "隐藏详情",
+        characterCountTemplate: "{count}/{max}",
         toolEmptyResult: "空结果",
         toolVerbs: {
             checkedProjects: "已检查项目",
@@ -569,8 +574,7 @@ const zhCN: Dictionary = {
         runBoardTriagePrompt: "对当前看板运行一次分诊检查。",
         storyPointsSet: "故事点已设置为 {value}。",
         readinessFieldUpdated: "已更新 {field}。",
-        characterCounterMax: 2000,
-        characterCounterShowAfter: 500,
+        characterCounterMax: 4000,
         breakdownAxes: {
             by_phase: {
                 label: "按阶段",
