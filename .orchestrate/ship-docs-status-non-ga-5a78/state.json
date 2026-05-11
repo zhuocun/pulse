@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-11T02:45:51.230Z",
       "lastUpdate": "2026-05-11T02:45:52.167Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "not-verified",
-      "attempts": 1
+      "verification": "not-verified"
     },
     {
       "name": "verify-reconciled-status-roadmap-docs",
@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-11T02:49:21.893Z",
       "lastUpdate": "2026-05-11T02:49:21.893Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [

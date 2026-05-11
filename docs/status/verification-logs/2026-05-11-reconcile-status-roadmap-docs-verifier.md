@@ -29,3 +29,5 @@ npx eslint src eslint.config.mjs --max-warnings 0
 
 - Auth password-strength + terms routing **matches** source (`passwordStrengthHint.tsx`, `termsAgreement.tsx`, `registerForm/index.tsx`, login importing terms from registerForm).
 - **`docs/status/release-todo.md` §16b** heading still describes `useAgent.ts` as a **935-line** monolith; **`docs/status/architecture-todo.md`** and **`wc -l`** agree on **853** lines — **cross-doc contradiction** (factual staleness in the resolved §16b row).
+
+**Follow-up (2026-05-11, `cursor/ship-docs-status-non-ga-5a78`):** §16b heading/body updated to drop the stale **935** figure; this log moved to [`docs/status/verification-logs/2026-05-11-reconcile-status-roadmap-docs-verifier.md`](docs/status/verification-logs/2026-05-11-reconcile-status-roadmap-docs-verifier.md).

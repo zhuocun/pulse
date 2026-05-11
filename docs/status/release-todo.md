@@ -291,13 +291,14 @@ the polish prompt so brief runs prime triage without a separate orchestrator.
 **Not** full multi-agent handoff — shared store only. Tests ride existing
 agent graph coverage plus store wiring in catalog modules.
 
-### ✅ 16b. `useAgent.ts` is a 935-line monolith  *(FE — Resolved 2026-05-10)*
+### ✅ 16b. `useAgent` stream framing extracted (post-§16b consumer split)  *(FE — Resolved 2026-05-10)*
 
 SSE stream framing + watchdog handling extracted to
 ``src/utils/hooks/useAgentStreamConsumer.ts`` (``forEachAgentStreamPart``);
 `useAgent.ts` delegates the consumer loop. Prior extractions remain:
 `useNudgeInbox.ts`, `useAgentToolResolver.ts`. Tests:
 ``useAgentStreamConsumer.test.ts`` plus existing `useAgent` suites.
+Line counts drift as the hook evolves; see [`architecture-todo.md`](architecture-todo.md) Theme 3 status for the current `wc -l` snapshot.
 
 ### ✅ 16c. `X-Pulse-Model` header / per-tenant model config  *(BE — Resolved 2026-05-10)*
 
@@ -480,7 +481,8 @@ alignment — not a separate numbered blocker. Historical structural notes live 
 
 ```bash
 npm install
-npm run eslint                                              # must be clean (--max-warnings 0)
+npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js  # CI parity (.github/workflows/frontend-ci.yml): no --fix; must pass --max-warnings 0
+# Local shortcut (runs with --fix): npm run eslint
 npx tsc --noEmit                                            # must be clean
 CI=true npm test -- --watchAll=false --runInBand            # Jest prints suite + test totals at end; compare to verification-logs/
 npx vite build                                              # must succeed

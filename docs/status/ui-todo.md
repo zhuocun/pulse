@@ -539,7 +539,7 @@ This is the explicit answer to "does the plan embody UI/UX best practice?". Each
 | Nielsen 2 — Match real world                         | 2.A.6, 2.A.8, 3.1                           |
 | Nielsen 3 — User control & freedom                   | 2.A.1, 2.A.4, 2.A.9                         |
 | Nielsen 4 — Consistency & standards                  | 1.1, 2.A.5, 2.A.10, 3.1                     |
-| Nielsen 5 — Error prevention                         | 2.A.1, 2.A.4, 2.7                           |
+| Nielsen 5 — Error prevention                         | 2.A.1, 2.A.4, Phase 2.7                     |
 | Nielsen 6 — Recognition over recall                  | 2.4, 2.A.2, 2.A.9                           |
 | Nielsen 7 — Flexibility & efficiency                 | 4.1, 4.5, 2.A.7, 2.A.9                      |
 | Nielsen 8 — Aesthetic & minimalist                   | 2.3, 2.A.10, 2.A.8                          |
