@@ -37,7 +37,7 @@ unit-test-verified
 - **Screenshot/recording:** No before/after capture in this environment; planner can attach from manual `npm run dev` if needed.
 - **Scope deviation:** Updated `src/pages/project.ai.test.tsx` (not in the original allow-list) because it asserted `details` and would fail CI; selectors now use `chat-tool-payload-block` and the **Show details** button.
 - **`microcopy.ai.copyMessage` vs `microcopy.a11y.copyResponse`:** Copy button `aria-label` now uses the new `ai.copyMessage` string per task; `copyMessageCopied` is in locales for parity (toast not used because the brief preferred icon flash).
-- **`docs/status`:** Not edited per instructions (orchestrator owns backlog rows).
+- **`docs/todo`:** Not edited per instructions (orchestrator owns backlog rows).
 
 ## Suggested follow-ups
 - Optional: add `message.success(microcopy.ai.copyMessageCopied)` if product wants redundant toast in addition to the checkmark icon.

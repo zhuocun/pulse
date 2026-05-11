@@ -21,7 +21,7 @@ success
   - `src/i18n/locales/en.ts` → `dragHints.taskCardKeyboard`
   - `src/i18n/locales/zh-CN.ts` → `dragHints.taskCardKeyboard`
 - Added a column test assertion in `src/components/column/index.test.tsx` verifying both the hint text (`title`) and the `aria-keyshortcuts` attribute on task cards.
-- Updated `docs/status/ui-todo.md` (Phase 3.4 / 2.A.9 references) to mark keyboard-drag discoverability on task cards as shipped/partially complete where appropriate.
+- Updated `docs/todo/ui-todo.md` (Phase 3.4 / 2.A.9 references) to mark keyboard-drag discoverability on task cards as shipped/partially complete where appropriate.
 - Captured a live UI recording demonstrating the tooltip hint on hover: `/opt/cursor/artifacts/task_card_keyboard_drag_hint_demo.mp4`.
 
 ## Measurements

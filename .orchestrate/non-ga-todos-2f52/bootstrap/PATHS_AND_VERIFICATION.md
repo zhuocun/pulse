@@ -1,6 +1,6 @@
 ## FE verification (after Copilot/metadata tasks)
 
-From `docs/status/release-todo.md` FE block:
+From `docs/todo/release-todo.md` FE block:
 
 ```bash
 npm ci
@@ -23,4 +23,4 @@ ruff check .
 ## Files this plan expects workers to honour
 
 - `bootstrap/BACKLOG_OPEN_NON_GA.md` — scope authority for non-GA slices
-- Repo `AGENTS.md` — backlog single source of truth in `docs/status/`
+- Repo `AGENTS.md` — backlog single source of truth in `docs/todo/`

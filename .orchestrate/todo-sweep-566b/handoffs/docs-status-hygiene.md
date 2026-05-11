@@ -14,16 +14,16 @@ success
 `orch/todo-sweep-566b/docs-status-hygiene`
 
 ## What I did
-- Updated `docs/status/ui-todo.md` for the five verifier-backed workers: struck completed sub-bullets and added **`[Complete on branch …]`** notes with evidence paths for **fix-project-detail-shell**, **chat-drawer-polish**, **auth-form-completion**, **dnd-affordances**, and **feedback-parity** (open-backlog **§20b** line and **§2.A.8** chat tool-payload rule aligned with the same branches / notes).
-- Appended five **At a glance** rows to `docs/status/product-done.md` (Surface | PRD/status ref | branch + evidence); **feedback-parity** documents **`## Branch` = `(no branch)`** verbatim and cites handoff **`Target` `orch/todo-sweep-566b/feedback-parity`** for integration hygiene.
-- Left **`docs/status/release-todo.md`** untouched; **only** `ui-todo.md` and `product-done.md` are in the diff.
+- Updated `docs/todo/ui-todo.md` for the five verifier-backed workers: struck completed sub-bullets and added **`[Complete on branch …]`** notes with evidence paths for **fix-project-detail-shell**, **chat-drawer-polish**, **auth-form-completion**, **dnd-affordances**, and **feedback-parity** (open-backlog **§20b** line and **§2.A.8** chat tool-payload rule aligned with the same branches / notes).
+- Appended five **At a glance** rows to `docs/todo/product-done.md` (Surface | PRD/status ref | branch + evidence); **feedback-parity** documents **`## Branch` = `(no branch)`** verbatim and cites handoff **`Target` `orch/todo-sweep-566b/feedback-parity`** for integration hygiene.
+- Left **`docs/todo/release-todo.md`** untouched; **only** `ui-todo.md` and `product-done.md` are in the diff.
 - Committed, pushed `orch/todo-sweep-566b/docs-status-hygiene`, opened **draft PR #203** (`main` ← head).
 
 ## Measurements
 (none)
 
 ## Verification
-- `git diff --stat docs/status/` → **only** `ui-todo.md` and `product-done.md`; **`git diff docs/status/release-todo.md`** empty (0 bytes).
+- `git diff --stat docs/todo/` → **only** `ui-todo.md` and `product-done.md`; **`git diff docs/todo/release-todo.md`** empty (0 bytes).
 - No tests run (docs-only worker per brief).
 
 ## Notes, concerns, deviations, findings, thoughts, feedback

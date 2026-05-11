@@ -120,7 +120,10 @@ const CopilotAboutPopover: React.FC = () => {
             const recursionLine =
                 typeof recursionLimit === "number" &&
                 Number.isFinite(recursionLimit)
-                    ? `Recursion limit: ${recursionLimit}`
+                    ? microcopy.about.recursionLimitLine.replace(
+                          "{limit}",
+                          String(recursionLimit)
+                      )
                     : null;
             const normalizedTags =
                 tags
@@ -133,7 +136,10 @@ const CopilotAboutPopover: React.FC = () => {
                     ? (() => {
                           const keys = Object.keys(contextSchema);
                           if (keys.length === 0) return null;
-                          return `Context schema keys: ${keys.join(", ")}`;
+                          return microcopy.about.contextSchemaKeysLine.replace(
+                              "{keys}",
+                              keys.join(", ")
+                          );
                       })()
                     : null;
             const hasDisclosedField =

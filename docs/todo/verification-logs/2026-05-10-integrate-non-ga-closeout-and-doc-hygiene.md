@@ -1,13 +1,13 @@
 # Verification — integrate non-GA closeout + doc hygiene
 
 - **Branch:** `orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene`
-- **Commit for this snapshot:** run `git log -1 --format=%H -- docs/status/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md`
+- **Commit for this snapshot:** run `git log -1 --format=%H -- docs/todo/verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md`
 
 ## Purpose
 
 Record a reproducible backend + frontend check after merging
 `close-non-ga-release-todo-items` with `release-todo-doc-hygiene-closeout`.
-`docs/status/release-todo.md` intentionally **does not** embed fixed
+`docs/todo/release-todo.md` intentionally **does not** embed fixed
 pytest/Jest totals (they drift with optional extras, markers, and new tests);
 compare any run to this log and the recipes in **BE verification** / **FE
 verification** in [`release-todo.md`](../release-todo.md).

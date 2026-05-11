@@ -1,6 +1,6 @@
 <!-- orchestrate handoff
 task: verify-release-todo-doc-hygiene-closeout
-branch: `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)
+branch: `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/todo/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)
 agentId: bc-b86205d5-239c-4917-a085-fe0e1a140009
 runId: run-04cbba5a-5c63-47dc-8839-2ff4f01cd9cf
 resultStatus: finished
@@ -19,11 +19,11 @@ Live pytest and Jest runs on this branch do **not** match the hard-coded totals 
 
 ## Branch
 
-`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)
+`orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `cf2ddac` (pushed after adding `docs/todo/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`)
 
 ## Execution
 
-- Read and cross-checked `docs/status/release-todo.md` and `docs/status/product-done.md` for open vs ✅-closed numbered gates and `product-done` “At a glance” links.
+- Read and cross-checked `docs/todo/release-todo.md` and `docs/todo/product-done.md` for open vs ✅-closed numbered gates and `product-done` “At a glance” links.
 - `source /workspace/.venv/bin/activate && cd /workspace/backend && python -m pytest -q --tb=no` → **`1042 passed, 1 skipped`**; **`100%` line coverage** met; **`1042 passed, 1 skipped, 40 warnings in ~19–22s`** on repeated run.
 - Same venv: `python -m pytest -q --tb=no -rs` → single skip: **`tests/test_agents_postgres_live.py`** requires **`PYTEST_AGENT_POSTGRES_URI`** (not the “integration gate” wording used in §7).
 - `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh" && nvm use` (Node **v24.15.0**), `cd /workspace && NODE_OPTIONS=--max-old-space-size=8192 CI=true npm test -- --watchAll=false --runInBand` → **`Test Suites: 149 passed, 149 total`**, **`Tests: 1082 passed, 1082 total`**, ~94s.
@@ -50,5 +50,5 @@ Other findings (severity-ordered):
 
 ## Notes & suggestions
 
-- Treat **`docs/status/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`** on **`cf2ddac`** as the live counterexample to the §7 / FE snippet numbers until the worker refreshes them (or removes hard-coded totals entirely).
+- Treat **`docs/todo/verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md`** on **`cf2ddac`** as the live counterexample to the §7 / FE snippet numbers until the worker refreshes them (or removes hard-coded totals entirely).
 - Planner should **not** treat this hygiene branch as “numeric reconciliation verified” without editing `release-todo.md` to match a fresh CI/local log or replacing integers with “see latest verifier log / CI artifact” only.

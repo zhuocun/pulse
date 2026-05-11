@@ -16,13 +16,13 @@ success
 ## What I did
 - Added `IDEMPOTENCY_BACKEND: redis` immediately above `REDIS_URI` in `backend/docker-compose.yml` next to `RATE_LIMIT_BACKEND` / `BUDGET_BACKEND`.
 - Refreshed the file header so Redis is described as backing rate limit, budget, and idempotency, and that agents share those Redis-backed concerns locally.
-- Tightened `docs/status/release-todo.md` §16d action bullets: compose now sets all three backends against `REDIS_URI`; caveat about missing idempotency in compose removed; clarified Dockerfile / prod paths still need parity before multi-worker.
+- Tightened `docs/todo/release-todo.md` §16d action bullets: compose now sets all three backends against `REDIS_URI`; caveat about missing idempotency in compose removed; clarified Dockerfile / prod paths still need parity before multi-worker.
 - Committed and pushed the branch; did not merge, rebase, or open a PR.
 
 ## Measurements
 - `IDEMPOTENCY_BACKEND=redis` adjacent to `REDIS_URI` in `backend/docker-compose.yml`: absent → present
 - Compose header mentions Redis for rate limit + budget + idempotency: partial → yes
-- `docs/status/release-todo.md` §16d matches current compose wiring: no → yes
+- `docs/todo/release-todo.md` §16d matches current compose wiring: no → yes
 
 ## Verification
 - `not-verified`

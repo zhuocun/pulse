@@ -1,7 +1,7 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "todo-sweep: Implement to-do items from docs/status using Opus as orchestrator and Composer 2 for every worker / verifier role; close as many independent open UI / architecture backlog rows as can be parallelized without colliding on shared files (the only open GA-code gate, release-todo §1 / Theme 5 MutationProposal lifecycle, is explicitly out of scope for this sweep because BE undo semantics are unspecified and the slice does not fit a single bounded worker).",
-  "summary": "todo-sweep: 5 parallel UI / a11y backlog workers, each with a composer-2-fast verifier, plus a docs-status hygiene worker to close the items in docs/status.",
+  "goal": "todo-sweep: Implement to-do items from docs/todo using Opus as orchestrator and Composer 2 for every worker / verifier role; close as many independent open UI / architecture backlog rows as can be parallelized without colliding on shared files (the only open GA-code gate, release-todo §1 / Theme 5 MutationProposal lifecycle, is explicitly out of scope for this sweep because BE undo semantics are unspecified and the slice does not fit a single bounded worker).",
+  "summary": "todo-sweep: 5 parallel UI / a11y backlog workers, each with a composer-2-fast verifier, plus a docs-status hygiene worker to close the items in docs/todo.",
   "rootSlug": "todo-sweep-566b",
   "baseBranch": "main",
   "prBase": "main",
@@ -11,7 +11,7 @@
   "acceptanceCriteria": [
     "Each implementation worker ships a draft PR that closes its scoped open item end-to-end (code + tests; i18n parity en + zh-CN where applicable).",
     "Each verifier records a strong verification class (unit-test-verified or live-ui-verified) for its target, or surfaces a concrete blocker that the planner can act on.",
-    "The docs-status hygiene worker reconciles docs/status/ui-todo.md and docs/status/product-done.md to reflect the merged item closures (no doc/code drift)."
+    "The docs-status hygiene worker reconciles docs/todo/ui-todo.md and docs/todo/product-done.md to reflect the merged item closures (no doc/code drift)."
   ],
   "tasks": [
     {
@@ -19,7 +19,7 @@
       "type": "worker",
       "model": "composer-2-fast",
       "scopedGoal": "Close ui-todo §5 / Phase 2.5: collapse the duplicate project-detail layout into the main shell, replace the left-aside popover with a real `<Breadcrumb>` element, and fix the stray `5 px` (broken) box-shadow value. Keep the `/projects/:projectId` → `/projects/:projectId/board` redirect intact so existing AI tests still mount the board route.",
-      "brief": "Implementation plan:\n\n1. **`src/pages/projectDetail.tsx`**: replace the dedicated `display: grid; grid-template-columns: 16rem 1fr` shell + left aside + `<ProjectPopover>` with a top-of-content AntD `<Breadcrumb>` (e.g. `Projects / {projectName}`). Keep the existing `useEffect`/redirect that sends `/projects/:projectId` to `/projects/:projectId/board`. Remove the broken `5 px` literal in the `box-shadow` declaration (it silently disables the shadow); use the design-system shadow token from `src/theme/tokens.ts` (`shadow.*`) instead of a hand-rolled rgba string.\n2. The breadcrumb must be a real interactive AntD `<Breadcrumb>` (anchor entries via `react-router`'s `<Link>`), not a static span. The breadcrumb's last segment is the project name (visible) with `aria-current=\"page\"`.\n3. Move any \"Members\" / \"Projects\" affordance that previously lived in the aside into the main header chrome if it lacks a duplicate (do NOT add a duplicate if already present in `src/components/header/index.tsx`); if it's already in the header, simply drop the aside without re-adding it.\n4. Add a focused test in `src/__tests__/` that mounts `ProjectDetailPage`, asserts the breadcrumb is present with an accessible name (`Projects` link + current project segment), the `5 px` typo is gone (rendered `box-shadow` does not contain the literal `5 px`), and that visiting `/projects/:id` still redirects to `/projects/:id/board`.\n5. i18n: every new visible string is keyed under `microcopy.breadcrumb.*` (or reused if equivalent keys exist); `en.ts` and `zh-CN.ts` both updated. Do not edit `docs/status/**` — the docs-status-hygiene worker owns that file.\n\nDo NOT modify any other component or page beyond what is strictly required to land this slice. Keep the existing test suite green. UI / interactive bug: capture a before/after screenshot or short recording of the project detail route and include the path in your handoff if you have any GUI-driven verification available.",
+      "brief": "Implementation plan:\n\n1. **`src/pages/projectDetail.tsx`**: replace the dedicated `display: grid; grid-template-columns: 16rem 1fr` shell + left aside + `<ProjectPopover>` with a top-of-content AntD `<Breadcrumb>` (e.g. `Projects / {projectName}`). Keep the existing `useEffect`/redirect that sends `/projects/:projectId` to `/projects/:projectId/board`. Remove the broken `5 px` literal in the `box-shadow` declaration (it silently disables the shadow); use the design-system shadow token from `src/theme/tokens.ts` (`shadow.*`) instead of a hand-rolled rgba string.\n2. The breadcrumb must be a real interactive AntD `<Breadcrumb>` (anchor entries via `react-router`'s `<Link>`), not a static span. The breadcrumb's last segment is the project name (visible) with `aria-current=\"page\"`.\n3. Move any \"Members\" / \"Projects\" affordance that previously lived in the aside into the main header chrome if it lacks a duplicate (do NOT add a duplicate if already present in `src/components/header/index.tsx`); if it's already in the header, simply drop the aside without re-adding it.\n4. Add a focused test in `src/__tests__/` that mounts `ProjectDetailPage`, asserts the breadcrumb is present with an accessible name (`Projects` link + current project segment), the `5 px` typo is gone (rendered `box-shadow` does not contain the literal `5 px`), and that visiting `/projects/:id` still redirects to `/projects/:id/board`.\n5. i18n: every new visible string is keyed under `microcopy.breadcrumb.*` (or reused if equivalent keys exist); `en.ts` and `zh-CN.ts` both updated. Do not edit `docs/todo/**` — the docs-status-hygiene worker owns that file.\n\nDo NOT modify any other component or page beyond what is strictly required to land this slice. Keep the existing test suite green. UI / interactive bug: capture a before/after screenshot or short recording of the project detail route and include the path in your handoff if you have any GUI-driven verification available.",
       "pathsAllowed": [
         "src/pages/projectDetail.tsx",
         "src/pages/projectDetail.test.tsx",
@@ -31,7 +31,7 @@
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/**",
+        "docs/todo/**",
         "src/components/header/**",
         "src/components/aiChatDrawer/**",
         "src/components/aiTaskAssistPanel/**",
@@ -84,7 +84,7 @@
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/**",
+        "docs/todo/**",
         "src/utils/hooks/useAgent.ts",
         "src/utils/hooks/useAgentChat.ts",
         "src/components/aiTaskAssistPanel/**",
@@ -141,7 +141,7 @@
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/**",
+        "docs/todo/**",
         "src/components/aiChatDrawer/**",
         "src/components/aiTaskAssistPanel/**",
         "src/components/boardBriefDrawer/**",
@@ -190,7 +190,7 @@
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/**",
+        "docs/todo/**",
         "src/utils/hooks/useDragEnd.ts",
         "src/utils/optimisticUpdate/**",
         "src/components/aiChatDrawer/**",
@@ -244,7 +244,7 @@
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/**",
+        "docs/todo/**",
         "src/components/aiChatDrawer/**",
         "src/components/column/**",
         "src/utils/hooks/useAgent.ts",
@@ -293,19 +293,19 @@
         "docs-status-hygiene"
       ],
       "scopedGoal": "Consolidate the six todo-sweep worker branches into a single unified integration branch the human operator will merge into `main` themselves. Do NOT open a PR. Push exactly `orch/todo-sweep-566b/merge-todo-sweep` and stop.",
-      "brief": "Operator wants one branch to review / merge into main. Your job is the consolidation, not new code.\n\n## Merge order (use `git merge --no-ff` for each so the audit trail survives)\n\n1. `orch/todo-sweep-566b/fix-project-detail-shell`\n2. `orch/todo-sweep-566b/dnd-affordances`\n3. `orch/todo-sweep-566b/chat-drawer-polish`\n4. `orch/todo-sweep-566b/auth-form-completion`\n5. `orch/todo-sweep-566b/feedback-parity`\n6. `orch/todo-sweep-566b/docs-status-hygiene`\n\nEach branch's full handoff is pasted into this prompt by the orchestrator; read them to learn what files each one touched and any deviations the verifier called out (e.g. feedback-parity's `(no branch)` line in the docs-hygiene handoff is a doc-note inaccuracy, the actual code IS on `orch/todo-sweep-566b/feedback-parity`).\n\n## Conflict-resolution policy\n\nMost conflicts will be in:\n\n- `src/i18n/locales/en.ts` and `src/i18n/locales/zh-CN.ts` — union of additions. Each worker added keys to different sub-objects (`microcopy.breadcrumb.*`, `microcopy.ai.*`, `microcopy.auth.*`, `microcopy.dragHints.*`, `microcopy.feedback.*`). Reconcile by re-reading the object structure and keeping every new key from every side; preserve sentence-case style and the trailing-comma convention used in the surrounding file.\n- `src/constants/microcopy.ts` — same union-of-additions policy as locales.\n- `docs/status/ui-todo.md` and `docs/status/product-done.md` — prefer the `docs-status-hygiene` version. It was authored after seeing all 5 worker handoffs and intentionally encodes the closure annotations. If an earlier worker (against the brief's `pathsForbidden`) snuck a doc edit in, drop that edit in favor of the hygiene worker's text.\n- Any code-file conflict: bias toward keeping both contributions and re-running `tsc --noEmit` to catch incompatibilities. If two workers genuinely contradict each other on the same line and you can't reconcile, prefer the more recent worker in the merge order (later wins) and call out the override in your handoff `## Notes` section.\n\nDo NOT rewrite history (no rebases, no squashes, no `git filter-branch`). Do NOT drop any worker's diff — every closed item must survive.\n\n## Verification (run on the final merged tree)\n\n- `npm install` (lockfile may have drifted across branches; if it did, prefer the most permissive lockfile resolution and re-run to confirm).\n- `npx tsc --noEmit` — must be clean.\n- `npm run eslint -- --max-warnings 0` — must be clean. If a worker introduced an `eslint-disable-next-line` that the surrounding context made redundant, leave it; do not chase lint debt outside this merge.\n- `CI=true npm test -- --watchAll=false --runInBand` — full Jest suite must pass. If a test in one slice breaks because another slice changed the shared surface, fix the test (not the implementation) and note the fix in your handoff.\n- `npx vite build` — must succeed.\n\n## Branch / PR discipline\n\n- Start from `main`.\n- Create branch `orch/todo-sweep-566b/merge-todo-sweep` and push it.\n- `openPR: false` — DO NOT open a PR. The human operator will do the final merge into `main` themselves.\n- In your handoff `## Branch`, report exactly `orch/todo-sweep-566b/merge-todo-sweep`.\n\n## Handoff requirements\n\nIn addition to the standard structure, include in `## What I did`:\n- The 6 merge SHAs (one per `--no-ff` merge commit).\n- Each file that needed manual conflict resolution and the policy you applied.\n- The exact pass/fail counts from the full Jest run, and tsc / eslint / vite-build outcomes.\n\nIf any verification step fails and you cannot resolve it within the merge worker's scope (e.g. the failure indicates a real bug in one of the underlying slices, not a merge collision), STOP merging, leave the branch in its last-known-good state, and emit `Status: blocked` with the specific failure pinned to a slice. The operator can then route a fix to the underlying worker rather than papering over it in the merge.",
+      "brief": "Operator wants one branch to review / merge into main. Your job is the consolidation, not new code.\n\n## Merge order (use `git merge --no-ff` for each so the audit trail survives)\n\n1. `orch/todo-sweep-566b/fix-project-detail-shell`\n2. `orch/todo-sweep-566b/dnd-affordances`\n3. `orch/todo-sweep-566b/chat-drawer-polish`\n4. `orch/todo-sweep-566b/auth-form-completion`\n5. `orch/todo-sweep-566b/feedback-parity`\n6. `orch/todo-sweep-566b/docs-status-hygiene`\n\nEach branch's full handoff is pasted into this prompt by the orchestrator; read them to learn what files each one touched and any deviations the verifier called out (e.g. feedback-parity's `(no branch)` line in the docs-hygiene handoff is a doc-note inaccuracy, the actual code IS on `orch/todo-sweep-566b/feedback-parity`).\n\n## Conflict-resolution policy\n\nMost conflicts will be in:\n\n- `src/i18n/locales/en.ts` and `src/i18n/locales/zh-CN.ts` — union of additions. Each worker added keys to different sub-objects (`microcopy.breadcrumb.*`, `microcopy.ai.*`, `microcopy.auth.*`, `microcopy.dragHints.*`, `microcopy.feedback.*`). Reconcile by re-reading the object structure and keeping every new key from every side; preserve sentence-case style and the trailing-comma convention used in the surrounding file.\n- `src/constants/microcopy.ts` — same union-of-additions policy as locales.\n- `docs/todo/ui-todo.md` and `docs/todo/product-done.md` — prefer the `docs-status-hygiene` version. It was authored after seeing all 5 worker handoffs and intentionally encodes the closure annotations. If an earlier worker (against the brief's `pathsForbidden`) snuck a doc edit in, drop that edit in favor of the hygiene worker's text.\n- Any code-file conflict: bias toward keeping both contributions and re-running `tsc --noEmit` to catch incompatibilities. If two workers genuinely contradict each other on the same line and you can't reconcile, prefer the more recent worker in the merge order (later wins) and call out the override in your handoff `## Notes` section.\n\nDo NOT rewrite history (no rebases, no squashes, no `git filter-branch`). Do NOT drop any worker's diff — every closed item must survive.\n\n## Verification (run on the final merged tree)\n\n- `npm install` (lockfile may have drifted across branches; if it did, prefer the most permissive lockfile resolution and re-run to confirm).\n- `npx tsc --noEmit` — must be clean.\n- `npm run eslint -- --max-warnings 0` — must be clean. If a worker introduced an `eslint-disable-next-line` that the surrounding context made redundant, leave it; do not chase lint debt outside this merge.\n- `CI=true npm test -- --watchAll=false --runInBand` — full Jest suite must pass. If a test in one slice breaks because another slice changed the shared surface, fix the test (not the implementation) and note the fix in your handoff.\n- `npx vite build` — must succeed.\n\n## Branch / PR discipline\n\n- Start from `main`.\n- Create branch `orch/todo-sweep-566b/merge-todo-sweep` and push it.\n- `openPR: false` — DO NOT open a PR. The human operator will do the final merge into `main` themselves.\n- In your handoff `## Branch`, report exactly `orch/todo-sweep-566b/merge-todo-sweep`.\n\n## Handoff requirements\n\nIn addition to the standard structure, include in `## What I did`:\n- The 6 merge SHAs (one per `--no-ff` merge commit).\n- Each file that needed manual conflict resolution and the policy you applied.\n- The exact pass/fail counts from the full Jest run, and tsc / eslint / vite-build outcomes.\n\nIf any verification step fails and you cannot resolve it within the merge worker's scope (e.g. the failure indicates a real bug in one of the underlying slices, not a merge collision), STOP merging, leave the branch in its last-known-good state, and emit `Status: blocked` with the specific failure pinned to a slice. The operator can then route a fix to the underlying worker rather than papering over it in the merge.",
       "pathsAllowed": [
         "src/**",
         "backend/**",
-        "docs/status/ui-todo.md",
-        "docs/status/product-done.md",
+        "docs/todo/ui-todo.md",
+        "docs/todo/product-done.md",
         "package.json",
         "package-lock.json",
         ".github/**"
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/release-todo.md"
+        "docs/todo/release-todo.md"
       ],
       "acceptance": [
         "Branch `orch/todo-sweep-566b/merge-todo-sweep` exists on origin and contains every commit from each of the six source branches (6 `--no-ff` merge commits visible in `git log --oneline --merges`).",
@@ -330,25 +330,25 @@
         "verify-dnd-affordances",
         "verify-feedback-parity"
       ],
-      "scopedGoal": "Close the docs/status loop for the five implementation workers: strike or mark complete the matching entries in `docs/status/ui-todo.md` and add one-liner rows under `docs/status/product-done.md` per AGENTS.md backlog hygiene. Do NOT modify code outside `docs/status/**` (no further i18n/test/component edits).",
-      "brief": "Implementation plan:\n\n1. Read each upstream handoff (pasted into this prompt by the orchestrator) and pull out:\n   - the closed item(s) (e.g. `ui-todo §5`, `ui-todo §12 chat-drawer`, `ui-todo §11 / Phase 2.7 remaining`, `ui-todo §15`, `ui-todo §20b`),\n   - the branch the worker pushed to,\n   - the evidence (test file paths, key file paths).\n2. **`docs/status/ui-todo.md`**: for each closed item, edit the existing bullet to **strike** the resolved sub-bullets (preserve the strike-through convention used throughout the doc) and add a `**[Complete on branch `orch/todo-sweep-566b/<task-name>`: <evidence>.]**` annotation. Do NOT delete items wholesale unless every sub-bullet in the row is now resolved.\n3. **`docs/status/product-done.md`**: append a new row to the `At a glance` table (or whichever section is the right home) for each closed item, with the standard `Surface | PRD section | Status` shape used elsewhere in the file. Reference branch + the closed item ids.\n4. Do NOT edit `docs/status/release-todo.md` — GA §1 stays open and is explicitly out of scope for this sweep.\n5. Do NOT add tests or run any test command (this worker only edits docs). Run `git diff --stat docs/status/` before pushing as a sanity check.\n6. Verify against AGENTS.md: \"Don't restate blockers inline in README.md / backend/README.md\" — keep this worker scoped to `docs/status/**` only.\n\nIf any upstream handoff reports `Status: blocked` or `Status: partial`, do NOT mark its item as complete — instead, add a short note under the existing row explaining what is still open.",
+      "scopedGoal": "Close the docs/todo loop for the five implementation workers: strike or mark complete the matching entries in `docs/todo/ui-todo.md` and add one-liner rows under `docs/todo/product-done.md` per AGENTS.md backlog hygiene. Do NOT modify code outside `docs/todo/**` (no further i18n/test/component edits).",
+      "brief": "Implementation plan:\n\n1. Read each upstream handoff (pasted into this prompt by the orchestrator) and pull out:\n   - the closed item(s) (e.g. `ui-todo §5`, `ui-todo §12 chat-drawer`, `ui-todo §11 / Phase 2.7 remaining`, `ui-todo §15`, `ui-todo §20b`),\n   - the branch the worker pushed to,\n   - the evidence (test file paths, key file paths).\n2. **`docs/todo/ui-todo.md`**: for each closed item, edit the existing bullet to **strike** the resolved sub-bullets (preserve the strike-through convention used throughout the doc) and add a `**[Complete on branch `orch/todo-sweep-566b/<task-name>`: <evidence>.]**` annotation. Do NOT delete items wholesale unless every sub-bullet in the row is now resolved.\n3. **`docs/todo/product-done.md`**: append a new row to the `At a glance` table (or whichever section is the right home) for each closed item, with the standard `Surface | PRD section | Status` shape used elsewhere in the file. Reference branch + the closed item ids.\n4. Do NOT edit `docs/todo/release-todo.md` — GA §1 stays open and is explicitly out of scope for this sweep.\n5. Do NOT add tests or run any test command (this worker only edits docs). Run `git diff --stat docs/todo/` before pushing as a sanity check.\n6. Verify against AGENTS.md: \"Don't restate blockers inline in README.md / backend/README.md\" — keep this worker scoped to `docs/todo/**` only.\n\nIf any upstream handoff reports `Status: blocked` or `Status: partial`, do NOT mark its item as complete — instead, add a short note under the existing row explaining what is still open.",
       "pathsAllowed": [
-        "docs/status/ui-todo.md",
-        "docs/status/product-done.md"
+        "docs/todo/ui-todo.md",
+        "docs/todo/product-done.md"
       ],
       "pathsForbidden": [
         ".orchestrate/**",
-        "docs/status/release-todo.md",
+        "docs/todo/release-todo.md",
         "src/**",
         "backend/**"
       ],
       "acceptance": [
-        "`docs/status/ui-todo.md` has each successfully-closed item bullet struck-through / marked complete with branch + evidence references.",
-        "`docs/status/product-done.md` has a new one-liner row per successfully-closed item.",
-        "`docs/status/release-todo.md` is untouched.",
+        "`docs/todo/ui-todo.md` has each successfully-closed item bullet struck-through / marked complete with branch + evidence references.",
+        "`docs/todo/product-done.md` has a new one-liner row per successfully-closed item.",
+        "`docs/todo/release-todo.md` is untouched.",
         "If any upstream handoff was `partial` / `blocked`, the matching status row notes what remains open instead of being marked closed."
       ],
-      "verify": "## Setup\n- (no install required)\n\n## Automated\n- `git diff --stat docs/status/` — only `ui-todo.md` and `product-done.md` should be in the diff.\n- `git diff docs/status/release-todo.md` must be empty.\n\n## Manual\n- (no UI changes)\n\n## Gotchas\n- The branch names recorded in the closed-item rows must match the actual handoff `## Branch` line, not the placeholder `orch/<rootSlug>/<task>` if the worker pushed a different name. Always use the handoff body's `## Branch` value verbatim.\n- Don't introduce new tracking documents (per AGENTS.md, \"ask before creating a new tracking doc\").",
+      "verify": "## Setup\n- (no install required)\n\n## Automated\n- `git diff --stat docs/todo/` — only `ui-todo.md` and `product-done.md` should be in the diff.\n- `git diff docs/todo/release-todo.md` must be empty.\n\n## Manual\n- (no UI changes)\n\n## Gotchas\n- The branch names recorded in the closed-item rows must match the actual handoff `## Branch` line, not the placeholder `orch/<rootSlug>/<task>` if the worker pushed a different name. Always use the handoff body's `## Branch` value verbatim.\n- Don't introduce new tracking documents (per AGENTS.md, \"ask before creating a new tracking doc\").",
       "openPR": true,
       "maxAttempts": 2
     }

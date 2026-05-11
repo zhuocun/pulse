@@ -18,7 +18,7 @@ success
 - Added shared localized Terms copy (`AuthTermsAgreement` in `registerForm/termsAgreement.tsx`) on login (below forgot-password) and register (above submit), linking to `/auth/terms`.
 - Implemented `src/pages/terms/index.tsx` placeholder page and wired `lazy` route `auth/terms` in `src/routes/index.tsx` with route test + mock updates.
 - Extended `microcopy.auth` in `en.ts` / `zh-CN.ts` (`passwordStrength`, `terms*` strings, placeholder page title/body).
-- Added/updated focused tests (`registerForm`, `loginForm`, `passwordStrength`, `terms` page, routes) plus `docs/status/ui-todo.md`, `docs/status/product-done.md` (including `Last updated`).
+- Added/updated focused tests (`registerForm`, `loginForm`, `passwordStrength`, `terms` page, routes) plus `docs/todo/ui-todo.md`, `docs/todo/product-done.md` (including `Last updated`).
 - Ran `npm run typecheck`; targeted Jest suites and `src/__tests__/uiI18nReadiness.strict.test.tsx`.
 
 ## Measurements

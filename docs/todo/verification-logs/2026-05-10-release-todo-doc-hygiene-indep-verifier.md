@@ -2,7 +2,7 @@
 
 - **Branch verified:** `orch/non-ga-todos-2f52/release-todo-doc-hygiene-closeout` @ `2c03083`
 - **Date:** 2026-05-10
-- **Scope:** `docs/status/release-todo.md` + `docs/status/product-done.md` consistency with AGENTS backlog rules; live pytest/Jest counts vs doc hard-codes.
+- **Scope:** `docs/todo/release-todo.md` + `docs/todo/product-done.md` consistency with AGENTS backlog rules; live pytest/Jest counts vs doc hard-codes.
 
 ## Doc audit (read-only)
 

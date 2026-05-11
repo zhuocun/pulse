@@ -34,9 +34,9 @@ success
 
 ## Notes, concerns, deviations, findings, thoughts, feedback
 - **Code vs. test:** `main` already had the fix in `column/index.tsx` (`alt=""`, `aria-hidden` on the type icons, comments note intentional lack of Tooltip to avoid double announcement). This slice locks that behavior with tests and closes the tracking bullet in `ui-todo.md`.
-- **AGENTS.md hygiene:** Allowed paths were only `src/components/column/**` and `docs/status/ui-todo.md`, so **`docs/status/product-done.md` was not updated**; the orchestrator may add a product-done row if your process requires it for this closeout.
+- **AGENTS.md hygiene:** Allowed paths were only `src/components/column/**` and `docs/todo/ui-todo.md`, so **`docs/todo/product-done.md` was not updated**; the orchestrator may add a product-done row if your process requires it for this closeout.
 - **eslint:** One repo warning remains in `aiChatDrawer` (not touched).
 
 ## Suggested follow-ups
-- Optionally add a one-liner to `docs/status/product-done.md` if backlog policy requires it for closed ui-todo items.
+- Optionally add a one-liner to `docs/todo/product-done.md` if backlog policy requires it for closed ui-todo items.
 - If any AT still surfaces SVG `<title>` from referenced assets in edge browsers, that would require editing `src/assets/*.svg` (out of scope for this worker’s path allowlist).

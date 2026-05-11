@@ -8,7 +8,7 @@
 | Target repository       | `pulse` (this repo)                                                                                                                                                                                                                                                                               |
 | Target release          | Internal preview, then opt-in toggle for end users                                                                                                                                                                                                                                                |
 | Document scope          | Product, UX, technical contract, rollout, testing                                                                                                                                                                                                                                                 |
-| Implementation progress | See [`product-done.md`](../status/product-done.md)                                                                                                                                                                                                                                  |
+| Implementation progress | See [`product-done.md`](../todo/product-done.md)                                                                                                                                                                                                                                  |
 
 ---
 

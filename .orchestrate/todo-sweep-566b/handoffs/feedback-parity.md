@@ -29,7 +29,7 @@ success
 unit-test-verified
 
 ## Notes, concerns, deviations, findings, feedback
-- Did **not** change **`docs/status/`** (per instructions). Did **not** run **`npm run dev`** or capture **screenshots** of each surface here; optional manual check still applies.
+- Did **not** change **`docs/todo/`** (per instructions). Did **not** run **`npm run dev`** or capture **screenshots** of each surface here; optional manual check still applies.
 - Ant **App** `component={false}` and **Space** `direction` deprecation warnings still appear in Jest output from existing Ant usage; unrelated to this change’s correctness.
 
 ## Suggested follow-ups

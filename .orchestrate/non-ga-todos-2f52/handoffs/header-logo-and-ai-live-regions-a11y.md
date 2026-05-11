@@ -22,7 +22,7 @@ success
 - Extended tests to assert the new a11y affordances:
   - Header accessible name/title assertions (`uiAccessibility.strict` + header/strict suites updated for new label text)
   - AI status live-region assertions in component agent tests for ready/error states.
-- Updated backlog hygiene in `docs/status/ui-todo.md`:
+- Updated backlog hygiene in `docs/todo/ui-todo.md`:
   - §21 header logo label item marked complete
   - §21 AI assist/brief live region item marked complete
   - Phase 3.4 / 4.1.3 line updated to reflect AI suggestion-arrival coverage across chat + assist + brief surfaces.

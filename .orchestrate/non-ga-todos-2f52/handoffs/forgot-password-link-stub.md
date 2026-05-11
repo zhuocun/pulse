@@ -29,7 +29,7 @@ success
   - `src/pages/forgotPassword/index.test.tsx`: placeholder page content render.
   - `src/routes/index.test.tsx`: route table includes `auth/forgot-password`.
   - `src/pages/home.test.tsx`: `/auth/forgot-password` treated as auth route.
-- Updated `docs/status/ui-todo.md` §11 and Phase 2.7 row to reflect partial closure for the forgot-password link/placeholder route item.
+- Updated `docs/todo/ui-todo.md` §11 and Phase 2.7 row to reflect partial closure for the forgot-password link/placeholder route item.
 
 ## Measurements
 - `CI=true npm test -- --runInBand (targeted suites): 23 passing == 23 passing`

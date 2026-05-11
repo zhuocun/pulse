@@ -23,7 +23,7 @@ success
   5. `5de3181adec25e77d526a26e7bd2268349050125` — Merge branch `orch/todo-sweep-566b/feedback-parity`
   6. `44a552f71310e66054adc7ae5ce54ef475e8938d` — Merge branch `orch/todo-sweep-566b/docs-status-hygiene`
 - **Manual conflict resolution:** only `.orchestrate/todo-sweep-566b/handoffs/verify-auth-form-completion.md` (add/add during auth merge). **Policy:** keep both sides’ content—full orchestrate XML/handoff block from the merge base line, then a separator and the verbatim branch verifier log—so nothing from either add was dropped.
-- No conflicts in `src/i18n/locales/*.ts`, `src/constants/microcopy.ts`, or `docs/status/*` (automatic merges only; docs came from `docs-status-hygiene` as intended).
+- No conflicts in `src/i18n/locales/*.ts`, `src/constants/microcopy.ts`, or `docs/todo/*` (automatic merges only; docs came from `docs-status-hygiene` as intended).
 - After **`npm run eslint -- --max-warnings 0`** rewrote `src/pages/project.ai.test.tsx` import layout, committed **`6eb36f8`** (`chore(merge): eslint import formatting in project.ai.test.tsx`) so the branch stays lint-clean without unstaged fixes.
 - Did **not** open a PR (`openPR: false`).
 - Pushed **`orch/todo-sweep-566b/merge-todo-sweep`** to `origin`.

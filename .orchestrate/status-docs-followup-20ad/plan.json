@@ -1,6 +1,6 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "status-docs-followup: review docs/status todo docs (excluding the release-todo closeout already handled), identify what is truly left, reconcile stale entries against the current codebase, and start implementation on one concrete open item.",
+  "goal": "status-docs-followup: review docs/todo todo docs (excluding the release-todo closeout already handled), identify what is truly left, reconcile stale entries against the current codebase, and start implementation on one concrete open item.",
   "summary": "Audit /status todo docs, sync stale entries, and start the first open UX item.",
   "selfAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
   "rootSlug": "status-docs-followup-20ad",
@@ -9,7 +9,7 @@
   "repoUrl": "https://github.com/zhuocun/pulse",
   "syncStateToGit": true,
   "acceptanceCriteria": [
-    "docs/status/architecture-todo.md and docs/status/ui-todo.md reflect true open items (stale done items corrected with file evidence)",
+    "docs/todo/architecture-todo.md and docs/todo/ui-todo.md reflect true open items (stale done items corrected with file evidence)",
     "A prioritized 'what is left' inventory is captured in status docs without contradicting release-todo",
     "At least one concrete open non-GA UI todo item is implemented with tests and status-doc hygiene updates"
   ],
@@ -18,12 +18,12 @@
       "name": "audit-status-doc-open-items",
       "type": "worker",
       "model": "composer-2-fast",
-      "scopedGoal": "Reconcile docs/status/architecture-todo.md and docs/status/ui-todo.md with the current repository so open items are accurate and stale resolved claims are corrected.",
-      "brief": "Audit only docs/status backlog docs and directly related code references they cite. Update architecture-todo/ui-todo wording where items are stale (e.g., TODO references already resolved) and tighten 'what remains' text to concrete unresolved work. Do not reopen release-todo non-GA closures. Keep links to release-todo for GA §1 gating. If an item is now resolved, mark it as complete in-place with concise evidence; if still open, keep it open with a clear next action.",
+      "scopedGoal": "Reconcile docs/todo/architecture-todo.md and docs/todo/ui-todo.md with the current repository so open items are accurate and stale resolved claims are corrected.",
+      "brief": "Audit only docs/todo backlog docs and directly related code references they cite. Update architecture-todo/ui-todo wording where items are stale (e.g., TODO references already resolved) and tighten 'what remains' text to concrete unresolved work. Do not reopen release-todo non-GA closures. Keep links to release-todo for GA §1 gating. If an item is now resolved, mark it as complete in-place with concise evidence; if still open, keep it open with a clear next action.",
       "pathsAllowed": [
-        "docs/status/architecture-todo.md",
-        "docs/status/ui-todo.md",
-        "docs/status/product-done.md",
+        "docs/todo/architecture-todo.md",
+        "docs/todo/ui-todo.md",
+        "docs/todo/product-done.md",
         "backend/**",
         "src/**"
       ],
@@ -48,7 +48,7 @@
         "audit-status-doc-open-items"
       ],
       "scopedGoal": "Independently verify that status-doc open-item inventory is accurate and free of stale resolved claims.",
-      "brief": "Re-audit docs/status/architecture-todo.md and docs/status/ui-todo.md against referenced code paths. Fail if an item is still mislabeled open/resolved, if contradictory statements remain, or if release-todo linkage is inconsistent.",
+      "brief": "Re-audit docs/todo/architecture-todo.md and docs/todo/ui-todo.md against referenced code paths. Fail if an item is still mislabeled open/resolved, if contradictory statements remain, or if release-todo linkage is inconsistent.",
       "acceptance": [
         "Verifier confirms no obvious stale TODO references remain in architecture/ui status docs",
         "Verifier confirms remaining work is clearly identified and actionable"
@@ -63,7 +63,7 @@
         "verify-audit-status-doc-open-items"
       ],
       "scopedGoal": "Start implementation by closing one concrete open UI todo item: add register-form password-strength feedback and a terms-of-service link, with tests and status-doc updates.",
-      "brief": "Implement the open auth-item follow-through tracked in ui-todo item 11 / Phase 2.7: password-strength indicator on register and a terms-of-service link in auth flow copy/UI. Keep implementation i18n-safe (`en` + `zh-CN`), accessible, and compatible with existing validation. Add/update focused tests. Because this closes a tracked ui-todo item subset, update docs/status/ui-todo.md and docs/status/product-done.md per AGENTS.md backlog hygiene.",
+      "brief": "Implement the open auth-item follow-through tracked in ui-todo item 11 / Phase 2.7: password-strength indicator on register and a terms-of-service link in auth flow copy/UI. Keep implementation i18n-safe (`en` + `zh-CN`), accessible, and compatible with existing validation. Add/update focused tests. Because this closes a tracked ui-todo item subset, update docs/todo/ui-todo.md and docs/todo/product-done.md per AGENTS.md backlog hygiene.",
       "pathsAllowed": [
         "src/components/registerForm/**",
         "src/components/loginForm/**",
@@ -71,8 +71,8 @@
         "src/i18n/locales/**",
         "src/constants/**",
         "src/__tests__/**",
-        "docs/status/ui-todo.md",
-        "docs/status/product-done.md"
+        "docs/todo/ui-todo.md",
+        "docs/todo/product-done.md"
       ],
       "pathsForbidden": [
         ".orchestrate/**"

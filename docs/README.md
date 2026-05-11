@@ -22,20 +22,20 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
 
 ## Status — what's done, what's next
 
-Tracking docs grouped under `status/`. Forward-looking docs follow
+Tracking docs grouped under `todo/`. Forward-looking docs follow
 `<scope>-todo.md`; the shipped-work doc is `<scope>-done.md`. Survey
 the whole backlog without folder-hopping.
 
-- [`status/release-todo.md`](status/release-todo.md) — GA blockers,
+- [`todo/release-todo.md`](todo/release-todo.md) — GA blockers,
   soft blockers, polish, and the recommended internal-beta →
   design-partner → public ship sequence.
-- [`status/architecture-todo.md`](status/architecture-todo.md) —
+- [`todo/architecture-todo.md`](todo/architecture-todo.md) —
   agent-runtime themes (contract hardening, stream errors, mutation
   lifecycle, durable resume, FE simplification, BE
   intelligence/resilience) with phased execution.
-- [`status/ui-todo.md`](status/ui-todo.md) — phased UI plan
+- [`todo/ui-todo.md`](todo/ui-todo.md) — phased UI plan
   (foundations, surfaces, polish, stretch).
-- [`status/product-done.md`](status/product-done.md) — implementation
+- [`todo/product-done.md`](todo/product-done.md) — implementation
   changelog: what has shipped, per-feature inventory,
   acceptance-criteria status.
 
