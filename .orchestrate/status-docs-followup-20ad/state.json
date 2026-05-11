@@ -82,14 +82,14 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T01:49:47.834Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-11T01:49:42.416Z",
+      "lastUpdate": "2026-05-11T01:49:47.834Z",
       "note": "respawned by local-cli (was cancelled; attempts=1)",
-      "attempts": 1,
+      "attempts": 2,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
@@ -116,6 +116,10 @@
     {
       "at": "2026-05-11T01:49:01.020Z",
       "message": "verify-auth-register-password-strength-and-tos: cancelled by operator"
+    },
+    {
+      "at": "2026-05-11T01:49:43.347Z",
+      "message": "verify-auth-register-password-strength-and-tos: respawned by local-cli (was cancelled)"
     }
   ]
 }
