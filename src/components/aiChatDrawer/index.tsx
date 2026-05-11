@@ -1,4 +1,5 @@
 import {
+    CheckOutlined,
     CopyOutlined,
     EditOutlined,
     PlusOutlined,
@@ -139,6 +140,10 @@ const AssistantAttribution = styled.div`
     font-weight: ${fontWeight.medium};
     gap: 4px;
     margin-bottom: ${space.xxs}px;
+    max-width: min(100%, 36rem);
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
 `;
 
 /**
@@ -160,23 +165,13 @@ const SamplePrompt = styled(Tag.CheckableTag)`
     }
 `;
 
-const ToolDetails = styled.details`
+const ToolPayloadPanel = styled.div`
     background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.02));
     border-radius: ${radius.sm}px;
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
     font-size: ${fontSize.xs}px;
     margin: ${space.xxs}px 0;
     padding: ${space.xxs}px ${space.xs}px;
-
-    summary {
-        cursor: pointer;
-        outline: none;
-    }
-
-    summary:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 2px;
-    }
 `;
 
 const { Text } = Typography;
@@ -394,6 +389,16 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     const [expandedCitations, setExpandedCitations] = useState<Set<number>>(
         () => new Set()
     );
+    /** Per-index clock labels for transcript rows (approximate display time). */
+    const [messageTimes, setMessageTimes] = useState<number[]>([]);
+    /** Which `tool` transcript rows have an expanded raw payload panel. */
+    const [expandedToolIndices, setExpandedToolIndices] = useState<Set<number>>(
+        () => new Set()
+    );
+    /** Assistant turn index recently copied — briefly swap icon to a checkmark. */
+    const [copyConfirmedAssistantIndex, setCopyConfirmedAssistantIndex] =
+        useState<number | null>(null);
+    const copyConfirmClearRef = useRef<number | null>(null);
 
     /**
      * Local dismissal tracking for v2.1 cards. Owners that pass
@@ -414,6 +419,15 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             if (prev.has(turnIndex)) return prev;
             const next = new Set(prev);
             next.add(turnIndex);
+            return next;
+        });
+    }, []);
+
+    const toggleToolPayload = useCallback((turnIndex: number) => {
+        setExpandedToolIndices((prev) => {
+            const next = new Set(prev);
+            if (next.has(turnIndex)) next.delete(turnIndex);
+            else next.add(turnIndex);
             return next;
         });
     }, []);
@@ -523,6 +537,29 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [open, project?._id, seedMessages]);
 
     useEffect(() => {
+        setMessageTimes((prev) => {
+            if (messages.length === 0) return [];
+            const next = prev.slice(0, messages.length);
+            const now = Date.now();
+            for (let i = 0; i < messages.length; i += 1) {
+                if (next[i] === undefined) {
+                    next[i] = now - (messages.length - 1 - i) * 1000;
+                }
+            }
+            return next;
+        });
+    }, [messages]);
+
+    useEffect(
+        () => () => {
+            if (copyConfirmClearRef.current !== null) {
+                window.clearTimeout(copyConfirmClearRef.current);
+            }
+        },
+        []
+    );
+
+    useEffect(() => {
         setLocalProposalHandled(false);
     }, [pendingProposal?.proposal_id, agentChat.pendingProposal?.proposal_id]);
 
@@ -622,6 +659,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setRegeneratedIndices(new Set());
         setExpandedCitations(new Set());
         setExpandedMessages(new Set());
+        setMessageTimes([]);
+        setExpandedToolIndices(new Set());
         setBudgetWarnDismissed(false);
         pendingRegenAfter.current = null;
     }, [reset]);
@@ -835,9 +874,31 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         return () => clearInterval(id);
     }, [isLoading]);
 
-    const remainingChars = microcopy.ai.characterCounterMax - input.length;
-    const showCounter = input.length >= microcopy.ai.characterCounterShowAfter;
-    const counterIsWarning = remainingChars < 0;
+    const clockFormatter = useMemo(
+        () =>
+            new Intl.DateTimeFormat(undefined, {
+                hour: "numeric",
+                minute: "numeric"
+            }),
+        []
+    );
+
+    const formatClock = useCallback(
+        (epochMs: number) => clockFormatter.format(new Date(epochMs)),
+        [clockFormatter]
+    );
+
+    const messageTimeAt = useCallback(
+        (index: number) => messageTimes[index] ?? Date.now(),
+        [messageTimes]
+    );
+
+    const promptCharMax = microcopy.ai.characterCounterMax;
+    const promptCharHintText = (microcopy.ai.characterCountTemplate as string)
+        .replace("{count}", String(input.length))
+        .replace("{max}", String(promptCharMax));
+    const promptCharHintWarning = input.length > promptCharMax * 0.9;
+
     const showDelayedLoadingBubble = useDelayedFlag(
         isLoading && !streamingText,
         250
@@ -1243,26 +1304,70 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             return null;
                         }
                         if (m.role === "tool") {
-                            // C-R11: render tool calls collapsed by default with a
-                            // human-readable summary instead of raw JSON.
+                            const toolPayloadOpen =
+                                expandedToolIndices.has(index);
+                            const timeMs = messageTimeAt(index);
+                            const toggleId = `chat-tool-toggle-${index}`;
+                            const panelId = `chat-tool-payload-${index}`;
                             return (
-                                <ToolDetails
+                                <MessageRow
+                                    $isUser={false}
                                     key={`tool-${m.toolCallId ?? index}`}
                                 >
-                                    <summary>
-                                        {`${humanizeTool(m.toolName)} · ${summarizeToolBody(m.content)}`}
-                                    </summary>
-                                    <pre
+                                    <Text
+                                        type="secondary"
                                         style={{
-                                            fontSize: fontSize.xs - 1,
-                                            margin: `${space.xxs}px 0 0`,
-                                            whiteSpace: "pre-wrap",
-                                            wordBreak: "break-word"
+                                            display: "block",
+                                            fontSize: fontSize.xs,
+                                            marginBottom: 2
                                         }}
                                     >
-                                        {m.content}
-                                    </pre>
-                                </ToolDetails>
+                                        <time
+                                            data-testid="tool-message-time"
+                                            dateTime={new Date(
+                                                timeMs
+                                            ).toISOString()}
+                                        >
+                                            {formatClock(timeMs)}
+                                        </time>
+                                    </Text>
+                                    <ToolPayloadPanel data-testid="chat-tool-payload-block">
+                                        <div>
+                                            {`${humanizeTool(m.toolName)} · ${summarizeToolBody(m.content)}`}
+                                        </div>
+                                        <Button
+                                            aria-controls={panelId}
+                                            aria-expanded={toolPayloadOpen}
+                                            id={toggleId}
+                                            onClick={() =>
+                                                toggleToolPayload(index)
+                                            }
+                                            size="small"
+                                            type="link"
+                                        >
+                                            {toolPayloadOpen
+                                                ? (microcopy.ai
+                                                      .toolDetailsHide as string)
+                                                : (microcopy.ai
+                                                      .toolDetailsToggle as string)}
+                                        </Button>
+                                        {toolPayloadOpen ? (
+                                            <pre
+                                                aria-labelledby={toggleId}
+                                                id={panelId}
+                                                role="region"
+                                                style={{
+                                                    fontSize: fontSize.xs - 1,
+                                                    margin: `${space.xxs}px 0 0`,
+                                                    whiteSpace: "pre-wrap",
+                                                    wordBreak: "break-word"
+                                                }}
+                                            >
+                                                {m.content}
+                                            </pre>
+                                        ) : null}
+                                    </ToolPayloadPanel>
+                                </MessageRow>
                             );
                         }
                         const isUser = m.role === "user";
@@ -1435,39 +1540,87 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         : undefined
                                 }
                             >
+                                {isUser && (
+                                    <Text
+                                        type="secondary"
+                                        style={{
+                                            display: "block",
+                                            fontSize: fontSize.xs,
+                                            marginBottom: 2,
+                                            maxWidth: "min(100%, 36rem)",
+                                            textAlign: "right",
+                                            width: "100%"
+                                        }}
+                                    >
+                                        <time
+                                            data-testid="user-message-time"
+                                            dateTime={new Date(
+                                                messageTimeAt(index)
+                                            ).toISOString()}
+                                        >
+                                            {formatClock(messageTimeAt(index))}
+                                        </time>
+                                    </Text>
+                                )}
                                 {isAssistant && (
                                     <AssistantAttribution>
-                                        <AiSparkleIcon aria-hidden />
-                                        <span>{microcopy.ai.copilotLabel}</span>
-                                        {isRegenerated && (
-                                            <Tooltip
-                                                title={
-                                                    microcopy.ai
-                                                        .regeneratedTooltip
-                                                }
-                                            >
-                                                <Tag
-                                                    color="purple"
-                                                    style={{
-                                                        marginInlineStart: 4,
-                                                        marginInlineEnd: 0
-                                                    }}
-                                                >
-                                                    <ReloadOutlined
-                                                        aria-hidden
-                                                        style={{
-                                                            fontSize:
-                                                                fontSize.xs - 1,
-                                                            marginInlineEnd: 4
-                                                        }}
-                                                    />
-                                                    {
+                                        <span
+                                            style={{
+                                                alignItems: "center",
+                                                display: "inline-flex",
+                                                flexWrap: "wrap",
+                                                gap: 4
+                                            }}
+                                        >
+                                            <AiSparkleIcon aria-hidden />
+                                            <span>
+                                                {microcopy.ai.copilotLabel}
+                                            </span>
+                                            {isRegenerated && (
+                                                <Tooltip
+                                                    title={
                                                         microcopy.ai
-                                                            .regeneratedBadge
+                                                            .regeneratedTooltip
                                                     }
-                                                </Tag>
-                                            </Tooltip>
-                                        )}
+                                                >
+                                                    <Tag
+                                                        color="purple"
+                                                        style={{
+                                                            marginInlineStart: 4,
+                                                            marginInlineEnd: 0
+                                                        }}
+                                                    >
+                                                        <ReloadOutlined
+                                                            aria-hidden
+                                                            style={{
+                                                                fontSize:
+                                                                    fontSize.xs -
+                                                                    1,
+                                                                marginInlineEnd: 4
+                                                            }}
+                                                        />
+                                                        {
+                                                            microcopy.ai
+                                                                .regeneratedBadge
+                                                        }
+                                                    </Tag>
+                                                </Tooltip>
+                                            )}
+                                        </span>
+                                        <time
+                                            data-testid="assistant-message-time"
+                                            dateTime={new Date(
+                                                messageTimeAt(index)
+                                            ).toISOString()}
+                                            style={{
+                                                fontVariantNumeric:
+                                                    "tabular-nums",
+                                                marginInlineStart: "auto",
+                                                whiteSpace: "nowrap"
+                                            }}
+                                        >
+                                            {formatClock(messageTimeAt(index))}
+                                        </time>
                                     </AssistantAttribution>
                                 )}
                                 {/* P3-D: Edit button for user messages */}
@@ -1656,9 +1809,19 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     >
                                         <Button
                                             aria-label={
-                                                microcopy.a11y.copyResponse
+                                                microcopy.ai
+                                                    .copyMessage as string
                                             }
-                                            icon={<CopyOutlined aria-hidden />}
+                                            icon={
+                                                copyConfirmedAssistantIndex ===
+                                                index ? (
+                                                    <CheckOutlined
+                                                        aria-hidden
+                                                    />
+                                                ) : (
+                                                    <CopyOutlined aria-hidden />
+                                                )
+                                            }
                                             onClick={() => {
                                                 const plainText =
                                                     m.content.replace(
@@ -1667,12 +1830,30 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                     );
                                                 void navigator.clipboard
                                                     .writeText(plainText)
-                                                    .then(() =>
-                                                        message.success(
-                                                            microcopy.ai
-                                                                .copiedShort
-                                                        )
-                                                    );
+                                                    .then(() => {
+                                                        if (
+                                                            copyConfirmClearRef.current !==
+                                                            null
+                                                        ) {
+                                                            window.clearTimeout(
+                                                                copyConfirmClearRef.current
+                                                            );
+                                                        }
+                                                        setCopyConfirmedAssistantIndex(
+                                                            index
+                                                        );
+                                                        copyConfirmClearRef.current =
+                                                            window.setTimeout(
+                                                                () => {
+                                                                    setCopyConfirmedAssistantIndex(
+                                                                        null
+                                                                    );
+                                                                    copyConfirmClearRef.current =
+                                                                        null;
+                                                                },
+                                                                2000
+                                                            );
+                                                    });
                                             }}
                                             size="small"
                                             type="text"
@@ -2041,20 +2222,18 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     </Button>
                 )}
             </Space.Compact>
-            {showCounter && (
-                <div
-                    style={{
-                        color: counterIsWarning
-                            ? "var(--ant-color-error, #EF4444)"
-                            : "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65))",
-                        fontSize: fontSize.xs,
-                        marginTop: 4,
-                        textAlign: "right"
-                    }}
-                >
-                    {input.length} / {microcopy.ai.characterCounterMax}
-                </div>
-            )}
+            <Typography.Text
+                data-testid="chat-prompt-char-hint"
+                style={{
+                    display: "block",
+                    fontSize: fontSize.xs,
+                    marginTop: 4,
+                    textAlign: "right"
+                }}
+                type={promptCharHintWarning ? "warning" : "secondary"}
+            >
+                {promptCharHintText}
+            </Typography.Text>
         </Drawer>
     );
 };

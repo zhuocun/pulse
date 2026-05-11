@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
@@ -129,20 +135,26 @@ describe("AiChatDrawer UI branches (mocked chat hook)", () => {
         expect(screen.getByText("Working…")).toBeInTheDocument();
     });
 
-    it("renders tool rows inside collapsed <details> with a human-readable summary", () => {
+    it("renders tool rows collapsed; expanding shows the raw payload", async () => {
         mockedUseAiChat.mockReturnValue({
             ...baseChat(),
             messages: [{ role: "tool", content: "payload" }]
         });
         renderDrawer();
-        const details = document.querySelector("details");
-        expect(details).toBeTruthy();
-        expect(details!.querySelector("summary")?.textContent).toMatch(
-            /Looked up/i
+        expect(
+            screen.getByTestId("chat-tool-payload-block")
+        ).toBeInTheDocument();
+        expect(document.querySelector("pre")).toBeNull();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.ai.toolDetailsToggle })
         );
-        // The raw payload still renders inside the <details> body so power
-        // users can expand to inspect it; the summary is the user-facing copy.
-        expect(details!.textContent).toContain("payload");
+
+        await waitFor(() => {
+            expect(document.querySelector("pre")?.textContent).toContain(
+                "payload"
+            );
+        });
     });
 
     it("renders the chat-bubble skeleton (not a Spin) while loading with no streaming text", () => {

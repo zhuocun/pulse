@@ -12,6 +12,8 @@ import { MemoryRouter } from "react-router-dom";
 import useAuth from "../../utils/hooks/useAuth";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 
+import { microcopy } from "../../constants/microcopy";
+
 import AiChatDrawer from ".";
 
 // Helpers to flip the mutation-proposals feature flag on/off in tests.
@@ -154,6 +156,11 @@ describe("AiChatDrawer", () => {
         mockEnv.aiBaseUrl = "";
         // Clear any chat history saved by prior tests so each test starts fresh.
         window.localStorage.removeItem("copilot_history_p1");
+        Object.assign(navigator, {
+            clipboard: {
+                writeText: jest.fn().mockResolvedValue(undefined)
+            }
+        });
     });
 
     it("shows the empty hint and sends a message that yields an assistant reply", async () => {
@@ -227,7 +234,7 @@ describe("AiChatDrawer", () => {
         expect(screen.getByText(/ask about this board/i)).toBeInTheDocument();
     });
 
-    it("renders tool output collapsed inside <details> when the assistant requests listProjects", async () => {
+    it("renders tool output collapsed; toggle shows raw payload when the assistant requests listProjects", async () => {
         mockApi.mockImplementation(async (endpoint: string) => {
             if (endpoint === "projects") {
                 return [{ _id: "p1", projectName: "Roadmap" }];
@@ -240,15 +247,19 @@ describe("AiChatDrawer", () => {
         });
         fireEvent.click(screen.getByLabelText("Send message"));
 
-        // Tool details land in a collapsed native <details> element with a
-        // plain-language verb summary like "Checked projects · …"
-        // (Optimization Plan §3 P2-2).
         await waitFor(() => {
-            const details = document.querySelector("details");
-            expect(details).toBeTruthy();
-            expect(details!.querySelector("summary")?.textContent).toMatch(
-                /Checked projects/i
-            );
+            expect(
+                screen.getByTestId("chat-tool-payload-block")
+            ).toBeInTheDocument();
+        });
+        expect(document.querySelector("pre")).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: /show details/i }));
+
+        await waitFor(() => {
+            const pre = document.querySelector("pre");
+            expect(pre).toBeTruthy();
+            expect(pre!.textContent).toMatch(/Roadmap|project/i);
         });
         expect(mockApi).toHaveBeenCalledWith(
             "projects",
@@ -285,8 +296,9 @@ describe("AiChatDrawer", () => {
         fireEvent.click(screen.getByLabelText("Send message"));
 
         await waitFor(() => {
-            const details = document.querySelector("details");
-            expect(details).toBeTruthy();
+            expect(
+                screen.getByTestId("chat-tool-payload-block")
+            ).toBeInTheDocument();
         });
 
         // No empty Board Copilot bubble between the user prompt and the
@@ -586,5 +598,31 @@ describe("AiChatDrawer", () => {
         expect(
             screen.queryByTestId("autonomy-option-suggest")
         ).not.toBeInTheDocument();
+    });
+
+    it("exposes an accessible copy control on assistant messages", async () => {
+        renderDrawer(true);
+        fireEvent.change(screen.getByLabelText("Message Board Copilot"), {
+            target: { value: "Hello" }
+        });
+        fireEvent.click(screen.getByLabelText("Send message"));
+        await waitFor(() => {
+            expect(
+                screen.getByLabelText(microcopy.ai.copyMessage as string)
+            ).toBeInTheDocument();
+        });
+    });
+
+    it("switches the character-count hint to warning style above 90% of the cap", () => {
+        renderDrawer(true);
+        const input = screen.getByLabelText("Message Board Copilot");
+        const threshold = Math.floor(
+            (microcopy.ai.characterCounterMax as number) * 0.9
+        );
+        fireEvent.change(input, {
+            target: { value: "x".repeat(threshold + 1) }
+        });
+        const hint = screen.getByTestId("chat-prompt-char-hint");
+        expect(hint.className).toMatch(/warning/i);
     });
 });
