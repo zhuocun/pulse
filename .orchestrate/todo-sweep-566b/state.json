@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-11T04:54:30.765Z",
       "lastUpdate": "2026-05-11T04:54:30.766Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "chat-drawer-polish",
@@ -87,11 +87,11 @@
       "finishedAt": "2026-05-11T04:56:43.301Z",
       "lastUpdate": "2026-05-11T04:56:43.301Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "auth-form-completion",
@@ -133,11 +133,11 @@
       "finishedAt": "2026-05-11T04:59:32.311Z",
       "lastUpdate": "2026-05-11T04:59:32.311Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "dnd-affordances",
@@ -179,11 +179,11 @@
       "finishedAt": "2026-05-11T04:58:10.689Z",
       "lastUpdate": "2026-05-11T04:58:10.689Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "feedback-parity",
@@ -225,11 +225,11 @@
       "finishedAt": "2026-05-11T05:08:39.717Z",
       "lastUpdate": "2026-05-11T05:08:39.717Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "docs-status-hygiene",
@@ -253,11 +253,11 @@
       "finishedAt": "2026-05-11T05:11:10.466Z",
       "lastUpdate": "2026-05-11T05:11:10.466Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 203,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
