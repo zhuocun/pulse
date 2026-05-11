@@ -14,14 +14,14 @@
       "resultStatus": "finished",
       "handoffPath": "handoffs/close-theme5-mutation-lifecycle.md",
       "startedAt": "2026-05-11T16:13:13.797Z",
-      "finishedAt": "2026-05-11T16:25:15.018Z",
-      "lastUpdate": "2026-05-11T16:25:15.018Z",
+      "finishedAt": "2026-05-11T16:25:15.087Z",
+      "lastUpdate": "2026-05-11T16:25:15.087Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-theme5-mutation-lifecycle",
@@ -37,9 +37,9 @@
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": "2026-05-11T16:25:23.467Z",
+      "startedAt": "2026-05-11T16:25:24.015Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-11T16:25:23.467Z",
+      "lastUpdate": "2026-05-11T16:25:24.015Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -63,11 +63,11 @@
       "finishedAt": "2026-05-11T16:18:28.059Z",
       "lastUpdate": "2026-05-11T16:18:28.060Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-remaining-architecture-themes",
@@ -87,11 +87,11 @@
       "finishedAt": "2026-05-11T16:21:16.649Z",
       "lastUpdate": "2026-05-11T16:21:16.650Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "integrate-architecture-backlog-closeout",
@@ -141,5 +141,10 @@
       "verification": null
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-11T16:25:16.162Z",
+      "message": "git-sync failed (close-theme5-mutation-lifecycle running -> handed-off): Command failed: git -C /workspace/.orchestrate/architecture-todo-impl-9ea4 push\nTo https://github.com/zhuocun/pulse\n ! [remote rejected] cursor/architecture-todo-impl-9ea4 -> cursor/architecture-todo-…"
+    }
+  ]
 }
