@@ -282,6 +282,32 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["candidates"],
         },
     },
+    "fe.applyMutation": {
+        "description": (
+            "Board mutation HITL: ``stage=approval`` waits for "
+            "``Command(resume={\"accepted\": <bool>})``; ``stage=apply`` "
+            "executes ``diff`` on the FE against authenticated task APIs."
+        ),
+        "args_schema": {
+            "type": "object",
+            "properties": {
+                "proposal_id": {"type": "string"},
+                "stage": {"type": "string", "enum": ["approval", "apply"]},
+                "project_id": {"type": "string"},
+                "diff": {"type": "object"},
+            },
+            "required": ["proposal_id", "stage"],
+            "additionalProperties": True,
+        },
+        "result_schema": {
+            "type": "object",
+            "properties": {
+                "ok": {"type": "boolean"},
+                "applied": {"type": "boolean"},
+                "journal_replay": {"type": "boolean"},
+            },
+        },
+    },
 }
 
 

@@ -20,6 +20,14 @@ export interface FeToolContext {
     projectId?: string;
     userId?: string;
     autonomyLevel?: AutonomyLevel;
+    /**
+     * Authenticated REST helper (from `useApi`) for mutation tools that
+     * must reach `/api/v1/*` during an agent interrupt.
+     */
+    apiRequest?: (
+        endpoint: string,
+        config?: { method?: string; data?: object }
+    ) => Promise<unknown>;
     [key: string]: unknown;
 }
 

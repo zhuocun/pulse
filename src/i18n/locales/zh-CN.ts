@@ -798,6 +798,7 @@ const zhCN: Dictionary = {
         copilotProposes: "Copilot 提议:{description}",
         acceptingWillChange: "接受后将更改：{fields}",
         acceptingProposal: "正在接受此提议…",
+        applyToast: "Copilot 已应用看板更改。",
         undoCountdownAria: "撤销 — 剩余 {seconds} 秒",
         undoCountdown: "撤销（{seconds} 秒）",
         undoAvailableAfterAccepting: "接受后有 10 秒可撤销",

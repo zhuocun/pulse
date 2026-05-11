@@ -32,6 +32,22 @@ def add_events(
     return list(left or []) + list(right or [])
 
 
+def merge_mutation_applied_ids(
+    left: list[str] | None,
+    right: list[str] | None,
+) -> list[str]:
+    """Append-only dedup list of proposal ids that finished the apply FE-tool."""
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in list(left or ()) + list(right or ()):
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 class AgentState(TypedDict, total=False):
     """Default state for chat-style agents.
 
@@ -129,9 +145,16 @@ class TaskEstimationState(BaseAgentState, WithSimilarTasks):
 class ChatState(BaseAgentState):
     """State for ``chat-agent`` (PRD §5A.6).
 
-    Inherits :class:`BaseAgentState` unchanged; the chat agent operates
-    purely on ``messages`` plus the common Board Copilot context fields.
+    Extends :class:`BaseAgentState` with a durable mutation-proposal HITL
+    lane (GA §1): ``mutation_pending`` is populated by the model/stub,
+    ``mutation_decision`` stores the ``Command(resume=…)`` payload after
+    the approval interrupt, and ``mutation_applied_ids`` records proposals
+    whose apply interrupt has completed once (idempotent replay guard).
     """
+
+    mutation_pending: NotRequired[dict[str, Any] | None]
+    mutation_decision: NotRequired[dict[str, Any] | None]
+    mutation_applied_ids: NotRequired[Annotated[list[str], merge_mutation_applied_ids]]
 
 
 class TriageState(BaseAgentState, WithBoardSnapshot, WithDriftResult):
