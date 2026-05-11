@@ -1,10 +1,8 @@
 import styled from "@emotion/styled";
-import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { useState } from "react";
+import { Link, Navigate } from "react-router";
 
-import ErrorBox from "../components/errorBox";
 import LoginForm from "../components/loginForm";
-import { NoPaddingButton } from "../components/projectList";
 import { microcopy } from "../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../layouts/authLayout";
 import { fontSize, space } from "../theme/tokens";
@@ -18,23 +16,14 @@ const SwitchRow = styled.p`
     text-align: center;
 `;
 
+const SwitchAuthLink = styled(Link)`
+    color: var(--ant-color-link);
+`;
+
 const LoginPage = () => {
     useTitle(microcopy.actions.logIn);
-    const navigate = useNavigate();
     const { user, token } = useAuth();
     const [error, setError] = useState<Error | IError | null>(null);
-    const errorRef = useRef<HTMLDivElement | null>(null);
-    const handleSwitch = () => {
-        navigate("/register", { viewTransition: true });
-    };
-
-    // When a server error appears, move focus to the alert so screen-reader
-    // and keyboard users immediately learn what went wrong.
-    useEffect(() => {
-        if (error) {
-            errorRef.current?.focus();
-        }
-    }, [error]);
 
     if (user && token) {
         return <Navigate to="/projects" replace />;
@@ -44,13 +33,12 @@ const LoginPage = () => {
         <>
             <AuthTitle>{microcopy.auth.loginTitle}</AuthTitle>
             <AuthSubtitle>{microcopy.auth.loginSubtitle}</AuthSubtitle>
-            <ErrorBox error={error} ref={errorRef} />
-            <LoginForm onError={setError} />
+            <LoginForm onError={setError} serverError={error} />
             <SwitchRow>
                 {microcopy.auth.switchToRegister}{" "}
-                <NoPaddingButton onClick={handleSwitch} type="link">
+                <SwitchAuthLink to="/register">
                     {microcopy.actions.registerCta}
-                </NoPaddingButton>
+                </SwitchAuthLink>
             </SwitchRow>
         </>
     );

@@ -295,9 +295,9 @@ const FormCard = styled(Card)`
             0 24px 48px -12px rgba(15, 23, 42, 0.18),
             var(--glass-shine);
         box-sizing: border-box;
-        max-width: 28rem;
+        max-width: 40rem;
         text-align: left;
-        width: 100%;
+        width: min(40rem, 100% - 2rem);
     }
 
     && .ant-card-body {

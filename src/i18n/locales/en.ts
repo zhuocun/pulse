@@ -142,7 +142,8 @@ export const enSource = {
     },
     dragHints: {
         taskCardKeyboard:
-            "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel."
+            "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel.",
+        columnDragHandle: "Drag to reorder column"
     },
     settings: {
         darkMode: "Dark mode",
@@ -299,7 +300,13 @@ export const enSource = {
         resultsFiltered: "Results filtered. {rationale}",
         noTasksMatched:
             "No tasks matched your search. Try different words, or clear to see everything.",
-        boardEmpty: "This board has no tasks yet."
+        boardEmpty: "This board has no tasks yet.",
+        /** ARIA grouping for thumbs feedback on Copilot estimate / readiness. */
+        taskAssistTitle:
+            "{section}: Rate this Board Copilot task assist suggestion",
+        /** ARIA grouping for thumbs feedback on the board brief recommendation. */
+        boardBriefTitle:
+            "{section}: Rate this Board Copilot brief recommendation"
     },
     /**
      * ICU-style placeholder greeting. Header reads it as
@@ -310,6 +317,9 @@ export const enSource = {
     greeting: "Hi, {name}",
     header: {
         logoLabel: "Pulse home"
+    },
+    breadcrumb: {
+        projects: "Projects"
     },
     board: {
         title: "Board",
@@ -567,6 +577,11 @@ export const enSource = {
         jumpToLatest: "Jump to latest",
         moreSources: "+{count} more",
         copiedShort: "Copied",
+        copyMessage: "Copy message",
+        copyMessageCopied: "Copied to clipboard",
+        toolDetailsToggle: "Show details",
+        toolDetailsHide: "Hide details",
+        characterCountTemplate: "{count}/{max}",
         toolEmptyResult: "empty result",
         toolVerbs: {
             checkedProjects: "Checked projects",
@@ -601,8 +616,7 @@ export const enSource = {
         runBoardTriagePrompt: "Run a triage check on the current board.",
         storyPointsSetTo: "Story points set to {value}.",
         readinessUpdated: "Updated {field}.",
-        characterCounterMax: 2000,
-        characterCounterShowAfter: 500,
+        characterCounterMax: 4000,
         breakdownAxes: {
             by_phase: {
                 label: "By phase",
@@ -653,6 +667,9 @@ export const enSource = {
         registerSubtitle: "Create your account to start tracking work.",
         switchToRegister: "Don't have an account?",
         switchToLogin: "Already have an account?",
+        errorSummaryTitle: "There is a problem",
+        errorSummaryIntro: "Correct the following and try again.",
+        errorSummaryRegionAriaLabel: "Form errors",
         heroBadge: "New: Board Copilot",
         heroTitle: "Ship work with calm focus.",
         heroSubtitle:

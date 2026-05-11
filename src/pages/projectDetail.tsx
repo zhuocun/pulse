@@ -10,13 +10,13 @@ import {
 } from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
-import ProjectPopover from "../components/projectPopover";
 import { microcopy } from "../constants/microcopy";
 import {
     blur,
     breakpoints,
     fontSize,
     fontWeight,
+    shadow,
     space
 } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -90,6 +90,8 @@ const TopBar = styled.div`
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
+
+    box-shadow: ${shadow.sm};
 `;
 
 /*
@@ -172,10 +174,6 @@ const tabItems = [
     }
 ];
 
-/**
- * Replaces the previous duplicated grid + sidebar shell with a breadcrumb +
- * tabs header (Phase 2.5). Also drops the broken `5 px` shadow rule.
- */
 const ProjectDetailPage = () => {
     const { pathname } = useLocation();
     const { projectId } = useParams<{ projectId: string }>();
@@ -214,12 +212,16 @@ const ProjectDetailPage = () => {
 
     return (
         <Container>
-            <TopBar>
+            <TopBar data-testid="project-detail-chrome">
                 <BreadcrumbWrapper>
                     <Breadcrumb
                         items={[
                             {
-                                title: <ProjectPopover />
+                                title: (
+                                    <Link to="/projects" viewTransition>
+                                        {microcopy.breadcrumb.projects}
+                                    </Link>
+                                )
                             },
                             {
                                 title:
@@ -230,8 +232,10 @@ const ProjectDetailPage = () => {
                                             style={{ width: 160 }}
                                         />
                                     ) : (
-                                        (project?.projectName ??
-                                        microcopy.labels.project)
+                                        <span aria-current="page">
+                                            {project?.projectName ??
+                                                microcopy.labels.project}
+                                        </span>
                                     )
                             }
                         ]}

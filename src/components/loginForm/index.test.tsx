@@ -124,6 +124,45 @@ describe("LoginForm", () => {
         expect(mutateAsync).not.toHaveBeenCalled();
     });
 
+    it("after an empty submit, shows an error summary with links to each invalid field", async () => {
+        const rtlUser = userEvent.setup();
+        renderLoginForm();
+
+        await submitLogin();
+
+        const summary = await screen.findByRole("alert", {
+            name: /there is a problem/i
+        });
+        expect(summary).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", {
+                name: /there is a problem/i
+            })
+        ).toBeInTheDocument();
+
+        const emailLink = summary.querySelector('a[href="#email"]');
+        const passwordLink = summary.querySelector('a[href="#password"]');
+        expect(emailLink).toBeTruthy();
+        expect(passwordLink).toBeTruthy();
+
+        expect(emailLink).toHaveTextContent(/please enter your email/i);
+        expect(passwordLink).toHaveTextContent(/please enter your password/i);
+
+        await rtlUser.click(emailLink!);
+        expect(screen.getByLabelText(/^email$/i)).toHaveFocus();
+    });
+
+    it("does not block paste on the password field", async () => {
+        const rtlUser = userEvent.setup();
+        renderLoginForm();
+
+        const password = screen.getByLabelText(/^password$/i);
+        await rtlUser.click(password);
+        await rtlUser.paste("pasted-secret");
+
+        expect(password).toHaveValue("pasted-secret");
+    });
+
     it("validates email format", async () => {
         renderLoginForm();
 

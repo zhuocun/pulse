@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -184,19 +190,22 @@ describe("ProjectPage with Board Copilot enabled", () => {
         fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
         await waitFor(() => {
+            const drawer = document.querySelector(".ant-drawer-open");
             expect(
-                document.querySelector(".ant-drawer-open details")
-            ).toBeInTheDocument();
+                drawer?.querySelector('[data-testid="chat-tool-payload-block"]')
+            ).toBeTruthy();
         });
-        const summaryEl = document.querySelector(
-            ".ant-drawer-open details summary"
-        ) as HTMLElement | null;
-        expect(summaryEl).toBeTruthy();
-        // The collapsed summary now uses plain-language verbs instead of
-        // raw tool names (Optimization Plan §3 P2-2 — "Checked projects"
-        // replaces "Looked up listProjects").
-        expect(summaryEl!.textContent ?? "").toMatch(/Checked projects/i);
-        fireEvent.click(summaryEl!);
+        const drawerEl = document.querySelector(".ant-drawer-open");
+        expect(drawerEl).toBeTruthy();
+        const toolBlock = drawerEl!.querySelector(
+            '[data-testid="chat-tool-payload-block"]'
+        );
+        expect(toolBlock?.textContent ?? "").toMatch(/Checked projects/i);
+        fireEvent.click(
+            within(drawerEl as HTMLElement).getByRole("button", {
+                name: /show details/i
+            })
+        );
 
         const drawerClose = document.querySelector(
             ".ant-drawer-open .ant-drawer-close"

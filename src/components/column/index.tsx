@@ -1,4 +1,4 @@
-import { MoreOutlined } from "@ant-design/icons";
+import { HolderOutlined, MoreOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Badge,
@@ -16,6 +16,7 @@ import bugIcon from "../../assets/bug.svg";
 import taskIcon from "../../assets/task.svg";
 import { microcopy } from "../../constants/microcopy";
 import {
+    brand,
     breakpoints,
     columnMinWidthRem,
     fontSize,
@@ -23,7 +24,9 @@ import {
     letterSpacing,
     radius,
     shadow,
-    space
+    space,
+    touchTargetCoarse,
+    touchTargetMin
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -31,7 +34,12 @@ import useTaskModal from "../../utils/hooks/useTaskModal";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
-import { Drag, Drop, DropChild } from "../dragAndDrop";
+import {
+    Drag,
+    Drop,
+    DropChild,
+    useDetachedDragHandleProps
+} from "../dragAndDrop";
 import { NoPaddingButton } from "../projectList";
 import Row from "../row";
 import TaskCreator from "../taskCreator";
@@ -104,6 +112,41 @@ const TaskContainer = styled.div`
     gap: ${space.xs}px;
     overflow-y: auto;
     padding-bottom: ${space.xs}px;
+
+    [data-rfd-placeholder-context-id] {
+        background: ${brand.primaryBg};
+        border: 1px dashed var(--ant-color-primary);
+        border-radius: ${radius.sm}px;
+        box-sizing: border-box;
+        min-height: 40px;
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none !important;
+        }
+    }
+`;
+
+const TaskRowDragShell = styled.div`
+    width: 100%;
+
+    .task-card-lift-surface {
+        transition:
+            border-color 120ms ease-out,
+            box-shadow 120ms ease-out,
+            transform 120ms ease-out;
+    }
+
+    &[data-dragging="true"] .task-card-lift-surface {
+        box-shadow: ${shadow.lift};
+
+        @media (prefers-reduced-motion: no-preference) {
+            transform: scale(1.02);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+    }
 `;
 
 const FilteredEmpty = styled.div`
@@ -291,6 +334,37 @@ const ColumnHeader = styled(Row)`
             min-height: 44px;
             min-width: 44px;
         }
+    }
+`;
+
+const ColumnDragHandleButton = styled.button`
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: ${radius.sm}px;
+    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
+    cursor: grab;
+    display: inline-flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    margin-inline-end: ${space.xxs}px;
+    min-height: ${touchTargetMin}px;
+    min-width: ${touchTargetMin}px;
+    padding: ${space.xxs}px;
+
+    &:active {
+        cursor: grabbing;
+    }
+
+    &:focus-visible {
+        box-shadow: ${shadow.focus};
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+        min-height: ${touchTargetCoarse}px;
+        min-width: ${touchTargetCoarse}px;
     }
 `;
 
@@ -541,6 +615,7 @@ const Column = React.forwardRef<
         ref
     ) => {
         const { startEditing } = useTaskModal();
+        const columnDragHandleProps = useDetachedDragHandleProps();
         const filteredTasks = tasks.filter(
             (task) =>
                 (!param.type || task.type === param.type) &&
@@ -566,6 +641,17 @@ const Column = React.forwardRef<
                             minWidth: 0
                         }}
                     >
+                        {columnDragHandleProps ? (
+                            <ColumnDragHandleButton
+                                type="button"
+                                {...columnDragHandleProps}
+                                aria-label={
+                                    microcopy.dragHints.columnDragHandle
+                                }
+                            >
+                                <HolderOutlined aria-hidden />
+                            </ColumnDragHandleButton>
+                        ) : null}
                         <ColumnDot
                             aria-hidden
                             statusColor={dotForColumn(column._id)}
@@ -617,17 +703,22 @@ const Column = React.forwardRef<
                                         // refuses to drag from by default; opt out of that block.
                                         disableInteractiveElementBlocking
                                     >
-                                        <TaskCard
-                                            isMock={!hasPersistedTaskId}
-                                            members={members}
-                                            onOpen={
-                                                hasPersistedTaskId
-                                                    ? () =>
-                                                          startEditing(task._id)
-                                                    : undefined
-                                            }
-                                            task={task}
-                                        />
+                                        <TaskRowDragShell>
+                                            <TaskCard
+                                                className="task-card-lift-surface"
+                                                isMock={!hasPersistedTaskId}
+                                                members={members}
+                                                onOpen={
+                                                    hasPersistedTaskId
+                                                        ? () =>
+                                                              startEditing(
+                                                                  task._id
+                                                              )
+                                                        : undefined
+                                                }
+                                                task={task}
+                                            />
+                                        </TaskRowDragShell>
                                     </Drag>
                                 );
                             })}
