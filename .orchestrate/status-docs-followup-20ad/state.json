@@ -89,11 +89,11 @@
       "finishedAt": null,
       "lastUpdate": "2026-05-11T01:32:00.122Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
