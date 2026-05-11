@@ -42,7 +42,7 @@
     {
       "name": "verify-audit-status-doc-open-items",
       "type": "verifier",
-      "model": "gpt-5.3-codex-high-fast",
+      "model": "composer-2-fast",
       "verifies": "audit-status-doc-open-items",
       "dependsOn": [
         "audit-status-doc-open-items"
@@ -89,7 +89,7 @@
     {
       "name": "verify-auth-register-password-strength-and-tos",
       "type": "verifier",
-      "model": "claude-opus-4-7",
+      "model": "composer-2-fast",
       "verifies": "start-auth-register-password-strength-and-tos",
       "dependsOn": [
         "start-auth-register-password-strength-and-tos"

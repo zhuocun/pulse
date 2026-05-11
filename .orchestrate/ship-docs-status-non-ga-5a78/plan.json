@@ -1,0 +1,56 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "Ship the remaining docs/status non-GA backlog: reconcile docs/status/architecture-todo.md and docs/status/ui-todo.md with main (release-todo now has only GA §1 as code gate; Beta/soft/polish rows are closed in repo), eliminate stale duplicated open narratives (especially auth/password/terms and status-docs-followup overlap), tighten immediate vs later workstreams with file-evidence citations, and apply AGENTS.md backlog hygiene (product-done.md one-liners when rows are struck or materially closed).",
+  "summary": "Final sweep of docs/status roadmap todos so they match main and GA-only release posture—all models on composer-2-fast.",
+  "selfAgentId": "bc-4d7d07d7-d77a-45a7-9f3e-01ffc4965a78",
+  "rootSlug": "ship-docs-status-non-ga-5a78",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "acceptanceCriteria": [
+    "architecture-todo.md and ui-todo.md contain no contradictory claims vs docs/status/release-todo.md (GA §1 remains the only numbered code gate)",
+    "Stale bullets that imply shipped auth/password/terms UX is still open are corrected",
+    "AGENTS backlog hygiene satisfied for any backlog rows removed or materially closed",
+    "Independent verifier signs off with repo-only evidence"
+  ],
+  "tasks": [
+    {
+      "name": "reconcile-status-roadmap-docs",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Reconcile architecture-todo.md and ui-todo.md against the repo and release-todo.md so the non-GA docs backlog is truthful: fix stale duplicated open items, align dates/groupings, update product-done.md per AGENTS when striking or closing doc-tracked slices.",
+      "brief": "**Context (do not rediscover—the planner verified):** release-todo.md (2026-05-10) closes non-GA §2–§7 and polish through §16e; only GA Blocker §1 stays open as code gate. architecture-todo.md and ui-todo.md (2026-05-11) already claim reconciliation but still enumerate Phase 2.7/auth follow-ups that overlap shipped register password-strength + terms (see ui-todo §1.2 item 11). Prior orchestrate workspace status-docs-followup-20ad completed audit + implementation handoffs.\n\n**Do:** Edit only under docs/status/** unless you must fix a broken path reference (prefer doc edits). Sweep architecture-todo and ui-todo for: (1) bullets that say work is outstanding when codebase already ships it—mark complete in-place with concise evidence pointers or tighten wording; (2) duplicate contradictory open-backlog narratives; (3) any remaining branch-name-only claims that contradict main.\n\n**AGENTS.md:** Removing or materially closing backlog entries requires product-done.md one-liners in the matching table.",
+      "pathsAllowed": [
+        "docs/status/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**"
+      ],
+      "acceptance": [
+        "No doc claims auth register password-strength or terms linkage is missing if src already implements them—update ui-todo/architecture framing accordingly",
+        "Open backlog groupings distinguish GA §1-adjacent vs product UX vs later phases without contradicting release-todo",
+        "product-done.md gains rows for each doc slice struck/closed under AGENTS hygiene rules"
+      ],
+      "verify": "Use rg/cat on cited paths to sanity-check assertions in the edited docs match the codebase; record commands + paths in handoff.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-reconciled-status-roadmap-docs",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "reconcile-status-roadmap-docs",
+      "dependsOn": [
+        "reconcile-status-roadmap-docs"
+      ],
+      "scopedGoal": "Independently verify docs/status architecture-todo.md, ui-todo.md, product-done.md, and release-todo.md are mutually consistent after the reconciliation worker.",
+      "brief": "Re-read the four docs. Fail if stale open narratives remain versus code evidence (spot-check register/terms/password-strength surfaces), if release-tier claims contradict release-todo, or if AGENTS-required product-done closures are missing for struck rows.",
+      "acceptance": [
+        "Verifier passes only when doc set is internally consistent and AGENTS backlog hygiene holds",
+        "Explicit fail message lists any contradictory sections with file headings"
+      ],
+      "maxAttempts": 2
+    }
+  ]
+}

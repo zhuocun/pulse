@@ -48,7 +48,7 @@
     {
       "name": "verify-non-ga-release-todo-closure",
       "type": "verifier",
-      "model": "gpt-5.3-codex-high-fast",
+      "model": "composer-2-fast",
       "verifies": "close-non-ga-release-todo-items",
       "dependsOn": [
         "close-non-ga-release-todo-items"
@@ -86,7 +86,7 @@
     {
       "name": "verify-release-todo-doc-hygiene-closeout",
       "type": "verifier",
-      "model": "gpt-5.3-codex-high-fast",
+      "model": "composer-2-fast",
       "verifies": "release-todo-doc-hygiene-closeout",
       "dependsOn": [
         "release-todo-doc-hygiene-closeout"
@@ -126,7 +126,7 @@
     {
       "name": "verify-integrated-non-ga-closeout",
       "type": "verifier",
-      "model": "gpt-5.3-codex-high-fast",
+      "model": "composer-2-fast",
       "verifies": "integrate-non-ga-closeout-and-doc-hygiene",
       "dependsOn": [
         "integrate-non-ga-closeout-and-doc-hygiene"
