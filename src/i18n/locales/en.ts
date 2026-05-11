@@ -142,7 +142,8 @@ export const enSource = {
     },
     dragHints: {
         taskCardKeyboard:
-            "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel."
+            "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel.",
+        columnDragHandle: "Drag to reorder column"
     },
     settings: {
         darkMode: "Dark mode",

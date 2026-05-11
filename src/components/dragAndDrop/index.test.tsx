@@ -11,24 +11,32 @@ jest.mock("@hello-pangea/dnd", () => {
             draggableId,
             index
         }: {
-            children: (provided: {
-                dragHandleProps: Record<string, string>;
-                draggableProps: Record<string, number | string>;
-                innerRef: jest.Mock;
-            }) => unknown;
+            children: (
+                provided: {
+                    dragHandleProps: Record<string, string>;
+                    draggableProps: Record<string, number | string>;
+                    innerRef: jest.Mock;
+                },
+                snapshot: { isDragging: boolean }
+            ) => unknown;
             draggableId: string;
             index: number;
         }) =>
-            children({
-                dragHandleProps: {
-                    "data-drag-handle-id": draggableId
+            children(
+                {
+                    dragHandleProps: {
+                        "data-drag-handle-id": draggableId
+                    },
+                    draggableProps: {
+                        "data-draggable-id": draggableId,
+                        "data-draggable-index": index
+                    },
+                    innerRef: jest.fn()
                 },
-                draggableProps: {
-                    "data-draggable-id": draggableId,
-                    "data-draggable-index": index
-                },
-                innerRef: jest.fn()
-            }),
+                {
+                    isDragging: String(draggableId).includes("__IS_DRAGGING__")
+                }
+            ),
         Droppable: ({
             children,
             droppableId
@@ -94,6 +102,39 @@ describe("drag and drop wrappers", () => {
         expect(screen.getByTestId("drag-child")).toHaveAttribute(
             "data-draggable-index",
             "2"
+        );
+        expect(screen.getByTestId("drag-child")).not.toHaveAttribute(
+            "data-dragging"
+        );
+    });
+
+    it("Drag sets data-dragging while snapshot.isDragging is true", () => {
+        render(
+            <Drag draggableId="task__IS_DRAGGING__x" index={2}>
+                <div data-testid="drag-child">Task card</div>
+            </Drag>
+        );
+
+        expect(screen.getByTestId("drag-child")).toHaveAttribute(
+            "data-dragging",
+            "true"
+        );
+    });
+
+    it("Drag omits drag-handle props from the root child when detachDragHandle is set", () => {
+        render(
+            <Drag detachDragHandle draggableId="col-1" index={0}>
+                <div data-testid="drag-child">Column</div>
+            </Drag>
+        );
+
+        expect(screen.getByTestId("drag-child")).toHaveAttribute(
+            "data-draggable-id",
+            "col-1"
+        );
+        expect(screen.getByTestId("drag-child")).not.toHaveAttribute(
+            "data-drag-handle-id",
+            "col-1"
         );
     });
 

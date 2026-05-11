@@ -914,6 +914,8 @@ const BoardPage = () => {
                                         <DropChild style={{ display: "flex" }}>
                                             {board?.map((column, index) => (
                                                 <Drag
+                                                    detachDragHandle
+                                                    disableInteractiveElementBlocking
                                                     key={column._id}
                                                     draggableId={`column${column._id}`}
                                                     index={index}

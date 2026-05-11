@@ -145,7 +145,8 @@ const zhCN: Dictionary = {
     },
     dragHints: {
         taskCardKeyboard:
-            "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。"
+            "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。",
+        columnDragHandle: "拖动以重新排序列"
     },
     labels: {
         members: "成员",
