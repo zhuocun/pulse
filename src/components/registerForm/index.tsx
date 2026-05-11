@@ -9,6 +9,7 @@ import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 
+import AuthErrorSummary from "../authErrorSummary";
 import { PasswordStrengthHint } from "./passwordStrengthHint";
 import { AuthTermsAgreement } from "./termsAgreement";
 
@@ -22,7 +23,8 @@ const CapsLockSlot = styled.span`
 
 const RegisterForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | null | IError>>;
-}> = ({ onError }) => {
+    serverError?: Error | IError | null;
+}> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
     const [form] = Form.useForm<{
         email: string;
@@ -31,6 +33,7 @@ const RegisterForm: React.FC<{
     }>();
     const passwordValue = Form.useWatch("password", form) ?? "";
     const [capsLockOn, setCapsLockOn] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
     const { mutateAsync, isLoading } = useReactMutation(
         "auth/register",
         "POST",
@@ -44,6 +47,7 @@ const RegisterForm: React.FC<{
         email: string;
         password: string;
     }) => {
+        setSubmitAttempted(false);
         try {
             await mutateAsync({
                 ...input,
@@ -59,8 +63,32 @@ const RegisterForm: React.FC<{
             // Error state is set by useReactMutation's onError callback.
         }
     };
+    const fieldMeta = [
+        { name: "email", id: "email", label: microcopy.fields.email },
+        {
+            name: "username",
+            id: "username",
+            label: microcopy.fields.username
+        },
+        {
+            name: "password",
+            id: "password",
+            label: microcopy.fields.password
+        }
+    ] as const;
+
     return (
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            onFinishFailed={() => setSubmitAttempted(true)}
+        >
+            <AuthErrorSummary
+                fields={fieldMeta}
+                includeFieldErrors={submitAttempted}
+                serverError={serverError}
+            />
             <Form.Item
                 label={microcopy.fields.email}
                 name="email"

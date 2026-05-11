@@ -17,6 +17,7 @@ type DragMockProps = {
     children: ReactNode;
     draggableId: string;
     isDragDisabled?: boolean;
+    detachDragHandle?: boolean;
 };
 
 type DropMockProps = {
@@ -42,17 +43,47 @@ type DropdownMockProps = {
     };
 };
 
-jest.mock("../dragAndDrop", () => ({
-    Drag: ({ children, draggableId, isDragDisabled }: DragMockProps) => (
-        <div data-disabled={String(isDragDisabled)} data-testid={draggableId}>
-            {children}
-        </div>
-    ),
-    Drop: ({ children, droppableId }: DropMockProps) => (
-        <div data-testid={`drop-${droppableId}`}>{children}</div>
-    ),
-    DropChild: ({ children }: { children: ReactNode }) => <div>{children}</div>
-}));
+jest.mock("../dragAndDrop", () => {
+    const React = jest.requireActual("react");
+    const { useDetachedDragHandleProps } =
+        jest.requireActual<typeof import("../dragAndDrop")>("../dragAndDrop");
+
+    return {
+        useDetachedDragHandleProps,
+        Drag: ({
+            children,
+            draggableId,
+            isDragDisabled,
+            detachDragHandle
+        }: DragMockProps) => {
+            if (detachDragHandle) {
+                return (
+                    <div data-testid={`detach-${draggableId}`}>{children}</div>
+                );
+            }
+            const isDragging = String(draggableId).includes("__IS_DRAGGING__");
+            const inner = React.isValidElement(children)
+                ? React.cloneElement(children, {
+                      "data-dragging": isDragging ? "true" : undefined
+                  } as never)
+                : children;
+            return (
+                <div
+                    data-disabled={String(isDragDisabled)}
+                    data-testid={draggableId}
+                >
+                    {inner}
+                </div>
+            );
+        },
+        Drop: ({ children, droppableId }: DropMockProps) => (
+            <div data-testid={`drop-${droppableId}`}>{children}</div>
+        ),
+        DropChild: ({ children }: { children: ReactNode }) => (
+            <div>{children}</div>
+        )
+    };
+});
 
 jest.mock("../taskCreator", () => ({
     __esModule: true,
@@ -281,6 +312,23 @@ describe("Column", () => {
             "aria-keyshortcuts",
             "Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
         );
+    });
+
+    it("marks the task row shell data-dragging while a drag snapshot is active", () => {
+        renderColumn({
+            tasks: [
+                task({
+                    _id: "persisted__IS_DRAGGING__",
+                    taskName: "Lifted task"
+                })
+            ]
+        });
+
+        expect(document.querySelector('[data-dragging="true"]')).toBeTruthy();
+        expect(
+            screen.getByRole("button", { name: /open task lifted task/i })
+                .className
+        ).toContain("task-card-lift-surface");
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {

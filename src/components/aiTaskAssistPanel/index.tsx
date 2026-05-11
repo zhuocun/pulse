@@ -30,6 +30,7 @@ import AiSuggestedBadge from "../aiSuggestedBadge";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
+import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 // Stable fallbacks: avoid producing a new `[]` reference on every render, which
 // otherwise re-fires the suggestion effect endlessly when the cache is empty.
@@ -45,6 +46,23 @@ const LIVE_REGION_STYLE = {
     padding: 0,
     position: "absolute" as const,
     width: 1
+};
+
+const extractSuggestionRunId = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== "object") return null;
+    const record = payload as Record<string, unknown>;
+    for (const key of [
+        "brief_run_id",
+        "run_id",
+        "suggestion_id",
+        "id"
+    ] as const) {
+        const candidate = record[key];
+        if (typeof candidate === "string" && candidate.length > 0) {
+            return candidate;
+        }
+    }
+    return null;
 };
 
 type WireEstimateSuggestion = Omit<
@@ -195,6 +213,14 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         return p.readiness ? adaptV21Readiness(p.readiness) : undefined;
     }, [remoteLastSuggestion]);
 
+    const remotePayloadRunId = useMemo(
+        () =>
+            !isRemote
+                ? null
+                : extractSuggestionRunId(remoteLastSuggestion?.payload),
+        [isRemote, remoteLastSuggestion?.payload]
+    );
+
     // Active data/error/loading derived from the selected engine.
     const estimateData = isRemote ? agentEstimateData : estimateAi.data;
     const readinessData = isRemote ? agentReadinessData : readinessAi.data;
@@ -239,6 +265,29 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
      * don't strand the panel.
      */
     const trimmedName = taskName.trim();
+
+    const taskAssistEstimateSuggestionKey =
+        estimateData == null
+            ? ""
+            : remotePayloadRunId
+              ? `${remotePayloadRunId}:estimate:${trimmedName}`
+              : [
+                    `local:${trimmedName}:estimate:${estimateData.storyPoints}:${estimateData.confidence}`,
+                    estimateData.rationale ?? "",
+                    (estimateData.similar ?? []).map((s) => s._id).join(",")
+                ].join(":");
+
+    const taskAssistReadinessSuggestionKey =
+        readinessData == null
+            ? ""
+            : remotePayloadRunId
+              ? `${remotePayloadRunId}:readiness:${trimmedName}:${readinessData.issues
+                    .map((i) => `${i.field}:${i.message}:${i.suggestion ?? ""}`)
+                    .join("|")}`
+              : `local:${trimmedName}:readiness:${readinessData.issues
+                    .map((i) => `${i.field}:${i.message}:${i.suggestion ?? ""}`)
+                    .join("|")}`;
+
     const remoteInput = useMemo(
         () => ({
             task_draft: {
@@ -514,18 +563,35 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             </div>
             <SectionHeading
                 right={
-                    estimateData ? (
-                        <Tooltip title={microcopy.ai.regenerateLabel}>
-                            <Button
-                                aria-label={microcopy.ai.regenerateLabel}
-                                disabled={estimateIsLoading}
-                                icon={<ReloadOutlined />}
-                                onClick={handleRegenerate}
-                                size="small"
-                                type="text"
+                    <Space align="center" wrap>
+                        {estimateData &&
+                        !showEstimateSpinner &&
+                        taskAssistEstimateSuggestionKey.length > 0 ? (
+                            <AiCopilotSurfaceFeedback
+                                ariaGroupLabel={(
+                                    microcopy.feedback.taskAssistTitle as string
+                                ).replace(
+                                    "{section}",
+                                    String(microcopy.ai.suggestedStoryPoints)
+                                )}
+                                citationCount={0}
+                                suggestionKey={taskAssistEstimateSuggestionKey}
+                                surface="task-assist"
                             />
-                        </Tooltip>
-                    ) : null
+                        ) : null}
+                        {estimateData ? (
+                            <Tooltip title={microcopy.ai.regenerateLabel}>
+                                <Button
+                                    aria-label={microcopy.ai.regenerateLabel}
+                                    disabled={estimateIsLoading}
+                                    icon={<ReloadOutlined />}
+                                    onClick={handleRegenerate}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                        ) : null}
+                    </Space>
                 }
             >
                 {microcopy.ai.suggestedStoryPoints as string}
@@ -700,7 +766,25 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             </div>
 
             <div style={{ marginTop: space.md }}>
-                <SectionHeading>
+                <SectionHeading
+                    right={
+                        readinessData &&
+                        !showReadinessSpinner &&
+                        taskAssistReadinessSuggestionKey.length > 0 ? (
+                            <AiCopilotSurfaceFeedback
+                                ariaGroupLabel={(
+                                    microcopy.feedback.taskAssistTitle as string
+                                ).replace(
+                                    "{section}",
+                                    String(microcopy.ai.readinessCheck)
+                                )}
+                                citationCount={0}
+                                suggestionKey={taskAssistReadinessSuggestionKey}
+                                surface="task-assist"
+                            />
+                        ) : null
+                    }
+                >
                     {microcopy.ai.readinessCheck as string}
                 </SectionHeading>
             </div>

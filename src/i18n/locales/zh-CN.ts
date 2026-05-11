@@ -145,7 +145,8 @@ const zhCN: Dictionary = {
     },
     dragHints: {
         taskCardKeyboard:
-            "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。"
+            "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。",
+        columnDragHandle: "拖动以重新排序列"
     },
     labels: {
         members: "成员",
@@ -296,11 +297,16 @@ const zhCN: Dictionary = {
         searchingTag: "搜索中…",
         resultsFiltered: "已筛选结果。{rationale}",
         noTasksMatched: "没有匹配的任务。请换一种说法,或清除以查看全部。",
-        boardEmpty: "此看板暂无任务。"
+        boardEmpty: "此看板暂无任务。",
+        taskAssistTitle: "{section}：对本条任务协助建议评分",
+        boardBriefTitle: "{section}：对本条看板简报建议评分"
     },
     greeting: "你好，{name}",
     header: {
         logoLabel: "Pulse 首页"
+    },
+    breadcrumb: {
+        projects: "项目"
     },
     board: {
         title: "看板",
@@ -533,6 +539,11 @@ const zhCN: Dictionary = {
         jumpToLatest: "跳转到最新内容",
         moreSources: "+{count} 个更多来源",
         copiedShort: "已复制",
+        copyMessage: "复制消息",
+        copyMessageCopied: "已复制到剪贴板",
+        toolDetailsToggle: "显示详情",
+        toolDetailsHide: "隐藏详情",
+        characterCountTemplate: "{count}/{max}",
         toolEmptyResult: "空结果",
         toolVerbs: {
             checkedProjects: "已检查项目",
@@ -565,8 +576,7 @@ const zhCN: Dictionary = {
         runBoardTriagePrompt: "对当前看板运行一次分诊检查。",
         storyPointsSet: "故事点已设置为 {value}。",
         readinessFieldUpdated: "已更新 {field}。",
-        characterCounterMax: 2000,
-        characterCounterShowAfter: 500,
+        characterCounterMax: 4000,
         breakdownAxes: {
             by_phase: {
                 label: "按阶段",
@@ -617,6 +627,9 @@ const zhCN: Dictionary = {
         registerSubtitle: "创建账号,开始追踪工作。",
         switchToRegister: "还没有账号?",
         switchToLogin: "已有账号?",
+        errorSummaryTitle: "存在问题",
+        errorSummaryIntro: "请修正以下项目后重试。",
+        errorSummaryRegionAriaLabel: "表单错误",
         heroBadge: "新功能:看板 Copilot",
         heroTitle: "在专注与从容中推进工作。",
         heroSubtitle:

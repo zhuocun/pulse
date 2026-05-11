@@ -5,6 +5,7 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -112,6 +113,43 @@ describe("RegisterForm", () => {
             await screen.findByText("Please enter your password")
         ).toBeInTheDocument();
         expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("after an empty submit, shows an error summary with links to invalid fields", async () => {
+        const rtlUser = userEvent.setup();
+        renderRegisterForm();
+
+        await submitRegister();
+
+        const summary = await screen.findByRole("alert", {
+            name: /there is a problem/i
+        });
+        expect(
+            screen.getByRole("heading", {
+                name: /there is a problem/i
+            })
+        ).toBeInTheDocument();
+
+        expect(summary.querySelector('a[href="#email"]')).toBeTruthy();
+        expect(summary.querySelector('a[href="#username"]')).toBeTruthy();
+        expect(summary.querySelector('a[href="#password"]')).toBeTruthy();
+
+        const userLink = summary.querySelector(
+            'a[href="#username"]'
+        ) as HTMLAnchorElement;
+        await rtlUser.click(userLink);
+        expect(screen.getByLabelText(/^username$/i)).toHaveFocus();
+    });
+
+    it("does not block paste on the password field", async () => {
+        const rtlUser = userEvent.setup();
+        renderRegisterForm();
+
+        const password = screen.getByLabelText(/^password$/i);
+        await rtlUser.click(password);
+        await rtlUser.paste("pasted-password");
+
+        expect(password).toHaveValue("pasted-password");
     });
 
     it("validates email format", async () => {

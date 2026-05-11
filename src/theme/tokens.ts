@@ -197,7 +197,9 @@ export const shadow = {
     /* Single brand-accent glow + soft aurora drop. Derived from the active
      * palette so a palette swap re-tints both in one shot. */
     glowAccent: `0 0 24px rgba(${palette.accent.rgb}, 0.28)`,
-    glowAurora: `0 12px 40px -8px rgba(${palette.accent.rgb}, 0.24), 0 0 0 1px rgba(${palette.accent.rgb}, 0.10)`
+    glowAurora: `0 12px 40px -8px rgba(${palette.accent.rgb}, 0.24), 0 0 0 1px rgba(${palette.accent.rgb}, 0.10)`,
+    /** Drag-lift: slightly above resting card shadow without the full `lg` stack. */
+    lift: "0 6px 16px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.06)"
 } as const;
 
 /**
