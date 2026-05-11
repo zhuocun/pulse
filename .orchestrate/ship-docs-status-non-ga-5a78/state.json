@@ -15,12 +15,12 @@
       "handoffPath": "handoffs/reconcile-status-roadmap-docs.md",
       "startedAt": "2026-05-11T02:43:48.320Z",
       "finishedAt": "2026-05-11T02:45:51.230Z",
-      "lastUpdate": "2026-05-11T02:45:51.231Z",
+      "lastUpdate": "2026-05-11T02:45:52.167Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "not-verified",
       "attempts": 1
     },
     {
@@ -34,18 +34,24 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T02:46:01.062Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T02:46:01.062Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-11T02:45:52.167Z",
+      "message": "reconcile-status-roadmap-docs: verification self-reported (not-verified)"
+    }
+  ]
 }
