@@ -13,7 +13,7 @@ The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `ta
 
 ## Status — 2026-05-11 (reconciled vs `main`)
 
-**Shipped earlier (2026-05-10 and before, including `claude/complete-subagent-orchestrator-fUazo`):**
+**Shipped earlier (2026-05-10 and before, now on `main`; evidence consolidated in [`product-done.md`](product-done.md) / numbered rows in [`release-todo.md`](release-todo.md)):**
 
 - **Theme 1:** per-surface Pydantic schemas with `extra="forbid"` (`backend/app/agents/events.py:48–155`), validation hook in the runtime (`validate_suggestion_payload` at `events.py:207–249`), and golden SSE transcript tests for all six agents (`backend/tests/test_agent_sse_transcripts.py`).
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
