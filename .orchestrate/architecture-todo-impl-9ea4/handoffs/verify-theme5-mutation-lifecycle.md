@@ -1,10 +1,10 @@
 <!-- orchestrate handoff
 task: verify-theme5-mutation-lifecycle
-branch: `orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle` (includes commit `2d556ec`: verifier log under `docs/todo/verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`)
-agentId: bc-38882107-ef90-418d-a3fa-d9e2b12d3d85
-runId: run-fd6456bf-17d7-4186-9ae4-70660b98a7f6
+branch: `orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle` (rebasing once onto `origin` to publish `docs/verification/close-theme5-mutation-lifecycle-verifier-report.md`)
+agentId: bc-e9e861a3-e67c-4d7a-955a-edf486d7cb51
+runId: run-5c10d756-9dc9-41e3-ba17-e4a5af411a07
 resultStatus: finished
-finishedAt: 2026-05-11T16:27:26.305Z
+finishedAt: 2026-05-11T16:27:43.775Z
 -->
 
 ## Verification
@@ -12,37 +12,44 @@ finishedAt: 2026-05-11T16:27:26.305Z
 `unit-test-verified`
 
 ## Target
+
 `close-theme5-mutation-lifecycle` on branch `orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle`
 
 ## Branch
-`orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle` (includes commit `2d556ec`: verifier log under `docs/todo/verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`)
+
+`orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle` (rebasing once onto `origin` to publish `docs/verification/close-theme5-mutation-lifecycle-verifier-report.md`)
 
 ## Execution
 
-- → `npm test -- --testPathPatterns=useAgentToolResolver --no-coverage` — 1 suite, 5 tests passed  
-- → `npm test -- --testPathPatterns=feTools/index --no-coverage` — 1 suite, 20 tests passed  
-- → `npm test -- --testPathPatterns=useAgent --no-coverage` — 5 suites, 64 tests passed  
-- → `npm run typecheck` (`tsc --noEmit`) — exit 0  
-- → `cd backend && python3 -m venv .venv && pip install -e ".[dev]"` then `python -m pytest tests/test_chat_mutation_lifecycle.py -v --no-cov` — 4 passed (emit proposal + interrupt; reject finishes without apply interrupt; accept yields `fe.applyMutation` stage `apply` then `mutation_applied_ids`; `mutation_applied_ids` matches proposal id once)  
-- → Did **not** run: live dev server, browser/UI recording, or `POST /api/v1/agents/mutations/record|undo` against a real Mongo-backed API  
+– `cd /workspace && npm run typecheck` → `tsc --noEmit` exited 0.  
+– `cd /workspace && npx jest --testPathPatterns="useAgentToolResolver|feTools/index" --no-cache` → **2 suites, 25 tests**, all passed.  
+– `cd /workspace && npx jest --testPathPatterns=useAgent --no-cache` → **5 suites, 64 tests**, all passed.  
+– `cd /workspace/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` then  
+  `.venv/bin/pytest tests/test_chat_mutation_lifecycle.py -v --tb=short -o addopts=` → **4 passed** (`mutation_proposal` + interrupts, reject clears without apply interrupt, accept reaches `fe.applyMutation` stage `apply`, applied ids assertion). *(Default `pytest` addopts enforce coverage globally; overriding `addopts` was required.)*  
+– Committed verifier log to `docs/verification/close-theme5-mutation-lifecycle-verifier-report.md` and pushed after `git pull --rebase origin <same-branch>` (required because `origin` advanced).  
+– Not run: dev server/browser, Mongo-backed HTTP flows for `/api/v1/agents/mutations/record` or `/undo`, or any screen recording.
 
 ## Findings
 
 Per acceptance criterion:
 
-- [ ] Remote session emits a proposal, acceptance resumes the graph, approved mutation is applied (**partially met**): LangGraph tests prove this on the **stub** path only (`__PROPOSE_MUTATION__` with stub LLM). The non-stub `chat-agent` path still returns normal chat replies and does **not** emit `mutation_proposal`, so organic remote chat is not covered by these tests.  
-- [ ] Reject exits cleanly; undo reverses within documented semantics (**partially met**): Reject path is asserted in `test_chat_reject_resume_no_apply_interrupt` (`__interrupt__` absent, “unchanged” in assistant text). Undo/journal behavior is implemented in `agent_mutation_journal.py` and `applyMutation.ts` but **not** exercised by the pytest/Jest commands above (no Mongo in default CI; no `fe.applyMutation` `run()` test with mocked API).  
-- [ ] Replay/idempotency tests prove no double-apply (**partially met**): `test_mutation_applied_ids_records_once` pins state after a single successful apply; `_mutation_finalize` guards `pid in mutation_applied_ids`; journal `record_apply_journal` documents duplicate no-op. There is **no** automated test that replays resume/apply or hammers duplicate `record`/`undo` through HTTP.  
+- **[ ] A remote chat/session can emit a proposal, acceptance resumes the graph, and the approved mutation is applied:** partly met → **stub/magic-token path only** (`__PROPOSE_MUTATION__` with stub model emits `mutation_proposal`); LangGraph pytest covers approval → apply interrupt wiring and `mutation_applied_ids`; **no jest coverage executes `applyMutationTool.run` (task `PUT` + journal `record`)**, so the apply leg is not test-proven on the FE.
+- **[ ] Reject exits cleanly; undo reverses an accepted mutation per documented semantics:** partly met → **reject** covered in `test_chat_reject_resume_no_apply_interrupt`; **undo** is implemented in `src/utils/ai/feTools/applyMutation.ts` + `agent_mutation_journal.py` but **not exercised** in this verification (no Mongo integration test, no UI run).
+- **[ ] Replay/idempotency tests prove no double-apply on retries/resume:** not met as stated → state uses `merge_mutation_applied_ids` and `_mutation_finalize` guards `pid in applied`, and `record_apply_journal` no-ops duplicates, but **no test replays a second `Command(resume=…)` / double apply**; **no CI test** hits the journal layer.
+
+Verifier-specific acceptance criteria:
+
+- **[ ] Full proposal→accept→apply→undo lifecycle with runtime evidence:** not met → **automated suites only**, no browser/HTTP evidence for undo or real remote session.
+- **[ ] Replay/idempotency behaviour prevents double apply:** not demonstrated by tests run here (see above).
 
 Other findings (severity-ordered):
 
-- **(high)** **GA §1 is not “closed” in repo docs on this branch:** `docs/todo/release-todo.md` still states §1 “still open” and that no agent emits `mutation_proposal` / no `fe.applyMutation` (see §1 block starting ~line 75). Code has moved on; backlog text is stale, so **Theme 5 / §1 cannot be treated as closed from documentation alone.**  
-- **(high)** **Mutation proposals are stub-gated for `chat-agent`:** only `is_stub_model` + `__PROPOSE_MUTATION__` enters `mutation_hitl`. That satisfies CI and manual QA with the magic string but **fails a strict reading of “end-to-end” for real LLM sessions** until a non-stub emission path exists.  
-- **(med)** **Frontend gap:** no Jest suite exercises `applyMutationTool.run` (task `PUT`s, `agents/mutations/record`, toast undo calling `agents/mutations/undo`). Registry and approval-stage auto-resume behavior are covered; the apply/undo tool body is not.  
-- **(med)** **Backend gap:** journal idempotency (`journal_replay_skip`, `undo_replay_skip`) has no pytest coverage in this environment (upstream note: Mongo optional in sandbox).  
-- **(low)** Backend pytest emits a LangGraph `LangChainPendingDeprecationWarning` from encrypted serde import; does not fail tests.
+- **(high):** Mutation **proposal emission is stub-gated** (real LLM chat does not automatically produce `mutation_proposal` without the deterministic trigger), so Theme 5 is **not “fully closed” for production chat** from a product perspective.  
+- **(med):** **Journal idempotency and undo** depend on Mongo in deploy; **no pytest in this run** validates `record`/`undo` routes or `journal_replay_skip` / `undo_replay_skip` metrics.  
+- **(low):** Backend default `pytest` config always injects `--cov` options; running the focused file required `-o addopts=` (venvs are gitignored; first run needs `python3 -m venv .venv` under `backend/`).
 
 ## Notes & suggestions
 
-- Treat **`unit-test-verified` as evidence for the stub-HITL graph + targeted FE hooks only**, not for full GA §1 sign-off. Next steps for a “fully closed” verdict: update `release-todo` / `product-done` per AGENTS.md when the team accepts scope, add non-stub proposal emission, add an HTTP or integration test for `record`/`undo`, add a replay/double-resume test for `mutation_applied_ids`, and optionally a Jest test for `fe.applyMutation` `stage: "apply"`.  
-- Full verifier log and exact outputs: `docs/todo/verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`.
+- Treat Theme 5 as **graph + FE wiring implemented** but **evidence-incomplete** for GA-style closure: add a **double-resume / replay** LangGraph test, **`applyMutation` unit tests** with mocked `apiRequest`, and optional **`RUN_INTEGRATION=1` + Mongo** (or `mongomock`) for `record`/`undo`.  
+- Extend **non-stub chat** to emit proposals via a model tool when product is ready.  
+- I had to **`git pull --rebase`** to push the verifier doc after `origin` moved; source files under review were not edited.
