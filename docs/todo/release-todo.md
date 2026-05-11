@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integrated on ``orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene``; only 🛑 GA §1 remains open; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + command recipes below).
+Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; 🛑 GA §1 is **partially** implemented — stub-mode HITL + FE wiring verified — see §1 body; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + [`../verification/`](../verification/) logs + command recipes below).
 
 ## TL;DR
 
@@ -30,26 +30,29 @@ Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integ
   ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items`` subject to
   operator env backfill (Redis for multi-worker, `MCP_ENABLED`, model map,
   pgvector optional).
-- **Public GA is gated on the remaining GA blocker** (§1, full
-  `MutationProposal` lifecycle + undo). §4’s optional pgvector path is
+- **Public GA is gated on completing GA blocker §1** (organic LLM mutation
+  proposals + hardened record/undo verification beyond the stub graph — see §1).
+  §4’s optional pgvector path is
   shipped behind env flags — production embeddings **backfill** and tuning
   remain operator readiness work (see §4 body), not an additional numbered
   blocker in this file.
 
 ## ⚠️ Blocker urgency — resolve before each tier
 
-**The product is NOT ready for public GA.** 🛑 **GA blocker §1**
-(full `MutationProposal` accept + undo) remains the only **code** gate
-called out in this document for design-partner expansion; Beta §2/§3/§6 and
-soft/polish items through §16d are closed on
-``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. The only
-acceptable posture until §1 closes is **proposal cards off** on the FE
-(see GA Blocker §1 mitigation) when exercising chat mutations.
+**The product is NOT ready for public GA** until 🛑 **GA blocker §1** reaches
+full organic coverage (see §1 — stub-mode paths **do** ship on the integration
+baseline, but external GA still needs non-stub proposal emission and broader
+undo/record proof). Beta §2/§3/§6 and soft/polish items through §16d remain
+closed in code on ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``
+subject to operator backfill. Until §1’s **remaining** scope closes, keep
+**proposal cards off** on the FE for chat mutations unless deliberately testing
+the gated surface (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, internal envs only).
 
-- **Per-tier blockers (internal beta today):** only **GA blocker §1**
-  (mutation proposal accept + undo) remains open; Beta/soft/polish gates
-  from the 2026-05-05 audit are closed in code on this branch subject to
-  operator backfill / CI pinning follow-ups called out inline below.
+- **Per-tier blockers (internal beta today):** **GA blocker §1** is partially
+  addressed — verified stub HITL + `fe.applyMutation` + journal APIs land on
+  ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``;
+  Beta/soft/polish gates from the 2026-05-05 audit stay closed subject to operator
+  backfill / CI pinning follow-ups called out inline below.
 - **Re-audit during release-readiness reviews** until ✅. If a blocker
   is reclassified, justify it in this file with file:line evidence.
 
@@ -72,58 +75,45 @@ the explicit blocker closures listed there.
 
 ## GA blockers — must close before public ship
 
-### 🛑 1. `MutationProposal` accept path is dead in remote mode  *(BE + FE)*
+### 🛑 1. `MutationProposal` lifecycle — organic GA coverage incomplete *(BE + FE)*
 
-**Verdict (2026-05-05 re-audit):** still open. No agent emits
-`custom/mutation_proposal`; no `fe.applyMutation` interrupt is
-registered.
+**Verdict (2026-05-11 integration baseline):** **partial closure.** The dead-end
+symptoms from the 2026-05-05 re-audit are **resolved for stub-mode LangGraph** and
+the FE interrupt registry — **not** yet for ordinary remote LLM sessions without the
+stub proposal trigger.
 
-**Backend symptom.** The FE renders `MutationProposalCard` and calls
-`agent.resume({accepted: true})` on accept, but no BE agent emits
-`custom/mutation_proposal`, no `fe.applyMutation` interrupt is
-registered, and there is no undo endpoint behind the `undoable` badge.
+**Shipped on** ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout`` **(machine-verified subset):**
 
-**Frontend symptom.** `AiChatDrawer` renders `MutationProposalCard`
-and wires `onAccept` to `agentChat.resumeProposal(true)`. The user
-sees the card vanish but no mutation is applied.
+- **Backend:** `chat-agent` graph enters human-in-the-loop mutation flow under stub
+  LLM + magic-string proposal (`__PROPOSE_MUTATION__`); emits `custom/mutation_proposal`;
+  LangGraph `Command(resume=…)` accept/reject resumes; post-apply idempotency tracked
+  via `mutation_applied_ids` in pytest (`backend/tests/test_chat_mutation_lifecycle.py`).
+  Mutation journal + HTTP undo/record surface backs the FE toast path (see
+  `src/utils/ai/feTools/applyMutation.ts` calling `agents/mutations/record` and
+  `agents/mutations/undo`).
+- **Frontend:** `fe.applyMutation` interrupt registration, proposal resume wiring,
+  and registry behavior covered by targeted Jest (`useAgentToolResolver`, `feTools/index`,
+  `useAgent` suites — exact commands in
+  [`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md)).
 
-- BE surface: any agent that would propose mutations (most naturally
-  `chat-agent`, future `board-coach-agent`).
-- FE files: `src/components/aiChatDrawer/index.tsx`,
-  `src/components/mutationProposalCard/index.tsx`.
+**Still outstanding before treating §1 as fully closed for design-partner / public GA:**
 
-**What closing this requires:**
+- **Organic proposals:** non-stub `chat-agent` sessions should emit `mutation_proposal`
+  without relying on stub-only triggers — today production-shaped graphs still return
+  ordinary chat text off the hot path.
+- **Integration proof:** Mongo-backed (or equivalent) HTTP tests for
+  `POST /api/v1/agents/mutations/record` and `…/undo`, replay/double-resume hammer tests,
+  and optional Jest exercising `applyMutationTool.run` task `PUT`s end-to-end.
+- **Autonomy enforcement:** server-side checks that map Suggest / Plan / Auto to
+  enforceable policies beyond UI gating (coordinates with PRD AC-V5 / preapproved tools).
 
-- A `MutationProposal` Pydantic shape mirroring `agent.d.ts`
-  (`proposal_id`, `description`,
-  `diff: {task_updates, column_updates, bulk_apply}`, `risk`,
-  `undoable`).
-- Emission from any write-capable agent — most naturally `chat-agent`
-  for tool-driven mutations and a future `board-coach-agent` for
-  proactive mutations.
-- A resume-accept handler that treats an accepted resume choice as a
-  request to raise a `fe.applyMutation` interrupt, so the FE applies the
-  diff through `useReactMutation`.
-  On `{choice: "reject"}` the agent terminates the proposal cycle.
-- An undo endpoint (or a structured undo payload re-triggered by a
-  follow-up `mutation_proposal`) so the FE 10-second undo toast
-  (PRD AC-V4) has something to call after accept.
+**Mitigation (unchanged):** `MutationProposalCard` stays **off by default** behind
+`environment.aiMutationProposalsEnabled` (`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`,
+default `false`). Enable only in internal environments until §1’s remaining scope
+closes.
 
-This is cross-cutting work across the agent runtime, the tool registry
-(a new `fe.applyMutation` interrupt), the BE-internal mutation
-execution path, and the spec for `auto`-autonomy preapproved tools
-(PRD AC-V5: `assignTask`, in-column `moveTask`, `renameColumn`).
-
-- **FE polish already shipped (2026-05-05):** `MutationProposalCard`
-  accepts `onUndo` and fires `AGENT_PROPOSAL_UNDONE`; full 10-second
-  countdown undo path with field-change disclosure. Only the BE half
-  remains for end-to-end GA.
-- **Mitigation (v2.1, `5d96e16`):** `MutationProposalCard` gated off
-  by default behind `environment.aiMutationProposalsEnabled` (env
-  var `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED`, default `false`).
-  The card does not render even when an agent emits a
-  `pendingProposal`. Set the env var to `true` only in internal
-  environments where the dead-end UX is acceptable.
+**References:** [`architecture-todo.md`](architecture-todo.md) Theme 5 disposition;
+[`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md).
 
 ## Beta blockers — must close before design-partner expansion
 
@@ -446,7 +436,8 @@ features above. Detailed PR-by-PR history lives in git log.
    keep one worker or scale horizontally one worker per container.
 
 Open work above Tier 9 that this file still tracks: **GA §1** (mutation
-proposal lifecycle). **§4** optional pgvector path is shipped; production
+proposal lifecycle — stub HITL + interrupts ship on the integration baseline;
+organic LLM coverage + hardened HTTP undo/record proof remains). **§4** optional pgvector path is shipped; production
 retrieval **depth** still depends on operator embeddings backfill and env
 alignment — not a separate numbered blocker. Historical structural notes live in
 [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
@@ -462,8 +453,10 @@ alignment — not a separate numbered blocker. Historical structural notes live 
    ships via `.github/workflows/frontend-ci.yml`. **Still close 🛑 GA §1**
    before expanding external users relying on mutation proposals; keep
    proposal cards hidden until then.
-3. **Public GA.** Close the 🛑 GA blocker §1 (full
-   `MutationProposal` lifecycle + undo). Surface proposal cards after §1.
+3. **Public GA.** Close the 🛑 GA blocker §1 remainder (organic
+   `MutationProposal` emission + hardened record/undo verification — stub-mode
+   lifecycle already lands on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``).
+   Surface proposal cards broadly after §1 fully closes.
    Treat §4 operator backfill (`task_embeddings`, matching dimensions, enabling
    `AGENT_VECTOR_SEARCH_ENABLED`) as production readiness for retrieval-grade
    quality — not a separate numbered blocker once the code path exists.
