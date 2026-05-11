@@ -152,13 +152,13 @@
       "handoffPath": "handoffs/dnd-affordances.md",
       "startedAt": "2026-05-11T04:51:18.291Z",
       "finishedAt": "2026-05-11T04:56:28.398Z",
-      "lastUpdate": "2026-05-11T04:56:28.398Z",
+      "lastUpdate": "2026-05-11T04:56:31.329Z",
       "note": "respawned by self-planner (was error; attempts=1)",
       "attempts": 2,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-dnd-affordances",
@@ -171,17 +171,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T04:56:37.064Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T04:56:37.064Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "feedback-parity",
@@ -272,6 +273,10 @@
     {
       "at": "2026-05-11T04:54:37.903Z",
       "message": "chat-drawer-polish: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-11T04:56:31.329Z",
+      "message": "dnd-affordances: verification self-reported (unit-test-verified)"
     }
   ]
 }
