@@ -101,6 +101,20 @@ describe("mapErrorResponse", () => {
         expect((err as AgentServerError).status).toBe(503);
     });
 
+    it("maps 408 to AgentTransportError with request_timeout code", async () => {
+        const err = await mapErrorResponse(
+            fakeResponse(408, { message: "gone" })
+        );
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect((err as AgentTransportError).code).toBe("request_timeout");
+    });
+
+    it("maps 504 to AgentTransportError with gateway_timeout code", async () => {
+        const err = await mapErrorResponse(fakeResponse(504));
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect((err as AgentTransportError).code).toBe("gateway_timeout");
+    });
+
     it("maps unexpected 4xx to AgentTransportError", async () => {
         const err = await mapErrorResponse(fakeResponse(418));
         expect(err).toBeInstanceOf(AgentTransportError);
@@ -252,5 +266,11 @@ describe("mapAgentErrorResponse", () => {
     it("maps 401 to AgentAuthError", async () => {
         const err = await mapAgentErrorResponse(fakeResponse(401));
         expect(err).toBeInstanceOf(AgentAuthError);
+    });
+
+    it("maps 504 to AgentTransportError with gateway_timeout code", async () => {
+        const err = await mapAgentErrorResponse(fakeResponse(504));
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect((err as AgentTransportError).code).toBe("gateway_timeout");
     });
 });
