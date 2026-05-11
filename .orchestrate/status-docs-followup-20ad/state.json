@@ -15,12 +15,12 @@
       "handoffPath": "handoffs/audit-status-doc-open-items.md",
       "startedAt": "2026-05-11T01:20:08.294Z",
       "finishedAt": "2026-05-11T01:22:13.791Z",
-      "lastUpdate": "2026-05-11T01:22:14.799Z",
+      "lastUpdate": "2026-05-11T01:25:39.753Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "not-verified",
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -58,17 +58,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T01:25:44.405Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T01:25:44.405Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-auth-register-password-strength-and-tos",
@@ -98,6 +99,10 @@
     {
       "at": "2026-05-11T01:22:14.799Z",
       "message": "audit-status-doc-open-items: verification self-reported (not-verified)"
+    },
+    {
+      "at": "2026-05-11T01:25:39.753Z",
+      "message": "audit-status-doc-open-items: verification recorded (unit-test-verified) by verifier verify-audit-status-doc-open-items"
     }
   ]
 }
