@@ -23,7 +23,9 @@ mutation lifecycle commits merged with `close-remaining-architecture-themes`.
 | Scope | Evidence |
 | --- | --- |
 | Integration merge sanity (post-merge baseline) | [`verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md`](verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md) |
+| Alternate integration command transcript | [`../verification/integrate-architecture-backlog-closeout-verification.log`](../verification/integrate-architecture-backlog-closeout-verification.log) |
 | Themes 2–4 / 6 FE–BE hygiene + full Jest command transcript | [`../verification/close-remaining-architecture-themes-verifier-036a.log`](../verification/close-remaining-architecture-themes-verifier-036a.log) |
+| Theme 5 independent report | [`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md) |
 | Theme 6 depth deferrals | [`../archive/architecture-theme6-deferred.md`](../archive/architecture-theme6-deferred.md) |
 | Theme 4 FE resume depth deferrals | [`../archive/architecture-theme4-fe-deferred.md`](../archive/architecture-theme4-fe-deferred.md) |
 

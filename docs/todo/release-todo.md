@@ -5,15 +5,16 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; 🛑 GA §1 is **partially** implemented — stub-mode HITL + FE wiring verified — see §1 body; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + [`../verification/`](../verification/) logs + command recipes below).
+Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; 🛑 **GA §1** — stub LangGraph HITL + `fe.applyMutation` wiring shipped; **sign-off** tracks organic chat proposals + apply/replay/Mongo proof — §1; command transcripts in [`verification-logs/`](verification-logs/), [`../verification/`](../verification/) incl. [`../verification/integrate-architecture-backlog-closeout-verification.log`](../verification/integrate-architecture-backlog-closeout-verification.log); rerun recipes below when pinning numeric totals.)
 
 ## TL;DR
 
 - **GA-ready surfaces — Backend.** All v1 JSON routes
   (deterministic + LLM-polish);
-  v2.1 SSE read-only / suggestion flows for `board-brief`,
-  `task-drafting`, `task-estimation`, `search`, `chat` (read-only
-  tools only), `triage` nudges; per-project AI opt-out, rate
+  v2.1 SSE flows for `board-brief`,
+  `task-drafting`, `task-estimation`, `search`, `chat` (including
+  **`MutationProposal` / `fe.applyMutation` wiring** behind FE flag —
+  see §1), `triage` nudges; per-project AI opt-out, rate
   limiting, monthly token budgets, OpenTelemetry, Prometheus,
   idempotency, Postgres-backed checkpointing when configured,
   boot-time prod guards.
@@ -24,15 +25,16 @@ Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-
   typed backend error envelopes surfaced through FE typed errors.
 - **Internal beta is deployable today** with `MutationProposalCard`
   hidden via the FE flag (see GA Blocker §1 mitigation).
-- **Design-partner beta is gated on GA blocker §1** (mutation lifecycle +
-  proposal UX). Non-GA backlog items (Beta §2/§3/§6, soft §4/§5/§7, polish
+- **Design-partner beta remains gated on GA §1 sign-off** (see §1 —
+  wiring landed; **public / external** reliance on chat mutations still needs
+  the listed confidence work). Non-GA backlog items (Beta §2/§3/§6, soft §4/§5/§7, polish
   §13–§16d) are **resolved in code** on branch
   ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items`` subject to
   operator env backfill (Redis for multi-worker, `MCP_ENABLED`, model map,
   pgvector optional).
-- **Public GA is gated on completing GA blocker §1** (organic LLM mutation
-  proposals + hardened record/undo verification beyond the stub graph — see §1).
-  §4’s optional pgvector path is
+- **Public GA is gated on completing GA §1** (organic LLM `MutationProposal`
+  path + hardened `record`/`undo` / replay / `applyMutation` proof beyond
+  stub LangGraph — see §1). §4’s optional pgvector path is
   shipped behind env flags — production embeddings **backfill** and tuning
   remain operator readiness work (see §4 body), not an additional numbered
   blocker in this file.
@@ -113,7 +115,8 @@ default `false`). Enable only in internal environments until §1’s remaining s
 closes.
 
 **References:** [`architecture-todo.md`](architecture-todo.md) Theme 5 disposition;
-[`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md).
+[`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md);
+[`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md).
 
 ## Beta blockers — must close before design-partner expansion
 
@@ -436,8 +439,8 @@ features above. Detailed PR-by-PR history lives in git log.
    keep one worker or scale horizontally one worker per container.
 
 Open work above Tier 9 that this file still tracks: **GA §1** (mutation
-proposal lifecycle — stub HITL + interrupts ship on the integration baseline;
-organic LLM coverage + hardened HTTP undo/record proof remains). **§4** optional pgvector path is shipped; production
+proposal lifecycle — stub HITL + interrupts ship on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``;
+**sign-off** still tracks organic LLM coverage + hardened HTTP undo/record and replay/apply proof — §1). **§4** optional pgvector path is shipped; production
 retrieval **depth** still depends on operator embeddings backfill and env
 alignment — not a separate numbered blocker. Historical structural notes live in
 [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
@@ -450,12 +453,12 @@ alignment — not a separate numbered blocker. Historical structural notes live 
    Document the search/estimation quality ceiling in product copy.
 2. **Design-partner beta.** Beta §2/§3/§6 and soft §4/§5/§7 are closed on
    branch ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. FE CI (§7b)
-   ships via `.github/workflows/frontend-ci.yml`. **Still close 🛑 GA §1**
+   ships via `.github/workflows/frontend-ci.yml`. **Still sign off 🛑 GA §1**
    before expanding external users relying on mutation proposals; keep
-   proposal cards hidden until then.
+   proposal cards hidden until then (§1 mitigation).
 3. **Public GA.** Close the 🛑 GA blocker §1 remainder (organic
-   `MutationProposal` emission + hardened record/undo verification — stub-mode
-   lifecycle already lands on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``).
+   `MutationProposal` emission + hardened record/undo / replay / apply-stage
+   verification — stub-mode lifecycle lands on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``).
    Surface proposal cards broadly after §1 fully closes.
    Treat §4 operator backfill (`task_embeddings`, matching dimensions, enabling
    `AGENT_VECTOR_SEARCH_ENABLED`) as production readiness for retrieval-grade
