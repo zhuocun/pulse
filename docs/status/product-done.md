@@ -8,7 +8,7 @@ open. Per-PR history lives in git log.
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); non-GA `release-todo.md` closures through polish §16d landed on `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (GA §1 remains open). |
-| Last updated | 2026-05-10                                                                                                                                                                       |
+| Last updated | 2026-05-11                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
 For the live GA / blocker / soft-blocker / polish status see
