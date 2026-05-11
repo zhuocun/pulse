@@ -1,3 +1,4 @@
+import { applyMutationTool } from "./applyMutation";
 import { boardSnapshotTool } from "./boardSnapshot";
 import { formDraftTool } from "./formDraft";
 import { getProjectTool } from "./getProject";
@@ -13,6 +14,7 @@ import { viewerContextTool } from "./viewerContext";
 import type { FeTool } from "./types";
 
 const tools: Array<FeTool<never, unknown>> = [
+    applyMutationTool,
     listProjectsTool,
     listMembersTool,
     getProjectTool,

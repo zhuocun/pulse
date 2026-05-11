@@ -27,6 +27,7 @@ import {
 import { forEachAgentStreamPart } from "./useAgentStreamConsumer";
 import { useAutonomyLevel } from "./useAiEnabled";
 import { useNudgeInbox } from "./useNudgeInbox";
+import useApi from "./useApi";
 
 export type {
     AgentToolResolverStatus,
@@ -251,6 +252,7 @@ const useAgent = (
     options: UseAgentOptions = {}
 ): UseAgentResult => {
     const queryClient = useQueryClient();
+    const apiRequest = useApi();
     const baseUrl = options.baseUrl ?? environment.aiBaseUrl;
     const [state, setState] = useState<UseAgentState>({ messages: [] });
     const [error, setError] = useState<Error | null>(null);
@@ -537,6 +539,7 @@ const useAgent = (
                 projectId: options.projectId,
                 userId: options.userId,
                 autonomyLevel: autonomyRef.current,
+                apiRequest,
                 ...(options.feToolContext ?? {})
             };
 
@@ -632,6 +635,7 @@ const useAgent = (
             }
         },
         [
+            apiRequest,
             clearWatchdog,
             consumeStream,
             options.feToolContext,

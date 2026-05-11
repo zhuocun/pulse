@@ -445,7 +445,7 @@ def test_readiness_issues_shape_flows_into_polish_readiness() -> None:
 def test_chat_metadata() -> None:
     agent = global_registry.get("chat-agent")
     assert isinstance(agent, ChatAgent)
-    assert agent.metadata.recursion_limit == 15
+    assert agent.metadata.recursion_limit == 18
 
 
 def test_chat_replies_with_user_text_and_supports_multi_turn() -> None:
