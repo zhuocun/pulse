@@ -13,7 +13,7 @@ import type {
 } from "../../interfaces/agent";
 import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
 import { AgentForbiddenError } from "../ai/agentErrors";
-import { streamAgent } from "../ai/agentClient";
+import { coerceAgentTransportError, streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
 import {
     isProjectAiDisabled,
@@ -169,6 +169,8 @@ export interface UseAgentOptions {
     feToolContext?: Partial<FeToolContext>;
     /** Override threadId persistence (useful for tests). */
     initialThreadId?: string;
+    /** When set, `useAutonomyLevel` clamps stored/user levels to this list (chat metadata). */
+    allowedAutonomy?: readonly AutonomyLevel[] | null;
 }
 
 /**
@@ -306,7 +308,7 @@ const useAgent = (
 
     // Gap B: sync autonomyRef with the user's persisted autonomy level so
     // start() calls without an explicit `autonomy` option honor the setting.
-    const { level: autonomyLevel } = useAutonomyLevel();
+    const { level: autonomyLevel } = useAutonomyLevel(options.allowedAutonomy);
     useEffect(() => {
         autonomyRef.current = autonomyLevel;
     }, [autonomyLevel]);
@@ -390,7 +392,7 @@ const useAgent = (
                             clearWatchdog,
                             onNonAbortTransportError: (err) => {
                                 if (mountedRef.current) {
-                                    setError(err as Error);
+                                    setError(coerceAgentTransportError(err));
                                 }
                             },
                             onPart: async (part) => {
