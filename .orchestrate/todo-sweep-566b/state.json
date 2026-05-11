@@ -15,13 +15,13 @@
       "handoffPath": "handoffs/fix-project-detail-shell.md",
       "startedAt": "2026-05-11T04:49:40.595Z",
       "finishedAt": "2026-05-11T04:52:13.255Z",
-      "lastUpdate": "2026-05-11T04:52:13.256Z",
+      "lastUpdate": "2026-05-11T04:52:14.177Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": 198,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-project-detail-shell",
@@ -34,17 +34,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T04:52:21.977Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T04:52:21.977Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "chat-drawer-polish",
@@ -262,6 +263,10 @@
     {
       "at": "2026-05-11T04:51:12.428Z",
       "message": "dnd-affordances: respawned by self-planner (was error)"
+    },
+    {
+      "at": "2026-05-11T04:52:14.177Z",
+      "message": "fix-project-detail-shell: verification self-reported (unit-test-verified)"
     }
   ]
 }
