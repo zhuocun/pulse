@@ -15,12 +15,12 @@
       "handoffPath": "handoffs/close-theme5-mutation-lifecycle.md",
       "startedAt": "2026-05-11T16:13:13.797Z",
       "finishedAt": "2026-05-11T16:25:15.018Z",
-      "lastUpdate": "2026-05-11T16:25:15.018Z",
+      "lastUpdate": "2026-05-11T16:27:44.950Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -105,17 +105,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T16:27:46.421Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T16:27:46.421Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-architecture-backlog-complete",
@@ -141,5 +142,10 @@
       "verification": null
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-11T16:27:44.950Z",
+      "message": "close-theme5-mutation-lifecycle: verification recorded (unit-test-verified) by verifier verify-theme5-mutation-lifecycle"
+    }
+  ]
 }
