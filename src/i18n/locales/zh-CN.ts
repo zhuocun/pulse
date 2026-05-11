@@ -624,7 +624,22 @@ const zhCN: Dictionary = {
         heroFeatureDraft: "用 AI 起草任务和站会简报。",
         heroFeatureDrag: "拖放式的列与卡片。",
         heroFeatureColors: "支持浅色、深色及跟随系统的主题。",
-        heroFinePrint: "为交付型团队打造。免费试用,无需信用卡。"
+        heroFinePrint: "为交付型团队打造。免费试用,无需信用卡。",
+        passwordStrength: {
+            meterAriaLabel: "密码强度",
+            tooShort: "太短 — 请至少输入 8 个字符。",
+            weak: "较弱 — 请混合使用大写字母、小写字母、数字或符号。",
+            fair: "尚可 — 增加长度或再补充一种字符类型以提升强度。",
+            strong: "强密码。"
+        },
+        termsLink: "服务条款",
+        termsLoginPrefix: "登录即表示您同意我们的",
+        termsLoginSuffix: "。",
+        termsRegisterPrefix: "注册即表示您同意我们的",
+        termsRegisterSuffix: "。",
+        termsPageTitle: "服务条款",
+        termsPageBody:
+            "当前部署暂不提供独立的法律条文页面。请向管理员或 Pulse 法务联系人索取适用于您工作区的条款与可接受使用政策。"
     },
     commandPalette: {
         title: "命令面板",

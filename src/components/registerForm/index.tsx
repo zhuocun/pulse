@@ -9,6 +9,9 @@ import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 
+import { PasswordStrengthHint } from "./passwordStrengthHint";
+import { AuthTermsAgreement } from "./termsAgreement";
+
 const inputSize = "large" as const;
 
 const CapsLockSlot = styled.span`
@@ -21,6 +24,12 @@ const RegisterForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | null | IError>>;
 }> = ({ onError }) => {
     const navigate = useNavigate();
+    const [form] = Form.useForm<{
+        email: string;
+        username: string;
+        password: string;
+    }>();
+    const passwordValue = Form.useWatch("password", form) ?? "";
     const [capsLockOn, setCapsLockOn] = useState(false);
     const { mutateAsync, isLoading } = useReactMutation(
         "auth/register",
@@ -51,7 +60,7 @@ const RegisterForm: React.FC<{
         }
     };
     return (
-        <Form layout="vertical" onFinish={handleSubmit}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
             <Form.Item
                 label={microcopy.fields.email}
                 name="email"
@@ -100,13 +109,16 @@ const RegisterForm: React.FC<{
             </Form.Item>
             <Form.Item
                 extra={
-                    <CapsLockSlot
-                        aria-atomic="true"
-                        aria-live="polite"
-                        role="status"
-                    >
-                        {capsLockOn ? microcopy.a11y.capsLockOn : ""}
-                    </CapsLockSlot>
+                    <>
+                        <PasswordStrengthHint password={passwordValue} />
+                        <CapsLockSlot
+                            aria-atomic="true"
+                            aria-live="polite"
+                            role="status"
+                        >
+                            {capsLockOn ? microcopy.a11y.capsLockOn : ""}
+                        </CapsLockSlot>
+                    </>
                 }
                 label={microcopy.fields.password}
                 name="password"
@@ -147,6 +159,7 @@ const RegisterForm: React.FC<{
                     id="password"
                 />
             </Form.Item>
+            <AuthTermsAgreement variant="register" />
             <Form.Item>
                 <AuthButton
                     loading={isLoading}

@@ -23,6 +23,7 @@ const HomePage = lazy(() => import("../pages/home"));
 const LoginPage = lazy(() => import("../pages/login"));
 const RegisterPage = lazy(() => import("../pages/register"));
 const ForgotPasswordPage = lazy(() => import("../pages/forgotPassword"));
+const TermsPage = lazy(() => import("../pages/terms"));
 const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
@@ -94,6 +95,10 @@ const routes = [
                     {
                         path: "auth/forgot-password",
                         element: <ForgotPasswordPage />
+                    },
+                    {
+                        path: "auth/terms",
+                        element: <TermsPage />
                     },
                     {
                         path: "projects",
