@@ -199,13 +199,13 @@
       "handoffPath": "handoffs/feedback-parity.md",
       "startedAt": "2026-05-11T04:49:56.896Z",
       "finishedAt": "2026-05-11T05:06:44.395Z",
-      "lastUpdate": "2026-05-11T05:06:44.396Z",
+      "lastUpdate": "2026-05-11T05:06:45.358Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": 202,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-feedback-parity",
@@ -218,17 +218,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T05:06:52.140Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T05:06:52.140Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "docs-status-hygiene",
@@ -282,6 +283,10 @@
     {
       "at": "2026-05-11T04:57:22.398Z",
       "message": "auth-form-completion: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-11T05:06:45.358Z",
+      "message": "feedback-parity: verification self-reported (unit-test-verified)"
     }
   ]
 }
