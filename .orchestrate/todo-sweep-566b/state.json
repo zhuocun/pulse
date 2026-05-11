@@ -17,11 +17,11 @@
       "finishedAt": null,
       "lastUpdate": "2026-05-11T04:49:43.993Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-fix-project-detail-shell",
@@ -62,11 +62,11 @@
       "finishedAt": null,
       "lastUpdate": "2026-05-11T04:49:46.355Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-chat-drawer-polish",
@@ -107,11 +107,11 @@
       "finishedAt": null,
       "lastUpdate": "2026-05-11T04:49:48.951Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-auth-form-completion",
@@ -145,18 +145,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "error",
+      "status": "pending",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": "2026-05-11T04:49:55.904Z",
+      "startedAt": null,
       "finishedAt": null,
-      "lastUpdate": "2026-05-11T04:49:55.906Z",
-      "note": "spawn failed after 3 transient sub-attempts: Error: template \"worker\" has unrendered placeholders: ...",
+      "lastUpdate": "2026-05-11T04:51:11.514Z",
+      "note": "respawned by self-planner (was error; attempts=1)",
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
-      "failureMode": "unknown",
-      "verification": null,
-      "attempts": 1
+      "failureMode": null,
+      "verification": null
     },
     {
       "name": "verify-dnd-affordances",
@@ -197,11 +197,11 @@
       "finishedAt": null,
       "lastUpdate": "2026-05-11T04:49:59.459Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "verify-feedback-parity",
