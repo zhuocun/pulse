@@ -1,0 +1,144 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "architecture-todo-impl: Implement all items in docs/todo/architecture-todo.md until the architecture backlog is complete (close or ship each actionable theme row; update docs/status per repo AGENTS.md when backlog entries move). Run the orchestrate loop until finished.",
+  "summary": "Close every actionable architecture backlog theme with code, tests, and status-doc hygiene.",
+  "selfAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+  "rootSlug": "architecture-todo-impl-9ea4",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "acceptanceCriteria": [
+    "All actionable rows in docs/todo/architecture-todo.md are either shipped or explicitly closed with rationale and supporting evidence",
+    "GA blocker release-todo §1 mutation lifecycle is fully functional end-to-end (proposal emission, accept/reject resume, apply, and undo semantics)",
+    "Theme 3/4/6 residual architecture work is implemented or decisively closed with truthful status/docs updates",
+    "Backlog hygiene in AGENTS.md is satisfied: status docs updated and docs/todo/product-done.md receives one-line closure notes for newly closed architecture entries",
+    "Relevant FE and BE tests for changed surfaces pass with evidence captured in handoffs"
+  ],
+  "tasks": [
+    {
+      "name": "close-theme5-mutation-lifecycle",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Implement Theme 5 / release-todo §1 end-to-end: emit mutation proposals, wire FE apply path and resume accept/reject, add undo semantics, and ship tests proving idempotent replay does not re-apply.",
+      "brief": "Implement the remaining GA blocker in code across backend and frontend contracts. Required outcomes: (1) a typed backend mutation-proposal payload/event that is emitted on relevant chat-agent turns, (2) FE-interrupt contract that can apply approved mutations through a concrete `fe.applyMutation` tool path (or equivalent registered FE tool), (3) accept/reject resume flow using LangGraph Command(resume=...) with persisted proposal identifiers, (4) server-side undo semantics that the FE toast can invoke safely, (5) audit/analytics for accepted mutations and undos, and (6) targeted tests for proposal->accept->apply plus idempotent replay safety. Keep solution production-safe under existing idempotency + auth + autonomy constraints.",
+      "pathsAllowed": [
+        "backend/**",
+        "src/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**"
+      ],
+      "acceptance": [
+        "A remote chat/session can emit a mutation proposal, user acceptance resumes the graph, and the approved mutation is actually applied",
+        "Reject path exits cleanly without side effects; undo path can reverse an accepted mutation within the documented semantics",
+        "Replay/idempotency tests prove accepted mutations are not double-applied on retries/resume"
+      ],
+      "verify": "Run the most direct FE+BE suites for touched files (unit/integration as needed) and include concrete command outputs showing proposal emission, accept/reject resume behavior, apply path, and undo/replay correctness.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-theme5-mutation-lifecycle",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "close-theme5-mutation-lifecycle",
+      "dependsOn": [
+        "close-theme5-mutation-lifecycle"
+      ],
+      "scopedGoal": "Independently verify that Theme 5 / release-todo §1 is truly closed end-to-end and not just partially wired.",
+      "brief": "Audit the target branch for backend event contracts, FE handling, resume/apply/undo semantics, and tests. Fail verification if any path is stubbed, gated-only, or non-functional. Specifically confirm idempotency safety (no double mutation on replay), clear reject behavior, and a callable undo lifecycle.",
+      "acceptance": [
+        "Verifier confirms full proposal->accept->apply->undo lifecycle works with runtime evidence",
+        "Verifier confirms replay/idempotency behavior prevents double apply"
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "close-remaining-architecture-themes",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Implement or decisively close all actionable residual work in architecture themes 1, 2, 3, 4, and 6 beyond Theme 5, with code/tests/runbooks as needed.",
+      "brief": "Treat docs/todo/architecture-todo.md as the source backlog and close each still-actionable row outside Theme 5. Prioritize: contract/error hardening residuals (Theme 1/2), FE surface simplification residuals (Theme 3: stable deps sweep, adapter thinning, useAi/useAgent divergence reduction, capability gating), durable resume/state continuity + operator decision-tree docs (Theme 4), and Theme 6 depth rows where practical. If a Theme 6 row should be closed as deferred/non-actionable now, do it explicitly with concrete rationale and no misleading claims. Ship code + tests for implementation rows; avoid touching docs/todo files in this task.",
+      "pathsAllowed": [
+        "backend/**",
+        "src/**",
+        "docs/operations/**",
+        "docs/archive/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**"
+      ],
+      "acceptance": [
+        "Residual Theme 1/2/3/4/6 actionable items have concrete implementation evidence or explicit closure rationale ready for status-doc integration",
+        "No remaining unstable `useAgent` consumer effect dependency loops or autonomy-capability drift in active surfaces",
+        "Operator-facing docs for resume/idempotency/failure policy are updated when behavior changes"
+      ],
+      "verify": "Run targeted FE/BE checks for every changed subsystem and include command outputs plus a row-by-row closure mapping from architecture themes to concrete code/doc artifacts.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-remaining-architecture-themes",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "close-remaining-architecture-themes",
+      "dependsOn": [
+        "close-remaining-architecture-themes"
+      ],
+      "scopedGoal": "Independently verify closure quality for non-Theme5 architecture rows.",
+      "brief": "Check whether each residual actionable row in themes 1/2/3/4/6 is actually closed by implementation evidence or explicit justified closure. Fail with exact row-level gaps if any claim lacks supporting code/tests/docs.",
+      "acceptance": [
+        "Verifier returns pass only if every residual actionable architecture row has defensible closure status"
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "integrate-architecture-backlog-closeout",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": [
+        "verify-theme5-mutation-lifecycle",
+        "verify-remaining-architecture-themes"
+      ],
+      "scopedGoal": "Integrate completed architecture branches into one coherent branch, reconcile conflicts, and update architecture/release/product status docs so the architecture backlog is complete and truthful.",
+      "brief": "Start from the strongest implementation branch and integrate the other verified branch's commits. Resolve conflicts without regressing behavior. Then perform AGENTS.md backlog hygiene in docs/todo: update architecture-todo rows to closed/shipped status, reflect any moved/deferred rows with rationale, keep release-todo/product-done aligned, and add one-line product-done entries for newly closed backlog items. Ensure final docs are truthful on the integrated baseline and reference verification logs where needed instead of brittle hard-coded counts.",
+      "pathsAllowed": [
+        "backend/**",
+        "src/**",
+        "docs/todo/**",
+        "docs/operations/**",
+        "docs/archive/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**"
+      ],
+      "acceptance": [
+        "Integrated branch contains all verified architecture implementations with no unresolved conflicts",
+        "docs/todo/architecture-todo.md has no remaining actionable open rows",
+        "docs/todo/product-done.md includes one-line entries for all newly closed architecture backlog work and remains consistent with release/status docs"
+      ],
+      "verify": "Run targeted FE/BE checks impacted by integration and include row-by-row mapping showing each architecture action row and its closure evidence on the integrated branch.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-architecture-backlog-complete",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "integrate-architecture-backlog-closeout",
+      "dependsOn": [
+        "integrate-architecture-backlog-closeout"
+      ],
+      "scopedGoal": "Final independent verification that architecture backlog closure is complete, accurate, and regression-safe.",
+      "brief": "Audit integrated code and docs. Confirm docs/todo/architecture-todo.md has no remaining actionable open rows, release/product docs are aligned, AGENTS backlog hygiene is met, and key tests covering changed surfaces pass. Fail with specific blockers if any residual architecture action remains unresolved or mis-documented.",
+      "acceptance": [
+        "Verifier confirms architecture backlog is complete and status docs are aligned",
+        "Verifier confirms no unresolved actionable architecture rows remain"
+      ],
+      "maxAttempts": 2
+    }
+  ]
+}
