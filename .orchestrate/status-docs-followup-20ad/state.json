@@ -79,15 +79,15 @@
       "dependsOn": [
         "start-auth-register-password-strength-and-tos"
       ],
-      "agentId": null,
-      "runId": null,
+      "agentId": "bc-49395529-fe69-48b1-ae13-75d34d3b3d9a",
+      "runId": "run-e0090ca1-80ed-438a-9881-2e56e5fea9be",
       "parentAgentId": "bc-0dc1a174-be50-443b-95ab-809f667420ad",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-11T01:49:47.834Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-11T01:49:47.834Z",
+      "lastUpdate": "2026-05-11T01:49:50.787Z",
       "note": "respawned by local-cli (was cancelled; attempts=1)",
       "attempts": 2,
       "slackTs": null,
