@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import type {
+    AutonomyLevel,
     CitationRef,
     MutationProposal,
     TriageNudge
@@ -158,7 +159,14 @@ export interface UseAgentChatResult {
  *
  * Pass `ctx = null` to disable the hook (same contract as `useAiChat`).
  */
-const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
+export interface UseAgentChatOptions {
+    allowedAutonomy?: readonly AutonomyLevel[] | null;
+}
+
+const useAgentChat = (
+    ctx: UseAiChatContext | null,
+    options: UseAgentChatOptions = {}
+): UseAgentChatResult => {
     // Note: useAgent already calls useQueryClient() internally and provides
     // it in the baseCtx for FE tools. We only need to pass projectId in
     // feToolContext to scope tool queries to the current project.
@@ -166,7 +174,8 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         projectId: ctx?.execution.projectId,
         feToolContext: {
             projectId: ctx?.execution.projectId
-        }
+        },
+        allowedAutonomy: options.allowedAutonomy
     });
 
     // Error dismissal: track whether the current error has been dismissed.
@@ -231,10 +240,10 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         proposalClearAfterResumeRef.current = null;
         agent.clearPendingProposal();
     }, [
-        agent.isStreaming,
+        agent.clearPendingProposal,
         agent.error,
-        agent.pendingProposal,
-        agent.clearPendingProposal
+        agent.isStreaming,
+        agent.pendingProposal?.proposal_id
     ]);
 
     // Derive displayed messages and streamingText from agent state.
@@ -276,7 +285,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
                 void err;
             }
         },
-        [agent, ctx]
+        [agent.start, ctx]
     );
 
     const reset = useCallback(() => {
@@ -286,7 +295,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
         lastInterruptSignatureRef.current = null;
         setDismissedNudgeIds(new Set());
         setErrorDismissed(false);
-    }, [agent]);
+    }, [agent.reset]);
 
     const resumeProposal = useCallback(
         (accepted: boolean) => {
@@ -315,7 +324,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
                 return next;
             });
         },
-        [agent]
+        [agent.dismissNudge]
     );
 
     const pendingNudges = agent.nudges.filter(
@@ -337,7 +346,7 @@ const useAgentChat = (ctx: UseAiChatContext | null): UseAgentChatResult => {
                 }))
             );
         },
-        [agent]
+        [agent.seedMessages]
     );
 
     return {

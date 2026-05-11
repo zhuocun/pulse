@@ -14,6 +14,7 @@ USERS = "users"
 PROJECTS = "projects"
 COLUMNS = "columns"
 TASKS = "tasks"
+AGENT_MUTATION_JOURNAL = "agent_mutation_journal"
 
 
 client: MongoClient = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=5000)
@@ -27,6 +28,9 @@ def ping() -> None:
 def ensure_indexes() -> None:
     collection(USERS).create_index("email", unique=True)
     collection(USERS).create_index("username", unique=True)
+    collection(AGENT_MUTATION_JOURNAL).create_index(
+        [("user_id", 1), ("proposal_id", 1)], unique=True
+    )
 
 
 def collection(name: str) -> Collection:

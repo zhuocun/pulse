@@ -16,6 +16,11 @@ jest.mock("../ai/agentClient", () => {
     };
 });
 
+jest.mock("./useApi", () => ({
+    __esModule: true,
+    default: () => jest.fn()
+}));
+
 jest.mock("../../constants/env", () => ({
     __esModule: true,
     default: {

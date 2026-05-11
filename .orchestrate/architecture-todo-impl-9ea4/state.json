@@ -1,0 +1,155 @@
+{
+  "rootSlug": "architecture-todo-impl-9ea4",
+  "tasks": [
+    {
+      "name": "close-theme5-mutation-lifecycle",
+      "type": "worker",
+      "branch": "orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle",
+      "startingRef": "main",
+      "dependsOn": [],
+      "agentId": "bc-964dca86-073d-434f-9dc2-815955e9b65b",
+      "runId": "run-a3b2234f-dbaa-4c2e-b204-34e186386060",
+      "parentAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/close-theme5-mutation-lifecycle.md",
+      "startedAt": "2026-05-11T16:13:13.797Z",
+      "finishedAt": "2026-05-11T16:25:15.018Z",
+      "lastUpdate": "2026-05-11T16:27:44.950Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": "unit-test-verified",
+      "attempts": 1
+    },
+    {
+      "name": "verify-theme5-mutation-lifecycle",
+      "type": "verifier",
+      "branch": "`orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle` (rebasing once onto `origin` to publish `docs/verification/close-theme5-mutation-lifecycle-verifier-report.md`)",
+      "startingRef": "orch/architecture-todo-impl-9ea4/close-theme5-mutation-lifecycle",
+      "dependsOn": [
+        "close-theme5-mutation-lifecycle"
+      ],
+      "agentId": "bc-e9e861a3-e67c-4d7a-955a-edf486d7cb51",
+      "runId": "run-5c10d756-9dc9-41e3-ba17-e4a5af411a07",
+      "parentAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-theme5-mutation-lifecycle.md",
+      "startedAt": "2026-05-11T16:25:23.467Z",
+      "finishedAt": "2026-05-11T16:27:43.775Z",
+      "lastUpdate": "2026-05-11T16:27:43.775Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "close-remaining-architecture-themes",
+      "type": "worker",
+      "branch": "orch/architecture-todo-impl-9ea4/close-remaining-architecture-themes",
+      "startingRef": "main",
+      "dependsOn": [],
+      "agentId": "bc-03bc0936-60b5-41be-aca2-c0b89cca21ee",
+      "runId": "run-97207853-8cac-453a-a317-c25dd06cd591",
+      "parentAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/close-remaining-architecture-themes.md",
+      "startedAt": "2026-05-11T16:13:16.797Z",
+      "finishedAt": "2026-05-11T16:18:28.059Z",
+      "lastUpdate": "2026-05-11T16:18:28.060Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "verify-remaining-architecture-themes",
+      "type": "verifier",
+      "branch": "orch/architecture-todo-impl-9ea4/close-remaining-architecture-themes",
+      "startingRef": "orch/architecture-todo-impl-9ea4/close-remaining-architecture-themes",
+      "dependsOn": [
+        "close-remaining-architecture-themes"
+      ],
+      "agentId": "bc-ccf2e7ee-33a6-40b2-8d5f-fde49437036a",
+      "runId": "run-e373d2e3-862b-4a45-ac70-6c4f7df5e21a",
+      "parentAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-remaining-architecture-themes.md",
+      "startedAt": "2026-05-11T16:18:29.617Z",
+      "finishedAt": "2026-05-11T16:21:16.649Z",
+      "lastUpdate": "2026-05-11T16:21:16.650Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "integrate-architecture-backlog-closeout",
+      "type": "worker",
+      "branch": "orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-theme5-mutation-lifecycle",
+        "verify-remaining-architecture-themes"
+      ],
+      "agentId": "bc-f0c40b4b-da89-4440-b2eb-95fb5d4a132d",
+      "runId": "run-99351039-9630-4da6-b30a-591197e597a6",
+      "parentAgentId": "bc-cf92c5d6-7e44-4592-9c22-e5bd885e9ea4",
+      "status": "running",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": "2026-05-11T16:27:46.421Z",
+      "finishedAt": null,
+      "lastUpdate": "2026-05-11T16:27:49.694Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "verify-architecture-backlog-complete",
+      "type": "verifier",
+      "branch": "orch/architecture-todo-impl-9ea4/verify-architecture-backlog-complete",
+      "startingRef": "orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout",
+      "dependsOn": [
+        "integrate-architecture-backlog-closeout"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    }
+  ],
+  "attention": [
+    {
+      "at": "2026-05-11T16:27:44.950Z",
+      "message": "close-theme5-mutation-lifecycle: verification recorded (unit-test-verified) by verifier verify-theme5-mutation-lifecycle"
+    },
+    {
+      "at": "2026-05-11T17:16:15.966Z",
+      "message": "git-sync failed (planned checkpoint restart): Command failed: git -C /workspace/.orchestrate/architecture-todo-impl-9ea4 commit -m orch: architecture-todo-impl-9ea4 planned checkpoint restart\nerror: Couldn't find key in agent?\n\nfatal: failed to w…"
+    }
+  ]
+}

@@ -52,6 +52,7 @@ import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
+import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import type {
     AutonomyLevel,
@@ -295,37 +296,6 @@ const BUDGET_CRITICAL_THRESHOLD = 7500;
  */
 const fallbackQueryClient = new QueryClient();
 
-/**
- * Autonomy options shown in the drawer's mode selector.
- *
- * "Auto" is intentionally hard-disabled in v2.1: no shipped agent
- * advertises `auto` in its `AgentMetadata.allowed_autonomy`, no
- * preapproved-tool surface exists yet, and selecting it previously
- * collapsed silently to "Plan" behavior — a no-op users couldn't
- * tell apart from a working autonomous mode. Disabling the option
- * with an explanatory tooltip surfaces the v3-blocker honestly.
- *
- * TODO(v3): when the mutation lifecycle and preapproved-tool schema
- * land (see `docs/prd/board-copilot-v3.md`), drive the disabled
- * state off `AgentMetadata.allowed_autonomy` instead of a hardcoded
- * flag and remove this comment.
- */
-const AUTONOMY_OPTIONS: Array<{
-    value: AutonomyLevel;
-    labelKey: string;
-    disabled?: boolean;
-    disabledTooltipKey?: string;
-}> = [
-    { value: "suggest", labelKey: "autonomyLevelSuggest" },
-    { value: "plan", labelKey: "autonomyLevelPlan" },
-    {
-        value: "auto",
-        labelKey: "autonomyLevelAuto",
-        disabled: true,
-        disabledTooltipKey: "autonomyAutoDisabledTooltip"
-    }
-];
-
 const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     open,
     onClose,
@@ -342,8 +312,50 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     onActionNudge,
     onDismissNudge
 }) => {
+    const chatMeta = useChatAgentMetadata();
+    const allowedAutonomy = useMemo(
+        () =>
+            chatMeta.status === "ready"
+                ? chatMeta.data.allowed_autonomy
+                : undefined,
+        [chatMeta]
+    );
+    const autonomySelectorOptions = useMemo(() => {
+        const base: Array<{
+            value: AutonomyLevel;
+            labelKey: string;
+            disabledTooltipKey?: string;
+        }> = [
+            { value: "suggest", labelKey: "autonomyLevelSuggest" },
+            { value: "plan", labelKey: "autonomyLevelPlan" },
+            {
+                value: "auto",
+                labelKey: "autonomyLevelAuto",
+                disabledTooltipKey: "autonomyAutoDisabledTooltip"
+            }
+        ];
+        const visible =
+            chatMeta.status === "ready"
+                ? base.filter((o) =>
+                      chatMeta.data.allowed_autonomy.includes(o.value)
+                  )
+                : base;
+        return visible.map((o) => {
+            if (o.value !== "auto") {
+                return { ...o, disabled: false as boolean | undefined };
+            }
+            const mutationsOk = environment.aiMutationProposalsEnabled;
+            const serverAllowsAuto =
+                chatMeta.status !== "ready" ||
+                chatMeta.data.allowed_autonomy.includes("auto");
+            return {
+                ...o,
+                disabled: !mutationsOk || !serverAllowsAuto
+            };
+        });
+    }, [chatMeta]);
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
-        useAutonomyLevel();
+        useAutonomyLevel(allowedAutonomy);
     const remoteHealthEnabled =
         environment.aiEnabled && !environment.aiUseLocalEngine;
     const { status: healthStatus } = useAgentHealth(
@@ -498,7 +510,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         environment.aiUseLocalEngine && open ? chatCtx : null
     );
     const agentChat = useAgentChat(
-        !environment.aiUseLocalEngine && open ? chatCtx : null
+        !environment.aiUseLocalEngine && open ? chatCtx : null,
+        { allowedAutonomy }
     );
 
     // Pick the active result — one object so render code stays branch-free.
@@ -1019,7 +1032,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         onChange={(value: AutonomyLevel) =>
                             setAutonomyLevel(value)
                         }
-                        options={AUTONOMY_OPTIONS.map((opt) => {
+                        options={autonomySelectorOptions.map((opt) => {
                             const labelText = microcopy.ai[
                                 opt.labelKey as keyof typeof microcopy.ai
                             ] as string;

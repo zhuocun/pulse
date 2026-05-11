@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +142,59 @@ class INudgePayload(BaseModel):
     severity: Optional[str] = None
 
 
+class TaskUpdateWire(BaseModel):
+    """Board task row diff — mirrors ``MutationProposal`` FE typing."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    task_id: str
+    field: str
+    from_: Optional[Any] = Field(default=None, alias="from")
+    to: Optional[Any] = None
+
+
+class ColumnUpdateWire(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    column_id: str
+    field: str
+    from_: Optional[Any] = Field(default=None, alias="from")
+    to: Optional[Any] = None
+
+
+class BulkApplyWire(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation: str
+    targets: list[str]
+    payload: dict[str, Any]
+
+
+class MutationDiffWire(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task_updates: Optional[list[TaskUpdateWire]] = None
+    column_updates: Optional[list[ColumnUpdateWire]] = None
+    bulk_apply: Optional[list[BulkApplyWire]] = None
+
+
+class MutationProposalWire(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str
+    description: str
+    diff: MutationDiffWire
+    risk: Literal["low", "med", "high"]
+    undoable: Literal[True] = True
+
+
+class MutationProposalEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["mutation_proposal"] = "mutation_proposal"
+    proposal: MutationProposalWire
+
+
 # Mapping from ``surface`` value to the corresponding payload schema class.
 _SURFACE_SCHEMAS: dict[str, type[BaseModel]] = {
     "brief": IBoardBriefPayload,
@@ -201,7 +254,30 @@ class Usage(BaseModel):
 
 
 # Union of all known event types.
-AgentEvent = Union[Suggestion, Citation, Usage]
+AgentEvent = Union[Suggestion, Citation, Usage, MutationProposalEvent]
+
+
+def validate_mutation_proposal_event(
+    evt: dict[str, Any],
+    *,
+    agent: str = "<unknown>",
+) -> dict[str, Any]:
+    """Validate ``kind="mutation_proposal"`` against the wire schema.
+
+    Pass-through with warning on failure (same policy as suggestions).
+    """
+
+    if not isinstance(evt, dict) or evt.get("kind") != "mutation_proposal":
+        return evt
+    try:
+        MutationProposalEvent(**evt)
+    except ValidationError as exc:
+        logger.warning(
+            "mutation_proposal validation failed for agent=%r: %s",
+            agent,
+            exc,
+        )
+    return evt
 
 
 def validate_suggestion_payload(
@@ -268,7 +344,7 @@ def coerce_event(value: Any) -> dict[str, Any]:
     a recognisable event shape.
     """
 
-    if isinstance(value, (Suggestion, Citation, Usage)):
+    if isinstance(value, (Suggestion, Citation, Usage, MutationProposalEvent)):
         return value.model_dump()
     if not isinstance(value, dict):
         raise ValueError(f"Expected dict or AgentEvent, got {type(value)!r}")
@@ -279,6 +355,8 @@ def coerce_event(value: Any) -> dict[str, Any]:
         return Citation(**value).model_dump()
     if kind == "usage":
         return Usage(**value).model_dump()
+    if kind == "mutation_proposal":
+        return MutationProposalEvent(**value).model_dump()
     # Unknown kind — return as-is so forward-compatible consumers don't break.
     return dict(value)
 
@@ -291,9 +369,14 @@ __all__ = [
     "INudgePayload",
     "ISearchPayload",
     "ITaskDraftPayload",
+    "MutationDiffWire",
+    "MutationProposalEvent",
+    "MutationProposalWire",
     "Suggestion",
+    "TaskUpdateWire",
     "Usage",
     "as_event_dict",
     "coerce_event",
+    "validate_mutation_proposal_event",
     "validate_suggestion_payload",
 ]

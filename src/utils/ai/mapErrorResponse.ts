@@ -118,12 +118,26 @@ const mapErrorResponseForSurface = async (
     if (status === 404) {
         return new AgentNotFoundError(messageFromBody);
     }
+    if (status === 408) {
+        return new AgentTransportError(
+            messageFromBody ?? "Request timed out",
+            undefined,
+            "request_timeout"
+        );
+    }
     if (status === 429) {
         if (safeReadBudgetReason(response)) {
             return new AgentBudgetError(messageFromBody);
         }
         const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
         return new AgentRateLimitError(retryAfter, messageFromBody);
+    }
+    if (status === 504) {
+        return new AgentTransportError(
+            messageFromBody ?? "Gateway timed out",
+            undefined,
+            "gateway_timeout"
+        );
     }
     if (status >= 500) {
         return new AgentServerError(status, messageFromBody);

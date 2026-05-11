@@ -849,6 +849,7 @@ export const enSource = {
         copilotProposes: "Copilot proposes: {description}",
         acceptingWillChange: "Accepting will change: {fields}",
         acceptingProposal: "Accepting this proposal…",
+        applyToast: "Copilot applied a board change.",
         fields: {
             coordinator: "Coordinator",
             column: "Column",

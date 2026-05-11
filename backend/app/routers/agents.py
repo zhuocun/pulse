@@ -35,7 +35,7 @@ from typing import Any, AsyncIterator, Dict, Mapping, Optional, get_type_hints
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents import AgentConfigurationError, AgentRuntime
 from app.agents.base import AgentMetadata
@@ -60,6 +60,7 @@ from app.routers._dispatch import (
     project_chat_model_from_map,
 )
 from app.security import current_user_id, current_user_payload_for_ai
+from app.services import agent_mutation_journal
 from app.services.project_service import is_project_manager
 from app.tools.fe_tool_schemas import fe_tool_definitions
 from app.tools.redaction import redact, redact_dict
@@ -638,6 +639,80 @@ def list_fe_tools(
     return {"tools": fe_tool_definitions()}
 
 
+class MutationRecordIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str
+    project_id: str
+    idempotency_nonce: str = ""
+    undo: dict[str, Any] = Field(default_factory=dict)
+
+
+class MutationUndoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str
+    project_id: str
+
+
+def _merge_autonomy_into_context(
+    context: Any,
+    autonomy: Optional[str],
+) -> Any:
+    if autonomy is None:
+        return context
+    if isinstance(context, dict):
+        merged = dict(context)
+        merged["autonomy_level"] = autonomy
+        return merged
+    return context
+
+
+@router.post("/mutations/record", status_code=status.HTTP_200_OK)
+def record_agent_mutation_apply(
+    body: MutationRecordIn,
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+) -> dict[str, Any]:
+    """Idempotent journal entry for an FE-applied proposal (undo payload)."""
+
+    user_id = current_user_id(auth_payload)
+    _require_project_manager(body.project_id, user_id)
+    created, status_txt = agent_mutation_journal.record_apply_journal(
+        user_id=user_id,
+        project_id=body.project_id.strip(),
+        proposal_id=body.proposal_id.strip(),
+        undo_diff=body.undo,
+    )
+    return {"ok": True, "created": created, "status": status_txt}
+
+
+@router.post("/mutations/undo", status_code=status.HTTP_200_OK)
+def undo_agent_mutation_apply(
+    body: MutationUndoIn,
+    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+) -> dict[str, Any]:
+    """Server-side reversal using the stored undo diff."""
+
+    user_id = current_user_id(auth_payload)
+    _require_project_manager(body.project_id, user_id)
+    ok, status_txt = agent_mutation_journal.undo_mutation(
+        user_id=user_id,
+        project_id=body.project_id.strip(),
+        proposal_id=body.proposal_id.strip(),
+    )
+    if not ok and status_txt in {"not_found", "project_mismatch"}:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "mutation_not_found", "message": status_txt}},
+        )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": status_txt}},
+        )
+    return {"ok": True, "status": status_txt}
+
+
 @router.get("/{name}", status_code=status.HTTP_200_OK)
 def get_agent(
     name: str,
@@ -735,6 +810,7 @@ async def invoke_agent(
             raise
 
         context = _request_context(name, payload, runtime, request)
+        context = _merge_autonomy_into_context(context, autonomy)
         timeout = settings.agent_request_timeout_seconds
         try:
             result = await asyncio.wait_for(
@@ -873,6 +949,7 @@ async def stream_agent(
 
         options = _run_options(payload, user_id=user_id)
         context = _request_context(name, payload, runtime, request)
+        context = _merge_autonomy_into_context(context, autonomy)
         timeout = settings.agent_request_timeout_seconds
 
         async def event_generator() -> AsyncIterator[bytes]:

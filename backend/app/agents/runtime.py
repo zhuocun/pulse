@@ -48,7 +48,10 @@ from app.agents.errors import (
     InvalidThreadKeyError,
 )
 from app.agents.context import ChatContext
-from app.agents.events import validate_suggestion_payload
+from app.agents.events import (
+    validate_mutation_proposal_event,
+    validate_suggestion_payload,
+)
 from app.agents.instrumentation import start_run_span
 from app.agents.llm import extract_token_usage, resolved_chat_model_id
 from app.agents.registry import AgentRegistry, ChainedAgentRegistry
@@ -845,13 +848,20 @@ class AgentRuntime:
             # Validate suggestion payloads at the emit boundary (Task 1).
             # Pass-through semantics: validation errors are logged but never
             # drop events so a schema bug cannot break a streaming response.
-            events = [
-                validate_suggestion_payload(evt, agent=name)
-                if isinstance(evt, dict) and evt.get("kind") == "suggestion"
-                else evt
-                for evt in raw_events
-            ]
-            return final_state, events
+            events_out: list[Any] = []
+            for evt in raw_events:
+                if isinstance(evt, dict) and evt.get("kind") == "suggestion":
+                    events_out.append(validate_suggestion_payload(evt, agent=name))
+                elif (
+                    isinstance(evt, dict)
+                    and evt.get("kind") == "mutation_proposal"
+                ):
+                    events_out.append(
+                        validate_mutation_proposal_event(evt, agent=name)
+                    )
+                else:
+                    events_out.append(evt)
+            return final_state, events_out
 
     async def astream(
         self,
@@ -916,9 +926,16 @@ class AgentRuntime:
                         for evt in current_events[_emitted_event_count:]:
                             # Validate suggestion payloads at the re-emission
                             # boundary (Task 1). Pass-through: validation errors
-                            # are logged but never drop events.
+                            # logged but never drop events.
                             if isinstance(evt, dict) and evt.get("kind") == "suggestion":
                                 evt = validate_suggestion_payload(evt, agent=name)
+                            elif (
+                                isinstance(evt, dict)
+                                and evt.get("kind") == "mutation_proposal"
+                            ):
+                                evt = validate_mutation_proposal_event(
+                                    evt, agent=name
+                                )
                             yield ("custom", evt)
                         _emitted_event_count = len(current_events)
                         if _need_values:

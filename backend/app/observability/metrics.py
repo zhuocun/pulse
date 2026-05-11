@@ -111,6 +111,7 @@ agent_invocations_total: Any = _NOOP
 agent_tokens_total: Any = _NOOP
 agent_run_duration_seconds: Any = _NOOP
 idempotency_cache_total: Any = _NOOP
+agent_mutations_total: Any = _NOOP
 
 _metrics_enabled: bool = False
 
@@ -147,6 +148,7 @@ def configure_metrics(*, settings: Settings) -> None:
     global agent_tokens_total
     global agent_run_duration_seconds
     global idempotency_cache_total
+    global agent_mutations_total
     global _metrics_enabled
 
     if not settings.prometheus_metrics:
@@ -178,6 +180,11 @@ def configure_metrics(*, settings: Settings) -> None:
         "idempotency_cache_total",
         "Idempotency-Key cache outcomes per route.",
         labelnames=("route", "outcome"),
+    )
+    agent_mutations_total = Counter(
+        "agent_mutations_total",
+        "Agent-driven board mutation lifecycle events.",
+        labelnames=("action",),
     )
     _metrics_enabled = True
     logger.info("Prometheus metrics configured.")
@@ -224,6 +231,12 @@ def record_idempotency(route: str, outcome: str) -> None:
     idempotency_cache_total.labels(route=route, outcome=outcome).inc()
 
 
+def record_agent_mutation_event(action: str) -> None:
+    """Count accepted / undo / replay-safe skips for mutation lifecycle."""
+
+    agent_mutations_total.labels(action=action).inc()
+
+
 def make_metrics_app() -> Optional[Any]:
     """Return a ``prometheus_client.make_asgi_app()`` mountable at ``/metrics``.
 
@@ -254,6 +267,7 @@ def reset_for_tests() -> None:
     global agent_tokens_total
     global agent_run_duration_seconds
     global idempotency_cache_total
+    global agent_mutations_total
     global _metrics_enabled
 
     if _metrics_enabled:
@@ -264,6 +278,7 @@ def reset_for_tests() -> None:
             agent_tokens_total,
             agent_run_duration_seconds,
             idempotency_cache_total,
+            agent_mutations_total,
         ):
             try:
                 REGISTRY.unregister(metric)
@@ -274,6 +289,7 @@ def reset_for_tests() -> None:
     agent_tokens_total = _NOOP
     agent_run_duration_seconds = _NOOP
     idempotency_cache_total = _NOOP
+    agent_mutations_total = _NOOP
     _metrics_enabled = False
 
 
@@ -283,11 +299,13 @@ __all__ = [
     "RUN_DURATION_BUCKETS",
     "TOKEN_DIRECTIONS",
     "agent_invocations_total",
+    "agent_mutations_total",
     "agent_run_duration_seconds",
     "agent_tokens_total",
     "configure_metrics",
     "idempotency_cache_total",
     "make_metrics_app",
+    "record_agent_mutation_event",
     "record_idempotency",
     "record_invocation",
     "reset_for_tests",

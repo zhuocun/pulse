@@ -87,6 +87,9 @@ const wrapNetworkError = (err: unknown): Error => {
     );
 };
 
+/** Normalises unknown stream failures into typed `Agent*` errors for the hook layer. */
+export const coerceAgentTransportError = wrapNetworkError;
+
 const checkAlreadyAborted = (signal: AbortSignal | undefined) => {
     if (signal?.aborted) {
         const err = new Error("Aborted");
