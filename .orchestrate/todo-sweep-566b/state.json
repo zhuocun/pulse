@@ -145,14 +145,14 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T04:51:18.291Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-11T04:51:11.514Z",
+      "lastUpdate": "2026-05-11T04:51:18.291Z",
       "note": "respawned by self-planner (was error; attempts=1)",
-      "attempts": 1,
+      "attempts": 2,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
@@ -258,6 +258,10 @@
     {
       "at": "2026-05-11T04:49:56.895Z",
       "message": "dnd-affordances: spawn failed after 3 transient sub-attempts: Error: template \"worker\" has unrendered placeholders: ..."
+    },
+    {
+      "at": "2026-05-11T04:51:12.428Z",
+      "message": "dnd-affordances: respawned by self-planner (was error)"
     }
   ]
 }
