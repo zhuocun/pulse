@@ -625,6 +625,9 @@ const zhCN: Dictionary = {
         registerSubtitle: "创建账号,开始追踪工作。",
         switchToRegister: "还没有账号?",
         switchToLogin: "已有账号?",
+        errorSummaryTitle: "存在问题",
+        errorSummaryIntro: "请修正以下项目后重试。",
+        errorSummaryRegionAriaLabel: "表单错误",
         heroBadge: "新功能:看板 Copilot",
         heroTitle: "在专注与从容中推进工作。",
         heroSubtitle:

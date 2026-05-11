@@ -10,6 +10,7 @@ import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import { writeAiProxyToken, writeAuthToken } from "../../utils/tokenStorage";
 
+import AuthErrorSummary from "../authErrorSummary";
 import { AuthTermsAgreement } from "../registerForm/termsAgreement";
 
 const inputSize = "large" as const;
@@ -37,9 +38,12 @@ const ForgotPasswordLink = styled(Link)`
 
 const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
-}> = ({ onError }) => {
+    serverError?: Error | IError | null;
+}> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
+    const [form] = Form.useForm<{ email: string; password: string }>();
     const [capsLockOn, setCapsLockOn] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
     const { mutateAsync, isLoading } = useReactMutation<IUser>(
         "auth/login",
         "POST",
@@ -49,6 +53,7 @@ const LoginForm: React.FC<{
         true
     );
     const handleSubmit = async (input: { email: string; password: string }) => {
+        setSubmitAttempted(false);
         try {
             const res = await mutateAsync(input);
             // The auth route is contractually required to return a jwt on
@@ -71,8 +76,27 @@ const LoginForm: React.FC<{
         }
     };
 
+    const fieldMeta = [
+        { name: "email", id: "email", label: microcopy.fields.email },
+        {
+            name: "password",
+            id: "password",
+            label: microcopy.fields.password
+        }
+    ] as const;
+
     return (
-        <Form layout="vertical" onFinish={handleSubmit}>
+        <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            onFinishFailed={() => setSubmitAttempted(true)}
+        >
+            <AuthErrorSummary
+                fields={fieldMeta}
+                includeFieldErrors={submitAttempted}
+                serverError={serverError}
+            />
             <Form.Item
                 label={microcopy.fields.email}
                 name="email"

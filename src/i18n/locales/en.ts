@@ -661,6 +661,9 @@ export const enSource = {
         registerSubtitle: "Create your account to start tracking work.",
         switchToRegister: "Don't have an account?",
         switchToLogin: "Already have an account?",
+        errorSummaryTitle: "There is a problem",
+        errorSummaryIntro: "Correct the following and try again.",
+        errorSummaryRegionAriaLabel: "Form errors",
         heroBadge: "New: Board Copilot",
         heroTitle: "Ship work with calm focus.",
         heroSubtitle:

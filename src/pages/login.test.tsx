@@ -11,14 +11,28 @@ jest.mock("../components/loginForm", () => {
 
     return {
         __esModule: true,
-        default: (props: { onError: (error: Error) => void }) =>
+        default: (props: {
+            onError: (error: Error) => void;
+            serverError?: Error | null;
+        }) =>
             React.createElement(
-                "button",
-                {
-                    onClick: () => props.onError(new Error("Login failed")),
-                    type: "button"
-                },
-                "Mock Login Form"
+                React.Fragment,
+                null,
+                props.serverError
+                    ? React.createElement(
+                          "div",
+                          { role: "alert", tabIndex: -1 },
+                          props.serverError.message
+                      )
+                    : null,
+                React.createElement(
+                    "button",
+                    {
+                        onClick: () => props.onError(new Error("Login failed")),
+                        type: "button"
+                    },
+                    "Mock Login Form"
+                )
             )
     };
 });
@@ -79,7 +93,7 @@ describe("LoginPage", () => {
 
         expect(screen.getByText("Login failed")).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: /sign up for an account/i })
+            screen.getByRole("link", { name: /sign up for an account/i })
         ).toBeInTheDocument();
     });
 
@@ -87,7 +101,7 @@ describe("LoginPage", () => {
         renderLoginPage();
 
         fireEvent.click(
-            screen.getByRole("button", { name: /sign up for an account/i })
+            screen.getByRole("link", { name: /sign up for an account/i })
         );
 
         expect(window.location.pathname).toBe("/register");
