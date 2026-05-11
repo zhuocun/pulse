@@ -7,7 +7,7 @@ open. Per-PR history lives in git log.
 
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); non-GA `release-todo.md` closures through polish §16d landed on `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (GA §1 remains open). |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); non-GA `release-todo.md` closures through polish §16e are on **`main`** (GA §1 remains the open code gate). |
 | Last updated | 2026-05-11                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
@@ -38,7 +38,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
-| Backend release gates | — | ⏳ Open for **GA §1** only (`MutationProposal` accept + undo — see [`release-todo.md`](release-todo.md)); Beta/soft/polish through §16d closed on orchestrator branch |
+| Backend release gates | — | ⏳ Open for **GA §1** only (`MutationProposal` accept + undo — see [`release-todo.md`](release-todo.md)); Beta/soft/polish through §16e closed on **`main`** |
 | Cross-provider chat failover (`with_fallbacks`, `AGENT_CHAT_MODEL_FAILOVER`) | [`release-todo.md`](release-todo.md) §2 | ✅ Anthropic/OpenAI retryable-error failover with OTel hooks; `tests/test_llm_failover.py` |
 | Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; operator embeddings backfill remains |
 | Polish-step JSON schema (`PolishStep`, `method="json_schema"` when supported) | [`release-todo.md`](release-todo.md) §5 | ✅ Provider-level polish validation ahead of FE validators |
@@ -84,7 +84,9 @@ For the live GA / blocker / soft-blocker / polish status see
 | Task modal Type select uses canonical Task / Bug constant | UX ([`ui-todo.md`](ui-todo.md) §10 / Phase 2.6) | ✅ `TASK_TYPE_OPTIONS` mirrors the schema regardless of dataset shape (still localized via `microcopy.options.taskTypes.*`); regression tests added for empty + single-type datasets |
 | `Suggested by Copilot` badge on AI story-points Apply | UX ([`ui-todo.md`](ui-todo.md) 2.A.8 partial) | ✅ `appliedFieldOrigin` provenance tracked in `TaskModal`; `microcopy.ai.suggestedByCopilot` (en + zh-CN) renders next to Story points after Apply and clears on user edit; unit test covers both branches |
 | Forgot-password link + placeholder `/auth/forgot-password` route | UX ([`ui-todo.md`](ui-todo.md) §11 / Phase 2.7) | ✅ Right-aligned `Forgot password?` link in `LoginForm` (i18n + accessible name); placeholder page in `src/pages/forgotPassword/` with title + body keys; route + auth-route gating wired; tests cover link presence, route render, and gating |
-| Architecture / UI status backlog reconciled vs codebase | [`architecture-todo.md`](architecture-todo.md), [`ui-todo.md`](ui-todo.md) | ✅ 2026-05-11: stale BE `runtime.py:… TODO` + obsolete FE TODO inventory removed; Theme gates aligned with GA-only posture in [`release-todo.md`](release-todo.md); immediate vs later workstreams added |
+| Architecture / UI status backlog reconciled vs codebase | [`architecture-todo.md`](architecture-todo.md), [`ui-todo.md`](ui-todo.md) | ✅ 2026-05-11: stale BE `runtime.py:… TODO` + obsolete FE TODO inventory removed; Theme gates aligned with GA-only posture in [`release-todo.md`](release-todo.md); immediate vs later workstreams added; branch-only ship claims dropped from architecture status header (evidence → `product-done` / `release-todo`) |
+| `release-todo.md` non-GA posture aligned to `main` | [`release-todo.md`](release-todo.md) | ✅ 2026-05-11: TL;DR + blocker urgency + Beta header + ship sequence cite **`main`** as canonical; historical `orch/*` integration branches retained only where useful for archaeology |
+| UI roadmap — auth Phase 2.7 duplication defanged | [`ui-todo.md`](ui-todo.md) §1.2 item 11, §3 step 8, open-backlog grouping | ✅ 2026-05-11: execution order + backlog grouping explicitly separate **shipped** register password-strength + terms routing (`PasswordStrengthHint`, `termsAgreement`, `/auth/terms`) from remaining shell/WCAG/error-summary work — no doc claim that strength or ToS links are missing |
 
 ---
 

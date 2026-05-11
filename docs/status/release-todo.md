@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integrated on ``orch/non-ga-todos-2f52/integrate-non-ga-closeout-and-doc-hygiene``; only 🛑 GA §1 remains open; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + command recipes below).
+Last updated: 2026-05-11 (non-GA backlog closures §2–§7 + §13–§16e are **merged to `main`**; only 🛑 GA §1 remains the open *code* gate; pytest/Jest totals defer to [`verification-logs/`](verification-logs/) + command recipes below).
 
 ## TL;DR
 
@@ -26,10 +26,9 @@ Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integ
   hidden via the FE flag (see GA Blocker §1 mitigation).
 - **Design-partner beta is gated on GA blocker §1** (mutation lifecycle +
   proposal UX). Non-GA backlog items (Beta §2/§3/§6, soft §4/§5/§7, polish
-  §13–§16d) are **resolved in code** on branch
-  ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items`` subject to
-  operator env backfill (Redis for multi-worker, `MCP_ENABLED`, model map,
-  pgvector optional).
+  §13–§16e) are **resolved in code on `main`** subject to operator env
+  backfill (Redis for multi-worker, `MCP_ENABLED`, model map, pgvector
+  optional).
 - **Public GA is gated on the remaining GA blocker** (§1, full
   `MutationProposal` lifecycle + undo). §4’s optional pgvector path is
   shipped behind env flags — production embeddings **backfill** and tuning
@@ -41,14 +40,13 @@ Last updated: 2026-05-10 (non-GA backlog closures §2–§7 + §13–§16d integ
 **The product is NOT ready for public GA.** 🛑 **GA blocker §1**
 (full `MutationProposal` accept + undo) remains the only **code** gate
 called out in this document for design-partner expansion; Beta §2/§3/§6 and
-soft/polish items through §16d are closed on
-``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. The only
-acceptable posture until §1 closes is **proposal cards off** on the FE
-(see GA Blocker §1 mitigation) when exercising chat mutations.
+soft/polish items through §16e are **closed on `main`** (see ✅ rows below).
+The only acceptable posture until §1 closes is **proposal cards off** on the
+FE (see GA Blocker §1 mitigation) when exercising chat mutations.
 
 - **Per-tier blockers (internal beta today):** only **GA blocker §1**
   (mutation proposal accept + undo) remains open; Beta/soft/polish gates
-  from the 2026-05-05 audit are closed in code on this branch subject to
+  from the 2026-05-05 audit are closed in code on **`main`** subject to
   operator backfill / CI pinning follow-ups called out inline below.
 - **Re-audit during release-readiness reviews** until ✅. If a blocker
   is reclassified, justify it in this file with file:line evidence.
@@ -127,7 +125,7 @@ execution path, and the spec for `auto`-autonomy preapproved tools
 
 ## Beta blockers — must close before design-partner expansion
 
-**Status (2026-05-10, branch `orch/non-ga-todos-2f52/close-non-ga-release-todo-items`):** all three items below are **resolved in code** — cross-provider failover, scoped AI JWT + FE `sessionStorage` proxy token, and an `integration` pytest gate with optional `RUN_INTEGRATION=1` hook for real-stack jobs.
+**Status (2026-05-11, `main`):** all three items below are **resolved in code** — cross-provider failover, scoped AI JWT + FE `sessionStorage` proxy token, and an `integration` pytest gate with optional `RUN_INTEGRATION=1` hook for real-stack jobs.
 
 ### ✅ 2. No provider fallback on 5xx  *(BE-only — Resolved 2026-05-10)*
 
@@ -202,7 +200,7 @@ to list opt-in skips (`RUN_INTEGRATION=1`, `PYTEST_AGENT_POSTGRES_URI`).
 GitHub-hosted green run URLs remain environment-specific; paste a succeeded
 `workflow_dispatch` or branch push run here when ops pins one.
 
-### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `orch/composer-todos-979e/fe-ci-workflow`)*
+### ✅ 7b. FE CI workflow  *(FE-only — Resolved on `main`; landed via `orch/composer-todos-979e/fe-ci-workflow`)*
 
 `.github/workflows/frontend-ci.yml` runs on FE path filters for `main`
 /`claude/**` (mirrors `backend-ci.yml` triggers): `npm ci`, `npm run
@@ -213,7 +211,7 @@ gap versus Vercel-only `vite build`.
 
 ### ✅ 8. AC-V5 preapproved-tools auto-autonomy not implemented  *(FE — Resolved 2026-05-05)*
 
-Resolved on `claude/v2.1-ai-readiness-check-TbxeM` by hard-disabling
+Resolved on `main` (`claude/v2.1-ai-readiness-check-TbxeM`) by hard-disabling
 the "Auto" option in `AiChatDrawer` with an explanatory i18n tooltip
 ("Auto requires an agent that supports preapproved tools. Available
 in v3."). The metadata-driven gating against
@@ -325,7 +323,7 @@ via more containers remains valid each at workers=1). Tests:
 ``backend/fly.toml`` still recommends one worker per machine when using
 memory backends; multi-worker **per machine** requires the Redis bundle.
 
-### ✅ 16e. `fly.toml` placeholder app name  *(BE — Resolved 2026-05-10, `orch/non-ga-todos-2f52/fly-app-placeholder`)*
+### ✅ 16e. `fly.toml` placeholder app name  *(BE — Resolved 2026-05-10 on `main`; branch `orch/non-ga-todos-2f52/fly-app-placeholder`)*
 
 `backend/fly.toml` now defaults to `app = "pulse-backend"` with an
 explicit header that operators must rename `app` to their Fly.io
@@ -456,7 +454,8 @@ alignment — not a separate numbered blocker. Historical structural notes live 
    default). Use the v2.1 surface for read-only / suggestion flows.
    Document the search/estimation quality ceiling in product copy.
 2. **Design-partner beta.** Beta §2/§3/§6 and soft §4/§5/§7 are closed on
-   branch ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``. FE CI (§7b)
+   **`main`** (integration work historically tracked on
+   ``orch/non-ga-todos-2f52/close-non-ga-release-todo-items``). FE CI (§7b)
    ships via `.github/workflows/frontend-ci.yml`. **Still close 🛑 GA §1**
    before expanding external users relying on mutation proposals; keep
    proposal cards hidden until then.
