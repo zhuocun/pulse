@@ -61,13 +61,13 @@
       "handoffPath": "handoffs/chat-drawer-polish.md",
       "startedAt": "2026-05-11T04:49:43.995Z",
       "finishedAt": "2026-05-11T04:54:36.973Z",
-      "lastUpdate": "2026-05-11T04:54:36.973Z",
+      "lastUpdate": "2026-05-11T04:54:37.903Z",
       "note": null,
       "attempts": 1,
       "slackTs": null,
       "prNumber": 199,
       "failureMode": null,
-      "verification": null
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-chat-drawer-polish",
@@ -80,17 +80,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-11T04:54:44.584Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-11T04:54:44.584Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "auth-form-completion",
@@ -267,6 +268,10 @@
     {
       "at": "2026-05-11T04:52:14.177Z",
       "message": "fix-project-detail-shell: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-11T04:54:37.903Z",
+      "message": "chat-drawer-polish: verification self-reported (unit-test-verified)"
     }
   ]
 }
