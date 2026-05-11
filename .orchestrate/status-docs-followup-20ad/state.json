@@ -1,0 +1,97 @@
+{
+  "rootSlug": "status-docs-followup-20ad",
+  "tasks": [
+    {
+      "name": "audit-status-doc-open-items",
+      "type": "worker",
+      "branch": "orch/status-docs-followup-20ad/audit-status-doc-open-items",
+      "startingRef": "main",
+      "dependsOn": [],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "running",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": "2026-05-11T01:20:08.294Z",
+      "finishedAt": null,
+      "lastUpdate": "2026-05-11T01:20:08.294Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "verify-audit-status-doc-open-items",
+      "type": "verifier",
+      "branch": "orch/status-docs-followup-20ad/verify-audit-status-doc-open-items",
+      "startingRef": "orch/status-docs-followup-20ad/audit-status-doc-open-items",
+      "dependsOn": [
+        "audit-status-doc-open-items"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "start-auth-register-password-strength-and-tos",
+      "type": "worker",
+      "branch": "orch/status-docs-followup-20ad/start-auth-register-password-strength-and-tos",
+      "startingRef": "main",
+      "dependsOn": [
+        "verify-audit-status-doc-open-items"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    },
+    {
+      "name": "verify-auth-register-password-strength-and-tos",
+      "type": "verifier",
+      "branch": "orch/status-docs-followup-20ad/verify-auth-register-password-strength-and-tos",
+      "startingRef": "orch/status-docs-followup-20ad/start-auth-register-password-strength-and-tos",
+      "dependsOn": [
+        "start-auth-register-password-strength-and-tos"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
+    }
+  ],
+  "attention": []
+}
