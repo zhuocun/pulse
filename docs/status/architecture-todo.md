@@ -7,30 +7,31 @@ Forward-looking themes for the Board Copilot agent runtime
 **Grounding:** structural backlog in [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md), operational items in [`release-todo.md`](release-todo.md), product contract in [`../prd/v2.1-agent.md`](../prd/v2.1-agent.md).  
 **Goal:** turn “streaming agents work” into **predictable contracts**, **recoverable sessions**, **fewer FE dual-paths**, and **production-grade intelligence/resilience** — without expanding scope into unrelated UX polish (see [`ui-todo.md`](ui-todo.md)).
 
-## Current architecture (2026-05-10)
+## Current architecture (2026-05-11)
 
-The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. Outstanding architectural gaps tracked below as Themes 5–6 (mutation lifecycle, provider gateway, real RAG, supervisor / shared subgraph, MCP) and operationally in [`release-todo.md`](release-todo.md) (GA Blocker §1, Beta Blockers §2/§3/§6, Soft Blocker §4, Polish §15–§16).
+The Pulse backend ships six LangGraph-based agents (`board-brief`, `triage`, `task-drafting`, `task-estimation`, `chat`, `search`) behind two HTTP surfaces: the v1 deterministic JSON shim (`/api/ai/*`) and the v2.1 SSE surface (`/api/v1/agents/*`). The agent runtime owns idempotency, redaction, rate limiting, monthly token budgets, OpenTelemetry, Prometheus, and Postgres-backed checkpointing. Six structural review phases shipped between 2026-05-08 and 2026-05-10 (see [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) for the measured outcome): events as first-class state, a `PolishStep` DSL replacing per-agent ad-hoc polish flows, model resolution decoupled from graph compilation via `Runtime[Context]`, a linear-pipeline scaffold for the five linear catalog agents and a shared HTTP-route factory, an explicit catalog manifest, and signed thread keys with rotation. **Release posture (2026-05-11):** only **GA Blocker §1** (`MutationProposal` accept + undo) remains an open *code* gate in [`release-todo.md`](release-todo.md); Beta §2/§3/§6, soft §4/§5/§7, and polish through §16e are **closed in repo** subject to operator env / backfill notes there. Themes below are the architectural backlog on top of that posture: **Theme 5** is the planned implementation path for §1; **Themes 1–4** are contracts, FE ergonomics, and resume hygiene; **Theme 6** is optional intelligence / resilience depth (not additional numbered release rows now that §2/§4/§15/§16c shipped).
 
-## Status — 2026-05-10 (PR #177 + two sweep re-audits)
+## Status — 2026-05-11 (reconciled vs `main`)
 
-The tractable single-day items across Themes 1, 2, and 4 shipped on `claude/complete-subagent-orchestrator-fUazo`. Specifically:
+**Shipped earlier (2026-05-10 and before, including `claude/complete-subagent-orchestrator-fUazo`):**
 
 - **Theme 1:** per-surface Pydantic schemas with `extra="forbid"` (`backend/app/agents/events.py:48–155`), validation hook in the runtime (`validate_suggestion_payload` at `events.py:207–249`), and golden SSE transcript tests for all six agents (`backend/tests/test_agent_sse_transcripts.py`).
 - **Theme 2:** normalized `AgentStatus` derived from existing hook state; `rateLimit` mid-stream envelopes now map to `AgentRateLimitError`.
-- **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)` (`src/utils/hooks/useAgent.ts:203–206`); F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
+- **Theme 4:** `threadId` persisted in `sessionStorage` per `(agent, projectId)` (helpers + `useState` initializer in `src/utils/hooks/useAgent.ts` ~195–310); F-43 context migration (`project_id` / `user_id` / `autonomy_level` moved off `BaseAgentState` onto `ChatContext`).
 
-Re-audit added 2026-05-10 (first sweep, on `claude/review-project-todos-8d5Oo`):
+**Verified against `main` (2026-05-11):**
 
-- **Theme 3** now explicitly tracks the `useAgent.ts` decomposition (935 lines after the nudge-inbox extraction; verified `wc -l`) and the remaining autonomy metadata / settings follow-through after the `AiChatDrawer` selector shipped.
-- **Theme 4** now tracks the multi-worker uvicorn unblock (Redis-backed rate-limit / budget / idempotency paths exist in `backend/app/middleware/redis_backends.py`, but env parity must be proven before the single-worker pin in `backend/Dockerfile:84` and `backend/fly.toml:38` is removed).
-- **Theme 6** now tracks per-tenant model selection (the `X-Pulse-Model` runtime TODO at `backend/app/agents/runtime.py:578` — the only TODO left in the BE source tree).
+- **Theme 3:** `useAgent.ts` is **853** lines (`wc -l`); the SSE consumer loop lives in `src/utils/hooks/useAgentStreamConsumer.ts` (`forEachAgentStreamPart`). Nudge inbox + FE-tool resolver extractions remain as in [`product-done.md`](product-done.md). [`release-todo.md`](release-todo.md) **§16b** is **closed** — further splitting (shared SSE adapter, thinner domain-event layer) is normal FE backlog, not a polish-row blocker.
+- **Theme 4 — verified 2026-05-11:** [`release-todo.md`](release-todo.md) **§16d** is **closed** — `_configure_middleware_backends` **raises** if `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 unless rate-limit, budget, and idempotency backends are all `redis` with `REDIS_URI` (`backend/tests/test_production_backend_guards.py`). Remaining Theme 4 work is **FE** thread/resume continuity and operator runbooks, not “remove the single-worker default before Redis exists.”
+- **Theme 6 — verified 2026-05-11:** **No** `TODO` / `FIXME` / `XXX` markers under `backend/app/` (`rg`, case-sensitive). Per-project / header chat-model merge **shipped** ([`release-todo.md`](release-todo.md) **§16c**; `chat_model_override_from_request`, `AGENT_PROJECT_CHAT_MODEL_MAP`, tests `test_dispatch_chat_context_merge.py`, `test_agents_request_context_merge.py`). `_build_context` documents resolution order in `backend/app/agents/runtime.py` (caller `chat_model` from dispatch wins before the agent default).
 
-Re-audit added 2026-05-10 (second sweep, on `claude/review-project-todos-7UKrJ`):
+**FE source TODO inventory (2026-05-11):** a single intentional **v3** tracker — the `AUTONOMY_OPTIONS` docblock in `src/components/aiChatDrawer/index.tsx` (~303–316) describing hard-disabled `auto` until mutation lifecycle + preapproved tools land; `CopilotAboutPopover` carries **no** `TODO` (knowledge cutoff + limits use `microcopy` + `useChatAgentMetadata` per [`release-todo.md`](release-todo.md) §14).
 
-- All Theme 1–6 framings still match the implementation; the changes from this pass landed in [`ui-todo.md`](ui-todo.md) (stale `<a onClick>` and `CopilotAboutPopover` claims corrected) and in [`product-done.md`](product-done.md) (`taskCreator` / `columnCreator` accessibility shipped).
-- BE TODO inventory: exactly one (`runtime.py:578`). FE TODO inventory: exactly two (`copilotAboutPopover/index.tsx:114` knowledge-cutoff config source; `aiChatDrawer/index.tsx:312` v3 autonomy gate). All three are tracked here or in `release-todo.md`.
+### Workstreams — immediate vs later
 
-Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autonomy capability gating / settings placement), Theme 5 (full mutation lifecycle), Theme 6 (provider gateway, vector store / RAG, `create_react_agent` migration, supervisor, MCP, per-tenant model). See [`release-todo.md`](release-todo.md) for the per-item severity / status.
+- **Immediate (GA-adjacent):** **Theme 5** / [`release-todo.md`](release-todo.md) **§1** — end-to-end `MutationProposal` emission, `fe.applyMutation` / resume, and undo surface the FE toast can call. Keep `MutationProposalCard` behind `environment.aiMutationProposalsEnabled` until §1 closes (per release doc).
+- **Immediate (FE hygiene, same release train):** **Theme 3** — sweep `useAgent` consumers per `AGENTS.md` (stable effect deps); metadata-driven autonomy options beyond the About popover once §1 + v3 tool contracts exist (coordinates with `aiChatDrawer` v3 comment above).
+- **Later (post-GA or continuous improvement):** **Theme 1–2** residual contract/error hardening; **Theme 4** cross-tab resume policy and support-facing idempotency docs; **Theme 6** depth (operator embeddings backfill under §4, gateway hedging beyond shipped failover, richer orchestration) without inventing new release-tier rows — see theme tables and [`release-todo.md`](release-todo.md) for what already shipped.
 
 ---
 
@@ -47,7 +48,7 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 
 ## Theme 1 — Contract hardening
 
-**Gates:** Soft Blocker [§5](release-todo.md) (structured-output validation; partial fix shipped 2026-05-10, `create_react_agent(response_format=...)` migration remains).
+**Gates:** — **[§5](release-todo.md) closed 2026-05-10** (`PolishStep` JSON-schema path). Remaining Theme 1 work stays important for drift prevention: finish per-output wire schemas, version bumps, and any `create_react_agent(response_format=...)` / graph polish migrations not yet uniform across catalog agents.
 
 | Action                                                                                                                                        | Rationale                                                                                                        |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -77,11 +78,11 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 
 ## Theme 3 — Frontend surface simplification
 
-**Gates:** GA Blocker [§1](release-todo.md) for the `MutationProposalCard` rollout-gate row only (FE flag stays off until §1 closes); Polish [§16b](release-todo.md) for the `useAgent.ts` decomposition; the rest is FE engineering hygiene.
+**Gates:** GA Blocker [§1](release-todo.md) for the `MutationProposalCard` rollout only (FE flag stays off until §1 closes). **[§16b](release-todo.md) closed** — stream consumer extracted to `useAgentStreamConsumer.ts`; remaining rows below are FE engineering backlog, not a polish-blocker row.
 
 | Action                                                                                                                            | Rationale                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Decompose `useAgent.ts` (after partial split).** Remaining scope: extract the SSE adapter into a separate hook/module. | AC-V14 nudge inbox extraction shipped to `useNudgeInbox` with compatibility re-exports from `useAgent`; FE-tool resolution + auto-resume sequencing now lives in `useAgentToolResolver`; `useAgent` still owns SSE parsing, thread-id persistence, TTFT, autonomy gate, and AI-disable guard, so further decomposition is still needed. |
+| **Decompose `useAgent.ts` further (after §16b consumer extraction).** `useAgentStreamConsumer` now owns the per-chunk loop; remaining scope is a thinner boundary between transport parsing and domain state (shared adapter for `useAgent` / `useAgentChat`), plus clearing duplication in suggestion/nudge reducers. | AC-V14 nudge inbox lives in `useNudgeInbox`; FE-tool resolution in `useAgentToolResolver`; `useAgent` still bundles thread id, TTFT, autonomy guardrails, and wiring — see [`product-done.md`](product-done.md) §16b notes. |
 | **Isolate stable callbacks** from streaming identity churn in `useAgent` consumers (effects must not depend on whole hook return) | Documented anti-pattern in repo `AGENTS.md`; sweep chat, brief, assist panel, search.      |
 | **Thin adapter layer** over SSE parser → domain events → UI state                                                                 | Limits duplicated parsing between `useAgent`, `useAgentChat`, and future shells.           |
 | Reduce **`useAi` vs `useAgent`** divergence where behavior is identical (keep local-engine fallback, centralize switching)        | Lowers duplicate validators and bug surface; preserves `REACT_APP_AI_USE_LOCAL`.           |
@@ -94,14 +95,14 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 
 ## Theme 4 — Durable resume / state
 
-**Gates:** Polish [§16d](release-todo.md) (single-worker uvicorn lock-in / Redis backends for rate-limit + budget). The F-43 sub-item already closed [§17](release-todo.md); the remaining items are reliability hygiene with no direct release-tier dependency.
+**Gates:** — **[§16d](release-todo.md) closed** (multi-worker requires Redis rate/budget/idempotency + `REDIS_URI`; see `test_production_backend_guards.py`). **[§17](release-todo.md) closed** (F-43 / `ChatContext`). Remaining Theme 4 items are **FE** resume continuity, cross-tab policy, and support runbooks — no additional numbered release gate.
 
 | Action                                                                                                                   | Rationale                                                                |
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Thread **`thread_id` / checkpoint** continuity across refresh and optional multi-tab policy (single writer vs broadcast) | Postgres checkpointing is useless if the FE always mints a fresh thread. |
 | FE **persist minimal resume handles** (e.g., thread id, last interrupt id) scoped per project/user session               | Enables “Continue last agent turn” after accidental reload.              |
 | Document **idempotency replay** vs **fresh stream** decision tree for support tooling                                    | Clarifies 409/422/`stream_completed` responses already on `/stream`.     |
-| **Move rate-limit / budget / idempotency backends off in-memory** so uvicorn can run > 1 worker. The Redis backends already exist (`backend/app/middleware/redis_backends.py`); production-like envs must set `RATE_LIMIT_BACKEND=redis`, `BUDGET_BACKEND=redis`, and `IDEMPOTENCY_BACKEND=redis` before the single-worker pin is relaxed. Track in [release-todo §16d](release-todo.md). | Single-worker pin is an implicit scaling ceiling. Removing it requires env parity plus replay smoke tests before anyone bumps the worker count. |
+| **Operate multi-worker / multi-instance with coherent quotas.** Redis-backed rate-limit, budget, and idempotency (`backend/app/middleware/redis_backends.py`) are **required** when `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 ([§16d](release-todo.md) closed — boot **raises** otherwise). Operator work: set `RATE_LIMIT_BACKEND`, `BUDGET_BACKEND`, `IDEMPOTENCY_BACKEND` to `redis` with a real `REDIS_URI`, then replay/idempotency smoke before turning workers up. | Horizontal scale still prefers one worker per container with Redis; memory backends are dev/single-instance only. |
 
 **Exit criteria:** User can reload mid-interrupt and either resume cleanly or see an explicit “session expired” with recovery steps — never silent loss or duplicate apply.
 
@@ -124,17 +125,17 @@ Open: Theme 3 (FE surface simplification sweep, `useAgent` decomposition, autono
 
 ## Theme 6 — Backend intelligence & resilience
 
-**Gates:** Beta Blocker [§2](release-todo.md) (provider gateway / failover), Soft Blocker [§4](release-todo.md) (real embeddings + vector store), Polish [§15](release-todo.md) (MCP mount), Polish [§16c](release-todo.md) (per-tenant model selection). The remaining sub-items (`create_react_agent` migration, supervisor / shared subgraph, memory namespaces) have no release-tier dependency.
+**Gates:** — **[§2](release-todo.md), [§4](release-todo.md), [§15](release-todo.md), [§16c](release-todo.md) closed in repo** (cross-provider failover baseline, optional pgvector augmentation path behind env, MCP `/mcp` mount, per-project map + `X-Pulse-Model` merge). Remaining Theme 6 rows are **depth** (hedging beyond the shipped fallback, production embeddings **backfill** under §4 notes, fuller ReAct / supervisor patterns) — follow [`release-todo.md`](release-todo.md) for operator caveats, not new numbered blockers.
 
 | Action                                                                                                                        | Rationale                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Provider gateway:** LiteLLM/Portkey-style failover + hedged requests (**F-9**)                                              | Converts intermittent 5xx into degraded quality, not hard failure.               |
-| **Real embeddings + vector store** (`pgvector` or managed) — retire SHA stub semantics for production ranking (**F-18/F-19**) | Unlocks search and estimation quality beyond FE candidate caps.                  |
+| **Provider resilience (beyond §2):** hedged requests / richer routing (**F-9**)                                              | §2 ships `with_fallbacks` between configured vendors (`tests/test_llm_failover.py`); this row is extra hedging LiteLLM/Portkey-style products may add. |
+| **Real embeddings + vector store** (`pgvector` or managed) — retire stub semantics for production ranking (**F-18/F-19**) | Code path + DDL exist ([`release-todo.md`](release-todo.md) §4); ranking depth still depends on operator **backfill** + dimension alignment.                  |
 | **`create_react_agent` migration** where appropriate (**F-12**)                                                               | Buys tool loops + structured output hooks consistently.                          |
 | **Supervisor / shared subgraph** for duplicated drift logic (**F-13**)                                                        | Shrinks catalog maintenance cost — only after single-agent contracts are stable. |
 | **Memory namespaces:** read/write paths for `user_preferences`, `project_profile`, etc. (**F-14**)                            | Optional Differentiator once observability proves safe use of store data.        |
-| **MCP mount** (**F-15**)                                                                                                      | External integration track — parallel, not blocking core product loop.           |
-| **Per-tenant model selection.** `backend/app/agents/runtime.py:578` carries a TODO to wire the `X-Pulse-Model` header to a per-tenant config. Today the header path is wired and gated by `AGENT_CHAT_MODEL_ALLOWLIST` (empty by default → header ignored), so this is **not** a security exposure — it's a missing product surface for design partners who want a non-default model. | Process-wide `AGENT_CHAT_MODEL_PROVIDER` env var is the only knob; design partners cannot opt their own project into a different model without redeploying. |
+| **MCP usage expansion** (**F-15**)                                                                                            | Transport ships when `MCP_ENABLED=true` ([§15](release-todo.md)); read-only `fe.*` today — broader tool exposure stays out of scope until GA §1 patterns exist.           |
+| **Per-project / header chat model merge**                                                                                     | **Complete** ([§16c](release-todo.md)): `AGENT_PROJECT_CHAT_MODEL_MAP`, `chat_model_override_from_request` / `X-Pulse-Model` + `AGENT_CHAT_MODEL_ALLOWLIST`, tests `test_dispatch_chat_context_merge.py` + `test_agents_request_context_merge.py`; `_build_context` documents stack order in `backend/app/agents/runtime.py`. |
 
 **Exit criteria:** Production config runs with non-stub embeddings dimensions, documented failover policy, and integration tests that hit gateway mocks / staged providers.
 

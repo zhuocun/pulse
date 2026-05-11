@@ -8,7 +8,7 @@ open. Per-PR history lives in git log.
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes (chat + brief + draft + estimate + readiness + search); non-GA `release-todo.md` closures through polish §16d landed on `orch/non-ga-todos-2f52/close-non-ga-release-todo-items` (GA §1 remains open). |
-| Last updated | 2026-05-10                                                                                                                                                                       |
+| Last updated | 2026-05-11                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
 For the live GA / blocker / soft-blocker / polish status see
@@ -84,6 +84,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Task modal Type select uses canonical Task / Bug constant | UX ([`ui-todo.md`](ui-todo.md) §10 / Phase 2.6) | ✅ `TASK_TYPE_OPTIONS` mirrors the schema regardless of dataset shape (still localized via `microcopy.options.taskTypes.*`); regression tests added for empty + single-type datasets |
 | `Suggested by Copilot` badge on AI story-points Apply | UX ([`ui-todo.md`](ui-todo.md) 2.A.8 partial) | ✅ `appliedFieldOrigin` provenance tracked in `TaskModal`; `microcopy.ai.suggestedByCopilot` (en + zh-CN) renders next to Story points after Apply and clears on user edit; unit test covers both branches |
 | Forgot-password link + placeholder `/auth/forgot-password` route | UX ([`ui-todo.md`](ui-todo.md) §11 / Phase 2.7) | ✅ Right-aligned `Forgot password?` link in `LoginForm` (i18n + accessible name); placeholder page in `src/pages/forgotPassword/` with title + body keys; route + auth-route gating wired; tests cover link presence, route render, and gating |
+| Architecture / UI status backlog reconciled vs codebase | [`architecture-todo.md`](architecture-todo.md), [`ui-todo.md`](ui-todo.md) | ✅ 2026-05-11: stale BE `runtime.py:… TODO` + obsolete FE TODO inventory removed; Theme gates aligned with GA-only posture in [`release-todo.md`](release-todo.md); immediate vs later workstreams added |
 
 ---
 
