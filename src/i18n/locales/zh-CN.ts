@@ -302,6 +302,9 @@ const zhCN: Dictionary = {
     header: {
         logoLabel: "Pulse 首页"
     },
+    breadcrumb: {
+        projects: "项目"
+    },
     board: {
         title: "看板",
         titleWithName: "{name} 看板",

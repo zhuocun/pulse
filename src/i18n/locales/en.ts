@@ -311,6 +311,9 @@ export const enSource = {
     header: {
         logoLabel: "Pulse home"
     },
+    breadcrumb: {
+        projects: "Projects"
+    },
     board: {
         title: "Board",
         titleWithName: "{name} board",
