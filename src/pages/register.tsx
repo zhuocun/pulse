@@ -1,9 +1,7 @@
 import styled from "@emotion/styled";
-import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { useState } from "react";
+import { Link, Navigate } from "react-router";
 
-import ErrorBox from "../components/errorBox";
-import { NoPaddingButton } from "../components/projectList";
 import RegisterForm from "../components/registerForm";
 import { microcopy } from "../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../layouts/authLayout";
@@ -18,21 +16,14 @@ const SwitchRow = styled.p`
     text-align: center;
 `;
 
+const SwitchAuthLink = styled(Link)`
+    color: var(--ant-color-link);
+`;
+
 const RegisterPage = () => {
     useTitle(microcopy.actions.signUp);
-    const navigate = useNavigate();
     const { user, token } = useAuth();
     const [error, setError] = useState<Error | null | IError>(null);
-    const errorRef = useRef<HTMLDivElement | null>(null);
-    const handleSwitch = () => {
-        navigate("/login", { viewTransition: true });
-    };
-
-    useEffect(() => {
-        if (error) {
-            errorRef.current?.focus();
-        }
-    }, [error]);
 
     if (user && token) {
         return <Navigate to="/projects" replace />;
@@ -41,13 +32,12 @@ const RegisterPage = () => {
         <>
             <AuthTitle>{microcopy.auth.registerTitle}</AuthTitle>
             <AuthSubtitle>{microcopy.auth.registerSubtitle}</AuthSubtitle>
-            <ErrorBox error={error} ref={errorRef} />
-            <RegisterForm onError={setError} />
+            <RegisterForm onError={setError} serverError={error} />
             <SwitchRow>
                 {microcopy.auth.switchToLogin}{" "}
-                <NoPaddingButton onClick={handleSwitch} type="link">
+                <SwitchAuthLink to="/login">
                     {microcopy.actions.loginCta}
-                </NoPaddingButton>
+                </SwitchAuthLink>
             </SwitchRow>
         </>
     );

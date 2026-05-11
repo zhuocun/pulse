@@ -11,14 +11,29 @@ jest.mock("../components/registerForm", () => {
 
     return {
         __esModule: true,
-        default: (props: { onError: (error: Error) => void }) =>
+        default: (props: {
+            onError: (error: Error) => void;
+            serverError?: Error | null;
+        }) =>
             React.createElement(
-                "button",
-                {
-                    onClick: () => props.onError(new Error("Register failed")),
-                    type: "button"
-                },
-                "Mock Register Form"
+                React.Fragment,
+                null,
+                props.serverError
+                    ? React.createElement(
+                          "div",
+                          { role: "alert", tabIndex: -1 },
+                          props.serverError.message
+                      )
+                    : null,
+                React.createElement(
+                    "button",
+                    {
+                        onClick: () =>
+                            props.onError(new Error("Register failed")),
+                        type: "button"
+                    },
+                    "Mock Register Form"
+                )
             )
     };
 });
@@ -79,7 +94,7 @@ describe("RegisterPage", () => {
 
         expect(screen.getByText("Register failed")).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: /log in to your account/i })
+            screen.getByRole("link", { name: /log in to your account/i })
         ).toBeInTheDocument();
     });
 
@@ -87,7 +102,7 @@ describe("RegisterPage", () => {
         renderRegisterPage();
 
         fireEvent.click(
-            screen.getByRole("button", { name: /log in to your account/i })
+            screen.getByRole("link", { name: /log in to your account/i })
         );
 
         expect(window.location.pathname).toBe("/login");

@@ -24,7 +24,9 @@ const getApiErrorMessage = (
     return microcopy.feedback.operationFailed;
 };
 
-const resolveMessage = (error: Error | IError | unknown): string | null => {
+export const resolveAuthPageErrorMessage = (
+    error: Error | IError | unknown
+): string | null => {
     if (error instanceof Error) {
         return error.message || microcopy.feedback.operationFailed;
     }
@@ -43,7 +45,7 @@ const ErrorBox = React.forwardRef<
     HTMLDivElement,
     { error: Error | IError | unknown }
 >(({ error }, ref) => {
-    const message = resolveMessage(error);
+    const message = resolveAuthPageErrorMessage(error);
     return (
         <div
             aria-atomic="true"

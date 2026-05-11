@@ -201,7 +201,7 @@ describe("UI quality :: microcopy compliance", () => {
         // The plan §3.1 places the cross-page CTA in the central bundle;
         // hard-coding it on the page is the regression we want to catch.
         expect(
-            screen.getByRole("button", { name: microcopy.actions.registerCta })
+            screen.getByRole("link", { name: microcopy.actions.registerCta })
         ).toBeInTheDocument();
     });
 
@@ -216,7 +216,7 @@ describe("UI quality :: microcopy compliance", () => {
         renderAt(<RegisterPage />);
 
         expect(
-            screen.getByRole("button", { name: microcopy.actions.loginCta })
+            screen.getByRole("link", { name: microcopy.actions.loginCta })
         ).toBeInTheDocument();
     });
 });
