@@ -164,7 +164,7 @@
     {
       "name": "verify-project-search-debounce-loading",
       "type": "verifier",
-      "branch": "orch/ui-buttons-fix-4cc5/verify-project-search-debounce-loading",
+      "branch": "`orch/ui-buttons-fix-4cc5/project-search-debounce-loading` (pushed: verifier log commit `ab425c4`)",
       "startingRef": "orch/ui-buttons-fix-4cc5/project-search-debounce-loading",
       "dependsOn": [
         "project-search-debounce-loading"
@@ -172,12 +172,12 @@
       "agentId": "bc-bb9a962a-22b5-4261-913f-1e56c41d5dc3",
       "runId": "run-9f1d3cb6-e524-48f5-995f-4fc6254ffefa",
       "parentAgentId": "bc-60bd325b-ec81-4a2e-b088-387f32964cc5",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-project-search-debounce-loading.md",
       "startedAt": "2026-05-12T14:45:46.979Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:45:50.160Z",
+      "finishedAt": "2026-05-12T14:47:24.463Z",
+      "lastUpdate": "2026-05-12T14:47:24.463Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
