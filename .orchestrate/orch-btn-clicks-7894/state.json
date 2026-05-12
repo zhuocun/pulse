@@ -135,12 +135,12 @@
       "handoffPath": "handoffs/fix-shell-overlay-clicks.md",
       "startedAt": "2026-05-12T14:51:43.044Z",
       "finishedAt": "2026-05-12T14:55:48.840Z",
-      "lastUpdate": "2026-05-12T14:55:48.840Z",
+      "lastUpdate": "2026-05-12T14:55:49.936Z",
       "note": null,
       "slackTs": null,
       "prNumber": 215,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -154,23 +154,28 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-12T14:55:51.879Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-12T14:55:51.879Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
     {
       "at": "2026-05-12T14:55:44.969Z",
       "message": "fix-hit-target-stacking: verification recorded (unit-test-verified) by verifier verify-fix-hit-target-stacking"
+    },
+    {
+      "at": "2026-05-12T14:55:49.936Z",
+      "message": "fix-shell-overlay-clicks: verification self-reported (unit-test-verified)"
     }
   ]
 }
