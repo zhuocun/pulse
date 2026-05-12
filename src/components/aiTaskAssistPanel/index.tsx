@@ -307,17 +307,22 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         ]
     );
     useEffect(() => {
+        // Skip the state write when the set is already empty so an unstable
+        // dep (e.g. a useAi mock returning fresh ``run``/``reset`` refs on
+        // every render) cannot drive this effect into a re-render loop.
+        const clearDismissed = () =>
+            setDismissedKeys((prev) => (prev.size === 0 ? prev : new Set()));
         if (!trimmedName) {
             resetEstimate();
             resetReadiness();
-            setDismissedKeys(new Set());
+            clearDismissed();
             if (isRemote) {
                 abortRemoteEstimate();
                 clearRemoteSuggestion();
             }
             return;
         }
-        setDismissedKeys(new Set());
+        clearDismissed();
         if (isRemote) {
             void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {

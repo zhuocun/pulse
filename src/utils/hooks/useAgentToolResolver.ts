@@ -215,9 +215,8 @@ const useAgentToolResolver = (): UseAgentToolResolverResult => {
                 lastInterrupt
             };
 
-            const stage = (
-                interrupt.args as { stage?: string } | undefined
-            )?.stage;
+            const stage = (interrupt.args as { stage?: string } | undefined)
+                ?.stage;
             if (interrupt.tool === "fe.applyMutation" && stage === "approval") {
                 return undefined;
             }

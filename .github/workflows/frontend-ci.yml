@@ -62,5 +62,16 @@ jobs:
             - name: ESLint (check only)
               run: npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js
             - run: npm run typecheck
-            - run: CI=true npm test -- --watchAll=false --runInBand
+            - name: Jest
+              env:
+                  # Defence-in-depth: bump V8 heap so jest cannot SIGABRT
+                  # (exit 134) on a momentary spike. The primary OOM guard
+                  # is the ``--workerIdleMemoryLimit`` below, which recycles
+                  # worker processes between test files.
+                  NODE_OPTIONS: --max-old-space-size=6144
+              # ``--runInBand`` accumulated memory linearly across all 155
+              # test files and SIGABRTed past ~4 GB. Use a small worker
+              # pool (matches the 2-core GH runner) and recycle workers
+              # whose RSS exceeds 512 MB so heap stays bounded.
+              run: CI=true npm test -- --watchAll=false --maxWorkers=2 --workerIdleMemoryLimit=512MB
             - run: npm run build
