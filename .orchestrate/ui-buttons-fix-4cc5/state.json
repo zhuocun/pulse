@@ -61,12 +61,12 @@
       "handoffPath": "handoffs/dedup-board-copilot-toolbar.md",
       "startedAt": "2026-05-12T14:41:01.192Z",
       "finishedAt": "2026-05-12T14:45:30.483Z",
-      "lastUpdate": "2026-05-12T14:45:30.483Z",
+      "lastUpdate": "2026-05-12T14:45:31.671Z",
       "note": null,
       "slackTs": null,
       "prNumber": 211,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -147,15 +147,15 @@
       "agentId": "bc-0be60bf9-e54c-4141-83a2-6e3764fff2a3",
       "runId": "run-4b9d4160-272c-4b11-a158-0d04bf47af3d",
       "parentAgentId": "bc-60bd325b-ec81-4a2e-b088-387f32964cc5",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/project-search-debounce-loading.md",
       "startedAt": "2026-05-12T14:41:06.785Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:41:09.753Z",
+      "finishedAt": "2026-05-12T14:45:32.429Z",
+      "lastUpdate": "2026-05-12T14:45:32.429Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 212,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -238,6 +238,10 @@
     {
       "at": "2026-05-12T14:45:28.085Z",
       "message": "filter-chip-touch-targets: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-12T14:45:31.671Z",
+      "message": "dedup-board-copilot-toolbar: verification self-reported (unit-test-verified)"
     }
   ]
 }
