@@ -1,5 +1,12 @@
 /* eslint-disable global-require */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { useNavigate } from "react-router";
 
@@ -38,7 +45,12 @@ jest.mock("../memberPopover", () => {
 
     return {
         __esModule: true,
-        default: () => React.createElement("span", null, "Members")
+        default: () =>
+            React.createElement(
+                "button",
+                { type: "button", "aria-label": "Members" },
+                "Members"
+            )
     };
 });
 // Mock environment so tests control aiEnabled/aiUseLocalEngine independently
@@ -178,9 +190,45 @@ describe("Header", () => {
     it("does not navigate when already on the projects list", () => {
         const { navigate } = renderHeader("/projects");
 
-        fireEvent.click(screen.getByRole("button", { name: /pulse home/i }));
+        const banner = screen.getByRole("banner");
+        expect(
+            within(banner).queryByRole("button", { name: /pulse home/i })
+        ).not.toBeInTheDocument();
+        expect(within(banner).getByText("Pulse")).toBeInTheDocument();
 
         expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("omits Pulse brand from tab order on /projects", async () => {
+        const ue = userEvent.setup();
+        renderHeader("/projects");
+
+        expect(
+            screen.queryByRole("button", { name: /pulse home/i })
+        ).not.toBeInTheDocument();
+
+        await ue.tab();
+        expect(document.activeElement).toHaveAccessibleName(/^members$/i);
+    });
+
+    it("tabs to Pulse home first in the header when not on /projects", async () => {
+        const ue = userEvent.setup();
+        renderHeader("/projects/p1/board");
+
+        const logo = screen.getByRole("button", { name: /pulse home/i });
+        await ue.tab();
+        expect(document.activeElement).toBe(logo);
+    });
+
+    it("navigates to /projects when Pulse home is activated from the keyboard", async () => {
+        const ue = userEvent.setup();
+        const { navigate } = renderHeader("/projects/p1/board");
+
+        await ue.tab();
+        await ue.keyboard("{Enter}");
+        expect(navigate).toHaveBeenCalledWith("/projects", {
+            viewTransition: true
+        });
     });
 
     it("prevents default navigation from the account trigger", () => {

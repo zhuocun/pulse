@@ -17,6 +17,7 @@
 import "@testing-library/jest-dom";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -707,5 +708,48 @@ describe("UI quality :: Header dropdown keyboard contract", () => {
         if (tabIndex !== null) {
             expect(parseInt(tabIndex, 10)).toBeGreaterThanOrEqual(0);
         }
+    });
+});
+
+/* -------------------------------------------------------------------------- */
+/* 8. Header brand — route-sensitive keyboard affordance                         */
+/* -------------------------------------------------------------------------- */
+describe("UI quality :: Header brand keyboard affordance", () => {
+    it("does not expose Pulse home as a focusable button on /projects", async () => {
+        const Header = require("../components/header").default;
+        const ue = userEvent.setup();
+        render(
+            <MemoryRouter initialEntries={["/projects"]}>
+                <Routes>
+                    <Route path="/projects" element={<Header />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        expect(
+            screen.queryByRole("button", { name: /pulse home/i })
+        ).not.toBeInTheDocument();
+
+        await ue.tab();
+        expect(document.activeElement).toHaveAccessibleName(/^members$/i);
+    });
+
+    it("exposes Pulse home as the first tab stop in the header off /projects", async () => {
+        const Header = require("../components/header").default;
+        const ue = userEvent.setup();
+        render(
+            <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={<Header />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        const logo = screen.getByRole("button", { name: /pulse home/i });
+        await ue.tab();
+        expect(document.activeElement).toBe(logo);
     });
 });

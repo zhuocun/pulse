@@ -5,6 +5,7 @@ import {
     MoonOutlined,
     SunOutlined
 } from "@ant-design/icons";
+import { css } from "@emotion/react";
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef } from "react";
@@ -281,16 +282,23 @@ const AgentHealthBadge: React.FC = () => {
     );
 };
 
-/**
- * Brand cluster — the shared `BrandMark` component (so a future brand
- * refresh is a single edit) wrapped in a `NoPaddingButton` so it stays
- * keyboard-focusable and announces "Pulse, link" to assistive tech.
- */
-const BrandLink = styled(NoPaddingButton)`
+const brandClusterCss = css`
     align-items: center;
     display: inline-flex;
     flex: 0 1 auto;
     min-width: 0;
+
+    /* On the narrowest viewports there isn't room for the wordmark beside
+     * the projects popover; the brand collapses to its glyph. */
+    @media (max-width: ${breakpoints.sm - 1}px) {
+        > span > span:last-child {
+            display: none;
+        }
+    }
+`;
+
+const BrandLink = styled(NoPaddingButton)`
+    ${brandClusterCss}
 
     && {
         height: 36px;
@@ -302,13 +310,16 @@ const BrandLink = styled(NoPaddingButton)`
             height: 44px;
         }
     }
+`;
 
-    /* On the narrowest viewports there isn't room for the wordmark beside
-     * the projects popover; the brand collapses to its glyph. */
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        > span > span:last-child {
-            display: none;
-        }
+const BrandPresentation = styled.span`
+    ${brandClusterCss}
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0;
+
+    @media (pointer: coarse) {
+        height: 44px;
     }
 `;
 
@@ -435,21 +446,24 @@ const Header: React.FC = () => {
     return (
         <PageHeader ref={headerRef}>
             <LeftCluster>
-                <BrandLink
-                    aria-label={microcopy.header.logoLabel}
-                    title={microcopy.header.logoLabel}
-                    type="link"
-                    onClick={
-                        path !== "/projects"
-                            ? () =>
-                                  navigate("/projects", {
-                                      viewTransition: true
-                                  })
-                            : undefined
-                    }
-                >
-                    <BrandMark size="sm" />
-                </BrandLink>
+                {path === "/projects" ? (
+                    <BrandPresentation>
+                        <BrandMark size="sm" />
+                    </BrandPresentation>
+                ) : (
+                    <BrandLink
+                        aria-label={microcopy.header.logoLabel}
+                        title={microcopy.header.logoLabel}
+                        type="link"
+                        onClick={() =>
+                            navigate("/projects", {
+                                viewTransition: true
+                            })
+                        }
+                    >
+                        <BrandMark size="sm" />
+                    </BrandLink>
+                )}
                 <MemberPopover />
             </LeftCluster>
             <RightCluster>
