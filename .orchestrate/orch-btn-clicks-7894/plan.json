@@ -1,0 +1,180 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "orch-btn-clicks: Fix the issue that many buttons don't respond to the user's click across the React app (board chrome, project cards/lists, drag-and-drop surfaces). Every spawned role uses model composer-2-fast. Before editing product code, read `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` from the bootstrap worker. Do not revert sibling agents' work — stay inside assigned pathsAllowed.",
+  "summary": "Find and fix click-eating overlays, DnD-guard blocks on real buttons, and card-as-link hit-target stacking so primary controls reliably receive pointer events.",
+  "rootSlug": "orch-btn-clicks-7894",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "selfAgentId": "bc-7c9de8a6-a6eb-4886-9c1b-d0a189cd7894",
+  "acceptanceCriteria": [
+    "Root planner discovery is reflected in `discovery/BUTTON-CLICK-AUDIT.md` (bootstrap) with prioritized causes and file-level pointers.",
+    "Implementation workers land fixes with regression tests where feasible; Jest + tsc stay green on touched slices.",
+    "Each verifier independently confirms its target slice against the audit recommendations and records a strong verification class or a concrete blocker."
+  ],
+  "tasks": [
+    {
+      "name": "bootstrap-btn-clicks-ref",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Produce the single descendant-facing reference: `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` cataloging every likely click-swallowing pattern in the repo (stacking/`::before`/`::after` card-as-link overlays, z-index, `pointer-events`, `@hello-pangea/dnd` interactive blocking per AGENTS.md, AntD Drawer/Modal mask quirks, invisible full-bleed wrappers) with repo-relative paths and line anchors where possible, plus a prioritized fix order for sibling workers.",
+      "brief": "## Must read\n- `AGENTS.md` (DnD + TaskModal gotchas).\n- `src/pages/board.tsx` (`ColumnsViewport` already documents intentional `pointer-events: none` on fades — cite as good pattern).\n- `src/components/projectCard/index.tsx` (card-as-link `TitleLink::after` covering the card; `MetaRow` uses `z-index: 1` — audit whether every interactive child is above the pseudo-layer or whether some controls are still dead).\n- Grep `src/` for `Draggable`, `Drag`, `disableInteractiveElementBlocking`, `onClick`, `::after`, `::before`, `pointer-events`, `z-index`, `inset: 0`.\n\n## Deliverable\nCreate/update **only** files under `.orchestrate/orch-btn-clicks-7894/discovery/**`. The markdown must include:\n1. **Executive summary** (5 bullets max) of the most probable regressions.\n2. **Inventory table**: Surface | Symptom | Suspected root | Files | Suggested fix pattern.\n3. **DnD audit**: list every `Draggable`/`Drag` whose child tree includes native interactive elements (`button`, `input`, etc.) and whether `disableInteractiveElementBlocking` is already set.\n4. **Stacking audit**: list pseudo-elements and positioned wrappers that span interactive areas without `pointer-events: none`.\n5. **Handoff**: standard orchestrate handoff sections (`## Branch`, `## What I did`, `## Measurements` if any).\n\nDo not change application `src/**` in this task — reference only.",
+      "pathsAllowed": [
+        ".orchestrate/orch-btn-clicks-7894/discovery/**"
+      ],
+      "pathsForbidden": [
+        "src/**",
+        "backend/**",
+        "docs/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "acceptance": [
+        "`BUTTON-CLICK-AUDIT.md` exists and is substantive (inventory + DnD + stacking sections).",
+        "No edits outside `.orchestrate/orch-btn-clicks-7894/discovery/**`.",
+        "Handoff names the audit path and highlights top 3 fixes for implementers."
+      ],
+      "verify": "## Setup\n- None.\n\n## Automated\n- `test -f .orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md`\n- `git diff --stat` shows only paths under `.orchestrate/orch-btn-clicks-7894/discovery/`\n\n## Manual\n- Skim the audit for actionable line pointers.\n\n## Gotchas\n- This worker is read-only for product code; do not \"helpfully\" patch `src`.",
+      "openPR": false,
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-hit-target-stacking",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": ["bootstrap-btn-clicks-ref"],
+      "scopedGoal": "Eliminate dead clicks on buttons and menus where card-as-link or stretched pseudo-elements steal pointer events; normalize stacking (`z-index`, `position`, `pointer-events: none` on decorative layers only) on project surfaces called out in the bootstrap audit (minimum: `projectCard`, `projectList`, `projectPopover` if in scope).",
+      "brief": "Read `handoffs/bootstrap-btn-clicks-ref.md` (or the audit file path from that handoff) and `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md`.\n\n## Implementation guidance\n- Prefer **not** removing the card-as-link pattern: keep accessibility, but ensure every real control sits above the stretched hit target OR mark the decorative stretch with `pointer-events: none` where semantically correct.\n- Any `::after` / `::before` used only for visuals should not intercept clicks intended for buttons.\n- Add or extend RTL/Jest tests that click auxiliary controls (kebab, like, etc.) and assert handlers fire (use `userEvent` / `fireEvent` per existing suite style).\n\n## Scope\nTouch only files you need under your `pathsAllowed`. If the audit points to additional files in this slice, include them in a follow-up handoff note rather than breaching `pathsForbidden`.\n\n## i18n\nOnly if new visible strings (unlikely); otherwise skip.\n",
+      "pathsAllowed": [
+        "src/components/projectCard/**",
+        "src/components/projectList/**",
+        "src/components/projectPopover/**",
+        "src/__tests__/**",
+        "src/components/projectCard.test.tsx"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/components/column/**",
+        "src/pages/board.tsx",
+        "src/components/dragAndDrop/**",
+        "src/layouts/**",
+        "src/components/header/**"
+      ],
+      "acceptance": [
+        "Buttons/menus on project cards/lists respond to click in dev and in new/updated tests.",
+        "No regression to keyboard focus order or link navigation for the primary card target.",
+        "CI test slice for touched components passes."
+      ],
+      "verify": "## Setup\n- `npm install` if needed.\n\n## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/projectCard src/components/projectList src/components/projectPopover`\n- `npm run eslint -- --max-warnings 0` on touched files\n- `npx tsc --noEmit`\n\n## Manual\n- Optional: `npm run dev`, click like/menu/edit on a project card.\n\n## Gotchas\n- `MetaRow` already uses `z-index: 1`; verify children aren't creating new stacking contexts that drop below the link overlay.",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-hit-target-stacking",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "fix-hit-target-stacking",
+      "dependsOn": ["fix-hit-target-stacking"],
+      "scopedGoal": "Independently verify hit-target / stacking fixes for project surfaces against the bootstrap audit and worker acceptance criteria.",
+      "brief": "Re-run the worker verify recipe on the worker branch. Re-read the relevant audit rows. Confirm tests cover the previously dead controls. Emit `unit-test-verified` on a clean Jest run or explain the blocker.",
+      "acceptance": [
+        "Verifier confirms auxiliary controls are clickable per tests or documented manual evidence.",
+        "Verifier records a strong verification class or a precise blocker."
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-dnd-interactive-clicks",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": ["bootstrap-btn-clicks-ref"],
+      "scopedGoal": "Fix board Kanban interactions where `@hello-pangea/dnd` suppresses clicks on native interactive elements inside draggables; align with AGENTS.md (`disableInteractiveElementBlocking` where appropriate) for task cards, column handles, and related drag wrappers.",
+      "brief": "Read the bootstrap audit DnD section and `AGENTS.md` drag-and-drop notes.\n\n## Tasks\n1. Inventory `src/components/column/**`, `src/components/dragAndDrop/**`, and any task-card presentation under `src/components/column/` or shared drag helpers.\n2. For each `Draggable`/`Drag` root that wraps or fronts a `button`, `input`, `textarea`, `select`, etc., either:\n   - move the interactive element outside the blocked subtree, or\n   - pass `disableInteractiveElementBlocking` on the library component (document why in a short code comment only if non-obvious).\n3. Add regression tests (mount column/task card, `userEvent.click` on a control that was previously dead) following existing `@hello-pangea/dnd` test patterns in the repo.\n\n## Out of scope\n- Do not change reorder mutation semantics or `useDragEnd` logic.",
+      "pathsAllowed": [
+        "src/components/column/**",
+        "src/components/dragAndDrop/**",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/utils/hooks/useDragEnd.ts",
+        "src/utils/optimisticUpdate/**",
+        "src/components/projectCard/**",
+        "src/pages/board.tsx"
+      ],
+      "acceptance": [
+        "Identified drags no longer block clicks on legitimate embedded controls called out in audit.",
+        "Tests prove at least one previously failing control class now receives clicks.",
+        "`npm test` slice for column/dragAndDrop passes."
+      ],
+      "verify": "## Setup\n- `npm install` if needed.\n\n## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/column src/components/dragAndDrop`\n- `npm run eslint -- --max-warnings 0` on touched files\n- `npx tsc --noEmit`\n\n## Manual\n- Optional: dev board — click task card buttons/inputs that share space with drag handles.\n\n## Gotchas\n- Adding `disableInteractiveElementBlocking` widens drag surface; ensure handles remain obvious per prior UX work.",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-dnd-interactive-clicks",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "fix-dnd-interactive-clicks",
+      "dependsOn": ["fix-dnd-interactive-clicks"],
+      "scopedGoal": "Independently verify DnD click-unblocking against AGENTS.md and the bootstrap audit.",
+      "brief": "Re-run the worker verify recipe. Confirm each `Draggable`/`Drag` change is justified and covered. Emit `unit-test-verified` or document blockers.",
+      "acceptance": [
+        "Verifier confirms interactive blocking fixes are present where audit required.",
+        "Verifier records a strong verification class or blocker."
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-shell-overlay-clicks",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": ["bootstrap-btn-clicks-ref"],
+      "scopedGoal": "Fix remaining chrome-level click swallowing on the board shell, header, copilot/column viewport wrappers, and shared layout surfaces identified in the audit (excluding slices owned by sibling workers).",
+      "brief": "Read the bootstrap audit stacking/overlay rows.\n\n## Likely targets (confirm against audit before editing)\n- `src/pages/board.tsx` (shell layers around `ColumnsViewport`, swipe hint, AI chrome — only if audit shows a blocker; preserve intentional `pointer-events: none` on gradient fades).\n- `src/layouts/mainLayout.tsx`, `src/components/header/**`, `src/components/copilotShell/**`, `src/components/copilotWelcomeBanner/**`, `src/components/commandPalette/**` if they install invisible interceptors.\n\n## Requirements\n- Each change should tie to a cited audit row.\n- Add tests where RTL can assert click reaches handlers (e.g., header buttons, command palette) — follow existing strict test patterns.\n- Do not modify `src/components/column/**` (sibling worker) unless audit proves shared file conflict; if conflict, document in handoff for planner merge.\n",
+      "pathsAllowed": [
+        "src/pages/board.tsx",
+        "src/layouts/mainLayout.tsx",
+        "src/components/header/**",
+        "src/components/copilotShell/**",
+        "src/components/copilotWelcomeBanner/**",
+        "src/components/commandPalette/**",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/components/column/**",
+        "src/components/dragAndDrop/**",
+        "src/components/projectCard/**",
+        "src/components/projectList/**",
+        "src/components/projectPopover/**"
+      ],
+      "acceptance": [
+        "Audit-cited shell/header/copilot/command issues resolved without breaking DnD or layout min-width fixes in `MainLayout`.",
+        "Tests or documented manual evidence for at least one fixed control path.",
+        "Lint + tsc clean for touched files."
+      ],
+      "verify": "## Setup\n- `npm install` if needed.\n\n## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/pages/board src/layouts/mainLayout src/components/header src/components/copilotShell src/components/copilotWelcomeBanner src/components/commandPalette`\n- `npm run eslint -- --max-warnings 0` touched files\n- `npx tsc --noEmit`\n\n## Manual\n- Optional: board page — exercise header/board AI buttons.\n\n## Gotchas\n- `MainLayout` grid `minmax(0,1fr)` is load-bearing per file comment — don't regress horizontal clipping.",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-shell-overlay-clicks",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "fix-shell-overlay-clicks",
+      "dependsOn": ["fix-shell-overlay-clicks"],
+      "scopedGoal": "Independently verify shell/overlay click fixes vs. audit and layout constraints.",
+      "brief": "Re-run the worker verify recipe. Confirm no gradient fade or skip-link regression. Emit `unit-test-verified` or blockers.",
+      "acceptance": [
+        "Verifier ties verification steps to audit rows.",
+        "Verifier records a strong verification class or blocker."
+      ],
+      "maxAttempts": 2
+    }
+  ]
+}
