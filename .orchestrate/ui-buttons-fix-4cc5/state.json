@@ -197,12 +197,12 @@
       "handoffPath": "handoffs/filter-chip-touch-targets.md",
       "startedAt": "2026-05-12T14:41:09.754Z",
       "finishedAt": "2026-05-12T14:45:26.813Z",
-      "lastUpdate": "2026-05-12T14:45:26.813Z",
+      "lastUpdate": "2026-05-12T14:45:28.085Z",
       "note": null,
       "slackTs": null,
       "prNumber": 210,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -216,23 +216,28 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-12T14:45:29.322Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-12T14:45:29.322Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
     {
       "at": "2026-05-12T14:45:07.625Z",
       "message": "enhance-task-search-filter-actions: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-12T14:45:28.085Z",
+      "message": "filter-chip-touch-targets: verification self-reported (unit-test-verified)"
     }
   ]
 }
