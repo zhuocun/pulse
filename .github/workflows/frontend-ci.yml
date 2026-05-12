@@ -62,5 +62,11 @@ jobs:
             - name: ESLint (check only)
               run: npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js
             - run: npm run typecheck
-            - run: CI=true npm test -- --watchAll=false --runInBand
+            - name: Jest
+              env:
+                  # Bump V8 heap so the single-process (`--runInBand`) jest run
+                  # cannot SIGABRT (exit 134) once the test suite grows past
+                  # Node's default 4 GB ceiling. GH Actions runners have ~7 GB.
+                  NODE_OPTIONS: --max-old-space-size=6144
+              run: CI=true npm test -- --watchAll=false --runInBand
             - run: npm run build
