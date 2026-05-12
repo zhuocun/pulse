@@ -87,12 +87,12 @@
       "handoffPath": "handoffs/fix-dnd-interactive-clicks.md",
       "startedAt": "2026-05-12T14:51:40.242Z",
       "finishedAt": "2026-05-12T14:54:13.291Z",
-      "lastUpdate": "2026-05-12T14:54:13.291Z",
+      "lastUpdate": "2026-05-12T14:56:10.897Z",
       "note": null,
       "slackTs": null,
       "prNumber": 214,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -146,7 +146,7 @@
     {
       "name": "verify-fix-shell-overlay-clicks",
       "type": "verifier",
-      "branch": "orch/orch-btn-clicks-7894/verify-fix-shell-overlay-clicks",
+      "branch": "`orch/orch-btn-clicks-7894/fix-shell-overlay-clicks` (no verifier commits)",
       "startingRef": "orch/orch-btn-clicks-7894/fix-shell-overlay-clicks",
       "dependsOn": [
         "fix-shell-overlay-clicks"
@@ -154,12 +154,12 @@
       "agentId": "bc-4284761f-a7aa-436e-b0a3-d9e2c64fa8bd",
       "runId": "run-663f98c5-7ad6-45a6-bf87-eaff64133e9c",
       "parentAgentId": "bc-7c9de8a6-a6eb-4886-9c1b-d0a189cd7894",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-shell-overlay-clicks.md",
       "startedAt": "2026-05-12T14:55:51.879Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:55:54.697Z",
+      "finishedAt": "2026-05-12T14:57:37.636Z",
+      "lastUpdate": "2026-05-12T14:57:37.636Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -176,6 +176,10 @@
     {
       "at": "2026-05-12T14:55:49.936Z",
       "message": "fix-shell-overlay-clicks: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-12T14:56:10.897Z",
+      "message": "fix-dnd-interactive-clicks: verification recorded (unit-test-verified) by verifier verify-fix-dnd-interactive-clicks"
     }
   ]
 }
