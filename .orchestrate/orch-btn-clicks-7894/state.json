@@ -39,12 +39,12 @@
       "handoffPath": "handoffs/fix-hit-target-stacking.md",
       "startedAt": "2026-05-12T14:51:37.167Z",
       "finishedAt": "2026-05-12T14:53:58.807Z",
-      "lastUpdate": "2026-05-12T14:53:58.808Z",
+      "lastUpdate": "2026-05-12T14:55:44.969Z",
       "note": null,
       "slackTs": null,
       "prNumber": 213,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -130,15 +130,15 @@
       "agentId": "bc-3b4a6e64-1f58-4387-b32d-db431abf0404",
       "runId": "run-a56dd41b-cdbf-434d-aba6-ba5e331a3889",
       "parentAgentId": "bc-7c9de8a6-a6eb-4886-9c1b-d0a189cd7894",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-shell-overlay-clicks.md",
       "startedAt": "2026-05-12T14:51:43.044Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:51:46.044Z",
+      "finishedAt": "2026-05-12T14:55:48.840Z",
+      "lastUpdate": "2026-05-12T14:55:48.840Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 215,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -167,5 +167,10 @@
       "verification": null
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-12T14:55:44.969Z",
+      "message": "fix-hit-target-stacking: verification recorded (unit-test-verified) by verifier verify-fix-hit-target-stacking"
+    }
+  ]
 }
