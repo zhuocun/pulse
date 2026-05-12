@@ -1,0 +1,23 @@
+Verifier artifact — fix-header-brand-affordance — 2026-05-12
+
+Branch: orch/ui-buttons-fix-4cc5/fix-header-brand-affordance
+
+1) CI=true npm test -- --watchAll=false --runInBand src/components/header src/__tests__/uiKeyboardNavigation.strict.test.tsx src/__tests__/uiQuality.strict.test.tsx
+
+> pulse@0.1.0 test
+> jest --watchAll=false --runInBand src/components/header src/__tests__/uiKeyboardNavigation.strict.test.tsx src/__tests__/uiQuality.strict.test.tsx
+
+
+Test Suites: 3 passed, 3 total
+Tests:       55 passed, 55 total
+Snapshots:   0 total
+
+2) npx eslint --max-warnings 0 src/components/header
+Exit code 0 (no stdout)
+
+3) npx tsc --noEmit
+Exit code 0
+
+Note: The worker recipe used npm run eslint, which invokes eslint with --fix on repo-wide globs plus the header path. This verifier ran npx eslint --max-warnings 0 src/components/header instead so no tracked files were auto-modified during verification.
+
+Live browser run on /projects vs board was not performed here (SPA requires authenticated session bootstrap); RTL strict tests explicitly assert banner role/tab order and absence of Pulse home button on /projects.
