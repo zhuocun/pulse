@@ -52,6 +52,14 @@ const SrOnly = styled.span`
     margin: -1px;
     overflow: hidden;
     padding: 0;
+    /*
+     * The 1×1 clip keeps the box visually invisible, but the element
+     * still occupies a hit-test target above whatever it is positioned
+     * over. Drop pointer-events so the visible button beneath always
+     * receives the click — matches the SR-only pattern used in
+     * commandPalette and the board filter announcer.
+     */
+    pointer-events: none;
     position: absolute;
     white-space: nowrap;
     width: 1px;

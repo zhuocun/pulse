@@ -1182,6 +1182,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     margin: -1,
                     overflow: "hidden",
                     padding: 0,
+                    pointerEvents: "none",
                     position: "absolute",
                     width: 1
                 }}
@@ -1199,6 +1200,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     margin: -1,
                     overflow: "hidden",
                     padding: 0,
+                    pointerEvents: "none",
                     position: "absolute",
                     width: 1
                 }}

@@ -490,6 +490,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                     margin: -1,
                     overflow: "hidden",
                     padding: 0,
+                    pointerEvents: "none",
                     position: "absolute",
                     width: 1
                 }}
