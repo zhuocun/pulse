@@ -1,7 +1,7 @@
 /**
  * CopilotShell unit tests — F-2: controlled tab switching.
  */
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import { microcopy } from "../../constants/microcopy";
 
@@ -53,6 +53,24 @@ describe("CopilotShell", () => {
             name: tabName(microcopy.copilotShell.tabs.brief)
         });
         expect(briefTab).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("invokes onOpenChat when the chat tab placeholder CTA is clicked", () => {
+        const onOpenChat = jest.fn();
+        render(
+            <CopilotShell
+                {...baseProps}
+                open
+                defaultTab="chat"
+                onOpenChat={onOpenChat}
+            />
+        );
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.copilotShell.ctaOpenChat
+            })
+        );
+        expect(onOpenChat).toHaveBeenCalledTimes(1);
     });
 
     it("switches to the new defaultTab when it changes (F-2)", () => {

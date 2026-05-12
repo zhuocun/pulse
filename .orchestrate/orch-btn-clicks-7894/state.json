@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-12T14:51:33.189Z",
       "lastUpdate": "2026-05-12T14:51:33.189Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-hit-target-stacking",
@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-12T14:53:58.807Z",
       "lastUpdate": "2026-05-12T14:55:44.969Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 213,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-hit-target-stacking",
@@ -65,11 +65,11 @@
       "finishedAt": "2026-05-12T14:55:41.908Z",
       "lastUpdate": "2026-05-12T14:55:41.908Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-dnd-interactive-clicks",
@@ -89,11 +89,11 @@
       "finishedAt": "2026-05-12T14:54:13.291Z",
       "lastUpdate": "2026-05-12T14:56:10.897Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 214,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-dnd-interactive-clicks",
@@ -113,11 +113,11 @@
       "finishedAt": "2026-05-12T14:56:09.485Z",
       "lastUpdate": "2026-05-12T14:56:09.486Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-shell-overlay-clicks",
@@ -137,11 +137,11 @@
       "finishedAt": "2026-05-12T14:55:48.840Z",
       "lastUpdate": "2026-05-12T14:55:49.936Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 215,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-shell-overlay-clicks",
@@ -161,11 +161,11 @@
       "finishedAt": "2026-05-12T14:57:37.636Z",
       "lastUpdate": "2026-05-12T14:57:37.636Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [

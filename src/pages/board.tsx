@@ -138,6 +138,7 @@ export const ColumnContainer = styled.div`
  */
 const ColumnsViewport = styled.div`
     flex: 1;
+    isolation: isolate;
     min-height: 0;
     position: relative;
 
@@ -856,6 +857,7 @@ const BoardPage = () => {
                         clip: "rect(0 0 0 0)",
                         height: 1,
                         overflow: "hidden",
+                        pointerEvents: "none",
                         position: "absolute",
                         whiteSpace: "nowrap",
                         width: 1

@@ -41,6 +41,7 @@ const Card = styled.article`
     box-shadow: ${shadow.xs};
     display: flex;
     flex-direction: column;
+    isolation: isolate;
     overflow: hidden;
     position: relative;
     transition:
@@ -83,6 +84,8 @@ const Body = styled.div`
     flex-direction: column;
     gap: ${space.sm}px;
     padding: ${space.md}px;
+    position: relative;
+    z-index: 0;
 `;
 
 /**
@@ -96,6 +99,7 @@ const HeaderRow = styled.div`
     display: flex;
     gap: ${space.sm}px;
     min-width: 0;
+    z-index: 2;
 `;
 
 const TitleStack = styled.div`
@@ -132,7 +136,7 @@ const TitleLink = styled(Link)`
         position: absolute;
         right: 0;
         top: 0;
-        z-index: 0;
+        z-index: 1;
     }
 
     &:hover,
@@ -170,7 +174,7 @@ const MetaRow = styled.div`
     margin-top: auto;
     min-width: 0;
     position: relative;
-    z-index: 1;
+    z-index: 2;
 `;
 
 const Identity = styled.span`
@@ -207,6 +211,9 @@ const ActionsCluster = styled.div`
     display: inline-flex;
     flex: 0 0 auto;
     gap: 2px;
+    isolation: isolate;
+    position: relative;
+    z-index: 3;
 
     /*
      * On touch devices, AntD's small icon buttons collapse to ~24 px, which
@@ -388,7 +395,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 onLike();
                             }}
                             size="small"
-                            style={{ position: "relative", zIndex: 2 }}
                             type="text"
                         />
                         <Dropdown
@@ -404,7 +410,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 icon={<MoreOutlined aria-hidden />}
                                 onClick={(e) => e.stopPropagation()}
                                 size="small"
-                                style={{ position: "relative", zIndex: 2 }}
                                 type="text"
                             />
                         </Dropdown>

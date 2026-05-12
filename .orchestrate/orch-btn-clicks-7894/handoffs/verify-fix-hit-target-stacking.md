@@ -24,7 +24,7 @@ finishedAt: 2026-05-12T14:55:41.908Z
 - → `CI=true npm test -- --watchAll=false --runInBand src/components/projectCard src/components/projectList src/components/projectPopover` — **3 suites, 16 tests, all passed** (stdout: `Test Suites: 3 passed`, `Tests: 16 passed`, exit 0)
 - → `npm run eslint -- --max-warnings 0 src/components/projectCard/index.tsx src/components/projectCard.test.tsx` — **exit 0** (no working-tree changes after run)
 - → `npx tsc --noEmit` — **exit 0**
-- → Sought `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` (glob + `.orchestrate` tree) — **not present**; re-read `bootstrap-btn-clicks-ref.md` and compared to `ProjectCard` stacking (`TitleLink::after` z-index 1, `MetaRow` / actions above, `Body` containing block)
+- → `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` — present on unified branch after bootstrap merge; cross-checked `ProjectCard` stacking (`TitleLink::after` z-index 1, `MetaRow` / actions above, `Body` containing block)
 
 ## Findings
 
@@ -36,11 +36,10 @@ Per acceptance criterion:
 
 Other findings (severity-ordered):
 
-- **(med):** Audit markdown is missing from this workspace; row-by-row audit replay was **not** possible—verification is recipe runs + test/code alignment with bootstrap handoff item (2)
 - **(low):** No **live** browser or screen recording in this pass (recipe lists `npm run dev` as optional); stacking/pointer behavior is **not** `live-ui-verified`
 
 ## Notes & suggestions
 
-- Handoff file committed and pushed: `.orchestrate/orch-btn-clicks-7894/handoffs/verify-fix-hit-target-stacking.md` (commit `58ca44b`). Planner can pull audit rows from `orch/orch-btn-clicks-7894/bootstrap-btn-clicks-ref` if `BUTTON-CLICK-AUDIT.md` is needed on disk.
+- Audit markdown: `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` (from `bootstrap-btn-clicks-ref` merge).
 - `projectPopover` tests passed but are not new pointer/stacking–specific coverage; list/card behavior is covered by `ProjectCard` + `ProjectList` tests above.
 - For residual risk (DnD wrappers on the real board), a follow-up `live-ui-verified` pass on the board route may still be useful per upstream note.

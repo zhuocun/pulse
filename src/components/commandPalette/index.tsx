@@ -106,6 +106,7 @@ const HiddenLabel = styled.span`
     margin: -1px;
     overflow: hidden;
     padding: 0;
+    pointer-events: none;
     position: absolute;
     width: 1px;
 `;
@@ -558,6 +559,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                     margin: -1,
                     overflow: "hidden",
                     padding: 0,
+                    pointerEvents: "none",
                     position: "absolute",
                     width: 1
                 }}
