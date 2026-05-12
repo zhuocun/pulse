@@ -8,6 +8,8 @@ import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 
+import { microcopy } from "../../constants/microcopy";
+
 import Header from ".";
 
 jest.mock("../../assets/logo-software.svg?react", () => {
@@ -181,6 +183,23 @@ describe("Header", () => {
         fireEvent.click(screen.getByRole("button", { name: /pulse home/i }));
 
         expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("invokes setPreference when the inline theme IconButton is clicked", () => {
+        const setPreference = jest.fn();
+        renderHeader("/projects/p1/board", undefined, {
+            preference: "light",
+            scheme: "light",
+            setPreference
+        });
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.a11y.useDarkMode
+            })
+        );
+
+        expect(setPreference).toHaveBeenCalledWith("dark");
     });
 
     it("prevents default navigation from the account trigger", () => {
