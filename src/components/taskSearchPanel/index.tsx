@@ -80,29 +80,51 @@ const FlexSelect = styled.div`
     }
 `;
 
-/*
- * "Reset filters" should sit outside the per-field flex grid because it acts on
- * all of them. On phone widths it stretches full width below the inputs; on
- * tablet+ it shrinks to its natural width and aligns with the filter fields.
- */
-const ResetButtonSlot = styled.div`
+const SrOnly = styled.h2`
+    border: 0;
+    clip-path: inset(50%);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+`;
+
+const FilterActionsCluster = styled.div`
     align-items: center;
     display: flex;
+    flex: 0 0 auto;
     gap: ${space.xs}px;
+    width: 100%;
 
     > .ant-btn {
         width: 100%;
     }
 
+    @media (max-width: ${breakpoints.md - 1}px) {
+        border-block-start: 1px solid
+            var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
+        padding-block-start: ${space.xs}px;
+    }
+
     @media (min-width: ${breakpoints.md}px) {
-        flex: 0 0 auto;
+        border-inline-start: 1px solid
+            var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
         margin-inline-start: auto;
+        padding-inline-start: ${space.sm}px;
+        width: auto;
 
         > .ant-btn {
             width: auto;
         }
     }
 `;
+
+const FilterSearchRegion = styled.div``;
+
+const taskSearchFilterRegionHeadingId = "task-search-panel-filter-label";
 
 const TaskSearchPanel: React.FC<Props> = ({
     tasks,
@@ -209,94 +231,109 @@ const TaskSearchPanel: React.FC<Props> = ({
     return (
         <FilterShell>
             {aiSearchSlot}
-            <FilterRow role="search" aria-label={microcopy.a11y.filterTasks}>
-                <FlexInput>
-                    <Input
-                        aria-label={microcopy.a11y.searchTasksByName}
-                        allowClear
-                        autoComplete="off"
-                        enterKeyHint="search"
-                        inputMode="search"
-                        onChange={(e) =>
-                            setParam({
-                                ...param,
-                                taskName: e.target.value
-                            })
-                        }
-                        placeholder={microcopy.placeholders.searchBoard}
-                        prefix={
-                            <SearchOutlined
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))"
-                                }}
-                            />
-                        }
-                        type="search"
-                        value={param.taskName ?? ""}
-                    />
-                </FlexInput>
-                <FlexSelect>
-                    <Select
-                        allowClear
-                        aria-label={microcopy.a11y.filterByCoordinator}
-                        loading={loading}
-                        onChange={(value) =>
-                            setParam({
-                                ...param,
-                                coordinatorId: value ?? ""
-                            })
-                        }
-                        placeholder={microcopy.placeholders.coordinator}
-                        style={{ width: "100%" }}
-                        value={param.coordinatorId || undefined}
-                    >
-                        <Select.Option value="">
-                            {microcopy.placeholders.coordinators}
-                        </Select.Option>
-                        {coordinators.map((member) => (
-                            <Select.Option value={member._id} key={member._id}>
-                                {member.username}
+            <FilterSearchRegion
+                aria-labelledby={taskSearchFilterRegionHeadingId}
+                role="search"
+            >
+                <SrOnly id={taskSearchFilterRegionHeadingId}>
+                    {microcopy.a11y.filterTasks}
+                </SrOnly>
+                <FilterRow>
+                    <FlexInput>
+                        <Input
+                            aria-label={microcopy.a11y.searchTasksByName}
+                            allowClear
+                            autoComplete="off"
+                            enterKeyHint="search"
+                            inputMode="search"
+                            onChange={(e) =>
+                                setParam({
+                                    ...param,
+                                    taskName: e.target.value
+                                })
+                            }
+                            placeholder={microcopy.placeholders.searchBoard}
+                            prefix={
+                                <SearchOutlined
+                                    aria-hidden
+                                    style={{
+                                        color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))"
+                                    }}
+                                />
+                            }
+                            type="search"
+                            value={param.taskName ?? ""}
+                        />
+                    </FlexInput>
+                    <FlexSelect>
+                        <Select
+                            allowClear
+                            aria-label={microcopy.a11y.filterByCoordinator}
+                            loading={loading}
+                            onChange={(value) =>
+                                setParam({
+                                    ...param,
+                                    coordinatorId: value ?? ""
+                                })
+                            }
+                            placeholder={microcopy.placeholders.coordinator}
+                            style={{ width: "100%" }}
+                            value={param.coordinatorId || undefined}
+                        >
+                            <Select.Option value="">
+                                {microcopy.placeholders.coordinators}
                             </Select.Option>
-                        ))}
-                    </Select>
-                </FlexSelect>
-                <FlexSelect>
-                    <Select
-                        allowClear
-                        aria-label={microcopy.a11y.filterByType}
-                        loading={loading}
-                        onChange={(value) =>
-                            setParam({
-                                ...param,
-                                type: value ?? ""
-                            })
-                        }
-                        placeholder={microcopy.placeholders.type}
-                        style={{ width: "100%" }}
-                        value={param.type || undefined}
-                    >
-                        <Select.Option value="">
-                            {microcopy.placeholders.types}
-                        </Select.Option>
-                        {types.map((type) => (
-                            <Select.Option value={type} key={type}>
-                                {typeLabel(type)}
+                            {coordinators.map((member) => (
+                                <Select.Option
+                                    value={member._id}
+                                    key={member._id}
+                                >
+                                    {member.username}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </FlexSelect>
+                    <FlexSelect>
+                        <Select
+                            allowClear
+                            aria-label={microcopy.a11y.filterByType}
+                            loading={loading}
+                            onChange={(value) =>
+                                setParam({
+                                    ...param,
+                                    type: value ?? ""
+                                })
+                            }
+                            placeholder={microcopy.placeholders.type}
+                            style={{ width: "100%" }}
+                            value={param.type || undefined}
+                        >
+                            <Select.Option value="">
+                                {microcopy.placeholders.types}
                             </Select.Option>
-                        ))}
-                    </Select>
-                </FlexSelect>
-                <ResetButtonSlot>
-                    <Button
-                        disabled={chips.length === 0}
-                        onClick={resetParams}
-                        type="text"
-                    >
-                        {microcopy.actions.resetFilters}
-                    </Button>
-                </ResetButtonSlot>
-            </FilterRow>
-            <FilterChips chips={chips} onDismiss={dismissChip} />
+                            {types.map((type) => (
+                                <Select.Option value={type} key={type}>
+                                    {typeLabel(type)}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </FlexSelect>
+                    <FilterActionsCluster>
+                        <Button
+                            disabled={chips.length === 0}
+                            onClick={resetParams}
+                            type="text"
+                        >
+                            {microcopy.actions.resetFilters}
+                        </Button>
+                    </FilterActionsCluster>
+                </FilterRow>
+                <FilterChips
+                    chips={chips}
+                    onClearAll={resetParams}
+                    onDismiss={dismissChip}
+                />
+            </FilterSearchRegion>
         </FilterShell>
     );
 };

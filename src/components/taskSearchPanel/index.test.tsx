@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 
 import useAuth from "../../utils/hooks/useAuth";
 
@@ -287,5 +293,68 @@ describe("TaskSearchPanel", () => {
         expect(container.querySelectorAll(".ant-select-loading")).toHaveLength(
             2
         );
+    });
+
+    it("keeps reset disabled while no filter chips are active", () => {
+        renderPanel();
+        expect(
+            screen.getByRole("button", { name: /reset filter/i })
+        ).toBeDisabled();
+    });
+
+    it("does not show chip Clear control with a single active chip", () => {
+        renderPanel({
+            param: { coordinatorId: "", taskName: "only", type: "" }
+        });
+        expect(
+            screen.queryByRole("button", { name: /^clear$/i })
+        ).not.toBeInTheDocument();
+    });
+
+    it("clears every chip dimension when Clear is used with multiple chips active", () => {
+        const setParam = jest.fn();
+        renderPanel({
+            param: {
+                coordinatorId: "u1",
+                semanticIds: "sem",
+                taskName: "inv",
+                type: "Bug"
+            },
+            setParam
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /^clear$/i }));
+
+        expect(setParam).toHaveBeenCalledWith({
+            coordinatorId: undefined,
+            semanticIds: undefined,
+            taskName: undefined,
+            type: undefined
+        });
+    });
+
+    it("exposes a labelled search region containing reset and active filters", () => {
+        renderPanel({
+            param: {
+                coordinatorId: "u1",
+                taskName: "x",
+                type: ""
+            }
+        });
+
+        const region = screen.getByRole("search", { name: /filter tasks/i });
+        expect(region).toHaveAttribute(
+            "aria-labelledby",
+            "task-search-panel-filter-label"
+        );
+        expect(
+            document.getElementById("task-search-panel-filter-label")
+        ).toHaveTextContent(/filter tasks/i);
+        expect(
+            within(region).getByRole("button", { name: /reset filter/i })
+        ).toBeEnabled();
+        expect(
+            within(region).getByRole("region", { name: /active filters/i })
+        ).toBeInTheDocument();
     });
 });
