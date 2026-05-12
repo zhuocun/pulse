@@ -1,0 +1,212 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "Fix many broken UI buttons.",
+  "summary": "Parallel UX fixes for misleading header logo clicks, duplicate Board Copilot actions, task-filter reset/clear parity & grouping, debounced project search feedback, and coarse-pointer-sized filter-chip dismiss targets.",
+  "rootSlug": "ui-buttons-fix-4cc5",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "selfAgentId": "bc-60bd325b-ec81-4a2e-b088-387f32964cc5",
+  "acceptanceCriteria": [
+    "Every worker lands independently mergeable changes scoped to `pathsAllowed` with tests + lint/typecheck green on touched surfaces.",
+    "Each verifier re-runs its target's verify recipe on the worker branch and records `unit-test-verified` or concrete `verifier-blocked` evidence.",
+    "No regressions to Board Copilot hooks (`useAgent` / `useAi` dual-mount patterns) or drag-and-drop interactive-element rules from AGENTS.md."
+  ],
+  "tasks": [
+    {
+      "name": "fix-header-brand-affordance",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Eliminate the misleading/dead Pulse logo control when the user is already on `/projects`: `BrandLink` in `src/components/header/index.tsx` passes `onClick={undefined}` on that route while still rendering as `styled(NoPaddingButton)`, which reads as an interactive button that does nothing.",
+      "brief": "## Discovery (root planner)\n- `header/index.tsx` ~438–449: `BrandLink` uses conditional `onClick` — on `/projects` the brand appears clickable but performs no navigation.\n\n## Requirements\n1. When `path === \"/projects\"`, present the brand as **non-interactive** semantics (e.g. remove button role: use `span`/`div` with same visuals, or keep `button` but set `disabled`, `tabIndex={-1}`, and honest `aria-disabled` — pick one pattern that matches the rest of the header).\n2. When `path !== \"/projects\"`, preserve existing navigate-to-projects behavior and `aria-label`/`title` from `microcopy.header.logoLabel`.\n3. Add/adjust a focused test (extend `header` tests or `src/__tests__/uiKeyboardNavigation.strict.test.tsx` / `uiQuality` suite) that asserts tab order / role: logo is **not** in the tab sequence on `/projects`, and **is** focusable/activates navigation from another route stub.\n4. Run eslint/tsc; keep zh-CN untouched unless you add visible strings (prefer none).\n\n## Forbidden\n- Do not change Copilot toggles, MemberPopover, or AI hooks.\n\n## Verify\n```bash\nnpm install\nCI=true npm test -- --watchAll=false --runInBand src/components/header src/__tests__/uiKeyboardNavigation.strict.test.tsx src/__tests__/uiQuality.strict.test.tsx\nnpm run eslint -- --max-warnings 0 -- src/components/header\nnpx tsc --noEmit\n```",
+      "pathsAllowed": [
+        "src/components/header/**",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/**",
+        "src/utils/hooks/useAgent.ts",
+        "src/components/aiChatDrawer/**",
+        "src/pages/board.tsx"
+      ],
+      "acceptance": [
+        "On `/projects`, the Pulse brand is not exposed as a redundant clickable button that does nothing.",
+        "From other routes, clicking the brand still navigates to `/projects`.",
+        "Tests cover the regression; eslint + tsc clean."
+      ],
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-header-brand-affordance",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "fix-header-brand-affordance",
+      "dependsOn": ["fix-header-brand-affordance"],
+      "scopedGoal": "Independently verify the header brand affordance fix against its acceptance criteria and verify recipe.",
+      "brief": "Check out the worker branch named in the target handoff. Re-run the verify commands from `fix-header-brand-affordance`. Confirm behaviour on `/projects` vs other routes and record `unit-test-verified` if Jest passes.",
+      "acceptance": [
+        "Verifier confirms role/tab semantics match acceptance.",
+        "Verifier records a strong verification class or blocker notes."
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "dedup-board-copilot-toolbar",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Remove redundant Board Copilot buttons on `BoardPage`: the sparkle dropdown already exposes Ask/Brief/Open panel (`src/pages/board.tsx` ~637–681) while `Space.Compact` still renders duplicate Brief + Ask buttons (~703–733), duplicating actions and crowding the toolbar per `docs/todo/ui-todo.md` §7.",
+      "brief": "## Discovery\n- Duplicate parallel entry points confuse users and waste horizontal space on narrow widths.\n\n## Requirements\n1. Keep **one** coherent Ask/Brief affordance set. Preferred direction: retain the AntD `Dropdown` Copilot menu as the single explicit control **or** keep `Space.Compact` — **not both**. If you keep the dropdown, remove the redundant `Space.Compact` pair (and ensure dropdown/menu items still call `openChatDrawer` / `openBriefDrawer` / shell).\n2. Preserve localized labels and every existing `aria-label`/`microcopy` key — relocate strings if controls move; do not weaken a11y.\n3. Update `src/pages/board.test.tsx` (and any AI/board strict tests) that query Brief/Ask buttons — adapt selectors/counts to the consolidated UI.\n4. Verify `CopilotWelcomeBanner` CTA still opens Brief via `onCta`.\n\n## Gotchas (AGENTS.md)\n- Do not destabilize `useAgent` effects — if touching drawer open helpers, keep deps minimal.\n\n## Verify\n```bash\nnpm install\nCI=true npm test -- --watchAll=false --runInBand src/pages/board src/pages/board.test.tsx\nnpm run eslint -- --max-warnings 0 -- src/pages/board.tsx\nnpx tsc --noEmit\n```",
+      "pathsAllowed": [
+        "src/pages/board.tsx",
+        "src/pages/board.test.tsx",
+        "src/__tests__/**",
+        "src/components/copilotWelcomeBanner/**",
+        "src/constants/microcopy.ts",
+        "src/i18n/locales/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/**",
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useAi.ts",
+        "src/components/aiChatDrawer/**",
+        "src/components/boardBriefDrawer/**"
+      ],
+      "acceptance": [
+        "Only one redundant-free set of Ask/Brief controls remains in the board header AI cluster.",
+        "All board tests updated and passing; eslint + tsc clean."
+      ],
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-dedup-board-copilot-toolbar",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "dedup-board-copilot-toolbar",
+      "dependsOn": ["dedup-board-copilot-toolbar"],
+      "scopedGoal": "Verify board Copilot toolbar deduplication and updated tests on the worker branch.",
+      "brief": "Re-run the worker verify recipe. Manually enumerate visible AI controls in code review if tests don't already assert counts.",
+      "acceptance": [
+        "No duplicate Brief/Ask strip alongside an equivalent dropdown.",
+        "Verifier records verification class or blocker."
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "enhance-task-search-filter-actions",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Fix task board filter UX gaps from `docs/todo/ui-todo.md` §9: `TaskSearchPanel` renders Reset as a lone `type=\"text\"` button (`src/components/taskSearchPanel/index.tsx` ~289–297) and omits `FilterChips`' optional `onClearAll` — unlike `ProjectSearchPanel`, users cannot clear multiple chip dimensions in one click.",
+      "brief": "## Requirements\n1. Pass `onClearAll` (and appropriate label) into `FilterChips` mirroring `projectSearchPanel` when multiple chips active.\n2. Improve reset affordance: wrap filter controls in a labelled region (`aria-labelledby` / `role=\"search\"` or `fieldset` pattern) and ensure Reset/Clear-all buttons are visually grouped (toolbar divider, `Space`, or subtle bordered cluster) — goal is perceptible attachment to filters per §9.\n3. Keep Reset disabled when no chips (current behaviour) unless UX demands otherwise — document choice in handoff.\n4. Extend `src/components/taskSearchPanel/index.test.tsx` for clear-all + grouping markers.\n\n## Verify\n```bash\nnpm install\nCI=true npm test -- --watchAll=false --runInBand src/components/taskSearchPanel src/components/filterChips\nnpm run eslint -- --max-warnings 0 -- src/components/taskSearchPanel\nnpx tsc --noEmit\n```",
+      "pathsAllowed": [
+        "src/components/taskSearchPanel/**",
+        "src/components/filterChips/**",
+        "src/constants/microcopy.ts",
+        "src/i18n/locales/**",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/**",
+        "src/pages/board.tsx",
+        "src/components/projectSearchPanel/**"
+      ],
+      "acceptance": [
+        "`FilterChips` clear-all parity exists for tasks panel.",
+        "Reset/clear controls read as part of the filter toolbar with improved semantics.",
+        "Tests green; eslint + tsc clean."
+      ],
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-enhance-task-search-filter-actions",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "enhance-task-search-filter-actions",
+      "dependsOn": ["enhance-task-search-filter-actions"],
+      "scopedGoal": "Verify task search panel filter actions/clear-all behaviour.",
+      "brief": "Re-run worker verify recipe; spot-check RTL output for region labels.",
+      "acceptance": ["Verifier signs off with evidence."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "project-search-debounce-loading",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Address `docs/todo/ui-todo.md` §9 project list row: debounce the project name filter input and surface loading/disabled feedback while `loading` is true so rapid typing and stale props do not feel broken (`src/components/projectSearchPanel/index.tsx`, consumed from `src/pages/project.tsx`).",
+      "brief": "## Requirements\n1. Debounce text input updates to `setParam` (200–400ms) while preserving immediate controlled input display.\n2. When parent `loading` is true, disable filter controls **or** show inline `Spin`/suffix on the search field — avoid submitting conflicting filter states.\n3. Add tests in `src/pages/project.test.tsx` or a dedicated panel test using fake timers.\n4. Do not break AI semantic filter slot wiring.\n\n## Verify\n```bash\nnpm install\nCI=true npm test -- --watchAll=false --runInBand src/components/projectSearchPanel src/pages/project.test.tsx\nnpm run eslint -- --max-warnings 0 -- src/components/projectSearchPanel src/pages/project.tsx\nnpx tsc --noEmit\n```",
+      "pathsAllowed": [
+        "src/components/projectSearchPanel/**",
+        "src/pages/project.tsx",
+        "src/pages/project.test.tsx",
+        "src/__tests__/**",
+        "src/utils/hooks/useDebounce.ts"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/**",
+        "src/components/taskSearchPanel/**",
+        "backend/**"
+      ],
+      "acceptance": [
+        "Debounced project search avoids thrashing parent queries.",
+        "Loading state disables or visibly guards controls appropriately.",
+        "Tests cover timing behaviour."
+      ],
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-project-search-debounce-loading",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "project-search-debounce-loading",
+      "dependsOn": ["project-search-debounce-loading"],
+      "scopedGoal": "Verify debounce + loading UX on project search.",
+      "brief": "Re-run worker verify recipe.",
+      "acceptance": ["Verifier signs off with evidence."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "filter-chip-touch-targets",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "scopedGoal": "Grow dismiss/clear chip controls to meet minimum touch targets on coarse pointers: `ChipDismiss` is 18×18 (`src/components/filterChips/index.tsx`) and violates the repo UI plan §touch (44×44 on coarse). `ClearAllButton` likely needs the same treatment.",
+      "brief": "## Requirements\n1. Under `@media (pointer: coarse)`, increase tap targets to ≥44×44 CSS px (padding/HitSlop via CSS, **without** breaking desktop density).\n2. Maintain circular hit styling consistent with design tokens (`theme/tokens.ts`).\n3. Update/extend filter chip tests if classes/roles change.\n4. Ensure dismiss buttons remain real `<button type=\"button\">`.\n\n## Verify\n```bash\nnpm install\nCI=true npm test -- --watchAll=false --runInBand src/components/filterChips\nnpm run eslint -- --max-warnings 0 -- src/components/filterChips\nnpx tsc --noEmit\n```",
+      "pathsAllowed": [
+        "src/components/filterChips/**",
+        "src/theme/tokens.ts",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/**",
+        "src/pages/**",
+        "src/components/taskSearchPanel/**",
+        "src/components/projectSearchPanel/**"
+      ],
+      "acceptance": [
+        "Chip dismiss + clear-all meet coarse-pointer minimum sizing.",
+        "Desktop layout stays compact; tests green."
+      ],
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-filter-chip-touch-targets",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "filter-chip-touch-targets",
+      "dependsOn": ["filter-chip-touch-targets"],
+      "scopedGoal": "Verify coarse-pointer sizing for filter chips.",
+      "brief": "Re-run worker verify recipe; optionally inspect computed styles in tests for `@media (pointer: coarse)` overrides if feasible in JSDOM (otherwise CSS review note).",
+      "acceptance": ["Verifier signs off with evidence."],
+      "maxAttempts": 2
+    }
+  ]
+}
