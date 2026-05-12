@@ -3,7 +3,13 @@ import styled from "@emotion/styled";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    fontSize,
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 
 export interface FilterChip {
     /** Stable key (e.g. "manager", "type"). Drives the dismiss handler. */
@@ -82,10 +88,10 @@ const ChipDismiss = styled.button`
     }
 
     @media (pointer: coarse) {
-        height: 44px;
-        min-height: 44px;
-        min-width: 44px;
-        width: 44px;
+        height: ${touchTargetCoarse}px;
+        min-height: ${touchTargetCoarse}px;
+        min-width: ${touchTargetCoarse}px;
+        width: ${touchTargetCoarse}px;
     }
 
     svg {
@@ -112,6 +118,18 @@ const ClearAllButton = styled.button`
     &:focus-visible {
         color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
         text-decoration-color: currentColor;
+    }
+
+    @media (pointer: coarse) {
+        align-items: center;
+        border-radius: ${radius.pill}px;
+        box-sizing: border-box;
+        display: inline-flex;
+        justify-content: center;
+        min-height: ${touchTargetCoarse}px;
+        min-width: ${touchTargetCoarse}px;
+        padding-block: ${space.xs}px;
+        padding-inline: ${space.sm}px;
     }
 `;
 
