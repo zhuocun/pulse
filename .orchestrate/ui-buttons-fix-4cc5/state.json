@@ -106,12 +106,12 @@
       "handoffPath": "handoffs/enhance-task-search-filter-actions.md",
       "startedAt": "2026-05-12T14:41:04.030Z",
       "finishedAt": "2026-05-12T14:45:05.146Z",
-      "lastUpdate": "2026-05-12T14:45:05.146Z",
+      "lastUpdate": "2026-05-12T14:45:07.625Z",
       "note": null,
       "slackTs": null,
       "prNumber": 209,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -122,15 +122,15 @@
       "dependsOn": [
         "enhance-task-search-filter-actions"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-80db47b3-ffac-4238-b104-52a63578a720",
+      "runId": "run-551e8115-68fb-4b98-9cd6-e6a42d8bf9cc",
+      "parentAgentId": "bc-60bd325b-ec81-4a2e-b088-387f32964cc5",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-12T14:45:06.315Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:45:06.315Z",
+      "lastUpdate": "2026-05-12T14:45:09.318Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -192,15 +192,15 @@
       "agentId": "bc-f934afe7-506c-4952-9b36-35465a19bc20",
       "runId": "run-2cca8e1f-ffa3-413b-acae-41ea1d4c2d3c",
       "parentAgentId": "bc-60bd325b-ec81-4a2e-b088-387f32964cc5",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/filter-chip-touch-targets.md",
       "startedAt": "2026-05-12T14:41:09.754Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-12T14:41:12.587Z",
+      "finishedAt": "2026-05-12T14:45:26.813Z",
+      "lastUpdate": "2026-05-12T14:45:26.813Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 210,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -229,5 +229,10 @@
       "verification": null
     }
   ],
-  "attention": []
+  "attention": [
+    {
+      "at": "2026-05-12T14:45:07.625Z",
+      "message": "enhance-task-search-filter-actions: verification self-reported (unit-test-verified)"
+    }
+  ]
 }
