@@ -1,13 +1,13 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
   "goal": "orch-btn-clicks: Fix the issue that many buttons don't respond to the user's click across the React app (board chrome, project cards/lists, drag-and-drop surfaces). Every spawned role uses model composer-2-fast. Before editing product code, read `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` from the bootstrap worker. Do not revert sibling agents' work — stay inside assigned pathsAllowed.",
-  "summary": "Find and fix click-eating overlays, DnD-guard blocks on real buttons, and card-as-link hit-target stacking so primary controls reliably receive pointer events.",
+  "summary": "buttons-broken: unblock button clicks across overlays, DnD interactive blockers, and stacked card hit-target layers.",
   "rootSlug": "orch-btn-clicks-7894",
   "baseBranch": "main",
   "prBase": "main",
   "repoUrl": "https://github.com/zhuocun/pulse",
   "syncStateToGit": true,
-  "selfAgentId": "bc-7c9de8a6-a6eb-4886-9c1b-d0a189cd7894",
+  "selfAgentId": "bc-137e2a1f-d0ce-4257-930b-af646f584290",
   "acceptanceCriteria": [
     "Root planner discovery is reflected in `discovery/BUTTON-CLICK-AUDIT.md` (bootstrap) with prioritized causes and file-level pointers.",
     "Implementation workers land fixes with regression tests where feasible; Jest + tsc stay green on touched slices.",
