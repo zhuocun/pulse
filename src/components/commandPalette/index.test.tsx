@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
+
 import CommandPalette from ".";
 
 expect.extend(toHaveNoViolations);
@@ -107,6 +109,19 @@ describe("CommandPalette", () => {
             "input"
         ) as HTMLInputElement;
         fireEvent.change(input, { target: { value: "/ what's at risk" } });
+        await waitFor(() => {
+            expect(screen.getByText(/Ask Board Copilot/i)).toBeInTheDocument();
+        });
+    });
+
+    it("activates AI mode when the sparkle toggle button receives a click", async () => {
+        renderPalette(true);
+        await screen.findByRole("combobox");
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.a11y.switchToBoardCopilot
+            })
+        );
         await waitFor(() => {
             expect(screen.getByText(/Ask Board Copilot/i)).toBeInTheDocument();
         });

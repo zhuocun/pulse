@@ -46,6 +46,11 @@ const Main = styled.main`
  * and land on the routed page content (WCAG 2.4.1 Bypass Blocks).
  */
 const SkipLink = styled.a`
+    /*
+     * Unfocused skip links sit above sticky chrome (z-index) while translated
+     * off-screen; keep pointer-events off until focus so clicks reach real targets.
+     */
+    pointer-events: none;
     background: var(--ant-color-primary, #ea580c);
     border-radius: ${radius.md}px;
     color: #fff;
@@ -64,6 +69,7 @@ const SkipLink = styled.a`
     &:focus-visible {
         outline: 2px solid #fff;
         outline-offset: 2px;
+        pointer-events: auto;
         transform: translateY(0);
     }
 `;
