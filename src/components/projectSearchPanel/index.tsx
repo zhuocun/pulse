@@ -1,7 +1,7 @@
 import { SearchOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Input, Select } from "antd";
-import React, { useMemo } from "react";
+import { Input, Select, Spin } from "antd";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { breakpoints, radius, space } from "../../theme/tokens";
@@ -65,6 +65,8 @@ const FlexInput = styled.div`
     }
 `;
 
+const PROJECT_NAME_DEBOUNCE_MS = 300;
+
 const FlexSelect = styled.div`
     flex: 0 0 auto;
     min-width: 0;
@@ -84,6 +86,47 @@ const ProjectSearchPanel: React.FC<Props> = ({
     loading,
     aiSearchSlot
 }) => {
+    const [draftProjectName, setDraftProjectName] = useState(
+        () => param.projectName ?? ""
+    );
+    const projectNameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null
+    );
+
+    useEffect(() => {
+        if (projectNameDebounceRef.current) {
+            clearTimeout(projectNameDebounceRef.current);
+            projectNameDebounceRef.current = null;
+        }
+        setDraftProjectName(param.projectName ?? "");
+    }, [param.projectName]);
+
+    useEffect(
+        () => () => {
+            if (projectNameDebounceRef.current) {
+                clearTimeout(projectNameDebounceRef.current);
+            }
+        },
+        []
+    );
+
+    const scheduleProjectNameCommit = (value: string) => {
+        if (projectNameDebounceRef.current) {
+            clearTimeout(projectNameDebounceRef.current);
+        }
+        projectNameDebounceRef.current = setTimeout(() => {
+            projectNameDebounceRef.current = null;
+            setParam({ projectName: value });
+        }, PROJECT_NAME_DEBOUNCE_MS);
+    };
+
+    const cancelProjectNameDebounce = () => {
+        if (projectNameDebounceRef.current) {
+            clearTimeout(projectNameDebounceRef.current);
+            projectNameDebounceRef.current = null;
+        }
+    };
+
     const managerName = members.find(
         (u) => u._id === param.managerId
     )?.username;
@@ -116,6 +159,7 @@ const ProjectSearchPanel: React.FC<Props> = ({
 
     const dismiss = (key: string) => {
         if (key === "projectName") {
+            cancelProjectNameDebounce();
             setParam({ ...param, projectName: "" });
         } else if (key === "managerId") {
             setParam({ ...param, managerId: "" });
@@ -125,6 +169,7 @@ const ProjectSearchPanel: React.FC<Props> = ({
     };
 
     const clearAll = () => {
+        cancelProjectNameDebounce();
         setParam({
             projectName: "",
             managerId: "",
@@ -141,14 +186,14 @@ const ProjectSearchPanel: React.FC<Props> = ({
                         aria-label={microcopy.a11y.searchProjectsByName}
                         allowClear
                         autoComplete="off"
+                        disabled={loading}
                         enterKeyHint="search"
                         inputMode="search"
-                        onChange={(e) =>
-                            setParam({
-                                ...param,
-                                projectName: e.target.value
-                            })
-                        }
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setDraftProjectName(value);
+                            scheduleProjectNameCommit(value);
+                        }}
                         placeholder={microcopy.placeholders.searchProjects}
                         prefix={
                             <SearchOutlined
@@ -158,14 +203,18 @@ const ProjectSearchPanel: React.FC<Props> = ({
                                 }}
                             />
                         }
+                        suffix={
+                            loading ? <Spin aria-hidden size="small" /> : null
+                        }
                         type="search"
-                        value={param.projectName ?? ""}
+                        value={draftProjectName}
                     />
                 </FlexInput>
                 <FlexSelect>
                     <Select
                         allowClear
                         aria-label={microcopy.a11y.filterByManager}
+                        disabled={loading}
                         loading={loading}
                         onChange={(value) =>
                             setParam({

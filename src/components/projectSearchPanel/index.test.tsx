@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import ProjectSearchPanel from ".";
 
@@ -52,31 +52,80 @@ describe("ProjectSearchPanel", () => {
         installAntdBrowserMocks();
     });
 
-    it("shows the current project name and updates it from the search input", () => {
-        const setParam = jest.fn();
-        const param = { projectName: "Roadmap", managerId: "u1" };
+    it("debounces committing the project name to setParam while keeping the input responsive", () => {
+        jest.useFakeTimers();
+        try {
+            const setParam = jest.fn();
+            const param = { projectName: "Roadmap", managerId: "u1" };
 
-        render(
-            <ProjectSearchPanel
-                loading={false}
-                members={members}
-                param={param}
-                setParam={setParam}
-            />
-        );
+            render(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={param}
+                    setParam={setParam}
+                />
+            );
 
-        expect(screen.getByPlaceholderText("Search this list")).toHaveValue(
-            "Roadmap"
-        );
+            expect(screen.getByPlaceholderText("Search this list")).toHaveValue(
+                "Roadmap"
+            );
 
-        fireEvent.change(screen.getByPlaceholderText("Search this list"), {
-            target: { value: "Billing" }
-        });
+            fireEvent.change(screen.getByPlaceholderText("Search this list"), {
+                target: { value: "Billing" }
+            });
 
-        expect(setParam).toHaveBeenCalledWith({
-            managerId: "u1",
-            projectName: "Billing"
-        });
+            expect(screen.getByPlaceholderText("Search this list")).toHaveValue(
+                "Billing"
+            );
+            expect(setParam).not.toHaveBeenCalled();
+
+            act(() => {
+                jest.advanceTimersByTime(300);
+            });
+
+            expect(setParam).toHaveBeenCalledTimes(1);
+            expect(setParam).toHaveBeenCalledWith({ projectName: "Billing" });
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it("does not apply a stale debounced name after the project chip is dismissed", () => {
+        jest.useFakeTimers();
+        try {
+            const setParam = jest.fn();
+            const param = { managerId: "", projectName: "Road" };
+
+            render(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={param}
+                    setParam={setParam}
+                />
+            );
+
+            fireEvent.change(screen.getByPlaceholderText("Search this list"), {
+                target: { value: "stale" }
+            });
+
+            fireEvent.click(
+                screen.getByRole("button", { name: "Remove Search filter" })
+            );
+
+            act(() => {
+                jest.advanceTimersByTime(400);
+            });
+
+            expect(
+                setParam.mock.calls.some(
+                    (call) => call[0]?.projectName === "stale"
+                )
+            ).toBe(false);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("shows the selected manager name when the manager id matches", () => {
@@ -136,6 +185,10 @@ describe("ProjectSearchPanel", () => {
         expect(screen.getByLabelText("Filter by manager")).toBeInTheDocument();
         expect(
             container.querySelector(".ant-select-loading")
+        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Search this list")).toBeDisabled();
+        expect(
+            container.querySelector(".ant-input-suffix .ant-spin")
         ).toBeInTheDocument();
     });
 });

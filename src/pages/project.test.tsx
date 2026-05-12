@@ -229,6 +229,7 @@ describe("ProjectPage", () => {
         // of an AntD <Spin>; the skeleton placeholders carry the
         // `.ant-skeleton` class.
         expect(container.querySelector(".ant-skeleton")).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Search this list")).toBeDisabled();
 
         resolveProjects(response([]));
         resolveMembers(response([]));
@@ -283,7 +284,7 @@ describe("ProjectPage", () => {
             });
 
             expect(screen.getByTestId("location")).toHaveTextContent(
-                "projectName=Billing"
+                "projectName=Road"
             );
             expect(
                 fetchMock.mock.calls.some(([url]) =>
@@ -301,6 +302,11 @@ describe("ProjectPage", () => {
                         String(url).includes("projectName=Billing")
                     )
                 ).toBe(true)
+            );
+            await waitFor(() =>
+                expect(screen.getByTestId("location")).toHaveTextContent(
+                    "projectName=Billing"
+                )
             );
         } finally {
             jest.useRealTimers();

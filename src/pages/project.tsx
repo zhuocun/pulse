@@ -27,7 +27,6 @@ import {
 } from "../theme/tokens";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
-import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -266,15 +265,10 @@ const ProjectPage = () => {
         "managerId",
         "semanticIds"
     ]);
-    /*
-     * Only the API-triggering params (projectName, managerId) are debounced;
-     * the client-side semanticIds filter applies immediately so users see
-     * keystroke-rate feedback. 300 ms is the sweet spot between perceived
-     * snappiness and avoiding a request per keystroke.
-     */
-    const debouncedParam = useDebounce(param, 300);
-    const { projectName, managerId } = debouncedParam;
-    const fetchParam = { projectName, managerId };
+    const fetchParam = {
+        projectName: param.projectName,
+        managerId: param.managerId
+    };
     const {
         isLoading: pLoading,
         error: pError,
