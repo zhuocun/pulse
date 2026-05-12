@@ -299,11 +299,16 @@ describe("BoardPage", () => {
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", {
+                name: /Board Copilot menu/i
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("menuitem", {
                 name: /Open Board Copilot brief/i
             })
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole("button", { name: /Ask Board Copilot/i })
+            screen.queryByRole("menuitem", { name: /Ask Board Copilot/i })
         ).not.toBeInTheDocument();
         fireEvent.click(
             screen.getByRole("button", { name: /Board Copilot settings/i })
@@ -331,7 +336,7 @@ describe("BoardPage", () => {
         });
     });
 
-    it("shows Brief and Ask again after turning Project AI back on", async () => {
+    it("shows Copilot menu with Brief and Ask entries after turning Project AI back on", async () => {
         localStorage.setItem(
             "boardCopilot:disabledProjectIds",
             JSON.stringify(["project-1"])
@@ -350,11 +355,19 @@ describe("BoardPage", () => {
 
         expect(
             await screen.findByRole("button", {
+                name: /Board Copilot menu/i
+            })
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /Board Copilot menu/i })
+        );
+        expect(
+            await screen.findByRole("menuitem", {
                 name: /Open Board Copilot brief/i
             })
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: /Ask Board Copilot/i })
+            screen.getByRole("menuitem", { name: /Ask Board Copilot/i })
         ).toBeInTheDocument();
     });
 

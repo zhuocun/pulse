@@ -291,14 +291,11 @@ const BoardTitle = styled(Typography.Title)`
 
 /**
  * Action cluster on the board header. Stretches full-width below the title
- * on phone-sized viewports so the Brief / Ask buttons get a usable target
- * size and do not crowd the project name. From md upwards the cluster
- * shrinks to its natural width and aligns to the right of the title row.
+ * on narrow viewports so controls stay reachable without crowding the
+ * project name; from md upwards the cluster aligns to the right of the row.
  *
- * `flex-wrap: nowrap` keeps the settings cog inline with the Brief/Ask
- * compact group on every viewport — when the cluster could wrap, the
- * 100 %-width Space.Compact pushed the cog onto its own row where it
- * floated, orphaned, between the title and the search panel.
+ * `flex-wrap: nowrap` keeps the Copilot menu trigger and settings control on
+ * one line so the cog does not wrap orphaned between the title and search.
  */
 const BoardActions = styled.div`
     align-items: center;
@@ -308,27 +305,9 @@ const BoardActions = styled.div`
     gap: ${themeSpace.xs}px;
     min-width: 0;
 
-    .ant-space-compact {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-
     @media (min-width: ${breakpoints.md}px) {
         flex: 0 0 auto;
         justify-content: flex-end;
-
-        .ant-space-compact {
-            flex: 0 0 auto;
-            /*
-             * Space.Compact ships with the \`block\` prop on this surface so
-             * Brief / Ask stretch full-width on phones. \`block\` writes
-             * \`width: 100%\` inline, which on tablet+ would have the compact
-             * group claim the entire BoardActions row and crush the
-             * settings cog beside it down to a 2 px sliver. Reset the
-             * width here so each child sizes to its content instead.
-             */
-            width: auto;
-        }
     }
 `;
 
@@ -634,14 +613,25 @@ const BoardPage = () => {
                             <BoardActions>
                                 {boardAiOn && (
                                     <>
-                                        {/* P1-A: CopilotMenu — consolidated AI entry point */}
                                         <Dropdown
                                             menu={{
                                                 items: [
                                                     {
                                                         key: "ask",
-                                                        label: microcopy.board
-                                                            .copilotMenuAsk,
+                                                        label: (
+                                                            <span
+                                                                aria-label={
+                                                                    microcopy.ai
+                                                                        .askCopilot
+                                                                }
+                                                            >
+                                                                {
+                                                                    microcopy
+                                                                        .board
+                                                                        .copilotMenuAsk
+                                                                }
+                                                            </span>
+                                                        ),
                                                         icon: (
                                                             <MessageOutlined
                                                                 aria-hidden
@@ -652,8 +642,21 @@ const BoardPage = () => {
                                                     },
                                                     {
                                                         key: "brief",
-                                                        label: microcopy.board
-                                                            .copilotMenuBrief,
+                                                        label: (
+                                                            <span
+                                                                aria-label={
+                                                                    microcopy
+                                                                        .a11y
+                                                                        .openBoardCopilotBrief
+                                                                }
+                                                            >
+                                                                {
+                                                                    microcopy
+                                                                        .board
+                                                                        .copilotMenuBrief
+                                                                }
+                                                            </span>
+                                                        ),
                                                         icon: (
                                                             <FileTextOutlined
                                                                 aria-hidden
@@ -699,38 +702,6 @@ const BoardPage = () => {
                                                 {microcopy.labels.copilotShort}
                                             </Button>
                                         </Dropdown>
-                                        {/* P1-A: Consolidate into CopilotMenu in next phase */}
-                                        <Space.Compact block>
-                                            <Button
-                                                aria-label={
-                                                    microcopy.a11y
-                                                        .openBoardCopilotBrief
-                                                }
-                                                icon={
-                                                    <FileTextOutlined
-                                                        aria-hidden
-                                                    />
-                                                }
-                                                onClick={openBriefDrawer}
-                                                type="default"
-                                            >
-                                                {microcopy.labels.briefShort}
-                                            </Button>
-                                            <Button
-                                                aria-label={
-                                                    microcopy.ai.askCopilot
-                                                }
-                                                icon={
-                                                    <MessageOutlined
-                                                        aria-hidden
-                                                    />
-                                                }
-                                                onClick={() => openChatDrawer()}
-                                                type="default"
-                                            >
-                                                {microcopy.labels.askShort}
-                                            </Button>
-                                        </Space.Compact>
                                     </>
                                 )}
                                 <Popover
