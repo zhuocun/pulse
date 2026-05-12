@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { DragDropContext } from "@hello-pangea/dnd";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -101,9 +102,20 @@ const defaultParam: TaskSearchParam = {
     type: ""
 };
 
-const renderColumnWithColumnDnD = () => {
+const formatTemplate = (
+    template: string,
+    values: Record<string, string | number>
+) =>
+    Object.entries(values).reduce(
+        (acc, [key, value]) => acc.replace(`{${key}}`, String(value)),
+        template
+    );
+
+const renderColumnWithColumnDnD = (options?: { startEditing?: jest.Mock }) => {
     mockedUseReactMutation.mockReturnValue({ mutate: jest.fn() });
-    mockedUseTaskModal.mockReturnValue({ startEditing: jest.fn() });
+    mockedUseTaskModal.mockReturnValue({
+        startEditing: options?.startEditing ?? jest.fn()
+    });
 
     return render(
         <MemoryRouter initialEntries={["/projects/project-1/board"]}>
@@ -143,6 +155,43 @@ const renderColumnWithColumnDnD = () => {
 };
 
 describe("Column DnD affordances (live @hello-pangea/dnd)", () => {
+    it("delivers clicks to the task card button inside a task Draggable (native button is not event-blocked)", async () => {
+        const user = userEvent.setup();
+        const startEditing = jest.fn();
+
+        renderColumnWithColumnDnD({ startEditing });
+
+        await user.click(
+            screen.getByRole("button", {
+                name: formatTemplate(microcopy.a11y.openTask as string, {
+                    name: "Build task"
+                })
+            })
+        );
+
+        expect(startEditing).toHaveBeenCalledTimes(1);
+        expect(startEditing).toHaveBeenCalledWith("task-1");
+    });
+
+    it("delivers clicks to the column more-actions control inside a column Draggable", async () => {
+        const user = userEvent.setup();
+
+        renderColumnWithColumnDnD();
+
+        await user.click(
+            screen.getByRole("button", {
+                name: formatTemplate(
+                    microcopy.a11y.moreActionsForColumn as string,
+                    {
+                        name: "Todo"
+                    }
+                )
+            })
+        );
+
+        expect(screen.getByTestId("dropdown-menu")).toBeInTheDocument();
+    });
+
     it("exposes an accessible column drag handle with RFD handle attributes, not on the column surface", () => {
         renderColumnWithColumnDnD();
 

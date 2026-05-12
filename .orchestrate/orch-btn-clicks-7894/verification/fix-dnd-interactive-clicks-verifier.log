@@ -1,0 +1,23 @@
+# Verifier: fix-dnd-interactive-clicks
+# Date: 2026-05-12
+# Branch: orch/orch-btn-clicks-7894/fix-dnd-interactive-clicks
+
+## Bootstrap audit
+`.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` — not present in workspace (0 matches).
+
+## AGENTS.md / code cross-check
+- `src/components/column/index.tsx`: task `Drag` sets `disableInteractiveElementBlocking` with rationale (TaskCard `<button>`).
+- `src/pages/board.tsx`: column `Drag` sets `disableInteractiveElementBlocking` + `detachDragHandle` (embedded column chrome controls).
+- `src/components/dragAndDrop/index.tsx`: thin `Draggable` wrapper; opt-in via passed props.
+
+## Recipe runs
+1. `npm install` — OK (deps up to date).
+2. `CI=true npm test -- --watchAll=false --runInBand src/components/column src/components/dragAndDrop` — OK: 4 suites, 29 tests passed.
+3. `npm run eslint -- --max-warnings 0 src/components/column/index.tsx src/components/column/column-dnd.test.tsx src/components/dragAndDrop/index.tsx src/components/dragAndDrop/index.test.tsx src/pages/board.tsx` — exit 0.
+4. `npx tsc --noEmit` — exit 0.
+
+## Regression coverage noted
+`src/components/column/column-dnd.test.tsx` — live `DragDropContext` + `userEvent.click` on task open button asserts `startEditing("task-1")`; column more-actions button asserts dropdown menu in document.
+
+## Verdict signal
+unit-test-verified (no live browser run in this verifier pass).
