@@ -46,7 +46,11 @@ const login = async (param: { email: string; password: string }) => {
         if (typeof user?.jwt !== "string" || user.jwt.length === 0) {
             return Promise.reject(new Error("Login response missing token"));
         }
-        writeAuthToken(user.jwt);
+        if (!writeAuthToken(user.jwt)) {
+            return Promise.reject(
+                new Error(microcopy.feedback.loginCouldNotPersistSession)
+            );
+        }
         if (typeof user.ai_jwt === "string" && user.ai_jwt.length > 0) {
             writeAiProxyToken(user.ai_jwt);
         }

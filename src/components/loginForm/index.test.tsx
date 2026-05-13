@@ -10,7 +10,7 @@ import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
-import { readAuthToken } from "../../utils/tokenStorage";
+import * as tokenStorage from "../../utils/tokenStorage";
 
 import LoginForm from ".";
 
@@ -203,7 +203,37 @@ describe("LoginForm", () => {
         await waitFor(() => {
             expect(window.location.pathname).toBe("/projects");
         });
-        expect(readAuthToken()).toBe("jwt-login");
+        expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+    });
+
+    it("sets autoComplete=username on the email field for password managers", () => {
+        renderLoginForm();
+        const email = screen.getByLabelText(/^email$/i);
+        expect(email).toHaveAttribute("autocomplete", "username");
+    });
+
+    it("stays on login with an error toast when JWT persistence fails", async () => {
+        const spy = jest
+            .spyOn(tokenStorage, "writeAuthToken")
+            .mockReturnValue(false);
+        const errSpy = jest
+            .spyOn(message, "error")
+            .mockImplementation(() => "" as never);
+        renderLoginForm();
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => expect(errSpy).toHaveBeenCalledTimes(1));
+        expect(errSpy.mock.calls[0][0]).toMatch(
+            /private browsing|allow site data/i
+        );
+        expect(window.location.pathname).toBe("/login");
+        expect(tokenStorage.readAuthToken()).toBeNull();
+
+        spy.mockRestore();
+        errSpy.mockRestore();
     });
 
     it("shows a welcome-back toast on successful login", async () => {
@@ -238,7 +268,7 @@ describe("LoginForm", () => {
             });
         });
         expect(window.location.pathname).toBe("/login");
-        expect(readAuthToken()).toBeNull();
+        expect(tokenStorage.readAuthToken()).toBeNull();
     });
 
     it("shows the submitting state from the mutation", () => {
