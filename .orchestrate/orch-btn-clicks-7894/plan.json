@@ -1,24 +1,25 @@
 {
   "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
-  "goal": "orch-btn-clicks: Fix the issue that many buttons don't respond to the user's click across the React app (board chrome, project cards/lists, drag-and-drop surfaces). Every spawned role uses model composer-2-fast. Before editing product code, read `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` from the bootstrap worker. Do not revert sibling agents' work — stay inside assigned pathsAllowed.",
-  "summary": "Find and fix click-eating overlays, DnD-guard blocks on real buttons, and card-as-link hit-target stacking so primary controls reliably receive pointer events.",
+  "goal": "dead-clicks / orch-btn-clicks: Many controls ignore clicks until a full page refresh; afterward the expected UI (e.g. TaskModal from `editingTaskId`) appears — implying either pointer-event swallowing (see bootstrap audit) or modal gates that stay closed while board `tasks` are still `undefined` (`TaskModal` uses `open={Boolean(editingTaskId && editingTask)}`). Every spawned role uses model composer-2-fast. Before editing product code, read `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md`. Respect `AGENTS.md` TaskModal rules (`tasks === undefined` means loading — never coerce board tasks to `[]`). Do not revert sibling agents' work — stay inside assigned pathsAllowed.",
+  "summary": "Dead clicks until refresh — finishing overlay/DnD/card stacking fixes from the audit and closing the TaskModal gap where URL opens a task before the tasks query hydrates so clicks no longer feel silently ignored.",
   "rootSlug": "orch-btn-clicks-7894",
   "baseBranch": "main",
   "prBase": "main",
   "repoUrl": "https://github.com/zhuocun/pulse",
   "syncStateToGit": true,
-  "selfAgentId": "bc-7c9de8a6-a6eb-4886-9c1b-d0a189cd7894",
+  "selfAgentId": "bc-df684a60-c826-4186-8c74-6169fe7e39f2",
   "acceptanceCriteria": [
     "Root planner discovery is reflected in `discovery/BUTTON-CLICK-AUDIT.md` (bootstrap) with prioritized causes and file-level pointers.",
     "Implementation workers land fixes with regression tests where feasible; Jest + tsc stay green on touched slices.",
-    "Each verifier independently confirms its target slice against the audit recommendations and records a strong verification class or a concrete blocker."
+    "Each verifier independently confirms its target slice against the audit recommendations and records a strong verification class or a concrete blocker.",
+    "If users report refresh-fixed modals, TaskModal opens while `tasks` are still loading when `editingTaskId` is set (loading chrome inside modal), without regressing stale deep-link clearing once tasks resolve."
   ],
   "tasks": [
     {
       "name": "bootstrap-btn-clicks-ref",
       "type": "worker",
       "model": "composer-2-fast",
-      "scopedGoal": "Produce the single descendant-facing reference: `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` cataloging every likely click-swallowing pattern in the repo (stacking/`::before`/`::after` card-as-link overlays, z-index, `pointer-events`, `@hello-pangea/dnd` interactive blocking per AGENTS.md, AntD Drawer/Modal mask quirks, invisible full-bleed wrappers) with repo-relative paths and line anchors where possible, plus a prioritized fix order for sibling workers.",
+      "scopedGoal": "Produce the single descendant-facing reference: `.orchestrate/orch-btn-clicks-7894/discovery/BUTTON-CLICK-AUDIT.md` cataloging every likely click-swallowing pattern in the repo (stacking/`::before`/`::after` card-as-link overlays, z-index, `pointer-events`, `@hello-pangea/dnd` interactive blocking per AGENTS.md, AntD Drawer/Modal mask quirks, invisible full-bleed wrappers) with repo-relative paths and line anchors where possible, plus a prioritized fix order for sibling workers. Include an explicit row for **refresh-then-modal** symptoms: contrast silent URL updates vs overlay-blocked clicks; cite `TaskModal` `open={Boolean(editingTaskId && editingTask)}` vs `tasks === undefined` loading semantics from AGENTS.md.",
       "brief": "## Must read\n- `AGENTS.md` (DnD + TaskModal gotchas).\n- `src/pages/board.tsx` (`ColumnsViewport` already documents intentional `pointer-events: none` on fades — cite as good pattern).\n- `src/components/projectCard/index.tsx` (card-as-link `TitleLink::after` covering the card; `MetaRow` uses `z-index: 1` — audit whether every interactive child is above the pseudo-layer or whether some controls are still dead).\n- Grep `src/` for `Draggable`, `Drag`, `disableInteractiveElementBlocking`, `onClick`, `::after`, `::before`, `pointer-events`, `z-index`, `inset: 0`.\n\n## Deliverable\nCreate/update **only** files under `.orchestrate/orch-btn-clicks-7894/discovery/**`. The markdown must include:\n1. **Executive summary** (5 bullets max) of the most probable regressions.\n2. **Inventory table**: Surface | Symptom | Suspected root | Files | Suggested fix pattern.\n3. **DnD audit**: list every `Draggable`/`Drag` whose child tree includes native interactive elements (`button`, `input`, etc.) and whether `disableInteractiveElementBlocking` is already set.\n4. **Stacking audit**: list pseudo-elements and positioned wrappers that span interactive areas without `pointer-events: none`.\n5. **Handoff**: standard orchestrate handoff sections (`## Branch`, `## What I did`, `## Measurements` if any).\n\nDo not change application `src/**` in this task — reference only.",
       "pathsAllowed": [
         ".orchestrate/orch-btn-clicks-7894/discovery/**"
@@ -172,6 +173,51 @@
       "brief": "Re-run the worker verify recipe. Confirm no gradient fade or skip-link regression. Emit `unit-test-verified` or blockers.",
       "acceptance": [
         "Verifier ties verification steps to audit rows.",
+        "Verifier records a strong verification class or blocker."
+      ],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-taskmodal-open-while-tasks-loading",
+      "type": "worker",
+      "model": "composer-2-fast",
+      "dependsOn": ["bootstrap-btn-clicks-ref"],
+      "scopedGoal": "Fix perceived dead clicks on task-open flows where `editingTaskId` is set in the URL but `TaskModal` stays closed until after a full refresh because board `tasks` are still `undefined` (`open` currently requires both `editingTaskId` and `editingTask`). Show a loading modal (or equivalent AntD-safe placeholder) whenever `editingTaskId` is a real id and tasks are still loading; preserve existing stale-ID cleanup once tasks resolve to a concrete array without a matching task.",
+      "brief": "Read `BUTTON-CLICK-AUDIT.md` refresh/modal notes and `AGENTS.md` TaskModal guidance.\n\n## Implementation\n- Adjust `TaskModal` `open` logic so users see feedback while `tasks === undefined` and `editingTaskId` is set (non-placeholder).\n- Guard form/footer destructive actions until `editingTask` exists.\n- Do **not** coerce board page `tasks` to `[]` — fix stays inside TaskModal (and tests).\n\n## Tests\n- Extend `src/components/taskModal/index.test.tsx` (or strict sibling) to cover: URL has `editingTaskId`, tasks query unresolved → modal visible with loading UI; tasks resolve with match → full form; stale id after resolve → URL cleared per existing behavior.",
+      "pathsAllowed": [
+        "src/components/taskModal/**",
+        "src/utils/hooks/useTaskModal.ts",
+        "src/utils/hooks/useUrl.ts",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/pages/board.tsx",
+        "src/components/column/**",
+        "src/components/dragAndDrop/**",
+        "src/components/projectCard/**",
+        "backend/**"
+      ],
+      "acceptance": [
+        "Modal opens with loading treatment when `editingTaskId` is present during `tasks === undefined`.",
+        "No regression on stale deep-link clearing after tasks load.",
+        "Jest + eslint + tsc clean for touched paths."
+      ],
+      "verify": "## Setup\n- `npm install` if needed.\n\n## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/taskModal`\n- `npm run eslint -- --max-warnings 0` on touched files\n- `npx tsc --noEmit`\n\n## Manual\n- Optional dev: throttle network or simulate slow tasks query — click task card; modal shell should appear immediately.\n\n## Gotchas\n- Keep optimistic-placeholder id handling unchanged.",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-taskmodal-open-while-tasks-loading",
+      "type": "verifier",
+      "model": "composer-2-fast",
+      "verifies": "fix-taskmodal-open-while-tasks-loading",
+      "dependsOn": ["fix-taskmodal-open-while-tasks-loading"],
+      "scopedGoal": "Independently verify TaskModal loading-open behavior and stale-ID semantics against acceptance criteria.",
+      "brief": "Re-run worker verify recipe. Read relevant test cases. Emit `unit-test-verified` or a precise blocker.",
+      "acceptance": [
+        "Verifier confirms loading-open path is covered by tests.",
         "Verifier records a strong verification class or blocker."
       ],
       "maxAttempts": 2
