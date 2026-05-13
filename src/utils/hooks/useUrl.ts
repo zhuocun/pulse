@@ -1,99 +1,105 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { URLSearchParamsInit, useSearchParams } from "react-router-dom";
 
 import filterRequest from "../filterRequest";
 
 /**
- * URL-as-state hook. Returns the current value of the requested keys and a
- * setter that writes them back to the location search string.
+ * URL-as-state hook used by every modal/drawer/page-filter.
  *
- * History — re-render binding on iOS Safari:
- * Modals/drawers that derive `open` purely from `useSearchParams()` were
- * intermittently failing to react to URL changes on iOS Safari WebKit. The
- * click reached `setSearchParams` (the URL did update — refreshing the page
- * showed the modal), but the consuming component never re-rendered with the
- * new search value, so the modal never opened and, once open via refresh,
- * could not be closed. To make UI flip in the same React render as the
- * click, we now keep a local React-state mirror of the keys we read:
+ * Why this design — cross-instance propagation:
  *
- *   - `setUrlParams` updates local state immediately (state is what the
- *     consumer reads — React's setState always re-renders, regardless of
- *     how `useSearchParams` propagates), and writes the URL as a side
- *     effect for deep-linking / back-button parity.
- *   - When the URL changes from outside the hook (browser back/forward,
- *     external `navigate`, refresh), an effect reconciles local state to
- *     match. A ref guard prevents the reconcile from firing for changes the
- *     hook itself just wrote.
+ * Several overlays in the app are mounted in a different React subtree
+ * from the button that opens them (e.g. the Create-project button lives
+ * in `ProjectPage`, but `ProjectModal` is mounted up in `MainLayout`).
+ * Each calls `useUrl` and that produces two independent hook instances
+ * over the same URL state. On iOS Safari WebKit the second instance was
+ * failing to observe writes made by the first — the address bar updated
+ * (refreshing brought the modal up), but the in-process modal never
+ * reacted. Same shape for the project-card `<Link>` → board navigation
+ * and the X-to-close case.
  *
- * Net effect: open/close are synchronous on tap; deep links and back-button
- * navigation still work.
+ * `useSearchParams()`' subscription path is the moving piece that fails
+ * on the affected device. To stay independent of it, every `useUrl`
+ * subscribes to a module-level pub/sub: a write by any instance calls
+ * `notify()`, which forces every other instance to re-render and re-read
+ * the URL from `window.location.search` — the ground truth that
+ * `history.pushState` updates synchronously inside `setSearchParams`.
+ *
+ * `useSearchParams` is still used for two things:
+ *   1. Writes go through its setter, so React Router stays authoritative
+ *      for the browser history (back/forward, view-transitions, etc.).
+ *   2. Reads fall back to it when `window.location.search` is empty —
+ *      that is, when the test harness uses `MemoryRouter`, which keeps
+ *      its state in memory rather than touching `window.location`.
+ *
+ * A `popstate` listener picks up navigations that originate outside the
+ * hook (browser back/forward, native iOS swipe-back).
  */
+const listeners = new Set<() => void>();
+
+const subscribe = (callback: () => void): (() => void) => {
+    listeners.add(callback);
+    return () => {
+        listeners.delete(callback);
+    };
+};
+
+const notify = (): void => {
+    for (const l of listeners) l();
+};
+
+if (typeof window !== "undefined") {
+    window.addEventListener("popstate", notify);
+}
+
 const useUrl = <K extends string>(keys: K[]) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [stateKeys] = useState(keys);
 
-    const urlDerived = useMemo(
-        () =>
-            stateKeys.reduce(
-                (prev, key) => {
-                    return { ...prev, [key]: searchParams.get(key) };
-                },
-                {} as { [key in K]: string | null }
-            ),
-        [searchParams, stateKeys]
-    );
+    const [tick, forceUpdate] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => subscribe(forceUpdate), []);
 
-    const [localState, setLocalState] = useState(urlDerived);
     /*
-     * Tracks the URL→state snapshot we have already absorbed, so the
-     * reconcile effect can tell "URL changed because the hook just wrote it"
-     * (no-op) from "URL changed because of an external navigation" (sync
-     * state). Stringify is fine — keys are a small known set.
+     * `tick` is intentionally a dep below: pub/sub-triggered re-renders
+     * need to re-read `window.location.search`, and without `tick` in
+     * the dep list `useMemo` would skip recomputation when the
+     * `searchParams` reference happens to be stable across renders
+     * (which is the failure mode on the affected device).
      */
-    const lastUrlJsonRef = useRef(JSON.stringify(urlDerived));
-
-    useEffect(() => {
-        const nextJson = JSON.stringify(urlDerived);
-        if (nextJson !== lastUrlJsonRef.current) {
-            lastUrlJsonRef.current = nextJson;
-            setLocalState(urlDerived);
-        }
-    }, [urlDerived]);
+    void tick;
+    const params = useMemo(() => {
+        const winSearch =
+            typeof window !== "undefined" ? window.location.search : "";
+        const sp = winSearch ? new URLSearchParams(winSearch) : searchParams;
+        return stateKeys.reduce(
+            (prev, key) => {
+                return { ...prev, [key]: sp.get(key) };
+            },
+            {} as { [key in K]: string | null }
+        );
+    }, [searchParams, stateKeys, tick]);
 
     const setUrlParams = useCallback(
-        (params: Partial<{ [key in K]: unknown }>) => {
-            setLocalState((prev) => {
-                const next = { ...prev };
-                for (const [k, v] of Object.entries(params)) {
-                    const value =
-                        v === undefined || v === null || v === ""
-                            ? null
-                            : String(v);
-                    (next as Record<string, string | null>)[k] = value;
-                }
-                /*
-                 * Pre-record the snapshot we are about to write to the URL so
-                 * the reconcile effect can treat the subsequent
-                 * `useSearchParams` update as a no-op (we already have the
-                 * value locally). Without this guard, the effect would race
-                 * the `setSearchParams` write and could overwrite an
-                 * in-flight `setLocalState` with stale URL data.
-                 */
-                lastUrlJsonRef.current = JSON.stringify(next);
-                return next;
-            });
+        (next: Partial<{ [key in K]: unknown }>) => {
             setSearchParams((prev) => {
                 const obj = filterRequest({
                     ...Object.fromEntries(prev.entries()),
-                    ...params
+                    ...next
                 }) as URLSearchParamsInit;
                 return obj;
             });
+            /*
+             * `setSearchParams` calls `history.pushState` synchronously,
+             * which updates `window.location.search`. Queue notify on a
+             * microtask so subscribers re-read after the URL write, not
+             * before.
+             */
+            queueMicrotask(notify);
         },
         [setSearchParams]
     );
 
-    return [localState, setUrlParams] as const;
+    return [params, setUrlParams] as const;
 };
 
 export default useUrl;
