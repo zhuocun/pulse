@@ -6,6 +6,7 @@ import {
     message,
     Modal,
     Select,
+    Spin,
     Tag,
     Typography
 } from "antd";
@@ -86,6 +87,17 @@ const TaskModal: React.FC<{
         () => {}
     );
     const editingTask = tasks?.find((task) => task._id === editingTaskId);
+    const tasksStillLoading = tasks === undefined;
+    const placeholderId = Boolean(
+        editingTaskId && isOptimisticPlaceholderId(editingTaskId)
+    );
+    const modalOpen =
+        Boolean(editingTaskId) &&
+        (placeholderId
+            ? Boolean(editingTask)
+            : tasksStillLoading || Boolean(editingTask));
+    const awaitingTaskResolution =
+        Boolean(editingTaskId) && !placeholderId && tasksStillLoading;
     const { data: membersData } = useMembersList();
     const members = membersData ?? [];
 
@@ -126,6 +138,9 @@ const TaskModal: React.FC<{
     );
 
     const onOk = async () => {
+        if (!editingTask) {
+            return;
+        }
         try {
             await form.validateFields();
         } catch {
@@ -160,7 +175,10 @@ const TaskModal: React.FC<{
     };
 
     const onDelete = () => {
-        const taskName = editingTask?.taskName;
+        if (!editingTask) {
+            return;
+        }
+        const taskName = editingTask.taskName;
         const taskId = editingTaskId;
         Modal.confirm({
             centered: true,
@@ -179,12 +197,10 @@ const TaskModal: React.FC<{
                         },
                         onError: () =>
                             message.error(
-                                taskName
-                                    ? microcopy.feedback.couldntDeleteTask.replace(
-                                          "{name}",
-                                          taskName
-                                      )
-                                    : microcopy.feedback.saveFailed
+                                microcopy.feedback.couldntDeleteTask.replace(
+                                    "{name}",
+                                    taskName
+                                )
                             )
                     }
                 );
@@ -193,6 +209,9 @@ const TaskModal: React.FC<{
     };
 
     useEffect(() => {
+        if (!editingTask) {
+            return;
+        }
         form.setFieldsValue(editingTask);
     }, [form, editingTask]);
 
@@ -275,7 +294,11 @@ const TaskModal: React.FC<{
             centered
             forceRender
             okText={microcopy.actions.save}
-            okButtonProps={{ size: "large", block: !screens.sm }}
+            okButtonProps={{
+                disabled: !editingTask || uLoading,
+                size: "large",
+                block: !screens.sm
+            }}
             cancelButtonProps={{ size: "large", block: !screens.sm }}
             onOk={onOk}
             cancelText={microcopy.actions.cancel}
@@ -352,7 +375,7 @@ const TaskModal: React.FC<{
                 );
             }}
             title={titleNode}
-            open={Boolean(editingTaskId && editingTask)}
+            open={modalOpen}
             styles={{
                 body: {
                     /*
@@ -374,162 +397,198 @@ const TaskModal: React.FC<{
             }}
             width={modalWidthCss(640)}
         >
-            <ErrorBox error={saveError} />
-            <Form
-                form={form}
-                initialValues={editingTask}
-                layout="vertical"
-                onValuesChange={(changedValues) => {
-                    setFormTick((tick) => tick + 1);
-                    if (saveError) setSaveError(null);
-                    clearOriginOnManualEdits(changedValues);
-                }}
-            >
-                <Form.Item
-                    label={microcopy.fields.taskName}
-                    name="taskName"
-                    required
-                    rules={[
-                        {
-                            required: true,
-                            whitespace: true,
-                            message: microcopy.validation.taskNameRequired
-                        }
-                    ]}
-                >
-                    <Input
-                        autoComplete="off"
-                        enterKeyHint="next"
-                        inputMode="text"
-                    />
-                </Form.Item>
-                <Form.Item
-                    label={microcopy.fields.coordinator}
-                    name="coordinatorId"
-                    required
-                    rules={[
-                        {
-                            required: true,
-                            message: microcopy.validation.coordinatorRequired
-                        }
-                    ]}
-                >
-                    <Select
-                        options={members.map((member) => ({
-                            label: member.username,
-                            value: member._id
-                        }))}
-                        placeholder={`Select a ${microcopy.fields.coordinator.toLowerCase()}`}
-                    />
-                </Form.Item>
-                <Form.Item
-                    label={microcopy.fields.type}
-                    name="type"
-                    required
-                    rules={[
-                        {
-                            required: true,
-                            message: microcopy.validation.taskTypeRequired
-                        }
-                    ]}
-                >
-                    <Select
-                        options={TASK_TYPE_OPTIONS}
-                        placeholder={`Select a ${microcopy.fields.type.toLowerCase()}`}
-                    />
-                </Form.Item>
-                <Form.Item label={microcopy.fields.epic} name="epic">
-                    <Input
-                        autoComplete="off"
-                        enterKeyHint="next"
-                        inputMode="text"
-                    />
-                </Form.Item>
-                <Form.Item
-                    label={
-                        <span
-                            style={{
-                                alignItems: "center",
-                                display: "inline-flex",
-                                gap: space.xs
-                            }}
+            <div style={{ position: "relative", width: "100%" }}>
+                {awaitingTaskResolution ? (
+                    <div
+                        style={{
+                            alignItems: "center",
+                            display: "flex",
+                            justifyContent: "center",
+                            marginBlock: space.xxl,
+                            minHeight: space.xxl * 3,
+                            width: "100%"
+                        }}
+                    >
+                        <Spin
+                            aria-label={microcopy.a11y.loadingBoard}
+                            size="large"
+                        />
+                    </div>
+                ) : null}
+                <div hidden={awaitingTaskResolution}>
+                    <ErrorBox error={saveError} />
+                    <Form
+                        form={form}
+                        initialValues={editingTask}
+                        layout="vertical"
+                        onValuesChange={(changedValues) => {
+                            setFormTick((tick) => tick + 1);
+                            if (saveError) setSaveError(null);
+                            clearOriginOnManualEdits(changedValues);
+                        }}
+                    >
+                        <Form.Item
+                            label={microcopy.fields.taskName}
+                            name="taskName"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    whitespace: true,
+                                    message:
+                                        microcopy.validation.taskNameRequired
+                                }
+                            ]}
                         >
-                            {microcopy.fields.storyPoints}
-                            {appliedFieldOrigin.storyPoints === "copilot" ? (
-                                <Tag
-                                    color="purple"
-                                    style={{ marginInlineEnd: 0 }}
+                            <Input
+                                autoComplete="off"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.coordinator}
+                            name="coordinatorId"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    message:
+                                        microcopy.validation.coordinatorRequired
+                                }
+                            ]}
+                        >
+                            <Select
+                                options={members.map((member) => ({
+                                    label: member.username,
+                                    value: member._id
+                                }))}
+                                placeholder={`Select a ${microcopy.fields.coordinator.toLowerCase()}`}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.type}
+                            name="type"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    message:
+                                        microcopy.validation.taskTypeRequired
+                                }
+                            ]}
+                        >
+                            <Select
+                                options={TASK_TYPE_OPTIONS}
+                                placeholder={`Select a ${microcopy.fields.type.toLowerCase()}`}
+                            />
+                        </Form.Item>
+                        <Form.Item label={microcopy.fields.epic} name="epic">
+                            <Input
+                                autoComplete="off"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={
+                                <span
+                                    style={{
+                                        alignItems: "center",
+                                        display: "inline-flex",
+                                        gap: space.xs
+                                    }}
                                 >
-                                    {microcopy.ai.suggestedByCopilot}
-                                </Tag>
-                            ) : null}
-                        </span>
-                    }
-                    name="storyPoints"
-                >
-                    <Select
-                        onChange={() => {
-                            setAppliedFieldOrigin((prev) => {
-                                if (!prev.storyPoints) return prev;
-                                const next = { ...prev };
-                                delete next.storyPoints;
-                                return next;
-                            });
-                        }}
-                        options={STORY_POINT_OPTIONS}
-                        placeholder={`Select ${microcopy.fields.storyPoints.toLowerCase()}`}
-                    />
-                </Form.Item>
-                <Form.Item label={microcopy.fields.notes} name="note">
-                    <Input.TextArea
-                        autoComplete="off"
-                        enterKeyHint="done"
-                        inputMode="text"
-                        placeholder={
-                            microcopy.placeholders.notesAcceptanceCriteria
-                        }
-                        rows={4}
-                    />
-                </Form.Item>
-            </Form>
-            {aiEnabled &&
-                boardAiOn &&
-                editingTaskId &&
-                !isOptimisticPlaceholderId(editingTaskId) && (
-                    <AiTaskAssistPanel
-                        excludeTaskId={editingTaskId}
-                        onApplyStoryPoints={(value) => {
-                            markFieldAsCopilotApplied("storyPoints");
-                            form.setFieldsValue({ storyPoints: value });
-                            setFormTick((tick) => tick + 1);
-                        }}
-                        onApplySuggestion={(field, suggestion, options) => {
-                            if (
-                                !options?.replace &&
-                                suggestion !== undefined &&
-                                isTaskModalField(field)
-                            ) {
-                                markFieldAsCopilotApplied(field);
+                                    {microcopy.fields.storyPoints}
+                                    {appliedFieldOrigin.storyPoints ===
+                                    "copilot" ? (
+                                        <Tag
+                                            color="purple"
+                                            style={{ marginInlineEnd: 0 }}
+                                        >
+                                            {microcopy.ai.suggestedByCopilot}
+                                        </Tag>
+                                    ) : null}
+                                </span>
                             }
-                            const current = form.getFieldValue(field) ?? "";
-                            if (options?.replace) {
-                                form.setFieldValue(field, suggestion);
-                            } else if (suggestion === undefined) {
-                                return;
-                            } else if (field === "note") {
-                                const appended = `${current}${
-                                    current ? "\n\n" : ""
-                                }## Acceptance criteria\n- ${suggestion}`;
-                                form.setFieldsValue({ note: appended });
-                            } else {
-                                form.setFieldsValue({ [field]: suggestion });
-                            }
-                            setFormTick((tick) => tick + 1);
-                        }}
-                        onOpenSimilarTask={(taskId) => startEditing(taskId)}
-                        values={liveValues}
-                    />
-                )}
+                            name="storyPoints"
+                        >
+                            <Select
+                                onChange={() => {
+                                    setAppliedFieldOrigin((prev) => {
+                                        if (!prev.storyPoints) return prev;
+                                        const next = { ...prev };
+                                        delete next.storyPoints;
+                                        return next;
+                                    });
+                                }}
+                                options={STORY_POINT_OPTIONS}
+                                placeholder={`Select ${microcopy.fields.storyPoints.toLowerCase()}`}
+                            />
+                        </Form.Item>
+                        <Form.Item label={microcopy.fields.notes} name="note">
+                            <Input.TextArea
+                                autoComplete="off"
+                                enterKeyHint="done"
+                                inputMode="text"
+                                placeholder={
+                                    microcopy.placeholders
+                                        .notesAcceptanceCriteria
+                                }
+                                rows={4}
+                            />
+                        </Form.Item>
+                    </Form>
+                    {aiEnabled &&
+                        boardAiOn &&
+                        editingTask &&
+                        editingTaskId &&
+                        !isOptimisticPlaceholderId(editingTaskId) && (
+                            <AiTaskAssistPanel
+                                excludeTaskId={editingTaskId}
+                                onApplyStoryPoints={(value) => {
+                                    markFieldAsCopilotApplied("storyPoints");
+                                    form.setFieldsValue({ storyPoints: value });
+                                    setFormTick((tick) => tick + 1);
+                                }}
+                                onApplySuggestion={(
+                                    field,
+                                    suggestion,
+                                    options
+                                ) => {
+                                    if (
+                                        !options?.replace &&
+                                        suggestion !== undefined &&
+                                        isTaskModalField(field)
+                                    ) {
+                                        markFieldAsCopilotApplied(field);
+                                    }
+                                    const current =
+                                        form.getFieldValue(field) ?? "";
+                                    if (options?.replace) {
+                                        form.setFieldValue(field, suggestion);
+                                    } else if (suggestion === undefined) {
+                                        return;
+                                    } else if (field === "note") {
+                                        const appended = `${current}${
+                                            current ? "\n\n" : ""
+                                        }## Acceptance criteria\n- ${suggestion}`;
+                                        form.setFieldsValue({ note: appended });
+                                    } else {
+                                        form.setFieldsValue({
+                                            [field]: suggestion
+                                        });
+                                    }
+                                    setFormTick((tick) => tick + 1);
+                                }}
+                                onOpenSimilarTask={(taskId) =>
+                                    startEditing(taskId)
+                                }
+                                values={liveValues}
+                            />
+                        )}
+                </div>
+            </div>
         </Modal>
     );
 };

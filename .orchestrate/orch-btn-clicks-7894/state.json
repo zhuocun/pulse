@@ -166,6 +166,54 @@
       "prNumber": null,
       "failureMode": null,
       "verification": null
+    },
+    {
+      "name": "fix-taskmodal-open-while-tasks-loading",
+      "type": "worker",
+      "branch": "orch/orch-btn-clicks-7894/fix-taskmodal-open-while-tasks-loading",
+      "startingRef": "main",
+      "dependsOn": [
+        "bootstrap-btn-clicks-ref"
+      ],
+      "agentId": "bc-c016827a-ea25-43e4-99f5-87cfa6d88487",
+      "runId": "run-7457b999-2ea9-4292-9d13-95e4fd9f378f",
+      "parentAgentId": "bc-df684a60-c826-4186-8c74-6169fe7e39f2",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-taskmodal-open-while-tasks-loading.md",
+      "startedAt": "2026-05-13T03:06:35.395Z",
+      "finishedAt": "2026-05-13T03:12:06.032Z",
+      "lastUpdate": "2026-05-13T03:13:54.999Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": 219,
+      "failureMode": null,
+      "verification": "unit-test-verified"
+    },
+    {
+      "name": "verify-fix-taskmodal-open-while-tasks-loading",
+      "type": "verifier",
+      "branch": "`orch/orch-btn-clicks-7894/fix-taskmodal-open-while-tasks-loading` (no verifier commits; working tree clean)",
+      "startingRef": "orch/orch-btn-clicks-7894/fix-taskmodal-open-while-tasks-loading",
+      "dependsOn": [
+        "fix-taskmodal-open-while-tasks-loading"
+      ],
+      "agentId": "bc-e89b1753-aa17-4836-ae1a-5c4782fc1c7c",
+      "runId": "run-3e1f538d-e217-42bd-996d-6e7458f85c49",
+      "parentAgentId": "bc-df684a60-c826-4186-8c74-6169fe7e39f2",
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-taskmodal-open-while-tasks-loading.md",
+      "startedAt": "2026-05-13T03:12:08.114Z",
+      "finishedAt": "2026-05-13T03:13:53.969Z",
+      "lastUpdate": "2026-05-13T03:13:53.969Z",
+      "note": null,
+      "attempts": 1,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
     }
   ],
   "attention": [
@@ -180,6 +228,10 @@
     {
       "at": "2026-05-12T14:56:10.897Z",
       "message": "fix-dnd-interactive-clicks: verification recorded (unit-test-verified) by verifier verify-fix-dnd-interactive-clicks"
+    },
+    {
+      "at": "2026-05-13T03:13:55.000Z",
+      "message": "fix-taskmodal-open-while-tasks-loading: verification recorded (unit-test-verified) by verifier verify-fix-taskmodal-open-while-tasks-loading"
     }
   ]
 }
