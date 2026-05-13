@@ -183,13 +183,13 @@
       "handoffPath": "handoffs/fix-taskmodal-open-while-tasks-loading.md",
       "startedAt": "2026-05-13T03:06:35.395Z",
       "finishedAt": "2026-05-13T03:12:06.032Z",
-      "lastUpdate": "2026-05-13T03:12:06.032Z",
+      "lastUpdate": "2026-05-13T03:13:54.999Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 219,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-taskmodal-open-while-tasks-loading",
@@ -209,11 +209,11 @@
       "finishedAt": "2026-05-13T03:13:53.969Z",
       "lastUpdate": "2026-05-13T03:13:53.969Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     }
   ],
   "attention": [
@@ -228,6 +228,10 @@
     {
       "at": "2026-05-12T14:56:10.897Z",
       "message": "fix-dnd-interactive-clicks: verification recorded (unit-test-verified) by verifier verify-fix-dnd-interactive-clicks"
+    },
+    {
+      "at": "2026-05-13T03:13:55.000Z",
+      "message": "fix-taskmodal-open-while-tasks-loading: verification recorded (unit-test-verified) by verifier verify-fix-taskmodal-open-while-tasks-loading"
     }
   ]
 }
