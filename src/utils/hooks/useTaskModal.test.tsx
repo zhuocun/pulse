@@ -1,16 +1,18 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { MemoryRouter } from "react-router-dom";
+
+import { store } from "../../store";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
 import useTaskModal from "./useTaskModal";
 
 const TaskModalProbe = () => {
     const { closeModal, editingTaskId, startEditing } = useTaskModal();
-    const location = useLocation();
 
     return (
         <div>
             <span data-testid="editingTaskId">{editingTaskId ?? "null"}</span>
-            <span data-testid="search">{location.search}</span>
             <button type="button" onClick={() => startEditing("task-2")}>
                 edit
             </button>
@@ -21,41 +23,48 @@ const TaskModalProbe = () => {
     );
 };
 
-const renderTaskModalProbe = (route: string) =>
+const renderTaskModalProbe = () =>
     render(
-        <MemoryRouter initialEntries={[route]}>
-            <TaskModalProbe />
-        </MemoryRouter>
+        <Provider store={store}>
+            <MemoryRouter>
+                <TaskModalProbe />
+            </MemoryRouter>
+        </Provider>
     );
 
-describe("useTaskModal", () => {
-    it("reads the editing task id from the URL", () => {
-        renderTaskModalProbe("/projects/p1/board?editingTaskId=task-1");
+describe("useTaskModal (Redux-only)", () => {
+    beforeEach(() => {
+        store.dispatch(overlaysActions.closeTaskModal());
+    });
 
+    afterEach(() => {
+        store.dispatch(overlaysActions.closeTaskModal());
+    });
+
+    it("reads the editing task id from Redux", () => {
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
+        renderTaskModalProbe();
         expect(screen.getByTestId("editingTaskId")).toHaveTextContent("task-1");
     });
 
-    it("writes and removes the editing task id", async () => {
-        renderTaskModalProbe("/projects/p1/board");
+    it("flips the editing task id synchronously on startEditing", () => {
+        renderTaskModalProbe();
+
+        expect(screen.getByTestId("editingTaskId")).toHaveTextContent("null");
 
         fireEvent.click(screen.getByRole("button", { name: "edit" }));
 
-        await waitFor(() =>
-            expect(screen.getByTestId("editingTaskId")).toHaveTextContent(
-                "task-2"
-            )
-        );
-        expect(screen.getByTestId("search")).toHaveTextContent(
-            "?editingTaskId=task-2"
-        );
+        expect(screen.getByTestId("editingTaskId")).toHaveTextContent("task-2");
+        expect(store.getState().overlays.editingTaskId).toBe("task-2");
+    });
+
+    it("clears the editing task id on close", () => {
+        store.dispatch(overlaysActions.startEditingTask("task-2"));
+        renderTaskModalProbe();
 
         fireEvent.click(screen.getByRole("button", { name: "close" }));
 
-        await waitFor(() =>
-            expect(screen.getByTestId("editingTaskId")).toHaveTextContent(
-                "null"
-            )
-        );
-        expect(screen.getByTestId("search")).toHaveTextContent("");
+        expect(screen.getByTestId("editingTaskId")).toHaveTextContent("null");
+        expect(store.getState().overlays.editingTaskId).toBe(null);
     });
 });

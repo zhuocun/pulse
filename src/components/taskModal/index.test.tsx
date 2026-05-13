@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { Modal } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+
+import { store } from "../../store";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
 import TaskModal from ".";
 
@@ -99,10 +103,16 @@ const renderModal = (
         initialTasks?: ITask[] | undefined;
         route?: string;
         boardAiOn?: boolean;
+        /**
+         * Task id to seed `overlaysSlice.editingTaskId` with before render.
+         * Replaces the previous `?editingTaskId=…` URL bootstrap now that
+         * the modal is Redux-driven. Pass `null` to render with the modal
+         * closed.
+         */
+        editingTaskId?: string | null;
     } = {}
 ) => {
-    const route =
-        options.route ?? "/projects/project-1/board?editingTaskId=task-1";
+    const route = options.route ?? "/projects/project-1/board";
     const boardAiOn =
         Object.prototype.hasOwnProperty.call(options, "boardAiOn") &&
         options.boardAiOn === false
@@ -114,6 +124,13 @@ const renderModal = (
     )
         ? options.initialTasks
         : tasks;
+    const editingTaskId =
+        options.editingTaskId === undefined ? "task-1" : options.editingTaskId;
+    if (editingTaskId) {
+        store.dispatch(overlaysActions.startEditingTask(editingTaskId));
+    } else {
+        store.dispatch(overlaysActions.closeTaskModal());
+    }
     const queryClient = new QueryClient({
         defaultOptions: {
             mutations: { retry: false },
@@ -123,24 +140,26 @@ const renderModal = (
     queryClient.setQueryData(["users/members"], members);
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={[route]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <>
-                                <TaskModal
-                                    boardAiOn={boardAiOn}
-                                    tasks={initialTasks}
-                                />
-                                <LocationProbe />
-                            </>
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[route]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <>
+                                    <TaskModal
+                                        boardAiOn={boardAiOn}
+                                        tasks={initialTasks}
+                                    />
+                                    <LocationProbe />
+                                </>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
@@ -219,7 +238,7 @@ describe("TaskModal", () => {
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
         await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("")
+            expect(store.getState().overlays.editingTaskId).toBe(null)
         );
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -247,7 +266,7 @@ describe("TaskModal", () => {
             })
         );
         await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("")
+            expect(store.getState().overlays.editingTaskId).toBe(null)
         );
     });
 
@@ -269,9 +288,7 @@ describe("TaskModal", () => {
                 screen.getByText(/save failed on server/i)
             ).toBeInTheDocument()
         );
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=task-1"
-        );
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
     });
 
     it("resets and clears the URL when cancelled", async () => {
@@ -283,7 +300,7 @@ describe("TaskModal", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("")
+            expect(store.getState().overlays.editingTaskId).toBe(null)
         );
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -322,7 +339,7 @@ describe("TaskModal", () => {
                 expect.objectContaining({ method: "DELETE" })
             );
             await waitFor(() =>
-                expect(screen.getByTestId("location")).toHaveTextContent("")
+                expect(store.getState().overlays.editingTaskId).toBe(null)
             );
         } finally {
             confirmSpy.mockRestore();
@@ -350,9 +367,7 @@ describe("TaskModal", () => {
 
             expect(confirmSpy).toHaveBeenCalled();
             expect(fetchMock).not.toHaveBeenCalled();
-            expect(screen.getByTestId("location")).toHaveTextContent(
-                "editingTaskId=task-1"
-            );
+            expect(store.getState().overlays.editingTaskId).toBe("task-1");
             expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
         } finally {
             confirmSpy.mockRestore();
@@ -383,9 +398,7 @@ describe("TaskModal", () => {
             );
 
             await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-            expect(screen.getByTestId("location")).toHaveTextContent(
-                "editingTaskId=task-1"
-            );
+            expect(store.getState().overlays.editingTaskId).toBe("task-1");
         } finally {
             confirmSpy.mockRestore();
         }
@@ -410,7 +423,8 @@ describe("TaskModal", () => {
                 }),
                 task({ _id: "task-2" })
             ],
-            route: "/projects/project-1/board?editingTaskId=mock"
+            editingTaskId: "mock",
+            route: "/projects/project-1/board"
         });
 
         expect(
@@ -424,11 +438,12 @@ describe("TaskModal", () => {
     it("clears a stale editingTaskId after tasks finish loading without a match", async () => {
         renderModal({
             initialTasks: [],
-            route: "/projects/project-1/board?editingTaskId=missing-task"
+            editingTaskId: "missing-task",
+            route: "/projects/project-1/board"
         });
 
         await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("")
+            expect(store.getState().overlays.editingTaskId).toBe(null)
         );
         expect(
             screen.queryByDisplayValue("Build task")
@@ -443,28 +458,31 @@ describe("TaskModal", () => {
             }
         });
         queryClient.setQueryData(["users/members"], members);
-        const route = "/projects/project-1/board?editingTaskId=task-1";
+        const route = "/projects/project-1/board";
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
 
         function Harness({ taskList }: { taskList: ITask[] | undefined }) {
             return (
-                <QueryClientProvider client={queryClient}>
-                    <MemoryRouter initialEntries={[route]}>
-                        <Routes>
-                            <Route
-                                path="/projects/:projectId/board"
-                                element={
-                                    <>
-                                        <TaskModal
-                                            boardAiOn={false}
-                                            tasks={taskList}
-                                        />
-                                        <LocationProbe />
-                                    </>
-                                }
-                            />
-                        </Routes>
-                    </MemoryRouter>
-                </QueryClientProvider>
+                <Provider store={store}>
+                    <QueryClientProvider client={queryClient}>
+                        <MemoryRouter initialEntries={[route]}>
+                            <Routes>
+                                <Route
+                                    path="/projects/:projectId/board"
+                                    element={
+                                        <>
+                                            <TaskModal
+                                                boardAiOn={false}
+                                                tasks={taskList}
+                                            />
+                                            <LocationProbe />
+                                        </>
+                                    }
+                                />
+                            </Routes>
+                        </MemoryRouter>
+                    </QueryClientProvider>
+                </Provider>
             );
         }
 
@@ -490,29 +508,24 @@ describe("TaskModal", () => {
         expect(
             screen.getByRole("button", { name: /^save$/i })
         ).not.toBeDisabled();
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=task-1"
-        );
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
     });
 
     it("does not open the modal for optimistic placeholder ids while tasks are still loading", () => {
         renderModal({
             initialTasks: undefined,
-            route: "/projects/project-1/board?editingTaskId=mock"
+            editingTaskId: "mock",
+            route: "/projects/project-1/board"
         });
 
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=mock"
-        );
+        expect(store.getState().overlays.editingTaskId).toBe("mock");
     });
 
     it("disables delete when the task list is unavailable", async () => {
         renderModal({ initialTasks: undefined });
 
-        expect(screen.getByTestId("location")).toHaveTextContent(
-            "editingTaskId=task-1"
-        );
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
         expect(await screen.findByRole("dialog")).toBeInTheDocument();
         expect(screen.getByLabelText(/loading board/i)).toBeInTheDocument();
         expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();

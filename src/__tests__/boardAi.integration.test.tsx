@@ -3,6 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "../App";
+import { store } from "../store";
+import { overlaysActions } from "../store/reducers/overlaysSlice";
+import { projectActions } from "../store/reducers/projectModalSlice";
 import AppProviders from "../utils/appProviders";
 
 // Lazy route loading + multi-step navigation chains (login → projects →
@@ -166,6 +169,11 @@ describe("Board AI integration (App + local engine)", () => {
         fetchMock.mockReset();
         localStorage.clear();
         window.history.pushState({}, "Reset", "/");
+        store.dispatch(overlaysActions.closeChatDrawer());
+        store.dispatch(overlaysActions.closeBoardBrief());
+        store.dispatch(overlaysActions.closeTaskModal());
+        store.dispatch(overlaysActions.closeAiDraft());
+        store.dispatch(projectActions.closeModal());
     });
 
     const setupAuthenticatedMocks = () => {

@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+
+import { store } from "../../store";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
 jest.mock("../aiTaskAssistPanel", () => ({
     __esModule: true,
@@ -104,27 +108,28 @@ describe("TaskModal onOpenSimilarTask", () => {
             }
         });
         queryClient.setQueryData(["users/members"], [member()]);
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter
-                    initialEntries={[
-                        "/projects/project-1/board?editingTaskId=task-1"
-                    ]}
-                >
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <>
-                                    <TaskModal tasks={tasks} />
-                                    <LocationProbe />
-                                </>
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter
+                        initialEntries={["/projects/project-1/board"]}
+                    >
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <>
+                                        <TaskModal tasks={tasks} />
+                                        <LocationProbe />
+                                    </>
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         expect(
@@ -133,9 +138,7 @@ describe("TaskModal onOpenSimilarTask", () => {
         fireEvent.click(screen.getByText("Open similar (test stub)"));
 
         await waitFor(() => {
-            expect(screen.getByTestId("location")).toHaveTextContent(
-                "editingTaskId=task-2"
-            );
+            expect(store.getState().overlays.editingTaskId).toBe("task-2");
         });
     });
 });

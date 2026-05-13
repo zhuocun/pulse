@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 
+import { overlaysSlice } from "./reducers/overlaysSlice";
 import { projectModalSlice } from "./reducers/projectModalSlice";
 
 export const rootReducer = {
-    projectModal: projectModalSlice.reducer
+    projectModal: projectModalSlice.reducer,
+    overlays: overlaysSlice.reducer
 };
 
 export const store = configureStore({

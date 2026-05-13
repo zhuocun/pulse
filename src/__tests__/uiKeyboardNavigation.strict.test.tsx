@@ -422,22 +422,24 @@ describe("UI quality :: Esc collapses inline editors", () => {
         });
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <TaskCreator
-                                    boardAiOn={false}
-                                    columnId="c1"
-                                    disabled={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <TaskCreator
+                                        boardAiOn={false}
+                                        columnId="c1"
+                                        disabled={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         fireEvent.click(screen.getByRole("button", { name: /^create task$/i }));

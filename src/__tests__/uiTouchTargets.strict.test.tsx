@@ -405,22 +405,24 @@ describe("UI quality :: TaskCreator create-task target", () => {
         });
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <TaskCreator
-                                    boardAiOn={false}
-                                    columnId="c1"
-                                    disabled={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <TaskCreator
+                                        boardAiOn={false}
+                                        columnId="c1"
+                                        disabled={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         const btn = screen.getByRole("button", { name: /^create task$/i });

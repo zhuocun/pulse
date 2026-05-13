@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { store } from "../store";
+import { overlaysActions } from "../store/reducers/overlaysSlice";
 import { projectActions } from "../store/reducers/projectModalSlice";
 
 import ProjectPage from "./project";
@@ -155,6 +156,10 @@ describe("ProjectPage", () => {
         jest.useRealTimers();
         localStorage.clear();
         store.dispatch(projectActions.closeModal());
+        store.dispatch(overlaysActions.closeChatDrawer());
+        store.dispatch(overlaysActions.closeBoardBrief());
+        store.dispatch(overlaysActions.closeTaskModal());
+        store.dispatch(overlaysActions.closeAiDraft());
         fetchMock.mockReset();
         fetchMock.mockImplementation((input) => {
             const url = String(input);
@@ -259,15 +264,13 @@ describe("ProjectPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("opens the project modal through URL state from the create button", async () => {
+    it("opens the project modal through Redux state from the create button", async () => {
         renderPage();
 
         expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
-        await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent("modal=on")
-        );
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
     });
 
     it("debounces project search URL params before refetching projects", async () => {
@@ -328,11 +331,11 @@ describe("ProjectPage", () => {
             );
         });
 
-        // After the event fires, the project page's handler sets the URL param
-        // `chat=1:...` via useAiChatDrawer, which makes `chatOpen` true and
-        // opens the AI drawer. Verify the URL reflects the open state.
+        // After the event fires, the project page's handler opens the AI
+        // drawer via `useAiChatDrawer`. The drawer is now Redux-driven; verify
+        // the slice flipped instead of inspecting the URL.
         await waitFor(() => {
-            expect(screen.getByTestId("location")).toHaveTextContent("chat=");
+            expect(store.getState().overlays.chatDrawer.open).toBe(true);
         });
     });
 });

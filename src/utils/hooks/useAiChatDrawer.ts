@@ -1,28 +1,42 @@
 import { useCallback } from "react";
 
-import useUrl from "./useUrl";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
+
+import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
- * URL-driven open/close state for the AI Chat drawer so the system back
- * button (iOS swipe-back, Android hardware back) dismisses the drawer
- * instead of exiting the page entirely — the same pattern used by
- * `useBoardBriefDrawer`, `useTaskModal`, and `useAiDraftModal`.
+ * Open/close state for the AI Chat drawer.
+ *
+ * Previously URL-driven (`?chat=1[:prompt]`); migrated to Redux for the
+ * same reason as the rest of the overlay family — see `useTaskModal` /
+ * `useProjectModal` for the iOS Safari WebKit symptom that drove the
+ * change.
  */
 const useAiChatDrawer = () => {
-    const [{ chat }, setUrl] = useUrl(["chat"]);
-    const open = chat === "1";
+    const dispatch = useReduxDispatch();
+    const open = useReduxSelector((s) => s.overlays.chatDrawer.open);
+    const pendingPrompt = useReduxSelector(
+        (s) => s.overlays.chatDrawer.pendingPrompt
+    );
     const openDrawer = useCallback(
         (initialPrompt?: string) => {
-            setUrl({ chat: initialPrompt ? `1:${initialPrompt}` : "1" });
+            dispatch(
+                overlaysActions.openChatDrawer(
+                    initialPrompt ? { pendingPrompt: initialPrompt } : undefined
+                )
+            );
         },
-        [setUrl]
+        [dispatch]
     );
     const closeDrawer = useCallback(() => {
-        setUrl({ chat: undefined });
-    }, [setUrl]);
-    const pendingPrompt =
-        chat && chat.startsWith("1:") ? chat.slice(2) : undefined;
-    return { open, openDrawer, closeDrawer, pendingPrompt };
+        dispatch(overlaysActions.closeChatDrawer());
+    }, [dispatch]);
+    return {
+        open,
+        openDrawer,
+        closeDrawer,
+        pendingPrompt: pendingPrompt ?? undefined
+    };
 };
 
 export default useAiChatDrawer;

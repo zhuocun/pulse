@@ -36,6 +36,8 @@ import TaskCreator from "../components/taskCreator";
 import TaskModal from "../components/taskModal";
 import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
+import { overlaysActions } from "../store/reducers/overlaysSlice";
+import { projectActions } from "../store/reducers/projectModalSlice";
 import useAi from "../utils/hooks/useAi";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
@@ -431,22 +433,24 @@ describe("UI quality :: banned literal strings in rendered DOM", () => {
         });
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <TaskCreator
-                                    boardAiOn={false}
-                                    columnId="c1"
-                                    disabled={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <TaskCreator
+                                        boardAiOn={false}
+                                        columnId="c1"
+                                        disabled={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         const createTask = (
@@ -575,11 +579,12 @@ describe("UI quality :: no string concatenation in user-facing JSX", () => {
         const queryClient = new QueryClient({
             defaultOptions: { queries: { retry: false } }
         });
+        store.dispatch(projectActions.openModal());
 
         return render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
-                    <MemoryRouter initialEntries={["/projects?modal=on"]}>
+                    <MemoryRouter initialEntries={["/projects"]}>
                         <Routes>
                             <Route
                                 path="/projects"
@@ -679,11 +684,12 @@ describe("UI quality :: banned button labels (Submit / OK / Login / Register)", 
         const queryClient = new QueryClient({
             defaultOptions: { queries: { retry: false } }
         });
+        store.dispatch(projectActions.openModal());
 
         render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
-                    <MemoryRouter initialEntries={["/projects?modal=on"]}>
+                    <MemoryRouter initialEntries={["/projects"]}>
                         <Routes>
                             <Route
                                 path="/projects"
@@ -704,6 +710,7 @@ describe("UI quality :: banned button labels (Submit / OK / Login / Register)", 
             defaultOptions: { queries: { retry: false } }
         });
         queryClient.setQueryData(["users/members"], [member()]);
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
 
         render(
             <Provider store={store}>

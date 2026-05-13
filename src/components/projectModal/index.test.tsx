@@ -99,7 +99,14 @@ const LocationProbe = () => {
     return <div data-testid="location">{location.search}</div>;
 };
 
-const renderProjectModal = (route: string) => {
+const renderProjectModal = (
+    initialAction?: { type: "open" } | { type: "edit"; id: string }
+) => {
+    if (initialAction?.type === "open") {
+        store.dispatch(projectActions.openModal());
+    } else if (initialAction?.type === "edit") {
+        store.dispatch(projectActions.startEditing(initialAction.id));
+    }
     const queryClient = new QueryClient({
         defaultOptions: {
             mutations: { retry: false },
@@ -110,7 +117,7 @@ const renderProjectModal = (route: string) => {
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={[route]}>
+                <MemoryRouter initialEntries={["/projects"]}>
                     <Routes>
                         <Route
                             path="/projects"
@@ -177,7 +184,7 @@ describe("ProjectModal", () => {
     });
 
     it("validates required create fields", async () => {
-        renderProjectModal("/projects?modal=on");
+        renderProjectModal({ type: "open" });
 
         expect(
             await screen.findByRole("dialog", { name: "Create project" })
@@ -194,7 +201,7 @@ describe("ProjectModal", () => {
     });
 
     it("creates a project and clears modal URL state on success", async () => {
-        renderProjectModal("/projects?modal=on");
+        renderProjectModal({ type: "open" });
 
         expect(
             await screen.findByRole("dialog", { name: "Create project" })
@@ -236,7 +243,7 @@ describe("ProjectModal", () => {
     });
 
     it("closes and resets the modal from the cancel button", async () => {
-        renderProjectModal("/projects?modal=on");
+        renderProjectModal({ type: "open" });
 
         expect(
             await screen.findByRole("dialog", { name: "Create project" })
@@ -278,7 +285,7 @@ describe("ProjectModal", () => {
 
             return Promise.resolve(response({}));
         });
-        renderProjectModal("/projects?editingProjectId=project-1");
+        renderProjectModal({ type: "edit", id: "project-1" });
 
         await waitFor(() =>
             expect(document.body.querySelector(".ant-spin")).toBeInTheDocument()

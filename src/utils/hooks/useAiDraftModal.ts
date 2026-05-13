@@ -1,28 +1,35 @@
 import { useCallback } from "react";
 
-import useUrl from "./useUrl";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
+
+import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
- * URL-driven open/close state for the AI Task Draft modal so the system back
- * button (iOS swipe-back, Android hardware back) dismisses the overlay
- * instead of exiting the page entirely. The query value is the column id the
- * draft is being created against, which lets multiple per-column triggers
- * coexist on the board without cross-talk: each TaskCreator only renders the
- * modal when `aiDraft === its columnId`.
+ * Open/close + active-column-id state for the AI Task Draft modal.
+ *
+ * Previously URL-driven (`?aiDraft=<columnId>`); migrated to Redux so
+ * the click flips the modal in the same render regardless of how React
+ * Router's context propagates — see `useTaskModal` / `useProjectModal`
+ * for the iOS Safari WebKit symptom. Multiple per-column triggers still
+ * coexist: each `TaskCreator` only renders the modal when
+ * `activeColumnId === its columnId`.
  */
 const useAiDraftModal = () => {
-    const [{ aiDraft }, setUrl] = useUrl(["aiDraft"]);
+    const dispatch = useReduxDispatch();
+    const activeColumnId = useReduxSelector(
+        (s) => s.overlays.aiDraftActiveColumnId
+    );
     const openModal = useCallback(
         (columnId: string) => {
-            setUrl({ aiDraft: columnId });
+            dispatch(overlaysActions.openAiDraft(columnId));
         },
-        [setUrl]
+        [dispatch]
     );
     const closeModal = useCallback(() => {
-        setUrl({ aiDraft: undefined });
-    }, [setUrl]);
+        dispatch(overlaysActions.closeAiDraft());
+    }, [dispatch]);
     return {
-        activeColumnId: aiDraft ?? undefined,
+        activeColumnId: activeColumnId ?? undefined,
         openModal,
         closeModal
     };
