@@ -44,6 +44,14 @@ const LIVE_REGION_STYLE = {
     margin: -1,
     overflow: "hidden",
     padding: 0,
+    /*
+     * SR-only region: the 1×1 clip keeps it visually invisible but the
+     * absolute-positioned box still grabs hit tests above whatever is
+     * stacked behind. Drop pointer-events so the underlying control
+     * (typically a TaskModal field) still receives clicks. Mirrors the
+     * commandPalette / board announcer pattern.
+     */
+    pointerEvents: "none" as const,
     position: "absolute" as const,
     width: 1
 };

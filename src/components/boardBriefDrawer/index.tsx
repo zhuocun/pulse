@@ -98,6 +98,14 @@ const LIVE_REGION_STYLE = {
     margin: -1,
     overflow: "hidden",
     padding: 0,
+    /*
+     * SR-only live region: the 1×1 clip hides it visually but the box
+     * still occupies a hit-test target. Drop pointer-events so any
+     * button stacked behind it (e.g. drawer chrome on tight viewports)
+     * always receives the click. Mirrors the pattern in
+     * commandPalette / board filter announcer.
+     */
+    pointerEvents: "none" as const,
     position: "absolute" as const,
     width: 1
 };
