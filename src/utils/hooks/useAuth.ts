@@ -13,7 +13,11 @@ const useAuth = () => {
     const queryClient = useQueryClient();
     const userQueryKey = ["users"];
     const user = queryClient.getQueryData<IUser>(userQueryKey);
-    const token = useSyncExternalStore(subscribeAuthToken, readAuthToken, () => null);
+    const token = useSyncExternalStore(
+        subscribeAuthToken,
+        readAuthToken,
+        () => null
+    );
     const clear = useCallback(async () => {
         queryClient.clear();
         clearAuthToken();

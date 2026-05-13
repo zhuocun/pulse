@@ -11,7 +11,9 @@ const authTokenListeners = new Set<AuthTokenListener>();
  * to `/projects`. Without this, some WebKit builds only surface the new token
  * on a full reload.
  */
-export const subscribeAuthToken = (listener: AuthTokenListener): (() => void) => {
+export const subscribeAuthToken = (
+    listener: AuthTokenListener
+): (() => void) => {
     authTokenListeners.add(listener);
     return () => {
         authTokenListeners.delete(listener);
