@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { projectActions } from "../../store/reducers/projectModalSlice";
 
 import useReactQuery from "./useReactQuery";
-import { useReduxDispatch, useReduxSelector } from "./useRedux";
+import { useReduxDispatch } from "./useRedux";
 import useUrl from "./useUrl";
 
 const useProjectModal = () => {
@@ -23,7 +23,16 @@ const useProjectModal = () => {
         undefined,
         Boolean(editingProjectId)
     );
-    const isModalOpened = useReduxSelector((s) => s.projectModal.isModalOpened);
+    /*
+     * Derive open-state from the URL directly. The previous version stored
+     * the same boolean in Redux and updated it from a useEffect, which
+     * inserted a render tick between the click and the modal becoming
+     * `open` — long enough on slower devices that users perceived the
+     * click as a no-op and only saw the modal after refreshing (when the
+     * URL is read synchronously on first mount). Reading the URL here
+     * means the click and the modal-open render are the same pass.
+     */
+    const isModalOpened = modal === "on" || Boolean(editingProjectId);
     const openModal = () => {
         setUrl({ modal: "on" });
     };
@@ -34,13 +43,20 @@ const useProjectModal = () => {
         setUrl({ editingProjectId: id });
     };
 
+    /*
+     * Mirror the URL-derived flag into Redux so any other consumer
+     * (selectors in tests, future code, the existing `projectModalSlice`
+     * unit tests) still sees a consistent value. This effect is no longer
+     * on the critical path for the modal opening — it's a write-through
+     * for downstream subscribers.
+     */
     useEffect(() => {
-        if (modal === "on" || Boolean(editingProjectId)) {
+        if (isModalOpened) {
             dispatch(projectActions.openModal());
         } else {
             dispatch(projectActions.closeModal());
         }
-    }, [dispatch, modal, editingProjectId]);
+    }, [dispatch, isModalOpened]);
 
     return {
         isModalOpened,
