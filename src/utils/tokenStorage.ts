@@ -1,6 +1,35 @@
 const TOKEN_STORAGE_KEY = "Token";
 const AI_PROXY_TOKEN_KEY = "AiProxyJwt";
 
+type AuthTokenListener = () => void;
+const authTokenListeners = new Set<AuthTokenListener>();
+
+/**
+ * Subscribe to REST bearer changes in `localStorage` (login, logout, clear).
+ * Used by `useAuth` so React re-renders when the token is written outside of
+ * React state — e.g. after `POST /auth/login` persists the JWT before routing
+ * to `/projects`. Without this, some WebKit builds only surface the new token
+ * on a full reload.
+ */
+export const subscribeAuthToken = (
+    listener: AuthTokenListener
+): (() => void) => {
+    authTokenListeners.add(listener);
+    return () => {
+        authTokenListeners.delete(listener);
+    };
+};
+
+const notifyAuthTokenChanged = (): void => {
+    authTokenListeners.forEach((listener) => {
+        try {
+            listener();
+        } catch {
+            // Subscriber errors must not break auth storage updates.
+        }
+    });
+};
+
 const getLocalStorage = (): Storage | null => {
     if (typeof globalThis === "undefined") return null;
     try {
@@ -36,6 +65,7 @@ export const writeAuthToken = (token: string): boolean => {
     if (!storage) return false;
     try {
         storage.setItem(TOKEN_STORAGE_KEY, token);
+        notifyAuthTokenChanged();
         return true;
     } catch {
         return false;
@@ -75,11 +105,13 @@ export const clearAiProxyToken = (): void => {
 
 export const clearAuthToken = (): void => {
     const storage = getLocalStorage();
-    if (!storage) return;
-    try {
-        storage.removeItem(TOKEN_STORAGE_KEY);
-    } catch {
-        // Storage access can fail in private / restricted browser modes.
+    if (storage) {
+        try {
+            storage.removeItem(TOKEN_STORAGE_KEY);
+        } catch {
+            // Storage access can fail in private / restricted browser modes.
+        }
     }
     clearAiProxyToken();
+    notifyAuthTokenChanged();
 };

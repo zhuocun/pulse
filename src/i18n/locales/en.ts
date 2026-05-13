@@ -289,6 +289,8 @@ export const enSource = {
         welcomeBack: "Welcome back!",
         loginFailedNoToken:
             "Login response was missing a session token. Please try again.",
+        loginCouldNotPersistSession:
+            "Could not save your session. Turn off private browsing, allow site data for this site, then try again.",
         accountCreated: "Account created. Please log in.",
         couldntDeleteTask: "Couldn't delete {name}.",
         couldntCopy: "Couldn't copy",

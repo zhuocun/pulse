@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { projectActions } from "../../store/reducers/projectModalSlice";
 
@@ -8,13 +9,21 @@ import useUrl from "./useUrl";
 
 const useProjectModal = () => {
     const dispatch = useReduxDispatch();
-    // Use a single useUrl so closeModal can clear both keys atomically. Two
-    // separate setSearchParams calls would each close over the same URL
-    // snapshot and the second would clobber the first.
-    const [{ modal, editingProjectId }, setUrl] = useUrl([
-        "modal",
-        "editingProjectId"
-    ]);
+    const [searchParams] = useSearchParams();
+    /*
+     * Read `modal` / `editingProjectId` from `useSearchParams`, not from the
+     * `useUrl` tuple. `useProjectModal` mounts in several places (page header,
+     * list, popover, and `ProjectModal`). Each call site gets its own `useUrl`
+     * instance with a private `localState` mirror — a click in one tree only
+     * updates that instance, so `ProjectModal` would keep reading stale
+     * `localState` and never set `open` on the AntD modal.
+     *
+     * We still use `useUrl` for writes so `closeModal` / `openModal` merge both
+     * keys in one `setSearchParams` call (two separate writes would clobber).
+     */
+    const [, setUrl] = useUrl(["modal", "editingProjectId"]);
+    const modal = searchParams.get("modal");
+    const editingProjectId = searchParams.get("editingProjectId");
     const { data: editingProject, isLoading } = useReactQuery<IProject>(
         "projects",
         { projectId: editingProjectId },
