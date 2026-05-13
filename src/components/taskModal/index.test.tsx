@@ -435,15 +435,90 @@ describe("TaskModal", () => {
         ).not.toBeInTheDocument();
     });
 
+    it("opens with loading UI while tasks are unresolved, then shows the full form once tasks resolve", async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                mutations: { retry: false },
+                queries: { retry: false }
+            }
+        });
+        queryClient.setQueryData(["users/members"], members);
+        const route = "/projects/project-1/board?editingTaskId=task-1";
+
+        function Harness({ taskList }: { taskList: ITask[] | undefined }) {
+            return (
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={[route]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <>
+                                        <TaskModal
+                                            boardAiOn={false}
+                                            tasks={taskList}
+                                        />
+                                        <LocationProbe />
+                                    </>
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            );
+        }
+
+        const { rerender } = render(<Harness taskList={undefined} />);
+
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(screen.getByLabelText(/loading board/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+        expect(
+            screen.getByRole("button", { name: /^delete$/i })
+        ).toBeDisabled();
+
+        await act(async () => {
+            rerender(<Harness taskList={tasks} />);
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.queryByLabelText(/loading board/i)
+            ).not.toBeInTheDocument()
+        );
+        expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /^save$/i })
+        ).not.toBeDisabled();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=task-1"
+        );
+    });
+
+    it("does not open the modal for optimistic placeholder ids while tasks are still loading", () => {
+        renderModal({
+            initialTasks: undefined,
+            route: "/projects/project-1/board?editingTaskId=mock"
+        });
+
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "editingTaskId=mock"
+        );
+    });
+
     it("disables delete when the task list is unavailable", async () => {
         renderModal({ initialTasks: undefined });
 
         expect(screen.getByTestId("location")).toHaveTextContent(
             "editingTaskId=task-1"
         );
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(screen.getByLabelText(/loading board/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
         expect(
-            screen.queryByRole("button", { name: /^delete$/i })
-        ).not.toBeInTheDocument();
+            screen.getByRole("button", { name: /^delete$/i })
+        ).toBeDisabled();
     });
 
     it("hides the assist panel when board AI is off for the project", async () => {
