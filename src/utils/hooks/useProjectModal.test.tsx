@@ -161,9 +161,7 @@ describe("useProjectModal", () => {
         renderSplitModalConsumers("/projects");
 
         expect(screen.getByTestId("remote-modal-open")).toHaveTextContent("no");
-        fireEvent.click(
-            screen.getByRole("button", { name: "remote-open" })
-        );
+        fireEvent.click(screen.getByRole("button", { name: "remote-open" }));
         expect(screen.getByTestId("remote-modal-open")).toHaveTextContent(
             "yes"
         );
