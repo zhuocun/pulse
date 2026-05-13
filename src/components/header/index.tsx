@@ -8,13 +8,14 @@ import {
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { blur, breakpoints, radius, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
+import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import BrandMark from "../brandMark";
@@ -330,7 +331,6 @@ const Header: React.FC = () => {
     } = useAiEnabled();
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
-    const navigate = useNavigate();
     /*
      * Publish the rendered header height to a global CSS custom property
      * so secondary sticky chrome (e.g. the project detail page's
@@ -441,10 +441,7 @@ const Header: React.FC = () => {
                     type="link"
                     onClick={
                         path !== "/projects"
-                            ? () =>
-                                  navigate("/projects", {
-                                      viewTransition: true
-                                  })
+                            ? () => nativeNavigate("/projects")
                             : undefined
                     }
                 >

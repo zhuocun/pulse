@@ -7,7 +7,8 @@ import {
 import styled from "@emotion/styled";
 import { Button, Dropdown, MenuProps, Skeleton } from "antd";
 import React from "react";
-import { useNavigate } from "react-router-dom";
+
+import nativeNavigate from "../../utils/nativeNavigate";
 
 import { microcopy } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
@@ -111,18 +112,19 @@ const TitleStack = styled.div`
 `;
 
 /*
- * Native `<a>` with an `onClick` that calls `useNavigate()`. On iOS
- * Safari WebKit, React Router's `<Link>` was updating the URL via
+ * Native `<a>` with an `onClick` that triggers a real browser
+ * navigation via `window.location.assign(...)`. React Router's
+ * `<Link>` and `useNavigate()` both updated the URL through
  * `history.pushState` without the `Routes` element re-rendering to
- * match — the routing-layer version of the same context-propagation
- * failure that broke overlay binding before we moved overlays off
- * URL state. Driving navigation imperatively from `useNavigate()`
- * has the same SPA semantics on every device that works, and the
- * native `href` attribute is the fallback for browsers (or
- * environments) where the SPA path isn't honored — including jsdom,
- * where setting `window.location.href` advances the URL bar even
- * though there is no real document fetch. The user gets to the
- * board either way.
+ * match on iOS Safari WebKit — same context-propagation failure
+ * that broke overlay binding before we moved overlays off URL
+ * state. A full document navigation bypasses Router entirely:
+ * the browser fetches `index.html`, the app mounts fresh, and
+ * React Router reads the URL on the first render. Slower than SPA
+ * navigation, but the user actually gets to the board. The native
+ * `href` is left in place so Cmd/Ctrl/Shift/middle-click open the
+ * project in a new tab through the browser without going through
+ * the imperative path at all.
  */
 const TitleLink = styled.a`
     color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
@@ -275,7 +277,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onEdit,
     onDelete
 }) => {
-    const navigate = useNavigate();
     // Per-result strength badge (P1-2). Null when no AI search is active.
     const strength = getAiSearchStrength("projects", project._id);
     const items: MenuProps["items"] = [
@@ -366,7 +367,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     return;
                                 }
                                 event.preventDefault();
-                                navigate(`/projects/${project._id}`);
+                                /*
+                                 * Force a real browser navigation — see
+                                 * `nativeNavigate.ts`.
+                                 */
+                                nativeNavigate(`/projects/${project._id}`);
                             }}
                         >
                             {project.projectName}
