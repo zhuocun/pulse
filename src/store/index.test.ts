@@ -12,7 +12,8 @@ describe("store", () => {
 
     it("contains the project modal reducer state", () => {
         expect(store.getState().projectModal).toEqual({
-            isModalOpened: false
+            isModalOpened: false,
+            editingProjectId: null
         });
     });
 
