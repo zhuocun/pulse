@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
 import useAuth from "./useAuth";
+import { writeAuthToken } from "../tokenStorage";
 
 const createThrowingStorage = (): Storage => ({
     get length(): number {
@@ -99,6 +100,20 @@ const renderAuthProbe = (queryClient: QueryClient, route = "/") =>
 describe("useAuth", () => {
     beforeEach(() => {
         localStorage.clear();
+    });
+
+    it("re-renders when the stored token is written after mount", () => {
+        const queryClient = createQueryClient();
+        localStorage.clear();
+        renderAuthProbe(queryClient);
+
+        expect(screen.getByTestId("token")).toHaveTextContent("none");
+
+        act(() => {
+            writeAuthToken("late-token");
+        });
+
+        expect(screen.getByTestId("token")).toHaveTextContent("late-token");
     });
 
     it("reads the cached user from React Query and token from localStorage", () => {

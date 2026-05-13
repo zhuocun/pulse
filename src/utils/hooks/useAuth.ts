@@ -1,15 +1,19 @@
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
-import { clearAuthToken, readAuthToken } from "../tokenStorage";
+import {
+    clearAuthToken,
+    readAuthToken,
+    subscribeAuthToken
+} from "../tokenStorage";
 
 const useAuth = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const userQueryKey = ["users"];
     const user = queryClient.getQueryData<IUser>(userQueryKey);
-    const token = readAuthToken();
+    const token = useSyncExternalStore(subscribeAuthToken, readAuthToken, () => null);
     const clear = useCallback(async () => {
         queryClient.clear();
         clearAuthToken();
