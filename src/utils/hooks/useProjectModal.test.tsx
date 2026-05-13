@@ -57,11 +57,40 @@ const ProjectModalProbe = () => {
     );
 };
 
+/** Simulates `ProjectPage` / `ProjectList` calling `openModal` while `ProjectModal` reads `isModalOpened`. */
+const ProjectModalOpener = () => {
+    const { openModal } = useProjectModal();
+    return (
+        <button type="button" onClick={openModal}>
+            remote-open
+        </button>
+    );
+};
+
+const ProjectModalObserver = () => {
+    const { isModalOpened } = useProjectModal();
+    return (
+        <span data-testid="remote-modal-open">
+            {isModalOpened ? "yes" : "no"}
+        </span>
+    );
+};
+
 const renderProjectModalProbe = (route: string) =>
     render(
         <Provider store={store}>
             <MemoryRouter initialEntries={[route]}>
                 <ProjectModalProbe />
+            </MemoryRouter>
+        </Provider>
+    );
+
+const renderSplitModalConsumers = (route: string) =>
+    render(
+        <Provider store={store}>
+            <MemoryRouter initialEntries={[route]}>
+                <ProjectModalOpener />
+                <ProjectModalObserver />
             </MemoryRouter>
         </Provider>
     );
@@ -125,6 +154,18 @@ describe("useProjectModal", () => {
             undefined,
             undefined,
             false
+        );
+    });
+
+    it("keeps `isModalOpened` in sync across separate `useProjectModal` instances (page vs modal shell)", () => {
+        renderSplitModalConsumers("/projects");
+
+        expect(screen.getByTestId("remote-modal-open")).toHaveTextContent("no");
+        fireEvent.click(
+            screen.getByRole("button", { name: "remote-open" })
+        );
+        expect(screen.getByTestId("remote-modal-open")).toHaveTextContent(
+            "yes"
         );
     });
 
