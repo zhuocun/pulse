@@ -65,7 +65,12 @@ const LoginForm: React.FC<{
             if (!res.jwt) {
                 throw new Error(microcopy.feedback.loginFailedNoToken);
             }
-            writeAuthToken(res.jwt);
+            // Safari / private mode can refuse `localStorage`; do not navigate
+            // without a persisted REST bearer or the app will look "logged out".
+            if (!writeAuthToken(res.jwt)) {
+                message.error(microcopy.feedback.loginCouldNotPersistSession);
+                return;
+            }
             if (typeof res.ai_jwt === "string" && res.ai_jwt.length > 0) {
                 writeAiProxyToken(res.ai_jwt);
             }
@@ -111,8 +116,12 @@ const LoginForm: React.FC<{
                     }
                 ]}
             >
+                {/*
+                 * `username` (not `email`) pairs with `current-password` for
+                 * iOS Safari / Keychain autofill (WCAG 3.3.7).
+                 */}
                 <Input
-                    autoComplete="email"
+                    autoComplete="username"
                     enterKeyHint="next"
                     inputMode="email"
                     onChange={() => onError(null)}
