@@ -144,4 +144,38 @@ describe("useUrl", () => {
         );
         expect(screen.getByTestId("search")).toHaveTextContent("extra=keep");
     });
+
+    /*
+     * Regression: on iOS Safari WebKit, modal/drawer state derived purely
+     * from `useSearchParams()` was failing to flip in the same render as
+     * the click — the URL did update (refreshing brought the modal up),
+     * but the consumer never re-rendered with the new value. This asserts
+     * the consumer-visible state flips synchronously with the click, so
+     * UI binds to local React state regardless of how the URL change
+     * propagates.
+     */
+    it("returns the new value synchronously after a click, without waiting for URL propagation", () => {
+        renderUrlProbe("/projects");
+
+        expect(screen.getByTestId("projectName")).toHaveTextContent("null");
+        expect(screen.getByTestId("managerId")).toHaveTextContent("null");
+
+        fireEvent.click(screen.getByRole("button", { name: "update" }));
+
+        // No waitFor: the value must be visible in the very next render
+        // produced by fireEvent's flushed state updates.
+        expect(screen.getByTestId("projectName")).toHaveTextContent("Billing");
+        expect(screen.getByTestId("managerId")).toHaveTextContent("u2");
+    });
+
+    it("clears the value synchronously when a key is set back to void", () => {
+        renderUrlProbe("/projects?projectName=Roadmap&managerId=u1");
+
+        expect(screen.getByTestId("projectName")).toHaveTextContent("Roadmap");
+
+        fireEvent.click(screen.getByRole("button", { name: "clear project" }));
+
+        expect(screen.getByTestId("projectName")).toHaveTextContent("null");
+        expect(screen.getByTestId("managerId")).toHaveTextContent("u2");
+    });
 });
