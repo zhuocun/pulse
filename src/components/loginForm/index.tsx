@@ -75,7 +75,11 @@ const LoginForm: React.FC<{
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
-            navigate("/projects", { viewTransition: true });
+            // Defer SPA navigation to the next turn so WebKit (iOS Safari) has
+            // committed `localStorage` before the `/projects` tree mounts.
+            queueMicrotask(() => {
+                navigate("/projects", { viewTransition: true });
+            });
         } catch {
             // Error state is set by useReactMutation's onError callback.
         }

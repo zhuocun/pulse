@@ -3,6 +3,7 @@ import {
     clearAuthToken,
     readAiProxyToken,
     readAuthToken,
+    subscribeAuthToken,
     writeAiProxyToken,
     writeAuthToken
 } from "./tokenStorage";
@@ -12,6 +13,23 @@ describe("tokenStorage", () => {
         localStorage.clear();
         sessionStorage.clear();
         jest.restoreAllMocks();
+    });
+
+    it("notifies auth-token subscribers on write and clear", () => {
+        const listener = jest.fn();
+        const unsub = subscribeAuthToken(listener);
+
+        expect(writeAuthToken("jwt-1")).toBe(true);
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        listener.mockClear();
+        clearAuthToken();
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        listener.mockClear();
+        unsub();
+        expect(writeAuthToken("jwt-2")).toBe(true);
+        expect(listener).not.toHaveBeenCalled();
     });
 
     it("reads, writes, and clears the auth token", () => {
