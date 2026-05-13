@@ -178,4 +178,43 @@ describe("useUrl", () => {
         expect(screen.getByTestId("projectName")).toHaveTextContent("null");
         expect(screen.getByTestId("managerId")).toHaveTextContent("u2");
     });
+
+    /*
+     * Regression: the Create-project button lives in `ProjectPage` and
+     * writes `?modal=on`, but the modal that has to react is mounted in
+     * `MainLayout` — a second, sibling `useUrl` instance. Earlier the
+     * second instance never observed the write (on iOS Safari WebKit),
+     * so the modal never opened. This asserts that a write from one
+     * `useUrl` instance is observed by an unrelated instance in the
+     * same render.
+     */
+    it("propagates a write from one useUrl instance to a sibling instance", async () => {
+        const Trigger = () => {
+            const [, setUrl] = useUrl(["modal"]);
+            return (
+                <button type="button" onClick={() => setUrl({ modal: "on" })}>
+                    open
+                </button>
+            );
+        };
+        const Observer = () => {
+            const [{ modal }] = useUrl(["modal"]);
+            return <span data-testid="observer">{modal ?? "null"}</span>;
+        };
+
+        render(
+            <MemoryRouter initialEntries={["/projects"]}>
+                <Trigger />
+                <Observer />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByTestId("observer")).toHaveTextContent("null");
+
+        fireEvent.click(screen.getByRole("button", { name: "open" }));
+
+        await waitFor(() =>
+            expect(screen.getByTestId("observer")).toHaveTextContent("on")
+        );
+    });
 });
