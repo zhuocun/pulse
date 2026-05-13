@@ -7,7 +7,7 @@ import {
 import styled from "@emotion/styled";
 import { Button, Dropdown, MenuProps, Skeleton } from "antd";
 import React from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
@@ -110,7 +110,21 @@ const TitleStack = styled.div`
     min-width: 0;
 `;
 
-const TitleLink = styled(Link)`
+/*
+ * Native `<a>` with an `onClick` that calls `useNavigate()`. On iOS
+ * Safari WebKit, React Router's `<Link>` was updating the URL via
+ * `history.pushState` without the `Routes` element re-rendering to
+ * match — the routing-layer version of the same context-propagation
+ * failure that broke overlay binding before we moved overlays off
+ * URL state. Driving navigation imperatively from `useNavigate()`
+ * has the same SPA semantics on every device that works, and the
+ * native `href` attribute is the fallback for browsers (or
+ * environments) where the SPA path isn't honored — including jsdom,
+ * where setting `window.location.href` advances the URL bar even
+ * though there is no real document fetch. The user gets to the
+ * board either way.
+ */
+const TitleLink = styled.a`
     color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
     font-size: ${fontSize.lg}px;
     font-weight: ${fontWeight.semibold};
@@ -261,6 +275,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onEdit,
     onDelete
 }) => {
+    const navigate = useNavigate();
     // Per-result strength badge (P1-2). Null when no AI search is active.
     const strength = getAiSearchStrength("projects", project._id);
     const items: MenuProps["items"] = [
@@ -334,8 +349,25 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 microcopy.labels.noOrganization}
                         </Organization>
                         <TitleLink
-                            to={`/projects/${project._id}`}
-                            viewTransition
+                            href={`/projects/${project._id}`}
+                            onClick={(event) => {
+                                /*
+                                 * Let modifier-clicks (Cmd/Ctrl + click,
+                                 * middle-click) open the project in a new
+                                 * tab — the browser handles those for free
+                                 * when the anchor has a real `href`.
+                                 */
+                                if (
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.button !== 0
+                                ) {
+                                    return;
+                                }
+                                event.preventDefault();
+                                navigate(`/projects/${project._id}`);
+                            }}
                         >
                             {project.projectName}
                         </TitleLink>
