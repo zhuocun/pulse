@@ -166,6 +166,53 @@
       "prNumber": null,
       "failureMode": null,
       "verification": null
+    },
+    {
+      "name": "fix-taskmodal-open-while-tasks-loading",
+      "type": "worker",
+      "branch": "orch/orch-btn-clicks-7894/fix-taskmodal-open-while-tasks-loading",
+      "startingRef": "main",
+      "dependsOn": [
+        "bootstrap-btn-clicks-ref"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "running",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": "2026-05-13T03:06:35.395Z",
+      "finishedAt": null,
+      "lastUpdate": "2026-05-13T03:06:35.395Z",
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null,
+      "attempts": 1
+    },
+    {
+      "name": "verify-fix-taskmodal-open-while-tasks-loading",
+      "type": "verifier",
+      "branch": "orch/orch-btn-clicks-7894/verify-fix-taskmodal-open-while-tasks-loading",
+      "startingRef": "orch/orch-btn-clicks-7894/fix-taskmodal-open-while-tasks-loading",
+      "dependsOn": [
+        "fix-taskmodal-open-while-tasks-loading"
+      ],
+      "agentId": null,
+      "runId": null,
+      "parentAgentId": null,
+      "status": "pending",
+      "resultStatus": null,
+      "handoffPath": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "lastUpdate": null,
+      "note": null,
+      "slackTs": null,
+      "prNumber": null,
+      "failureMode": null,
+      "verification": null
     }
   ],
   "attention": [
