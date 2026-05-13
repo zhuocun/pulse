@@ -25,6 +25,9 @@ import {
     waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
+
+import { store } from "../store";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 import ColumnCreator from "../components/columnCreator";
@@ -154,9 +157,11 @@ describe("UI quality :: microcopy compliance", () => {
             defaultOptions: { queries: { retry: false } }
         });
         return render(
-            <QueryClientProvider client={queryClient}>
-                <BrowserRouter>{node}</BrowserRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <BrowserRouter>{node}</BrowserRouter>
+                </QueryClientProvider>
+            </Provider>
         );
     };
 
@@ -249,22 +254,24 @@ describe("UI quality :: form input hygiene", () => {
         });
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <TaskCreator
-                                    boardAiOn={false}
-                                    columnId="c1"
-                                    disabled={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <TaskCreator
+                                        boardAiOn={false}
+                                        columnId="c1"
+                                        disabled={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
     };
 

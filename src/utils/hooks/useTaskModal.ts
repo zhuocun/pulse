@@ -1,17 +1,31 @@
 import { useCallback } from "react";
 
-import useUrl from "./useUrl";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
+import { useReduxDispatch, useReduxSelector } from "./useRedux";
+
+/**
+ * Open/close + editing-id state for the task modal.
+ *
+ * Previously URL-driven (`?editingTaskId=…`) so the system back button
+ * could dismiss the overlay. iOS Safari WebKit didn't propagate
+ * React-Router context updates to the modal's subtree, so the click
+ * wrote the URL but the modal never opened — see PR #226 for the same
+ * migration applied to `useProjectModal`. The whole family is now on
+ * Redux, dispatched synchronously, propagated via
+ * `useSyncExternalStore` under `react-redux`.
+ */
 const useTaskModal = () => {
-    const [{ editingTaskId }, setEditingTaskId] = useUrl(["editingTaskId"]);
+    const dispatch = useReduxDispatch();
+    const editingTaskId = useReduxSelector((s) => s.overlays.editingTaskId);
     const closeModal = useCallback(() => {
-        setEditingTaskId({ editingTaskId: undefined });
-    }, [setEditingTaskId]);
+        dispatch(overlaysActions.closeTaskModal());
+    }, [dispatch]);
     const startEditing = useCallback(
         (id: string) => {
-            setEditingTaskId({ editingTaskId: id });
+            dispatch(overlaysActions.startEditingTask(id));
         },
-        [setEditingTaskId]
+        [dispatch]
     );
     return {
         editingTaskId,

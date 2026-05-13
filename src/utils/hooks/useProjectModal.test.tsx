@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 import { store } from "../../store";
 import { projectActions } from "../../store/reducers/projectModalSlice";
@@ -31,13 +31,20 @@ const queryResult = (overrides: Record<string, unknown> = {}) =>
     }) as unknown as ReturnType<typeof useReactQuery<IProject>>;
 
 const ProjectModalProbe = () => {
-    const { closeModal, editingProject, isLoading, openModal, startEditing } =
-        useProjectModal();
-    const location = useLocation();
+    const {
+        closeModal,
+        editingProject,
+        isLoading,
+        isModalOpened,
+        openModal,
+        startEditing
+    } = useProjectModal();
 
     return (
         <div>
-            <span data-testid="search">{location.search}</span>
+            <span data-testid="isModalOpened">
+                {isModalOpened ? "yes" : "no"}
+            </span>
             <span data-testid="project">
                 {editingProject?.projectName ?? "none"}
             </span>
@@ -57,7 +64,7 @@ const ProjectModalProbe = () => {
     );
 };
 
-/** Simulates `ProjectPage` / `ProjectList` calling `openModal` while `ProjectModal` reads `isModalOpened`. */
+/** Simulates `ProjectPage` calling `openModal` while `ProjectModal` reads `isModalOpened`. */
 const ProjectModalOpener = () => {
     const { openModal } = useProjectModal();
     return (
@@ -76,26 +83,26 @@ const ProjectModalObserver = () => {
     );
 };
 
-const renderProjectModalProbe = (route: string) =>
+const renderProjectModalProbe = () =>
     render(
         <Provider store={store}>
-            <MemoryRouter initialEntries={[route]}>
+            <MemoryRouter>
                 <ProjectModalProbe />
             </MemoryRouter>
         </Provider>
     );
 
-const renderSplitModalConsumers = (route: string) =>
+const renderSplitModalConsumers = () =>
     render(
         <Provider store={store}>
-            <MemoryRouter initialEntries={[route]}>
+            <MemoryRouter>
                 <ProjectModalOpener />
                 <ProjectModalObserver />
             </MemoryRouter>
         </Provider>
     );
 
-describe("useProjectModal", () => {
+describe("useProjectModal (Redux-only)", () => {
     beforeEach(() => {
         store.dispatch(projectActions.closeModal());
         mockedUseReactQuery.mockReset();
@@ -106,30 +113,31 @@ describe("useProjectModal", () => {
         store.dispatch(projectActions.closeModal());
     });
 
-    it("opens the Redux modal flag when modal=on is present", async () => {
-        renderProjectModalProbe("/projects?modal=on");
+    it("openModal flips the Redux modal flag and the consumer-visible state synchronously", () => {
+        renderProjectModalProbe();
 
-        await waitFor(() =>
-            expect(store.getState().projectModal.isModalOpened).toBe(true)
-        );
+        expect(screen.getByTestId("isModalOpened")).toHaveTextContent("no");
+
+        fireEvent.click(screen.getByRole("button", { name: "open" }));
+
+        expect(screen.getByTestId("isModalOpened")).toHaveTextContent("yes");
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
     });
 
-    it("opens the modal and fetches the editing project when editingProjectId is present", async () => {
+    it("startEditing sets editingProjectId and opens the modal, fetching the project", () => {
         mockedUseReactQuery.mockReturnValue(
-            queryResult({
-                data: project(),
-                isLoading: true
-            })
+            queryResult({ data: project(), isLoading: true })
         );
 
-        renderProjectModalProbe("/projects?editingProjectId=p1");
+        renderProjectModalProbe();
 
-        await waitFor(() =>
-            expect(store.getState().projectModal.isModalOpened).toBe(true)
-        );
+        fireEvent.click(screen.getByRole("button", { name: "edit" }));
+
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
+        expect(store.getState().projectModal.editingProjectId).toBe("p2");
         expect(mockedUseReactQuery).toHaveBeenCalledWith(
             "projects",
-            { projectId: "p1" },
+            { projectId: "p2" },
             "editingProject",
             undefined,
             undefined,
@@ -139,26 +147,21 @@ describe("useProjectModal", () => {
         expect(screen.getByTestId("loading")).toHaveTextContent("loading");
     });
 
-    it("closes the modal when neither modal param is present", async () => {
-        store.dispatch(projectActions.openModal());
+    it("closeModal clears the editing id and closes the modal", () => {
+        renderProjectModalProbe();
 
-        renderProjectModalProbe("/projects");
+        fireEvent.click(screen.getByRole("button", { name: "edit" }));
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
+        expect(store.getState().projectModal.editingProjectId).toBe("p2");
 
-        await waitFor(() =>
-            expect(store.getState().projectModal.isModalOpened).toBe(false)
-        );
-        expect(mockedUseReactQuery).toHaveBeenCalledWith(
-            "projects",
-            { projectId: null },
-            "editingProject",
-            undefined,
-            undefined,
-            false
-        );
+        fireEvent.click(screen.getByRole("button", { name: "close" }));
+
+        expect(store.getState().projectModal.isModalOpened).toBe(false);
+        expect(store.getState().projectModal.editingProjectId).toBe(null);
     });
 
-    it("keeps `isModalOpened` in sync across separate `useProjectModal` instances (page vs modal shell)", () => {
-        renderSplitModalConsumers("/projects");
+    it("keeps `isModalOpened` in sync across separate `useProjectModal` instances", () => {
+        renderSplitModalConsumers();
 
         expect(screen.getByTestId("remote-modal-open")).toHaveTextContent("no");
         fireEvent.click(screen.getByRole("button", { name: "remote-open" }));
@@ -174,7 +177,7 @@ describe("useProjectModal", () => {
      * flag is bound to URL re-propagation, this is the test that fails.
      */
     it("flips a sibling observer's `isModalOpened` synchronously with the click", () => {
-        renderSplitModalConsumers("/projects");
+        renderSplitModalConsumers();
 
         expect(screen.getByTestId("remote-modal-open")).toHaveTextContent("no");
 
@@ -184,32 +187,5 @@ describe("useProjectModal", () => {
             "yes"
         );
         expect(store.getState().projectModal.isModalOpened).toBe(true);
-    });
-
-    it("writes modal and editing params without dropping existing query state, then removes them on close", async () => {
-        renderProjectModalProbe("/projects");
-
-        fireEvent.click(screen.getByRole("button", { name: "open" }));
-
-        await waitFor(() =>
-            expect(screen.getByTestId("search")).toHaveTextContent("?modal=on")
-        );
-
-        fireEvent.click(screen.getByRole("button", { name: "edit" }));
-
-        await waitFor(() =>
-            expect(screen.getByTestId("search")).toHaveTextContent(
-                "?modal=on&editingProjectId=p2"
-            )
-        );
-
-        fireEvent.click(screen.getByRole("button", { name: "close" }));
-
-        await waitFor(() =>
-            expect(screen.getByTestId("search")).toHaveTextContent("")
-        );
-        await waitFor(() =>
-            expect(store.getState().projectModal.isModalOpened).toBe(false)
-        );
     });
 });

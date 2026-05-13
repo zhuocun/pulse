@@ -7,7 +7,11 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+
+import { store } from "../store";
+import { overlaysActions } from "../store/reducers/overlaysSlice";
 
 import BoardPage from "./board";
 
@@ -225,23 +229,29 @@ const renderBoard = (route = "/projects/project-1/board") => {
         }
     });
     queryClient.setQueryData(["users"], user());
+    store.dispatch(overlaysActions.closeTaskModal());
+    store.dispatch(overlaysActions.closeChatDrawer());
+    store.dispatch(overlaysActions.closeBoardBrief());
+    store.dispatch(overlaysActions.closeAiDraft());
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={[route]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <>
-                                <BoardPage />
-                                <LocationProbe />
-                            </>
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[route]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <>
+                                    <BoardPage />
+                                    <LocationProbe />
+                                </>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
@@ -454,8 +464,9 @@ describe("BoardPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("opens the task modal from the editingTaskId URL param", async () => {
-        renderBoard("/projects/project-1/board?editingTaskId=task-1");
+    it("opens the task modal when the Redux store has an editingTaskId", async () => {
+        renderBoard();
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
 
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
         expect(

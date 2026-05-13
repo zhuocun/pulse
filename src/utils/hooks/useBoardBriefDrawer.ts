@@ -1,23 +1,24 @@
 import { useCallback } from "react";
 
-import useUrl from "./useUrl";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
+
+import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
- * URL-driven open/close state for the Board Brief drawer. Tying the drawer
- * to a query param means the system back button (iOS swipe-back, Android
- * hardware back) dismisses the drawer instead of exiting the board route —
- * a baseline mobile-native expectation that 59% of sites violate (Baymard
- * 2024).
+ * Open/close state for the Board Brief drawer. Previously URL-driven
+ * (`?brief=1`); migrated to Redux for cross-subtree propagation that
+ * stays reliable on iOS Safari WebKit — see `useTaskModal` /
+ * `useProjectModal` for the underlying symptom.
  */
 const useBoardBriefDrawer = () => {
-    const [{ brief }, setUrl] = useUrl(["brief"]);
-    const open = brief === "1";
+    const dispatch = useReduxDispatch();
+    const open = useReduxSelector((s) => s.overlays.boardBriefOpen);
     const openDrawer = useCallback(() => {
-        setUrl({ brief: "1" });
-    }, [setUrl]);
+        dispatch(overlaysActions.openBoardBrief());
+    }, [dispatch]);
     const closeDrawer = useCallback(() => {
-        setUrl({ brief: undefined });
-    }, [setUrl]);
+        dispatch(overlaysActions.closeBoardBrief());
+    }, [dispatch]);
     return { open, openDrawer, closeDrawer };
 };
 

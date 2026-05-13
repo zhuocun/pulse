@@ -18,6 +18,7 @@ import ProjectModal from "../components/projectModal";
 import TaskModal from "../components/taskModal";
 import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
+import { projectActions } from "../store/reducers/projectModalSlice";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useReactMutation from "../utils/hooks/useReactMutation";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -130,11 +131,12 @@ const renderProjectModalOpen = () => {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } }
     });
+    store.dispatch(projectActions.openModal());
 
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects?modal=on"]}>
+                <MemoryRouter initialEntries={["/projects"]}>
                     <Routes>
                         <Route path="/projects" element={<ProjectModal />} />
                     </Routes>
