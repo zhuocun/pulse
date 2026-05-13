@@ -167,6 +167,25 @@ describe("useProjectModal", () => {
         );
     });
 
+    /*
+     * Regression for the iOS Safari "click doesn't open" report. The
+     * synchronous Redux dispatch inside `openModal` must flip the
+     * observer in the very next render, with no `waitFor`. If the open
+     * flag is bound to URL re-propagation, this is the test that fails.
+     */
+    it("flips a sibling observer's `isModalOpened` synchronously with the click", () => {
+        renderSplitModalConsumers("/projects");
+
+        expect(screen.getByTestId("remote-modal-open")).toHaveTextContent("no");
+
+        fireEvent.click(screen.getByRole("button", { name: "remote-open" }));
+
+        expect(screen.getByTestId("remote-modal-open")).toHaveTextContent(
+            "yes"
+        );
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
+    });
+
     it("writes modal and editing params without dropping existing query state, then removes them on close", async () => {
         renderProjectModalProbe("/projects");
 
