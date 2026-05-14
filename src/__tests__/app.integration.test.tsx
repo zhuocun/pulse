@@ -11,6 +11,28 @@ import AppProviders from "../utils/appProviders";
 // when other suites are competing for the worker pool.
 jest.setTimeout(60000);
 
+/*
+ * `nativeNavigate` calls `window.location.assign(...)` to force a real
+ * browser document navigation in production. jsdom's `Location` is
+ * non-configurable so the call is a no-op in tests — replace it with a
+ * `history.pushState` so React Router still sees the URL change and
+ * the integration assertions on `window.location.pathname` keep working.
+ */
+jest.mock("../utils/nativeNavigate", () => ({
+    __esModule: true,
+    default: (url: string) => {
+        const g = globalThis as {
+            history?: History;
+            dispatchEvent?: (e: Event) => boolean;
+        };
+        g.history?.pushState({}, "", url);
+        // `pushState` doesn't fire `popstate` — synthesize one so React
+        // Router's history listener notices the URL changed and re-runs
+        // the routes.
+        g.dispatchEvent?.(new Event("popstate"));
+    }
+}));
+
 jest.mock("../constants/env", () => ({
     __esModule: true,
     default: {
