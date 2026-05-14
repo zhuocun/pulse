@@ -64,12 +64,48 @@ your change closes or opens a backlog item, update `status/` in the same PR:
   `useDragEnd` (`src/utils/hooks/useDragEnd.ts`). Reorder mutations are
   optimistic — see `src/utils/optimisticUpdate/reorder.ts`.
 
-## Task modal / URL state
+## Task modal / loading state
 
 - `TaskModal` treats `tasks === undefined` as "still loading" and only clears a
-  stale `editingTaskId` from the URL after tasks resolve to a concrete array.
-  Do not coerce the board page's tasks query to `[]` before passing it into
-  `TaskModal`, or deep-linked edits will close immediately during load.
+  stale `editingTaskId` from Redux (`overlaysSlice`) after tasks resolve to a
+  concrete array. Do not coerce the board page's tasks query to `[]` before
+  passing it into `TaskModal`, or deep-linked edits will close immediately
+  during load.
+
+## Cross-page navigation + overlay state on mobile
+
+React Router's `<Link>` / `useNavigate()` and any `useSearchParams`-derived
+state were observed to fail to propagate to a sibling subtree on **both** iOS
+Safari (WebKit) and Chrome Android: the URL bar advances but `Routes` — or the
+consuming hook in another subtree — never re-renders. Refreshing the page
+works because the URL is read on first mount; in-session updates don't reach
+the listener. Three intermediate `useUrl` fixes (local-state mirror,
+`useSearchParams` direct read, module-level pub/sub) all inherited the same
+dependency on React Router context propagation.
+
+Two escape hatches live in the codebase:
+
+- **Cross-page navigation:** call `nativeNavigate(url)` from
+  `src/utils/nativeNavigate.ts`. It uses `window.location.assign(...)`,
+  triggering a full browser document fetch and bypassing React Router
+  entirely. Used by `ProjectCard.TitleLink` and `Header.BrandLink` — both
+  page-level transitions where a full reload is acceptable. The native
+  `<a href>` stays so Cmd/Ctrl/Shift/middle-click still open in a new tab
+  without going through the imperative path. Tests mock `nativeNavigate` to
+  dispatch `history.pushState` + a synthetic `popstate` event so jsdom-bound
+  URL assertions keep working — see `src/__tests__/app.integration.test.tsx`
+  for the pattern.
+- **Overlay open/close state:** Redux, not URL. `useProjectModal` /
+  `useTaskModal` / `useAiChatDrawer` / `useBoardBriefDrawer` /
+  `useAiDraftModal` all dispatch through `projectModalSlice` or
+  `overlaysSlice`; `react-redux`'s `useSyncExternalStore` subscription
+  propagates updates reliably across subtrees. Trade-off: deep links
+  (`?modal=on`, `?editingTaskId=…`, `?chat=1`, etc.) and the system back
+  button no longer auto-open or dismiss overlays.
+
+Before adding a new `<Link>` / `useNavigate()` for a cross-page transition,
+or routing modal state through the URL, consider whether you need one of
+these escape hatches.
 
 ## Deployment
 
