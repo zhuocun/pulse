@@ -2,27 +2,10 @@ import { Typography } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
+import extractErrorMessage from "../../utils/extractErrorMessage";
 
 const isErrorPayload = (error: unknown): error is IError =>
     error !== null && typeof error === "object" && "error" in error;
-
-const getApiErrorMessage = (
-    error: IError["error"] | string | unknown
-): string => {
-    if (typeof error === "string") {
-        return error || microcopy.feedback.operationFailed;
-    }
-
-    if (Array.isArray(error)) {
-        const message = error.find(
-            (item): item is { msg?: string } =>
-                Boolean(item) && typeof item === "object"
-        )?.msg;
-        return message || microcopy.feedback.operationFailed;
-    }
-
-    return microcopy.feedback.operationFailed;
-};
 
 export const resolveAuthPageErrorMessage = (
     error: Error | IError | unknown
@@ -31,7 +14,10 @@ export const resolveAuthPageErrorMessage = (
         return error.message || microcopy.feedback.operationFailed;
     }
     if (isErrorPayload(error) && error.error != null) {
-        return getApiErrorMessage(error.error);
+        return (
+            extractErrorMessage(error.error) ??
+            microcopy.feedback.operationFailed
+        );
     }
     return null;
 };

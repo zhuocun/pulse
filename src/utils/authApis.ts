@@ -2,16 +2,9 @@ import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 
 import getAuthErrorMessage from "./getAuthErrorMessage";
+import { rewriteNetworkFetchError } from "./networkFetchError";
 import { parseFetchBody } from "./parseFetchBody";
 import { writeAiProxyToken, writeAuthToken } from "./tokenStorage";
-
-/**
- * Mirrors the network-error narrowing in `useApi.ts` so offline / DNS / CORS
- * failures surface a friendly message in the auth forms instead of the raw
- * `TypeError("Failed to fetch")` browser string.
- */
-const isNetworkError = (err: unknown): boolean =>
-    err instanceof TypeError && err.message.toLowerCase().includes("fetch");
 
 const authFetch = async (
     endpoint: string,
@@ -20,12 +13,14 @@ const authFetch = async (
     try {
         return await fetch(`${environment.apiBaseUrl}/${endpoint}`, init);
     } catch (err) {
-        if (isNetworkError(err)) {
-            throw new Error(microcopy.feedback.networkError, { cause: err });
-        }
+        const rewritten = rewriteNetworkFetchError(err);
+        if (rewritten) throw rewritten;
         throw err;
     }
 };
+
+const failureMessage = (status: number, body: unknown): string =>
+    status === 404 ? "Failed to connect" : getAuthErrorMessage(body);
 
 const login = async (param: { email: string; password: string }) => {
     const res = await authFetch("auth/login", {
@@ -56,9 +51,7 @@ const login = async (param: { email: string; password: string }) => {
         }
         return user;
     }
-    const errMsg =
-        res.status === 404 ? "Failed to connect" : getAuthErrorMessage(body);
-    return Promise.reject(new Error(errMsg));
+    return Promise.reject(new Error(failureMessage(res.status, body)));
 };
 
 const register = async (param: {
@@ -77,9 +70,7 @@ const register = async (param: {
     if (res.ok) {
         return body;
     }
-    const errMsg =
-        res.status === 404 ? "Failed to connect" : getAuthErrorMessage(body);
-    return Promise.reject(new Error(errMsg));
+    return Promise.reject(new Error(failureMessage(res.status, body)));
 };
 
 export { login, register };
