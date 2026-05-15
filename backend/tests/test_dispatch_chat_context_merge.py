@@ -87,6 +87,30 @@ def test_merged_v1_returns_none_when_both_absent() -> None:
         assert merged_v1_chat_context(project_id=None, request=req) is None
 
 
+def test_merged_v1_threads_settings_to_both_sources() -> None:
+    req = MagicMock()
+    cfg = object()
+    with (
+        patch(
+            "app.routers._dispatch.project_chat_model_from_map",
+            return_value={"chat_model": "from_map"},
+        ) as mapped,
+        patch(
+            "app.routers._dispatch.chat_model_override_from_request",
+            return_value=None,
+        ) as header,
+    ):
+        merged = merged_v1_chat_context(
+            project_id="p9",
+            request=req,
+            settings=cfg,
+        )
+
+    assert merged == {"chat_model": "from_map"}
+    mapped.assert_called_once_with("p9", settings=cfg)
+    header.assert_called_once_with(req, settings=cfg)
+
+
 def test_project_chat_model_from_map_happy_path() -> None:
     cfg = replace(
         global_settings,

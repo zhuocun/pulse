@@ -18,6 +18,8 @@ import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
+import { srOnlyLiveRegionStyle } from "../../utils/a11y/srOnlyLiveRegionStyle";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
@@ -37,41 +39,6 @@ import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 const EMPTY_TASKS: ITask[] = [];
 const EMPTY_MEMBERS: IMember[] = [];
 const EMPTY_COLUMNS: IColumn[] = [];
-const LIVE_REGION_STYLE = {
-    border: 0,
-    clip: "rect(0 0 0 0)",
-    height: 1,
-    margin: -1,
-    overflow: "hidden",
-    padding: 0,
-    /*
-     * SR-only region: the 1×1 clip keeps it visually invisible but the
-     * absolute-positioned box still grabs hit tests above whatever is
-     * stacked behind. Drop pointer-events so the underlying control
-     * (typically a TaskModal field) still receives clicks. Mirrors the
-     * commandPalette / board announcer pattern.
-     */
-    pointerEvents: "none" as const,
-    position: "absolute" as const,
-    width: 1
-};
-
-const extractSuggestionRunId = (payload: unknown): string | null => {
-    if (!payload || typeof payload !== "object") return null;
-    const record = payload as Record<string, unknown>;
-    for (const key of [
-        "brief_run_id",
-        "run_id",
-        "suggestion_id",
-        "id"
-    ] as const) {
-        const candidate = record[key];
-        if (typeof candidate === "string" && candidate.length > 0) {
-            return candidate;
-        }
-    }
-    return null;
-};
 
 type WireEstimateSuggestion = Omit<
     IEstimateSuggestion,
@@ -570,7 +537,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 aria-atomic="true"
                 aria-live="polite"
                 role="status"
-                style={LIVE_REGION_STYLE}
+                style={srOnlyLiveRegionStyle}
             >
                 {suggestionStatusAnnouncement}
             </div>

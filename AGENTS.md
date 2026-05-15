@@ -30,7 +30,8 @@ your change closes or opens a backlog item, update `status/` in the same PR:
   v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
   alongside `useAi` and switches on `environment.aiUseLocalEngine`). `useAi`
   remains the local-engine fallback path.
-- Triage nudges are subject to PRD AC-V14 inbox rules in `useAgent.ts`:
+- Triage nudges are subject to PRD AC-V14 inbox rules in
+  `src/utils/hooks/useNudgeInbox.ts` (re-exported from `useAgent.ts`):
   `NUDGE_INBOX_MAX = 5`, dedup by `(kind, project_id)`, `NUDGE_EXPIRY_MS = 4h`,
   60-second prune sweep, plus an explicit `dismissNudge(nudge_id)` API. The
   pure `reduceNudgeInbox` reducer is exported for unit tests.

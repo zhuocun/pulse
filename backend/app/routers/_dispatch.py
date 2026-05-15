@@ -121,11 +121,12 @@ def merged_v1_chat_context(
     *,
     project_id: Optional[str],
     request: Request,
+    settings: Any = None,
 ) -> Optional[Dict[str, Any]]:
     """Merge ``AGENT_PROJECT_CHAT_MODEL_MAP`` with ``X-Pulse-Model`` (header wins)."""
 
-    mapped = project_chat_model_from_map(project_id)
-    header = chat_model_override_from_request(request)
+    mapped = project_chat_model_from_map(project_id, settings=settings)
+    header = chat_model_override_from_request(request, settings=settings)
     if mapped is None and header is None:
         return None
     if mapped is None:
