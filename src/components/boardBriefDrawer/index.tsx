@@ -667,7 +667,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                 aria-atomic="true"
                 aria-live="polite"
                 role="status"
-                    style={srOnlyLiveRegionStyle}
+                style={srOnlyLiveRegionStyle}
             >
                 {briefStatusAnnouncement}
             </div>
