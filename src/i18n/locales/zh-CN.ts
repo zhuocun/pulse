@@ -321,6 +321,10 @@ const zhCN: Dictionary = {
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
     },
+    projectModal: {
+        createDescription: "设置名称、组织和负责人,开始跟踪工作。",
+        editDescription: "更新项目详情和分配信息。"
+    },
     projectsPage: {
         title: "项目",
         subtitle:
@@ -576,7 +580,7 @@ const zhCN: Dictionary = {
         workloadSection: "工作负载：{entries}",
         generateBoardBriefPrompt: "为这个看板生成简报。",
         runBoardTriagePrompt: "对当前看板运行一次分诊检查。",
-        storyPointsSet: "故事点已设置为 {value}。",
+        storyPointsSet: "故事点已设置为 {points}。",
         readinessFieldUpdated: "已更新 {field}。",
         characterCounterMax: 4000,
         breakdownAxes: {
@@ -673,6 +677,7 @@ const zhCN: Dictionary = {
         sublabelColumn: "列",
         navigateInstructions: "搜索并跳转。在查询前加“/”切换到看板 Copilot。",
         copilotPromptHint: "输入您的问题,然后按回车键。",
+        noResultsCopilotCta: "尝试询问看板 Copilot →",
         sampleAi: [
             "这个看板有哪些风险?",
             "总结一下这个看板",

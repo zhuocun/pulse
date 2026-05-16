@@ -118,7 +118,7 @@ export const aiErrorView = (
     }
     if (error instanceof DOMException && error.name === "AbortError") {
         return {
-            heading: "Stopped",
+            heading: microcopy.ai.stopped as string,
             body: "",
             retryable: true,
             severity: "info"

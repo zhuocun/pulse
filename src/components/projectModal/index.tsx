@@ -54,15 +54,19 @@ const ProjectModal: React.FC = () => {
         const payload = isEditing
             ? { ...editingProject, ...input }
             : { ...editingProject, ...createOnly };
-        mutateAsync(payload).then(onClose);
+        mutateAsync(payload)
+            .then(onClose)
+            .catch(() => {});
     };
     const submit = () => {
         form.submit();
     };
-    const modalTitle = isEditing ? "Edit project" : "Create project";
+    const modalTitle = isEditing
+        ? microcopy.actions.editProject
+        : microcopy.actions.createProject;
     const okText = isEditing
         ? microcopy.actions.save
-        : `${microcopy.actions.create} project`;
+        : microcopy.actions.createProject;
 
     useEffect(() => {
         form.setFieldsValue(editingProject);
@@ -136,8 +140,8 @@ const ProjectModal: React.FC = () => {
                     type="secondary"
                 >
                     {isEditing
-                        ? "Update project details and assignment."
-                        : "Set a name, organization, and a manager to start tracking work."}
+                        ? microcopy.projectModal.editDescription
+                        : microcopy.projectModal.createDescription}
                 </Typography.Text>
                 <Form form={form} layout="vertical" onFinish={onFinish}>
                     <ErrorBox error={error} />

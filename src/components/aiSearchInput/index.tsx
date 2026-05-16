@@ -357,7 +357,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 applyResult(validateSearch(raw, valid), query);
             }
         },
-        [applyResult, props, searchAi]
+        [applyResult, isRemote, props, startRemoteSearch]
     );
 
     const onClear = () => {
