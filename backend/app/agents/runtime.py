@@ -267,7 +267,7 @@ def _verify_sigv1(token: str, agent_name: str, scope: str) -> Optional[str]:
         _signing_key(), message.encode(), hashlib.sha256
     ).hexdigest()
     if not _hmac.compare_digest(expected, tok_digest):
-        raise ValueError("Signed thread key rejected: HMAC signature mismatch.")
+        return None
     return tok_original
 
 
@@ -305,7 +305,7 @@ def _verify_sigv2(token: str, agent_name: str, scope: str) -> Optional[str]:
     message = f"{tok_kid}{_SEP}{tok_agent}{_SEP}{tok_scope}{_SEP}{tok_original}"
     expected = _hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
     if not _hmac.compare_digest(expected, tok_digest):
-        raise ValueError("Signed thread key rejected: HMAC signature mismatch.")
+        return None
     return tok_original
 
 

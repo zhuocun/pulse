@@ -334,6 +334,11 @@ export const enSource = {
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project."
     },
+    projectModal: {
+        createDescription:
+            "Set a name, organization, and a manager to start tracking work.",
+        editDescription: "Update project details and assignment."
+    },
     projectsPage: {
         title: "Projects",
         subtitle:
@@ -715,6 +720,7 @@ export const enSource = {
         navigateInstructions:
             "Search and navigate. Start the query with “/” to switch to Board Copilot.",
         copilotPromptHint: "Type your question, then press Enter.",
+        noResultsCopilotCta: "Try asking Board Copilot →",
         sampleAi: [
             "What's at risk on this board?",
             "Summarize this board",

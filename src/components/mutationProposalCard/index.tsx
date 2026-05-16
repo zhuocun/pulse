@@ -405,7 +405,6 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                             {microcopy.actions.apply}
                         </Button>
                     </Space>
-                    <FooterHint>10s undo available after accepting</FooterHint>
                     <FooterHint>
                         {microcopy.mutation.undoAvailableAfterAccepting}
                     </FooterHint>

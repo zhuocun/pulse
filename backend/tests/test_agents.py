@@ -1578,16 +1578,21 @@ def test_try_verify_returns_none_for_wrong_field_count() -> None:
     assert result is None
 
 
-def test_try_verify_raises_on_invalid_hmac() -> None:
-    """_try_verify_signed_thread_key raises ValueError when HMAC is wrong."""
+def test_try_verify_returns_none_on_invalid_hmac() -> None:
+    """_try_verify_signed_thread_key returns None (soft-fail) when HMAC is wrong.
+
+    An HMAC mismatch must NOT raise; the rolling-restart safety contract
+    requires the caller to fall through to the unsigned path when the
+    digest does not match (e.g. because the signing key was rotated).
+    """
     import base64
     from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX, _SEP
 
     # Build a payload with the right fields but a bogus digest.
     payload = f"echo{_SEP}u1{_SEP}my-thread{_SEP}0000000000000000000000000000000000000000000000000000000000000000"
     encoded = base64.urlsafe_b64encode(payload.encode()).decode()
-    with pytest.raises(ValueError, match="HMAC signature mismatch"):
-        _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}{encoded}", "echo", "u1")
+    result = _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}{encoded}", "echo", "u1")
+    assert result is None
 
 
 def test_namespaced_thread_treats_malformed_sigv1_as_unsigned(
@@ -1832,19 +1837,19 @@ def test_sigv2_wrong_field_count_returns_none() -> None:
     assert _verify_sigv2(f"sigv2.{bad}", "echo", "u1") is None
 
 
-def test_sigv2_hmac_mismatch_raises(
+def test_sigv2_hmac_mismatch_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A sigv2 token with a tampered HMAC raises a clear ``ValueError``
-    rather than silently accepting the forgery."""
+    """A sigv2 token with a tampered HMAC returns None (soft-fail) rather
+    than raising, consistent with the rolling-restart safety contract."""
     import base64
     from app.agents.runtime import _verify_sigv2
 
     _patch_signing_keys(monkeypatch, ("v1:secret-one",))
     payload = "v1\x00echo\x00u1\x00thread-x\x00deadbeef-not-the-real-hmac"
     forged = "sigv2." + base64.urlsafe_b64encode(payload.encode()).decode()
-    with pytest.raises(ValueError, match="HMAC signature mismatch"):
-        _verify_sigv2(forged, "echo", "u1")
+    result = _verify_sigv2(forged, "echo", "u1")
+    assert result is None
 
 
 def test_agent_runtime_invoke_and_ainvoke_with_context(

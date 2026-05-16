@@ -619,7 +619,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                                             size="small"
                                             type="link"
                                         >
-                                            Try asking Board Copilot →
+                                            {
+                                                microcopy.commandPalette
+                                                    .noResultsCopilotCta
+                                            }
                                         </Button>
                                     </div>
                                 )}
