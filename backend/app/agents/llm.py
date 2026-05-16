@@ -28,7 +28,6 @@ import importlib
 import itertools
 import json
 import logging
-import os
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -36,6 +35,7 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from app.config import Settings, settings as default_settings
+from app.deploy_env import HOSTED_PLATFORM_ENV_MARKERS, has_hosted_platform_env
 
 logger = logging.getLogger(__name__)
 
@@ -378,24 +378,13 @@ def _wrap_cross_provider_failover(
     return wrapped
 
 
-# Env vars that indicate a hosted / production-shaped deploy. Mirrors the
-# curated list in :mod:`app.main`; duplicated here so the llm module stays
-# import-free of app.main (which imports from us).
-_PROVIDER_PRODUCTION_SHAPED_ENV_VARS: tuple[str, ...] = (
-    "VERCEL",
-    "VERCEL_URL",
-    "RENDER_EXTERNAL_HOSTNAME",
-    "RENDER",
-    "KUBERNETES_SERVICE_HOST",
-    "FLY_APP_NAME",
-    "RAILWAY_PROJECT_ID",
-)
+_PROVIDER_PRODUCTION_SHAPED_ENV_VARS = HOSTED_PLATFORM_ENV_MARKERS
 
 
 def _is_production_like_env() -> bool:
     """``True`` when one of the curated hosted-platform env vars is set."""
 
-    return any(os.getenv(name) for name in _PROVIDER_PRODUCTION_SHAPED_ENV_VARS)
+    return has_hosted_platform_env()
 
 
 def assert_provider_available(

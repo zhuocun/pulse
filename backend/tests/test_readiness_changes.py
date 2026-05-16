@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 from app import main, security
 from app.config import settings as app_settings
+from app.deploy_env import HOSTED_PLATFORM_ENV_MARKERS
 from app.security import create_token
 from app.tools.fe_tool_schemas import fe_tool_definitions
 
@@ -393,17 +394,6 @@ def test_validate_agent_postgres_runs_for_store_only() -> None:
 # ---------------------------------------------------------------------------
 
 
-_PRODUCTION_SHAPED_ENV_VARS = (
-    "VERCEL",
-    "VERCEL_URL",
-    "RENDER_EXTERNAL_HOSTNAME",
-    "RENDER",
-    "KUBERNETES_SERVICE_HOST",
-    "FLY_APP_NAME",
-    "RAILWAY_PROJECT_ID",
-)
-
-
 @pytest.fixture(autouse=True)
 def _clean_production_shaped_env(monkeypatch: pytest.MonkeyPatch) -> Iterable[None]:
     """Clear the production-shaped host detector env vars per-test.
@@ -414,7 +404,7 @@ def _clean_production_shaped_env(monkeypatch: pytest.MonkeyPatch) -> Iterable[No
     deterministic regardless of where the suite runs.
     """
 
-    for key in _PRODUCTION_SHAPED_ENV_VARS:
+    for key in HOSTED_PLATFORM_ENV_MARKERS:
         monkeypatch.delenv(key, raising=False)
     yield
 

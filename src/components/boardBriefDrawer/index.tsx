@@ -26,6 +26,8 @@ import { microcopy } from "../../constants/microcopy";
 import { BRIEF_CACHE_TTL_MS } from "../../theme/aiTokens";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
+import { srOnlyLiveRegionStyle } from "../../utils/a11y/srOnlyLiveRegionStyle";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
@@ -91,41 +93,6 @@ const WorkloadBar = styled.div<{ overloaded: boolean }>`
     transition: transform 320ms ease-out;
     width: 100%;
 `;
-const LIVE_REGION_STYLE = {
-    border: 0,
-    clip: "rect(0 0 0 0)",
-    height: 1,
-    margin: -1,
-    overflow: "hidden",
-    padding: 0,
-    /*
-     * SR-only live region: the 1×1 clip hides it visually but the box
-     * still occupies a hit-test target. Drop pointer-events so any
-     * button stacked behind it (e.g. drawer chrome on tight viewports)
-     * always receives the click. Mirrors the pattern in
-     * commandPalette / board filter announcer.
-     */
-    pointerEvents: "none" as const,
-    position: "absolute" as const,
-    width: 1
-};
-
-const extractSuggestionRunId = (payload: unknown): string | null => {
-    if (!payload || typeof payload !== "object") return null;
-    const record = payload as Record<string, unknown>;
-    for (const key of [
-        "brief_run_id",
-        "run_id",
-        "suggestion_id",
-        "id"
-    ] as const) {
-        const candidate = record[key];
-        if (typeof candidate === "string" && candidate.length > 0) {
-            return candidate;
-        }
-    }
-    return null;
-};
 
 interface BoardBriefDrawerProps {
     open: boolean;
@@ -700,7 +667,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                 aria-atomic="true"
                 aria-live="polite"
                 role="status"
-                style={LIVE_REGION_STYLE}
+                style={srOnlyLiveRegionStyle}
             >
                 {briefStatusAnnouncement}
             </div>

@@ -15,6 +15,7 @@ from app.agents.errors import AgentConfigurationError
 from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
 from app.agents.llm import assert_provider_available
 from app.config import Settings, settings
+from app.deploy_env import HOSTED_PLATFORM_ENV_MARKERS, has_hosted_platform_env
 from app.errors import AppError
 from app.middleware import budget as _budget
 from app.middleware import idempotency as _idempotency
@@ -164,15 +165,7 @@ def _propagate_langsmith_env(cfg: Settings) -> None:
         os.environ.setdefault("LANGSMITH_PROJECT", cfg.langsmith_project)
 
 
-_PRODUCTION_SHAPED_ENV_VARS: tuple[str, ...] = (
-    "VERCEL",
-    "VERCEL_URL",
-    "RENDER_EXTERNAL_HOSTNAME",
-    "RENDER",
-    "KUBERNETES_SERVICE_HOST",
-    "FLY_APP_NAME",
-    "RAILWAY_PROJECT_ID",
-)
+_PRODUCTION_SHAPED_ENV_VARS = HOSTED_PLATFORM_ENV_MARKERS
 
 
 _LOCALHOST_HOSTS: frozenset[str] = frozenset(
@@ -231,7 +224,7 @@ def _warn_about_localhost_only_cors(cfg: Settings) -> None:
     deploy log without breaking startup.
     """
 
-    if not any(os.getenv(name) for name in _PRODUCTION_SHAPED_ENV_VARS):
+    if not has_hosted_platform_env():
         return
     if cfg.cors_origin_regex:
         return
