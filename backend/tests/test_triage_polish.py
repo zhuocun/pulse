@@ -321,6 +321,40 @@ def test_generate_nudges_appends_polish_usage_message_for_budget() -> None:
     assert usage["output_tokens"] == 4
 
 
+def test_generate_nudges_emits_healthy_nudge_when_no_drift() -> None:
+    """A board with zero drift signals must surface a single ``healthy`` nudge.
+
+    Pre-fix the panel was silently empty, indistinguishable from an outage.
+    Demo viewers should see "board looks healthy" instead.
+    """
+    agent = TriageAgent()
+    checkpointer, store = _persistence()
+    graph = agent.build(checkpointer=checkpointer, store=store)
+
+    # Snapshot with no unowned bugs, no WIP overflow, no stale tasks.
+    snapshot = {
+        "columns": [{"id": "c1", "name": "Todo", "wip_limit": 5}],
+        "tasks": [],
+    }
+
+    final = _drive(
+        graph,
+        {"project_id": "p-healthy-1"},
+        [snapshot],
+        thread_id="nudge-healthy-1",
+    )
+
+    nudges = final.get("nudges") or []
+    assert len(nudges) == 1
+    assert nudges[0]["type"] == "healthy"
+    assert "healthy" in nudges[0]["summary"].lower()
+    events = final.get("events") or []
+    suggestion_events = [
+        e for e in events if isinstance(e, dict) and e.get("kind") == "suggestion"
+    ]
+    assert suggestion_events, "Expected a healthy nudge suggestion event"
+
+
 def test_generate_nudges_emits_suggestion_nudge_shape() -> None:
     """The ``generate_nudges`` node must populate ``state['events']`` with nudge suggestions.
 

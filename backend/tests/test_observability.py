@@ -32,6 +32,7 @@ from app.observability.metrics import (
     TOKEN_DIRECTIONS,
     configure_metrics,
     make_metrics_app,
+    record_event_validation_failure,
     record_idempotency,
     record_invocation,
 )
@@ -444,6 +445,37 @@ def test_record_idempotency_is_safe_when_metrics_disabled() -> None:
     cfg = replace(app_settings, prometheus_metrics=False)
     configure_metrics(settings=cfg)
     record_idempotency("/x", "hit")  # no-op, no raise
+
+
+def test_record_event_validation_failure_increments_counter() -> None:
+    """Each fail-safe pass-through must bump the validation-failure counter
+    so an operator can alert on schema drift in production."""
+
+    cfg = replace(app_settings, prometheus_metrics=True)
+    configure_metrics(settings=cfg)
+    record_event_validation_failure(
+        agent="board-brief-agent", kind="suggestion", surface="brief"
+    )
+    record_event_validation_failure(
+        agent="board-brief-agent", kind="suggestion", surface="brief"
+    )
+    assert (
+        _counter_value(
+            metrics_module.agent_event_validation_failures_total,
+            agent="board-brief-agent",
+            kind="suggestion",
+            surface="brief",
+        )
+        == 2.0
+    )
+
+
+def test_record_event_validation_failure_is_safe_when_metrics_disabled() -> None:
+    cfg = replace(app_settings, prometheus_metrics=False)
+    configure_metrics(settings=cfg)
+    record_event_validation_failure(
+        agent="x", kind="mutation_proposal"
+    )  # no-op, no raise
 
 
 # ---------------------------------------------------------------------------

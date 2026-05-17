@@ -102,8 +102,22 @@ def test_validate_mutation_proposal_event_returns_non_mutation_unchanged() -> No
 
 def test_validate_mutation_proposal_event_logs_and_passes_through_invalid(
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Pydantic failure → warning logged, original dict returned unchanged."""
+    """Pydantic failure → warning logged, original dict returned unchanged,
+    and the validation-failure Prometheus counter is bumped so an operator
+    can alert on schema drift even though the bad payload still streams.
+    """
+
+    captured: list[dict[str, str]] = []
+
+    def fake_record(*, agent: str, kind: str, surface: str = "") -> None:
+        captured.append({"agent": agent, "kind": kind, "surface": surface})
+
+    monkeypatch.setattr(
+        "app.observability.metrics.record_event_validation_failure",
+        fake_record,
+    )
 
     bad = {"kind": "mutation_proposal", "proposal": {"proposal_id": "x"}}
     with caplog.at_level(logging.WARNING):
@@ -113,6 +127,9 @@ def test_validate_mutation_proposal_event_logs_and_passes_through_invalid(
         "mutation_proposal validation failed" in rec.message
         for rec in caplog.records
     )
+    assert captured == [
+        {"agent": "chat-agent", "kind": "mutation_proposal", "surface": ""}
+    ]
 
 
 def test_validate_mutation_proposal_event_accepts_valid_payload() -> None:
@@ -167,11 +184,19 @@ def test_mutation_hitl_returns_empty_when_no_pending_proposal() -> None:
     assert chat_module._mutation_hitl({}) == {}
 
 
-def test_mutation_hitl_returns_empty_for_blank_proposal_id() -> None:
-    """A proposal whose id is not a non-empty string is silently skipped."""
+def test_mutation_hitl_drops_loudly_for_blank_proposal_id() -> None:
+    """A proposal whose id is blank now aborts with a user-visible message.
+
+    Pre-hardening this silently returned ``{}`` and the empty string ended up
+    in ``mutation_applied_ids`` on the apply side, poisoning the idempotency
+    guard for every later proposal in the same thread.
+    """
 
     state = {"mutation_pending": {"proposal_id": "   "}}
-    assert chat_module._mutation_hitl(state) == {}
+    out = chat_module._mutation_hitl(state)
+    assert out["mutation_pending"] is None
+    assert out["mutation_decision"] is None
+    assert "missing id" in out["messages"][0].content
 
 
 def test_mutation_finalize_returns_empty_when_no_pending_proposal() -> None:

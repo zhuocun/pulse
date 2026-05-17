@@ -143,6 +143,23 @@ def reset_embeddings_singleton() -> None:
     _embeddings_singleton = None
 
 
+def using_stub_embeddings() -> bool:
+    """Return ``True`` when the resolved provider is the SHA-256 stub.
+
+    Demo-state hardening: agents that rerank via cosine similarity (search,
+    task-estimation) lean on real embeddings to surface "strong" matches.
+    The stub clusters every score in 0.2-0.6, so a stub-mode demo shows
+    only "weak"/"moderate" badges and looks broken.  This helper lets
+    catalog agents tag the wire payload so the FE / operator can tell
+    "no strong matches found" apart from "running without an embeddings
+    key".
+    """
+
+    from app.agents.embeddings import is_stub_embeddings
+
+    return is_stub_embeddings(_resolve_embeddings())
+
+
 async def embed_async(texts: list[str], dim: int = 16) -> list[list[float]]:
     """Like :func:`embed` but safe to ``await`` from async LangGraph nodes.
 

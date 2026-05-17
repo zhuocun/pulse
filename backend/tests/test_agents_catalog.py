@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
@@ -689,6 +689,154 @@ def test_chat_agent_provider_error_falls_back_to_stub_reply() -> None:
     assert messages, "must have at least one message in final state"
     last = messages[-1]
     assert last.content, "fallback reply must be non-empty"
+    # Demo-state hardening: the silently-degraded reply must carry a visible
+    # marker so the operator/audience can tell the live provider wasn't used.
+    from app.agents.catalog.chat import _DEGRADED_REPLY_PREFIX
+
+    assert _DEGRADED_REPLY_PREFIX in last.content
+
+
+def test_chat_agent_trim_keeps_tool_message_paired_with_tool_call() -> None:
+    """The model must never see a ``ToolMessage`` whose paired ``AIMessage``
+    (with ``tool_calls``) was dropped by trim.
+
+    Pre-fix the trim used ``token_counter=len`` so it never ran in practice;
+    once we switched to a real token counter, ``start_on="human"`` is what
+    actually prevents an orphan-tool-message shape from being sent to a
+    provider (Anthropic 400s on it).  Force the trim by stubbing the budget
+    down to a single message, run a turn whose message list starts with a
+    tool message, and assert the conversation passed to the model begins
+    with a HumanMessage (i.e. the orphan tool message was dropped).
+    """
+    import app.agents.catalog.chat as chat_mod
+    from langchain_core.messages import ToolMessage
+
+    agent = global_registry.get("chat-agent")
+    checkpointer, store = _persistence()
+
+    captured: list[list[Any]] = []
+
+    class _CapturingModel:
+        async def ainvoke(self, messages: Any, **__: Any) -> Any:
+            captured.append(list(messages))
+            return AIMessage(content="ok")
+
+        def bind_tools(self, _tools: Any) -> "_CapturingModel":
+            return self
+
+    original_is_stub = chat_mod.is_stub_model
+    chat_mod.is_stub_model = lambda _m: False
+    agent.set_chat_model(_CapturingModel())
+    # Force the trim to actually drop messages by setting the budget tiny.
+    original_budget = chat_mod._CHAT_TRIM_TOKEN_BUDGET
+    chat_mod._CHAT_TRIM_TOKEN_BUDGET = 10
+
+    try:
+        graph = agent.compile(checkpointer=checkpointer, store=store)
+        cfg = {"configurable": {"thread_id": "chat-tool-pair-1"}}
+
+        async def run() -> Any:
+            # Orphan tool message at the head: if the trim doesn't enforce
+            # start_on='human' the conversation sent to the model starts
+            # with a ToolMessage and Anthropic returns a 400.
+            return await graph.ainvoke(
+                {
+                    "messages": [
+                        ToolMessage(
+                            content="stale tool result",
+                            tool_call_id="orphan-1",
+                        ),
+                        HumanMessage(content="latest user turn"),
+                    ]
+                },
+                config=cfg,
+            )
+
+        asyncio.run(run())
+    finally:
+        chat_mod.is_stub_model = original_is_stub
+        chat_mod._CHAT_TRIM_TOKEN_BUDGET = original_budget
+        global_registry.clear()
+        _ensure_catalog_registered()
+
+    assert captured, "model should have been invoked"
+    conversation = captured[0]
+    # The system prompt comes first, but every non-system message must form
+    # a valid Anthropic conversation -- specifically, no orphan ToolMessage
+    # in the leading position.
+    non_system = [
+        m for m in conversation if not isinstance(m, SystemMessage)
+    ]
+    assert non_system, "expected at least the trimmed human turn"
+    assert isinstance(non_system[0], HumanMessage)
+    assert not any(isinstance(m, ToolMessage) for m in non_system)
+
+
+def test_chat_agent_trim_fallback_when_no_human_fits_budget() -> None:
+    """If ``start_on="human"`` would yield an empty list, the agent must
+    fall back to the most recent ``HumanMessage`` so the model sees what
+    the user asked.
+
+    Pre-fix: a long tool loop whose latest human turn fell outside the
+    trim budget left the conversation as ``[SystemMessage]`` only, and the
+    model produced a generic greeting because it had no user input to
+    answer.
+    """
+
+    import app.agents.catalog.chat as chat_mod
+    from langchain_core.messages import ToolMessage
+
+    agent = global_registry.get("chat-agent")
+    checkpointer, store = _persistence()
+
+    captured: list[list[Any]] = []
+
+    class _CapturingModel:
+        async def ainvoke(self, messages: Any, **__: Any) -> Any:
+            captured.append(list(messages))
+            return AIMessage(content="ok")
+
+        def bind_tools(self, _tools: Any) -> "_CapturingModel":
+            return self
+
+    original_is_stub = chat_mod.is_stub_model
+    chat_mod.is_stub_model = lambda _m: False
+    agent.set_chat_model(_CapturingModel())
+    # Force the trim to drop everything by setting the budget to 0.
+    original_budget = chat_mod._CHAT_TRIM_TOKEN_BUDGET
+    chat_mod._CHAT_TRIM_TOKEN_BUDGET = 0
+
+    try:
+        graph = agent.compile(checkpointer=checkpointer, store=store)
+        cfg = {"configurable": {"thread_id": "chat-empty-trim-1"}}
+
+        async def run() -> Any:
+            return await graph.ainvoke(
+                {
+                    "messages": [
+                        HumanMessage(content="original question"),
+                        AIMessage(content="thinking..."),
+                        ToolMessage(
+                            content="t-result", tool_call_id="t-call-1"
+                        ),
+                    ]
+                },
+                config=cfg,
+            )
+
+        asyncio.run(run())
+    finally:
+        chat_mod.is_stub_model = original_is_stub
+        chat_mod._CHAT_TRIM_TOKEN_BUDGET = original_budget
+        global_registry.clear()
+        _ensure_catalog_registered()
+
+    assert captured, "model should have been invoked"
+    conversation = captured[0]
+    # Must contain the system prompt + the recovered HumanMessage at minimum.
+    human_messages = [m for m in conversation if isinstance(m, HumanMessage)]
+    assert human_messages, "fallback must inject the most recent HumanMessage"
+    assert human_messages[-1].content == "original question"
 
 
 def test_chat_agent_propagates_cancellation_through_provider_call() -> None:

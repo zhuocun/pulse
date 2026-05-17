@@ -514,11 +514,19 @@ class SearchAgent(BaseAgent):
                     )
             n = len(candidates)
             if not candidates:
+                # Demo-state visibility: the previous "No candidates returned
+                # for this query." reads like a backend error.  Be explicit
+                # that the FE legitimately returned an empty list so the
+                # operator can tell a zero-result search from a fetch failure.
+                query_label = (query or "").strip() or "(empty query)"
                 return {
                     "ranking": {
                         "ids": [],
                         "matches": [],
-                        "rationale": "No candidates returned for this query.",
+                        "rationale": (
+                            f"No tasks matched {query_label!r} - try a "
+                            "broader query or remove filters."
+                        ),
                     }
                 }
             # Embed query and all candidate texts in a single batch where
@@ -538,11 +546,26 @@ class SearchAgent(BaseAgent):
             ids = [item_id for item_id, _score in neighbours]
             score_map = {item_id: score for item_id, score in neighbours}
             matches = _build_matches(ids, score_map)
+            # Demo-state visibility: in stub-embeddings mode every score
+            # clusters in 0.2-0.6 so the FE never shows a "strong" badge
+            # and search looks broken.  Tag the rationale so the operator
+            # (and ultimately the FE) can tell stub-mode from a genuine
+            # all-weak-matches result.
+            if be_tools.using_stub_embeddings():
+                rationale = (
+                    f"[demo embeddings] Ranked by SHA-256 stub similarity "
+                    f"over {n} candidates - set OPENAI_API_KEY for real "
+                    "semantic search."
+                )
+            else:
+                rationale = (
+                    f"Ranked by embedding similarity over {n} candidates."
+                )
             return {
                 "ranking": {
                     "ids": ids,
                     "matches": matches,
-                    "rationale": f"Ranked by embedding similarity over {n} candidates.",
+                    "rationale": rationale,
                     # Thread the original cosine scores through to ``polish``
                     # so LLM-reranked ids keep their real scores rather than
                     # the bucket floor from ``_strength_to_score``.

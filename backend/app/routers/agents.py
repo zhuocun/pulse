@@ -446,6 +446,56 @@ def _enforce_status(metadata: AgentMetadata, response_headers: dict[str, str]) -
         response_headers["Deprecation"] = "true"
 
 
+def _redact_content_blocks(
+    blocks: list[Any],
+    spans_out: list[Any],
+) -> list[Any]:
+    """Redact PII inside a list of LangChain content blocks.
+
+    Handles three shapes a user message can carry:
+
+    * ``{"type": "text", "text": "<str>"}`` -> redact ``text``.
+    * ``{"type": "tool_result", "content": "<str>"}`` -> redact ``content``.
+    * ``{"type": "tool_result", "content": [<nested blocks>]}`` -> recurse.
+
+    Any other shape (``tool_use``, opaque blocks) passes through unchanged.
+    ``spans_out`` is appended to in place so the caller's
+    ``request.state.redaction_spans`` audit list stays complete.
+    """
+
+    new_blocks: list[Any] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            new_blocks.append(block)
+            continue
+        text = block.get("text")
+        if isinstance(text, str):
+            replaced, block_spans = redact(text)
+            spans_out.extend(block_spans)
+            new_blocks.append({**block, "text": replaced})
+            continue
+        # ``tool_result`` blocks: Anthropic allows either a plain string
+        # content or a nested block list.  Both can carry redaction
+        # candidates so recurse on lists and redact strings in place.
+        if block.get("type") == "tool_result":
+            content = block.get("content")
+            if isinstance(content, str):
+                replaced, block_spans = redact(content)
+                spans_out.extend(block_spans)
+                new_blocks.append({**block, "content": replaced})
+                continue
+            if isinstance(content, list):
+                new_blocks.append(
+                    {
+                        **block,
+                        "content": _redact_content_blocks(content, spans_out),
+                    }
+                )
+                continue
+        new_blocks.append(block)
+    return new_blocks
+
+
 def _redact_inputs(
     inputs: dict[str, Any],
     request: Request,
@@ -481,16 +531,23 @@ def _redact_inputs(
     if isinstance(messages, list):
         new_messages: list[Any] = []
         for message in messages:
-            if (
-                isinstance(message, dict)
-                and message.get("role") == "user"
-                and isinstance(message.get("content"), str)
-            ):
-                replaced, msg_spans = redact(message["content"])
-                spans.extend(msg_spans)
-                new_messages.append({**message, "content": replaced})
-            else:
-                new_messages.append(message)
+            if isinstance(message, dict) and message.get("role") == "user":
+                content = message.get("content")
+                if isinstance(content, str):
+                    replaced, msg_spans = redact(content)
+                    spans.extend(msg_spans)
+                    new_messages.append({**message, "content": replaced})
+                    continue
+                if isinstance(content, list):
+                    # LangChain tool-call messages carry content as a list of
+                    # typed blocks (text / tool_use / tool_result).  Both
+                    # ``text`` blocks AND ``tool_result.content`` (string or
+                    # nested-block list) can hold user-supplied PII; pre-fix
+                    # only the string-content message shape was redacted.
+                    new_blocks = _redact_content_blocks(content, spans)
+                    new_messages.append({**message, "content": new_blocks})
+                    continue
+            new_messages.append(message)
         redacted["messages"] = new_messages
 
     if metadata is not None:
@@ -922,10 +979,38 @@ async def stream_agent(
             cached = idem.cached_response
             record_idempotency(route_path, "hit")
             record_invocation(name, "replay")
-            return JSONResponse(
-                content=cached.body,
+            # The /stream endpoint serves ``text/event-stream``; serving a
+            # cached JSON body to an SSE consumer hangs the FE (parseSseLine
+            # finds zero ``data:`` lines and yields nothing). Replay the
+            # completion marker as a single SSE frame plus the DONE
+            # sentinel so the FE's reader sees the contract it expects.
+            replay_envelope = {
+                "type": "custom",
+                "ns": [],
+                "data": {"kind": "status", "message": "stream_completed"},
+            }
+
+            async def _replay_stream() -> AsyncIterator[bytes]:
+                yield encode_sse(replay_envelope)
+                yield DONE_FRAME
+
+            # Build the replay header dict explicitly to avoid any
+            # case-collision between ``Content-Type`` and ``content-type``
+            # if the cache backend ever returns headers with the capitalised
+            # key.  Drop any existing content-type variant before forcing
+            # the SSE one.
+            replay_headers = {
+                key: value
+                for key, value in cached.headers.items()
+                if key.lower() != "content-type"
+            }
+            replay_headers["Idempotent-Replay"] = "true"
+            replay_headers["content-type"] = "text/event-stream"
+            return StreamingResponse(
+                _replay_stream(),
                 status_code=cached.status_code,
-                headers={**cached.headers, "Idempotent-Replay": "true"},
+                media_type="text/event-stream",
+                headers=replay_headers,
             )
 
     reserved_budget = 0

@@ -265,6 +265,8 @@ def validate_mutation_proposal_event(
     """Validate ``kind="mutation_proposal"`` against the wire schema.
 
     Pass-through with warning on failure (same policy as suggestions).
+    A Prometheus counter is bumped on every failure so operators can
+    alert on drift even though the bad payload still streams through.
     """
 
     if not isinstance(evt, dict) or evt.get("kind") != "mutation_proposal":
@@ -277,6 +279,12 @@ def validate_mutation_proposal_event(
             agent,
             exc,
         )
+        # Local import: app.observability imports from this package
+        # tree transitively (via app.agents.instrumentation), so
+        # top-level import would cycle.
+        from app.observability.metrics import record_event_validation_failure
+
+        record_event_validation_failure(agent=agent, kind="mutation_proposal")
     return evt
 
 
@@ -321,6 +329,11 @@ def validate_suggestion_payload(
             agent,
             surface,
             exc,
+        )
+        from app.observability.metrics import record_event_validation_failure
+
+        record_event_validation_failure(
+            agent=agent, kind="suggestion", surface=surface
         )
     return suggestion
 

@@ -245,6 +245,147 @@ def test_redact_inputs_consults_metadata_dict_fields() -> None:
     assert "bob@corp.com" not in out["task_draft"]["taskName"]
 
 
+def test_redact_inputs_handles_tool_result_string_content() -> None:
+    """``tool_result`` blocks carrying ``content: "<str>"`` must be redacted.
+
+    Anthropic's tool_result shape allows either a string content or a nested
+    block list; pre-fix only ``{"type": "text", "text": "<str>"}`` was
+    handled and PII in tool_result.content (the more common shape for
+    successful tool calls) flowed to the LLM and to logs un-redacted.
+    """
+
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t-1",
+                        "content": "matched alice@example.com",
+                    }
+                ],
+            }
+        ]
+    }
+    out = _redact_inputs(payload, _RequestStub(), None)
+    block = out["messages"][0]["content"][0]
+    assert block["content"] == "matched [EMAIL]"
+    assert block["tool_use_id"] == "t-1"
+
+
+def test_redact_inputs_recurses_into_nested_tool_result_blocks() -> None:
+    """Nested tool_result content (``[{type:text, text:...}, ...]``) must
+    have each inner text block redacted."""
+
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t-2",
+                        "content": [
+                            {"type": "text", "text": "see bob@corp.com"},
+                            {"type": "tool_use", "id": "t-noop", "name": "n"},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    out = _redact_inputs(payload, _RequestStub(), None)
+    inner = out["messages"][0]["content"][0]["content"]
+    assert inner[0]["text"] == "see [EMAIL]"
+    # Non-text blocks inside the nested list pass through untouched.
+    assert inner[1] == {"type": "tool_use", "id": "t-noop", "name": "n"}
+
+
+def test_redact_inputs_passes_through_unknown_block_shapes() -> None:
+    """A block that is not a dict, or a tool_result with an unexpected
+    content type, must be passed through unchanged."""
+
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    "raw-string-block",  # not a dict
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t-3",
+                        "content": 42,  # not str / not list
+                    },
+                ],
+            }
+        ]
+    }
+    out = _redact_inputs(payload, _RequestStub(), None)
+    blocks = out["messages"][0]["content"]
+    assert blocks[0] == "raw-string-block"
+    assert blocks[1]["content"] == 42
+
+
+def test_redact_inputs_handles_list_content_blocks() -> None:
+    """User messages with list-shape ``content`` (LangChain tool-call blocks)
+    must have PII inside each text block redacted.
+
+    Pre-fix the router only handled ``content: str`` and a tool-call message
+    carrying ``[{type: "text", text: "...alice@x.com..."}]`` slipped past
+    redaction entirely.
+    """
+
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "ping alice@example.com"},
+                    {"type": "tool_use", "id": "t-1", "name": "noop"},
+                ],
+            }
+        ]
+    }
+    out = _redact_inputs(payload, _RequestStub(), None)
+    blocks = out["messages"][0]["content"]
+    assert blocks[0]["text"] == "ping [EMAIL]"
+    # Non-text blocks pass through unchanged.
+    assert blocks[1] == {"type": "tool_use", "id": "t-1", "name": "noop"}
+
+
 # ---------------------------------------------------------------------------
 # Integration: polish_search must not forward PII from candidate text
 # ---------------------------------------------------------------------------

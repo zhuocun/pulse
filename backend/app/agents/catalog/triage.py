@@ -342,6 +342,20 @@ class TriageAgent(BaseAgent):
             )
             # F-43: project_id is now in context, not state.
             project_id = _ctx.get("project_id") or ""
+            # Demo-state visibility: a no-drift board used to surface zero
+            # nudges with no signal, indistinguishable from "agent never ran".
+            # Emit a single "healthy" nudge so the panel is never silently
+            # empty.
+            if not polished_nudges:
+                polished_nudges = [
+                    {
+                        "type": "healthy",
+                        "summary": "No drift detected - board looks healthy.",
+                        "severity": "info",
+                        "details": {},
+                        "actions": [],
+                    }
+                ]
             extra_messages = [raw_msg] if raw_msg is not None else []
             new_events: list[dict] = []
             for index, nudge in enumerate(polished_nudges):

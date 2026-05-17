@@ -26,6 +26,29 @@ def test_failover_exception_types_non_empty() -> None:
     assert len(_failover_exception_types()) >= 1
 
 
+def test_failover_exception_types_include_rate_limit() -> None:
+    """A 429 from the primary must trigger failover, not bubble up.
+
+    Pre-fix, RateLimitError was missing from the tuple and a steady-state
+    quota dip on the primary provider killed the demo path even though the
+    secondary would have answered.
+    """
+
+    types = _failover_exception_types()
+    try:
+        import anthropic
+    except ImportError:  # pragma: no cover -- vendor optional in CI
+        anthropic = None
+    try:
+        import openai
+    except ImportError:  # pragma: no cover
+        openai = None
+    if anthropic is not None:
+        assert anthropic.RateLimitError in types
+    if openai is not None:
+        assert openai.RateLimitError in types
+
+
 def test_failover_secondary_none_for_stub_provider() -> None:
     spec = ChatModelSpec(
         provider=PROVIDER_STUB,
