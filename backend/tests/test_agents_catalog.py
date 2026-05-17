@@ -772,6 +772,73 @@ def test_chat_agent_trim_keeps_tool_message_paired_with_tool_call() -> None:
     assert not any(isinstance(m, ToolMessage) for m in non_system)
 
 
+def test_chat_agent_trim_fallback_when_no_human_fits_budget() -> None:
+    """If ``start_on="human"`` would yield an empty list, the agent must
+    fall back to the most recent ``HumanMessage`` so the model sees what
+    the user asked.
+
+    Pre-fix: a long tool loop whose latest human turn fell outside the
+    trim budget left the conversation as ``[SystemMessage]`` only, and the
+    model produced a generic greeting because it had no user input to
+    answer.
+    """
+
+    import app.agents.catalog.chat as chat_mod
+    from langchain_core.messages import ToolMessage
+
+    agent = global_registry.get("chat-agent")
+    checkpointer, store = _persistence()
+
+    captured: list[list[Any]] = []
+
+    class _CapturingModel:
+        async def ainvoke(self, messages: Any, **__: Any) -> Any:
+            captured.append(list(messages))
+            return AIMessage(content="ok")
+
+        def bind_tools(self, _tools: Any) -> "_CapturingModel":
+            return self
+
+    original_is_stub = chat_mod.is_stub_model
+    chat_mod.is_stub_model = lambda _m: False
+    agent.set_chat_model(_CapturingModel())
+    # Force the trim to drop everything by setting the budget to 0.
+    original_budget = chat_mod._CHAT_TRIM_TOKEN_BUDGET
+    chat_mod._CHAT_TRIM_TOKEN_BUDGET = 0
+
+    try:
+        graph = agent.compile(checkpointer=checkpointer, store=store)
+        cfg = {"configurable": {"thread_id": "chat-empty-trim-1"}}
+
+        async def run() -> Any:
+            return await graph.ainvoke(
+                {
+                    "messages": [
+                        HumanMessage(content="original question"),
+                        AIMessage(content="thinking..."),
+                        ToolMessage(
+                            content="t-result", tool_call_id="t-call-1"
+                        ),
+                    ]
+                },
+                config=cfg,
+            )
+
+        asyncio.run(run())
+    finally:
+        chat_mod.is_stub_model = original_is_stub
+        chat_mod._CHAT_TRIM_TOKEN_BUDGET = original_budget
+        global_registry.clear()
+        _ensure_catalog_registered()
+
+    assert captured, "model should have been invoked"
+    conversation = captured[0]
+    # Must contain the system prompt + the recovered HumanMessage at minimum.
+    human_messages = [m for m in conversation if isinstance(m, HumanMessage)]
+    assert human_messages, "fallback must inject the most recent HumanMessage"
+    assert human_messages[-1].content == "original question"
+
+
 def test_chat_agent_propagates_cancellation_through_provider_call() -> None:
     """chat-agent must NOT swallow CancelledError from the provider call.
 

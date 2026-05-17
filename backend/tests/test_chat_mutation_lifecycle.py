@@ -191,8 +191,13 @@ def test_chat_apply_non_success_shape_treated_as_failure(chat_graph) -> None:
     asyncio.run(run())
 
 
-def test_chat_apply_with_edited_diff_preserved(chat_graph) -> None:
-    """An ``edited_diff`` on the accept resume must propagate to the decision."""
+def test_chat_apply_with_edited_diff_reaches_fe_apply(chat_graph) -> None:
+    """A user-edited diff on the accept resume must reach ``fe.applyMutation``.
+
+    Pre-fix the decision dict preserved ``edited_diff`` but the finalize node
+    used the original proposal diff for the apply stage, so any user edit
+    during approval was silently dropped.
+    """
 
     async def run() -> None:
         cfg = {"configurable": {"thread_id": "mut-edit-1"}}
@@ -202,13 +207,28 @@ def test_chat_apply_with_edited_diff_preserved(chat_graph) -> None:
             config=cfg,
             context=ctx,
         )
-        edited = {"task_updates": []}
+        edited = {
+            "task_updates": [
+                {
+                    "task_id": "edited-task-1",
+                    "field": "taskName",
+                    "from": "Before",
+                    "to": "User-Edited Title",
+                }
+            ]
+        }
         mid = await chat_graph.ainvoke(
             Command(resume={"accepted": True, "edited_diff": edited}),
             config=cfg,
             context=ctx,
         )
-        assert mid.get("mutation_decision", {}).get("edited_diff") == edited
+        # The edited diff must be on the apply-stage interrupt payload, not
+        # just stashed on the decision.
+        interrupts = mid.get("__interrupt__") or []
+        assert interrupts, "expected the apply-stage interrupt"
+        payload = interrupts[0].value
+        assert payload["args"]["stage"] == "apply"
+        assert payload["args"]["diff"] == edited
 
     asyncio.run(run())
 

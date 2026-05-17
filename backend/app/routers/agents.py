@@ -446,6 +446,56 @@ def _enforce_status(metadata: AgentMetadata, response_headers: dict[str, str]) -
         response_headers["Deprecation"] = "true"
 
 
+def _redact_content_blocks(
+    blocks: list[Any],
+    spans_out: list[Any],
+) -> list[Any]:
+    """Redact PII inside a list of LangChain content blocks.
+
+    Handles three shapes a user message can carry:
+
+    * ``{"type": "text", "text": "<str>"}`` -> redact ``text``.
+    * ``{"type": "tool_result", "content": "<str>"}`` -> redact ``content``.
+    * ``{"type": "tool_result", "content": [<nested blocks>]}`` -> recurse.
+
+    Any other shape (``tool_use``, opaque blocks) passes through unchanged.
+    ``spans_out`` is appended to in place so the caller's
+    ``request.state.redaction_spans`` audit list stays complete.
+    """
+
+    new_blocks: list[Any] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            new_blocks.append(block)
+            continue
+        text = block.get("text")
+        if isinstance(text, str):
+            replaced, block_spans = redact(text)
+            spans_out.extend(block_spans)
+            new_blocks.append({**block, "text": replaced})
+            continue
+        # ``tool_result`` blocks: Anthropic allows either a plain string
+        # content or a nested block list.  Both can carry redaction
+        # candidates so recurse on lists and redact strings in place.
+        if block.get("type") == "tool_result":
+            content = block.get("content")
+            if isinstance(content, str):
+                replaced, block_spans = redact(content)
+                spans_out.extend(block_spans)
+                new_blocks.append({**block, "content": replaced})
+                continue
+            if isinstance(content, list):
+                new_blocks.append(
+                    {
+                        **block,
+                        "content": _redact_content_blocks(content, spans_out),
+                    }
+                )
+                continue
+        new_blocks.append(block)
+    return new_blocks
+
+
 def _redact_inputs(
     inputs: dict[str, Any],
     request: Request,
@@ -490,21 +540,11 @@ def _redact_inputs(
                     continue
                 if isinstance(content, list):
                     # LangChain tool-call messages carry content as a list of
-                    # typed blocks (text / tool_use / tool_result).  The text
-                    # blocks can hold user-supplied PII; pre-fix they bypassed
-                    # redaction entirely because the loop only matched the
-                    # string-content shape.
-                    new_blocks: list[Any] = []
-                    for block in content:
-                        if (
-                            isinstance(block, dict)
-                            and isinstance(block.get("text"), str)
-                        ):
-                            block_replaced, block_spans = redact(block["text"])
-                            spans.extend(block_spans)
-                            new_blocks.append({**block, "text": block_replaced})
-                        else:
-                            new_blocks.append(block)
+                    # typed blocks (text / tool_use / tool_result).  Both
+                    # ``text`` blocks AND ``tool_result.content`` (string or
+                    # nested-block list) can hold user-supplied PII; pre-fix
+                    # only the string-content message shape was redacted.
+                    new_blocks = _redact_content_blocks(content, spans)
                     new_messages.append({**message, "content": new_blocks})
                     continue
             new_messages.append(message)
@@ -954,13 +994,18 @@ async def stream_agent(
                 yield encode_sse(replay_envelope)
                 yield DONE_FRAME
 
+            # Build the replay header dict explicitly to avoid any
+            # case-collision between ``Content-Type`` and ``content-type``
+            # if the cache backend ever returns headers with the capitalised
+            # key.  Drop any existing content-type variant before forcing
+            # the SSE one.
             replay_headers = {
-                **cached.headers,
-                "Idempotent-Replay": "true",
-                # Cached.headers came from a JSONResponse so the content-type
-                # is application/json; force the SSE one back.
-                "content-type": "text/event-stream",
+                key: value
+                for key, value in cached.headers.items()
+                if key.lower() != "content-type"
             }
+            replay_headers["Idempotent-Replay"] = "true"
+            replay_headers["content-type"] = "text/event-stream"
             return StreamingResponse(
                 _replay_stream(),
                 status_code=cached.status_code,

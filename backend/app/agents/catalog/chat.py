@@ -202,7 +202,11 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
             "mutation_decision": None,
         }
 
-    diff = proposal.get("diff") or {}
+    # ``decision["edited_diff"]`` is populated when the FE resume payload
+    # carried a user-edited diff (PRD §5.3 resume shape).  Prefer it over
+    # the original proposal so an in-flight edit during approval actually
+    # reaches the apply stage instead of being silently dropped.
+    diff = decision.get("edited_diff") or proposal.get("diff") or {}
     fe_result = interrupt(
         interrupt_payload(
             "fe.applyMutation",
@@ -355,6 +359,17 @@ class ChatAgent(BaseAgent):
                 allow_partial=False,
                 start_on="human",
             )
+            # ``start_on="human"`` returns an empty list when no HumanMessage
+            # fits the budget (e.g. the whole window is AI + tool messages).
+            # Sending ``[SystemMessage]`` alone strips the user's request and
+            # the model responds with a generic greeting -- worse than a
+            # potential trim violation.  Fall back to the most recent human
+            # message so the model always sees what the user asked.
+            if not trimmed and messages:
+                for msg in reversed(messages):
+                    if isinstance(msg, HumanMessage):
+                        trimmed = [msg]
+                        break
             conversation: List[Any] = [SystemMessage(content=_SYSTEM_PROMPT)]
             conversation.extend(trimmed)
             bound = chat_model.bind_tools(CHAT_TOOLS)
