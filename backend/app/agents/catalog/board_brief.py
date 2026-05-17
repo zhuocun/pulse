@@ -132,17 +132,28 @@ def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
     workload = sorted(
         member_load.values(), key=lambda m: m["openPoints"], reverse=True
     )[:5]
-    headline = (
-        f"{len(task_list)} tasks across {len(columns)} columns; "
-        f"{len(unowned)} unowned, {len(largest_unstarted)} large unstarted."
-    )
+    if not task_list and not (columns if isinstance(columns, list) else []):
+        # Demo-state visibility: an empty board used to surface as
+        # "0 tasks across 0 columns; 0 unowned, 0 large unstarted." which is
+        # indistinguishable from a successful brief on a tiny project.
+        # Produce something a viewer recognises as a deliberate empty state.
+        headline = "Board is empty - add tasks to see a brief."
+        recommendation = "Create the first column and a starter task."
+    else:
+        headline = (
+            f"{len(task_list)} tasks across {len(columns)} columns; "
+            f"{len(unowned)} unowned, {len(largest_unstarted)} large unstarted."
+        )
+        recommendation = (
+            "Reassign unowned bugs first; chunk large unstarted cards."
+        )
     return {
         "headline": headline[:140],
         "counts": counts,
         "largestUnstarted": largest_unstarted,
         "unowned": unowned,
         "workload": workload,
-        "recommendation": "Reassign unowned bugs first; chunk large unstarted cards.",
+        "recommendation": recommendation,
     }
 
 

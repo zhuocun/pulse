@@ -700,6 +700,22 @@ def test_v1_engine_board_brief_skips_invalid_entries() -> None:
     assert out["counts"][0]["columnId"] == "c1"
 
 
+def test_board_brief_empty_board_renders_explicit_empty_state() -> None:
+    """A zero-tasks / zero-columns board must produce a visible empty headline.
+
+    Pre-fix the headline was ``"0 tasks across 0 columns; 0 unowned, 0 large
+    unstarted."`` which reads like a successful brief on a tiny project.
+    Demo viewers couldn't distinguish "empty board" from "snapshot fetch
+    silently returned nothing".
+    """
+
+    from app.agents.catalog.board_brief import _compute_board_brief
+
+    out = _compute_board_brief({"columns": [], "tasks": [], "members": []})
+    assert "empty" in out["headline"].lower()
+    assert "first column" in out["recommendation"].lower()
+
+
 def test_v1_engine_board_brief_non_list_tasks_treated_as_empty() -> None:
     """Malformed ``tasks`` (not a list) must not iterate strings / corrupt aggregates."""
 

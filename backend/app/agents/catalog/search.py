@@ -514,11 +514,19 @@ class SearchAgent(BaseAgent):
                     )
             n = len(candidates)
             if not candidates:
+                # Demo-state visibility: the previous "No candidates returned
+                # for this query." reads like a backend error.  Be explicit
+                # that the FE legitimately returned an empty list so the
+                # operator can tell a zero-result search from a fetch failure.
+                query_label = (query or "").strip() or "(empty query)"
                 return {
                     "ranking": {
                         "ids": [],
                         "matches": [],
-                        "rationale": "No candidates returned for this query.",
+                        "rationale": (
+                            f"No tasks matched {query_label!r} - try a "
+                            "broader query or remove filters."
+                        ),
                     }
                 }
             # Embed query and all candidate texts in a single batch where
