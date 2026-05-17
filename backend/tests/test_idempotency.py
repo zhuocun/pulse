@@ -1381,10 +1381,14 @@ def test_stream_replays_completion_marker_with_idempotency_key(
     ai_budget_backend: BudgetTracker,
 ) -> None:
     """Initial POST streams SSE; a retry with the same key short-circuits
-    to a 200 JSON marker carrying ``Idempotent-Replay: true`` instead of
-    re-running the agent. The wire stream itself is not stored -- only
-    the completion marker is cached, which is enough to dedupe a real
-    network retry.
+    to a single-frame SSE replay carrying ``Idempotent-Replay: true``
+    instead of re-running the agent.
+
+    Pre-fix the replay served a JSON body (``{"status": "stream_completed"}``)
+    with ``content-type: application/json``; the FE's SSE reader yielded zero
+    events from it and the UI hung blank.  Replay now matches the original
+    wire contract: ``text/event-stream`` with one ``custom.status`` envelope
+    plus the ``[DONE]`` sentinel.
     """
 
     headers = {**auth_headers, "Idempotency-Key": "stream-replay"}
@@ -1403,10 +1407,22 @@ def test_stream_replays_completion_marker_with_idempotency_key(
     )
     assert spent_after_first > 0
 
-    second = client.post("/api/v1/agents/idem-noise/stream", json=body, headers=headers)
-    assert second.status_code == HTTPStatus.OK
-    assert second.headers.get("Idempotent-Replay") == "true"
-    assert second.json() == {"status": "stream_completed"}
+    with client.stream(
+        "POST",
+        "/api/v1/agents/idem-noise/stream",
+        json=body,
+        headers=headers,
+    ) as second:
+        assert second.status_code == HTTPStatus.OK
+        assert second.headers.get("Idempotent-Replay") == "true"
+        assert second.headers.get("content-type", "").startswith(
+            "text/event-stream"
+        )
+        replay_body = b"".join(second.iter_bytes()).decode()
+    # Wire contract: one ``data: {...stream_completed...}`` frame plus DONE.
+    assert "stream_completed" in replay_body
+    assert "[DONE]" in replay_body
+    assert replay_body.lstrip().startswith("data:")
     spent_after_second = (
         ai_budget_backend.monthly_cap - ai_budget_backend.remaining("p-replay")
     )

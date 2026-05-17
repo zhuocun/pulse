@@ -939,10 +939,33 @@ async def stream_agent(
             cached = idem.cached_response
             record_idempotency(route_path, "hit")
             record_invocation(name, "replay")
-            return JSONResponse(
-                content=cached.body,
+            # The /stream endpoint serves ``text/event-stream``; serving a
+            # cached JSON body to an SSE consumer hangs the FE (parseSseLine
+            # finds zero ``data:`` lines and yields nothing). Replay the
+            # completion marker as a single SSE frame plus the DONE
+            # sentinel so the FE's reader sees the contract it expects.
+            replay_envelope = {
+                "type": "custom",
+                "ns": [],
+                "data": {"kind": "status", "message": "stream_completed"},
+            }
+
+            async def _replay_stream() -> AsyncIterator[bytes]:
+                yield encode_sse(replay_envelope)
+                yield DONE_FRAME
+
+            replay_headers = {
+                **cached.headers,
+                "Idempotent-Replay": "true",
+                # Cached.headers came from a JSONResponse so the content-type
+                # is application/json; force the SSE one back.
+                "content-type": "text/event-stream",
+            }
+            return StreamingResponse(
+                _replay_stream(),
                 status_code=cached.status_code,
-                headers={**cached.headers, "Idempotent-Replay": "true"},
+                media_type="text/event-stream",
+                headers=replay_headers,
             )
 
     reserved_budget = 0
