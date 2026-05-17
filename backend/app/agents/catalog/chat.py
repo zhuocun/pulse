@@ -66,6 +66,12 @@ _TASK_ID_RE = re.compile(r"__TASK_ID__:([a-fA-F0-9]{24})__")
 # serving the deterministic stub reply instead.  Audience/operator sees it
 # without any FE change so a silently-degraded demo is impossible.
 _DEGRADED_REPLY_PREFIX = "[Live AI unavailable - showing fallback]"
+# Approximate-token budget for the trimmed chat history sent to the
+# provider on each turn.  Sized to fit comfortably under Claude / GPT-4
+# 128k context with headroom for the system prompt, bound tools, and a
+# new turn.  Tests rely on this being a module attribute so they can
+# patch it down without re-importing chat.py.
+_CHAT_TRIM_TOKEN_BUDGET = 32000
 
 
 def _last_user_text(state: ChatState) -> str:
@@ -330,13 +336,24 @@ class ChatAgent(BaseAgent):
                     "mutation_decision": None,
                 }
 
+            # Token-budget trim with two safety properties beyond the prior
+            # ``len``-based no-op:
+            # * ``token_counter="approximate"`` actually bounds context size;
+            #   the previous ``len`` counter measured items, so
+            #   ``max_tokens=4000`` meant "up to 4000 messages" and never
+            #   trimmed in practice.
+            # * ``start_on="human"`` keeps tool_use / tool_result message
+            #   pairs intact -- LangChain's trim drops the leading tool_*
+            #   messages so a trimmed-mid-loop conversation never sends an
+            #   orphan tool_use to Anthropic (which 400s on that shape).
             trimmed = trim_messages(
                 messages,
-                max_tokens=4000,
+                max_tokens=_CHAT_TRIM_TOKEN_BUDGET,
                 strategy="last",
-                token_counter=len,
+                token_counter="approximate",
                 include_system=False,
                 allow_partial=False,
+                start_on="human",
             )
             conversation: List[Any] = [SystemMessage(content=_SYSTEM_PROMPT)]
             conversation.extend(trimmed)
