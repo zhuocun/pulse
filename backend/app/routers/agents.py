@@ -481,16 +481,33 @@ def _redact_inputs(
     if isinstance(messages, list):
         new_messages: list[Any] = []
         for message in messages:
-            if (
-                isinstance(message, dict)
-                and message.get("role") == "user"
-                and isinstance(message.get("content"), str)
-            ):
-                replaced, msg_spans = redact(message["content"])
-                spans.extend(msg_spans)
-                new_messages.append({**message, "content": replaced})
-            else:
-                new_messages.append(message)
+            if isinstance(message, dict) and message.get("role") == "user":
+                content = message.get("content")
+                if isinstance(content, str):
+                    replaced, msg_spans = redact(content)
+                    spans.extend(msg_spans)
+                    new_messages.append({**message, "content": replaced})
+                    continue
+                if isinstance(content, list):
+                    # LangChain tool-call messages carry content as a list of
+                    # typed blocks (text / tool_use / tool_result).  The text
+                    # blocks can hold user-supplied PII; pre-fix they bypassed
+                    # redaction entirely because the loop only matched the
+                    # string-content shape.
+                    new_blocks: list[Any] = []
+                    for block in content:
+                        if (
+                            isinstance(block, dict)
+                            and isinstance(block.get("text"), str)
+                        ):
+                            block_replaced, block_spans = redact(block["text"])
+                            spans.extend(block_spans)
+                            new_blocks.append({**block, "text": block_replaced})
+                        else:
+                            new_blocks.append(block)
+                    new_messages.append({**message, "content": new_blocks})
+                    continue
+            new_messages.append(message)
         redacted["messages"] = new_messages
 
     if metadata is not None:

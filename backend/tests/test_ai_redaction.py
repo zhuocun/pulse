@@ -245,6 +245,41 @@ def test_redact_inputs_consults_metadata_dict_fields() -> None:
     assert "bob@corp.com" not in out["task_draft"]["taskName"]
 
 
+def test_redact_inputs_handles_list_content_blocks() -> None:
+    """User messages with list-shape ``content`` (LangChain tool-call blocks)
+    must have PII inside each text block redacted.
+
+    Pre-fix the router only handled ``content: str`` and a tool-call message
+    carrying ``[{type: "text", text: "...alice@x.com..."}]`` slipped past
+    redaction entirely.
+    """
+
+    from app.routers.agents import _redact_inputs
+
+    class _RequestStub:
+        class _State:
+            redaction_spans: list[Any] = []
+
+        state = _State()
+
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "ping alice@example.com"},
+                    {"type": "tool_use", "id": "t-1", "name": "noop"},
+                ],
+            }
+        ]
+    }
+    out = _redact_inputs(payload, _RequestStub(), None)
+    blocks = out["messages"][0]["content"]
+    assert blocks[0]["text"] == "ping [EMAIL]"
+    # Non-text blocks pass through unchanged.
+    assert blocks[1] == {"type": "tool_use", "id": "t-1", "name": "noop"}
+
+
 # ---------------------------------------------------------------------------
 # Integration: polish_search must not forward PII from candidate text
 # ---------------------------------------------------------------------------
