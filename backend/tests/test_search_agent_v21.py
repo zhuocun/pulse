@@ -158,6 +158,10 @@ def test_resume_with_fe_envelope_dict_produces_ranked_result() -> None:
 
     The FE sends the candidates wrapped in a ``{"candidates": [...]}``
     envelope; ``fetch_candidates`` must unwrap it before storing.
+
+    Under stub embeddings (default in tests), the rationale must carry the
+    ``[demo embeddings]`` prefix so a demo running without an OpenAI key
+    surfaces the fact instead of looking like search-is-broken.
     """
 
     agent = SearchAgent()
@@ -178,6 +182,32 @@ def test_resume_with_fe_envelope_dict_produces_ranked_result() -> None:
     assert all(id_ in candidate_ids for id_ in ranking["ids"])
     # Rationale must mention candidate count.
     assert "3" in ranking["rationale"]
+    # Demo-state signal: tests run with stub embeddings, so the rationale
+    # must carry the visible marker.
+    assert "[demo embeddings]" in ranking["rationale"]
+
+
+def test_real_embeddings_rationale_omits_demo_prefix() -> None:
+    """When the embeddings provider is real (not stub), the rationale must
+    omit the ``[demo embeddings]`` prefix so production runs read cleanly."""
+
+    with patch(
+        "app.agents.catalog.search.be_tools.using_stub_embeddings",
+        return_value=False,
+    ):
+        agent = SearchAgent()
+        checkpointer, store = _persistence()
+        graph = agent.build(checkpointer=checkpointer, store=store)
+        final = _drive(
+            graph,
+            {"messages": [], "query": "auth bug", "project_id": "p1", "kind": "tasks"},
+            [{"candidates": _CANDIDATES}],
+            thread_id="real-embeddings-rationale-1",
+        )
+    ranking = final.get("ranking")
+    assert ranking is not None
+    assert "[demo embeddings]" not in ranking["rationale"]
+    assert "Ranked by embedding similarity" in ranking["rationale"]
 
 
 def test_resume_with_raw_list_produces_ranked_result() -> None:

@@ -546,11 +546,26 @@ class SearchAgent(BaseAgent):
             ids = [item_id for item_id, _score in neighbours]
             score_map = {item_id: score for item_id, score in neighbours}
             matches = _build_matches(ids, score_map)
+            # Demo-state visibility: in stub-embeddings mode every score
+            # clusters in 0.2-0.6 so the FE never shows a "strong" badge
+            # and search looks broken.  Tag the rationale so the operator
+            # (and ultimately the FE) can tell stub-mode from a genuine
+            # all-weak-matches result.
+            if be_tools.using_stub_embeddings():
+                rationale = (
+                    f"[demo embeddings] Ranked by SHA-256 stub similarity "
+                    f"over {n} candidates - set OPENAI_API_KEY for real "
+                    "semantic search."
+                )
+            else:
+                rationale = (
+                    f"Ranked by embedding similarity over {n} candidates."
+                )
             return {
                 "ranking": {
                     "ids": ids,
                     "matches": matches,
-                    "rationale": f"Ranked by embedding similarity over {n} candidates.",
+                    "rationale": rationale,
                     # Thread the original cosine scores through to ``polish``
                     # so LLM-reranked ids keep their real scores rather than
                     # the bucket floor from ``_strength_to_score``.
