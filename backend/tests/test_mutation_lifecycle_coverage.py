@@ -167,11 +167,19 @@ def test_mutation_hitl_returns_empty_when_no_pending_proposal() -> None:
     assert chat_module._mutation_hitl({}) == {}
 
 
-def test_mutation_hitl_returns_empty_for_blank_proposal_id() -> None:
-    """A proposal whose id is not a non-empty string is silently skipped."""
+def test_mutation_hitl_drops_loudly_for_blank_proposal_id() -> None:
+    """A proposal whose id is blank now aborts with a user-visible message.
+
+    Pre-hardening this silently returned ``{}`` and the empty string ended up
+    in ``mutation_applied_ids`` on the apply side, poisoning the idempotency
+    guard for every later proposal in the same thread.
+    """
 
     state = {"mutation_pending": {"proposal_id": "   "}}
-    assert chat_module._mutation_hitl(state) == {}
+    out = chat_module._mutation_hitl(state)
+    assert out["mutation_pending"] is None
+    assert out["mutation_decision"] is None
+    assert "missing id" in out["messages"][0].content
 
 
 def test_mutation_finalize_returns_empty_when_no_pending_proposal() -> None:

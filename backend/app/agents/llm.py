@@ -279,6 +279,10 @@ def _failover_exception_types() -> tuple[type[BaseException], ...]:
                 anthropic.InternalServerError,
                 anthropic.APIConnectionError,
                 anthropic.APITimeoutError,
+                # 429 from the primary should also failover to the secondary
+                # provider; otherwise a steady-state quota dip kills the demo
+                # path even though the fallback would have served the call.
+                anthropic.RateLimitError,
             )
         )
     except ImportError:
@@ -291,6 +295,7 @@ def _failover_exception_types() -> tuple[type[BaseException], ...]:
                 openai.InternalServerError,
                 openai.APIConnectionError,
                 openai.APITimeoutError,
+                openai.RateLimitError,
             )
         )
     except ImportError:

@@ -689,6 +689,11 @@ def test_chat_agent_provider_error_falls_back_to_stub_reply() -> None:
     assert messages, "must have at least one message in final state"
     last = messages[-1]
     assert last.content, "fallback reply must be non-empty"
+    # Demo-state hardening: the silently-degraded reply must carry a visible
+    # marker so the operator/audience can tell the live provider wasn't used.
+    from app.agents.catalog.chat import _DEGRADED_REPLY_PREFIX
+
+    assert _DEGRADED_REPLY_PREFIX in last.content
 
 
 def test_chat_agent_propagates_cancellation_through_provider_call() -> None:

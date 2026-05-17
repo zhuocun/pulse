@@ -62,6 +62,10 @@ _SYSTEM_PROMPT = (
 
 _STUB_MUTATION_TRIGGER = "__PROPOSE_MUTATION__"
 _TASK_ID_RE = re.compile(r"__TASK_ID__:([a-fA-F0-9]{24})__")
+# Visible marker on the AIMessage when the live provider failed and we are
+# serving the deterministic stub reply instead.  Audience/operator sees it
+# without any FE change so a silently-degraded demo is impossible.
+_DEGRADED_REPLY_PREFIX = "[Live AI unavailable - showing fallback]"
 
 
 def _last_user_text(state: ChatState) -> str:
@@ -116,16 +120,41 @@ def _mutation_hitl(state: ChatState) -> dict[str, Any]:
         return {}
     pid = proposal.get("proposal_id")
     if not isinstance(pid, str) or not pid.strip():
-        return {}
+        # Defensive: a malformed proposal would silently coast through the
+        # finalize node with pid="" and write the empty string into
+        # mutation_applied_ids, breaking idempotency for every future
+        # proposal in the thread. Drop it loudly instead.
+        logger.warning("chat-agent: dropping mutation_pending with blank proposal_id.")
+        return {
+            "messages": [
+                AIMessage(content="Could not surface that proposal (missing id).")
+            ],
+            "mutation_pending": None,
+            "mutation_decision": None,
+        }
     raw = interrupt(
         interrupt_payload(
             "fe.applyMutation",
             {"proposal_id": pid, "stage": "approval"},
         )
     )
-    decision = raw if isinstance(raw, dict) else {"accepted": bool(raw)}
+    # Resume payload contract: ``Command(resume={"accepted": <bool>})``.
+    # Reject anything else loudly rather than coercing — a non-dict resume
+    # historically became ``{"accepted": True}`` for any truthy value, so a
+    # client bug could auto-accept a mutation the user never saw.
+    if not isinstance(raw, dict) or "accepted" not in raw:
+        logger.warning(
+            "chat-agent: malformed resume payload (%r); treating as rejection.",
+            type(raw).__name__,
+        )
+        decision = {"accepted": False, "reason": "malformed_resume"}
+    else:
+        decision = {"accepted": bool(raw.get("accepted"))}
+        # Preserve optional editor-modified diff if the FE sends one.
+        if "edited_diff" in raw:
+            decision["edited_diff"] = raw["edited_diff"]
     record_agent_mutation_event(
-        "proposal_resumed_accept" if decision.get("accepted") else "proposal_resumed_reject"
+        "proposal_resumed_accept" if decision["accepted"] else "proposal_resumed_reject"
     )
     return {"mutation_decision": decision}
 
@@ -183,6 +212,30 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
         return {
             "messages": [
                 AIMessage(content=f"Could not apply: {fe_result.get('error')}")
+            ],
+            "mutation_pending": None,
+            "mutation_decision": None,
+        }
+    # Require the documented success shape from ``fe.applyMutation`` (see
+    # ``src/utils/ai/feTools/applyMutation.ts`` -> ``{ok, applied}``).  An
+    # empty dict or any other non-success shape used to be treated as
+    # "Applied!" which silently lies to the user when the FE bailed out
+    # without setting ``error``.
+    applied_ok = isinstance(fe_result, dict) and fe_result.get("applied") is True
+    if not applied_ok:
+        logger.warning(
+            "chat-agent: fe.applyMutation returned non-success shape %r; "
+            "treating as failure.",
+            fe_result,
+        )
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "Could not confirm the apply succeeded; please "
+                        "refresh the board and try again."
+                    )
+                )
             ],
             "mutation_pending": None,
             "mutation_decision": None,
@@ -297,8 +350,14 @@ class ChatAgent(BaseAgent):
                     "chat-agent provider call failed; falling back to stub reply.",
                     exc_info=True,
                 )
+                # Make the degradation visible to the operator/audience instead
+                # of silently serving a deterministic answer.  Without this
+                # marker the demo can show a "successful" turn that never
+                # actually hit the live LLM.
                 reply = _stub_response(user_text, project_id)
-                response = AIMessage(content=reply)
+                response = AIMessage(
+                    content=f"{_DEGRADED_REPLY_PREFIX} {reply}"
+                )
                 return {
                     "messages": [response],
                     "mutation_pending": None,
