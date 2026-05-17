@@ -317,8 +317,25 @@ def test_validate_suggestion_payload_known_good_nudge() -> None:
 
 def test_validate_suggestion_payload_bad_payload_logs_and_passes_through(
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Extra field in payload triggers a warning but does not mutate or drop the event."""
+    """Extra field in payload triggers a warning + Prometheus counter bump
+    but does not mutate or drop the event.
+
+    The counter is the only signal that closes the fail-safe pass-through
+    gap; without it a schema drift in production is invisible until the FE
+    starts rendering half-cards.
+    """
+    captured: list[dict[str, str]] = []
+
+    def fake_record(*, agent: str, kind: str, surface: str = "") -> None:
+        captured.append({"agent": agent, "kind": kind, "surface": surface})
+
+    monkeypatch.setattr(
+        "app.observability.metrics.record_event_validation_failure",
+        fake_record,
+    )
+
     evt = {
         "kind": "suggestion",
         "surface": "search",
@@ -335,6 +352,9 @@ def test_validate_suggestion_payload_bad_payload_logs_and_passes_through(
     assert result["payload"]["UNEXPECTED_EXTRA_FIELD"] == "should trigger warning"
     # A warning was logged
     assert any("search" in record.message for record in caplog.records)
+    assert captured == [
+        {"agent": "search-agent", "kind": "suggestion", "surface": "search"}
+    ]
 
 
 def test_validate_suggestion_payload_does_not_mutate_dict() -> None:

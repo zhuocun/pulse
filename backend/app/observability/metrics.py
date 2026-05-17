@@ -112,6 +112,7 @@ agent_tokens_total: Any = _NOOP
 agent_run_duration_seconds: Any = _NOOP
 idempotency_cache_total: Any = _NOOP
 agent_mutations_total: Any = _NOOP
+agent_event_validation_failures_total: Any = _NOOP
 
 _metrics_enabled: bool = False
 
@@ -149,6 +150,7 @@ def configure_metrics(*, settings: Settings) -> None:
     global agent_run_duration_seconds
     global idempotency_cache_total
     global agent_mutations_total
+    global agent_event_validation_failures_total
     global _metrics_enabled
 
     if not settings.prometheus_metrics:
@@ -185,6 +187,17 @@ def configure_metrics(*, settings: Settings) -> None:
         "agent_mutations_total",
         "Agent-driven board mutation lifecycle events.",
         labelnames=("action",),
+    )
+    agent_event_validation_failures_total = Counter(
+        "agent_event_validation_failures_total",
+        # Each failure is a fail-safe pass-through in
+        # ``app.agents.events`` -- the bad payload still streams to the
+        # FE so a schema bug never breaks a live response, but the
+        # counter is the only signal that a drift is happening.  Alert
+        # on rate > 0 in production.
+        "Suggestion / mutation_proposal payloads that failed schema "
+        "validation but were passed through unchanged.",
+        labelnames=("agent", "kind", "surface"),
     )
     _metrics_enabled = True
     logger.info("Prometheus metrics configured.")
@@ -237,6 +250,24 @@ def record_agent_mutation_event(action: str) -> None:
     agent_mutations_total.labels(action=action).inc()
 
 
+def record_event_validation_failure(
+    *, agent: str, kind: str, surface: str = ""
+) -> None:
+    """Increment the validation-failure counter.
+
+    Called from :mod:`app.agents.events` whenever a
+    ``suggestion`` / ``mutation_proposal`` payload fails Pydantic
+    validation and the runtime falls back to pass-through.  Operators
+    should alert on rate > 0; a non-zero rate means the FE is being
+    handed payloads that the FE-side schema rejects, which manifests
+    as half-rendered cards.
+    """
+
+    agent_event_validation_failures_total.labels(
+        agent=agent, kind=kind, surface=surface
+    ).inc()
+
+
 def make_metrics_app() -> Optional[Any]:
     """Return a ``prometheus_client.make_asgi_app()`` mountable at ``/metrics``.
 
@@ -268,6 +299,7 @@ def reset_for_tests() -> None:
     global agent_run_duration_seconds
     global idempotency_cache_total
     global agent_mutations_total
+    global agent_event_validation_failures_total
     global _metrics_enabled
 
     if _metrics_enabled:
@@ -279,6 +311,7 @@ def reset_for_tests() -> None:
             agent_run_duration_seconds,
             idempotency_cache_total,
             agent_mutations_total,
+            agent_event_validation_failures_total,
         ):
             try:
                 REGISTRY.unregister(metric)
@@ -290,6 +323,7 @@ def reset_for_tests() -> None:
     agent_run_duration_seconds = _NOOP
     idempotency_cache_total = _NOOP
     agent_mutations_total = _NOOP
+    agent_event_validation_failures_total = _NOOP
     _metrics_enabled = False
 
 
@@ -298,6 +332,7 @@ __all__ = [
     "INVOCATION_OUTCOMES",
     "RUN_DURATION_BUCKETS",
     "TOKEN_DIRECTIONS",
+    "agent_event_validation_failures_total",
     "agent_invocations_total",
     "agent_mutations_total",
     "agent_run_duration_seconds",
@@ -306,6 +341,7 @@ __all__ = [
     "idempotency_cache_total",
     "make_metrics_app",
     "record_agent_mutation_event",
+    "record_event_validation_failure",
     "record_idempotency",
     "record_invocation",
     "reset_for_tests",
