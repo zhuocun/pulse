@@ -52,15 +52,15 @@
       "branch": "orch/code-smell-sweep-9be8/fix-dnd-clone-types",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-43d0feba-23c8-40a9-8b83-58ccc8ed52ec",
+      "runId": "run-211a978f-a9d4-4e56-b38a-6340965adb14",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:15:14.240Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:15:14.240Z",
+      "lastUpdate": "2026-05-18T17:15:16.978Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -100,17 +100,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:15:16.979Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:15:16.979Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-project-modal-errors",
@@ -304,6 +305,10 @@
     {
       "at": "2026-05-18T17:15:14.240Z",
       "message": "fix-dnd-clone-types: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:15:16.979Z",
+      "message": "fix-project-modal-errors: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
