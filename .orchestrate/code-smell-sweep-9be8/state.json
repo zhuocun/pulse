@@ -197,12 +197,12 @@
       "handoffPath": "handoffs/extract-use-agent-thread-persist.md",
       "startedAt": "2026-05-18T17:15:22.458Z",
       "finishedAt": "2026-05-18T17:17:30.330Z",
-      "lastUpdate": "2026-05-18T17:17:30.330Z",
+      "lastUpdate": "2026-05-18T17:17:31.393Z",
       "note": null,
       "slackTs": null,
       "prNumber": 240,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -216,17 +216,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:17:37.261Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:17:37.261Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "be-catalog-vector-dedup",
@@ -351,6 +352,14 @@
     {
       "at": "2026-05-18T17:17:24.750Z",
       "message": "verify-be-catalog-vector-dedup: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:17:31.393Z",
+      "message": "extract-use-agent-thread-persist: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:17:37.260Z",
+      "message": "verify-extract-use-agent-thread-persist: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
