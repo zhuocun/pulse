@@ -153,12 +153,12 @@
       "handoffPath": "handoffs/fix-ai-task-assist-smells.md",
       "startedAt": "2026-05-18T17:15:19.550Z",
       "finishedAt": "2026-05-18T17:18:05.538Z",
-      "lastUpdate": "2026-05-18T17:18:05.538Z",
+      "lastUpdate": "2026-05-18T17:18:06.708Z",
       "note": null,
       "slackTs": null,
       "prNumber": 242,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -172,17 +172,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:18:12.564Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:18:12.564Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "extract-use-agent-thread-persist",
@@ -365,6 +366,14 @@
     {
       "at": "2026-05-18T17:17:49.862Z",
       "message": "verify-fix-project-modal-errors: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:18:06.709Z",
+      "message": "fix-ai-task-assist-smells: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:18:12.563Z",
+      "message": "verify-fix-ai-task-assist-smells: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
