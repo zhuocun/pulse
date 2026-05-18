@@ -1,0 +1,25 @@
+# Verifier: fix-use-agent-chat-resume-errors
+# Date: 2026-05-18
+# Branch: orch/code-smell-sweep-2-9be8/fix-use-agent-chat-resume-errors
+
+## Recipe runs
+
+1. `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useAgentChat`
+   Exit: 0
+   Test Suites: 1 passed, 1 total
+   Tests: 18 passed, 18 total
+   Time: ~2.2s
+
+2. `npx tsc --noEmit`
+   Exit: 0 (no output)
+
+## Acceptance spot-checks (read-only)
+
+- `useAgentChat.ts`: `resumeError` state merged into `effectiveError` via `agent.error ?? resumeError`; exposed as hook `error`.
+- `resumeProposal`: `.catch` sets `setResumeError(...)` and `setErrorDismissed(false)` — not empty.
+- Post-resume effect: `agent.error ?? resumeError` prevents clearing `pendingProposal` on failure.
+- Tests: `keeps pendingProposal and surfaces error when resume stream fails`; `surfaces rejected resume promise without clearing pendingProposal`.
+
+## Verdict signal
+
+unit-test-verified (no live browser run in this verifier pass).
