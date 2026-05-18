@@ -26,7 +26,7 @@
     {
       "name": "verify-fix-use-react-mutation-types",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-9be8/verify-fix-use-react-mutation-types",
+      "branch": "`orch/code-smell-sweep-9be8/fix-use-react-mutation-types` (no verifier commits)",
       "startingRef": "orch/code-smell-sweep-9be8/fix-use-react-mutation-types",
       "dependsOn": [
         "fix-use-react-mutation-types"
@@ -34,12 +34,12 @@
       "agentId": "bc-f4b92671-ac03-44d6-8bee-47c2a4d32482",
       "runId": "run-6468e204-33c7-49c3-b926-2108789789fc",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-use-react-mutation-types.md",
       "startedAt": "2026-05-18T17:17:17.803Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:17:21.526Z",
+      "finishedAt": "2026-05-18T17:18:50.138Z",
+      "lastUpdate": "2026-05-18T17:18:50.138Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
