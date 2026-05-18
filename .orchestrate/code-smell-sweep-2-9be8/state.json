@@ -56,15 +56,15 @@
       "agentId": "bc-71df6c69-1ede-4f4f-a1e7-4cfec709ef2e",
       "runId": "run-7b165d69-a424-4725-aeb2-87e804ecb8a0",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-use-agent-chat-resume-errors.md",
       "startedAt": "2026-05-18T17:48:48.746Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:48:51.471Z",
+      "finishedAt": "2026-05-18T17:51:30.613Z",
+      "lastUpdate": "2026-05-18T17:51:30.613Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 250,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -152,12 +152,12 @@
       "handoffPath": "handoffs/extract-ai-chat-tool-display.md",
       "startedAt": "2026-05-18T17:48:53.923Z",
       "finishedAt": "2026-05-18T17:51:26.680Z",
-      "lastUpdate": "2026-05-18T17:51:26.680Z",
+      "lastUpdate": "2026-05-18T17:51:27.821Z",
       "note": null,
       "slackTs": null,
       "prNumber": 249,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -351,15 +351,15 @@
       "dependsOn": [
         "be-board-brief-extract-counts"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-7af74499-9118-4e16-8d9c-7d493dd77822",
+      "runId": "run-47d97de7-7a07-48db-bbb5-3857780c62f5",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:51:25.320Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:25.320Z",
+      "lastUpdate": "2026-05-18T17:51:27.783Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -461,6 +461,10 @@
     {
       "at": "2026-05-18T17:51:25.319Z",
       "message": "verify-be-board-brief-extract-counts: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:51:27.822Z",
+      "message": "extract-ai-chat-tool-display: verification self-reported (unit-test-verified)"
     }
   ]
 }
