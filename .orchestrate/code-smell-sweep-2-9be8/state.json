@@ -106,12 +106,12 @@
       "handoffPath": "handoffs/extract-use-agent-thread-id.md",
       "startedAt": "2026-05-18T17:48:51.472Z",
       "finishedAt": "2026-05-18T17:50:31.587Z",
-      "lastUpdate": "2026-05-18T17:50:31.588Z",
+      "lastUpdate": "2026-05-18T17:50:32.673Z",
       "note": null,
       "slackTs": null,
       "prNumber": 245,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -125,17 +125,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:50:36.687Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:50:36.687Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "extract-ai-chat-tool-display",
@@ -429,6 +430,14 @@
     {
       "at": "2026-05-18T17:50:14.039Z",
       "message": "verify-microcopy-string-helper: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:50:32.674Z",
+      "message": "extract-use-agent-thread-id: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:50:36.686Z",
+      "message": "verify-extract-use-agent-thread-id: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
