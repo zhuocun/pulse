@@ -169,15 +169,15 @@
       "dependsOn": [
         "fix-ai-task-assist-smells"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-a69f530e-ec0d-4a07-857a-f0814f524d32",
+      "runId": "run-3cf5562d-79d0-4619-8461-92523c934537",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:18:12.564Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:18:12.564Z",
+      "lastUpdate": "2026-05-18T17:18:15.589Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -293,17 +293,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:18:15.591Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:18:15.591Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
@@ -374,6 +375,10 @@
     {
       "at": "2026-05-18T17:18:12.563Z",
       "message": "verify-fix-ai-task-assist-smells: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:18:15.590Z",
+      "message": "merge-code-smell-sweep: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
