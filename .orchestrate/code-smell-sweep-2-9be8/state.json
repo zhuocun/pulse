@@ -97,15 +97,15 @@
       "branch": "orch/code-smell-sweep-2-9be8/extract-use-agent-thread-id",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-86868faa-0b5e-4726-a1b3-4c3f74c34c5e",
+      "runId": "run-872cf69d-445c-41cb-a394-38732aa3493d",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:48:51.472Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:48:51.472Z",
+      "lastUpdate": "2026-05-18T17:48:53.922Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -145,17 +145,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:48:53.923Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:48:53.923Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-extract-ai-chat-tool-display",
@@ -400,6 +401,10 @@
     {
       "at": "2026-05-18T17:48:51.471Z",
       "message": "extract-use-agent-thread-id: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:48:53.923Z",
+      "message": "extract-ai-chat-tool-display: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
