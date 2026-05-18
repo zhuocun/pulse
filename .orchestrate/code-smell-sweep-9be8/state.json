@@ -256,7 +256,7 @@
     {
       "name": "verify-be-catalog-vector-dedup",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-9be8/verify-be-catalog-vector-dedup",
+      "branch": "orch/code-smell-sweep-9be8/be-catalog-vector-dedup",
       "startingRef": "orch/code-smell-sweep-9be8/be-catalog-vector-dedup",
       "dependsOn": [
         "be-catalog-vector-dedup"
@@ -264,12 +264,12 @@
       "agentId": "bc-199c9bf0-01e4-47b0-a323-d590186e9109",
       "runId": "run-45466ff0-cf39-41a1-922a-047abc40e1a1",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-be-catalog-vector-dedup.md",
       "startedAt": "2026-05-18T17:17:24.750Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:17:27.257Z",
+      "finishedAt": "2026-05-18T17:18:47.864Z",
+      "lastUpdate": "2026-05-18T17:18:47.864Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
