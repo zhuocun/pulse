@@ -1,0 +1,22 @@
+# Verifier: be-catalog-vector-dedup
+# Date: 2026-05-18
+# Branch: orch/code-smell-sweep-9be8/be-catalog-vector-dedup
+
+## Discovery audit
+`.orchestrate/code-smell-sweep-9be8/discovery/CODE-SMELL-AUDIT.md` — not present in workspace.
+
+## Code cross-check (read-only)
+- `backend/app/agents/catalog/_shared.py`: `augment_items_with_vector_neighbours` centralizes settings gate → embed → fetch → merge flow.
+- `backend/app/agents/catalog/task_estimation.py`: `fetch_embeddings` calls helper (default `max_total=24`).
+- `backend/app/agents/catalog/search.py`: `rank` calls helper with `max_total=40`, gated on `kind == "tasks"`.
+- No `logging` / `logger` imports remain in task_estimation.py or search.py.
+- `fetch_vector_neighbours_for_project` / `merge_similar_with_vector_hits` only referenced from `_shared.py` for augment path.
+
+## Recipe runs
+1. `source /workspace/.venv/bin/activate && cd backend && python -m pytest tests/test_vector_augmented_agents.py -q --no-cov`
+   - 5 passed in 0.07s (exit 0)
+2. `source /workspace/.venv/bin/activate && cd backend && ruff check app/agents/catalog/_shared.py app/agents/catalog/task_estimation.py app/agents/catalog/search.py`
+   - All checks passed! (exit 0)
+
+## Verdict signal
+unit-test-verified

@@ -24,6 +24,9 @@ agent file:
 - :func:`detect_drift_node`: shared ``detect_drift`` node body for
   board-brief and triage agents.
 
+- :func:`augment_items_with_vector_neighbours`: pgvector prefetch +
+  merge for ``task_estimation`` and ``search`` catalog agents.
+
 - :func:`cap_polished_text` and :func:`merge_keyed_string_updates` are
   re-exported here for backward compatibility; the canonical
   implementations now live in :mod:`app.agents.polish`.
@@ -227,7 +230,46 @@ def build_citation_refs(
     return refs
 
 
+async def augment_items_with_vector_neighbours(
+    items: list[Any],
+    *,
+    query_text: str,
+    project_id: str,
+    settings: Any,
+    max_total: int = 24,
+    failure_log_message: str = "Vector-augmented merge failed; using FE list only.",
+) -> list[Any]:
+    """Merge FE items with pgvector neighbours when vector search is enabled.
+
+    Best-effort: on embed, store, or merge failure the original ``items``
+  list is returned unchanged after logging ``failure_log_message``.
+    """
+
+    if not getattr(settings, "agent_vector_search_enabled", False):
+        return items
+
+    from app.agents.task_vector_pg import (
+        fetch_vector_neighbours_for_project,
+        merge_similar_with_vector_hits,
+    )
+    from app.tools import be_tools
+
+    try:
+        qvecs = await be_tools.embed_async([query_text])
+        qv = qvecs[0] if qvecs else []
+        hits = fetch_vector_neighbours_for_project(
+            project_id=str(project_id or ""),
+            query_embedding=list(qv),
+            settings=settings,
+        )
+        return merge_similar_with_vector_hits(items, hits, max_total=max_total)
+    except Exception:  # noqa: BLE001 -- best-effort augment; callers keep FE list
+        logger.warning(failure_log_message, exc_info=True)
+        return items
+
+
 __all__ = [
+    "augment_items_with_vector_neighbours",
     "build_citation_refs",
     "cap_polished_text",
     "detect_drift_node",
