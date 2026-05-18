@@ -257,7 +257,7 @@
     {
       "name": "verify-fix-sw-registration-logging",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-2-9be8/verify-fix-sw-registration-logging",
+      "branch": "`orch/code-smell-sweep-2-9be8/fix-sw-registration-logging` (pushed commit `d183fa2` — verifier log only; no target source changes)",
       "startingRef": "orch/code-smell-sweep-2-9be8/fix-sw-registration-logging",
       "dependsOn": [
         "fix-sw-registration-logging"
@@ -265,12 +265,12 @@
       "agentId": "bc-415e9f4d-d70a-47b4-ac69-1cfee2e688c0",
       "runId": "run-37cd9139-1b89-4745-9b7a-22d7f4f06051",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-sw-registration-logging.md",
       "startedAt": "2026-05-18T17:50:49.517Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:50:52.041Z",
+      "finishedAt": "2026-05-18T17:52:34.982Z",
+      "lastUpdate": "2026-05-18T17:52:34.983Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
