@@ -23,13 +23,15 @@ type MutationContext = {
     previousItems: unknown;
     didApplyOptimistic: boolean;
 };
+type OptimisticUpdateCallback = {
+    bivarianceHack(target: unknown, old?: unknown): unknown | undefined;
+}["bivarianceHack"];
 
 const useReactMutation = <D>(
     endPoint: string,
     method: string,
     queryKey?: QueryKey | string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    callback?: (...args: any) => any,
+    callback?: OptimisticUpdateCallback,
     onError?: (err: Error) => void,
     setCache?: boolean
 ) => {

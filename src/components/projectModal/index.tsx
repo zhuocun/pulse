@@ -1,6 +1,6 @@
 import { Form, Grid, Input, Modal, Select, Spin, Typography } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, lineHeight, modalWidthCss, space } from "../../theme/tokens";
@@ -24,22 +24,33 @@ const ProjectModal: React.FC = () => {
     const isEditing = Boolean(editingProject);
     const screens = Grid.useBreakpoint();
 
+    const [saveError, setSaveError] = useState<Error | null>(null);
     const createProjectMutation = useReactMutation<IProject>(
         "projects",
-        "POST"
+        "POST",
+        undefined,
+        undefined,
+        (err) => setSaveError(err)
     );
-    const updateProjectMutation = useReactMutation<IProject>("projects", "PUT");
+    const updateProjectMutation = useReactMutation<IProject>(
+        "projects",
+        "PUT",
+        undefined,
+        undefined,
+        (err) => setSaveError(err)
+    );
     const activeMutation = isEditing
         ? updateProjectMutation
         : createProjectMutation;
-    const { mutateAsync, error, isLoading: mutateLoading } = activeMutation;
+    const { mutateAsync, isLoading: mutateLoading } = activeMutation;
 
     const [form] = useForm();
     const onClose = () => {
         closeModal();
         form.resetFields();
+        setSaveError(null);
     };
-    const onFinish = (input: {
+    const onFinish = async (input: {
         projectName: string;
         organization: string;
         managerId: string;
@@ -54,9 +65,15 @@ const ProjectModal: React.FC = () => {
         const payload = isEditing
             ? { ...editingProject, ...input }
             : { ...editingProject, ...createOnly };
-        mutateAsync(payload)
-            .then(onClose)
-            .catch(() => {});
+        try {
+            await mutateAsync(payload);
+            setSaveError(null);
+            onClose();
+        } catch {
+            // ErrorBox surfaces the message via the onError callback above;
+            // keep the modal open so the user can retry without re-entering
+            // their changes.
+        }
     };
     const submit = () => {
         form.submit();
@@ -144,7 +161,7 @@ const ProjectModal: React.FC = () => {
                         : microcopy.projectModal.createDescription}
                 </Typography.Text>
                 <Form form={form} layout="vertical" onFinish={onFinish}>
-                    <ErrorBox error={error} />
+                    <ErrorBox error={saveError} />
                     <Form.Item
                         label={microcopy.fields.projectName}
                         name="projectName"

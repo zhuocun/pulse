@@ -27,8 +27,20 @@ import {
 import { forEachAgentStreamPart } from "./useAgentStreamConsumer";
 import { useAutonomyLevel } from "./useAiEnabled";
 import { useNudgeInbox } from "./useNudgeInbox";
+import {
+    clearPersistedThreadStorage,
+    readPersistedThread,
+    threadStorageKey,
+    writePersistedThread
+} from "./useAgentThreadPersist";
 import useApi from "./useApi";
 
+export {
+    clearPersistedThreadStorage,
+    readPersistedThread,
+    threadStorageKey,
+    writePersistedThread
+} from "./useAgentThreadPersist";
 export type {
     AgentToolResolverStatus,
     UseAgentToolResolverResult
@@ -194,47 +206,6 @@ const generateThreadId = (): string => {
     }
     return `t_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
 };
-
-// ─── sessionStorage helpers (Theme 4) ────────────────────────────────────────
-
-/**
- * Build the sessionStorage key for a given (agentName, projectId) pair so
- * LangGraph checkpoint threads survive page refresh.
- */
-const threadStorageKey = (agentName: string, projectId?: string): string =>
-    `pulse.agentThread.${agentName}.${projectId ?? "none"}`;
-
-/** Read back a persisted thread id. Returns undefined on SSR or storage error. */
-const readPersistedThread = (key: string): string | undefined => {
-    if (typeof window === "undefined") return undefined;
-    try {
-        return sessionStorage.getItem(key) ?? undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** Write a thread id to sessionStorage. No-ops on SSR or storage errors. */
-const writePersistedThread = (key: string, threadId: string): void => {
-    if (typeof window === "undefined") return;
-    try {
-        sessionStorage.setItem(key, threadId);
-    } catch {
-        // Private-mode / quota exceeded — silently ignore.
-    }
-};
-
-/** Erase a persisted thread id from sessionStorage. */
-const clearPersistedThreadStorage = (key: string): void => {
-    if (typeof window === "undefined") return;
-    try {
-        sessionStorage.removeItem(key);
-    } catch {
-        // ignore
-    }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** TTFT SLO threshold in ms (P2-I). Turns exceeding this emit AGENT_TTFT_SLOW. */
 const TTFT_SLO_MS = 1500;

@@ -27,7 +27,6 @@ work unchanged via :func:`polish_search`.
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -47,6 +46,7 @@ from app.agents.catalog._schemas import (
     SEARCH_RATIONALE_MAX,
 )
 from app.agents.catalog._shared import (
+    augment_items_with_vector_neighbours,
     cap_polished_text,
     filter_to_allowed_ids,
 )
@@ -58,8 +58,6 @@ from langgraph.runtime import get_runtime
 from app.tools import be_tools
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
-
-logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -484,34 +482,22 @@ class SearchAgent(BaseAgent):
                 return {}
             candidates = list(state.get("candidates") or [])
             query = state.get("query") or ""
-            from app.config import settings as app_settings
-            from app.agents.task_vector_pg import (
-                fetch_vector_neighbours_for_project,
-                merge_similar_with_vector_hits,
-            )
+            if (state.get("kind") or "tasks") == "tasks":
+                from app.config import settings as app_settings
 
-            if (
-                app_settings.agent_vector_search_enabled
-                and (state.get("kind") or "tasks") == "tasks"
-            ):
-                try:
-                    qvecs = await be_tools.embed_async([query])
-                    qv = qvecs[0] if qvecs else []
-                    _rt = get_runtime(ChatContext)
-                    pid = str((_rt.context or {}).get("project_id") or "")
-                    hits = fetch_vector_neighbours_for_project(
-                        project_id=pid,
-                        query_embedding=list(qv),
-                        settings=app_settings,
-                    )
-                    candidates = merge_similar_with_vector_hits(
-                        candidates, hits, max_total=40
-                    )
-                except Exception:
-                    logger.warning(
-                        "Vector-augmented search candidates failed; using FE list only.",
-                        exc_info=True,
-                    )
+                _rt = get_runtime(ChatContext)
+                pid = str((_rt.context or {}).get("project_id") or "")
+                candidates = await augment_items_with_vector_neighbours(
+                    candidates,
+                    query_text=query,
+                    project_id=pid,
+                    settings=app_settings,
+                    max_total=40,
+                    failure_log_message=(
+                        "Vector-augmented search candidates failed; "
+                        "using FE list only."
+                    ),
+                )
             n = len(candidates)
             if not candidates:
                 # Demo-state visibility: the previous "No candidates returned
