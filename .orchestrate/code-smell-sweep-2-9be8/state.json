@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-18T17:50:05.696Z",
       "lastUpdate": "2026-05-18T17:50:06.694Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 244,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-microcopy-string-helper",
@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-18T17:51:55.438Z",
       "lastUpdate": "2026-05-18T17:51:55.439Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-use-agent-chat-resume-errors",
@@ -63,11 +63,11 @@
       "finishedAt": "2026-05-18T17:51:30.613Z",
       "lastUpdate": "2026-05-18T17:51:31.649Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 250,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-use-agent-chat-resume-errors",
@@ -87,11 +87,11 @@
       "finishedAt": "2026-05-18T17:53:22.319Z",
       "lastUpdate": "2026-05-18T17:53:22.319Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "extract-use-agent-thread-id",
@@ -109,11 +109,11 @@
       "finishedAt": "2026-05-18T17:50:31.587Z",
       "lastUpdate": "2026-05-18T17:50:32.673Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 245,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-extract-use-agent-thread-id",
@@ -133,11 +133,11 @@
       "finishedAt": "2026-05-18T17:52:07.150Z",
       "lastUpdate": "2026-05-18T17:52:07.150Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "extract-ai-chat-tool-display",
@@ -155,11 +155,11 @@
       "finishedAt": "2026-05-18T17:51:26.680Z",
       "lastUpdate": "2026-05-18T17:51:27.821Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 249,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-extract-ai-chat-tool-display",
@@ -179,11 +179,11 @@
       "finishedAt": "2026-05-18T17:53:03.739Z",
       "lastUpdate": "2026-05-18T17:53:03.740Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "extract-ai-chat-composer",
@@ -203,11 +203,11 @@
       "finishedAt": "2026-05-18T17:53:39.294Z",
       "lastUpdate": "2026-05-18T17:53:40.475Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 251,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-extract-ai-chat-composer",
@@ -227,11 +227,11 @@
       "finishedAt": "2026-05-18T17:55:23.061Z",
       "lastUpdate": "2026-05-18T17:55:23.062Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-sw-registration-logging",
@@ -249,11 +249,11 @@
       "finishedAt": "2026-05-18T17:50:40.748Z",
       "lastUpdate": "2026-05-18T17:50:41.798Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 246,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-sw-registration-logging",
@@ -273,11 +273,11 @@
       "finishedAt": "2026-05-18T17:52:34.982Z",
       "lastUpdate": "2026-05-18T17:52:34.983Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "be-fe-tool-name-constants",
@@ -295,11 +295,11 @@
       "finishedAt": "2026-05-18T17:51:12.677Z",
       "lastUpdate": "2026-05-18T17:52:59.163Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-be-fe-tool-name-constants",
@@ -319,11 +319,11 @@
       "finishedAt": "2026-05-18T17:52:58.062Z",
       "lastUpdate": "2026-05-18T17:52:58.062Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "be-board-brief-extract-counts",
@@ -341,11 +341,11 @@
       "finishedAt": "2026-05-18T17:51:21.858Z",
       "lastUpdate": "2026-05-18T17:51:23.935Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 248,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-be-board-brief-extract-counts",
@@ -365,11 +365,11 @@
       "finishedAt": "2026-05-18T17:52:57.042Z",
       "lastUpdate": "2026-05-18T17:52:57.042Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "merge-code-smell-sweep-2",
@@ -393,13 +393,13 @@
       "handoffPath": "handoffs/merge-code-smell-sweep-2.md",
       "startedAt": "2026-05-18T17:53:49.395Z",
       "finishedAt": "2026-05-18T17:58:42.627Z",
-      "lastUpdate": "2026-05-18T17:58:42.628Z",
+      "lastUpdate": "2026-05-18T17:58:43.843Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": "unit-test-verified"
     }
   ],
   "attention": [
@@ -502,6 +502,10 @@
     {
       "at": "2026-05-18T17:53:49.394Z",
       "message": "merge-code-smell-sweep-2: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:58:43.843Z",
+      "message": "merge-code-smell-sweep-2: verification self-reported (unit-test-verified)"
     }
   ]
 }
