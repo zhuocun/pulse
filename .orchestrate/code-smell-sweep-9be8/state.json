@@ -118,7 +118,7 @@
     {
       "name": "verify-fix-project-modal-errors",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-9be8/verify-fix-project-modal-errors",
+      "branch": "`orch/code-smell-sweep-9be8/fix-project-modal-errors` (no verifier commits; working tree clean)",
       "startingRef": "orch/code-smell-sweep-9be8/fix-project-modal-errors",
       "dependsOn": [
         "fix-project-modal-errors"
@@ -126,12 +126,12 @@
       "agentId": "bc-cf4197ec-0d11-4190-aa4e-a7a65c62dddf",
       "runId": "run-06071cf7-8db5-4cb3-9d94-4259a249ba0c",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-project-modal-errors.md",
       "startedAt": "2026-05-18T17:17:49.863Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:17:52.558Z",
+      "finishedAt": "2026-05-18T17:19:23.941Z",
+      "lastUpdate": "2026-05-18T17:19:23.941Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
