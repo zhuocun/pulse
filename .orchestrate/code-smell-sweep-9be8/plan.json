@@ -1,0 +1,267 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "code-smell-sweep-9be8: Sweep review of the project, identify code smells, and fix them; every spawned role uses model composer-2.5. Read `.orchestrate/code-smell-sweep-9be8/discovery/CODE-SMELL-AUDIT.md` and `bootstrap/PATHS_AND_VERIFICATION.md` before editing product code. Respect `AGENTS.md`. Do not revert sibling agents' work.",
+  "summary": "Parallel code-smell fixes: typed mutation/DnD hooks, project-modal error surfacing, aiTaskAssistPanel dedup, useAgent thread-persist extraction, and BE vector-augment dedup — then merge.",
+  "rootSlug": "code-smell-sweep-9be8",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "selfAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
+  "acceptanceCriteria": [
+    "Each implementation worker fixes its scoped smell with tests where feasible; eslint + tsc green on touched slices.",
+    "Each verifier records unit-test-verified or a concrete blocker.",
+    "Merge worker produces `orch/code-smell-sweep-9be8/merge-code-smell-sweep` with full Jest + tsc + eslint + vite build green."
+  ],
+  "tasks": [
+    {
+      "name": "fix-use-react-mutation-types",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Remove `any` from `useReactMutation` optimistic callback typing (audit id mutation-callback-any).",
+      "brief": "Read `.orchestrate/code-smell-sweep-9be8/discovery/CODE-SMELL-AUDIT.md`.\n\nReplace the `callback?: (...args: any) => any` parameter in `src/utils/hooks/useReactMutation.ts` with a typed signature such as `(target: unknown, old?: unknown) => unknown | undefined`. Remove eslint-disable for explicit-any on that line. Update call sites only if TypeScript surfaces real mismatches — behavior must stay identical (rollback on undefined/same reference).\n\nAdd or extend a focused test in `useReactMutation.test.ts` if one exists, or a minimal test file proving optimistic rollback still works.",
+      "pathsAllowed": [
+        "src/utils/hooks/useReactMutation.ts",
+        "src/utils/hooks/useReactMutation.test.ts",
+        "src/**/useReactMutation*"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "backend/**"
+      ],
+      "acceptance": [
+        "No `any` in `useReactMutation` public callback type.",
+        "Existing mutation consumers compile without new eslint disables.",
+        "Tests for the hook pass."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useReactMutation`\n- `npm run eslint -- --max-warnings 0 src/utils/hooks/useReactMutation.ts`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-use-react-mutation-types",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-use-react-mutation-types",
+      "dependsOn": ["fix-use-react-mutation-types"],
+      "scopedGoal": "Verify useReactMutation typing cleanup.",
+      "brief": "Re-run verify recipe on worker branch. Confirm `any` is gone from callback typing and tests pass.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-dnd-clone-types",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Tighten `dragAndDrop` cloneElement typing; remove `as any` where possible (audit id dnd-clone-element-any).",
+      "brief": "Read the discovery audit. In `src/components/dragAndDrop/index.tsx`, replace `RefAttributes<unknown> | any` and `base as any` with a narrow child prop type or `React.ReactElement` constraint. Keep runtime behavior identical — existing `index.test.tsx` and column DnD tests must pass.\n\nDo not change `disableInteractiveElementBlocking` usage on board/column — out of scope.",
+      "pathsAllowed": [
+        "src/components/dragAndDrop/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/components/column/**",
+        "src/pages/board.tsx",
+        "backend/**"
+      ],
+      "acceptance": [
+        "No `@typescript-eslint/no-explicit-any` disable for cloneElement props unless unavoidable with a one-line rationale.",
+        "`src/components/dragAndDrop/index.test.tsx` passes."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/dragAndDrop`\n- `npm run eslint -- --max-warnings 0 src/components/dragAndDrop`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-dnd-clone-types",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-dnd-clone-types",
+      "dependsOn": ["fix-dnd-clone-types"],
+      "scopedGoal": "Verify dragAndDrop typing cleanup.",
+      "brief": "Re-run verify recipe; confirm tests pass and `any` usage reduced.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-project-modal-errors",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Stop swallowing project create/edit mutation failures (audit id project-modal-swallowed-error).",
+      "brief": "In `src/components/projectModal/index.tsx`, replace `mutateAsync(payload).then(onClose).catch(() => {})` with error handling that surfaces failures to the user (AntD `message.error` with `getError` / microcopy, or inline form error — match patterns from `taskModal` or other modals). Only call `onClose` on success.\n\nAdd/extend tests in `src/components/projectModal/index.test.tsx` asserting a failed mutation does not close the modal and shows feedback.",
+      "pathsAllowed": [
+        "src/components/projectModal/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "backend/**"
+      ],
+      "acceptance": [
+        "No empty `.catch(() => {})` on project mutation.",
+        "Failed mutation leaves modal open with user-visible error.",
+        "Tests cover failure path."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/projectModal`\n- `npm run eslint -- --max-warnings 0 src/components/projectModal`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-project-modal-errors",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-project-modal-errors",
+      "dependsOn": ["fix-project-modal-errors"],
+      "scopedGoal": "Verify project modal error surfacing.",
+      "brief": "Re-run verify recipe; confirm failure test and no empty catch.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-ai-task-assist-smells",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Dedup local AI context, surface local-engine errors, hoist magic delay constants in aiTaskAssistPanel.",
+      "brief": "Read discovery audit ids ai-assist-dup-context, ai-assist-swallowed-catch, ai-assist-magic-delays.\n\nIn `src/components/aiTaskAssistPanel/index.tsx`:\n1. Extract `buildLocalAiContext(projectId, columns, tasks, members)` (module-level or `aiTaskAssistContext.ts` co-located) replacing three duplicate payload blocks.\n2. Replace `.catch(() => undefined)` on `runEstimate`/`runReadiness`/regenerate with routing to existing `estimateError`/`readinessError` or equivalent — no silent failures.\n3. Hoist `1000` debounce and `250` delayed-flag ms to named constants at module top.\n4. Reduce `(microcopy… as string)` casts where a small `asMicrocopyString()` helper or typed key path fixes them without widening types globally.\n\nPreserve dual `useAi`/`useAgent` unconditional mount. Do not change hook APIs. Extend `agent.test.tsx` or component tests for error visibility if feasible.",
+      "pathsAllowed": [
+        "src/components/aiTaskAssistPanel/**"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useAi.ts",
+        "backend/**"
+      ],
+      "acceptance": [
+        "Single helper builds local-engine context payloads.",
+        "No `.catch(() => undefined)` on estimate/readiness runs.",
+        "Debounce/delay constants named.",
+        "Existing aiTaskAssistPanel tests pass."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiTaskAssistPanel`\n- `npm run eslint -- --max-warnings 0 src/components/aiTaskAssistPanel`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-ai-task-assist-smells",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-ai-task-assist-smells",
+      "dependsOn": ["fix-ai-task-assist-smells"],
+      "scopedGoal": "Verify aiTaskAssistPanel smell fixes.",
+      "brief": "Re-run verify recipe; grep for empty catch on estimate/readiness paths.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "extract-use-agent-thread-persist",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Extract thread persistence helpers from useAgent.ts into useAgentThreadPersist.ts without API changes.",
+      "brief": "Read discovery id use-agent-thread-persist.\n\nMove `threadStorageKey`, `readPersistedThread`, `writePersistedThread`, and related safe-storage helpers from `src/utils/hooks/useAgent.ts` into `src/utils/hooks/useAgentThreadPersist.ts`. Re-export any symbols tests import from `useAgent.ts` if needed. Default export `useAgent` behavior unchanged.\n\nAdd `useAgentThreadPersist.test.ts` covering read/write round-trip with mocked localStorage.\n\nDo not change stream consumer, tool resolver, or nudge inbox — those are separate modules already.",
+      "pathsAllowed": [
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useAgentThreadPersist.ts",
+        "src/utils/hooks/useAgentThreadPersist.test.ts",
+        "src/utils/hooks/useAgent.test.tsx"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/utils/hooks/useAgentStreamConsumer.ts",
+        "src/utils/hooks/useAgentToolResolver.ts",
+        "src/utils/hooks/useNudgeInbox.ts",
+        "backend/**"
+      ],
+      "acceptance": [
+        "`useAgent.ts` line count drops materially (helpers moved).",
+        "All `useAgent.test.tsx` tests pass unchanged in behavior.",
+        "New unit test covers persistence helpers."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useAgent src/utils/hooks/useAgentThreadPersist`\n- `npm run eslint -- --max-warnings 0 src/utils/hooks/useAgent.ts src/utils/hooks/useAgentThreadPersist.ts`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-extract-use-agent-thread-persist",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "extract-use-agent-thread-persist",
+      "dependsOn": ["extract-use-agent-thread-persist"],
+      "scopedGoal": "Verify useAgent thread persistence extraction.",
+      "brief": "Re-run verify recipe; confirm useAgent public API unchanged.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "be-catalog-vector-dedup",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Deduplicate pgvector augmentation between task_estimation and search catalog agents (audit id be-cat-dup-vec).",
+      "brief": "Read discovery audit. Extract shared async helper in `backend/app/agents/catalog/_shared.py` for the repeated pattern: settings gate, `embed_async`, `fetch_vector_neighbours_for_project`, `merge_similar_with_vector_hits`, warning log on failure. Update `task_estimation.py` and `search.py` call sites. Narrow `except Exception` to documented BLE001 only where intentional.\n\nRun `python -m pytest tests/test_vector_augmented_agents.py` and related tests.",
+      "pathsAllowed": [
+        "backend/app/agents/catalog/_shared.py",
+        "backend/app/agents/catalog/task_estimation.py",
+        "backend/app/agents/catalog/search.py",
+        "backend/tests/test_vector_augmented_agents.py"
+      ],
+      "pathsForbidden": [
+        ".orchestrate/**",
+        "docs/todo/**",
+        "src/**"
+      ],
+      "acceptance": [
+        "Vector augment logic lives in one shared helper.",
+        "task_estimation and search behavior unchanged per tests.",
+        "ruff check passes on touched files."
+      ],
+      "verify": "## Automated\n- `cd backend && python -m pytest tests/test_vector_augmented_agents.py -q`\n- `cd backend && ruff check app/agents/catalog/_shared.py app/agents/catalog/task_estimation.py app/agents/catalog/search.py`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-be-catalog-vector-dedup",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "be-catalog-vector-dedup",
+      "dependsOn": ["be-catalog-vector-dedup"],
+      "scopedGoal": "Verify BE vector augment dedup.",
+      "brief": "Re-run pytest + ruff on worker branch.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "merge-code-smell-sweep",
+      "type": "worker",
+      "model": "composer-2.5",
+      "startingRef": "main",
+      "dependsOn": [
+        "fix-use-react-mutation-types",
+        "fix-dnd-clone-types",
+        "fix-project-modal-errors",
+        "fix-ai-task-assist-smells",
+        "extract-use-agent-thread-persist",
+        "be-catalog-vector-dedup"
+      ],
+      "scopedGoal": "Merge six worker branches into orch/code-smell-sweep-9be8/merge-code-smell-sweep; full FE verification; no PR.",
+      "brief": "Merge order (git merge --no-ff):\n1. fix-use-react-mutation-types\n2. fix-dnd-clone-types\n3. fix-project-modal-errors\n4. fix-ai-task-assist-smells\n5. extract-use-agent-thread-persist\n6. be-catalog-vector-dedup\n\nConflict policy: union code changes; for useAgent.ts + useAgentThreadPersist.ts prefer extract branch. Run full verification from bootstrap/PATHS_AND_VERIFICATION.md plus `npx vite build` and `cd backend && python -m pytest -q` on merged tree.",
+      "pathsAllowed": [
+        "src/**",
+        "backend/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "Branch orch/code-smell-sweep-9be8/merge-code-smell-sweep pushed with 6 merge commits.",
+        "tsc, eslint, full Jest, vite build, backend pytest green."
+      ],
+      "verify": "## Automated\n- `npx tsc --noEmit`\n- `npm run eslint -- --max-warnings 0`\n- `CI=true npm test -- --watchAll=false --runInBand`\n- `npx vite build`\n- `cd backend && python -m pytest -q`",
+      "openPR": false,
+      "maxAttempts": 2
+    }
+  ]
+}
