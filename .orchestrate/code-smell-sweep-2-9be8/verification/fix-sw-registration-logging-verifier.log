@@ -1,0 +1,21 @@
+# Verifier: fix-sw-registration-logging
+# Date: 2026-05-18
+# Branch: orch/code-smell-sweep-2-9be8/fix-sw-registration-logging
+
+## Recipe runs
+1. `CI=true npm test -- --watchAll=false --runInBand src/index.test.tsx`
+   - OK: 1 suite, 10 tests passed (2.374s)
+2. `npx tsc --noEmit`
+   - OK: exit 0
+
+## Acceptance evidence (from tests + code read)
+- `warnOnServiceWorkerRegistrationFailure(error, isProd)` in `src/index.tsx`:
+  - Early return when `isProd` (production silent).
+  - `console.warn` with `Board Copilot:` prefix when not prod.
+- `src/index.test.tsx` describe block `warnOnServiceWorkerRegistrationFailure`:
+  - `warns in non-production when registration fails` — expects warn once with message + error.
+  - `does not warn in production when registration fails` — expects no warn.
+- SW registration catch at module load calls helper with `process.env.NODE_ENV === "production"`.
+
+## Verdict signal
+unit-test-verified (no live browser / dev-server run).

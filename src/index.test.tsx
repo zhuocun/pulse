@@ -11,8 +11,12 @@ type WarnFn = (
     isProd: boolean
 ) => void;
 
-function loadWarnFn(): WarnFn {
-    let fn!: WarnFn;
+type SwWarnFn = (error: unknown, isProd: boolean) => void;
+
+function loadIndexExports<
+    T extends Record<string, unknown>
+>(exportName: keyof T): T[keyof T] {
+    let fn!: T[keyof T];
     // Mock ReactDOM so createRoot doesn't blow up in jsdom
     jest.doMock("react-dom/client", () => ({
         __esModule: true,
@@ -23,14 +27,24 @@ function loadWarnFn(): WarnFn {
         default: jest.fn()
     }));
     jest.isolateModules(() => {
-        const mod = require("./index") as {
-            warnIfMissingObservabilityEndpoints: WarnFn;
-        };
-        fn = mod.warnIfMissingObservabilityEndpoints;
+        const mod = require("./index") as T;
+        fn = mod[exportName];
     });
     jest.dontMock("react-dom/client");
     jest.dontMock("./reportWebVitals");
     return fn;
+}
+
+function loadWarnFn(): WarnFn {
+    return loadIndexExports<{ warnIfMissingObservabilityEndpoints: WarnFn }>(
+        "warnIfMissingObservabilityEndpoints"
+    );
+}
+
+function loadSwWarnFn(): SwWarnFn {
+    return loadIndexExports<{
+        warnOnServiceWorkerRegistrationFailure: SwWarnFn;
+    }>("warnOnServiceWorkerRegistrationFailure");
 }
 
 describe("warnIfMissingObservabilityEndpoints", () => {
@@ -118,6 +132,42 @@ describe("warnIfMissingObservabilityEndpoints", () => {
         ).__copilotObservabilityWarnings__;
 
         expect(recorded == null || recorded.length === 0).toBe(true);
+    });
+});
+
+describe("warnOnServiceWorkerRegistrationFailure", () => {
+    let warnOnSwFailure: SwWarnFn;
+    let warnSpy: jest.SpyInstance;
+
+    beforeAll(() => {
+        document.body.innerHTML = '<div id="root"></div>';
+        warnOnSwFailure = loadSwWarnFn();
+    });
+
+    beforeEach(() => {
+        warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        warnSpy.mockRestore();
+    });
+
+    it("warns in non-production when registration fails", () => {
+        const err = new Error("registration failed");
+
+        warnOnSwFailure(err, false);
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0][0]).toContain(
+            "service worker registration failed"
+        );
+        expect(warnSpy.mock.calls[0][1]).toBe(err);
+    });
+
+    it("does not warn in production when registration fails", () => {
+        warnOnSwFailure(new Error("registration failed"), true);
+
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 });
 
