@@ -242,6 +242,45 @@ describe("ProjectModal", () => {
         expect(postBody).not.toHaveProperty("managerId");
     });
 
+    it("surfaces a create error and keeps the modal open when POST fails", async () => {
+        fetchMock.mockImplementation((input, init) => {
+            const url = String(input);
+            const method = init?.method?.toUpperCase() ?? "GET";
+
+            if (url.includes("users/members")) {
+                return Promise.resolve(response(members));
+            }
+            if (url.includes("projects") && method === "POST") {
+                return Promise.resolve(
+                    response({ error: "Create failed on server" }, false)
+                );
+            }
+
+            return Promise.resolve(response({}));
+        });
+        renderProjectModal({ type: "open" });
+
+        expect(
+            await screen.findByRole("dialog", { name: "Create project" })
+        ).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText("Project name"), {
+            target: { value: "Billing" }
+        });
+        fireEvent.change(screen.getByLabelText("Organization"), {
+            target: { value: "Finance" }
+        });
+        fireEvent.mouseDown(screen.getByRole("combobox"));
+        fireEvent.click(await screen.findByText("Alice"));
+        fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+        await waitFor(() =>
+            expect(
+                screen.getByText(/create failed on server/i)
+            ).toBeInTheDocument()
+        );
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
+    });
+
     it("closes and resets the modal from the cancel button", async () => {
         renderProjectModal({ type: "open" });
 
@@ -317,6 +356,50 @@ describe("ProjectModal", () => {
                             "Platform"
                 )
             ).toBe(true)
+        );
+    });
+
+    it("surfaces a save error and keeps the modal open when PUT fails", async () => {
+        fetchMock.mockImplementation((input, init) => {
+            const url = String(input);
+            const method = init?.method?.toUpperCase() ?? "GET";
+
+            if (url.includes("users/members")) {
+                return Promise.resolve(response(members));
+            }
+            if (url.includes("projects?projectId=project-1")) {
+                return Promise.resolve(response(project()));
+            }
+            if (url.includes("projects") && method === "PUT") {
+                return Promise.resolve(
+                    response({ error: "Save failed on server" }, false)
+                );
+            }
+
+            return Promise.resolve(response({}));
+        });
+        renderProjectModal({ type: "edit", id: "project-1" });
+
+        expect(
+            await screen.findByRole("dialog", { name: "Edit project" })
+        ).toBeInTheDocument();
+        await act(async () => {
+            fireEvent.change(screen.getByDisplayValue("Product"), {
+                target: { value: "Platform" }
+            });
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.getByText(/save failed on server/i)
+            ).toBeInTheDocument()
+        );
+        expect(store.getState().projectModal.isModalOpened).toBe(true);
+        expect(store.getState().projectModal.editingProjectId).toBe(
+            "project-1"
         );
     });
 });
