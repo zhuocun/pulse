@@ -112,6 +112,23 @@ warnIfMissingObservabilityEndpoints(
     process.env.NODE_ENV === "production"
 );
 
+/**
+ * Emits `console.warn` when service worker registration fails in non-production
+ * builds. Silent in production.
+ */
+export function warnOnServiceWorkerRegistrationFailure(
+    error: unknown,
+    isProd: boolean
+): void {
+    if (isProd) return;
+
+    // eslint-disable-next-line no-console
+    console.warn(
+        "Board Copilot: service worker registration failed.",
+        error
+    );
+}
+
 if (analyticsEndpoint) {
     setAnalyticsSink(
         httpAnalyticsSink({
@@ -150,6 +167,13 @@ reportWebVitals(
 
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
+        navigator.serviceWorker
+            .register("/sw.js")
+            .catch((error) =>
+                warnOnServiceWorkerRegistrationFailure(
+                    error,
+                    process.env.NODE_ENV === "production"
+                )
+            );
     });
 }
