@@ -303,7 +303,7 @@
     {
       "name": "verify-be-fe-tool-name-constants",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-2-9be8/verify-be-fe-tool-name-constants",
+      "branch": "`orch/code-smell-sweep-2-9be8/be-fe-tool-name-constants` (commit `d6df6c8` — verifier log only)",
       "startingRef": "orch/code-smell-sweep-2-9be8/be-fe-tool-name-constants",
       "dependsOn": [
         "be-fe-tool-name-constants"
@@ -311,12 +311,12 @@
       "agentId": "bc-9a3f97f8-68c4-431c-87e7-2a5ae70508a9",
       "runId": "run-4c65e2b2-fd41-4f34-9909-1cf1177e2d19",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-be-fe-tool-name-constants.md",
       "startedAt": "2026-05-18T17:51:22.928Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:25.318Z",
+      "finishedAt": "2026-05-18T17:52:58.062Z",
+      "lastUpdate": "2026-05-18T17:52:58.062Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
