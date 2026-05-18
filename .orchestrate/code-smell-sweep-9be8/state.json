@@ -7,15 +7,15 @@
       "branch": "orch/code-smell-sweep-9be8/fix-use-react-mutation-types",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-cf715f23-186d-4c0c-b260-d0e57cea56a8",
+      "runId": "run-3e2d5895-3ddb-4286-8988-cadf6dc87ffb",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:15:11.474Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:15:11.474Z",
+      "lastUpdate": "2026-05-18T17:15:14.237Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -55,17 +55,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:15:14.240Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:15:14.240Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-dnd-clone-types",
@@ -299,6 +300,10 @@
     {
       "at": "2026-05-18T17:15:11.470Z",
       "message": "fix-use-react-mutation-types: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:15:14.240Z",
+      "message": "fix-dnd-clone-types: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
