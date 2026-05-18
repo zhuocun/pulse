@@ -13,9 +13,9 @@ type WarnFn = (
 
 type SwWarnFn = (error: unknown, isProd: boolean) => void;
 
-function loadIndexExports<
-    T extends Record<string, unknown>
->(exportName: keyof T): T[keyof T] {
+function loadIndexExports<T extends Record<string, unknown>>(
+    exportName: keyof T
+): T[keyof T] {
     let fn!: T[keyof T];
     // Mock ReactDOM so createRoot doesn't blow up in jsdom
     jest.doMock("react-dom/client", () => ({

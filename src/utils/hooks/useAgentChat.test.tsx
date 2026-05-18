@@ -526,9 +526,7 @@ describe("useAgentChat", () => {
                 }
             ])
         );
-        useAgentResumeOverride.current = jest
-            .fn()
-            .mockRejectedValue(resumeErr);
+        useAgentResumeOverride.current = jest.fn().mockRejectedValue(resumeErr);
 
         const queryClient = new QueryClient();
         const { result } = renderHook(() => useAgentChat(makeCtx()), {

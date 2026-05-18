@@ -36,6 +36,7 @@ import {
 import { generateThreadId, TTFT_SLO_MS } from "./useAgentThreadId";
 import useApi from "./useApi";
 
+export { generateThreadId, TTFT_SLO_MS } from "./useAgentThreadId";
 export {
     clearPersistedThreadStorage,
     readPersistedThread,
@@ -53,7 +54,6 @@ export {
     NUDGE_PRUNE_INTERVAL_MS,
     reduceNudgeInbox
 } from "./useNudgeInbox";
-export { generateThreadId, TTFT_SLO_MS } from "./useAgentThreadId";
 
 export interface AgentMessage {
     role: "user" | "assistant" | "tool" | "system";

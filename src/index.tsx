@@ -123,10 +123,7 @@ export function warnOnServiceWorkerRegistrationFailure(
     if (isProd) return;
 
     // eslint-disable-next-line no-console
-    console.warn(
-        "Board Copilot: service worker registration failed.",
-        error
-    );
+    console.warn("Board Copilot: service worker registration failed.", error);
 }
 
 if (analyticsEndpoint) {

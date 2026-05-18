@@ -68,8 +68,22 @@ import EngineModeTag from "../engineModeTag";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
 import { AiChatComposer } from "./AiChatComposer";
-import { AssistantAttribution, AssistantDisclaimer, MessageBubble, MessageRow, SamplePrompt, StreamingCursor, ToolPayloadPanel } from "./aiChatDrawerStyles";
-import { BUDGET_CRITICAL_THRESHOLD, BUDGET_WARN_THRESHOLD, CITATION_INLINE_LIMIT, humanizeTool, summarizeToolBody } from "./aiChatToolDisplay";
+import {
+    AssistantAttribution,
+    AssistantDisclaimer,
+    MessageBubble,
+    MessageRow,
+    SamplePrompt,
+    StreamingCursor,
+    ToolPayloadPanel
+} from "./aiChatDrawerStyles";
+import {
+    BUDGET_CRITICAL_THRESHOLD,
+    BUDGET_WARN_THRESHOLD,
+    CITATION_INLINE_LIMIT,
+    humanizeTool,
+    summarizeToolBody
+} from "./aiChatToolDisplay";
 
 const { Text } = Typography;
 

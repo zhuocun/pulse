@@ -259,8 +259,7 @@ const useAgentChat = (
 
     // Effective error (null if dismissed).
     const activeError = agent.error ?? resumeError;
-    const effectiveError =
-        activeError && !errorDismissed ? activeError : null;
+    const effectiveError = activeError && !errorDismissed ? activeError : null;
 
     const dismissError = useCallback(() => {
         setErrorDismissed(true);
