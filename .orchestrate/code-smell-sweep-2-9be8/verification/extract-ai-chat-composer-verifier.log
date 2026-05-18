@@ -1,0 +1,17 @@
+# Verifier: extract-ai-chat-composer
+# Date: 2026-05-18
+# Branch: orch/code-smell-sweep-2-9be8/extract-ai-chat-composer
+
+## Acceptance spot-check (read-only)
+- `src/components/aiChatDrawer/AiChatComposer.tsx` exists (presentational footer: TextArea, Send/Stop, char hint).
+- `src/components/aiChatDrawer/index.tsx` imports `./AiChatComposer` and renders `<AiChatComposer ... />` at drawer footer (~L2195).
+- `data-testid="chat-prompt-char-hint"` and microcopy `aria-label`s live in `AiChatComposer.tsx`; `index.test.tsx` still queries `chat-prompt-char-hint`.
+
+## Recipe runs
+1. `CI=true npm test -- --watchAll=false --runInBand src/components/aiChatDrawer`
+   - exit 0 — Test Suites: 2 passed, 2 total; Tests: 25 passed, 25 total; Time: ~7.7s
+2. `npx tsc --noEmit`
+   - exit 0 — no diagnostics
+
+## Verdict signal
+unit-test-verified (no live browser run in this verifier pass).
