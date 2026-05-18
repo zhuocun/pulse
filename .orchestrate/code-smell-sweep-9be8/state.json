@@ -77,15 +77,15 @@
       "dependsOn": [
         "fix-dnd-clone-types"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-65b7bbbd-3707-49ef-b1a3-0a5ff86ecc1e",
+      "runId": "run-37cfb7d1-086f-4a2c-92ec-307eb95d1d45",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:17:21.527Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:17:21.527Z",
+      "lastUpdate": "2026-05-18T17:17:24.748Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -242,12 +242,12 @@
       "handoffPath": "handoffs/be-catalog-vector-dedup.md",
       "startedAt": "2026-05-18T17:15:25.264Z",
       "finishedAt": "2026-05-18T17:17:20.480Z",
-      "lastUpdate": "2026-05-18T17:17:20.480Z",
+      "lastUpdate": "2026-05-18T17:17:22.639Z",
       "note": null,
       "slackTs": null,
       "prNumber": 239,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -261,17 +261,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:17:24.750Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:17:24.750Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "merge-code-smell-sweep",
@@ -342,6 +343,14 @@
     {
       "at": "2026-05-18T17:17:21.527Z",
       "message": "verify-fix-dnd-clone-types: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:17:22.639Z",
+      "message": "be-catalog-vector-dedup: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:17:24.750Z",
+      "message": "verify-be-catalog-vector-dedup: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
