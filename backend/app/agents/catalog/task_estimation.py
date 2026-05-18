@@ -42,6 +42,7 @@ from app.agents.state import TaskEstimationState
 from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
+from app.tools.fe_tool_names import FE_SIMILAR_TASKS
 from app.tools.redaction import redact_dict, redact_task_fields
 
 
@@ -415,7 +416,7 @@ class TaskEstimationAgent(BaseAgent):
         status="active",
         rate_limit=(20, 200),
         allowed_autonomy=("suggest", "plan"),
-        tools=("fe.similarTasks", "be.embed", "be.embedding_neighbors"),
+        tools=(FE_SIMILAR_TASKS, "be.embed", "be.embedding_neighbors"),
         redactable_dict_fields=("task_draft", "context"),
         rationale={
             "recursion_limit": (

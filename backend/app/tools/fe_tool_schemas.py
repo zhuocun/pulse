@@ -14,6 +14,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.tools.fe_tool_names import (
+    FE_APPLY_MUTATION,
+    FE_BOARD_SNAPSHOT,
+    FE_FORM_DRAFT,
+    FE_GET_PROJECT,
+    FE_GET_TASK,
+    FE_LIST_BOARD,
+    FE_LIST_MEMBERS,
+    FE_LIST_PROJECTS,
+    FE_LIST_TASKS,
+    FE_RECENT_ACTIVITY,
+    FE_SEARCH_CANDIDATES,
+    FE_SIMILAR_TASKS,
+    FE_VIEWER_CONTEXT,
+)
+
 # Common reusable schemas
 _PROJECT_ID = {"type": "string", "description": "Project identifier."}
 _TASK_ID = {"type": "string", "description": "Task identifier."}
@@ -26,7 +42,7 @@ _LIMIT = {
 
 
 FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
-    "fe.listProjects": {
+    FE_LIST_PROJECTS: {
         "description": "List projects visible to the current viewer.",
         "args_schema": {
             "type": "object",
@@ -44,7 +60,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["projects"],
         },
     },
-    "fe.listMembers": {
+    FE_LIST_MEMBERS: {
         "description": "List members of a project.",
         "args_schema": {
             "type": "object",
@@ -63,7 +79,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["members"],
         },
     },
-    "fe.getProject": {
+    FE_GET_PROJECT: {
         "description": "Fetch a single project by id.",
         "args_schema": {
             "type": "object",
@@ -77,7 +93,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["project"],
         },
     },
-    "fe.listBoard": {
+    FE_LIST_BOARD: {
         "description": "List columns + ordered task ids for a project board.",
         "args_schema": {
             "type": "object",
@@ -96,7 +112,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["columns"],
         },
     },
-    "fe.listTasks": {
+    FE_LIST_TASKS: {
         "description": "List tasks in a project, optionally filtered.",
         "args_schema": {
             "type": "object",
@@ -135,7 +151,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["tasks"],
         },
     },
-    "fe.getTask": {
+    FE_GET_TASK: {
         "description": "Fetch a single task by id.",
         "args_schema": {
             "type": "object",
@@ -149,7 +165,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["task"],
         },
     },
-    "fe.boardSnapshot": {
+    FE_BOARD_SNAPSHOT: {
         "description": "Return a normalised board snapshot used by the brief and triage agents.",
         "args_schema": {
             "type": "object",
@@ -167,7 +183,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    "fe.similarTasks": {
+    FE_SIMILAR_TASKS: {
         "description": "Return tasks similar to a given prompt or draft for grounding.",
         "args_schema": {
             "type": "object",
@@ -190,7 +206,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["similar"],
         },
     },
-    "fe.viewerContext": {
+    FE_VIEWER_CONTEXT: {
         "description": "Return the current viewer's identity, role and preferences.",
         "args_schema": {
             "type": "object",
@@ -206,7 +222,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    "fe.recentActivity": {
+    FE_RECENT_ACTIVITY: {
         "description": "Return recent activity entries for a project.",
         "args_schema": {
             "type": "object",
@@ -228,7 +244,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["activity"],
         },
     },
-    "fe.formDraft": {
+    FE_FORM_DRAFT: {
         "description": "Return any draft the user has in-flight in a task creation form.",
         "args_schema": {
             "type": "object",
@@ -243,7 +259,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    "fe.searchCandidates": {
+    FE_SEARCH_CANDIDATES: {
         "description": (
             "Return candidate tasks or projects for embedding-based reranking. "
             "The BE embeds the query and each candidate's text, then scores by "
@@ -282,7 +298,7 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["candidates"],
         },
     },
-    "fe.applyMutation": {
+    FE_APPLY_MUTATION: {
         "description": (
             "Board mutation HITL: ``stage=approval`` waits for "
             "``Command(resume={\"accepted\": <bool>})``; ``stage=apply`` "
