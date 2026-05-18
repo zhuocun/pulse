@@ -164,7 +164,7 @@
     {
       "name": "verify-extract-ai-chat-tool-display",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-2-9be8/verify-extract-ai-chat-tool-display",
+      "branch": "`orch/code-smell-sweep-2-9be8/extract-ai-chat-tool-display` (no verifier commits; read-only verification)",
       "startingRef": "orch/code-smell-sweep-2-9be8/extract-ai-chat-tool-display",
       "dependsOn": [
         "extract-ai-chat-tool-display"
@@ -172,12 +172,12 @@
       "agentId": "bc-1bf77b54-0697-4e41-a65d-836e681cfcf4",
       "runId": "run-5d552762-9aee-4086-b546-d32b0d35ebff",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-extract-ai-chat-tool-display.md",
       "startedAt": "2026-05-18T17:51:40.599Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:43.237Z",
+      "finishedAt": "2026-05-18T17:53:03.739Z",
+      "lastUpdate": "2026-05-18T17:53:03.740Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -292,12 +292,12 @@
       "handoffPath": "handoffs/be-fe-tool-name-constants.md",
       "startedAt": "2026-05-18T17:48:59.150Z",
       "finishedAt": "2026-05-18T17:51:12.677Z",
-      "lastUpdate": "2026-05-18T17:51:12.677Z",
+      "lastUpdate": "2026-05-18T17:52:59.163Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -484,6 +484,10 @@
     {
       "at": "2026-05-18T17:51:43.238Z",
       "message": "extract-ai-chat-composer: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:52:59.164Z",
+      "message": "be-fe-tool-name-constants: verification recorded (unit-test-verified) by verifier verify-be-fe-tool-name-constants"
     }
   ]
 }
