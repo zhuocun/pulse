@@ -8,6 +8,7 @@ import {
     Draggable,
     DraggableProps,
     DraggableProvidedDragHandleProps,
+    DraggableProvidedDraggableProps,
     Droppable,
     DroppableProps,
     DroppableProvided,
@@ -21,6 +22,17 @@ const DetachedDragHandleContext = createContext<
 export const useDetachedDragHandleProps = () =>
     useContext(DetachedDragHandleContext);
 
+type DropCloneProps = Partial<DroppableProvidedProps> &
+    RefAttributes<HTMLElement> & {
+        provided?: DroppableProvided;
+    };
+
+type DragCloneProps = Partial<DraggableProvidedDraggableProps> &
+    Partial<DraggableProvidedDragHandleProps> &
+    RefAttributes<HTMLElement> & {
+        "data-dragging"?: string;
+    };
+
 type DropProps = Omit<DroppableProps, "children"> & { children: ReactNode };
 
 export const Drop = ({ children, ...props }: DropProps) => {
@@ -28,9 +40,8 @@ export const Drop = ({ children, ...props }: DropProps) => {
         <Droppable {...props}>
             {(provided) => {
                 if (React.isValidElement(children)) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    return React.cloneElement<RefAttributes<unknown> | any>(
-                        children,
+                    return React.cloneElement(
+                        children as React.ReactElement<DropCloneProps>,
                         {
                             ...provided.droppableProps,
                             ref: provided.innerRef,
@@ -75,22 +86,18 @@ export const Drag = ({
             {(provided, rbdSnapshot) => {
                 if (React.isValidElement(children)) {
                     const isDragging = Boolean(rbdSnapshot?.isDragging);
-                    const base: Record<string, unknown> = {
+                    const base: DragCloneProps = {
                         ...provided.draggableProps,
                         "data-dragging": isDragging ? "true" : undefined,
-                        ref: provided.innerRef
+                        ref: provided.innerRef,
+                        ...(detachDragHandle
+                            ? {}
+                            : (provided.dragHandleProps ?? {}))
                     };
-                    if (!detachDragHandle) {
-                        Object.assign(
-                            base,
-                            provided.dragHandleProps ?? undefined
-                        );
-                    }
 
                     const cloned = React.cloneElement(
-                        children,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RBD cloneElement loses child ref/prop precision
-                        base as any
+                        children as React.ReactElement<DragCloneProps>,
+                        base
                     );
 
                     if (detachDragHandle) {
