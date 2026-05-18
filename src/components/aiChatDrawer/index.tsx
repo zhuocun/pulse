@@ -3,8 +3,7 @@ import {
     CopyOutlined,
     EditOutlined,
     PlusOutlined,
-    ReloadOutlined,
-    StopOutlined
+    ReloadOutlined
 } from "@ant-design/icons";
 import {
     Alert,
@@ -12,7 +11,6 @@ import {
     Button,
     Drawer,
     Grid,
-    Input,
     Modal,
     Select,
     Skeleton,
@@ -69,6 +67,7 @@ import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
+import { AiChatComposer } from "./AiChatComposer";
 import { AssistantAttribution, AssistantDisclaimer, MessageBubble, MessageRow, SamplePrompt, StreamingCursor, ToolPayloadPanel } from "./aiChatDrawerStyles";
 import { BUDGET_CRITICAL_THRESHOLD, BUDGET_WARN_THRESHOLD, CITATION_INLINE_LIMIT, humanizeTool, summarizeToolBody } from "./aiChatToolDisplay";
 
@@ -2051,62 +2050,18 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 />
             )}
 
-            <Space.Compact style={{ width: "100%" }}>
-                <Input.TextArea
-                    aria-label={microcopy.a11y.messageBoardCopilot}
-                    autoComplete="off"
-                    autoSize={{ maxRows: 4, minRows: 1 }}
-                    disabled={isLoading}
-                    enterKeyHint="send"
-                    inputMode="text"
-                    maxLength={microcopy.ai.characterCounterMax}
-                    onChange={(e) => setInput(e.target.value)}
-                    onPressEnter={(e) => {
-                        if (!e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
-                        }
-                    }}
-                    placeholder={microcopy.placeholders.chatAsk}
-                    ref={inputRef}
-                    value={input}
-                />
-                {isLoading ? (
-                    <Button
-                        aria-label={microcopy.ai.stopResponse}
-                        danger
-                        icon={<StopOutlined aria-hidden />}
-                        onClick={() => abort()}
-                        type="default"
-                    >
-                        {microcopy.actions.stop}
-                    </Button>
-                ) : (
-                    <Button
-                        aria-label={microcopy.a11y.sendMessage}
-                        disabled={
-                            !input.trim() ||
-                            (remoteHealthEnabled && healthStatus === "offline")
-                        }
-                        onClick={handleSend}
-                        type="primary"
-                    >
-                        {microcopy.actions.send}
-                    </Button>
-                )}
-            </Space.Compact>
-            <Typography.Text
-                data-testid="chat-prompt-char-hint"
-                style={{
-                    display: "block",
-                    fontSize: fontSize.xs,
-                    marginTop: 4,
-                    textAlign: "right"
-                }}
-                type={promptCharHintWarning ? "warning" : "secondary"}
-            >
-                {promptCharHintText}
-            </Typography.Text>
+            <AiChatComposer
+                healthStatus={healthStatus}
+                input={input}
+                inputRef={inputRef}
+                isLoading={isLoading}
+                onAbort={abort}
+                onSend={handleSend}
+                promptCharHintText={promptCharHintText}
+                promptCharHintWarning={promptCharHintWarning}
+                remoteHealthEnabled={remoteHealthEnabled}
+                setInput={setInput}
+            />
         </Drawer>
     );
 };
