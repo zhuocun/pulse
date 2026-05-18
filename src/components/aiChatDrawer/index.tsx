@@ -969,7 +969,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     .filter(Boolean).length;
                 const template =
                     wordCount === 1
-                        ? microcopyString(microcopy.ai.completionAnnouncementOne)
+                        ? microcopyString(
+                              microcopy.ai.completionAnnouncementOne
+                          )
                         : microcopyString(
                               microcopy.ai.completionAnnouncementOther
                           );
@@ -990,7 +992,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      */
     useEffect(() => {
         if (isLoading) {
-            setStreamingAnnouncement(microcopyString(microcopy.ai.chatResponding));
+            setStreamingAnnouncement(
+                microcopyString(microcopy.ai.chatResponding)
+            );
         } else {
             setStreamingAnnouncement("");
         }
@@ -1370,7 +1374,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         >
                                             {toolPayloadOpen
                                                 ? microcopyString(
-                                                      microcopy.ai.toolDetailsHide
+                                                      microcopy.ai
+                                                          .toolDetailsHide
                                                   )
                                                 : microcopyString(
                                                       microcopy.ai

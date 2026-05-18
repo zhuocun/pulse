@@ -558,7 +558,9 @@ const useAgent = (
                     });
                     if (!hasRealAnswer) {
                         setError(
-                            new Error(microcopyString(microcopy.ai.toolRoundExhausted))
+                            new Error(
+                                microcopyString(microcopy.ai.toolRoundExhausted)
+                            )
                         );
                         turnErrored = true;
                     }
