@@ -180,6 +180,8 @@ const useAgentChat = (
 
     // Error dismissal: track whether the current error has been dismissed.
     const [errorDismissed, setErrorDismissed] = useState(false);
+    /** Resume rejections that useAgent does not surface on `agent.error`. */
+    const [resumeError, setResumeError] = useState<Error | null>(null);
 
     // Tool-trace messages synthesized from interrupt events. Cleared on reset.
     const [toolTraceMessages, setToolTraceMessages] = useState<AiChatMessage[]>(
@@ -229,7 +231,7 @@ const useAgentChat = (
         const draft = proposalClearAfterResumeRef.current;
         if (!draft) return;
         if (agent.isStreaming) return;
-        if (agent.error) {
+        if (agent.error ?? resumeError) {
             proposalClearAfterResumeRef.current = null;
             return;
         }
@@ -243,7 +245,8 @@ const useAgentChat = (
         agent.clearPendingProposal,
         agent.error,
         agent.isStreaming,
-        agent.pendingProposal?.proposal_id
+        agent.pendingProposal?.proposal_id,
+        resumeError
     ]);
 
     // Derive displayed messages and streamingText from agent state.
@@ -255,7 +258,8 @@ const useAgentChat = (
     );
 
     // Effective error (null if dismissed).
-    const effectiveError = agent.error && !errorDismissed ? agent.error : null;
+    const activeError = agent.error ?? resumeError;
+    const effectiveError = activeError && !errorDismissed ? activeError : null;
 
     const dismissError = useCallback(() => {
         setErrorDismissed(true);
@@ -275,6 +279,7 @@ const useAgentChat = (
             // Clear tool traces for the new turn.
             setToolTraceMessages([]);
             lastInterruptSignatureRef.current = null;
+            setResumeError(null);
             try {
                 await agent.start({
                     messages: [{ role: "user", content: trimmed }]
@@ -295,6 +300,7 @@ const useAgentChat = (
         lastInterruptSignatureRef.current = null;
         setDismissedNudgeIds(new Set());
         setErrorDismissed(false);
+        setResumeError(null);
     }, [agent.reset]);
 
     const resumeProposal = useCallback(
@@ -302,8 +308,12 @@ const useAgentChat = (
             const pid = pendingProposalIdRef.current;
             if (!pid) return;
             proposalClearAfterResumeRef.current = { proposal_id: pid };
-            void agent.resume({ accepted }).catch(() => {
-                proposalClearAfterResumeRef.current = null;
+            setResumeError(null);
+            void agent.resume({ accepted }).catch((err: unknown) => {
+                setErrorDismissed(false);
+                setResumeError(
+                    err instanceof Error ? err : new Error(String(err))
+                );
             });
         },
         [agent.resume]

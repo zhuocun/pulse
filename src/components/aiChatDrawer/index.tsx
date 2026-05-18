@@ -3,17 +3,14 @@ import {
     CopyOutlined,
     EditOutlined,
     PlusOutlined,
-    ReloadOutlined,
-    StopOutlined
+    ReloadOutlined
 } from "@ant-design/icons";
-import styled from "@emotion/styled";
 import {
     Alert,
     App,
     Button,
     Drawer,
     Grid,
-    Input,
     Modal,
     Select,
     Skeleton,
@@ -40,7 +37,7 @@ import {
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
@@ -70,110 +67,23 @@ import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
-
-const MessageRow = styled.div<{ $isUser: boolean }>`
-    margin-bottom: ${space.sm}px;
-    text-align: ${(props) => (props.$isUser ? "right" : "left")};
-`;
-
-/**
- * Chat bubble. Centralizing the bubble's background, padding, and width
- * cap here means a tweak to the chat visual language is one edit instead
- * of three duplicated inline-style objects.
- */
-const MessageBubble = styled(Typography.Paragraph)<{ $isUser: boolean }>`
-    && {
-        background: ${(props) =>
-            props.$isUser
-                ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.10))"
-                : "var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04))"};
-        border-radius: ${radius.md}px;
-        color: var(--ant-color-text, inherit);
-        display: inline-block;
-        margin-bottom: 0;
-        max-width: min(100%, 36rem);
-        padding: ${space.xs}px ${space.sm}px;
-        text-align: left;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    && pre,
-    && code {
-        max-width: 100%;
-        overflow-x: auto;
-    }
-`;
-
-/**
- * AntD's `Typography.Text` with `code` looks heavy here; this is a
- * lightweight pseudo-cursor that pulses while tokens stream in. The
- * bare span avoids a re-render storm from CSS animations on every chunk.
- */
-const StreamingCursor = styled.span`
-    display: inline-block;
-    margin-inline-start: 2px;
-    animation: aiCursorBlink 1s steps(1) infinite;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-
-    @keyframes aiCursorBlink {
-        50% {
-            opacity: 0;
-        }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        animation: none;
-    }
-`;
-
-/**
- * Attribution row above each assistant bubble (P2-5). The sparkle is
- * decorative — the visible "Board Copilot" label is what screen readers
- * announce. Pairing the model name with the bubble matches the
- * ChatGPT/Claude convention so users always know the source of the text.
- */
-const AssistantAttribution = styled.div`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: 4px;
-    margin-bottom: ${space.xxs}px;
-    max-width: min(100%, 36rem);
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-`;
-
-/**
- * "AI · review before using" footnote below each assistant bubble (P2-2).
- * Kept intentionally low-contrast so it sits out of the reading flow but
- * remains discoverable when users are calibrating trust on a response.
- */
-const AssistantDisclaimer = styled.div`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    font-size: ${fontSize.xs}px;
-    margin-top: 2px;
-`;
-
-const SamplePrompt = styled(Tag.CheckableTag)`
-    && {
-        border-radius: ${radius.pill}px;
-        font-weight: ${fontWeight.medium};
-        padding: ${space.xxs}px ${space.sm}px;
-    }
-`;
-
-const ToolPayloadPanel = styled.div`
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.02));
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.xs}px;
-    margin: ${space.xxs}px 0;
-    padding: ${space.xxs}px ${space.xs}px;
-`;
+import { AiChatComposer } from "./AiChatComposer";
+import {
+    AssistantAttribution,
+    AssistantDisclaimer,
+    MessageBubble,
+    MessageRow,
+    SamplePrompt,
+    StreamingCursor,
+    ToolPayloadPanel
+} from "./aiChatDrawerStyles";
+import {
+    BUDGET_CRITICAL_THRESHOLD,
+    BUDGET_WARN_THRESHOLD,
+    CITATION_INLINE_LIMIT,
+    humanizeTool,
+    summarizeToolBody
+} from "./aiChatToolDisplay";
 
 const { Text } = Typography;
 
@@ -233,60 +143,6 @@ export interface AiChatDrawerProps {
      */
     onDismissNudge?: (nudge: TriageNudge) => void;
 }
-
-/**
- * Plain-language verb for each known tool (Optimization Plan §3 P2-2).
- *
- * Tool messages in the chat transcript should read like evidence the
- * assistant gathered ("Checked 12 tasks"), not like a function call
- * ("listTasks · 12 items"). Unmapped tools fall back to a sentence-cased
- * version of the raw name so a future tool that hasn't been wired here
- * still produces sensible UI.
- */
-const TOOL_VERB: Record<string, string> = {
-    listProjects: microcopy.ai.toolVerbs.checkedProjects as string,
-    listMembers: microcopy.ai.toolVerbs.checkedTeamMembers as string,
-    listBoard: microcopy.ai.toolVerbs.checkedBoardColumns as string,
-    listTasks: microcopy.ai.toolVerbs.checkedTasks as string,
-    getProject: microcopy.ai.toolVerbs.openedProject as string,
-    getTask: microcopy.ai.toolVerbs.openedTask as string
-};
-
-const humanizeTool = (name?: string) => {
-    if (!name) return microcopy.ai.toolVerbs.lookedUpEvidence as string;
-    if (TOOL_VERB[name]) return TOOL_VERB[name];
-    return name
-        .replace(/^.*:/, "")
-        .replace(/[._]/g, " ")
-        .replace(/^./, (s) => s.toUpperCase());
-};
-
-/**
- * Tool message bodies are now plain-language evidence summaries (see
- * `summarizeToolResultForUser`) instead of raw JSON. The collapsed
- * `<details>` summary line just shows the first sentence so users can
- * scan the evidence chain without expanding every row.
- */
-const summarizeToolBody = (body: string): string => {
-    const trimmed = body.trim();
-    if (!trimmed) return microcopy.ai.toolEmptyResult as string;
-    const firstLine = trimmed.split("\n", 1)[0];
-    return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
-};
-
-/**
- * Citations are inline superscript chips after the assistant bubble. When
- * an answer leans on a lot of records (e.g. a workload summary that cites
- * every member) rendering all of them inline produces a sprawling chip
- * tail that crowds the message. We collapse anything over this threshold
- * behind a "+N more" affordance — clicking it expands the list inline
- * (no second click required) so verifying every claim is still possible.
- */
-const CITATION_INLINE_LIMIT = 6;
-
-/** Approximate token thresholds for context-window warnings (P1-C). */
-const BUDGET_WARN_THRESHOLD = 6000;
-const BUDGET_CRITICAL_THRESHOLD = 7500;
 
 /**
  * Fallback QueryClient used when the drawer is rendered outside a
@@ -907,7 +763,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     );
 
     const promptCharMax = microcopy.ai.characterCounterMax;
-    const promptCharHintText = (microcopy.ai.characterCountTemplate as string)
+    const promptCharHintText = microcopyString(
+        microcopy.ai.characterCountTemplate
+    )
         .replace("{count}", String(input.length))
         .replace("{max}", String(promptCharMax));
     const promptCharHintWarning = input.length > promptCharMax * 0.9;
@@ -967,8 +825,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     .filter(Boolean).length;
                 const template =
                     wordCount === 1
-                        ? (microcopy.ai.completionAnnouncementOne as string)
-                        : (microcopy.ai.completionAnnouncementOther as string);
+                        ? microcopyString(
+                              microcopy.ai.completionAnnouncementOne
+                          )
+                        : microcopyString(
+                              microcopy.ai.completionAnnouncementOther
+                          );
                 setCompletionAnnouncement(
                     template
                         .replace("{label}", String(microcopy.ai.copilotLabel))
@@ -986,7 +848,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      */
     useEffect(() => {
         if (isLoading) {
-            setStreamingAnnouncement(microcopy.ai.chatResponding as string);
+            setStreamingAnnouncement(
+                microcopyString(microcopy.ai.chatResponding)
+            );
         } else {
             setStreamingAnnouncement("");
         }
@@ -1026,20 +890,24 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             extra={
                 <Space size={space.xs}>
                     <Select
-                        aria-label={
-                            microcopy.ai.autonomySelectorAriaLabel as string
-                        }
+                        aria-label={microcopyString(
+                            microcopy.ai.autonomySelectorAriaLabel
+                        )}
                         onChange={(value: AutonomyLevel) =>
                             setAutonomyLevel(value)
                         }
                         options={autonomySelectorOptions.map((opt) => {
-                            const labelText = microcopy.ai[
-                                opt.labelKey as keyof typeof microcopy.ai
-                            ] as string;
+                            const labelText = microcopyString(
+                                microcopy.ai[
+                                    opt.labelKey as keyof typeof microcopy.ai
+                                ]
+                            );
                             const tooltip = opt.disabledTooltipKey
-                                ? (microcopy.ai[
-                                      opt.disabledTooltipKey as keyof typeof microcopy.ai
-                                  ] as string)
+                                ? microcopyString(
+                                      microcopy.ai[
+                                          opt.disabledTooltipKey as keyof typeof microcopy.ai
+                                      ]
+                                  )
                                 : undefined;
                             return {
                                 value: opt.value,
@@ -1361,10 +1229,14 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                             type="link"
                                         >
                                             {toolPayloadOpen
-                                                ? (microcopy.ai
-                                                      .toolDetailsHide as string)
-                                                : (microcopy.ai
-                                                      .toolDetailsToggle as string)}
+                                                ? microcopyString(
+                                                      microcopy.ai
+                                                          .toolDetailsHide
+                                                  )
+                                                : microcopyString(
+                                                      microcopy.ai
+                                                          .toolDetailsToggle
+                                                  )}
                                         </Button>
                                         {toolPayloadOpen ? (
                                             <pre
@@ -1823,10 +1695,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         }}
                                     >
                                         <Button
-                                            aria-label={
-                                                microcopy.ai
-                                                    .copyMessage as string
-                                            }
+                                            aria-label={microcopyString(
+                                                microcopy.ai.copyMessage
+                                            )}
                                             icon={
                                                 copyConfirmedAssistantIndex ===
                                                 index ? (
@@ -2193,62 +2064,18 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                 />
             )}
 
-            <Space.Compact style={{ width: "100%" }}>
-                <Input.TextArea
-                    aria-label={microcopy.a11y.messageBoardCopilot}
-                    autoComplete="off"
-                    autoSize={{ maxRows: 4, minRows: 1 }}
-                    disabled={isLoading}
-                    enterKeyHint="send"
-                    inputMode="text"
-                    maxLength={microcopy.ai.characterCounterMax}
-                    onChange={(e) => setInput(e.target.value)}
-                    onPressEnter={(e) => {
-                        if (!e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
-                        }
-                    }}
-                    placeholder={microcopy.placeholders.chatAsk}
-                    ref={inputRef}
-                    value={input}
-                />
-                {isLoading ? (
-                    <Button
-                        aria-label={microcopy.ai.stopResponse}
-                        danger
-                        icon={<StopOutlined aria-hidden />}
-                        onClick={() => abort()}
-                        type="default"
-                    >
-                        {microcopy.actions.stop}
-                    </Button>
-                ) : (
-                    <Button
-                        aria-label={microcopy.a11y.sendMessage}
-                        disabled={
-                            !input.trim() ||
-                            (remoteHealthEnabled && healthStatus === "offline")
-                        }
-                        onClick={handleSend}
-                        type="primary"
-                    >
-                        {microcopy.actions.send}
-                    </Button>
-                )}
-            </Space.Compact>
-            <Typography.Text
-                data-testid="chat-prompt-char-hint"
-                style={{
-                    display: "block",
-                    fontSize: fontSize.xs,
-                    marginTop: 4,
-                    textAlign: "right"
-                }}
-                type={promptCharHintWarning ? "warning" : "secondary"}
-            >
-                {promptCharHintText}
-            </Typography.Text>
+            <AiChatComposer
+                healthStatus={healthStatus}
+                input={input}
+                inputRef={inputRef}
+                isLoading={isLoading}
+                onAbort={abort}
+                onSend={handleSend}
+                promptCharHintText={promptCharHintText}
+                promptCharHintWarning={promptCharHintWarning}
+                remoteHealthEnabled={remoteHealthEnabled}
+                setInput={setInput}
+            />
         </Drawer>
     );
 };

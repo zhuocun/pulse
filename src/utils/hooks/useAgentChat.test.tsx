@@ -31,6 +31,31 @@ jest.mock("../../constants/env", () => ({
     }
 }));
 
+const useAgentResumeOverride: {
+    current: ((resumeValue: unknown) => Promise<void>) | null;
+} = { current: null };
+
+jest.mock("./useAgent", () => {
+    const actual =
+        jest.requireActual<typeof import("./useAgent")>("./useAgent");
+    return {
+        __esModule: true,
+        default: (
+            name: string,
+            options?: Parameters<typeof actual.default>[1]
+        ) => {
+            const agent = actual.default(name, options);
+            if (useAgentResumeOverride.current) {
+                return {
+                    ...agent,
+                    resume: useAgentResumeOverride.current
+                };
+            }
+            return agent;
+        }
+    };
+});
+
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../ai/agentClient";
 import useAgentChat from "./useAgentChat";
@@ -72,6 +97,7 @@ const makeWrapper = (queryClient: QueryClient) => {
 describe("useAgentChat", () => {
     beforeEach(() => {
         mockedStream.mockReset();
+        useAgentResumeOverride.current = null;
         localStorage.removeItem("boardCopilot:disabledProjectIds");
     });
 
@@ -423,7 +449,7 @@ describe("useAgentChat", () => {
         expect(result.current.pendingNudges).toHaveLength(0);
     });
 
-    it("keeps pendingProposal when resume stream fails so the user can retry", async () => {
+    it("keeps pendingProposal and surfaces error when resume stream fails", async () => {
         mockedStream
             .mockReturnValueOnce(
                 fromParts([
@@ -469,12 +495,67 @@ describe("useAgentChat", () => {
 
         await waitFor(() => {
             expect(result.current.isLoading).toBe(false);
+            expect(result.current.error).toBeTruthy();
         });
 
         expect(result.current.pendingProposal?.proposal_id).toBe(
             "mp-resume-fail"
         );
-        expect(result.current.error).toBeTruthy();
+        expect(result.current.error?.message).toContain(
+            "resume transport failed"
+        );
+    });
+
+    it("surfaces rejected resume promise without clearing pendingProposal", async () => {
+        const resumeErr = new Error("resume promise rejected");
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "custom",
+                    ns: ["root"],
+                    data: {
+                        kind: "mutation_proposal",
+                        proposal: {
+                            proposal_id: "mp-promise-reject",
+                            description: "Change",
+                            diff: {},
+                            risk: "low" as const,
+                            undoable: true as const
+                        }
+                    }
+                }
+            ])
+        );
+        useAgentResumeOverride.current = jest.fn().mockRejectedValue(resumeErr);
+
+        const queryClient = new QueryClient();
+        const { result } = renderHook(() => useAgentChat(makeCtx()), {
+            wrapper: makeWrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.send("Propose a change");
+        });
+
+        await waitFor(() => {
+            expect(result.current.pendingProposal?.proposal_id).toBe(
+                "mp-promise-reject"
+            );
+        });
+
+        await act(async () => {
+            result.current.resumeProposal(true);
+        });
+
+        await waitFor(() => {
+            expect(result.current.error?.message).toBe(
+                "resume promise rejected"
+            );
+        });
+
+        expect(result.current.pendingProposal?.proposal_id).toBe(
+            "mp-promise-reject"
+        );
     });
 
     it("resumeProposal calls agent.resume and clears the pending proposal", async () => {
