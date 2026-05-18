@@ -278,15 +278,15 @@
       "branch": "orch/code-smell-sweep-2-9be8/be-fe-tool-name-constants",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-d8acbf74-5012-413a-8e8e-93164f497090",
+      "runId": "run-31de38c2-74c3-4bd5-9ef7-7ca1e29b4346",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:48:59.150Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:48:59.150Z",
+      "lastUpdate": "2026-05-18T17:49:01.646Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -326,17 +326,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:49:01.648Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:49:01.648Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-be-board-brief-extract-counts",
@@ -415,6 +416,10 @@
     {
       "at": "2026-05-18T17:48:59.150Z",
       "message": "be-fe-tool-name-constants: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:49:01.647Z",
+      "message": "be-board-brief-extract-counts: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
