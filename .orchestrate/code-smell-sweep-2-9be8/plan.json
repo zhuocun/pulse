@@ -1,0 +1,282 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "code-smell-sweep-2-9be8: Second sweep on merged main — review remaining smells from CODE-SMELL-AUDIT-R2 and fix them; every role uses composer-2.5. Read discovery + bootstrap under `.orchestrate/code-smell-sweep-2-9be8/`. Respect AGENTS.md.",
+  "summary": "Round-2 smell fixes: microcopyString helper, agent-chat resume errors, useAgent thread-id extract, aiChatDrawer module splits, SW logging, BE tool constants + board-brief helper — then merge.",
+  "rootSlug": "code-smell-sweep-2-9be8",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "selfAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
+  "acceptanceCriteria": [
+    "Each worker fixes its scoped smell with tests; eslint + tsc green on touched slices.",
+    "Verifiers record unit-test-verified or a concrete blocker.",
+    "Merge branch passes full Jest, tsc, eslint, vite build, and scoped backend pytest."
+  ],
+  "tasks": [
+    {
+      "name": "microcopy-string-helper",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Add microcopyString() and remove `as string` casts in aiChatDrawer and useAgent.",
+      "brief": "Read CODE-SMELL-AUDIT-R2 id microcopy-as-string.\n\n1. In `src/constants/microcopy.ts`, export `microcopyString(value: unknown): string` that returns `typeof value === 'string' ? value : String(value ?? '')` (or stricter: throw in dev if not string).\n2. Replace `(microcopy… as string)` in `src/components/aiChatDrawer/index.tsx` with `microcopyString(microcopy…)` for template `.replace`, aria labels, announcements.\n3. Fix the one cast in `src/utils/hooks/useAgent.ts` (`toolRoundExhausted`).\n4. Add `microcopy.test.ts` or extend existing i18n tests for the helper.\n\nDo not change locale files unless a key is genuinely missing.",
+      "pathsAllowed": [
+        "src/constants/microcopy.ts",
+        "src/constants/microcopy.test.ts",
+        "src/components/aiChatDrawer/index.tsx",
+        "src/utils/hooks/useAgent.ts"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**"],
+      "acceptance": [
+        "microcopyString exported and tested.",
+        "No `as string` casts on microcopy leaf reads in aiChatDrawer or useAgent.",
+        "aiChatDrawer + useAgent tests pass."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/constants/microcopy src/components/aiChatDrawer src/utils/hooks/useAgent`\n- `npm run eslint -- --max-warnings 0` on touched files\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-microcopy-string-helper",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "microcopy-string-helper",
+      "dependsOn": ["microcopy-string-helper"],
+      "scopedGoal": "Verify microcopyString helper adoption.",
+      "brief": "Re-run verify recipe; grep aiChatDrawer and useAgent for `microcopy.* as string`.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-use-agent-chat-resume-errors",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Surface mutation resume failures in useAgentChat instead of silent catch.",
+      "brief": "Read audit id agent-chat-resume-silent.\n\nIn `src/utils/hooks/useAgentChat.ts`, replace `void agent.resume({ accepted }).catch(() => { proposalClearAfterResumeRef.current = null })` with error handling that sets the hook's error state (or reuses `agent.error` / local `setError`) and clears the proposal ref only on success. Add test in `useAgentChat.test.tsx` proving a rejected resume leaves user-visible error and does not clear proposal prematurely.\n\nPreserve dual useAi/useAgent mount and existing dismiss/reset semantics.",
+      "pathsAllowed": [
+        "src/utils/hooks/useAgentChat.ts",
+        "src/utils/hooks/useAgentChat.test.tsx"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**", "src/utils/hooks/useAgent.ts"],
+      "acceptance": [
+        "Resume rejection is user-visible.",
+        "Test covers failed resume path.",
+        "No empty catch on resume."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useAgentChat`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-use-agent-chat-resume-errors",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-use-agent-chat-resume-errors",
+      "dependsOn": ["fix-use-agent-chat-resume-errors"],
+      "scopedGoal": "Verify useAgentChat resume error surfacing.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "extract-use-agent-thread-id",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Extract generateThreadId and TTFT_SLO_MS from useAgent.ts.",
+      "brief": "Move `generateThreadId` and `TTFT_SLO_MS` from `useAgent.ts` into `src/utils/hooks/useAgentThreadId.ts`. Re-export from `useAgent.ts` if tests import them. Add unit test for generateThreadId format (prefix `t_`). No behavior change.",
+      "pathsAllowed": [
+        "src/utils/hooks/useAgent.ts",
+        "src/utils/hooks/useAgentThreadId.ts",
+        "src/utils/hooks/useAgentThreadId.test.ts",
+        "src/utils/hooks/useAgent.test.tsx"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**"],
+      "acceptance": [
+        "useAgentThreadId.ts owns thread id + TTFT constant.",
+        "useAgent.test.tsx green."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useAgent src/utils/hooks/useAgentThreadId`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-extract-use-agent-thread-id",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "extract-use-agent-thread-id",
+      "dependsOn": ["extract-use-agent-thread-id"],
+      "scopedGoal": "Verify useAgent thread-id extraction.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "extract-ai-chat-tool-display",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Extract tool-display helpers and message-bubble styled components from aiChatDrawer.",
+      "brief": "From `src/components/aiChatDrawer/index.tsx`, move to co-located files (no behavior change):\n- `TOOL_VERB`, `humanizeTool`, `summarizeToolBody`, `CITATION_INLINE_LIMIT`, budget threshold constants → `aiChatToolDisplay.ts`\n- Styled primitives `MessageRow`, `MessageBubble`, `StreamingCursor`, `AssistantAttribution`, `AssistantDisclaimer`, `ToolPayloadPanel` → `aiChatDrawerStyles.ts` (or keep with display module if cleaner)\n\n`index.tsx` imports and re-exports as needed. Run `src/components/aiChatDrawer/index.test.tsx` and `src/__tests__/aiAccessibility.strict.test.tsx` if feasible within pathsAllowed — add `src/__tests__/aiAccessibility.strict.test.tsx` to pathsAllowed only if required for green CI.",
+      "pathsAllowed": [
+        "src/components/aiChatDrawer/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**"],
+      "acceptance": [
+        "index.tsx line count drops by at least 150 lines.",
+        "aiChatDrawer tests pass."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiChatDrawer`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-extract-ai-chat-tool-display",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "extract-ai-chat-tool-display",
+      "dependsOn": ["extract-ai-chat-tool-display"],
+      "scopedGoal": "Verify aiChatDrawer tool-display extraction.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "extract-ai-chat-composer",
+      "type": "worker",
+      "model": "composer-2.5",
+      "dependsOn": ["extract-ai-chat-tool-display"],
+      "scopedGoal": "Extract prompt composer footer from aiChatDrawer to AiChatComposer.tsx.",
+      "brief": "After tool-display extraction lands, move the drawer footer (TextArea, send/stop buttons, character-count hint ~lines 2196-2251) into `src/components/aiChatDrawer/AiChatComposer.tsx` with typed props: `input`, `setInput`, `isLoading`, `onSend`, `onAbort`, `promptCharHintText`, `promptCharHintWarning`, `health gating`, refs.\n\nWire from `AiChatDrawerInner`. Preserve all aria-labels and data-testid `chat-prompt-char-hint`. Tests must pass.",
+      "pathsAllowed": ["src/components/aiChatDrawer/**"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**"],
+      "acceptance": [
+        "AiChatComposer.tsx exists and index.tsx uses it.",
+        "Composer behavior unchanged in tests."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiChatDrawer`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-extract-ai-chat-composer",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "extract-ai-chat-composer",
+      "dependsOn": ["extract-ai-chat-composer"],
+      "scopedGoal": "Verify AiChatComposer extraction.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-sw-registration-logging",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Log service-worker registration failures in development.",
+      "brief": "In `src/index.tsx`, replace `.catch(() => {})` on `navigator.serviceWorker.register` with dev-only `console.warn` (match existing observability warn pattern). Production stays silent. Add/update `index.test.tsx` if needed.",
+      "pathsAllowed": ["src/index.tsx", "src/index.test.tsx"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "backend/**"],
+      "acceptance": ["Dev warns on SW failure; prod unchanged.", "index tests pass."],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/index.test.tsx`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-sw-registration-logging",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-sw-registration-logging",
+      "dependsOn": ["fix-sw-registration-logging"],
+      "scopedGoal": "Verify SW registration logging.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "be-fe-tool-name-constants",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Centralize FE tool name string literals in backend catalog.",
+      "brief": "Add `app/tools/fe_tool_names.py` (or constants block in fe_tool_schemas.py) with constants for `fe.boardSnapshot`, `fe.similarTasks`, `fe.searchCandidates`, `fe.applyMutation`, `fe.viewerContext`, etc. Replace literals in `catalog/_shared.py` interrupt helpers and catalog metadata `tools=` tuples where mechanical. Run `python -m pytest tests/test_tools.py tests/test_search_agent_v21.py -q`.",
+      "pathsAllowed": [
+        "backend/app/tools/fe_tool_names.py",
+        "backend/app/tools/fe_tool_schemas.py",
+        "backend/app/agents/catalog/_shared.py",
+        "backend/app/agents/catalog/board_brief.py",
+        "backend/app/agents/catalog/search.py",
+        "backend/app/agents/catalog/task_estimation.py",
+        "backend/app/agents/catalog/task_drafting.py",
+        "backend/app/agents/catalog/chat.py"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": ["Shared constants module exists.", "ruff + scoped pytest pass."],
+      "verify": "## Automated\n- `cd backend && python -m pytest tests/test_tools.py tests/test_search_agent_v21.py -q`\n- `cd backend && ruff check app/tools/ app/agents/catalog/_shared.py`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-be-fe-tool-name-constants",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "be-fe-tool-name-constants",
+      "dependsOn": ["be-fe-tool-name-constants"],
+      "scopedGoal": "Verify BE FE tool constants.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "be-board-brief-extract-counts",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Extract column task-count aggregation from _compute_board_brief.",
+      "brief": "In `board_brief.py`, extract `_column_task_counts(columns, tasks) -> list[dict]` (or similar) from `_compute_board_brief`; call it from the main function. Add/extend unit test in `tests/test_board_brief.py` or existing board brief tests. Behavior byte-identical.",
+      "pathsAllowed": [
+        "backend/app/agents/catalog/board_brief.py",
+        "backend/tests/test_board_brief.py",
+        "backend/tests/test_v1_ai_shim_parity.py"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": ["Helper extracted.", "pytest for board brief green."],
+      "verify": "## Automated\n- `cd backend && python -m pytest tests/test_board_brief.py -q`\n- `cd backend && ruff check app/agents/catalog/board_brief.py`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-be-board-brief-extract-counts",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "be-board-brief-extract-counts",
+      "dependsOn": ["be-board-brief-extract-counts"],
+      "scopedGoal": "Verify board brief extraction.",
+      "brief": "Re-run verify recipe.",
+      "acceptance": ["Verifier records unit-test-verified or blocker."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "merge-code-smell-sweep-2",
+      "type": "worker",
+      "model": "composer-2.5",
+      "startingRef": "main",
+      "dependsOn": [
+        "microcopy-string-helper",
+        "fix-use-agent-chat-resume-errors",
+        "extract-use-agent-thread-id",
+        "extract-ai-chat-composer",
+        "fix-sw-registration-logging",
+        "be-fe-tool-name-constants",
+        "be-board-brief-extract-counts"
+      ],
+      "scopedGoal": "Merge all round-2 workers into orch/code-smell-sweep-2-9be8/merge-code-smell-sweep-2; full verification; no PR.",
+      "brief": "Merge order:\n1. extract-use-agent-thread-id\n2. microcopy-string-helper\n3. fix-use-agent-chat-resume-errors\n4. extract-ai-chat-tool-display\n5. extract-ai-chat-composer\n6. fix-sw-registration-logging\n7. be-fe-tool-name-constants\n8. be-board-brief-extract-counts\n\nConflict policy: union changes; for aiChatDrawer prefer later extraction branches; for useAgent prefer thread-id + microcopy branches.\n\nRun: tsc, eslint, full Jest, vite build, `cd backend && python -m pytest -q`.",
+      "pathsAllowed": ["src/**", "backend/**", "package.json", "package-lock.json"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "Branch orch/code-smell-sweep-2-9be8/merge-code-smell-sweep-2 pushed.",
+        "Full FE + BE verification green."
+      ],
+      "verify": "## Automated\n- `npx tsc --noEmit && npm run eslint -- --max-warnings 0 && CI=true npm test -- --watchAll=false --runInBand && npx vite build`\n- `cd backend && python -m pytest -q`",
+      "openPR": false,
+      "maxAttempts": 2
+    }
+  ]
+}
