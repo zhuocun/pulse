@@ -34,6 +34,16 @@ import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
+import {
+    absorbUseAiRunRejection,
+    asMicrocopyString,
+    buildLocalAiContext,
+    buildLocalEstimateRunPayload,
+    buildLocalReadinessRunPayload,
+    TASK_ASSIST_DEBOUNCE_MS,
+    TASK_ASSIST_DELAYED_SPINNER_MS
+} from "./aiTaskAssistContext";
+
 // Stable fallbacks: avoid producing a new `[]` reference on every render, which
 // otherwise re-fires the suggestion effect endlessly when the cache is empty.
 const EMPTY_TASKS: ITask[] = [];
@@ -140,7 +150,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         useCachedQueryData<IColumn[]>(["boards", { projectId }]) ??
         EMPTY_COLUMNS;
 
-    const debouncedValues = useDebounce(values, 1000);
+    const debouncedValues = useDebounce(values, TASK_ASSIST_DEBOUNCE_MS);
     const taskName = debouncedValues.taskName ?? "";
 
     // Mount BOTH hooks unconditionally (React hook ordering rule).
@@ -210,11 +220,11 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
 
     const showEstimateSpinner = useDelayedFlag(
         estimateIsLoading && !estimateData,
-        250
+        TASK_ASSIST_DELAYED_SPINNER_MS
     );
     const showReadinessSpinner = useDelayedFlag(
         readinessIsLoading && !readinessData,
-        250
+        TASK_ASSIST_DELAYED_SPINNER_MS
     );
     /**
      * Dismissed readiness issues (T-R5). Cleared whenever the task name
@@ -240,6 +250,28 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
      * don't strand the panel.
      */
     const trimmedName = taskName.trim();
+
+    const localAiContext = useMemo(
+        () => buildLocalAiContext(projectId, columns, tasks, members),
+        [projectId, columns, tasks, members]
+    );
+
+    const localDraftFields = useMemo(
+        () => ({
+            taskName: trimmedName,
+            note: debouncedValues.note,
+            epic: debouncedValues.epic,
+            type: debouncedValues.type,
+            coordinatorId: debouncedValues.coordinatorId
+        }),
+        [
+            trimmedName,
+            debouncedValues.note,
+            debouncedValues.epic,
+            debouncedValues.type,
+            debouncedValues.coordinatorId
+        ]
+    );
 
     const taskAssistEstimateSuggestionKey =
         estimateData == null
@@ -301,49 +333,23 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         if (isRemote) {
             void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
-            runEstimate({
-                estimate: {
-                    taskName: trimmedName,
-                    note: debouncedValues.note,
-                    epic: debouncedValues.epic,
-                    type: debouncedValues.type,
+            void runEstimate(
+                buildLocalEstimateRunPayload(localDraftFields, {
                     tasks,
                     excludeTaskId,
-                    context: {
-                        project: { _id: projectId ?? "", projectName: "" },
-                        columns,
-                        tasks,
-                        members
-                    }
-                }
-            }).catch(() => undefined);
-            runReadiness({
-                readiness: {
-                    taskName: trimmedName,
-                    note: debouncedValues.note,
-                    epic: debouncedValues.epic,
-                    type: debouncedValues.type,
-                    coordinatorId: debouncedValues.coordinatorId,
-                    context: {
-                        project: { _id: projectId ?? "", projectName: "" },
-                        columns,
-                        tasks,
-                        members
-                    }
-                }
-            }).catch(() => undefined);
+                    context: localAiContext
+                })
+            ).catch(absorbUseAiRunRejection);
+            void runReadiness(
+                buildLocalReadinessRunPayload(localDraftFields, localAiContext)
+            ).catch(absorbUseAiRunRejection);
         }
     }, [
         trimmedName,
-        debouncedValues.note,
-        debouncedValues.epic,
-        debouncedValues.type,
-        debouncedValues.coordinatorId,
+        localDraftFields,
+        localAiContext,
         excludeTaskId,
-        projectId,
-        columns,
         tasks,
-        members,
         isRemote,
         remoteInput,
         startRemoteEstimate,
@@ -377,7 +383,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             confidence: estimateData.confidence
         });
         undoToast.show({
-            description: (microcopy.ai.storyPointsSet as string).replace(
+            description: asMicrocopyString(microcopy.ai.storyPointsSet).replace(
                 "{points}",
                 String(next)
             ),
@@ -401,8 +407,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 ...(excludeTaskId ? { taskId: excludeTaskId } : {})
             });
             undoToast.show({
-                description: (
-                    microcopy.ai.readinessFieldUpdated as string
+                description: asMicrocopyString(
+                    microcopy.ai.readinessFieldUpdated
                 ).replace("{field}", String(issue.field)),
                 analyticsTag: "copilot.readiness.apply",
                 undo: () => {
@@ -424,33 +430,20 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             clearRemoteSuggestion();
             void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
-            runEstimate({
-                estimate: {
-                    taskName: trimmedName,
-                    note: debouncedValues.note,
-                    epic: debouncedValues.epic,
-                    type: debouncedValues.type,
+            void runEstimate(
+                buildLocalEstimateRunPayload(localDraftFields, {
                     tasks,
                     excludeTaskId,
-                    context: {
-                        project: { _id: projectId ?? "", projectName: "" },
-                        columns,
-                        tasks,
-                        members
-                    }
-                }
-            }).catch(() => undefined);
+                    context: localAiContext
+                })
+            ).catch(absorbUseAiRunRejection);
         }
     }, [
         trimmedName,
-        debouncedValues.note,
-        debouncedValues.epic,
-        debouncedValues.type,
+        localDraftFields,
+        localAiContext,
         excludeTaskId,
-        projectId,
-        columns,
         tasks,
-        members,
         isRemote,
         remoteInput,
         startRemoteEstimate,
@@ -548,11 +541,13 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         !showEstimateSpinner &&
                         taskAssistEstimateSuggestionKey.length > 0 ? (
                             <AiCopilotSurfaceFeedback
-                                ariaGroupLabel={(
-                                    microcopy.feedback.taskAssistTitle as string
+                                ariaGroupLabel={asMicrocopyString(
+                                    microcopy.feedback.taskAssistTitle
                                 ).replace(
                                     "{section}",
-                                    String(microcopy.ai.suggestedStoryPoints)
+                                    asMicrocopyString(
+                                        microcopy.ai.suggestedStoryPoints
+                                    )
                                 )}
                                 citationCount={0}
                                 suggestionKey={taskAssistEstimateSuggestionKey}
@@ -574,7 +569,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                     </Space>
                 }
             >
-                {microcopy.ai.suggestedStoryPoints as string}
+                {asMicrocopyString(microcopy.ai.suggestedStoryPoints)}
             </SectionHeading>
             <div aria-atomic="false" aria-live="polite">
                 {!trimmedName && !estimateIsLoading && (
@@ -582,13 +577,15 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         style={{ margin: 0 }}
                         type="secondary"
                     >
-                        {microcopy.ai.estimateTaskNameHint as string}
+                        {asMicrocopyString(microcopy.ai.estimateTaskNameHint)}
                     </Typography.Paragraph>
                 )}
                 {showEstimateSpinner && (
                     <Skeleton
                         active
-                        aria-label={microcopy.ai.estimatingPoints as string}
+                        aria-label={asMicrocopyString(
+                            microcopy.ai.estimatingPoints
+                        )}
                         paragraph={{ rows: 2 }}
                         title={false}
                     />
@@ -623,8 +620,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                             }}
                         >
                             <span
-                                aria-label={(
-                                    microcopy.ai.suggestedPointsAria as string
+                                aria-label={asMicrocopyString(
+                                    microcopy.ai.suggestedPointsAria
                                 ).replace(
                                     "{points}",
                                     String(estimateData.storyPoints)
@@ -641,9 +638,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                 tooltip="Based on similar tasks on this board."
                             />
                             <Button
-                                aria-label={
-                                    microcopy.ai.applyPointsAria as string
-                                }
+                                aria-label={asMicrocopyString(
+                                    microcopy.ai.applyPointsAria
+                                )}
                                 onClick={handleApplyPoints}
                                 size="small"
                                 type={lowConfidence ? "default" : "primary"}
@@ -709,7 +706,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         {estimateData.similar.length > 0 && (
                             <div>
                                 <strong>
-                                    {microcopy.ai.similarTasks as string}
+                                    {asMicrocopyString(
+                                        microcopy.ai.similarTasks
+                                    )}
                                 </strong>
                                 <ul style={{ paddingLeft: space.lg }}>
                                     {estimateData.similar.map((entry) => {
@@ -752,11 +751,13 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         !showReadinessSpinner &&
                         taskAssistReadinessSuggestionKey.length > 0 ? (
                             <AiCopilotSurfaceFeedback
-                                ariaGroupLabel={(
-                                    microcopy.feedback.taskAssistTitle as string
+                                ariaGroupLabel={asMicrocopyString(
+                                    microcopy.feedback.taskAssistTitle
                                 ).replace(
                                     "{section}",
-                                    String(microcopy.ai.readinessCheck)
+                                    asMicrocopyString(
+                                        microcopy.ai.readinessCheck
+                                    )
                                 )}
                                 citationCount={0}
                                 suggestionKey={taskAssistReadinessSuggestionKey}
@@ -765,14 +766,16 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         ) : null
                     }
                 >
-                    {microcopy.ai.readinessCheck as string}
+                    {asMicrocopyString(microcopy.ai.readinessCheck)}
                 </SectionHeading>
             </div>
             <div aria-atomic="false" aria-live="polite">
                 {showReadinessSpinner && (
                     <Skeleton
                         active
-                        aria-label={microcopy.ai.runningReadiness as string}
+                        aria-label={asMicrocopyString(
+                            microcopy.ai.runningReadiness
+                        )}
                         paragraph={{ rows: 1 }}
                         title={false}
                     />
@@ -787,7 +790,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 )}
                 {readinessData && readinessData.issues.length === 0 && (
                     <Alert
-                        title={microcopy.ai.readinessReady as string}
+                        title={asMicrocopyString(microcopy.ai.readinessReady)}
                         showIcon
                         type="success"
                     />
