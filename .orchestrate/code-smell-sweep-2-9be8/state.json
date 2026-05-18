@@ -233,15 +233,15 @@
       "branch": "orch/code-smell-sweep-2-9be8/fix-sw-registration-logging",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-30de0213-b0da-4ec1-8ae9-9b83cfeec4d1",
+      "runId": "run-f45fdefe-0b85-41b1-ac05-d4a30a6e2f06",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:48:56.715Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:48:56.715Z",
+      "lastUpdate": "2026-05-18T17:48:59.149Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -281,17 +281,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:48:59.150Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:48:59.150Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-be-fe-tool-name-constants",
@@ -410,6 +411,10 @@
     {
       "at": "2026-05-18T17:48:56.715Z",
       "message": "fix-sw-registration-logging: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:48:59.150Z",
+      "message": "be-fe-tool-name-constants: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
