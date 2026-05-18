@@ -12,7 +12,6 @@ fallback without breaking the FE contract.
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -31,6 +30,7 @@ from app.agents.catalog._schemas import (
     READINESS_MESSAGE_MAX,
 )
 from app.agents.catalog._shared import (
+    augment_items_with_vector_neighbours,
     build_citation_refs,
     fetch_similar_node,
     merge_keyed_string_updates,
@@ -43,8 +43,6 @@ from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.redaction import redact_dict, redact_task_fields
-
-logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -451,27 +449,16 @@ class TaskEstimationAgent(BaseAgent):
             draft = state.get("task_draft") or {}
             query_text = draft.get("taskName", "")
             from app.config import settings as app_settings
-            from app.agents.task_vector_pg import (
-                fetch_vector_neighbours_for_project,
-                merge_similar_with_vector_hits,
-            )
 
-            if app_settings.agent_vector_search_enabled:
-                try:
-                    qvecs = await be_tools.embed_async([query_text])
-                    qv = qvecs[0] if qvecs else []
-                    pid = str(state.get("project_id") or "")
-                    hits = fetch_vector_neighbours_for_project(
-                        project_id=pid,
-                        query_embedding=list(qv),
-                        settings=app_settings,
-                    )
-                    similar = merge_similar_with_vector_hits(similar, hits)
-                except Exception:
-                    logger.warning(
-                        "Vector-augmented similar merge failed; using FE list only.",
-                        exc_info=True,
-                    )
+            similar = await augment_items_with_vector_neighbours(
+                similar,
+                query_text=query_text,
+                project_id=str(state.get("project_id") or ""),
+                settings=app_settings,
+                failure_log_message=(
+                    "Vector-augmented similar merge failed; using FE list only."
+                ),
+            )
             corpus_texts = [item.get("text", "") for item in similar]
             corpus_ids = [item.get("id", str(idx)) for idx, item in enumerate(similar)]
             # Embed query and corpus in a single batched call so a load-
