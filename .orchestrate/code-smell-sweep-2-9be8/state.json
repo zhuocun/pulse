@@ -77,15 +77,15 @@
       "dependsOn": [
         "fix-use-agent-chat-resume-errors"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-72edae0d-f920-4c29-bda8-0169f7b34488",
+      "runId": "run-c047b3bf-8fb8-4373-b780-514792660f9e",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:51:37.787Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:37.787Z",
+      "lastUpdate": "2026-05-18T17:51:40.597Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -172,17 +172,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:51:40.599Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:51:40.599Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "extract-ai-chat-composer",
@@ -474,6 +475,10 @@
     {
       "at": "2026-05-18T17:51:37.786Z",
       "message": "verify-fix-use-agent-chat-resume-errors: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:51:40.598Z",
+      "message": "verify-extract-ai-chat-tool-display: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
