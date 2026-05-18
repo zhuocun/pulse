@@ -72,7 +72,7 @@
     {
       "name": "verify-fix-use-agent-chat-resume-errors",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-2-9be8/verify-fix-use-agent-chat-resume-errors",
+      "branch": "`orch/code-smell-sweep-2-9be8/fix-use-agent-chat-resume-errors` (verifier commit `9d41640`: `chore: add verifier log for fix-use-agent-chat-resume-errors`)",
       "startingRef": "orch/code-smell-sweep-2-9be8/fix-use-agent-chat-resume-errors",
       "dependsOn": [
         "fix-use-agent-chat-resume-errors"
@@ -80,12 +80,12 @@
       "agentId": "bc-72edae0d-f920-4c29-bda8-0169f7b34488",
       "runId": "run-c047b3bf-8fb8-4373-b780-514792660f9e",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-use-agent-chat-resume-errors.md",
       "startedAt": "2026-05-18T17:51:37.787Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:40.597Z",
+      "finishedAt": "2026-05-18T17:53:22.319Z",
+      "lastUpdate": "2026-05-18T17:53:22.319Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
