@@ -118,11 +118,12 @@ def fetch_snapshot_node(state: Any) -> dict[str, Any]:
 
     from langgraph.types import interrupt
 
+    from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT
     from app.tools.fe_tool_schemas import interrupt_payload
 
     snapshot = interrupt(
         interrupt_payload(
-            "fe.boardSnapshot",
+            FE_BOARD_SNAPSHOT,
             {"project_id": state.get("project_id")},
         )
     )
@@ -147,6 +148,7 @@ def fetch_similar_node(state: Any) -> dict[str, Any]:
 
     from langgraph.types import interrupt
 
+    from app.tools.fe_tool_names import FE_SIMILAR_TASKS
     from app.tools.fe_tool_schemas import interrupt_payload
 
     query = (
@@ -156,7 +158,7 @@ def fetch_similar_node(state: Any) -> dict[str, Any]:
     )
     payload = interrupt(
         interrupt_payload(
-            "fe.similarTasks",
+            FE_SIMILAR_TASKS,
             {
                 "project_id": state.get("project_id"),
                 "query": query,

@@ -39,6 +39,7 @@ from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test p
 from app.agents.polish import PolishStep
 from app.agents.state import BoardBriefState
 from app.tools.be_tools import _is_done_column
+from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT
 from app.tools.redaction import redact_dict
 from app.store import namespaces
 
@@ -392,7 +393,7 @@ class BoardBriefAgent(BaseAgent):
         status="active",
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
-        tools=("fe.boardSnapshot", "be.detect_drift", "be.summarize"),
+        tools=(FE_BOARD_SNAPSHOT, "be.detect_drift", "be.summarize"),
         redactable_dict_fields=("context",),
         rationale={
             "recursion_limit": (

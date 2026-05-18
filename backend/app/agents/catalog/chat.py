@@ -46,6 +46,7 @@ from app.agents.events import (
 from app.agents.llm import is_stub_model
 from app.agents.state import ChatState
 from app.tools import be_tools
+from app.tools.fe_tool_names import FE_APPLY_MUTATION
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.observability.metrics import record_agent_mutation_event
 
@@ -140,7 +141,7 @@ def _mutation_hitl(state: ChatState) -> dict[str, Any]:
         }
     raw = interrupt(
         interrupt_payload(
-            "fe.applyMutation",
+            FE_APPLY_MUTATION,
             {"proposal_id": pid, "stage": "approval"},
         )
     )
@@ -209,7 +210,7 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
     diff = decision.get("edited_diff") or proposal.get("diff") or {}
     fe_result = interrupt(
         interrupt_payload(
-            "fe.applyMutation",
+            FE_APPLY_MUTATION,
             {
                 "proposal_id": pid,
                 "stage": "apply",
@@ -278,7 +279,7 @@ class ChatAgent(BaseAgent):
             "listBoard",
             "listTasks",
             "getTask",
-            "fe.applyMutation",
+            FE_APPLY_MUTATION,
         ),
         rationale={
             "recursion_limit": (

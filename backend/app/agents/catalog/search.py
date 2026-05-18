@@ -56,6 +56,7 @@ from app.agents.polish import PolishStep
 from app.agents.state import SearchState
 from langgraph.runtime import get_runtime
 from app.tools import be_tools
+from app.tools.fe_tool_names import FE_SEARCH_CANDIDATES
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
 
@@ -393,7 +394,7 @@ class SearchAgent(BaseAgent):
         status="active",
         rate_limit=(30, 300),
         allowed_autonomy=("suggest",),
-        tools=("fe.searchCandidates", "be.embed", "be.embedding_neighbors"),
+        tools=(FE_SEARCH_CANDIDATES, "be.embed", "be.embedding_neighbors"),
         redactable_text_fields=("query",),
         redactable_dict_fields=("context",),
         rationale={
@@ -446,7 +447,7 @@ class SearchAgent(BaseAgent):
             _ctx = _rt.context or {}
             candidates = interrupt(
                 interrupt_payload(
-                    "fe.searchCandidates",
+                    FE_SEARCH_CANDIDATES,
                     {
                         "project_id": _ctx.get("project_id"),
                         "query": state.get("query") or "",

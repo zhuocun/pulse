@@ -43,6 +43,7 @@ from app.agents.polish import PolishStep
 from app.agents.state import TaskDraftingState
 from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
+from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT, FE_SIMILAR_TASKS
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
 logger = logging.getLogger(__name__)
@@ -356,7 +357,7 @@ class TaskDraftingAgent(BaseAgent):
         status="active",
         rate_limit=(10, 100),
         allowed_autonomy=("suggest", "plan"),
-        tools=("fe.boardSnapshot", "fe.similarTasks"),
+        tools=(FE_BOARD_SNAPSHOT, FE_SIMILAR_TASKS),
         redactable_text_fields=("prompt",),
         redactable_dict_fields=("context", "task_draft"),
         rationale={
