@@ -305,15 +305,15 @@
       "dependsOn": [
         "be-fe-tool-name-constants"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-9a3f97f8-68c4-431c-87e7-2a5ae70508a9",
+      "runId": "run-4c65e2b2-fd41-4f34-9909-1cf1177e2d19",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:51:22.928Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:22.928Z",
+      "lastUpdate": "2026-05-18T17:51:25.318Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -335,12 +335,12 @@
       "handoffPath": "handoffs/be-board-brief-extract-counts.md",
       "startedAt": "2026-05-18T17:49:01.648Z",
       "finishedAt": "2026-05-18T17:51:21.858Z",
-      "lastUpdate": "2026-05-18T17:51:21.858Z",
+      "lastUpdate": "2026-05-18T17:51:23.935Z",
       "note": null,
       "slackTs": null,
       "prNumber": 248,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -354,17 +354,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:51:25.320Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:51:25.320Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "merge-code-smell-sweep-2",
@@ -452,6 +453,14 @@
     {
       "at": "2026-05-18T17:51:22.927Z",
       "message": "verify-be-fe-tool-name-constants: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:51:23.936Z",
+      "message": "be-board-brief-extract-counts: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:51:25.319Z",
+      "message": "verify-be-board-brief-extract-counts: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
