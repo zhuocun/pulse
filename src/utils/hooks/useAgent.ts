@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import type {
     AutonomyLevel,
     CitationRef,
@@ -558,7 +558,7 @@ const useAgent = (
                     });
                     if (!hasRealAnswer) {
                         setError(
-                            new Error(microcopy.ai.toolRoundExhausted as string)
+                            new Error(microcopyString(microcopy.ai.toolRoundExhausted))
                         );
                         turnErrored = true;
                     }
