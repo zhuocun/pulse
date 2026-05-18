@@ -6,7 +6,6 @@ import {
     ReloadOutlined,
     StopOutlined
 } from "@ant-design/icons";
-import styled from "@emotion/styled";
 import {
     Alert,
     App,
@@ -70,110 +69,8 @@ import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import EngineModeTag from "../engineModeTag";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
-
-const MessageRow = styled.div<{ $isUser: boolean }>`
-    margin-bottom: ${space.sm}px;
-    text-align: ${(props) => (props.$isUser ? "right" : "left")};
-`;
-
-/**
- * Chat bubble. Centralizing the bubble's background, padding, and width
- * cap here means a tweak to the chat visual language is one edit instead
- * of three duplicated inline-style objects.
- */
-const MessageBubble = styled(Typography.Paragraph)<{ $isUser: boolean }>`
-    && {
-        background: ${(props) =>
-            props.$isUser
-                ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.10))"
-                : "var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04))"};
-        border-radius: ${radius.md}px;
-        color: var(--ant-color-text, inherit);
-        display: inline-block;
-        margin-bottom: 0;
-        max-width: min(100%, 36rem);
-        padding: ${space.xs}px ${space.sm}px;
-        text-align: left;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    && pre,
-    && code {
-        max-width: 100%;
-        overflow-x: auto;
-    }
-`;
-
-/**
- * AntD's `Typography.Text` with `code` looks heavy here; this is a
- * lightweight pseudo-cursor that pulses while tokens stream in. The
- * bare span avoids a re-render storm from CSS animations on every chunk.
- */
-const StreamingCursor = styled.span`
-    display: inline-block;
-    margin-inline-start: 2px;
-    animation: aiCursorBlink 1s steps(1) infinite;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-
-    @keyframes aiCursorBlink {
-        50% {
-            opacity: 0;
-        }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        animation: none;
-    }
-`;
-
-/**
- * Attribution row above each assistant bubble (P2-5). The sparkle is
- * decorative — the visible "Board Copilot" label is what screen readers
- * announce. Pairing the model name with the bubble matches the
- * ChatGPT/Claude convention so users always know the source of the text.
- */
-const AssistantAttribution = styled.div`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: 4px;
-    margin-bottom: ${space.xxs}px;
-    max-width: min(100%, 36rem);
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-`;
-
-/**
- * "AI · review before using" footnote below each assistant bubble (P2-2).
- * Kept intentionally low-contrast so it sits out of the reading flow but
- * remains discoverable when users are calibrating trust on a response.
- */
-const AssistantDisclaimer = styled.div`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    font-size: ${fontSize.xs}px;
-    margin-top: 2px;
-`;
-
-const SamplePrompt = styled(Tag.CheckableTag)`
-    && {
-        border-radius: ${radius.pill}px;
-        font-weight: ${fontWeight.medium};
-        padding: ${space.xxs}px ${space.sm}px;
-    }
-`;
-
-const ToolPayloadPanel = styled.div`
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.02));
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.xs}px;
-    margin: ${space.xxs}px 0;
-    padding: ${space.xxs}px ${space.xs}px;
-`;
+import { AssistantAttribution, AssistantDisclaimer, MessageBubble, MessageRow, SamplePrompt, StreamingCursor, ToolPayloadPanel } from "./aiChatDrawerStyles";
+import { BUDGET_CRITICAL_THRESHOLD, BUDGET_WARN_THRESHOLD, CITATION_INLINE_LIMIT, humanizeTool, summarizeToolBody } from "./aiChatToolDisplay";
 
 const { Text } = Typography;
 
@@ -233,60 +130,6 @@ export interface AiChatDrawerProps {
      */
     onDismissNudge?: (nudge: TriageNudge) => void;
 }
-
-/**
- * Plain-language verb for each known tool (Optimization Plan §3 P2-2).
- *
- * Tool messages in the chat transcript should read like evidence the
- * assistant gathered ("Checked 12 tasks"), not like a function call
- * ("listTasks · 12 items"). Unmapped tools fall back to a sentence-cased
- * version of the raw name so a future tool that hasn't been wired here
- * still produces sensible UI.
- */
-const TOOL_VERB: Record<string, string> = {
-    listProjects: microcopyString(microcopy.ai.toolVerbs.checkedProjects),
-    listMembers: microcopyString(microcopy.ai.toolVerbs.checkedTeamMembers),
-    listBoard: microcopyString(microcopy.ai.toolVerbs.checkedBoardColumns),
-    listTasks: microcopyString(microcopy.ai.toolVerbs.checkedTasks),
-    getProject: microcopyString(microcopy.ai.toolVerbs.openedProject),
-    getTask: microcopyString(microcopy.ai.toolVerbs.openedTask)
-};
-
-const humanizeTool = (name?: string) => {
-    if (!name) return microcopyString(microcopy.ai.toolVerbs.lookedUpEvidence);
-    if (TOOL_VERB[name]) return TOOL_VERB[name];
-    return name
-        .replace(/^.*:/, "")
-        .replace(/[._]/g, " ")
-        .replace(/^./, (s) => s.toUpperCase());
-};
-
-/**
- * Tool message bodies are now plain-language evidence summaries (see
- * `summarizeToolResultForUser`) instead of raw JSON. The collapsed
- * `<details>` summary line just shows the first sentence so users can
- * scan the evidence chain without expanding every row.
- */
-const summarizeToolBody = (body: string): string => {
-    const trimmed = body.trim();
-    if (!trimmed) return microcopyString(microcopy.ai.toolEmptyResult);
-    const firstLine = trimmed.split("\n", 1)[0];
-    return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
-};
-
-/**
- * Citations are inline superscript chips after the assistant bubble. When
- * an answer leans on a lot of records (e.g. a workload summary that cites
- * every member) rendering all of them inline produces a sprawling chip
- * tail that crowds the message. We collapse anything over this threshold
- * behind a "+N more" affordance — clicking it expands the list inline
- * (no second click required) so verifying every claim is still possible.
- */
-const CITATION_INLINE_LIMIT = 6;
-
-/** Approximate token thresholds for context-window warnings (P1-C). */
-const BUDGET_WARN_THRESHOLD = 6000;
-const BUDGET_CRITICAL_THRESHOLD = 7500;
 
 /**
  * Fallback QueryClient used when the drawer is rendered outside a
