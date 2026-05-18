@@ -15,12 +15,12 @@
       "handoffPath": "handoffs/microcopy-string-helper.md",
       "startedAt": "2026-05-18T17:48:46.151Z",
       "finishedAt": "2026-05-18T17:50:05.696Z",
-      "lastUpdate": "2026-05-18T17:50:05.696Z",
+      "lastUpdate": "2026-05-18T17:50:06.694Z",
       "note": null,
       "slackTs": null,
       "prNumber": 244,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -34,17 +34,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:50:14.041Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:50:14.041Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-use-agent-chat-resume-errors",
@@ -420,6 +421,14 @@
     {
       "at": "2026-05-18T17:49:01.647Z",
       "message": "be-board-brief-extract-counts: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:50:06.695Z",
+      "message": "microcopy-string-helper: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-18T17:50:14.039Z",
+      "message": "verify-microcopy-string-helper: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
