@@ -217,15 +217,15 @@
       "dependsOn": [
         "extract-ai-chat-composer"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-7182638b-9f31-4c4e-8959-39965423de71",
+      "runId": "run-ce6c769e-6dcc-4ae5-b655-a4b99b6f8c7b",
+      "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-18T17:53:46.548Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:53:46.548Z",
+      "lastUpdate": "2026-05-18T17:53:49.393Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -388,17 +388,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-18T17:53:49.395Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-18T17:53:49.395Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
@@ -497,6 +498,10 @@
     {
       "at": "2026-05-18T17:53:46.547Z",
       "message": "verify-extract-ai-chat-composer: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:53:49.394Z",
+      "message": "merge-code-smell-sweep-2: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
