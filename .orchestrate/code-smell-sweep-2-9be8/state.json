@@ -349,7 +349,7 @@
     {
       "name": "verify-be-board-brief-extract-counts",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-2-9be8/verify-be-board-brief-extract-counts",
+      "branch": "orch/code-smell-sweep-2-9be8/be-board-brief-extract-counts",
       "startingRef": "orch/code-smell-sweep-2-9be8/be-board-brief-extract-counts",
       "dependsOn": [
         "be-board-brief-extract-counts"
@@ -357,12 +357,12 @@
       "agentId": "bc-7af74499-9118-4e16-8d9c-7d493dd77822",
       "runId": "run-47d97de7-7a07-48db-bbb5-3857780c62f5",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-be-board-brief-extract-counts.md",
       "startedAt": "2026-05-18T17:51:25.320Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:51:27.783Z",
+      "finishedAt": "2026-05-18T17:52:57.042Z",
+      "lastUpdate": "2026-05-18T17:52:57.042Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
