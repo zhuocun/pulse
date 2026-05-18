@@ -10,15 +10,15 @@
       "agentId": "bc-cf715f23-186d-4c0c-b260-d0e57cea56a8",
       "runId": "run-3e2d5895-3ddb-4286-8988-cadf6dc87ffb",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-use-react-mutation-types.md",
       "startedAt": "2026-05-18T17:15:11.474Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:15:14.237Z",
+      "finishedAt": "2026-05-18T17:17:15.657Z",
+      "lastUpdate": "2026-05-18T17:17:15.657Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 238,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -60,12 +60,12 @@
       "handoffPath": "handoffs/fix-dnd-clone-types.md",
       "startedAt": "2026-05-18T17:15:14.240Z",
       "finishedAt": "2026-05-18T17:17:13.776Z",
-      "lastUpdate": "2026-05-18T17:17:13.777Z",
+      "lastUpdate": "2026-05-18T17:17:14.885Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -324,6 +324,10 @@
     {
       "at": "2026-05-18T17:15:25.263Z",
       "message": "be-catalog-vector-dedup: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-18T17:17:14.886Z",
+      "message": "fix-dnd-clone-types: verification self-reported (unit-test-verified)"
     }
   ]
 }
