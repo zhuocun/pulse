@@ -17,11 +17,11 @@
       "finishedAt": "2026-05-18T17:17:15.657Z",
       "lastUpdate": "2026-05-18T17:17:16.738Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 238,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-use-react-mutation-types",
@@ -41,11 +41,11 @@
       "finishedAt": "2026-05-18T17:18:50.138Z",
       "lastUpdate": "2026-05-18T17:18:50.138Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-dnd-clone-types",
@@ -63,11 +63,11 @@
       "finishedAt": "2026-05-18T17:17:13.776Z",
       "lastUpdate": "2026-05-18T17:17:14.885Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-dnd-clone-types",
@@ -87,11 +87,11 @@
       "finishedAt": "2026-05-18T17:18:42.247Z",
       "lastUpdate": "2026-05-18T17:18:42.247Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-project-modal-errors",
@@ -109,11 +109,11 @@
       "finishedAt": "2026-05-18T17:17:40.733Z",
       "lastUpdate": "2026-05-18T17:19:25.041Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 241,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-project-modal-errors",
@@ -133,11 +133,11 @@
       "finishedAt": "2026-05-18T17:19:23.941Z",
       "lastUpdate": "2026-05-18T17:19:23.941Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "fix-ai-task-assist-smells",
@@ -155,11 +155,11 @@
       "finishedAt": "2026-05-18T17:18:05.538Z",
       "lastUpdate": "2026-05-18T17:18:06.708Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 242,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-fix-ai-task-assist-smells",
@@ -179,11 +179,11 @@
       "finishedAt": "2026-05-18T17:19:54.591Z",
       "lastUpdate": "2026-05-18T17:19:54.591Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "extract-use-agent-thread-persist",
@@ -201,11 +201,11 @@
       "finishedAt": "2026-05-18T17:17:30.330Z",
       "lastUpdate": "2026-05-18T17:17:31.393Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 240,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-extract-use-agent-thread-persist",
@@ -225,11 +225,11 @@
       "finishedAt": "2026-05-18T17:19:20.658Z",
       "lastUpdate": "2026-05-18T17:19:20.658Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "be-catalog-vector-dedup",
@@ -247,11 +247,11 @@
       "finishedAt": "2026-05-18T17:17:20.480Z",
       "lastUpdate": "2026-05-18T17:17:22.639Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": 239,
       "failureMode": null,
-      "verification": "unit-test-verified",
-      "attempts": 1
+      "verification": "unit-test-verified"
     },
     {
       "name": "verify-be-catalog-vector-dedup",
@@ -271,11 +271,11 @@
       "finishedAt": "2026-05-18T17:18:47.864Z",
       "lastUpdate": "2026-05-18T17:18:47.864Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": null
     },
     {
       "name": "merge-code-smell-sweep",
@@ -298,13 +298,13 @@
       "handoffPath": "handoffs/merge-code-smell-sweep.md",
       "startedAt": "2026-05-18T17:18:15.591Z",
       "finishedAt": "2026-05-18T17:22:48.744Z",
-      "lastUpdate": "2026-05-18T17:22:48.744Z",
+      "lastUpdate": "2026-05-18T17:22:51.879Z",
       "note": null,
+      "attempts": 1,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
-      "attempts": 1
+      "verification": "unit-test-verified"
     }
   ],
   "attention": [
@@ -383,6 +383,10 @@
     {
       "at": "2026-05-18T17:19:25.042Z",
       "message": "fix-project-modal-errors: verification recorded (unit-test-verified) by verifier verify-fix-project-modal-errors"
+    },
+    {
+      "at": "2026-05-18T17:22:51.879Z",
+      "message": "merge-code-smell-sweep: verification self-reported (unit-test-verified)"
     }
   ]
 }
