@@ -1,0 +1,20 @@
+# Verifier: be-board-brief-extract-counts
+# Date: 2026-05-18
+# Branch: orch/code-smell-sweep-2-9be8/be-board-brief-extract-counts
+
+## Code cross-check (read-only)
+- `backend/app/agents/catalog/board_brief.py`: `_column_index` and `_column_task_counts` extracted; `_compute_board_brief` calls both for counts and largest_unstarted filtering.
+- `backend/tests/test_board_brief.py`: four tests target `_column_task_counts` and parity with `_compute_board_brief` counts.
+
+## Recipe runs
+1. `source /workspace/.venv/bin/activate && cd backend && python -m pytest tests/test_board_brief.py -q`
+   - 4 passed in 0.81s
+   - exit 1: coverage fail-under 100% on subset (total 26%); expected for targeted file run per pyproject.toml
+2. `source /workspace/.venv/bin/activate && cd backend && python -m pytest tests/test_board_brief.py -q --no-cov`
+   - `....` [100%]
+   - 4 passed in 0.01s (exit 0)
+3. `source /workspace/.venv/bin/activate && cd backend && ruff check app/agents/catalog/board_brief.py`
+   - All checks passed! (exit 0)
+
+## Verdict signal
+unit-test-verified
