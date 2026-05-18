@@ -33,6 +33,7 @@ import {
     threadStorageKey,
     writePersistedThread
 } from "./useAgentThreadPersist";
+import { generateThreadId, TTFT_SLO_MS } from "./useAgentThreadId";
 import useApi from "./useApi";
 
 export {
@@ -52,6 +53,7 @@ export {
     NUDGE_PRUNE_INTERVAL_MS,
     reduceNudgeInbox
 } from "./useNudgeInbox";
+export { generateThreadId, TTFT_SLO_MS } from "./useAgentThreadId";
 
 export interface AgentMessage {
     role: "user" | "assistant" | "tool" | "system";
@@ -185,30 +187,6 @@ export interface UseAgentOptions {
     /** When set, `useAutonomyLevel` clamps stored/user levels to this list (chat metadata). */
     allowedAutonomy?: readonly AutonomyLevel[] | null;
 }
-
-/**
- * Per-turn thread id. Uses `crypto.randomUUID()` when available (modern
- * browsers, Node 19+) and falls back to a `Math.random()` blend for SSR
- * shells / older runtimes that strip `crypto`. Exported so tests can
- * stub it without monkey-patching the global.
- */
-const generateThreadId = (): string => {
-    const cryptoLike =
-        typeof globalThis !== "undefined"
-            ? (
-                  globalThis as {
-                      crypto?: { randomUUID?: () => string };
-                  }
-              ).crypto
-            : undefined;
-    if (cryptoLike && typeof cryptoLike.randomUUID === "function") {
-        return `t_${cryptoLike.randomUUID()}`;
-    }
-    return `t_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
-};
-
-/** TTFT SLO threshold in ms (P2-I). Turns exceeding this emit AGENT_TTFT_SLOW. */
-const TTFT_SLO_MS = 1500;
 
 /**
  * Drive a LangGraph v2 agent run end-to-end (PRD §5). Handles SSE parsing,
