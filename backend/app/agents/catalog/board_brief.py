@@ -50,6 +50,40 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _column_index(columns: Any) -> dict[str, str]:
+    column_index: dict[str, str] = {}
+    for col in columns if isinstance(columns, list) else []:
+        if not isinstance(col, dict):
+            continue
+        cid = col.get("_id")
+        if isinstance(cid, str):
+            column_index[cid] = col.get("name") or cid
+    return column_index
+
+
+def _column_task_counts(columns: Any, tasks: Any) -> list[dict[str, Any]]:
+    """Per-column task counts for ``IBoardBrief.counts``."""
+    task_list = tasks if isinstance(tasks, list) else []
+    column_index = _column_index(columns)
+    column_task_count: Counter[str] = Counter()
+    for task in task_list:
+        if not isinstance(task, dict):
+            continue
+        cid = task.get("columnId")
+        if isinstance(cid, str):
+            column_task_count[cid] += 1
+    counts: list[dict[str, Any]] = []
+    for cid, name in column_index.items():
+        counts.append(
+            {
+                "columnId": cid,
+                "columnName": name,
+                "count": column_task_count.get(cid, 0),
+            }
+        )
+    return counts
+
+
 def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
     """Return an ``IBoardBrief`` for the given board context.
 
@@ -61,29 +95,8 @@ def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
     tasks = context.get("tasks") or []
     task_list = tasks if isinstance(tasks, list) else []
     members = context.get("members") or []
-    counts: list[dict[str, Any]] = []
-    column_index: dict[str, str] = {}
-    for col in columns if isinstance(columns, list) else []:
-        if not isinstance(col, dict):
-            continue
-        cid = col.get("_id")
-        if isinstance(cid, str):
-            column_index[cid] = col.get("name") or cid
-    column_task_count: Counter[str] = Counter()
-    for task in task_list:
-        if not isinstance(task, dict):
-            continue
-        cid = task.get("columnId")
-        if isinstance(cid, str):
-            column_task_count[cid] += 1
-    for cid, name in column_index.items():
-        counts.append(
-            {
-                "columnId": cid,
-                "columnName": name,
-                "count": column_task_count.get(cid, 0),
-            }
-        )
+    counts = _column_task_counts(columns, tasks)
+    column_index = _column_index(columns)
     largest = sorted(
         [t for t in task_list if isinstance(t, dict) and isinstance(t.get("_id"), str)],
         key=lambda t: int(t.get("storyPoints") or 0),
