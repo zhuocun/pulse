@@ -91,3 +91,7 @@ const makeProxy = (path: readonly string[]): unknown =>
     });
 
 export const microcopy = makeProxy([]) as typeof enSource;
+
+/** Coerces a microcopy leaf (or other unknown) to a string for `.replace` / ARIA. */
+export const microcopyString = (value: unknown): string =>
+    typeof value === "string" ? value : String(value ?? "");

@@ -14,10 +14,25 @@
  * proxies for nested objects, that harness would silently start
  * iterating an empty list. These tests pin the contract directly.
  */
-import { microcopy } from "./microcopy";
+import { microcopy, microcopyString } from "./microcopy";
 import en from "../i18n/locales/en";
 import zhCN from "../i18n/locales/zh-CN";
 import { DEFAULT_LOCALE, setActiveLocale } from "../i18n";
+
+describe("microcopyString", () => {
+    it("returns strings unchanged", () => {
+        expect(microcopyString("hello")).toBe("hello");
+        expect(microcopyString(microcopy.actions.cancel)).toBe(
+            microcopy.actions.cancel
+        );
+    });
+
+    it("coerces non-strings via String()", () => {
+        expect(microcopyString(42)).toBe("42");
+        expect(microcopyString(null)).toBe("");
+        expect(microcopyString(undefined)).toBe("");
+    });
+});
 
 describe("microcopy Proxy", () => {
     afterEach(() => {

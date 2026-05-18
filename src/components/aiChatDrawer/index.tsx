@@ -40,7 +40,7 @@ import {
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
@@ -244,16 +244,16 @@ export interface AiChatDrawerProps {
  * still produces sensible UI.
  */
 const TOOL_VERB: Record<string, string> = {
-    listProjects: microcopy.ai.toolVerbs.checkedProjects as string,
-    listMembers: microcopy.ai.toolVerbs.checkedTeamMembers as string,
-    listBoard: microcopy.ai.toolVerbs.checkedBoardColumns as string,
-    listTasks: microcopy.ai.toolVerbs.checkedTasks as string,
-    getProject: microcopy.ai.toolVerbs.openedProject as string,
-    getTask: microcopy.ai.toolVerbs.openedTask as string
+    listProjects: microcopyString(microcopy.ai.toolVerbs.checkedProjects),
+    listMembers: microcopyString(microcopy.ai.toolVerbs.checkedTeamMembers),
+    listBoard: microcopyString(microcopy.ai.toolVerbs.checkedBoardColumns),
+    listTasks: microcopyString(microcopy.ai.toolVerbs.checkedTasks),
+    getProject: microcopyString(microcopy.ai.toolVerbs.openedProject),
+    getTask: microcopyString(microcopy.ai.toolVerbs.openedTask)
 };
 
 const humanizeTool = (name?: string) => {
-    if (!name) return microcopy.ai.toolVerbs.lookedUpEvidence as string;
+    if (!name) return microcopyString(microcopy.ai.toolVerbs.lookedUpEvidence);
     if (TOOL_VERB[name]) return TOOL_VERB[name];
     return name
         .replace(/^.*:/, "")
@@ -269,7 +269,7 @@ const humanizeTool = (name?: string) => {
  */
 const summarizeToolBody = (body: string): string => {
     const trimmed = body.trim();
-    if (!trimmed) return microcopy.ai.toolEmptyResult as string;
+    if (!trimmed) return microcopyString(microcopy.ai.toolEmptyResult);
     const firstLine = trimmed.split("\n", 1)[0];
     return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
 };
@@ -907,7 +907,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     );
 
     const promptCharMax = microcopy.ai.characterCounterMax;
-    const promptCharHintText = (microcopy.ai.characterCountTemplate as string)
+    const promptCharHintText = microcopyString(
+        microcopy.ai.characterCountTemplate
+    )
         .replace("{count}", String(input.length))
         .replace("{max}", String(promptCharMax));
     const promptCharHintWarning = input.length > promptCharMax * 0.9;
@@ -967,8 +969,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     .filter(Boolean).length;
                 const template =
                     wordCount === 1
-                        ? (microcopy.ai.completionAnnouncementOne as string)
-                        : (microcopy.ai.completionAnnouncementOther as string);
+                        ? microcopyString(
+                              microcopy.ai.completionAnnouncementOne
+                          )
+                        : microcopyString(
+                              microcopy.ai.completionAnnouncementOther
+                          );
                 setCompletionAnnouncement(
                     template
                         .replace("{label}", String(microcopy.ai.copilotLabel))
@@ -986,7 +992,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      */
     useEffect(() => {
         if (isLoading) {
-            setStreamingAnnouncement(microcopy.ai.chatResponding as string);
+            setStreamingAnnouncement(
+                microcopyString(microcopy.ai.chatResponding)
+            );
         } else {
             setStreamingAnnouncement("");
         }
@@ -1026,20 +1034,24 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             extra={
                 <Space size={space.xs}>
                     <Select
-                        aria-label={
-                            microcopy.ai.autonomySelectorAriaLabel as string
-                        }
+                        aria-label={microcopyString(
+                            microcopy.ai.autonomySelectorAriaLabel
+                        )}
                         onChange={(value: AutonomyLevel) =>
                             setAutonomyLevel(value)
                         }
                         options={autonomySelectorOptions.map((opt) => {
-                            const labelText = microcopy.ai[
-                                opt.labelKey as keyof typeof microcopy.ai
-                            ] as string;
+                            const labelText = microcopyString(
+                                microcopy.ai[
+                                    opt.labelKey as keyof typeof microcopy.ai
+                                ]
+                            );
                             const tooltip = opt.disabledTooltipKey
-                                ? (microcopy.ai[
-                                      opt.disabledTooltipKey as keyof typeof microcopy.ai
-                                  ] as string)
+                                ? microcopyString(
+                                      microcopy.ai[
+                                          opt.disabledTooltipKey as keyof typeof microcopy.ai
+                                      ]
+                                  )
                                 : undefined;
                             return {
                                 value: opt.value,
@@ -1361,10 +1373,14 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                             type="link"
                                         >
                                             {toolPayloadOpen
-                                                ? (microcopy.ai
-                                                      .toolDetailsHide as string)
-                                                : (microcopy.ai
-                                                      .toolDetailsToggle as string)}
+                                                ? microcopyString(
+                                                      microcopy.ai
+                                                          .toolDetailsHide
+                                                  )
+                                                : microcopyString(
+                                                      microcopy.ai
+                                                          .toolDetailsToggle
+                                                  )}
                                         </Button>
                                         {toolPayloadOpen ? (
                                             <pre
@@ -1823,10 +1839,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         }}
                                     >
                                         <Button
-                                            aria-label={
-                                                microcopy.ai
-                                                    .copyMessage as string
-                                            }
+                                            aria-label={microcopyString(
+                                                microcopy.ai.copyMessage
+                                            )}
                                             icon={
                                                 copyConfirmedAssistantIndex ===
                                                 index ? (
