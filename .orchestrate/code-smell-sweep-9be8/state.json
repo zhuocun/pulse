@@ -210,7 +210,7 @@
     {
       "name": "verify-extract-use-agent-thread-persist",
       "type": "verifier",
-      "branch": "orch/code-smell-sweep-9be8/verify-extract-use-agent-thread-persist",
+      "branch": "`orch/code-smell-sweep-9be8/extract-use-agent-thread-persist` (no verifier commits; working tree clean)",
       "startingRef": "orch/code-smell-sweep-9be8/extract-use-agent-thread-persist",
       "dependsOn": [
         "extract-use-agent-thread-persist"
@@ -218,12 +218,12 @@
       "agentId": "bc-25a83d15-b02c-481b-8eea-b45a4a7de716",
       "runId": "run-a2794743-c605-407d-a9be-74649d46691d",
       "parentAgentId": "bc-376b1eb1-85bc-490b-a811-d1584dc9bfeb",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-extract-use-agent-thread-persist.md",
       "startedAt": "2026-05-18T17:17:37.261Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-18T17:17:39.860Z",
+      "finishedAt": "2026-05-18T17:19:20.658Z",
+      "lastUpdate": "2026-05-18T17:19:20.658Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
