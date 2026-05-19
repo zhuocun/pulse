@@ -463,7 +463,9 @@ const TaskModal: React.FC<{
                                     label: member.username,
                                     value: member._id
                                 }))}
-                                placeholder={`Select a ${microcopy.fields.coordinator.toLowerCase()}`}
+                                placeholder={
+                                    microcopy.placeholders.selectCoordinator
+                                }
                             />
                         </Form.Item>
                         <Form.Item
@@ -480,7 +482,7 @@ const TaskModal: React.FC<{
                         >
                             <Select
                                 options={TASK_TYPE_OPTIONS}
-                                placeholder={`Select a ${microcopy.fields.type.toLowerCase()}`}
+                                placeholder={microcopy.placeholders.selectType}
                             />
                         </Form.Item>
                         <Form.Item label={microcopy.fields.epic} name="epic">
@@ -523,7 +525,9 @@ const TaskModal: React.FC<{
                                     });
                                 }}
                                 options={STORY_POINT_OPTIONS}
-                                placeholder={`Select ${microcopy.fields.storyPoints.toLowerCase()}`}
+                                placeholder={
+                                    microcopy.placeholders.selectStoryPoints
+                                }
                             />
                         </Form.Item>
                         <Form.Item label={microcopy.fields.notes} name="note">

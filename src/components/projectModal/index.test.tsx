@@ -9,6 +9,8 @@ import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
+import zhCN from "../../i18n/locales/zh-CN";
 import { store } from "../../store";
 import { projectActions } from "../../store/reducers/projectModalSlice";
 
@@ -181,6 +183,23 @@ describe("ProjectModal", () => {
     afterAll(() => {
         consoleErrorSpy.mockRestore();
         fetchMock.mockRestore();
+    });
+
+    afterEach(() => {
+        setActiveLocale(DEFAULT_LOCALE);
+    });
+
+    it("renders a localized manager select placeholder when zh-CN is active", async () => {
+        setActiveLocale("zh-CN");
+        renderProjectModal({ type: "open" });
+
+        expect(
+            await screen.findByRole("dialog", { name: zhCN.actions.createProject })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(zhCN.placeholders.selectManager)
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Select a manager/i)).not.toBeInTheDocument();
     });
 
     it("validates required create fields", async () => {
