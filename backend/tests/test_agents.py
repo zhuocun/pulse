@@ -1596,22 +1596,52 @@ def test_try_verify_returns_none_on_invalid_hmac() -> None:
     assert result is None
 
 
-def test_namespaced_thread_treats_malformed_sigv1_as_unsigned(
+def test_namespaced_thread_rejects_malformed_sigv1(
     fresh_registry: AgentRegistry,
 ) -> None:
-    """A ``sigv1.`` token that returns None from verification falls back to unsigned path."""
+    """A ``sigv1.`` token that fails verification raises ``InvalidThreadKeyError``."""
+    from app.agents.errors import InvalidThreadKeyError
     from app.agents.runtime import _SIGNED_PREFIX
 
     fresh_registry.register(EchoAgent())
     runtime = AgentRuntime(registry=fresh_registry)
     agent = runtime.get("echo")
 
-    # Construct a token that starts with sigv1. but has invalid base64 body.
     malformed_token = f"{_SIGNED_PREFIX}!!!invalid!!!"
-    # Should not raise; falls back to iterative-strip treating the whole
-    # token as a plain thread id.
-    cfg = runtime.build_config(agent, thread_id=malformed_token, user_id="u1")
-    assert cfg["configurable"]["thread_id"].startswith("echo:u1:")
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        runtime.build_config(agent, thread_id=malformed_token, user_id="u1")
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
+
+
+def test_tampered_signed_thread_key_rejected(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A valid-looking ``sigv1.`` token with a bad HMAC is rejected, not unsigned."""
+    import base64
+
+    from app.agents.errors import InvalidThreadKeyError
+    from app.agents.runtime import sign_thread_key, _SEP, _SIGNED_PREFIX
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    agent = runtime.get("echo")
+
+    token = sign_thread_key("echo", "u1", "my-thread")
+    encoded = token[len(_SIGNED_PREFIX) :]
+    payload = base64.urlsafe_b64decode(encoded.encode()).decode()
+    parts = payload.split(_SEP, 3)
+    parts[3] = "0" * 64
+    tampered = f"{_SIGNED_PREFIX}{base64.urlsafe_b64encode(_SEP.join(parts).encode()).decode()}"
+
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        runtime.build_config(agent, thread_id=tampered, user_id="u1")
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
 
 
 # ---------------------------------------------------------------------------
