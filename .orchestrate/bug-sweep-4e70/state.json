@@ -532,17 +532,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:28:44.665Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:28:44.665Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-be-thread-id-strict",
@@ -701,6 +702,10 @@
     {
       "at": "2026-05-19T05:28:33.261Z",
       "message": "fix-ai-search-remote-query: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:28:44.665Z",
+      "message": "verify-fix-be-mutation-undo: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
