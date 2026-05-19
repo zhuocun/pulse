@@ -291,12 +291,12 @@
       "handoffPath": "handoffs/fix-chat-drawer-focus.md",
       "startedAt": "2026-05-19T05:26:47.121Z",
       "finishedAt": "2026-05-19T05:29:59.724Z",
-      "lastUpdate": "2026-05-19T05:29:59.725Z",
+      "lastUpdate": "2026-05-19T05:32:04.785Z",
       "note": null,
       "slackTs": null,
       "prNumber": 265,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -486,7 +486,7 @@
     {
       "name": "verify-fix-be-error-envelopes",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-be-error-envelopes",
+      "branch": "`orch/bug-sweep-4e70/fix-be-error-envelopes` (verifier log commit `42c14d3`)",
       "startingRef": "orch/bug-sweep-4e70/fix-be-error-envelopes",
       "dependsOn": [
         "fix-be-error-envelopes"
@@ -494,12 +494,12 @@
       "agentId": "bc-889e7b3d-c072-4fc8-8c70-6e48b72e6e7a",
       "runId": "run-617b8f2a-6083-4dc3-a452-0b3c2da9b6ed",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-be-error-envelopes.md",
       "startedAt": "2026-05-19T05:30:27.369Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:30:29.867Z",
+      "finishedAt": "2026-05-19T05:32:34.978Z",
+      "lastUpdate": "2026-05-19T05:32:34.979Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -619,15 +619,15 @@
         "fix-be-mutation-undo",
         "fix-be-thread-id-strict"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-9dede6cd-953a-4cb4-ad25-0b3543da12b2",
+      "runId": "run-430712ab-9f20-451b-b59f-71807325be00",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:32:02.779Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:32:02.779Z",
+      "lastUpdate": "2026-05-19T05:32:05.293Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -792,6 +792,10 @@
     {
       "at": "2026-05-19T05:32:02.779Z",
       "message": "merge-bug-sweep: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:32:04.785Z",
+      "message": "fix-chat-drawer-focus: verification recorded (unit-test-verified) by verifier verify-fix-chat-drawer-focus"
     }
   ]
 }
