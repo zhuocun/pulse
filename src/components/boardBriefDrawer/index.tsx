@@ -455,7 +455,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
      */
     useEffect(() => {
         if (!isRemote) return;
-        if (open && project) {
+        if (open && projectId) {
             void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         } else if (!open) {
             abortRemoteBrief();
@@ -464,22 +464,40 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     }, [
         open,
         isRemote,
-        project,
+        projectId,
         startRemoteBrief,
         abortRemoteBrief,
         clearRemoteBriefSuggestion
     ]);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open) {
+            lastFingerprintRef.current = "";
+            return;
+        }
         track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
-        if (lastFingerprintRef.current !== fingerprint) {
+        const prevFingerprint = lastFingerprintRef.current;
+        const fingerprintChanged =
+            prevFingerprint !== "" && prevFingerprint !== fingerprint;
+        if (prevFingerprint !== fingerprint) {
             lastFingerprintRef.current = fingerprint;
         }
         if (!isRemote) {
             void runBrief();
+        } else if (fingerprintChanged) {
+            abortRemoteBrief();
+            clearRemoteBriefSuggestion();
+            void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         }
-    }, [open, fingerprint, runBrief, isRemote]);
+    }, [
+        open,
+        fingerprint,
+        runBrief,
+        isRemote,
+        abortRemoteBrief,
+        clearRemoteBriefSuggestion,
+        startRemoteBrief
+    ]);
 
     /**
      * Drawer close (B-R13): preserve the cached brief so reopening

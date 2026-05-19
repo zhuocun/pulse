@@ -243,6 +243,119 @@ describe("BoardBriefDrawer — remote agent path", () => {
         );
     });
 
+    it("restarts the brief agent when the board fingerprint changes while open", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const abort = jest.fn();
+        const clearSuggestion = jest.fn();
+        mockedUseAgent.mockReturnValue(
+            baseAgent({ start, abort, clearSuggestion })
+        );
+
+        const { rerender } = render(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <BoardBriefDrawer
+                        columns={columns}
+                        members={members}
+                        onClose={jest.fn()}
+                        open
+                        project={project}
+                        tasks={tasks}
+                    />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        start.mockClear();
+        abort.mockClear();
+        clearSuggestion.mockClear();
+
+        const tasksWithNewMember: ITask[] = [
+            ...tasks,
+            {
+                _id: "t3",
+                columnId: "c1",
+                coordinatorId: "m1",
+                epic: "x",
+                index: 2,
+                note: "",
+                projectId: "p1",
+                storyPoints: 1,
+                taskName: "New task",
+                type: "Task"
+            }
+        ];
+
+        rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <BoardBriefDrawer
+                        columns={columns}
+                        members={members}
+                        onClose={jest.fn()}
+                        open
+                        project={project}
+                        tasks={tasksWithNewMember}
+                    />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(abort).toHaveBeenCalled();
+            expect(clearSuggestion).toHaveBeenCalled();
+            expect(start).toHaveBeenCalledWith(
+                "Generate the brief for this board."
+            );
+        });
+    });
+
+    it("does not restart the brief agent when only the project object identity changes", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const abort = jest.fn();
+        mockedUseAgent.mockReturnValue(baseAgent({ start, abort }));
+
+        const { rerender } = render(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <BoardBriefDrawer
+                        columns={columns}
+                        members={members}
+                        onClose={jest.fn()}
+                        open
+                        project={project}
+                        tasks={tasks}
+                    />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        start.mockClear();
+        abort.mockClear();
+
+        const projectClone: IProject = { ...project };
+
+        rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter>
+                    <BoardBriefDrawer
+                        columns={columns}
+                        members={members}
+                        onClose={jest.fn()}
+                        open
+                        project={projectClone}
+                        tasks={tasks}
+                    />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(0));
+        expect(abort).not.toHaveBeenCalled();
+    });
+
     it("does not restart the brief agent on rerenders caused by streaming state updates", async () => {
         const start = jest.fn().mockResolvedValue(undefined);
         const abort = jest.fn();
