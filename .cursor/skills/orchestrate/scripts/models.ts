@@ -147,6 +147,23 @@ export const MODEL_CATALOG: ModelProfile[] = [
     use: "Reserved for exceptionally difficult tasks. May overthink simple problems — only reach for this when standard `gpt-5.5-high-fast` has produced unsatisfying results.",
   },
   {
+    slug: "composer-2.5",
+    selection: {
+      id: "composer-2.5",
+      params: [{ id: "fast", value: "false" }],
+    },
+    summary:
+      "Composer 2.5 without fast mode; balanced quality for review and implementation.",
+    strengths: [
+      "code review",
+      "bug finding",
+      "implementation",
+      "test-driven fixes",
+    ],
+    speed: "medium",
+    use: "Use when the operator requires Composer 2.5 with fast mode disabled. Set on every task role (workers, verifiers, subplanners) when specified.",
+  },
+  {
     slug: "composer-2-fast",
     selection: {
       id: "composer-2",
