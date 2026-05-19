@@ -78,6 +78,16 @@ testpaths = ["tests"]
 addopts = "--cov=app --cov-report=term-missing --cov-fail-under=100"
 markers = [
     "integration: optional real-stack checks; enable with RUN_INTEGRATION=1",
+    "eval: outcome eval harness; opt-in via RUN_EVAL=1 (skipped by default)",
+]
+
+[tool.coverage.run]
+# ``app.eval`` is a dev / CI harness, not production code.  Its tests
+# are opt-in (RUN_EVAL=1) so they don't run during the default
+# ``pytest`` invocation, which would otherwise count the module as
+# uncovered and break ``--cov-fail-under=100``.
+omit = [
+    "app/eval/*",
 ]
 
 [tool.ruff]
