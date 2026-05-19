@@ -383,12 +383,12 @@
       "handoffPath": "handoffs/fix-be-resume-budget.md",
       "startedAt": "2026-05-19T05:26:52.377Z",
       "finishedAt": "2026-05-19T05:31:56.996Z",
-      "lastUpdate": "2026-05-19T05:31:56.997Z",
+      "lastUpdate": "2026-05-19T05:32:00.033Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -402,17 +402,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:32:00.317Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:32:00.317Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-be-v1-budget-gate",
@@ -778,6 +779,14 @@
     {
       "at": "2026-05-19T05:30:27.369Z",
       "message": "verify-fix-be-error-envelopes: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:32:00.034Z",
+      "message": "fix-be-resume-budget: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:32:00.316Z",
+      "message": "verify-fix-be-resume-budget: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
