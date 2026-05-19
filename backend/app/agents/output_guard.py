@@ -151,15 +151,15 @@ def classify_pre_mutation(
         diff_actions = _diff_actions(pending_mutation)
         for match in _ACTION_VERB_RE.finditer(text):
             phrase = match.group(0).lower()
+            # The outer regex requires a verb in its match, so the inner
+            # search always succeeds — narrowing finds the specific verb.
             verb = re.search(
                 r"\b(?:delete|remove|archive|reassign|rename|move|update|"
                 r"create|change|edit|drop|clear|reset|merge|split|close|"
                 r"reopen|assign)\b",
                 phrase,
             )
-            if not verb:
-                continue
-            verb_kind = verb.group(0).lower()
+            verb_kind = verb.group(0).lower()  # type: ignore[union-attr]
             # Direct overlap or class overlap (rename->update etc.)
             if verb_kind in diff_actions:
                 continue

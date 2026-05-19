@@ -140,3 +140,66 @@ def test_multiple_flags_aggregate() -> None:
     # Both the bypass and bulk-delete flags should fire on this single string.
     assert "bypass_approval_language" in result["reasons"]
     assert "unauthorised_bulk_delete" in result["reasons"]
+
+
+def test_cross_project_reference_with_slug_id_is_flagged() -> None:
+    """Slug-style project IDs (project-foo) trip the capture-group branch."""
+    proposal = {
+        "proposal_id": "pr-slug",
+        "project_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+        "diff": {
+            "task_updates": [
+                {"task_id": "t1", "field": "taskName", "from": "x", "to": "y"}
+            ]
+        },
+    }
+    result = classify_pre_mutation(
+        "I'll rename the task; then update project-other-foo too.",
+        proposal,
+    )
+    assert result["safe"] is False
+    assert "cross_project_reference" in result["reasons"]
+
+
+def test_non_dict_diff_treats_all_actions_as_outside() -> None:
+    """A proposal whose ``diff`` isn't a dict yields no recognised actions."""
+    proposal = {"proposal_id": "pr-bad-diff", "diff": "not-a-dict"}
+    result = classify_pre_mutation("I'll rename the task as requested.", proposal)
+    assert result["safe"] is False
+    assert "action_outside_approved_diff" in result["reasons"]
+
+
+def test_column_updates_diff_accepts_rename_verb() -> None:
+    """``column_updates`` populates the rename/update action set."""
+    proposal = {
+        "proposal_id": "pr-cols",
+        "diff": {
+            "column_updates": [
+                {"column_id": "c1", "field": "name", "from": "Doing", "to": "In Progress"}
+            ]
+        },
+    }
+    result = classify_pre_mutation(
+        "I'll rename the column as the user requested.",
+        proposal,
+    )
+    assert result["safe"] is True
+    assert result["reasons"] == []
+
+
+def test_change_verb_class_overlaps_update_action() -> None:
+    """``change`` is treated as equivalent to ``update`` for class overlap."""
+    proposal = {
+        "proposal_id": "pr-change",
+        "diff": {
+            "task_updates": [
+                {"task_id": "t1", "field": "description", "from": "x", "to": "y"}
+            ]
+        },
+    }
+    result = classify_pre_mutation(
+        "I'll change the task description as requested.",
+        proposal,
+    )
+    assert result["safe"] is True
+    assert "action_outside_approved_diff" not in result["reasons"]

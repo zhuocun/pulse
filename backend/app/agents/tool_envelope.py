@@ -48,10 +48,7 @@ def _serialise(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, (dict, list, tuple)):
-        try:
-            return json.dumps(content, sort_keys=True, ensure_ascii=False, default=str)
-        except (TypeError, ValueError):
-            return str(content)
+        return json.dumps(content, sort_keys=True, ensure_ascii=False, default=str)
     return str(content)
 
 
@@ -91,14 +88,10 @@ def wrap_tool_result(
             tool_name,
             flags,
         )
-        try:
-            # Deferred import to keep the envelope cheap when observability
-            # is off (the metrics module is itself lazy).
-            from app.observability.metrics import record_agent_mutation_event
+        # Deferred import keeps the envelope cheap when observability is off.
+        from app.observability.metrics import record_agent_mutation_event
 
-            record_agent_mutation_event("tool_envelope_injection_flagged")
-        except Exception:  # noqa: BLE001 -- observability must never fail the agent
-            logger.debug("tool_envelope: observability hook failed", exc_info=True)
+        record_agent_mutation_event("tool_envelope_injection_flagged")
         return (
             f'<untrusted_tool_result tool="{tool_name}" '
             f'flags="{_INJECTION_FLAG}">{serialised}'

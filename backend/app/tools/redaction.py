@@ -185,15 +185,8 @@ def flag_injection_attempts(text: str) -> list[str]:
     not appear twice even if the underlying regex finds multiple hits.
     """
 
-    if not isinstance(text, str) or not text:
-        return []
-
-    seen: set[str] = set()
     out: list[str] = []
     for name, pattern in INJECTION_PATTERNS:
-        if name in seen:
-            continue
         if pattern.search(text):
-            seen.add(name)
             out.append(name)
     return out
