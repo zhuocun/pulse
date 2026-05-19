@@ -232,15 +232,15 @@
       "branch": "orch/bug-sweep-4e70/fix-i18n-select-placeholders",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-9809ed18-523c-46f5-8fdc-34b3d11bb743",
+      "runId": "run-4ba4740a-c7b5-4d81-909f-c6c43bb4e343",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:44.528Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:44.528Z",
+      "lastUpdate": "2026-05-19T05:26:47.119Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -280,17 +280,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:47.121Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:47.121Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-chat-drawer-focus",
@@ -639,6 +640,10 @@
     {
       "at": "2026-05-19T05:26:44.527Z",
       "message": "fix-i18n-select-placeholders: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:47.120Z",
+      "message": "fix-chat-drawer-focus: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
