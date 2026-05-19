@@ -1,0 +1,130 @@
+{
+    "draft-auth-001": {
+        "epic": "Auth",
+        "epic_raw_be": "Auth",
+        "storyPoints": 1,
+        "type": "spike",
+        "type_raw_be": "spike"
+    },
+    "draft-bug-001": {
+        "epic": "Bug Fix",
+        "epic_raw_be": "Bug Fix",
+        "storyPoints": 1,
+        "type": "bug",
+        "type_raw_be": "bug"
+    },
+    "draft-bug-002": {
+        "epic": "Bug Fix",
+        "epic_raw_be": "Bug Fix",
+        "storyPoints": 1,
+        "type": "bug",
+        "type_raw_be": "bug"
+    },
+    "draft-bug-mixed-hints": {
+        "epic": "Bug Fix",
+        "epic_raw_be": "Bug Fix",
+        "storyPoints": 1,
+        "type": "bug",
+        "type_raw_be": "bug"
+    },
+    "draft-docs-001": {
+        "epic": "Documentation",
+        "epic_raw_be": "Documentation",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-empty-prompt": {
+        "epic": "DEFAULT",
+        "epic_raw_be": "General",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-feature-001": {
+        "epic": "DEFAULT",
+        "epic_raw_be": "General",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-no-keyword-match": {
+        "epic": "DEFAULT",
+        "epic_raw_be": "General",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-perf-001": {
+        "epic": "Performance",
+        "epic_raw_be": "Performance",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-refactor-001": {
+        "epic": "Refactor",
+        "epic_raw_be": "Refactor",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-spike-001": {
+        "epic": "DEFAULT",
+        "epic_raw_be": "General",
+        "storyPoints": 1,
+        "type": "spike",
+        "type_raw_be": "spike"
+    },
+    "draft-testing-001": {
+        "epic": "Testing",
+        "epic_raw_be": "Testing",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-ui-001": {
+        "epic": "UI Polish",
+        "epic_raw_be": "UI Polish",
+        "storyPoints": 1,
+        "type": "feature_or_task",
+        "type_raw_be": "feature"
+    },
+    "draft-very-short": {
+        "epic": "Bug Fix",
+        "epic_raw_be": "Bug Fix",
+        "storyPoints": 1,
+        "type": "bug",
+        "type_raw_be": "bug"
+    },
+    "search-projects-001": {
+        "has_results": true,
+        "ids_order": ["p1", "p3"],
+        "ids_set": ["p1", "p3"]
+    },
+    "search-tasks-001": {
+        "has_results": true,
+        "ids_order": ["t1"],
+        "ids_set": ["t1"]
+    },
+    "search-tasks-002": {
+        "has_results": true,
+        "ids_order": ["t10", "t11"],
+        "ids_set": ["t10", "t11"]
+    },
+    "search-tasks-empty": {
+        "has_results": false,
+        "ids_order": [],
+        "ids_set": []
+    },
+    "search-tasks-noresults": {
+        "has_results": false,
+        "ids_order": [],
+        "ids_set": []
+    },
+    "search-tasks-strong-match": {
+        "has_results": true,
+        "ids_order": ["t1"],
+        "ids_set": ["t1"]
+    }
+}
