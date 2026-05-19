@@ -333,12 +333,12 @@
       "handoffPath": "handoffs/fix-project-list-date-sort.md",
       "startedAt": "2026-05-19T05:26:49.590Z",
       "finishedAt": "2026-05-19T05:28:53.162Z",
-      "lastUpdate": "2026-05-19T05:28:53.162Z",
+      "lastUpdate": "2026-05-19T05:28:54.121Z",
       "note": null,
       "slackTs": null,
       "prNumber": 260,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -352,17 +352,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:28:59.518Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:28:59.518Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-be-resume-budget",
@@ -715,6 +716,14 @@
     {
       "at": "2026-05-19T05:28:47.102Z",
       "message": "verify-fix-be-thread-id-strict: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:28:54.121Z",
+      "message": "fix-project-list-date-sort: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:28:59.517Z",
+      "message": "verify-fix-project-list-date-sort: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
