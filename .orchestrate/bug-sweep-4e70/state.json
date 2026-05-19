@@ -264,17 +264,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:29:37.798Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:29:37.798Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-chat-drawer-focus",
@@ -746,6 +747,10 @@
     {
       "at": "2026-05-19T05:29:29.745Z",
       "message": "fix-be-v1-budget-gate: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:29:37.797Z",
+      "message": "verify-fix-i18n-select-placeholders: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
