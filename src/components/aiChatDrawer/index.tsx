@@ -235,6 +235,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     const messagesContainerRef = useRef<HTMLDivElement | null>(null);
     /** P2-B: ref for the last assistant message for focus management. */
     const lastAssistantRef = useRef<HTMLDivElement | null>(null);
+    /** When true, the next loading→idle transition focuses the assistant bubble. */
+    const shouldFocusAssistantOnCompleteRef = useRef(false);
+    const prevIsLoadingRef = useRef(false);
     /** P1-C: whether the budget warn alert has been dismissed by user. */
     const [budgetWarnDismissed, setBudgetWarnDismissed] = useState(false);
 
@@ -597,6 +600,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         // Mark the next assistant message as regenerated so the user can
         // tell which bubble is the fresh answer (P1-2).
         pendingRegenAfter.current = messages.length;
+        shouldFocusAssistantOnCompleteRef.current = true;
         dispatch(previous.content);
     };
 
@@ -857,12 +861,29 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading]);
 
     /**
-     * P2-B: After streaming completes, focus the last assistant message so
-     * screen-reader and keyboard users are placed in context.
+     * P2-B: After streaming completes, keep focus on the composer when the
+     * user is composing a follow-up. Only move focus to the last assistant
+     * bubble after an explicit Regenerate; completion announcements still
+     * notify screen-reader users without stealing the text field.
      */
     useEffect(() => {
-        if (!isLoading && lastAssistantRef.current) {
+        const wasLoading = prevIsLoadingRef.current;
+        prevIsLoadingRef.current = isLoading;
+
+        if (!wasLoading || isLoading) return;
+
+        if (
+            shouldFocusAssistantOnCompleteRef.current &&
+            lastAssistantRef.current
+        ) {
             lastAssistantRef.current.focus();
+            shouldFocusAssistantOnCompleteRef.current = false;
+            return;
+        }
+
+        const composer = inputRef.current?.resizableTextArea?.textArea ?? null;
+        if (composer !== null && document.activeElement === composer) {
+            inputRef.current?.focus({ cursor: "end" });
         }
     }, [isLoading]);
 

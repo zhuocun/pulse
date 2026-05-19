@@ -286,6 +286,65 @@ describe("AiChatDrawer UI branches (mocked chat hook)", () => {
         expect(badges.length).toBe(1);
     });
 
+    it("does not move focus to the last assistant bubble when loading completes while the composer has focus", () => {
+        const messages: AiChatMessage[] = [
+            { role: "user", content: "Hi" },
+            { role: "assistant", content: "Hello back" }
+        ];
+        mockedUseAiChat.mockReturnValue({
+            ...baseChat(),
+            isLoading: true,
+            messages,
+            streamingText: "Hello back"
+        });
+        const { rerender } = renderDrawer();
+
+        const focusedElements: HTMLElement[] = [];
+        const focusSpy = jest
+            .spyOn(HTMLElement.prototype, "focus")
+            .mockImplementation(function focusMock(this: HTMLElement) {
+                focusedElements.push(this);
+            });
+
+        mockedUseAiChat.mockReturnValue({
+            ...baseChat(),
+            isLoading: false,
+            messages
+        });
+        act(() => {
+            rerender(
+                <QueryClientProvider
+                    client={
+                        new QueryClient({
+                            defaultOptions: { queries: { retry: false } }
+                        })
+                    }
+                >
+                    <MemoryRouter>
+                        <AntdApp component={false}>
+                            <AiChatDrawer
+                                columns={columns}
+                                knownProjectIds={["p1"]}
+                                members={members}
+                                onClose={jest.fn()}
+                                open
+                                project={project}
+                                tasks={tasks}
+                            />
+                        </AntdApp>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            );
+            fireEvent.focus(screen.getByLabelText("Message Board Copilot"));
+        });
+
+        const assistantGroup = screen.getByLabelText(
+            String(microcopy.ai.copilotLabel)
+        );
+        expect(focusedElements).not.toContain(assistantGroup);
+        focusSpy.mockRestore();
+    });
+
     it("shows a feedback toast on thumbs up and de-dupes repeated clicks", () => {
         mockedUseAiChat.mockReturnValue({
             ...baseChat(),
