@@ -412,15 +412,15 @@
       "branch": "orch/bug-sweep-4e70/fix-be-v1-budget-gate",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-ac6d9550-2db5-477a-95d1-6bec3feb972e",
+      "runId": "run-c3fe9814-97e5-47bf-9e39-466a57b8d5ba",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:54.797Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:54.797Z",
+      "lastUpdate": "2026-05-19T05:26:58.908Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -460,17 +460,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:58.910Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:58.910Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-be-error-envelopes",
@@ -659,6 +660,10 @@
     {
       "at": "2026-05-19T05:26:54.796Z",
       "message": "fix-be-v1-budget-gate: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:58.910Z",
+      "message": "fix-be-error-envelopes: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
