@@ -1,0 +1,441 @@
+{
+  "$schema": "../../.cursor/skills/orchestrate/schemas/plan.schema.json",
+  "goal": "bug-sweep-4e70: Sweep review of the project, identify as many bugs as possible, and fix them all. Every spawned role uses model composer-2.5 (fast mode forbidden). Read `.orchestrate/bug-sweep-4e70/discovery/BUG-SWEEP-AUDIT.md` before editing product code. Respect AGENTS.md (TaskModal loading, DnD interactive blocking, useAgent stable deps). Do not revert sibling agents' work — stay inside pathsAllowed.",
+  "summary": "Bug sweep: 13 parallel fix workers (FE DnD, remote Copilot paths, draft/i18n/a11y, BE budget/resume/errors) with composer-2.5 verifiers, then merge into one integration branch.",
+  "rootSlug": "bug-sweep-4e70",
+  "baseBranch": "main",
+  "prBase": "main",
+  "repoUrl": "https://github.com/zhuocun/pulse",
+  "syncStateToGit": true,
+  "selfAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
+  "acceptanceCriteria": [
+    "Each implementation worker fixes its audit row(s) end-to-end with regression tests where feasible.",
+    "Each verifier records unit-test-verified (or verifier-blocked with concrete env failure) for its target.",
+    "Merge worker produces `orch/bug-sweep-4e70/merge-bug-sweep` with green tsc, eslint, full Jest, backend pytest, and vite build."
+  ],
+  "tasks": [
+    {
+      "name": "fix-drag-reorder-empty-ref",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B1: task reorder to empty column / no reference task. Align FE and BE so dropping without a reference task succeeds (audit IDs B1).",
+      "brief": "Read `discovery/BUG-SWEEP-AUDIT.md` row B1.\n\n**Root cause:** `useDragEnd` sends `referenceId: referenceTask?._id ?? \"\"` but `task_service.reorder` treats empty string as a present-but-invalid reference.\n\n**Fix (preferred):** Normalize on both sides for safety:\n1. `src/utils/hooks/useDragEnd.ts` — send `null` or omit `referenceId` when there is no reference task (update `useDragEnd.test.tsx` expectations).\n2. `backend/app/services/task_service.py` — coerce `reference_id = (reference_id or None)` or treat `\"\"` as None before the validation guard.\n3. Add/adjust tests: FE `useDragEnd.test.tsx`; BE `test_api_features.py` with `referenceId: \"\"` case.\n\nKeep optimistic reorder behavior in `src/utils/optimisticUpdate/reorder.ts` consistent.",
+      "pathsAllowed": [
+        "src/utils/hooks/useDragEnd.ts",
+        "src/utils/hooks/useDragEnd.test.tsx",
+        "src/utils/optimisticUpdate/reorder.ts",
+        "src/utils/optimisticUpdate/reorder.test.ts",
+        "backend/app/services/task_service.py",
+        "backend/tests/test_api_features.py"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "PUT reorder with no reference task (empty column drop) succeeds on the backend.",
+        "FE sends null/omitted referenceId, not `\"\"`, when there is no reference task.",
+        "Regression tests cover the empty-reference path on FE and BE."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useDragEnd src/utils/optimisticUpdate/reorder`\n- `cd backend && pytest tests/test_api_features.py -q -k reorder`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-drag-reorder-empty-ref",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-drag-reorder-empty-ref",
+      "dependsOn": ["fix-drag-reorder-empty-ref"],
+      "scopedGoal": "Independently verify B1 drag reorder empty-reference fix.",
+      "brief": "Re-run target verify recipe on worker branch. Confirm `referenceId` contract and tests. Emit unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B1 fix and records strong verification class."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-board-brief-remote",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B2+B4 in BoardBriefDrawer remote path: refresh brief on board fingerprint changes and stabilize remote-start effect deps.",
+      "brief": "Read audit rows B2 and B4 in `discovery/BUG-SWEEP-AUDIT.md`.\n\n1. When `open && isRemote` and `fingerprint` changes, restart remote brief (abort prior, call `startRemoteBrief`) — mirror local `runBrief()` behavior.\n2. Change remote-start effect deps from `project` to `project?._id` (and `open`, `isRemote`) to avoid React Query identity churn restarting the agent.\n3. Add tests in `boardBriefDrawer` test files covering fingerprint-driven refresh in remote mode (mock `useAgent`).\n\nDo not change local-engine TTL cache semantics except as needed for parity.",
+      "pathsAllowed": [
+        "src/components/boardBriefDrawer/**",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/utils/hooks/useAgent.ts"],
+      "acceptance": [
+        "Remote board brief re-runs when fingerprint changes while drawer is open.",
+        "Remote start effect does not depend on whole `project` object identity.",
+        "Tests pass for touched boardBriefDrawer files."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/boardBriefDrawer`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-board-brief-remote",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-board-brief-remote",
+      "dependsOn": ["fix-board-brief-remote"],
+      "scopedGoal": "Verify B2+B4 board brief remote fixes.",
+      "brief": "Re-run verify recipe; confirm fingerprint refresh and stable deps. unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B2 and B4."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-ai-search-remote-query",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B3: remote AI search must apply results against the submitted query, not live draft state.",
+      "brief": "Audit row B3. In `src/components/aiSearchInput/index.tsx`, store `lastSubmittedQuery` in a ref when starting remote search; pass that into `applyResult` instead of React `draft` state. Add/update tests proving reformulations use submitted query when draft changes mid-flight.",
+      "pathsAllowed": ["src/components/aiSearchInput/**", "src/__tests__/**"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/utils/hooks/useAgent.ts"],
+      "acceptance": [
+        "Remote search apply path uses submitted query ref, not stale draft.",
+        "Tests cover draft mutation before async result returns."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiSearchInput`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-ai-search-remote-query",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-ai-search-remote-query",
+      "dependsOn": ["fix-ai-search-remote-query"],
+      "scopedGoal": "Verify B3 ai search remote query binding.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B3."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-task-assist-estimate-deps",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B5: stop AiTaskAssistPanel remote estimate effect from restarting on unrelated board task-cache updates.",
+      "brief": "Audit row B5. Remove bare `tasks` from the estimate `useEffect` dependency array in `aiTaskAssistPanel/index.tsx`. Pass only fields needed for estimation (draft debounced fields, excludeTaskId, projectId) or a stable fingerprint of estimate input — not the full tasks array reference from `useCachedQueryData`. Preserve AGENTS.md guidance: depend on stable `remoteAgent.start` destructuring, not whole `useAgent()` object. Add test that simulates unrelated tasks cache update without re-triggering estimate when draft unchanged.",
+      "pathsAllowed": ["src/components/aiTaskAssistPanel/**", "src/__tests__/**"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/utils/hooks/useAgent.ts"],
+      "acceptance": [
+        "Unrelated tasks list updates do not restart remote estimate when draft fields unchanged.",
+        "Estimate still runs when debounced draft fields change."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiTaskAssistPanel`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-task-assist-estimate-deps",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-task-assist-estimate-deps",
+      "dependsOn": ["fix-task-assist-estimate-deps"],
+      "scopedGoal": "Verify B5 task assist estimate effect deps.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B5."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-ai-draft-modal-guards",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B6+B7: AiTaskDraftModal whitespace-only names and remote draft validateDraft sanitization.",
+      "brief": "Audit rows B6–B7.\n1. Add `whitespace: true` to `taskName` rules (match `taskModal`).\n2. Before `form.setFieldsValue` on remote `lastSuggestion`, run `validateDraft()` like local `useAi` path (`columns`, `members`, `tasks`, fallback column).\n3. Tests for whitespace rejection and invalid remote IDs clamped/rejected.",
+      "pathsAllowed": [
+        "src/components/aiTaskDraftModal/**",
+        "src/utils/hooks/useAi.ts",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "Whitespace-only task names fail validation.",
+        "Remote suggestions pass through validateDraft before populating the form."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiTaskDraftModal`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-ai-draft-modal-guards",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-ai-draft-modal-guards",
+      "dependsOn": ["fix-ai-draft-modal-guards"],
+      "scopedGoal": "Verify B6+B7 draft modal guards.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B6 and B7."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-i18n-select-placeholders",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B8: replace English-only Select placeholders with localized microcopy (en + zh-CN).",
+      "brief": "Audit row B8. Replace `` `Select a ${microcopy.fields.*.toLowerCase()}` `` in `taskModal` and `projectModal` with keys under `microcopy.placeholders.*`. Update `en.ts`, `zh-CN.ts`, `microcopy.ts`. Add test or extend existing modal tests asserting zh-CN locale renders non-English placeholder text.",
+      "pathsAllowed": [
+        "src/components/taskModal/**",
+        "src/components/projectModal/**",
+        "src/i18n/locales/**",
+        "src/constants/microcopy.ts",
+        "src/__tests__/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "No hardcoded English Select-a templates in taskModal/projectModal.",
+        "en + zh-CN parity for new placeholder keys."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/taskModal src/components/projectModal`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-i18n-select-placeholders",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-i18n-select-placeholders",
+      "dependsOn": ["fix-i18n-select-placeholders"],
+      "scopedGoal": "Verify B8 i18n select placeholders.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B8."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-chat-drawer-focus",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B9: AiChatDrawer should not steal keyboard focus to last assistant message after every response.",
+      "brief": "Audit row B9. Adjust the `isLoading` false effect so focus returns to input when the user was composing, or only focus assistant on explicit action / first open. Preserve open-drawer input focus behavior. Add test for focus remaining on input after assistant completes when input had focus.",
+      "pathsAllowed": ["src/components/aiChatDrawer/**", "src/__tests__/**"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "Keyboard users typing a follow-up are not kicked to last assistant bubble after each reply.",
+        "jest-axe / existing aiAccessibility tests stay green."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/aiChatDrawer src/__tests__/aiAccessibility`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-chat-drawer-focus",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-chat-drawer-focus",
+      "dependsOn": ["fix-chat-drawer-focus"],
+      "scopedGoal": "Verify B9 chat drawer focus behavior.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B9."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-project-list-date-sort",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B10: project list date sort handles empty/invalid createdAt strings.",
+      "brief": "Audit row B10. Normalize `createdAt` before `new Date()` in sort comparator (`projectList/index.tsx`). Extend `projectList/index.test.tsx` for `createdAt: \"\"` stable ordering.",
+      "pathsAllowed": ["src/components/projectList/**"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "Newest/Oldest sort is stable when createdAt is empty or invalid.",
+        "Tests cover empty-string createdAt."
+      ],
+      "verify": "## Automated\n- `CI=true npm test -- --watchAll=false --runInBand src/components/projectList`\n- `npx tsc --noEmit`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-project-list-date-sort",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-project-list-date-sort",
+      "dependsOn": ["fix-project-list-date-sort"],
+      "scopedGoal": "Verify B10 project list date sort.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B10."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-be-resume-budget",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B11: agent resume turns must enforce project access, manager role, and token budget like initial turns.",
+      "brief": "Audit row B11. In `backend/app/routers/agents.py`, on resume resolve `project_id` from checkpoint/configurable metadata and run `_require_project_manager` + `_enforce_budget` (reserve tokens) before continuing. Add pytest covering resume without client-supplied project_id still gates budget.",
+      "pathsAllowed": [
+        "backend/app/routers/agents.py",
+        "backend/tests/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": [
+        "Resume path cannot bypass budget when project_id was only present on initial turn.",
+        "New/updated pytest documents the regression."
+      ],
+      "verify": "## Automated\n- `cd backend && pytest tests/ -q -k resume` (or targeted new test file)\n- Full `pytest -q` if fast enough",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-be-resume-budget",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-be-resume-budget",
+      "dependsOn": ["fix-be-resume-budget"],
+      "scopedGoal": "Verify B11 BE resume budget gates.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B11."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-be-v1-budget-gate",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B12: legacy v1 structured AI routes must use atomic budget reserve + reconcile (not read-only can_spend).",
+      "brief": "Audit row B12. Switch `run_v1_route` / `_gate` in `backend/app/routers/ai.py` to reservation semantics matching agents invoke (`_gate_with_reservation` or `_enforce_budget`). Fix reconcile delta assuming phantom 1-token debit. Update tests for concurrent cap enforcement if feasible.",
+      "pathsAllowed": [
+        "backend/app/routers/ai.py",
+        "backend/app/routers/_dispatch.py",
+        "backend/tests/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": [
+        "Structured v1 routes reserve tokens at gate time.",
+        "Reconcile true-ups reservation vs actual usage correctly."
+      ],
+      "verify": "## Automated\n- `cd backend && pytest tests/ -q -k budget`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-be-v1-budget-gate",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-be-v1-budget-gate",
+      "dependsOn": ["fix-be-v1-budget-gate"],
+      "scopedGoal": "Verify B12 v1 budget gate atomicity.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B12."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-be-error-envelopes",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B13: standardize AgentError and agent HTTP errors to nested `{ error: { code, message } }` for FE mapErrorResponse.",
+      "brief": "Audit row B13. Update `backend/app/agents/errors.py` and `app_error_handler` in `main.py` to emit stable `error.code`. Normalize agents router HTTPException paths that return string-only or flat `code` at top level (autonomy forbidden, rate limit, project AI disabled) to nested shape. Keep SSE error frames consistent. Add/adjust tests asserting JSON shape.",
+      "pathsAllowed": [
+        "backend/app/agents/errors.py",
+        "backend/app/main.py",
+        "backend/app/routers/agents.py",
+        "backend/tests/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": [
+        "Agent invoke errors include `error.code` in JSON body.",
+        "Major agent HTTP error paths use consistent nested envelope."
+      ],
+      "verify": "## Automated\n- `cd backend && pytest tests/ -q -k 'error or agent'`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-be-error-envelopes",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-be-error-envelopes",
+      "dependsOn": ["fix-be-error-envelopes"],
+      "scopedGoal": "Verify B13 BE error envelopes.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B13."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-be-mutation-undo",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B14: undo_mutation must not mark journal entry undone when per-task undo rows fail.",
+      "brief": "Audit row B14. In `agent_mutation_journal.py`, track per-row success; set `undoneAt` only when all undo operations succeed; return partial-failure status otherwise. Add pytest for partial failure leaving journal reversible.",
+      "pathsAllowed": [
+        "backend/app/services/agent_mutation_journal.py",
+        "backend/tests/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": [
+        "Partial undo does not set undoneAt.",
+        "Tests cover partial failure semantics."
+      ],
+      "verify": "## Automated\n- `cd backend && pytest tests/ -q -k mutation`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-be-mutation-undo",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-be-mutation-undo",
+      "dependsOn": ["fix-be-mutation-undo"],
+      "scopedGoal": "Verify B14 mutation undo partial failure.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B14."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "fix-be-thread-id-strict",
+      "type": "worker",
+      "model": "composer-2.5",
+      "scopedGoal": "Fix B15: reject tampered signed thread_id tokens instead of treating them as raw unsigned ids.",
+      "brief": "Audit row B15. In `backend/app/agents/runtime.py`, if token has `sigv1.`/`sigv2.` prefix and verification fails, raise `InvalidThreadKeyError` — do not fall through to unsigned handling. Add pytest for tampered sig token.",
+      "pathsAllowed": [
+        "backend/app/agents/runtime.py",
+        "backend/tests/**"
+      ],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**", "src/**"],
+      "acceptance": [
+        "Tampered signed thread keys are rejected.",
+        "Valid unsigned ids still work."
+      ],
+      "verify": "## Automated\n- `cd backend && pytest tests/ -q -k thread`",
+      "openPR": true,
+      "maxAttempts": 2
+    },
+    {
+      "name": "verify-fix-be-thread-id-strict",
+      "type": "verifier",
+      "model": "composer-2.5",
+      "verifies": "fix-be-thread-id-strict",
+      "dependsOn": ["fix-be-thread-id-strict"],
+      "scopedGoal": "Verify B15 signed thread_id strict mode.",
+      "brief": "Re-run verify recipe; unit-test-verified or verifier-blocked.",
+      "acceptance": ["Verifier confirms B15."],
+      "maxAttempts": 2
+    },
+    {
+      "name": "merge-bug-sweep",
+      "type": "worker",
+      "model": "composer-2.5",
+      "startingRef": "main",
+      "dependsOn": [
+        "fix-drag-reorder-empty-ref",
+        "fix-board-brief-remote",
+        "fix-ai-search-remote-query",
+        "fix-task-assist-estimate-deps",
+        "fix-ai-draft-modal-guards",
+        "fix-i18n-select-placeholders",
+        "fix-chat-drawer-focus",
+        "fix-project-list-date-sort",
+        "fix-be-resume-budget",
+        "fix-be-v1-budget-gate",
+        "fix-be-error-envelopes",
+        "fix-be-mutation-undo",
+        "fix-be-thread-id-strict"
+      ],
+      "scopedGoal": "Merge all 13 bug-sweep fix branches into `orch/bug-sweep-4e70/merge-bug-sweep` with full verification. No PR — operator merges to main.",
+      "brief": "Merge order (git merge --no-ff each):\n1. fix-drag-reorder-empty-ref\n2. fix-board-brief-remote\n3. fix-ai-search-remote-query\n4. fix-task-assist-estimate-deps\n5. fix-ai-draft-modal-guards\n6. fix-i18n-select-placeholders\n7. fix-chat-drawer-focus\n8. fix-project-list-date-sort\n9. fix-be-resume-budget\n10. fix-be-v1-budget-gate\n11. fix-be-error-envelopes\n12. fix-be-mutation-undo\n13. fix-be-thread-id-strict\n\nConflict policy: union i18n keys; later worker wins on true code conflicts only after tsc fails. Run: `npm ci`, `npx tsc --noEmit`, `npm run eslint -- --max-warnings 0`, `CI=true npm test -- --watchAll=false --runInBand`, `cd backend && pytest -q`, `npx vite build`. openPR: false. Push `orch/bug-sweep-4e70/merge-bug-sweep`.",
+      "pathsAllowed": ["src/**", "backend/**", "package.json", "package-lock.json"],
+      "pathsForbidden": [".orchestrate/**", "docs/todo/**"],
+      "acceptance": [
+        "13 merge commits on integration branch.",
+        "Full FE + BE verification green."
+      ],
+      "verify": "## Automated\n- `npx tsc --noEmit`\n- `npm run eslint -- --max-warnings 0`\n- `CI=true npm test -- --watchAll=false --runInBand`\n- `cd backend && pytest -q`\n- `npx vite build`",
+      "openPR": false,
+      "maxAttempts": 2
+    }
+  ]
+}
