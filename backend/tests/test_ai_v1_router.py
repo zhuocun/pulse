@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import replace
 from http import HTTPStatus
 from typing import Any, Iterable
@@ -766,8 +767,8 @@ def test_task_draft_records_real_usage_against_budget(
         _restore_stub(client, "task-drafting-agent")
     assert response.status_code == HTTPStatus.OK
     after = ai_budget_backend.remaining("p-1")
-    # 1 token was debited at gate-time (in==9, out==6 -> total 15 -> top-up 14).
-    assert starting - after == 14
+    # reserve(1) at gate + record(delta=14) for in==9, out==6 -> total 15.
+    assert starting - after == 15
 
 
 def test_task_breakdown_polishes_first_then_replicates(
@@ -992,8 +993,8 @@ def test_readiness_records_real_usage_against_budget(
         _restore_stub(client, "task-estimation-agent")
     assert response.status_code == HTTPStatus.OK
     after = ai_budget_backend.remaining("p-1")
-    # 1 token debited at gate-time; in==10, out==6 -> total 16 -> top-up 15.
-    assert starting - after == 15
+    # reserve(1) at gate + record(delta=15) for in==10, out==6 -> total 16.
+    assert starting - after == 16
 
 
 def test_readiness_skips_polish_when_all_fields_populated(
@@ -1312,8 +1313,8 @@ def test_polish_and_record_skips_top_up_when_actual_is_zero(
         _restore_stub(client, "task-drafting-agent")
     assert response.status_code == HTTPStatus.OK
     after = ai_budget_backend.remaining("p-1")
-    # Only the gate-time 1-token debit was recorded; no provider top-up.
-    assert starting - after == 0
+    # reserve(1) at gate; provider reported (0, 0) so no top-up.
+    assert starting - after == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1480,9 +1481,9 @@ def test_search_records_real_usage_against_budget(
     finally:
         _restore_stub(client, "search-agent")
     after = ai_budget_backend.remaining("p-1")
-    # Total 9 tokens; 1 was prebooked at the gate; delta = 8.
+    # reserve(1) at gate + record(delta=8) for total usage 9.
     assert response.status_code == HTTPStatus.OK
-    assert starting - after == 8
+    assert starting - after == 9
 
 
 def test_candidates_from_context_projects_tasks_to_id_text() -> None:
@@ -2327,6 +2328,85 @@ def test_chat_refunds_reservation_on_ainvoke_failure(
     assert after == before
 
 
+def test_task_draft_refunds_reservation_on_agent_failure(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
+) -> None:
+    """Structured v1 routes refund the gate reservation when the agent run fails."""
+    project_id = "p-1"
+    before = ai_budget_backend.remaining(project_id)
+
+    async def explode(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("forced failure")
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "arun_with_events", explode, raising=False)
+
+    lax = TestClient(client.app, raise_server_exceptions=False)
+    lax.post(
+        "/api/ai/task-draft",
+        headers=auth_headers,
+        json={"context": _project_context(), "prompt": "Fix login bug"},
+    )
+    after = ai_budget_backend.remaining(project_id)
+    assert after == before
+
+
+def test_v1_structured_route_concurrent_requests_respect_budget_cap(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
+) -> None:
+    """Reserve-at-gate prevents TOCTOU overshoot when many requests hit at once."""
+    project_id = "p-1"
+    monkeypatch.setattr(ai_budget_backend, "monthly_cap", 2)
+    barrier = threading.Barrier(3)
+    statuses: list[int] = []
+    lock = threading.Lock()
+
+    async def slow_ok(*args: Any, **kwargs: Any) -> Any:
+        return (
+            {},
+            [
+                {
+                    "kind": "suggestion",
+                    "surface": "draft",
+                    "payload": {
+                        "taskName": "stub",
+                        "note": "stub",
+                        "rationale": "stub",
+                    },
+                }
+            ],
+        )
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "arun_with_events", slow_ok, raising=False)
+
+    def fire() -> None:
+        barrier.wait()
+        response = client.post(
+            "/api/ai/task-draft",
+            headers=auth_headers,
+            json={"context": _project_context(), "prompt": "x"},
+        )
+        with lock:
+            statuses.append(response.status_code)
+
+    threads = [threading.Thread(target=fire) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert statuses.count(HTTPStatus.OK) == 2
+    assert statuses.count(HTTPStatus.PAYMENT_REQUIRED) == 1
+    assert ai_budget_backend.remaining(project_id) == 0
+
+
 def test_chat_records_budget_top_up_when_actual_tokens_exceed_reservation(
     client: TestClient,
     auth_headers: dict[str, str],
@@ -2514,10 +2594,8 @@ def test_board_brief_records_budget_top_up_when_actual_tokens_exceed_reservation
     )
     assert response.status_code == HTTPStatus.OK
     after = ai_budget_backend.remaining(project_id)
-    # ``_gate`` does NOT reserve (it is a read-only ``can_spend`` check),
-    # so the post-run record is ``max(0, actual - 1)`` = 14 — same
-    # under-by-one debit the pre-migration ``_polish_and_record`` had.
-    assert before - after == 14
+    # reserve(1) at gate + record(delta=14) for actual usage 15.
+    assert before - after == 15
 
 
 # ---------------------------------------------------------------------------

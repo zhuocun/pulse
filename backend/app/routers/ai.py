@@ -269,11 +269,10 @@ def _gate_with_reservation(
 ) -> int:
     """Like ``_gate`` but atomically reserves 1 token instead of read-only ``can_spend``.
 
-    Used only by the chat handler, which calls the live LLM and reconciles
-    actual usage afterwards; the other v1 routes use deterministic stubs so
-    the TOCTOU window in ``_gate`` is not exploitable there.
+    Used by chat and the structured v1 routes (via :func:`run_v1_route`) so
+    concurrent requests cannot overshoot the cap between check and record.
 
-    Returns the     reservation amount (1 when project_id is set, 0 otherwise)
+    Returns the reservation amount (1 when project_id is set, 0 otherwise)
     so the caller can pass it to ``budget_tracker.refund`` on failure
     or top-up via ``record`` on success.
     """
@@ -357,6 +356,8 @@ def _reconcile_token_budget(
     budget_tracker: BudgetBackend,
     final_state: Any,
     custom_events: List[Any],
+    *,
+    prebooked: int = 0,
 ) -> None:
     """True-up the project token budget after an agent run.
 
@@ -366,17 +367,18 @@ def _reconcile_token_budget(
     emitted by catalog agents that short-circuit onto pre-populated state
     (task-draft, estimate, readiness, search).
 
-    The gate already debited 1 token at entry, so we top-up by
-    ``max(0, total - 1)``.
+    ``prebooked`` is the amount reserved at gate time; tops up by
+    ``max(0, max(1, actual) - prebooked)`` so a provider that reports zero
+    usage still keeps the reservation charge.
     """
 
-    if not project_id:
+    if not project_id or prebooked <= 0:
         return
     tokens_in, tokens_out = result_token_usage_from_graph_result(final_state)
     if tokens_in == 0 and tokens_out == 0:
         tokens_in, tokens_out = _token_usage_from_events(custom_events)
     actual = max(0, int(tokens_in)) + max(0, int(tokens_out))
-    delta = max(0, actual - 1)
+    delta = max(0, max(1, actual) - prebooked)
     if delta > 0:
         budget_tracker.record(project_id, tokens=delta)
 
@@ -925,9 +927,6 @@ async def chat(
     try:
         chat_metadata = runtime.get(meta.catalog_agent_name).metadata
         project_id = _project_id_from_payload(payload)
-        # Use reserve-based gate (not read-only can_spend) to prevent TOCTOU
-        # budget overrun under concurrent requests; other v1 routes use stubs
-        # so _gate's can_spend is acceptable there.
         reserved_budget = _gate_with_reservation(
             request,
             user_id,
