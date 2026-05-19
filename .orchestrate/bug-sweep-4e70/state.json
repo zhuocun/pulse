@@ -107,12 +107,12 @@
       "handoffPath": "handoffs/fix-ai-search-remote-query.md",
       "startedAt": "2026-05-19T05:26:37.038Z",
       "finishedAt": "2026-05-19T05:28:31.258Z",
-      "lastUpdate": "2026-05-19T05:28:31.258Z",
+      "lastUpdate": "2026-05-19T05:28:33.261Z",
       "note": null,
       "slackTs": null,
       "prNumber": 257,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -123,15 +123,15 @@
       "dependsOn": [
         "fix-ai-search-remote-query"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-ccb939f2-e23c-40e0-bbeb-3340a916707e",
+      "runId": "run-93beb483-0bc7-4617-831e-8f697c322296",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:28:32.261Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:28:32.261Z",
+      "lastUpdate": "2026-05-19T05:28:34.662Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -508,12 +508,12 @@
       "agentId": "bc-c9e532f7-b58d-48f9-93ec-057f83057ef8",
       "runId": "run-151e2edb-32bc-4366-bed4-8280d892693f",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-be-mutation-undo.md",
       "startedAt": "2026-05-19T05:27:01.632Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:27:04.017Z",
+      "finishedAt": "2026-05-19T05:28:43.473Z",
+      "lastUpdate": "2026-05-19T05:28:43.474Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -697,6 +697,10 @@
     {
       "at": "2026-05-19T05:28:32.260Z",
       "message": "verify-fix-ai-search-remote-query: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:28:33.261Z",
+      "message": "fix-ai-search-remote-query: verification self-reported (unit-test-verified)"
     }
   ]
 }
