@@ -5,7 +5,8 @@ import {
     readAuthToken,
     subscribeAuthToken,
     writeAiProxyToken,
-    writeAuthToken
+    writeAuthToken,
+    writeAuthTokenWithStatus
 } from "./tokenStorage";
 
 const clearAllCookies = (): void => {
@@ -109,6 +110,75 @@ describe("tokenStorage", () => {
         // off the cookie value once the spy is restored.
         setItemSpy.mockRestore();
         expect(readAuthToken()).toBe("jwt-1");
+    });
+
+    it("does not report persistence when the cookie write is silently ignored", () => {
+        const setItemSpy = jest
+            .spyOn(Storage.prototype, "setItem")
+            .mockImplementation(() => {
+                throw new Error("blocked");
+            });
+        const cookieDescriptor = Object.getOwnPropertyDescriptor(
+            Document.prototype,
+            "cookie"
+        );
+        Object.defineProperty(document, "cookie", {
+            configurable: true,
+            get() {
+                return "";
+            },
+            set() {
+                // Safari/WebKit can accept the assignment syntax but leave no
+                // readable cookie when storage policy rejects it.
+            }
+        });
+
+        try {
+            expect(writeAuthToken("jwt-1")).toBe(false);
+            expect(readAuthToken()).toBeNull();
+            expect(setItemSpy).toHaveBeenCalledWith("Token", "jwt-1");
+        } finally {
+            if (cookieDescriptor) {
+                Object.defineProperty(document, "cookie", cookieDescriptor);
+            } else {
+                delete (document as unknown as { cookie?: string }).cookie;
+            }
+            setItemSpy.mockRestore();
+        }
+    });
+
+    it("reports when the cookie mirror is unavailable despite a localStorage write", () => {
+        const cookieDescriptor = Object.getOwnPropertyDescriptor(
+            Document.prototype,
+            "cookie"
+        );
+        Object.defineProperty(document, "cookie", {
+            configurable: true,
+            get() {
+                return "";
+            },
+            set() {
+                // Simulates a browser policy that silently drops cookie writes.
+            }
+        });
+
+        try {
+            expect(writeAuthTokenWithStatus("jwt-1")).toEqual({
+                persisted: true,
+                storage: true,
+                cookie: false
+            });
+            expect(readAuthToken()).toBe("jwt-1");
+
+            localStorage.clear();
+            expect(readAuthToken()).toBeNull();
+        } finally {
+            if (cookieDescriptor) {
+                Object.defineProperty(document, "cookie", cookieDescriptor);
+            } else {
+                delete (document as unknown as { cookie?: string }).cookie;
+            }
+        }
     });
 
     it("fails closed when both storage and cookie access are blocked", () => {

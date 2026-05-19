@@ -10,7 +10,10 @@ import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import nativeNavigate from "../../utils/nativeNavigate";
 import { isMacLike } from "../../utils/platform";
-import { writeAiProxyToken, writeAuthToken } from "../../utils/tokenStorage";
+import {
+    writeAiProxyToken,
+    writeAuthTokenWithStatus
+} from "../../utils/tokenStorage";
 
 import AuthErrorSummary from "../authErrorSummary";
 import { AuthTermsAgreement } from "../registerForm/termsAgreement";
@@ -69,7 +72,8 @@ const LoginForm: React.FC<{
             }
             // Safari / private mode can refuse `localStorage`; do not navigate
             // without a persisted REST bearer or the app will look "logged out".
-            if (!writeAuthToken(res.jwt)) {
+            const authTokenWrite = writeAuthTokenWithStatus(res.jwt);
+            if (!authTokenWrite.persisted) {
                 message.error(microcopy.feedback.loginCouldNotPersistSession);
                 return;
             }
@@ -81,7 +85,7 @@ const LoginForm: React.FC<{
             // re-rendering routes after login; use a full document navigation
             // (same escape hatch as project cards). Desktop keeps SPA nav.
             const goToProjects = () => {
-                if (isMacLike()) {
+                if (isMacLike() && authTokenWrite.cookie) {
                     nativeNavigate("/projects");
                     return;
                 }

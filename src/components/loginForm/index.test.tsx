@@ -229,6 +229,36 @@ describe("LoginForm", () => {
         expect(tokenStorage.readAuthToken()).toBe("jwt-login");
     });
 
+    it("keeps iOS login in the SPA when the cookie mirror is unavailable", async () => {
+        (isMacLike as jest.Mock).mockReturnValue(true);
+        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        const tokenWriteSpy = jest
+            .spyOn(tokenStorage, "writeAuthTokenWithStatus")
+            .mockImplementation((token) => {
+                localStorage.setItem("Token", token);
+                return {
+                    persisted: true,
+                    storage: true,
+                    cookie: false
+                };
+            });
+        try {
+            renderLoginForm();
+
+            await changeField(/^email$/i, "alice@example.com");
+            await changeField(/^password$/i, "secret");
+            await submitLogin();
+
+            await waitFor(() => {
+                expect(window.location.pathname).toBe("/projects");
+            });
+            expect(nativeNavigate).not.toHaveBeenCalled();
+            expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+        } finally {
+            tokenWriteSpy.mockRestore();
+        }
+    });
+
     it("sets autoComplete=username on the email field for password managers", () => {
         renderLoginForm();
         const email = screen.getByLabelText(/^email$/i);
@@ -237,8 +267,12 @@ describe("LoginForm", () => {
 
     it("stays on login with an error toast when JWT persistence fails", async () => {
         const spy = jest
-            .spyOn(tokenStorage, "writeAuthToken")
-            .mockReturnValue(false);
+            .spyOn(tokenStorage, "writeAuthTokenWithStatus")
+            .mockReturnValue({
+                persisted: false,
+                storage: false,
+                cookie: false
+            });
         const errSpy = jest
             .spyOn(message, "error")
             .mockImplementation(() => "" as never);

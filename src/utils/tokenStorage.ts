@@ -13,6 +13,12 @@ const TOKEN_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
 type AuthTokenListener = () => void;
 const authTokenListeners = new Set<AuthTokenListener>();
 
+export type AuthTokenWriteStatus = {
+    persisted: boolean;
+    storage: boolean;
+    cookie: boolean;
+};
+
 /**
  * Subscribe to REST bearer changes in `localStorage` (login, logout, clear).
  * Used by `useAuth` so React re-renders when the token is written outside of
@@ -117,7 +123,7 @@ const writeAuthCookie = (token: string): boolean => {
         ];
         if (isSecureContext) attrs.push("Secure");
         doc.cookie = attrs.join("; ");
-        return true;
+        return readAuthCookie() === token;
     } catch {
         return false;
     }
@@ -197,12 +203,15 @@ export const readAuthToken = (): string | null => {
 
 /**
  * Persist the REST bearer to both `localStorage` and a same-origin
- * cookie. Success is reported when AT LEAST ONE write path succeeds —
- * Safari Mobile private mode and sandboxed iframes can disable either
- * mechanism individually, but in practice never both at once. Login
- * continues to refuse to navigate on a totally hard `false` return.
+ * cookie. Success is reported when AT LEAST ONE write path is readable
+ * after the write attempt. Safari Mobile private mode and sandboxed
+ * iframes can disable either mechanism individually; the detailed status
+ * lets login avoid full document navigation when only localStorage is
+ * available.
  */
-export const writeAuthToken = (token: string): boolean => {
+export const writeAuthTokenWithStatus = (
+    token: string
+): AuthTokenWriteStatus => {
     let storageOk = false;
     const storage = getLocalStorage();
     if (storage) {
@@ -214,12 +223,19 @@ export const writeAuthToken = (token: string): boolean => {
         }
     }
     const cookieOk = writeAuthCookie(token);
-    if (storageOk || cookieOk) {
+    const persisted = storageOk || cookieOk;
+    if (persisted) {
         notifyAuthTokenChanged();
-        return true;
     }
-    return false;
+    return {
+        persisted,
+        storage: storageOk,
+        cookie: cookieOk
+    };
 };
+
+export const writeAuthToken = (token: string): boolean =>
+    writeAuthTokenWithStatus(token).persisted;
 
 export const readAiProxyToken = (): string | null => {
     const storage = getSessionStorageSafe();
