@@ -1,0 +1,52 @@
+# Verifier: fix-be-error-envelopes (B13)
+# Date: 2026-05-19
+# Branch: orch/bug-sweep-4e70/fix-be-error-envelopes
+# Target commit: b66aa00 fix(backend): nest agent HTTP and AppError envelopes with stable codes
+
+## Recipe (verification plan)
+`cd backend && pytest tests/ -q -k 'error or agent' --no-cov`
+
+## Environment
+- venv: `/workspace/.venv/bin/activate` (system `pytest` not on PATH)
+
+## Recipe run
+```
+source /workspace/.venv/bin/activate && cd /workspace/backend && pytest tests/ -q -k 'error or agent' --no-cov
+```
+```
+........................................................................ [ 16%]
+........................................................................ [ 32%]
+........................................................................ [ 48%]
+........................................................................ [ 64%]
+...s.................................................................... [ 81%]
+........................................................................ [ 97%]
+............                                                             [100%]
+443 passed, 1 skipped, 797 deselected in 5.10s
+```
+Exit code: 0
+
+## Targeted acceptance spot-checks
+```
+pytest tests/test_agents.py::test_router_invoke_returns_429_with_retry_after_when_rate_limited -q --no-cov
+# 1 passed
+
+pytest tests/test_agents.py::test_router_invoke_returns_402_when_budget_exhausted \
+  tests/test_agents.py::test_router_invoke_agent_error_returns_nested_code \
+  tests/test_agents.py::test_router_returns_403_when_project_ai_is_disabled \
+  tests/test_agents_errors.py -q --no-cov
+# 4 passed
+
+pytest tests/test_agents_router_v21.py -k 'autonomy' -q --no-cov
+# 4 passed
+```
+
+Assertions exercised (from test source):
+- `rate_body["error"]["code"] == "rate_limit_exceeded"`
+- `budget_body["error"]["code"] == "budget_exhausted"`
+- `body["error"]["code"] == "agent_configuration"` (invoke AgentError)
+- `body["error"]["code"] == "forbidden"` (project AI disabled)
+- `body["error"]["code"] == "autonomy_forbidden"` (v2.1 router)
+- `agent_http_error_detail` / `agent_app_error_content` unit shapes in `test_agents_errors.py`
+
+## Verdict signal
+unit-test-verified
