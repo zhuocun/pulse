@@ -172,6 +172,33 @@ describe("api", () => {
         await expect(api("projects")).rejects.toThrow("Operation failed");
     });
 
+    it("attaches the HTTP status to rejected errors so callers can detect 401", async () => {
+        // The backend's 401 body is `{"error": "empty JWT"}` — the
+        // message-based regex check missed it, so refreshUser couldn't
+        // tell a real auth failure from a transient network error and
+        // bounced the user back to /login after a successful Safari
+        // Mobile login.
+        fetchMock().mockResolvedValue(
+            jsonResponse({ error: "empty JWT" }, false, 401)
+        );
+
+        await expect(api("users")).rejects.toMatchObject({
+            message: "empty JWT",
+            status: 401
+        });
+    });
+
+    it("attaches the HTTP status to 5xx rejections", async () => {
+        fetchMock().mockResolvedValue(
+            jsonResponse({ error: "boom" }, false, 503)
+        );
+
+        await expect(api("users")).rejects.toMatchObject({
+            message: "boom",
+            status: 503
+        });
+    });
+
     it("converts a fetch network failure into a friendly error message", async () => {
         fetchMock().mockRejectedValue(new TypeError("Failed to fetch"));
 

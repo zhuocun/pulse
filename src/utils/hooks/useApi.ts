@@ -58,9 +58,16 @@ export const api = async (
     if (res.ok) {
         return resData;
     }
-    return Promise.reject(
-        new Error(extractErrorMessage(resData) ?? "Operation failed")
-    );
+    const error = new Error(
+        extractErrorMessage(resData) ?? "Operation failed"
+    ) as Error & { status?: number };
+    // Surface the HTTP status so callers (notably `useAuth.refreshUser`) can
+    // tell a real 401 from a transient network / 5xx failure. The fallback
+    // message text alone is unreliable — the backend's 401 body is
+    // `{"error": "empty JWT"}` etc., which the message extractor surfaces
+    // as "empty JWT" and the previous regex-on-message check missed.
+    error.status = res.status;
+    return Promise.reject(error);
 };
 
 const useApi = () => {
