@@ -39,6 +39,7 @@ from app.agents.catalog._shared import (
     truncate_snapshot,
 )
 from app.agents.context import ChatContext
+from app.agents.identity import COPILOT_IDENTITY
 from app.agents.polish import PolishStep
 from app.agents.state import TriageState
 from app.tools.redaction import redact_dict
@@ -165,7 +166,9 @@ def _build_triage_prompt(state: dict[str, Any]) -> str:
             f"{json.dumps(redact_dict(hint))}\n"
         )
     return (
-        "Rewrite the summary for each board-triage nudge below so it is "
+        COPILOT_IDENTITY
+        + "\n\n"
+        + "Rewrite the summary for each board-triage nudge below so it is "
         "specific and actionable, incorporating the signal details (e.g. "
         "column name, current count vs. WIP limit, task id). Keep each "
         "summary <=120 chars and on a single line. Preserve the nudge_id "
