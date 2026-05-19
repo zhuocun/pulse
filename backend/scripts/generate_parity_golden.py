@@ -27,6 +27,8 @@ the BE heuristic snapshot in a committed JSON file is the entire point.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -142,6 +144,20 @@ def main() -> int:
     golden = _generate()
     GOLDEN_PATH.write_text(json.dumps(golden, indent=4, sort_keys=True) + "\n")
     print(f"Wrote {len(golden)} entries to {GOLDEN_PATH}")
+    # Run prettier in-place if available, so the committed JSON file
+    # matches the repo's standard formatting. Without this the JS
+    # tooling complains about ``parity_golden.json`` on every CI run.
+    prettier = shutil.which("prettier") or shutil.which("npx")
+    if prettier:
+        args = (
+            [prettier, "--write", str(GOLDEN_PATH)]
+            if prettier.endswith("prettier")
+            else [prettier, "prettier", "--write", str(GOLDEN_PATH)]
+        )
+        try:
+            subprocess.run(args, check=False, cwd=str(ROOT))
+        except FileNotFoundError:
+            pass
     return 0
 
 
