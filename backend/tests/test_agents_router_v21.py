@@ -260,7 +260,9 @@ def test_invoke_validates_autonomy_against_allowed(
         headers=auth_headers,
     )
     assert response.status_code == HTTPStatus.FORBIDDEN
-    assert "auto" in response.json().get("error", "")
+    body = response.json()
+    assert body["error"]["code"] == "autonomy_forbidden"
+    assert "auto" in body["error"]["message"]
 
 
 def test_invoke_accepts_allowed_autonomy(

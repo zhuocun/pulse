@@ -1321,15 +1321,20 @@ def test_env_positive_int_rejects_non_positive(
 def test_agent_configuration_error_without_details() -> None:
     err = AgentConfigurationError("boom")
     assert err.details is None
-    assert err.detail == {"error": "boom"}
+    assert err.detail == {
+        "error": {"code": "agent_configuration", "message": "boom"},
+    }
 
 
 def test_agent_recursion_error_payload() -> None:
     err = AgentRecursionError("x", 7)
     assert err.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert err.detail == {
-        "error": "Agent 'x' exceeded recursion limit of 7",
-        "details": {"name": "x", "recursion_limit": 7},
+        "error": {
+            "code": "agent_recursion",
+            "message": "Agent 'x' exceeded recursion limit of 7",
+            "details": {"name": "x", "recursion_limit": 7},
+        },
     }
     assert err.recursion_limit == 7
 
@@ -1338,12 +1343,12 @@ def test_agent_execution_error_records_cause() -> None:
     cause = ValueError("nope")
     err = AgentExecutionError("x", cause=cause)
     assert err.cause is cause
-    assert err.detail["details"]["cause"] == "ValueError"
+    assert err.detail["error"]["details"]["cause"] == "ValueError"
     assert err.message == "Agent 'x' failed: Execution failed"
     assert "nope" not in err.message
 
     err_no_cause = AgentExecutionError("x")
-    assert err_no_cause.detail["details"]["cause"] is None
+    assert err_no_cause.detail["error"]["details"]["cause"] is None
 
 
 def test_agent_runtime_defaults_use_global_registry() -> None:
@@ -2865,7 +2870,9 @@ def test_router_context_coercion_branches(
             headers=auth_headers,
         )
         assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
-        assert "Unsupported context schema" in response.json()["error"]
+        err_body = response.json()["error"]
+        assert err_body["code"] == "agent_configuration"
+        assert "Unsupported context schema" in err_body["message"]
     finally:
         global_registry.unregister(echo.name)
         global_registry.unregister(plain.name)
@@ -3336,6 +3343,9 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     assert second.status_code == HTTPStatus.TOO_MANY_REQUESTS
     assert "Retry-After" in second.headers
     assert int(second.headers["Retry-After"]) >= 1
+    rate_body = second.json()
+    assert rate_body["error"]["code"] == "rate_limit_exceeded"
+    assert rate_body["error"]["message"] == "rate limit exceeded"
     ai_rate_limit_backend.reset()
 
 
@@ -3407,6 +3417,9 @@ def test_router_invoke_returns_402_when_budget_exhausted(
     )
     assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
     assert response.headers.get("X-Reason") == "budget"
+    budget_body = response.json()
+    assert budget_body["error"]["code"] == "budget_exhausted"
+    assert budget_body["error"]["message"] == "project budget exhausted"
     monkeypatch.setattr(
         ai_budget_backend,
         "monthly_cap",
@@ -3459,6 +3472,32 @@ def test_router_records_usage_after_stream_completes(
         < DEFAULT_MONTHLY_TOKEN_CAP
     )
     ai_budget_backend.reset()
+
+
+def test_router_invoke_agent_error_returns_nested_code(
+    client: TestClient,
+    echo_in_global_registry: EchoAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.agents.errors import AgentConfigurationError
+
+    runtime = client.app.state.agent_runtime
+
+    async def boom(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AgentConfigurationError("misconfigured")
+
+    monkeypatch.setattr(runtime, "ainvoke", boom, raising=False)
+
+    response = client.post(
+        "/api/v1/agents/echo/invoke",
+        json={"inputs": {"text": "x"}},
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    body = response.json()
+    assert body["error"]["code"] == "agent_configuration"
+    assert body["error"]["message"] == "misconfigured"
 
 
 def test_router_returns_403_when_project_ai_is_disabled(
@@ -3971,7 +4010,7 @@ def test_agent_execution_error_classifies_module_based_error() -> None:
     from app.agents.errors import AgentExecutionError
 
     exc = AgentExecutionError("echo", cause=_ApiIoFailure("api failed"))
-    assert exc.detail["details"]["cause_kind"] == "network_error"
+    assert exc.detail["error"]["details"]["cause_kind"] == "network_error"
 
 
 # ---------------------------------------------------------------------------
