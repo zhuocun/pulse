@@ -254,6 +254,76 @@ describe("ProjectList", () => {
         ).toEqual(["Alpha", "Zulu"]);
     });
 
+    const projectNamesInGridOrder = () =>
+        screen.getAllByRole("link").map((link) => link.textContent);
+
+    const selectSortOrder = async (label: RegExp) => {
+        fireEvent.mouseDown(
+            screen.getByRole("combobox", { name: /sort projects/i })
+        );
+        fireEvent.click(await screen.findByText(label));
+    };
+
+    it("keeps stable order for empty createdAt when sorting newest", async () => {
+        renderList({
+            dataSource: [
+                project({
+                    _id: "project-empty-a",
+                    createdAt: "",
+                    projectName: "Empty Alpha"
+                }),
+                project({
+                    _id: "project-empty-b",
+                    createdAt: "",
+                    projectName: "Empty Beta"
+                }),
+                project({
+                    _id: "project-dated",
+                    createdAt: "2026-06-01T00:00:00.000Z",
+                    projectName: "Dated"
+                })
+            ]
+        });
+
+        await selectSortOrder(/newest first/i);
+
+        expect(projectNamesInGridOrder()).toEqual([
+            "Dated",
+            "Empty Alpha",
+            "Empty Beta"
+        ]);
+    });
+
+    it("keeps stable order for empty createdAt when sorting oldest", async () => {
+        renderList({
+            dataSource: [
+                project({
+                    _id: "project-empty-a",
+                    createdAt: "",
+                    projectName: "Empty Alpha"
+                }),
+                project({
+                    _id: "project-empty-b",
+                    createdAt: "",
+                    projectName: "Empty Beta"
+                }),
+                project({
+                    _id: "project-dated",
+                    createdAt: "2026-06-01T00:00:00.000Z",
+                    projectName: "Dated"
+                })
+            ]
+        });
+
+        await selectSortOrder(/oldest first/i);
+
+        expect(projectNamesInGridOrder()).toEqual([
+            "Empty Alpha",
+            "Empty Beta",
+            "Dated"
+        ]);
+    });
+
     it("opens the edit flow from row actions", () => {
         renderList();
 
