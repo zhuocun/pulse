@@ -493,17 +493,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:30:27.369Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:30:27.369Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-be-mutation-undo",
@@ -519,12 +520,12 @@
       "handoffPath": "handoffs/fix-be-mutation-undo.md",
       "startedAt": "2026-05-19T05:27:01.632Z",
       "finishedAt": "2026-05-19T05:28:43.473Z",
-      "lastUpdate": "2026-05-19T05:28:43.474Z",
+      "lastUpdate": "2026-05-19T05:30:22.896Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -769,6 +770,14 @@
     {
       "at": "2026-05-19T05:30:19.608Z",
       "message": "fix-be-error-envelopes: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:30:22.897Z",
+      "message": "fix-be-mutation-undo: verification recorded (unit-test-verified) by verifier verify-fix-be-mutation-undo"
+    },
+    {
+      "at": "2026-05-19T05:30:27.369Z",
+      "message": "verify-fix-be-error-envelopes: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
