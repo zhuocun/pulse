@@ -23,6 +23,20 @@ describe("isNetworkFetchFailure", () => {
         );
     });
 
+    it("matches Safari's network error messages", () => {
+        // iOS Safari Mobile and desktop Safari throw `TypeError("Load failed")`
+        // on offline / DNS / CORS failures, or
+        // "The network connection was lost." when a request is dropped
+        // mid-flight. Without recognising those, fetch wrappers fall through
+        // to the raw TypeError instead of the friendly network microcopy.
+        expect(isNetworkFetchFailure(new TypeError("Load failed"))).toBe(true);
+        expect(
+            isNetworkFetchFailure(
+                new TypeError("The network connection was lost.")
+            )
+        ).toBe(true);
+    });
+
     it("rejects non-TypeError values", () => {
         expect(isNetworkFetchFailure(new Error("Failed to fetch"))).toBe(false);
         expect(isNetworkFetchFailure(null)).toBe(false);

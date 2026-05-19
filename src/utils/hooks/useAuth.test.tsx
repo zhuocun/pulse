@@ -273,8 +273,11 @@ describe("useAuth", () => {
         );
     });
 
-    it("logs out when refreshUser cannot refetch the current user", async () => {
+    it("logs out when refreshUser sees an explicit 401 from the user fetch", async () => {
         const queryClient = createQueryClient();
+        const unauthorized = Object.assign(new Error("empty JWT"), {
+            status: 401
+        });
         const refetchSpy = jest
             .spyOn(queryClient, "refetchQueries")
             .mockImplementation(() => Promise.resolve());
@@ -282,11 +285,11 @@ describe("useAuth", () => {
             data: undefined,
             dataUpdateCount: 0,
             dataUpdatedAt: 0,
-            error: new Error("offline"),
+            error: unauthorized,
             errorUpdateCount: 1,
             errorUpdatedAt: Date.now(),
             fetchFailureCount: 1,
-            fetchFailureReason: new Error("offline"),
+            fetchFailureReason: unauthorized,
             fetchMeta: null,
             isInvalidated: false,
             status: "error",
@@ -306,6 +309,86 @@ describe("useAuth", () => {
             expect(refetchSpy).toHaveBeenCalledWith({ queryKey: ["users"] })
         );
         await waitFor(() => expect(localStorage.getItem("Token")).toBeNull());
+    });
+
+    it("keeps the session on a transient refetch failure even without a cached user (Safari Mobile bug)", async () => {
+        const queryClient = createQueryClient();
+        // Safari Mobile rejects fetch with TypeError("Load failed") on
+        // flaky cellular and during Vercel cold-starts. With no cached
+        // user (the steady state right after `nativeNavigate("/projects")`
+        // does a full reload and wipes the in-memory cache), the previous
+        // code dropped the token and redirected to /login — losing the
+        // session the user just successfully created.
+        const transient = new TypeError("Load failed");
+        const refetchSpy = jest
+            .spyOn(queryClient, "refetchQueries")
+            .mockImplementation(() => Promise.resolve());
+        jest.spyOn(queryClient, "getQueryState").mockReturnValue({
+            data: undefined,
+            dataUpdateCount: 0,
+            dataUpdatedAt: 0,
+            error: transient,
+            errorUpdateCount: 1,
+            errorUpdatedAt: Date.now(),
+            fetchFailureCount: 1,
+            fetchFailureReason: transient,
+            fetchMeta: null,
+            isInvalidated: false,
+            status: "error",
+            fetchStatus: "idle"
+        });
+        localStorage.setItem("Token", "stored-token");
+
+        const { result } = renderHook(() => useAuth(), {
+            wrapper: createWrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.refreshUser();
+        });
+
+        await waitFor(() =>
+            expect(refetchSpy).toHaveBeenCalledWith({ queryKey: ["users"] })
+        );
+        // Token MUST survive a transient network failure.
+        expect(localStorage.getItem("Token")).toBe("stored-token");
+        // No cached user to patch; cache stays empty until the next retry.
+        expect(queryClient.getQueryData(["users"])).toBeUndefined();
+    });
+
+    it("keeps the session on a server 5xx failure even without a cached user", async () => {
+        const queryClient = createQueryClient();
+        const serverErr = Object.assign(new Error("Operation failed"), {
+            status: 503
+        });
+        jest.spyOn(queryClient, "refetchQueries").mockImplementation(() =>
+            Promise.resolve()
+        );
+        jest.spyOn(queryClient, "getQueryState").mockReturnValue({
+            data: undefined,
+            dataUpdateCount: 0,
+            dataUpdatedAt: 0,
+            error: serverErr,
+            errorUpdateCount: 1,
+            errorUpdatedAt: Date.now(),
+            fetchFailureCount: 1,
+            fetchFailureReason: serverErr,
+            fetchMeta: null,
+            isInvalidated: false,
+            status: "error",
+            fetchStatus: "idle"
+        });
+        localStorage.setItem("Token", "stored-token");
+
+        const { result } = renderHook(() => useAuth(), {
+            wrapper: createWrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.refreshUser();
+        });
+
+        expect(localStorage.getItem("Token")).toBe("stored-token");
     });
 
     it("keeps the session when refreshUser fails transiently but profile data is cached", async () => {
