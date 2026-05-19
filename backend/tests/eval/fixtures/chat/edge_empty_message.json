@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": ""}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: empty user message. Agent should respond gracefully (asking for clarification) and not crash."
+}

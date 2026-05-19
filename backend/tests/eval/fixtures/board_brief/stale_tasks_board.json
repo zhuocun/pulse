@@ -1,0 +1,22 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Old task A", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1", "updatedAt": "2023-01-01T00:00:00Z"},
+        {"id": "t-2", "taskName": "Old task B", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-2", "updatedAt": "2023-02-01T00:00:00Z"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Both tasks last updated > 1 year ago. Stale-task drift signal should fire."
+}

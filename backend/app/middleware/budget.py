@@ -2,15 +2,17 @@
 
 Pluggable backend so the same gate code in the routers works against an
 in-process dict (the default -- perfect for tests and single-process
-dev) or Redis (production, where multiple workers / serverless
-instances must enforce a single shared cap). The contract is the same
-either way: route handlers depend only on :class:`BudgetBackend`, and
-the FastAPI lifespan swaps the module-level :data:`budget_tracker` to
-whichever concrete backend ``BUDGET_BACKEND`` selects.
+dev), Redis (production, shared across workers via Lua-script
+atomicity), or Postgres (production, shared across workers via
+``INSERT ... ON CONFLICT DO UPDATE`` atomicity). The contract is the
+same either way: route handlers depend only on :class:`BudgetBackend`,
+and the FastAPI lifespan swaps the module-level :data:`budget_tracker`
+to whichever concrete backend ``BUDGET_BACKEND`` selects.
 
-The Redis implementation lives in :mod:`app.middleware.redis_backends`
-and is imported lazily by the lifespan so the production-only
-``redis`` extra stays optional for stub / dev installs.
+The Redis implementation lives in :mod:`app.middleware.redis_backends`;
+the Postgres implementation in :mod:`app.middleware.budget_pg`. Both
+are imported lazily so installs that only need the in-memory default
+don't pay the cost of optional dependencies.
 """
 
 from __future__ import annotations
@@ -186,3 +188,68 @@ def get_budget_tracker(request: Request) -> BudgetBackend:
     module-level singleton when state is not populated.
     """
     return getattr(request.app.state, "budget_tracker", budget_tracker)
+
+
+# ---------------------------------------------------------------------------
+# Backend factory
+#
+# Selects an implementation by name. Used by the FastAPI lifespan to wire
+# the per-app :data:`budget_tracker` and by test harnesses that want to
+# swap backends without touching ``app.main``. Returning ``None`` for the
+# postgres / redis paths defers construction to the caller (which owns
+# the connection pool / client lifetime), mirroring the
+# :func:`app.agents.checkpointing.build_checkpointer` /
+# :func:`open_checkpointer` split.
+# ---------------------------------------------------------------------------
+
+
+SUPPORTED_BUDGET_BACKENDS: frozenset[str] = frozenset(
+    {"memory", "redis", "postgres"}
+)
+
+
+def build_budget_backend(
+    backend: str,
+    *,
+    monthly_cap: int = DEFAULT_MONTHLY_TOKEN_CAP,
+    redis_client: Optional[object] = None,
+    postgres_pool: Optional[object] = None,
+) -> BudgetBackend:
+    """Construct a :class:`BudgetBackend` for ``backend``.
+
+    - ``"memory"`` → fresh :class:`InMemoryBudgetBackend`.
+    - ``"redis"`` → :class:`RedisBudgetBackend` (requires ``redis_client``).
+    - ``"postgres"`` → :class:`PostgresBudgetBackend` (requires
+      ``postgres_pool`` -- an :class:`~psycopg_pool.AsyncConnectionPool`,
+      typically the one shared with the LangGraph checkpoint saver).
+
+    Lazy imports keep the optional Redis / psycopg deps out of the
+    in-memory path so installs that never select them stay slim.
+    """
+
+    normalized = (backend or "").strip().lower() or "memory"
+    if normalized == "memory":
+        return InMemoryBudgetBackend(monthly_cap=monthly_cap)
+    if normalized == "redis":
+        if redis_client is None:
+            raise RuntimeError(
+                "BUDGET_BACKEND=redis requires a redis client; pass one "
+                "from app.middleware.redis_backends.build_redis_client(...)"
+            )
+        from app.middleware.redis_backends import RedisBudgetBackend
+
+        return RedisBudgetBackend(redis_client, monthly_cap=monthly_cap)
+    if normalized == "postgres":
+        if postgres_pool is None:
+            raise RuntimeError(
+                "BUDGET_BACKEND=postgres requires an AsyncConnectionPool; "
+                "pass one from "
+                "app.agents.checkpointing.enter_agent_postgres_pool(...)"
+            )
+        from app.middleware.budget_pg import PostgresBudgetBackend
+
+        return PostgresBudgetBackend(postgres_pool, monthly_cap=monthly_cap)
+    raise RuntimeError(
+        f"Unsupported BUDGET_BACKEND={backend!r}; "
+        f"expected one of {', '.join(sorted(SUPPORTED_BUDGET_BACKENDS))}."
+    )

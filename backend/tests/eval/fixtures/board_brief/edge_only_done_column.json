@@ -1,0 +1,19 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Finished work", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-done", "coordinatorId": "m-1"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: only Done column populated; no unowned, no large unstarted."
+}

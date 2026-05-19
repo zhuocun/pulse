@@ -1,0 +1,26 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-review", "name": "Review"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Onboarding tour", "type": "feature", "epic": "UI Polish", "storyPoints": 5, "columnId": "c-todo", "coordinatorId": "m-1"},
+        {"id": "t-2", "taskName": "Bug: payments retry", "type": "bug", "epic": "Bug Fix", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-2"},
+        {"id": "t-3", "taskName": "Refactor auth tokens", "type": "feature", "epic": "Refactor", "storyPoints": 13, "columnId": "c-todo"},
+        {"id": "t-4", "taskName": "Add logging", "type": "feature", "epic": "General", "storyPoints": 2, "columnId": "c-review", "coordinatorId": "m-1"},
+        {"id": "t-5", "taskName": "Doc updates", "type": "feature", "epic": "Documentation", "storyPoints": 1, "columnId": "c-done", "coordinatorId": "m-2"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}, {"id": "m-3", "username": "carol"}]
+    }
+  },
+  "must_have": ["5 tasks"],
+  "must_not": [],
+  "notes": "Realistic mid-size board with one unowned large task. Recommendation moderate."
+}

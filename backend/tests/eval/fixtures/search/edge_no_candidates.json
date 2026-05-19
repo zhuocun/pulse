@@ -1,0 +1,12 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "login bug",
+    "kind": "tasks",
+    "candidates": []
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: no candidates. Ranking should be empty or noted as such; must not error."
+}

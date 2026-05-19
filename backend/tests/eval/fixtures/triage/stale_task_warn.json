@@ -1,0 +1,21 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Half-done old work", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1", "updatedAt": "2022-06-01T00:00:00Z"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Stale task only; severity should be 'warn'."
+}

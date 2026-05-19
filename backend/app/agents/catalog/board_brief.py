@@ -39,6 +39,7 @@ from app.agents.catalog._shared import (
     truncate_snapshot,
 )
 from app.agents.context import ChatContext
+from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.state import BoardBriefState
@@ -330,7 +331,9 @@ class BriefHeadline(BaseModel):
 def _build_headline_prompt(state: dict[str, Any]) -> str:
     safe_facts = redact_dict(state["_facts"])
     return (
-        "Write a single-line, <=120-character standup headline for this "
+        COPILOT_IDENTITY
+        + "\n\n"
+        + "Write a single-line, <=120-character standup headline for this "
         "Jira-style board snapshot. Do not invent counts; only use the "
         "facts provided. Return JSON matching the schema. Facts (JSON):\n"
         + json.dumps(safe_facts)

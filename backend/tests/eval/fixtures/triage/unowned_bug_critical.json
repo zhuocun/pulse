@@ -1,0 +1,20 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Production crash on checkout", "type": "bug", "epic": "Bug Fix", "storyPoints": 5, "columnId": "c-todo"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    }
+  },
+  "must_have": ["unowned"],
+  "must_not": [],
+  "notes": "Unowned bug; nudge severity must be 'critical'."
+}

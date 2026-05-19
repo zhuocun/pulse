@@ -43,3 +43,6 @@ __pycache__/
 
 # Cursor orchestrate workspaces (operator-local log)
 .orchestrate/**/attention.log
+
+# Claude Code subagent worktrees (transient; never committed)
+.claude/worktrees/

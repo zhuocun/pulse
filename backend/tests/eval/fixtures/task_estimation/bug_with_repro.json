@@ -1,0 +1,17 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Fix double-charge on retry path",
+      "note": "Reproducible: any payment that fails the idempotency check is charged twice. Stripe webhook does not de-duplicate. Add idempotency key handling in PaymentsService.charge."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Stripe webhook idempotency"},
+      {"id": "t-old-2", "text": "Payment retry race"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Bug with clear repro; mid effort (~ 3 points)."
+}

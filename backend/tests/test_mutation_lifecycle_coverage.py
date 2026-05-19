@@ -251,9 +251,13 @@ def test_mutation_finalize_surfaces_apply_error_from_fe(
         lambda _payload: {"error": "task_not_found"},
     )
 
+    approval_id = "appr-pr-1-deadbeef"
     state = {
         "mutation_pending": {"proposal_id": "pr-1", "diff": {}},
-        "mutation_decision": {"accepted": True},
+        "mutation_decision": {"accepted": True, "approval_id": approval_id},
+        "pending_approvals": {
+            approval_id: {"proposal_id": "pr-1", "mutation": {"diff": {}}}
+        },
     }
     out = chat_module._mutation_finalize(state)
     assert "Could not apply: task_not_found" in out["messages"][0].content

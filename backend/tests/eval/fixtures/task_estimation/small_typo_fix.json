@@ -1,0 +1,17 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Fix typo in README install section",
+      "note": "Change 'npm install' to 'pnpm install' in the README. One line edit."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Fix typo in CHANGELOG"},
+      {"id": "t-old-2", "text": "Update README example"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Obviously small (S). storyPoints should be 1 or 2."
+}

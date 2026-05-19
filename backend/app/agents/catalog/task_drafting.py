@@ -41,9 +41,11 @@ from app.agents.catalog._shared import (
     token_set,
 )
 from app.agents.context import ChatContext
+from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.state import TaskDraftingState
+from app.agents.tool_envelope import wrap_tool_result
 from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT, FE_SIMILAR_TASKS
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
@@ -224,13 +226,16 @@ def _build_draft_prompt(state: dict[str, Any]) -> str:
     safe_prompt = redact(prompt)[0]
     safe_similar = redact_dict(similar[:3])
     safe_draft = redact_task_fields(deterministic)
+    fenced_similar = wrap_tool_result(FE_SIMILAR_TASKS, safe_similar)
     return (
-        "You are drafting a Jira task card. Update only the eligible text "
+        COPILOT_IDENTITY
+        + "\n\n"
+        + "You are drafting a Jira task card. Update only the eligible text "
         "fields and return them in the structured schema. Keep taskName "
         "<=80 chars, note <=500 chars (plain text), rationale <=180 "
         "chars. Do not invent ids; do not change story points.\n\n"
         f"Prompt: {safe_prompt}\n"
-        f"Similar tasks: {json.dumps(safe_similar)}\n"
+        f"Similar tasks: {fenced_similar}\n"
         f"Current draft: {json.dumps(safe_draft)}"
     )
 

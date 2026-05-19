@@ -1,0 +1,16 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Implement new pricing engine",
+      "note": "The new pricing engine must support tiered pricing, volume discounts, prepayment credits, currency conversion with daily rate refresh, promotional codes, regional tax rules for the EU, US, and JP, audit logging of every price calculation, idempotent retries, an admin UI for browsing historical calculations, automated tests at the unit, integration, and end-to-end levels, telemetry dashboards, performance budgets (p95 < 50ms), and migration of all existing customers from the legacy engine without invoice drift. Coordination required with finance and legal."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Pricing migration to new engine"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Very long note with many requirements. Should map to >=8 points."
+}

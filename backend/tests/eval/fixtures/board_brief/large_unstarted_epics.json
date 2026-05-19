@@ -1,0 +1,23 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Migrate auth provider", "type": "feature", "epic": "Auth", "storyPoints": 21, "columnId": "c-todo"},
+        {"id": "t-2", "taskName": "Rebuild dashboard", "type": "feature", "epic": "Performance", "storyPoints": 13, "columnId": "c-todo"},
+        {"id": "t-3", "taskName": "Replace queue system", "type": "feature", "epic": "Refactor", "storyPoints": 13, "columnId": "c-todo"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    }
+  },
+  "must_have": ["large"],
+  "must_not": [],
+  "notes": "All large unstarted; brief should surface largestUnstarted with all three."
+}

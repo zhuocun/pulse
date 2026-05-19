@@ -1,0 +1,26 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Investigate the flaky test in checkout/ — it fails ~10% of the time in CI but passes locally.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Checkout race condition", "type": "bug", "epic": "Bug Fix", "storyPoints": 5, "columnId": "c-todo"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Fix flaky payments e2e test"},
+      {"id": "t-old-2", "text": "Stabilise login spec timing"}
+    ]
+  },
+  "must_have": ["flaky", "checkout"],
+  "must_not": [],
+  "notes": "Bug investigation; epic should be Bug Fix or Testing, type=spike or bug."
+}

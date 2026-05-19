@@ -1,0 +1,25 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress", "wipLimit": 2},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-bug", "taskName": "Bug: prod 500", "type": "bug", "epic": "Bug Fix", "storyPoints": 3, "columnId": "c-todo"},
+        {"id": "t-1", "taskName": "T1", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-2", "taskName": "T2", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-2"},
+        {"id": "t-3", "taskName": "T3", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-4", "taskName": "T4", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-2", "updatedAt": "2022-01-01T00:00:00Z"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Three signal types: unowned_bug (critical), wip_overflow (warn), stale_task (warn). Each must get its own nudge with appropriate severity."
+}

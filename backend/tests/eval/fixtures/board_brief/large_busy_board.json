@@ -1,0 +1,32 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-backlog", "name": "Backlog"},
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-review", "name": "Review"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Bug A", "type": "bug", "epic": "Bug Fix", "storyPoints": 3, "columnId": "c-todo"},
+        {"id": "t-2", "taskName": "Bug B", "type": "bug", "epic": "Bug Fix", "storyPoints": 2, "columnId": "c-todo", "coordinatorId": "m-1"},
+        {"id": "t-3", "taskName": "Feature C", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-4", "taskName": "Feature D", "type": "feature", "epic": "UI Polish", "storyPoints": 8, "columnId": "c-backlog"},
+        {"id": "t-5", "taskName": "Refactor E", "type": "feature", "epic": "Refactor", "storyPoints": 13, "columnId": "c-backlog"},
+        {"id": "t-6", "taskName": "Perf F", "type": "feature", "epic": "Performance", "storyPoints": 8, "columnId": "c-todo", "coordinatorId": "m-2"},
+        {"id": "t-7", "taskName": "Docs G", "type": "feature", "epic": "Documentation", "storyPoints": 1, "columnId": "c-review", "coordinatorId": "m-2"},
+        {"id": "t-8", "taskName": "Auth H", "type": "feature", "epic": "Auth", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-9", "taskName": "Test I", "type": "feature", "epic": "Testing", "storyPoints": 2, "columnId": "c-todo"},
+        {"id": "t-10", "taskName": "Cleanup J", "type": "feature", "epic": "Refactor", "storyPoints": 1, "columnId": "c-done", "coordinatorId": "m-1"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}, {"id": "m-3", "username": "carol"}]
+    }
+  },
+  "must_have": ["10 tasks"],
+  "must_not": [],
+  "notes": "Bigger board with unowned bug and large unstarted refactor. Strong recommendation expected."
+}

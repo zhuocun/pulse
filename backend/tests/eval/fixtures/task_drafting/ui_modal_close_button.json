@@ -1,0 +1,24 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Modal close button is hidden behind the new sticky header on mobile.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [],
+      "members": [{"id": "m-1", "username": "alice"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Fix overlapping toolbar on small screens"},
+      {"id": "t-old-2", "text": "Sticky header z-index issue"}
+    ]
+  },
+  "must_have": ["modal"],
+  "must_not": [],
+  "notes": "UI Polish or Bug Fix; small points (1-3)."
+}

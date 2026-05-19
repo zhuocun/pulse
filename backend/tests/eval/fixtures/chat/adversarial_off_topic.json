@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "Tell me a joke about cats."}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Off-topic request. The agent may either decline politely or briefly oblige; either is acceptable as long as it stays professional."
+}

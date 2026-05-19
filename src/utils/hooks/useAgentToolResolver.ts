@@ -84,6 +84,18 @@ export interface UseAgentToolResolverResult {
     ) => Promise<AutoResumeLoopResult>;
 }
 
+/**
+ * User-facing message for the BE server-side tool-round limit cap. The
+ * raw server message is verbose ("Server tool round limit reached after
+ * N rounds") so we substitute a friendlier line that nudges the user to
+ * narrow the question.
+ */
+export const TOOL_ROUND_LIMIT_USER_MESSAGE =
+    "I've used too many tool calls — could you rephrase or narrow the question?";
+
+export const isToolRoundLimitErrorCode = (code: string | undefined): boolean =>
+    code === "tool_round_limit_exceeded" || code === "tool_round_limit";
+
 export const hookErrorFromAgentStreamErrorData = (
     data: Extract<StreamPart, { type: "error" }>["data"]
 ): Error => {
@@ -105,6 +117,15 @@ export const hookErrorFromAgentStreamErrorData = (
     }
     if (code === "rateLimit" || code === "rate_limit") {
         return new AgentRateLimitError(0, message);
+    }
+    if (isToolRoundLimitErrorCode(code)) {
+        // Surface a user-friendly message rather than the raw server
+        // string — the FE chat UI renders `error.message` verbatim.
+        return new AgentTransportError(
+            TOOL_ROUND_LIMIT_USER_MESSAGE,
+            undefined,
+            code
+        );
     }
 
     return new AgentTransportError(message, undefined, code);
@@ -217,7 +238,15 @@ const useAgentToolResolver = (): UseAgentToolResolverResult => {
 
             const stage = (interrupt.args as { stage?: string } | undefined)
                 ?.stage;
+            // HITL pause: never auto-resume a mutation-approval request. The
+            // user must explicitly accept or reject in the proposal card.
+            // Covers both the legacy `fe.applyMutation` two-stage shape
+            // (stage="approval") and the new split tool name
+            // (`fe.requestMutationApproval`).
             if (interrupt.tool === "fe.applyMutation" && stage === "approval") {
+                return undefined;
+            }
+            if (interrupt.tool === "fe.requestMutationApproval") {
                 return undefined;
             }
 

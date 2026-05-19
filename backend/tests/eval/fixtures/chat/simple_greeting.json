@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "Hi!"}
+    ]
+  },
+  "must_have": [],
+  "must_not": ["As an AI language model"],
+  "notes": "Trivial greeting. Reply should be brief and not contain LLM tells."
+}

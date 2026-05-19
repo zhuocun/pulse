@@ -126,3 +126,67 @@ def redact_dict(obj: object) -> object:
     if isinstance(obj, tuple):
         return tuple(redact_dict(v) for v in obj)
     return obj
+
+
+# ---------------------------------------------------------------------------
+# Prompt-injection heuristics
+# ---------------------------------------------------------------------------
+# These detect common attack shapes embedded in tool returns / user text so
+# the agent can fence the content as ``<untrusted_tool_result flags="...">``
+# and observability hooks can alert on the rate.  Pattern names are stable
+# strings used by tests + dashboards; reorder freely but do not rename without
+# updating ``tests/test_redaction.py`` and the alert rules.
+
+INJECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "ignore_previous_instructions",
+        re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.IGNORECASE),
+    ),
+    (
+        "disregard_prior",
+        re.compile(r"disregard\s+(all\s+)?prior", re.IGNORECASE),
+    ),
+    (
+        "you_are_now",
+        re.compile(r"you\s+are\s+now\b", re.IGNORECASE),
+    ),
+    (
+        "embedded_system_tag",
+        # Matches a fake role marker anywhere except at column 0 of the input
+        # (legitimate system prompts open the string, never appear mid-text).
+        re.compile(r"(?<!^)\bsystem\s*:", re.IGNORECASE | re.MULTILINE),
+    ),
+    (
+        "role_tag_injection",
+        re.compile(
+            r"<\/?(system|user|assistant|untrusted_tool_result)\b[^>]*>",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "act_as_privileged_role",
+        # "act as" within ~30 chars of an elevated role keyword.
+        re.compile(
+            r"act\s+as\b[^\n]{0,30}\b(admin|root|developer|superuser)\b",
+            re.IGNORECASE,
+        ),
+    ),
+]
+
+
+def flag_injection_attempts(text: str) -> list[str]:
+    """Return the names of every injection pattern matched in ``text``.
+
+    Pure read-only scan: the input is not modified. Caller chooses what to
+    do (tag the envelope, drop the result, alert observability) based on
+    the returned list. An empty list means no patterns fired.
+
+    Names are emitted in match order, deduplicated, so a single flag does
+    not appear twice even if the underlying regex finds multiple hits.
+    """
+
+    out: list[str] = []
+    for name, pattern in INJECTION_PATTERNS:
+        if pattern.search(text):
+            out.append(name)
+    return out

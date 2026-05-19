@@ -1,0 +1,15 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Fix login bug"},
+      {"id": "t-2", "text": "Update docs"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: empty query. Agent should not crash; ranking can be arbitrary but well-formed."
+}

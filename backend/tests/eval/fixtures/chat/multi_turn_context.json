@@ -1,0 +1,14 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "Show me the largest unstarted task."},
+      {"role": "assistant", "content": "Looking at the board, the largest unstarted task is 'Migrate auth provider' (21 points)."},
+      {"role": "user", "content": "Who should own it?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Pronoun resolution; the agent should answer about the migration task. Should call listMembers or note groundeing."
+}

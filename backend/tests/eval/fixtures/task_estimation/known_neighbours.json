@@ -1,0 +1,17 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Add dark mode toggle",
+      "note": "Add a UI toggle in settings that persists in localStorage and applies the dark theme class to <html>."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Add theme toggle - took 3 points"},
+      {"id": "t-old-2", "text": "Persist user preferences in localStorage - took 2 points"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Has near-neighbours; agent should anchor on them and produce ~3 points with high-ish confidence."
+}

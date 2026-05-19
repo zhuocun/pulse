@@ -1,0 +1,26 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Add SSO docs", "type": "feature", "epic": "Documentation", "storyPoints": 2, "columnId": "c-todo", "coordinatorId": "m-1"},
+        {"id": "t-2", "taskName": "Refactor user service", "type": "feature", "epic": "Refactor", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-2"},
+        {"id": "t-3", "taskName": "Wire up Sentry", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-done", "coordinatorId": "m-1"}
+      ],
+      "members": [
+        {"id": "m-1", "username": "alice"},
+        {"id": "m-2", "username": "bob"}
+      ]
+    }
+  },
+  "must_have": ["3 tasks"],
+  "must_not": [],
+  "notes": "Small board, no drift. Brief should be terse and steady-state."
+}

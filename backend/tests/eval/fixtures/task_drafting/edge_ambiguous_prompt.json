@@ -1,0 +1,17 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "make it better",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [{"id": "c-todo", "name": "To Do"}],
+      "tasks": [],
+      "members": []
+    },
+    "similar_tasks": []
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge case: hopelessly vague prompt. Agent should produce a low-confidence placeholder draft, not invent content."
+}
