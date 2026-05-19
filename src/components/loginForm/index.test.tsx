@@ -10,11 +10,17 @@ import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import nativeNavigate from "../../utils/nativeNavigate";
+import { isMacLike } from "../../utils/platform";
 import * as tokenStorage from "../../utils/tokenStorage";
 
 import LoginForm from ".";
 
 jest.mock("../../utils/hooks/useReactMutation");
+jest.mock("../../utils/nativeNavigate");
+jest.mock("../../utils/platform", () => ({
+    isMacLike: jest.fn(() => false)
+}));
 
 const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
     typeof useReactMutation
@@ -93,6 +99,7 @@ describe("LoginForm", () => {
         localStorage.clear();
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue(user());
+        (isMacLike as jest.Mock).mockReturnValue(false);
     });
 
     it("wires the login mutation with cache and error handling", () => {
@@ -202,6 +209,22 @@ describe("LoginForm", () => {
         });
         await waitFor(() => {
             expect(window.location.pathname).toBe("/projects");
+        });
+        expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+        expect(nativeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("uses a full document navigation on iOS after login", async () => {
+        (isMacLike as jest.Mock).mockReturnValue(true);
+        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        renderLoginForm();
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(nativeNavigate).toHaveBeenCalledWith("/projects");
         });
         expect(tokenStorage.readAuthToken()).toBe("jwt-login");
     });
