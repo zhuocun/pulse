@@ -11,6 +11,40 @@ from typing import Any, Optional
 from app.errors import AppError
 
 
+def _safe_cause_kind(exc: BaseException) -> str:
+    """Map an internal exception to a safe, public-facing error category.
+
+    Returns one of: ``database_error``, ``network_error``, ``timeout_error``,
+    ``unknown_error``.  Raw exception class names (e.g. ``psycopg.OperationalError``)
+    are intentionally NOT surfaced to API clients to avoid leaking internal
+    implementation details.  The original exception is still available on
+    :attr:`AgentExecutionError.cause` for internal logging / Sentry.
+    """
+    qualname = type(exc).__qualname__.lower()
+    module = (type(exc).__module__ or "").lower()
+
+    # Timeout: check before network because some timeout types inherit from
+    # connection errors in certain libraries.
+    if "timeout" in qualname or "timeout" in module:
+        return "timeout_error"
+
+    # Database: psycopg, asyncpg, sqlalchemy, motor, pymongo, redis, etc.
+    db_markers = ("psycopg", "asyncpg", "sqlalchemy", "pymongo", "motor", "redis")
+    if any(m in module for m in db_markers):
+        return "database_error"
+    if any(m in qualname for m in ("operational", "database", "db")):
+        return "database_error"
+
+    # Network: connection/transport errors from httpx, requests, aiohttp, etc.
+    net_markers = ("connection", "network", "http", "socket", "ssl", "tls")
+    if any(m in qualname for m in net_markers):
+        return "network_error"
+    if any(m in module for m in ("httpx", "requests", "aiohttp", "urllib")):
+        return "network_error"
+
+    return "unknown_error"
+
+
 class AgentError(AppError):
     """Base class for agent-related errors.
 
@@ -105,10 +139,26 @@ class AgentExecutionError(AgentError):
         cause: Optional[BaseException] = None,
         message: str = "Execution failed",
     ) -> None:
+        # Map the raw exception to a safe public category so internal class
+        # names (e.g. psycopg.OperationalError) are never exposed to clients
+        # via cause_kind.  The raw class name is kept as "cause" for backward
+        # compatibility with existing callers; cause_kind is the recommended
+        # field for new consumers.  The original exception stays on self.cause
+        # for internal logging / Sentry.
+        cause_kind: Optional[str] = _safe_cause_kind(cause) if cause is not None else None
+        cause_message: Optional[str] = None
+        if cause is not None:
+            raw = str(cause)
+            cause_message = raw[:200] if len(raw) > 200 else raw
         super().__init__(
             f"Agent '{name}' failed: {message}",
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-            details={"name": name, "cause": type(cause).__name__ if cause else None},
+            details={
+                "name": name,
+                "cause": type(cause).__name__ if cause is not None else None,
+                "cause_kind": cause_kind,
+                "cause_message": cause_message,
+            },
         )
         self.name = name
         self.cause = cause

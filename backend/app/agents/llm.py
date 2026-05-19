@@ -19,6 +19,19 @@ The factory hides three concerns from the catalog:
 Bumping providers, swapping LangChain versions, or wiring a gateway like
 LiteLLM is a single-file change as long as :func:`make_chat_model` keeps
 returning a ``BaseChatModel``.
+
+Anthropic prompt-caching contract
+----------------------------------
+``langchain-anthropic>=0.3.0`` (the pinned lower bound) transparently
+forwards ``cache_control: {"type": "ephemeral"}`` blocks that callers
+place on message content blocks or tool definitions -- no beta header
+or extra constructor kwarg is needed at the SDK level. This factory
+therefore does **not** add any ``extra_headers``; it simply must not
+*strip* cache_control. The instantiation in :func:`_instantiate_chat_model`
+passes only the supported constructor kwargs so unknown fields on content
+blocks are left untouched by langchain-anthropic and forwarded verbatim
+to the Anthropic SDK. Callers (typically catalog system-message builders)
+are responsible for adding ``cache_control`` markers where appropriate.
 """
 
 from __future__ import annotations
@@ -316,9 +329,13 @@ def _failover_secondary_spec(
     if primary.provider == PROVIDER_ANTHROPIC:
         if not cfg.openai_api_key:
             return None
+        # Fix: agent_chat_model_id holds an Anthropic model id when the
+        # primary is Anthropic; do NOT carry it over to the OpenAI secondary.
+        # Only use it when the providers match (OpenAI->OpenAI), otherwise
+        # fall back to the provider-appropriate default.
         return ChatModelSpec(
             provider=PROVIDER_OPENAI,
-            model=cfg.agent_chat_model_id or DEFAULT_OPENAI_MODEL,
+            model=DEFAULT_OPENAI_MODEL,
             temperature=primary.temperature,
             api_key=cfg.openai_api_key,
             max_retries=primary.max_retries,
@@ -327,9 +344,11 @@ def _failover_secondary_spec(
     if primary.provider == PROVIDER_OPENAI:
         if not cfg.anthropic_api_key:
             return None
+        # Symmetric: agent_chat_model_id may hold an OpenAI id; use the
+        # Anthropic default for the secondary.
         return ChatModelSpec(
             provider=PROVIDER_ANTHROPIC,
-            model=cfg.agent_chat_model_id or DEFAULT_ANTHROPIC_MODEL,
+            model=DEFAULT_ANTHROPIC_MODEL,
             temperature=primary.temperature,
             api_key=cfg.anthropic_api_key,
             max_retries=primary.max_retries,
@@ -348,7 +367,27 @@ def _wrap_cross_provider_failover(
     secondary_spec = _failover_secondary_spec(resolved, cfg)
     if secondary_spec is None:
         return primary
-    secondary = _instantiate_chat_model(secondary_spec)
+    # Fix: when failover is active the SDK's per-instance max_retries stacks
+    # with with_fallbacks, producing retry storms. Force max_retries=0 on
+    # both sides; with_fallbacks itself is the retry/failover mechanism.
+    no_retry_primary_spec = ChatModelSpec(
+        provider=resolved.provider,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        api_key=resolved.api_key,
+        max_retries=0,
+        timeout_seconds=resolved.timeout_seconds,
+    )
+    no_retry_secondary_spec = ChatModelSpec(
+        provider=secondary_spec.provider,
+        model=secondary_spec.model,
+        temperature=secondary_spec.temperature,
+        api_key=secondary_spec.api_key,
+        max_retries=0,
+        timeout_seconds=secondary_spec.timeout_seconds,
+    )
+    primary = _instantiate_chat_model(no_retry_primary_spec)
+    secondary = _instantiate_chat_model(no_retry_secondary_spec)
     if is_stub_model(secondary):
         return primary
     fb_label = f"{resolved.provider}→{secondary_spec.provider}"
@@ -456,8 +495,8 @@ def assert_provider_available(
 def is_stub_model(model: BaseChatModel) -> bool:
     """Return ``True`` when ``model`` is the deterministic Phase A stub.
 
-    Catalog agents use this as a feature flag: stub → keep the deterministic
-    Python path; real model → call it (via ``with_structured_output`` for
+    Catalog agents use this as a feature flag: stub -> keep the deterministic
+    Python path; real model -> call it (via ``with_structured_output`` for
     typed payloads, or plain ``ainvoke`` for chat).
     """
 
@@ -494,6 +533,32 @@ def extract_token_usage(message: Any) -> tuple[int, int]:
             return int(openai_usage.get("prompt_tokens", 0) or 0), int(
                 openai_usage.get("completion_tokens", 0) or 0
             )
+    return 0, 0
+
+
+def extract_cache_token_usage(message: Any) -> tuple[int, int]:
+    """Return ``(cache_read_tokens, cache_creation_tokens)`` from a LangChain ``AIMessage``.
+
+    Reads ``cache_read_input_tokens`` and ``cache_creation_input_tokens``
+    from :attr:`AIMessage.usage_metadata` (the standardized location
+    langchain-anthropic populates for Anthropic cache hits). Returns
+    ``(0, 0)`` when the fields are absent -- non-Anthropic providers and
+    non-cached calls will always return zeros.
+
+    Use this alongside :func:`extract_token_usage` to understand the
+    fraction of input tokens served from the prompt cache vs billed at
+    the full write rate. Cache hits are charged at ~10% of the normal
+    input-token rate, so ``cache_read_tokens`` is a direct cost-reduction
+    signal.
+    """
+
+    if message is None:
+        return 0, 0
+    usage = getattr(message, "usage_metadata", None)
+    if isinstance(usage, dict):
+        read = int(usage.get("cache_read_input_tokens", 0) or 0)
+        creation = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        return read, creation
     return 0, 0
 
 
@@ -541,7 +606,7 @@ def estimate_text_tokens(text: str) -> int:
 
     if not text:
         return 0
-    if any(ord(ch) > 127 for ch in text):
+    if not text.isascii():
         # Approximate worst-case BPE expansion for non-ASCII content.
         return max(1, len(text) // 2)
     return max(1, len(text) // 4)
