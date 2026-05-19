@@ -79,27 +79,36 @@ class _AgentRunSpan:
         self._operation = operation
         self._agent_name = agent_name
         self._model_id = model_id
+        self._project_id = project_id
+        self._autonomy = autonomy
         self._tokens_in = 0
         self._tokens_out = 0
         self._start: float = 0.0
         self._span_cm: Any = None
         self._span: Any = None
         self._tracer = get_tracer()
-        self._attrs = gen_ai_span_attrs(
-            operation=operation,
-            agent_name=agent_name,
-            model_id=model_id,
-            project_id=project_id,
-            autonomy=autonomy,
-        )
+        # Defer span attribute computation to __enter__ so that when OTel is
+        # no-op (the span is non-recording) we skip the attribute dict build
+        # entirely.  _attrs is populated in __enter__.
+        self._attrs: Any = None
 
     def __enter__(self) -> "_AgentRunSpan":
         self._start = time.monotonic()
-        self._span_cm = self._tracer.start_as_current_span(
-            f"agent.{self._agent_name}.{self._operation}",
-            attributes=self._attrs,
-        )
+        span_name = f"agent.{self._agent_name}.{self._operation}"
+        # Start with a name-only span first so we can interrogate is_recording();
+        # if the span is live we then build and set attrs.
+        self._span_cm = self._tracer.start_as_current_span(span_name)
         self._span = self._span_cm.__enter__()
+        if getattr(self._span, "is_recording", lambda: True)():
+            self._attrs = gen_ai_span_attrs(
+                operation=self._operation,
+                agent_name=self._agent_name,
+                model_id=self._model_id,
+                project_id=self._project_id,
+                autonomy=self._autonomy,
+            )
+            for key, val in self._attrs.items():
+                self._span.set_attribute(key, val)
         return self
 
     def set_result(self, result: Any) -> None:

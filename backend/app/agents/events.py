@@ -271,6 +271,11 @@ def validate_mutation_proposal_event(
 
     if not isinstance(evt, dict) or evt.get("kind") != "mutation_proposal":
         return evt
+    # Deferred to function body (not module level) to avoid an import cycle:
+    # app.observability imports from this package tree transitively via
+    # app.agents.instrumentation.
+    from app.observability.metrics import record_event_validation_failure
+
     try:
         MutationProposalEvent(**evt)
     except ValidationError as exc:
@@ -279,11 +284,6 @@ def validate_mutation_proposal_event(
             agent,
             exc,
         )
-        # Local import: app.observability imports from this package
-        # tree transitively (via app.agents.instrumentation), so
-        # top-level import would cycle.
-        from app.observability.metrics import record_event_validation_failure
-
         record_event_validation_failure(agent=agent, kind="mutation_proposal")
     return evt
 
@@ -321,6 +321,11 @@ def validate_suggestion_payload(
     if schema_cls is None:
         # Unknown surface — forward as-is so future surfaces are not blocked.
         return suggestion
+    # Deferred to function body (not module level) to avoid an import cycle:
+    # app.observability imports from this package tree transitively via
+    # app.agents.instrumentation.
+    from app.observability.metrics import record_event_validation_failure
+
     try:
         schema_cls(**payload)
     except ValidationError as exc:
@@ -330,8 +335,6 @@ def validate_suggestion_payload(
             surface,
             exc,
         )
-        from app.observability.metrics import record_event_validation_failure
-
         record_event_validation_failure(
             agent=agent, kind="suggestion", surface=surface
         )

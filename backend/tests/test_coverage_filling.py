@@ -1804,17 +1804,37 @@ def test_catalog_discover_propagates_import_errors(
 def test_sse_to_jsonable_placeholder_when_encoded_not_json_serializable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``jsonable_encoder`` can return a structure ``json.dumps`` rejects."""
+    """Top-level scalar fast-path returns the value directly; non-fast-path
+    objects whose ``jsonable_encoder`` raises fall back to the placeholder.
+
+    The redundant ``json.dumps`` probe was removed (Fix 1); unserializable
+    results from ``jsonable_encoder`` are now caught at the ``encode_sse``
+    level.  This test covers the scalar fast-path (line 63) and the
+    ``jsonable_encoder`` raise branch on a non-fast-path input.
+    """
 
     from app.agents import sse as sse_module
 
+    # --- Scalar fast-path (covers the ``return value`` on line 63) ---
+    assert sse_module._to_jsonable(42) == 42
+    assert sse_module._to_jsonable("hello") == "hello"
+    assert sse_module._to_jsonable(None) is None
+    assert sse_module._to_jsonable(True) is True
+
+    # --- jsonable_encoder raise path on a non-fast-path input ---
+    # A bare object() is not in _FAST_PATH_TYPES and is not a plain-scalar dict,
+    # so it reaches jsonable_encoder.  When that raises, we get the placeholder.
     monkeypatch.setattr(
         sse_module,
         "jsonable_encoder",
-        lambda _v: {"nested": object()},
+        lambda _v: (_ for _ in ()).throw(TypeError("not encodable")),
     )
-    out = sse_module._to_jsonable({"ignored": True})
-    assert out == {"__unserializable__": "dict"}
+
+    class _Opaque:
+        pass
+
+    out = sse_module._to_jsonable(_Opaque())
+    assert out == {"__unserializable__": "_Opaque"}
 
 
 def test_sse_to_jsonable_falls_back_when_encoder_raises_but_json_dumps_works(
