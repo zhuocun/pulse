@@ -530,7 +530,7 @@
     {
       "name": "verify-fix-be-mutation-undo",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-be-mutation-undo",
+      "branch": "`orch/bug-sweep-4e70/fix-be-mutation-undo` (commit `c2e034d` — verifier log only)",
       "startingRef": "orch/bug-sweep-4e70/fix-be-mutation-undo",
       "dependsOn": [
         "fix-be-mutation-undo"
@@ -538,12 +538,12 @@
       "agentId": "bc-7fc802d7-8c69-4bf8-b825-cea2055c2c10",
       "runId": "run-0245084e-617e-4272-9be1-f06d6e03c4c4",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-be-mutation-undo.md",
       "startedAt": "2026-05-19T05:28:44.665Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:28:47.101Z",
+      "finishedAt": "2026-05-19T05:30:21.849Z",
+      "lastUpdate": "2026-05-19T05:30:21.849Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
