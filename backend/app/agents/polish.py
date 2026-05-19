@@ -201,9 +201,15 @@ class PolishStep(Generic[_SchemaT]):
         self._schema = schema
         self._fallback_fn = fallback_fn
         self._redact = redact
-        # Cache keyed by id(model) so we never call with_structured_output
-        # more than once per model instance.
-        self._chain_cache: dict[int, Any] = {}
+        # Weakly cache the structured-output chain per model instance so we
+        # never call ``with_structured_output`` more than once per model.
+        # Weak keys avoid id() collisions when a test-local mock model is
+        # GC'd and its address is reused by a subsequent mock.
+        import weakref
+
+        self._chain_cache: "weakref.WeakKeyDictionary[Any, Any]" = (
+            weakref.WeakKeyDictionary()
+        )
 
         if cap_field is not None:
             _field_name, _max_chars = cap_field
@@ -271,8 +277,7 @@ class PolishStep(Generic[_SchemaT]):
             messages = raw_prompt
 
         try:
-            model_key = id(model)
-            structured = self._chain_cache.get(model_key)
+            structured = self._chain_cache.get(model)
             if structured is None:
                 try:
                     structured = model.with_structured_output(
@@ -282,7 +287,7 @@ class PolishStep(Generic[_SchemaT]):
                     structured = model.with_structured_output(
                         self._schema, include_raw=True
                     )
-                self._chain_cache[model_key] = structured
+                self._chain_cache[model] = structured
             response = await structured.ainvoke(messages)
         except Exception:  # noqa: BLE001
             logger.warning(
