@@ -235,15 +235,23 @@ def assert_embeddings_provider_available(
     cfg = settings if settings is not None else default_settings
     resolved = spec if spec is not None else resolve_embeddings_spec(settings=cfg)
     _require_integration(resolved.provider)
-    if resolved.provider == PROVIDER_OPENAI and cfg.embeddings_dimensions != STUB_EMBEDDING_DIM:
-        logger.warning(
-            "Embedding width changed (configured=%d, stub=%d). If you previously "
-            "ran with the stub against a Postgres store, the existing vector column "
-            "may be sized for the stub width — re-create the store schema before "
-            "depending on this width.",
+    if resolved.provider == PROVIDER_OPENAI:
+        # Always log the active dimension at INFO so operators can spot
+        # mismatches in the deploy log without waiting for a query to fail.
+        logger.info(
+            "Embeddings provider=openai model=%s dimensions=%d",
+            resolved.model,
             cfg.embeddings_dimensions,
-            STUB_EMBEDDING_DIM,
         )
+        if cfg.embeddings_dimensions != STUB_EMBEDDING_DIM:
+            logger.warning(
+                "Embedding width changed (configured=%d, stub=%d). If you previously "
+                "ran with the stub against a Postgres store, the existing vector column "
+                "may be sized for the stub width — re-create the store schema before "
+                "depending on this width.",
+                cfg.embeddings_dimensions,
+                STUB_EMBEDDING_DIM,
+            )
 
 
 def is_stub_embeddings(model: object) -> bool:

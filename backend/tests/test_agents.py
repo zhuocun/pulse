@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
-from langgraph.runtime import Runtime
+from langgraph.runtime import Runtime, get_runtime
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel
@@ -38,6 +38,7 @@ from app.agents import (
     BaseAgent,
     registry as global_registry,
 )
+from app.agents.context import ChatContext
 from app.agents import catalog as agent_catalog
 from app.agents import checkpointing as agent_checkpointing
 from app.agents import stores as agent_stores
@@ -306,12 +307,12 @@ def test_agent_metadata_as_dict_context_schema_handles_hint_failure(
     class _Sch:
         __annotations__ = {"q": int}
 
-    meta = AgentMetadata(name="x", context_schema=_Sch)
-
     def _boom(*_a: object, **_k: object) -> dict[str, object]:  # noqa: ANN401
         raise TypeError("unusable hints")
 
+    # Patch BEFORE construction so the eager __post_init__ cache uses the stub.
     monkeypatch.setattr("app.agents.base.get_type_hints", _boom)
+    meta = AgentMetadata(name="x", context_schema=_Sch)
     assert meta.as_dict()["context_schema"] == {}
 
 
@@ -588,7 +589,7 @@ def test_compile_double_check_returns_cached_when_other_thread_won_the_race() ->
         # (after acquiring the lock) returns True so the inner branch fires.
         if calls["n"] == 1:
             return False
-        agent._compiled = sentinel  # noqa: SLF001
+        agent._compiled_state = (sentinel, None, None)  # noqa: SLF001
         return True
 
     agent._cache_hit = fake_cache_hit  # type: ignore[assignment]
@@ -2180,9 +2181,11 @@ def test_agent_runtime_astream_swallows_aggregation_errors(
         agent.compile = real_compile  # type: ignore[assignment]
         agent.acompile = real_acompile  # type: ignore[assignment]
 
-    # set_token_usage must NOT have been called because aggregation raised
-    # and we suppressed the exception rather than failing the stream.
-    assert captured == []
+    # With the new _aggregate_tokens_from_payload path the success path does
+    # NOT call aget_state; it reads from the final values payload instead.
+    # So set_token_usage IS called (with 0, 0 because EchoAgent has no usage
+    # metadata), and the aget_state boom is never triggered.
+    assert captured == [(0, 0)]
 
 
 def test_agent_runtime_astream_records_token_usage_on_translated_failure(
@@ -2289,8 +2292,12 @@ def test_agent_runtime_astream_failure_aggregation_does_not_mask_original(
 def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(
     fresh_registry: AgentRegistry,
 ) -> None:
-    """An AgentError raised by aget_state must propagate, not be swallowed
-    alongside generic best-effort failures (compile/lookup glitches)."""
+    """An AgentError raised during post-loop token aggregation must propagate,
+    not be swallowed alongside generic best-effort failures.
+
+    The new success path calls ``_aggregate_tokens_from_payload`` (sync) rather
+    than ``aget_state``, so we patch that method directly.
+    """
     import app.agents.runtime as runtime_mod
     from app.agents.errors import AgentExecutionError
 
@@ -2313,28 +2320,12 @@ def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(
     original_start = runtime_mod.start_run_span
     runtime_mod.start_run_span = lambda **_: _Span()  # type: ignore[assignment]
 
-    agent = fresh_registry.get("echo")
+    original_agg = runtime._aggregate_tokens_from_payload  # noqa: SLF001
 
-    class _AgentErrGraph:
-        def __init__(self, real: Any) -> None:
-            self._real = real
+    def boom_agg(payload: Any, run_span: Any) -> None:
+        raise AgentExecutionError("echo", message="forced")
 
-        def __getattr__(self, name: str) -> Any:
-            return getattr(self._real, name)
-
-        async def aget_state(self, *args: Any, **kwargs: Any) -> Any:
-            raise AgentExecutionError("echo", message="forced")
-
-        async def astream(self, *args: Any, **kwargs: Any) -> Any:
-            async for ev in self._real.astream(*args, **kwargs):
-                yield ev
-
-    real_acompile = agent.acompile
-
-    async def patched_acompile(**kwargs: Any) -> Any:
-        return _AgentErrGraph(await real_acompile(**kwargs))
-
-    agent.acompile = patched_acompile  # type: ignore[assignment]
+    runtime._aggregate_tokens_from_payload = boom_agg  # type: ignore[assignment]  # noqa: SLF001
 
     async def collect() -> None:
         async for _ in runtime.astream(
@@ -2347,7 +2338,332 @@ def test_agent_runtime_astream_propagates_agent_errors_during_aggregation(
             asyncio.run(collect())
     finally:
         runtime_mod.start_run_span = original_start  # type: ignore[assignment]
-        agent.acompile = real_acompile  # type: ignore[assignment]
+        runtime._aggregate_tokens_from_payload = original_agg  # type: ignore[assignment]  # noqa: SLF001
+
+
+def test_arun_with_events_captures_custom_stream_events(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 1: custom-mode payloads must be captured and merged into events_out.
+
+    Agents that emit via ``langgraph.types.StreamWriter`` produce ``custom``
+    chunks.  Before the fix those were silently discarded; after the fix they
+    are appended to the returned events list de-duplicated against the
+    state-sourced events list.
+    """
+    from langgraph.graph import END, START, StateGraph
+    from langgraph.types import StreamWriter
+
+    class _CustomEventState(TypedDict, total=False):
+        done: bool
+
+    class _CustomEmitterAgent(BaseAgent):
+        metadata = AgentMetadata(name="custom-emitter")
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            def emit_node(
+                state: _CustomEventState,
+                writer: StreamWriter,
+            ) -> dict[str, Any]:
+                writer({"kind": "custom-ping", "data": "hello"})
+                return {"done": True}
+
+            graph = StateGraph(_CustomEventState)
+            graph.add_node("emit", emit_node)
+            graph.add_edge(START, "emit")
+            graph.add_edge("emit", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    agent = _CustomEmitterAgent()
+    fresh_registry.register(agent)
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    async def run() -> tuple[Any, list[Any]]:
+        return await runtime.arun_with_events("custom-emitter", {})
+
+    final_state, events = asyncio.run(run())
+    # The custom payload must appear in events_out.
+    custom_pings = [e for e in events if isinstance(e, dict) and e.get("kind") == "custom-ping"]
+    assert custom_pings, f"expected custom-ping in events, got {events}"
+    assert custom_pings[0]["data"] == "hello"
+
+
+def test_build_context_injects_autonomy_level(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 11: _build_context must inject autonomy_level into ChatContext."""
+    from langgraph.runtime import get_runtime
+
+    class _AutonomyState(TypedDict, total=False):
+        autonomy: str | None
+
+    class _AutonomyAgent(BaseAgent):
+        metadata = AgentMetadata(
+            name="autonomy-recorder",
+            context_schema=ChatContext,
+        )
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            def record(state: _AutonomyState) -> dict[str, Any]:
+                rt = get_runtime(ChatContext)
+                ctx = rt.context or {}
+                return {"autonomy": ctx.get("autonomy_level")}
+
+            graph = StateGraph(_AutonomyState, context_schema=ChatContext)
+            graph.add_node("record", record)
+            graph.add_edge(START, "record")
+            graph.add_edge("record", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    agent = _AutonomyAgent()
+    fresh_registry.register(agent)
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    async def run() -> Any:
+        return await runtime.ainvoke(
+            "autonomy-recorder",
+            {"autonomy_level": "auto"},
+        )
+
+    final = asyncio.run(run())
+    assert final.get("autonomy") == "auto"
+
+
+def test_astream_success_path_swallows_non_agent_error_in_aggregation(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 2: on the success path, if _aggregate_tokens_from_payload raises a
+    non-AgentError (e.g. ValueError), it must be swallowed and the stream must
+    complete cleanly (lines 991-992 coverage).
+    """
+    import app.agents.runtime as runtime_mod
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    original_start = runtime_mod.start_run_span
+    original_agg = runtime._aggregate_tokens_from_payload  # noqa: SLF001
+
+    def boom_aggregate(payload: Any, run_span: Any) -> None:
+        raise ValueError("simulated bad payload")
+
+    runtime._aggregate_tokens_from_payload = boom_aggregate  # type: ignore[method-assign]
+    runtime_mod.start_run_span = lambda **_: type(  # type: ignore[assignment]
+        "_S",
+        (),
+        {
+            "__enter__": lambda s: s,
+            "__exit__": lambda s, *a: None,
+            "set_result": lambda s, r: None,
+            "set_token_usage": lambda s, i, o: None,
+        },
+    )()
+
+    try:
+        async def collect() -> None:
+            async for _ in runtime.astream(
+                "echo", {"text": "x"}, context=EchoContext()
+            ):
+                pass
+
+        # Must complete without error even though aggregation raises ValueError.
+        asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+        runtime._aggregate_tokens_from_payload = original_agg  # type: ignore[method-assign]
+
+
+def test_astream_failure_path_uses_aget_state_when_no_values_emitted(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 2: on the failure path, when no ``values`` chunk was emitted before
+    the error, ``_aggregate_astream_tokens_no_propagate`` falls back to
+    ``_aggregate_astream_tokens`` (aget_state path, lines 1055-1067, 1093-1095).
+
+    We force this by patching ``agent.astream`` to raise immediately (before
+    yielding any ``values`` tuple), keeping ``_last_values_payload = None``.
+    """
+    import app.agents.runtime as runtime_mod
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    aget_state_calls: list[int] = []
+
+    class _TrackingSpan:
+        def __enter__(self) -> "_TrackingSpan":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            aget_state_calls.append(1)
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: _TrackingSpan()  # type: ignore[assignment]
+
+    agent = fresh_registry.get("echo")
+    real_astream = agent.astream
+
+    async def boom_astream(*args: Any, **kwargs: Any) -> Any:
+        # Raise before yielding a single event so _last_values_payload stays None.
+        raise RuntimeError("no values before boom")
+        yield  # make it an async generator
+
+    agent.astream = boom_astream  # type: ignore[method-assign]
+
+    try:
+        async def collect() -> None:
+            async for _ in runtime.astream("echo", {"text": "x"}):
+                pass
+
+        with pytest.raises(AgentExecutionError):
+            asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+        agent.astream = real_astream  # type: ignore[method-assign]
+
+    # set_token_usage must have been called via the aget_state fallback.
+    assert aget_state_calls == [1]
+
+
+def test_async_build_lock_lazy_creation() -> None:
+    """Fix 3: ``_async_build_lock`` must be None at construction and created
+    lazily on first ``acompile()`` call (Python 3.12+ loop-binding safety).
+    """
+    agent = EchoAgent()
+    # At construction: lock is None.
+    assert agent._async_build_lock is None  # noqa: SLF001
+
+    async def compile_once() -> None:
+        await agent.acompile()
+
+    asyncio.run(compile_once())
+    # After first acompile(): lock is an asyncio.Lock.
+    import asyncio as _asyncio
+
+    assert isinstance(agent._async_build_lock, _asyncio.Lock)  # noqa: SLF001
+
+
+def test_compiled_state_atomic_tuple() -> None:
+    """Fix 4: ``_compiled_state`` must store the (compiled, checkpointer, store)
+    triple as a single atomic tuple; reading it as one load prevents
+    stale-checkpointer pairs under concurrent compile/recompile.
+    """
+    agent = EchoAgent()
+    # Before compile: None.
+    assert agent._compiled_state is None  # noqa: SLF001
+
+    saver = InMemorySaver()
+    agent.compile(checkpointer=saver)
+
+    state = agent._compiled_state  # noqa: SLF001
+    assert state is not None
+    compiled, cp, st = state
+    assert cp is saver
+    assert st is None  # no store passed
+
+    # set_chat_model must clear the whole tuple.
+    agent.set_chat_model(object())
+    assert agent._compiled_state is None  # noqa: SLF001
+
+
+def test_arun_with_events_custom_suggestion_validation(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 1: custom events with kind='suggestion' must go through
+    validate_suggestion_payload (the same path as state-sourced events).
+    """
+    from langgraph.types import StreamWriter
+
+    class _SuggestionCustomEmitter(BaseAgent):
+        metadata = AgentMetadata(name="suggestion-custom-emitter")
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            def emit_node(
+                state: EchoState,
+                writer: StreamWriter,
+            ) -> dict[str, Any]:
+                # Emit a suggestion via the custom channel.
+                writer({"kind": "suggestion", "id": "s1", "text": "hello"})
+                return {}
+
+            graph = StateGraph(EchoState)
+            graph.add_node("emit", emit_node)
+            graph.add_edge(START, "emit")
+            graph.add_edge("emit", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    agent = _SuggestionCustomEmitter()
+    fresh_registry.register(agent)
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    async def run() -> list[Any]:
+        _fs, events = await runtime.arun_with_events("suggestion-custom-emitter", {})
+        return events
+
+    events = asyncio.run(run())
+    suggestions = [e for e in events if isinstance(e, dict) and e.get("kind") == "suggestion"]
+    assert suggestions, f"expected suggestion event, got {events}"
+
+
+def test_arun_with_events_custom_mutation_proposal_validation(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Fix 1: custom events with kind='mutation_proposal' must go through
+    validate_mutation_proposal_event (same path as state-sourced events).
+    """
+    from langgraph.types import StreamWriter
+
+    class _MutationCustomEmitter(BaseAgent):
+        metadata = AgentMetadata(name="mutation-custom-emitter")
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            def emit_node(
+                state: EchoState,
+                writer: StreamWriter,
+            ) -> dict[str, Any]:
+                writer({"kind": "mutation_proposal", "id": "m1", "op": "add"})
+                return {}
+
+            graph = StateGraph(EchoState)
+            graph.add_node("emit", emit_node)
+            graph.add_edge(START, "emit")
+            graph.add_edge("emit", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    agent = _MutationCustomEmitter()
+    fresh_registry.register(agent)
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    async def run() -> list[Any]:
+        _fs, events = await runtime.arun_with_events("mutation-custom-emitter", {})
+        return events
+
+    events = asyncio.run(run())
+    proposals = [e for e in events if isinstance(e, dict) and e.get("kind") == "mutation_proposal"]
+    assert proposals, f"expected mutation_proposal event, got {events}"
 
 
 def test_lifespan_attaches_runtime(client: TestClient) -> None:
@@ -3380,3 +3696,317 @@ def test_task_estimation_agent_emits_citation_custom_event() -> None:
     ]
     assert custom
     assert custom[0]["refs"][0]["quote"]
+
+
+def test_arun_with_events_deduplicates_custom_event_already_in_state(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Line 885: the ``continue`` in the custom-events dedup loop must be hit
+    when a custom-stream event's object identity matches one already in
+    state_event_ids.
+
+    We simulate this by patching ``_build_context`` so the agent never runs
+    (we call ``arun_with_events`` with a no-op agent) and directly manipulate
+    the state to ensure the same Python object appears in both sets.
+    """
+    from langgraph.types import StreamWriter
+
+    class _DedupeState(TypedDict, total=False):
+        events: list[dict]
+
+    # Build a shared event object that is BOTH returned in state AND emitted
+    # as a custom chunk via the same object reference.
+    shared_evt: dict = {"kind": "test-dedup", "payload": 42}
+
+    class _DedupeAgent(BaseAgent):
+        metadata = AgentMetadata(name="dedup-agent")
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            def emit_node(
+                state: _DedupeState,
+                writer: StreamWriter,
+            ) -> dict[str, Any]:
+                # Return the shared object in state AND write via custom channel.
+                writer(shared_evt)
+                return {"events": [shared_evt]}
+
+            graph = StateGraph(_DedupeState)
+            graph.add_node("emit", emit_node)
+            graph.add_edge(START, "emit")
+            graph.add_edge("emit", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    agent = _DedupeAgent()
+    fresh_registry.register(agent)
+    runtime = AgentRuntime(registry=fresh_registry)
+
+    async def run() -> tuple[Any, list[Any]]:
+        return await runtime.arun_with_events("dedup-agent", {})
+
+    _final, events = asyncio.run(run())
+    # The shared_evt should appear exactly once (de-duplicated).
+    matching = [e for e in events if isinstance(e, dict) and e.get("kind") == "test-dedup"]
+    assert len(matching) == 1, f"expected 1 deduped event, got {matching}"
+
+
+def test_aggregate_astream_tokens_covers_messages_loop(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Lines 1064-1066: the for-loop body of ``_aggregate_astream_tokens`` must
+    run when ``aget_state`` returns messages.
+
+    We set up an agent that writes a dummy message to state, then patch
+    ``agent.astream`` to raise AFTER the agent has actually run once
+    (storing state in the checkpointer).  The failure path then calls
+    ``_aggregate_astream_tokens`` which reads back non-empty messages.
+    """
+    import app.agents.runtime as runtime_mod
+
+    class _MsgState(TypedDict, total=False):
+        messages: list[Any]
+
+    class _MessageWriterAgent(BaseAgent):
+        metadata = AgentMetadata(name="msg-writer")
+
+        def build(
+            self,
+            *,
+            checkpointer: Optional[BaseCheckpointSaver],
+            store: Optional[BaseStore],
+        ) -> Pregel:
+            from langchain_core.messages import AIMessage
+
+            def write_node(state: _MsgState) -> dict[str, Any]:
+                return {"messages": [AIMessage(content="hello")]}
+
+            graph = StateGraph(_MsgState)
+            graph.add_node("write", write_node)
+            graph.add_edge(START, "write")
+            graph.add_edge("write", END)
+            return graph.compile(checkpointer=checkpointer, store=store)
+
+    fresh_registry.register(_MessageWriterAgent())
+    saver = InMemorySaver()
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=saver)
+
+    token_calls: list[tuple[int, int]] = []
+
+    class _TrackingSpan:
+        def __enter__(self) -> "_TrackingSpan":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def set_token_usage(self, tokens_in: int, tokens_out: int) -> None:
+            token_calls.append((tokens_in, tokens_out))
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: _TrackingSpan()  # type: ignore[assignment]
+
+    # First, run the agent normally so the checkpointer has state.
+    agent = fresh_registry.get("msg-writer")
+    real_astream = agent.astream
+    thread_id = "msg-writer-test-1"
+
+    async def run_then_boom() -> None:
+        # Run once successfully to store state.
+        async for _ in runtime.astream(
+            "msg-writer", {"messages": []}, thread_id=thread_id
+        ):
+            pass
+        # Now patch astream to raise immediately (no values emitted).
+        boom_called = False
+
+        async def boom_astream(*args: Any, **kwargs: Any) -> Any:
+            nonlocal boom_called
+            boom_called = True
+            raise RuntimeError("boom after state stored")
+            yield  # noqa: unreachable -- makes it an async generator
+
+        agent.astream = boom_astream  # type: ignore[method-assign]
+        try:
+            async for _ in runtime.astream(
+                "msg-writer", {}, thread_id=thread_id
+            ):
+                pass
+        except AgentExecutionError:
+            pass
+        finally:
+            agent.astream = real_astream  # type: ignore[method-assign]
+
+    try:
+        asyncio.run(run_then_boom())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+
+    # The second run's failure path should have called set_token_usage with
+    # tokens read from the stored state.
+    assert len(token_calls) >= 2, f"expected >=2 calls, got {token_calls}"
+
+
+def test_aggregate_astream_tokens_no_propagate_swallows_aggregate_error(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """Lines 1094-1095: the ``except`` clause in
+    ``_aggregate_astream_tokens_no_propagate`` must be hit when
+    ``_aggregate_astream_tokens`` raises on the no-payload failure path.
+    """
+    import app.agents.runtime as runtime_mod
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry, checkpointer=InMemorySaver())
+
+    original_start = runtime_mod.start_run_span
+    runtime_mod.start_run_span = lambda **_: type(  # type: ignore[assignment]
+        "_S",
+        (),
+        {
+            "__enter__": lambda s: s,
+            "__exit__": lambda s, *a: None,
+            "set_result": lambda s, r: None,
+            "set_token_usage": lambda s, i, o: None,
+        },
+    )()
+
+    agent = fresh_registry.get("echo")
+    real_astream = agent.astream
+    original_agg = runtime._aggregate_astream_tokens  # noqa: SLF001
+
+    async def boom_agg(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("agg boom in no_propagate")
+
+    runtime._aggregate_astream_tokens = boom_agg  # type: ignore[method-assign]  # noqa: SLF001
+
+    async def boom_astream(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("no values before boom")
+        yield  # noqa: unreachable -- makes it an async generator
+
+    agent.astream = boom_astream  # type: ignore[method-assign]
+
+    try:
+        async def collect() -> None:
+            async for _ in runtime.astream("echo", {"text": "x"}):
+                pass
+
+        # Must propagate AgentExecutionError (not the RuntimeError from agg).
+        with pytest.raises(AgentExecutionError):
+            asyncio.run(collect())
+    finally:
+        runtime_mod.start_run_span = original_start  # type: ignore[assignment]
+        runtime._aggregate_astream_tokens = original_agg  # type: ignore[method-assign]  # noqa: SLF001
+        agent.astream = real_astream  # type: ignore[method-assign]
+
+
+class _ApiIoFailure(Exception):
+    """Module-level: qualname = '_ApiIoFailure', no network markers in name."""
+
+
+_ApiIoFailure.__module__ = "requests.exceptions"
+
+
+def test_agent_execution_error_classifies_module_based_error() -> None:
+    """errors.py line 43: the module-based network-error branch must be
+    reachable when the exception's class-qualname does not contain a network
+    marker but its ``__module__`` does (e.g. a plain Exception from the
+    ``requests`` package).
+
+    The class is defined at module level so its qualname is just
+    ``_ApiIoFailure`` (no function name prefix that could contain "network").
+    """
+    from app.agents.errors import AgentExecutionError
+
+    exc = AgentExecutionError("echo", cause=_ApiIoFailure("api failed"))
+    assert exc.detail["details"]["cause_kind"] == "network_error"
+
+
+# ---------------------------------------------------------------------------
+# Coverage for llm.py:555-562 — extract_cache_token_usage
+# ---------------------------------------------------------------------------
+
+
+def test_extract_cache_token_usage_none_message() -> None:
+    """llm.py line 555-556: None input returns (0, 0) immediately."""
+    from app.agents.llm import extract_cache_token_usage
+
+    assert extract_cache_token_usage(None) == (0, 0)
+
+
+def test_extract_cache_token_usage_with_dict_metadata() -> None:
+    """llm.py lines 558-561: dict usage_metadata returns (read, creation)."""
+    from langchain_core.messages import AIMessage
+
+    from app.agents.llm import extract_cache_token_usage
+
+    msg = AIMessage(
+        content="hi",
+        usage_metadata={
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "total_tokens": 15,
+            "cache_read_input_tokens": 7,
+            "cache_creation_input_tokens": 3,
+        },
+    )
+    assert extract_cache_token_usage(msg) == (7, 3)
+
+
+def test_extract_cache_token_usage_no_cache_fields() -> None:
+    """llm.py line 562: dict usage_metadata without cache keys returns (0, 0)."""
+    from langchain_core.messages import AIMessage
+
+    from app.agents.llm import extract_cache_token_usage
+
+    msg = AIMessage(content="hi", usage_metadata={"input_tokens": 5, "output_tokens": 2, "total_tokens": 7})
+    assert extract_cache_token_usage(msg) == (0, 0)
+
+
+def test_extract_cache_token_usage_non_dict_metadata() -> None:
+    """llm.py line 562: non-dict usage_metadata (e.g. None attr) returns (0, 0)."""
+    from app.agents.llm import extract_cache_token_usage
+
+    class _FakeMsg:
+        usage_metadata = None
+
+    assert extract_cache_token_usage(_FakeMsg()) == (0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Coverage for task_vector_pg.py:107 — fetch_vector_neighbours_for_project_async
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_vector_neighbours_for_project_async_delegates_to_sync() -> None:
+    """task_vector_pg.py line 107: async wrapper calls sync function via to_thread."""
+    from unittest.mock import patch
+
+    from app.agents import task_vector_pg
+    from app.config import Settings
+
+    cfg = Settings(agent_vector_search_enabled=False)
+    captured: list[dict] = []
+
+    def fake_sync(**kwargs: object) -> list:
+        captured.append(dict(kwargs))
+        return []
+
+    async def _run() -> None:
+        with patch.object(
+            task_vector_pg,
+            "fetch_vector_neighbours_for_project",
+            fake_sync,
+        ):
+            result = await task_vector_pg.fetch_vector_neighbours_for_project_async(
+                project_id="proj",
+                query_embedding=[0.1, 0.2],
+                settings=cfg,
+            )
+        assert result == []
+        assert captured[0]["project_id"] == "proj"
+
+    asyncio.run(_run())

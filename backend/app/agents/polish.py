@@ -201,6 +201,15 @@ class PolishStep(Generic[_SchemaT]):
         self._schema = schema
         self._fallback_fn = fallback_fn
         self._redact = redact
+        # Weakly cache the structured-output chain per model instance so we
+        # never call ``with_structured_output`` more than once per model.
+        # Weak keys avoid id() collisions when a test-local mock model is
+        # GC'd and its address is reused by a subsequent mock.
+        import weakref
+
+        self._chain_cache: "weakref.WeakKeyDictionary[Any, Any]" = (
+            weakref.WeakKeyDictionary()
+        )
 
         if cap_field is not None:
             _field_name, _max_chars = cap_field
@@ -248,10 +257,11 @@ class PolishStep(Generic[_SchemaT]):
         from app.agents.llm import extract_token_usage, is_stub_model
         from langchain_core.messages import HumanMessage
 
-        fallback = self._fallback_fn(state)
+        def _lazy_fallback() -> Any:
+            return self._fallback_fn(state)
 
         if is_stub_model(model):
-            return self._merge_fn(state, fallback), 0, 0
+            return self._merge_fn(state, _lazy_fallback()), 0, 0
 
         # Build prompt
         raw_prompt = self._prompt_fn(state)
@@ -267,14 +277,17 @@ class PolishStep(Generic[_SchemaT]):
             messages = raw_prompt
 
         try:
-            try:
-                structured = model.with_structured_output(
-                    self._schema, include_raw=True, method="json_schema"
-                )
-            except TypeError:
-                structured = model.with_structured_output(
-                    self._schema, include_raw=True
-                )
+            structured = self._chain_cache.get(model)
+            if structured is None:
+                try:
+                    structured = model.with_structured_output(
+                        self._schema, include_raw=True, method="json_schema"
+                    )
+                except TypeError:
+                    structured = model.with_structured_output(
+                        self._schema, include_raw=True
+                    )
+                self._chain_cache[model] = structured
             response = await structured.ainvoke(messages)
         except Exception:  # noqa: BLE001
             logger.warning(
@@ -282,7 +295,7 @@ class PolishStep(Generic[_SchemaT]):
                 self._schema.__name__,
                 exc_info=True,
             )
-            return self._merge_fn(state, fallback), 0, 0
+            return self._merge_fn(state, _lazy_fallback()), 0, 0
 
         raw_msg, parsed, parse_error = unpack_structured_response(response)
         tokens_in, tokens_out = extract_token_usage(raw_msg)
@@ -293,7 +306,7 @@ class PolishStep(Generic[_SchemaT]):
                 self._schema.__name__,
                 type(parsed).__name__,
             )
-            return self._merge_fn(state, fallback), tokens_in, tokens_out
+            return self._merge_fn(state, _lazy_fallback()), tokens_in, tokens_out
 
         return self._merge_fn(state, parsed), tokens_in, tokens_out
 

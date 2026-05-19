@@ -266,3 +266,22 @@ def test_assert_embeddings_provider_available_warns_on_dim_mismatch(
             settings=_settings(embeddings_dimensions=STUB_EMBEDDING_DIM + 16),
         )
     assert any("Embedding width changed" in rec.message for rec in caplog.records)
+
+
+def test_assert_embeddings_provider_available_logs_info_for_openai(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Startup always logs the configured dimension at INFO so operators can
+    spot mismatches without waiting for a query to fail."""
+
+    spec = EmbeddingsSpec(
+        provider=PROVIDER_OPENAI, model="text-embedding-3-small", api_key="sk-x"
+    )
+    with caplog.at_level("INFO", logger=embeddings_module.__name__):
+        assert_embeddings_provider_available(
+            spec,
+            settings=_settings(embeddings_dimensions=STUB_EMBEDDING_DIM),
+        )
+    assert any(
+        "Embeddings provider=openai" in rec.message for rec in caplog.records
+    )

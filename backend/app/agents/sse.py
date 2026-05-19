@@ -22,10 +22,10 @@ one, or many envelope dicts ready to be JSON-encoded into the SSE
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Iterable, Optional
 
+import orjson
 from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,15 @@ logger = logging.getLogger(__name__)
 _INTERRUPT_KEY = "__interrupt__"
 
 
+_PRIMITIVE_TYPES = (str, int, float, bool, type(None))
+_FAST_PATH_TYPES = (str, int, float, bool, type(None))
+
+
+def _is_scalar(v: Any) -> bool:
+    """Return True if ``v`` is a JSON-primitive (no encoding needed)."""
+    return isinstance(v, _PRIMITIVE_TYPES)
+
+
 def _to_jsonable(value: Any) -> Any:
     """Best-effort coercion to a JSON-serializable value.
 
@@ -44,29 +53,22 @@ def _to_jsonable(value: Any) -> Any:
     objects. A truly unserialisable value falls back to a structured
     envelope (so the FE keeps seeing dicts under ``data``) instead of
     a bare ``repr`` string the discriminator cannot parse.
+
+    Fast-path: top-level scalars and plain dicts whose values are all
+    scalars are returned immediately without invoking ``jsonable_encoder``.
     """
+
+    # Fast-path: top-level scalar
+    if isinstance(value, _FAST_PATH_TYPES):
+        return value
+
+    # Fast-path: plain dict with all scalar values
+    if type(value) is dict and all(_is_scalar(v) for v in value.values()):
+        return value
 
     try:
         encoded = jsonable_encoder(value)
     except (TypeError, ValueError):
-        try:
-            json.dumps(value)
-            return value
-        except TypeError:
-            logger.warning(
-                "SSE chunk could not be JSON-encoded; emitting placeholder.",
-                exc_info=True,
-            )
-            return {"__unserializable__": type(value).__name__}
-
-    # ``jsonable_encoder`` can return a structure that ``json.dumps``
-    # subsequently rejects (e.g. it walked into a nested ``object()``
-    # and surfaced it as-is). Validate once so the SSE writer does not
-    # 500 the whole stream on a single bad chunk; the placeholder lets
-    # the rest of the response continue.
-    try:
-        json.dumps(encoded)
-    except TypeError:
         logger.warning(
             "SSE chunk could not be JSON-encoded; emitting placeholder.",
             exc_info=True,
@@ -75,7 +77,7 @@ def _to_jsonable(value: Any) -> Any:
 
     # ``jsonable_encoder`` can return ``{}`` for arbitrary instances that do
     # not expose encodable attributes (no exception). Treat that as failure
-    # so we emit the same placeholder as the ``json.dumps`` fallback path.
+    # so we emit the same placeholder as the encode fallback path.
     if encoded == {} and not isinstance(
         value, (dict, list, tuple, str, int, float, bool, type(None))
     ):
@@ -245,13 +247,15 @@ def encode_sse(envelope: dict[str, Any]) -> bytes:
     """
 
     try:
-        body = json.dumps(envelope)
+        body = orjson.dumps(envelope).decode()
     except (TypeError, ValueError):
         logger.warning(
             "SSE envelope failed final JSON encode; substituting error frame.",
             exc_info=True,
         )
-        body = json.dumps(error_envelope("invalid stream chunk", code="encode_error"))
+        body = orjson.dumps(
+            error_envelope("invalid stream chunk", code="encode_error")
+        ).decode()
     return f"data: {body}\n\n".encode("utf-8")
 
 

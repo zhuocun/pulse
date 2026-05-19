@@ -54,7 +54,10 @@ def enforce_request_limits(
     # cheaper upper-bound estimate without whitespace inflation.  Still
     # needed because clients can omit Content-Length (chunked transfer)
     # and to defend against payloads that decompress past the header.
-    body_size = len(json.dumps(payload, separators=(",", ":")))
+    # Encode to UTF-8 bytes: multi-byte CJK/emoji chars count as 1 codepoint
+    # but 3-4 bytes; measuring codepoints would allow those payloads to bypass
+    # the limit.
+    body_size = len(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     if body_size > _MAX_BODY_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

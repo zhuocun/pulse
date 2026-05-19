@@ -8,6 +8,7 @@ this path.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -85,6 +86,31 @@ def fetch_vector_neighbours_for_project(
             }
         )
     return out
+
+
+async def fetch_vector_neighbours_for_project_async(
+    *,
+    project_id: str,
+    query_embedding: list[float],
+    limit: int = 8,
+    settings: Optional[Settings] = None,
+) -> list[dict[str, Any]]:
+    """Async wrapper around :func:`fetch_vector_neighbours_for_project`.
+
+    Runs the synchronous ``psycopg.connect`` call inside
+    :func:`asyncio.to_thread` so the event loop is not blocked while the
+    database round-trip completes. The catalog's ``_shared.py`` call site
+    should prefer this async variant; the sync function is kept for
+    backward-compatibility and direct test use.
+    """
+
+    return await asyncio.to_thread(
+        fetch_vector_neighbours_for_project,
+        project_id=project_id,
+        query_embedding=query_embedding,
+        limit=limit,
+        settings=settings,
+    )
 
 
 def merge_similar_with_vector_hits(

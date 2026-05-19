@@ -33,7 +33,10 @@ from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
     fetch_snapshot_node,
+    make_usage_message,
     merge_keyed_string_updates,
+    resolve_chat_model,
+    truncate_snapshot,
 )
 from app.agents.context import ChatContext
 from app.agents.polish import PolishStep
@@ -44,29 +47,6 @@ from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
-
-# Cap how much board snapshot we forward to the provider. Real boards
-# can carry hundreds of tasks; the headline / nudge prompt only needs
-# enough context to recognise drift, and a 200kB snapshot wastes the
-# context window.
-_SNAPSHOT_TRUNCATION = {
-    "tasks": 20,
-    "columns": 12,
-    "members": 25,
-}
-
-
-def _truncate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of ``snapshot`` with bulky list fields capped."""
-
-    if not isinstance(snapshot, dict):
-        return snapshot
-    out = dict(snapshot)
-    for key, cap in _SNAPSHOT_TRUNCATION.items():
-        items = snapshot.get(key)
-        if isinstance(items, list) and len(items) > cap:
-            out[key] = items[:cap]
-    return out
 
 
 _FE_NUDGE_SEVERITY = {
@@ -175,7 +155,7 @@ def _build_triage_prompt(state: dict[str, Any]) -> str:
         }
         for idx, n in enumerate(deterministic_nudges)
     ]
-    safe_snapshot = redact_dict(_truncate_snapshot(board_snapshot))
+    safe_snapshot = redact_dict(truncate_snapshot(board_snapshot))
     safe_nudges = redact_dict(nudge_summaries)
     hint = state.get("_profile_hint")
     hint_suffix = ""
@@ -250,18 +230,7 @@ async def _polish_triage(
     if profile_hint:
         _state["_profile_hint"] = profile_hint
     update, tokens_in, tokens_out = await _triage_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -327,10 +296,7 @@ class TriageAgent(BaseAgent):
         detect_drift = detect_drift_node
 
         async def generate_nudges(state: TriageState) -> dict[str, Any]:
-            # Prefer the per-call context model; fall back to the default.
-            _rt = get_runtime(ChatContext)
-            _ctx = _rt.context or {}
-            chat_model: BaseChatModel = _ctx.get("chat_model") or _default_model
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             nudges = _nudges_for(drift)
             board_snapshot = state.get("board_snapshot") or {}
@@ -341,7 +307,8 @@ class TriageAgent(BaseAgent):
                 profile_hint=state.get("profile_hint"),
             )
             # F-43: project_id is now in context, not state.
-            project_id = _ctx.get("project_id") or ""
+            from langgraph.runtime import get_runtime as _get_runtime
+            project_id = str((_get_runtime(ChatContext).context or {}).get("project_id") or "")
             # Demo-state visibility: a no-drift board used to surface zero
             # nudges with no signal, indistinguishable from "agent never ran".
             # Emit a single "healthy" nudge so the panel is never silently

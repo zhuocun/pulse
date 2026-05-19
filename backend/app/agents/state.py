@@ -10,6 +10,7 @@ Shared-field mixins (``WithBoardSnapshot``, ``WithDriftResult``,
 declarations via multiple inheritance rather than repeating them.
 """
 
+import itertools
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import BaseMessage
@@ -27,20 +28,26 @@ def add_events(
     the typed event list. Both ``left`` and ``right`` may be ``None``
     (e.g. on the very first superstep before any node has run), which is
     normalised to an empty list so the final value is always a plain list.
+
+    Fix 7: unpacking avoids an intermediate list allocation vs
+    ``list(left or []) + list(right or [])``.
     """
 
-    return list(left or []) + list(right or [])
+    return [*(left or []), *(right or [])]
 
 
 def merge_mutation_applied_ids(
     left: list[str] | None,
     right: list[str] | None,
 ) -> list[str]:
-    """Append-only dedup list of proposal ids that finished the apply FE-tool."""
+    """Append-only dedup list of proposal ids that finished the apply FE-tool.
+
+    Fix 7: ``itertools.chain`` avoids a temporary concatenated list.
+    """
 
     seen: set[str] = set()
     out: list[str] = []
-    for item in list(left or ()) + list(right or ()):
+    for item in itertools.chain(left or (), right or ()):
         if item in seen:
             continue
         seen.add(item)

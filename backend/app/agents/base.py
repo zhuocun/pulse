@@ -121,6 +121,21 @@ class AgentMetadata:
                 raise ValueError(
                     f"Agent allowed_autonomy entries must be one of {_valid_autonomy!r}",
                 )
+        # Fix 9: Eagerly compute and cache the context_schema dict so that
+        # repeated ``as_dict()`` calls (e.g. on every API list request) pay
+        # ``get_type_hints`` cost at most once per agent instance.
+        schema = self.context_schema
+        if schema is not None and hasattr(schema, "__annotations__"):
+            try:
+                hints = get_type_hints(schema, include_extras=True)
+                _schema_dict: Optional[dict[str, Any]] = {
+                    k: getattr(v, "__name__", str(v)) for k, v in hints.items()
+                }
+            except (TypeError, NameError):
+                _schema_dict = {}
+        else:
+            _schema_dict = None
+        object.__setattr__(self, "_cached_schema_dict", _schema_dict)
 
     def as_dict(self) -> dict[str, Any]:
         """Return the wire-shape the FE consumes for the agent picker."""
@@ -137,17 +152,7 @@ class AgentMetadata:
             "recursion_limit": self.recursion_limit,
             "tags": list(self.tags),
         }
-        schema = self.context_schema
-        if schema is not None and hasattr(schema, "__annotations__"):
-            try:
-                hints = get_type_hints(schema, include_extras=True)
-                out["context_schema"] = {
-                    k: getattr(v, "__name__", str(v)) for k, v in hints.items()
-                }
-            except (TypeError, NameError):
-                out["context_schema"] = {}
-        else:
-            out["context_schema"] = None
+        out["context_schema"] = self._cached_schema_dict  # type: ignore[attr-defined]
         return out
 
 
@@ -172,27 +177,24 @@ class BaseAgent(ABC):
             raise TypeError(
                 f"{type(self).__name__} must define a class-level 'metadata'",
             )
-        # Cache the (checkpointer, store, compiled) triple so identity
-        # comparisons (``is``) drive invalidation. We keep strong refs to
-        # both persistence objects while they are cached; ``id()`` would
-        # be unsafe because CPython recycles ids after GC (review F-4).
-        self._compiled: Optional[Pregel] = None
-        self._compiled_checkpointer: Any = None
-        self._compiled_store: Any = None
+        # Fix 4: Cache the (compiled, checkpointer, store) triple as a single
+        # atomic tuple so that a reader never sees a partially-updated state.
+        # Identity (``is``) comparisons drive invalidation; ``id()`` recycling
+        # is safe here because the runtime holds strong refs to both
+        # persistence objects for its lifetime.
+        self._compiled_state: Optional[tuple[Pregel, Any, Any]] = None
         # ``threading.Lock`` guards cache-field writes from sync ``compile()``
         # and from the cache-update step of async ``acompile()``; this keeps
         # cross-path consistency when sync ``invoke()`` (in a threadpool) and
         # async ``astream()`` (on the event loop) race the first build.  The
-        # critical section is brief — only the three field assignments — so
+        # critical section is brief -- only the one tuple assignment -- so
         # holding it from an async path doesn't block the loop meaningfully.
         self._build_lock = threading.Lock()
-        # ``asyncio.Lock`` serialises concurrent async waiters during a cache
-        # miss, replacing the prior pattern of dispatching the entire compile
-        # via ``asyncio.to_thread`` so that all waiters could share one
-        # ``threading.Lock``.  The fast (cache-hit) path takes neither lock —
-        # an attribute read is atomic enough for one-shot graph compilation
-        # whose result, once cached, never changes for the life of the agent.
-        self._async_build_lock = asyncio.Lock()
+        # Fix 3: ``asyncio.Lock`` serialises concurrent async waiters during a
+        # cache miss.  Created lazily so that constructing an agent in one
+        # event-loop does not bind the lock to that loop -- Python 3.12 warns
+        # if you await a lock created in a different loop context.
+        self._async_build_lock: Optional[asyncio.Lock] = None
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -254,15 +256,30 @@ class BaseAgent(ABC):
         # Hold the build lock while clearing so we don't race with a
         # concurrent compile() or acompile() that may be mid-build.
         with self._build_lock:
-            if self._compiled is not None:
+            if self._compiled_state is not None:
                 logger.debug(
                     "set_chat_model called on %r after compile(); "
                     "next compile() will rebuild with the new model.",
                     self.metadata.name,
                 )
-            self._compiled = None
-            self._compiled_checkpointer = None
-            self._compiled_store = None
+            self._compiled_state = None
+
+    def _get_async_build_lock(self) -> asyncio.Lock:
+        """Return the async build lock, creating it lazily (Fix 3).
+
+        Lazy creation avoids binding the lock to a specific event loop at
+        agent construction time -- Python 3.12 warns when you ``await`` a
+        lock that was created in a different loop context, which happens in
+        tests that spin up fresh event loops per test.
+        """
+        lock = self._async_build_lock
+        if lock is None:
+            with self._build_lock:
+                lock = self._async_build_lock
+                if lock is None:
+                    lock = asyncio.Lock()
+                    self._async_build_lock = lock
+        return lock
 
     def _cache_hit(
         self,
@@ -273,21 +290,19 @@ class BaseAgent(ABC):
         """Return ``True`` when the cached compile matches the supplied
         ``(checkpointer, store)`` pair and ``force`` is not set.
 
-        Identity (``is``) comparison is intentional: ``id()`` recycling
-        cannot short-circuit a rebuild to a stale graph because the
-        runtime hands a single pair to every agent for its lifetime,
-        so cache hits dominate in production.  Reading ``self._compiled``
-        without a lock is safe — Python attribute reads are atomic and
-        the cache fields are only ever transitioned ``None → built``
-        (never invalidated mid-flight outside :meth:`set_chat_model`,
-        which is documented as test-only).
+        Identity (``is``) comparison is intentional: the runtime hands a
+        single pair to every agent for its lifetime so cache hits dominate
+        in production.  Reading ``self._compiled_state`` without a lock is
+        safe -- Python attribute reads are atomic and the tuple is only ever
+        transitioned ``None -> (compiled, cp, store)`` (never partially
+        updated) except in :meth:`set_chat_model`, which is test-only.
         """
-
+        state = self._compiled_state
         return (
             not force
-            and self._compiled is not None
-            and self._compiled_checkpointer is checkpointer
-            and self._compiled_store is store
+            and state is not None
+            and state[1] is checkpointer
+            and state[2] is store
         )
 
     def compile(
@@ -307,14 +322,13 @@ class BaseAgent(ABC):
         """
 
         if self._cache_hit(checkpointer, store, force):
-            return self._compiled
+            return self._compiled_state[0]  # type: ignore[index]
         with self._build_lock:
             if self._cache_hit(checkpointer, store, force):
-                return self._compiled
-            self._compiled = self.build(checkpointer=checkpointer, store=store)
-            self._compiled_checkpointer = checkpointer
-            self._compiled_store = store
-            return self._compiled
+                return self._compiled_state[0]  # type: ignore[index]
+            compiled = self.build(checkpointer=checkpointer, store=store)
+            self._compiled_state = (compiled, checkpointer, store)
+            return compiled
 
     async def acompile(
         self,
@@ -333,8 +347,8 @@ class BaseAgent(ABC):
           entire compile through :func:`asyncio.to_thread` purely so all
           waiters could share one ``threading.Lock``.
         - :attr:`_build_lock` (a ``threading.Lock``) is held briefly only
-          for the three cache-field writes, keeping cross-path
-          consistency with sync :meth:`compile` from a threadpool.
+          for the tuple write, keeping cross-path consistency with sync
+          :meth:`compile` from a threadpool.
 
         The actual ``self.build()`` call is dispatched to
         :func:`asyncio.to_thread` because graph compilation is CPU-bound
@@ -343,18 +357,16 @@ class BaseAgent(ABC):
         """
 
         if self._cache_hit(checkpointer, store, force):
-            return self._compiled
-        async with self._async_build_lock:
+            return self._compiled_state[0]  # type: ignore[index]
+        async with self._get_async_build_lock():
             if self._cache_hit(checkpointer, store, force):
-                return self._compiled
+                return self._compiled_state[0]  # type: ignore[index]
             compiled = await asyncio.to_thread(
                 self.build, checkpointer=checkpointer, store=store
             )
             with self._build_lock:
-                self._compiled = compiled
-                self._compiled_checkpointer = checkpointer
-                self._compiled_store = store
-            return self._compiled
+                self._compiled_state = (compiled, checkpointer, store)
+            return compiled
 
     @staticmethod
     def _normalize_input(inputs: Any) -> Any:
@@ -379,10 +391,11 @@ class BaseAgent(ABC):
         checkpointer: Optional[BaseCheckpointSaver] = None,
         store: Optional[BaseStore] = None,
     ) -> Any:
+        # Fix 8: pass config directly -- LangGraph already accepts Mapping.
         graph = self.compile(checkpointer=checkpointer, store=store)
         return graph.invoke(
             self._normalize_input(inputs),
-            config=dict(config) if config else None,
+            config=config,
             context=context,
         )
 
@@ -395,10 +408,11 @@ class BaseAgent(ABC):
         checkpointer: Optional[BaseCheckpointSaver] = None,
         store: Optional[BaseStore] = None,
     ) -> Any:
+        # Fix 8: pass config directly -- LangGraph already accepts Mapping.
         graph = await self.acompile(checkpointer=checkpointer, store=store)
         return await graph.ainvoke(
             self._normalize_input(inputs),
-            config=dict(config) if config else None,
+            config=config,
             context=context,
         )
 
@@ -419,10 +433,11 @@ class BaseAgent(ABC):
         so consumers can fan them out to SSE / WebSocket / log sinks.
         """
 
+        # Fix 8: pass config directly -- LangGraph already accepts Mapping.
         graph = await self.acompile(checkpointer=checkpointer, store=store)
         async for event in graph.astream(
             self._normalize_input(inputs),
-            config=dict(config) if config else None,
+            config=config,
             context=context,
             stream_mode=list(stream_mode),
         ):

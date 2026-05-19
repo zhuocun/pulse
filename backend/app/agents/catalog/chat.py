@@ -61,6 +61,37 @@ _SYSTEM_PROMPT = (
     "ground every factual claim in a tool result."
 )
 
+# Fix 12: Anthropic prompt-caching marker on the system message.
+# langchain-anthropic >=1.4.3 serialises the ``cache_control`` key in
+# content blocks to the Anthropic API so the provider can cache the
+# system prompt across turns in the same session.  Non-Anthropic providers
+# ignore unknown content-block keys, so this is safe on all providers.
+_SYSTEM_MESSAGE = SystemMessage(
+    content=[
+        {
+            "type": "text",
+            "text": _SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+)
+
+# Fix 5: Hoist bind_tools to build() time.
+# Binding tools to a model is pure decoration (no I/O, no side effects);
+# repeated calls with the same model instance produce byte-identical
+# results. Cache the bound model so every ``respond`` invocation in the
+# same process reuses the already-configured instance rather than
+# re-wrapping it on every turn.
+_bound_cache: dict[int, BaseChatModel] = {}
+
+
+def _get_bound(model: BaseChatModel) -> BaseChatModel:
+    """Return ``model.bind_tools(CHAT_TOOLS)``, caching by object identity."""
+    key = id(model)
+    if key not in _bound_cache:
+        _bound_cache[key] = model.bind_tools(CHAT_TOOLS)
+    return _bound_cache[key]
+
 _STUB_MUTATION_TRIGGER = "__PROPOSE_MUTATION__"
 _TASK_ID_RE = re.compile(r"__TASK_ID__:([a-fA-F0-9]{24})__")
 # Visible marker on the AIMessage when the live provider failed and we are
@@ -371,9 +402,9 @@ class ChatAgent(BaseAgent):
                     if isinstance(msg, HumanMessage):
                         trimmed = [msg]
                         break
-            conversation: List[Any] = [SystemMessage(content=_SYSTEM_PROMPT)]
+            conversation: List[Any] = [_SYSTEM_MESSAGE]
             conversation.extend(trimmed)
-            bound = chat_model.bind_tools(CHAT_TOOLS)
+            bound = _get_bound(chat_model)
             try:
                 raw = await bound.ainvoke(conversation)
             except (asyncio.CancelledError, GeneratorExit):

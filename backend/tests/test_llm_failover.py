@@ -9,6 +9,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.agents.llm import (
+    DEFAULT_ANTHROPIC_MODEL,
+    DEFAULT_OPENAI_MODEL,
     PROVIDER_ANTHROPIC,
     PROVIDER_OPENAI,
     PROVIDER_STUB,
@@ -60,7 +62,6 @@ def test_failover_secondary_none_for_stub_provider() -> None:
     )
     assert _failover_secondary_spec(spec, Settings(openai_api_key="sk")) is None
 
-
     cfg = Settings(agent_chat_model_failover="none")
     spec = MagicMock()
     spec.provider = PROVIDER_ANTHROPIC
@@ -78,9 +79,17 @@ def test_wrap_cross_provider_skips_stub_primary() -> None:
 def test_wrap_cross_provider_failover_invokes_with_fallbacks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    primary = MagicMock()
+    # Failover re-instantiates both models with max_retries=0. Track calls.
     chained = MagicMock()
-    primary.with_fallbacks.return_value = chained
+    calls: list[MagicMock] = []
+
+    def fake_instantiate(_spec: object) -> MagicMock:
+        m = MagicMock()
+        if not calls:
+            m.with_fallbacks.return_value = chained
+        calls.append(m)
+        return m
+
     resolved = MagicMock(
         provider=PROVIDER_ANTHROPIC,
         model="m",
@@ -90,15 +99,15 @@ def test_wrap_cross_provider_failover_invokes_with_fallbacks(
         timeout_seconds=1.0,
     )
     cfg = Settings(openai_api_key="sk-open", agent_chat_model_failover="auto")
-    monkeypatch.setattr(
-        "app.agents.llm._instantiate_chat_model", lambda _spec: MagicMock()
-    )
+    monkeypatch.setattr("app.agents.llm._instantiate_chat_model", fake_instantiate)
     monkeypatch.setattr("app.agents.llm.is_stub_model", lambda _m: False)
 
-    out = _wrap_cross_provider_failover(primary, resolved, cfg)
+    original_primary = MagicMock()
+    out = _wrap_cross_provider_failover(original_primary, resolved, cfg)
     assert out is chained
-    primary.with_fallbacks.assert_called_once()
-    args, kwargs = primary.with_fallbacks.call_args
+    assert len(calls) == 2  # primary and secondary both re-instantiated with max_retries=0
+    calls[0].with_fallbacks.assert_called_once()
+    args, kwargs = calls[0].with_fallbacks.call_args
     assert args[0]  # fallbacks non-empty
     assert "exceptions_to_handle" in kwargs
 
@@ -171,7 +180,10 @@ def test_failover_secondary_returns_none_for_unknown_provider() -> None:
 
 
 def test_wrap_returns_primary_when_secondary_is_stub(monkeypatch: pytest.MonkeyPatch) -> None:
-    primary = MagicMock()
+    # When _instantiate_chat_model always returns a stub, the new_primary is a stub
+    # too (is_stub_model returns True for it) so we skip failover entirely and
+    # return the re-instantiated primary (which is also a stub).
+    original_primary = MagicMock()
     resolved = ChatModelSpec(
         provider=PROVIDER_ANTHROPIC,
         model="c",
@@ -185,8 +197,9 @@ def test_wrap_returns_primary_when_secondary_is_stub(monkeypatch: pytest.MonkeyP
     stub = GenericFakeChatModel(messages=itertools.cycle([sample]))
     monkeypatch.setattr("app.agents.llm._instantiate_chat_model", lambda _s: stub)
 
-    out = _wrap_cross_provider_failover(primary, resolved, cfg)
-    assert out is primary
+    out = _wrap_cross_provider_failover(original_primary, resolved, cfg)
+    # Both re-instantiations return the stub; out is the re-instantiated primary stub.
+    assert isinstance(out, GenericFakeChatModel)
 
 
 def test_wrap_swallows_otel_exporter_failures(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,3 +228,118 @@ def test_wrap_swallows_otel_exporter_failures(monkeypatch: pytest.MonkeyPatch) -
         MagicMock(side_effect=RuntimeError("no sdk")),
     )
     _wrap_cross_provider_failover(primary, resolved, cfg)
+
+
+# ---------------------------------------------------------------------------
+# Cross-provider secondary model ID fix
+# ---------------------------------------------------------------------------
+
+
+def test_failover_secondary_anthropic_to_openai_uses_openai_default_model() -> None:
+    """When primary is Anthropic, secondary must use OpenAI default, NOT the
+    Anthropic model id from agent_chat_model_id."""
+
+    spec = ChatModelSpec(
+        provider=PROVIDER_ANTHROPIC,
+        model="claude-sonnet-4-6",
+        temperature=0.2,
+        api_key="ak-ant",
+        max_retries=2,
+        timeout_seconds=30.0,
+    )
+    cfg = Settings(
+        openai_api_key="sk-open",
+        agent_chat_model_failover="auto",
+        # Simulate operator setting an Anthropic model id
+        agent_chat_model_id="claude-sonnet-4-6",
+    )
+    sec = _failover_secondary_spec(spec, cfg)
+    assert sec is not None
+    assert sec.provider == PROVIDER_OPENAI
+    # Must NOT be the Anthropic id
+    assert sec.model == DEFAULT_OPENAI_MODEL
+    assert "claude" not in sec.model
+
+
+def test_failover_secondary_openai_to_anthropic_uses_anthropic_default_model() -> None:
+    """Symmetric: primary OpenAI -> secondary must use Anthropic default."""
+
+    spec = ChatModelSpec(
+        provider=PROVIDER_OPENAI,
+        model="gpt-4o-mini",
+        temperature=0.2,
+        api_key="sk-open",
+        max_retries=2,
+        timeout_seconds=30.0,
+    )
+    cfg = Settings(
+        anthropic_api_key="ak-ant",
+        agent_chat_model_failover="auto",
+        agent_chat_model_id="gpt-4o-mini",
+    )
+    sec = _failover_secondary_spec(spec, cfg)
+    assert sec is not None
+    assert sec.provider == PROVIDER_ANTHROPIC
+    assert sec.model == DEFAULT_ANTHROPIC_MODEL
+    assert "gpt" not in sec.model
+
+
+# ---------------------------------------------------------------------------
+# max_retries=0 enforcement when failover is active
+# ---------------------------------------------------------------------------
+
+
+def test_failover_forces_max_retries_zero_on_both_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both primary and secondary must be instantiated with max_retries=0."""
+
+    captured_specs: list[object] = []
+
+    def capturing_instantiate(spec: object) -> MagicMock:
+        captured_specs.append(spec)
+        m = MagicMock()
+        if len(captured_specs) == 1:
+            chained = MagicMock()
+            m.with_fallbacks.return_value = chained
+        return m
+
+    monkeypatch.setattr("app.agents.llm._instantiate_chat_model", capturing_instantiate)
+    monkeypatch.setattr("app.agents.llm.is_stub_model", lambda _m: False)
+
+    resolved = ChatModelSpec(
+        provider=PROVIDER_ANTHROPIC,
+        model="claude-sonnet-4-6",
+        temperature=0.2,
+        api_key="ak",
+        max_retries=3,  # original has retries
+        timeout_seconds=30.0,
+    )
+    cfg = Settings(openai_api_key="sk-open", agent_chat_model_failover="auto")
+    primary = MagicMock()
+    _wrap_cross_provider_failover(primary, resolved, cfg)
+
+    assert len(captured_specs) == 2
+    for spec in captured_specs:
+        assert getattr(spec, "max_retries") == 0, (
+            f"Expected max_retries=0, got {getattr(spec, 'max_retries')}"
+        )
+
+
+def test_no_failover_preserves_configured_max_retries() -> None:
+    """Without failover, max_retries from config is kept."""
+
+    spec = ChatModelSpec(
+        provider=PROVIDER_ANTHROPIC,
+        model="claude-sonnet-4-6",
+        temperature=0.2,
+        api_key="ak",
+        max_retries=3,
+        timeout_seconds=30.0,
+    )
+    # No openai key -> no secondary -> no failover
+    cfg = Settings(openai_api_key="", agent_chat_model_failover="auto")
+    sec = _failover_secondary_spec(spec, cfg)
+    assert sec is None  # failover not activated
+    # The spec's max_retries is untouched
+    assert spec.max_retries == 3

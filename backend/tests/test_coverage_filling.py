@@ -1392,9 +1392,9 @@ def test_v1_engine_least_loaded_member_with_only_invalid_entries() -> None:
 
 
 def test_v1_engine_jaccard_returns_zero_for_empty_inputs() -> None:
-    from app.agents.catalog.task_drafting import _jaccard
+    from app.agents.catalog._shared import jaccard
 
-    assert _jaccard([], []) == 0.0
+    assert jaccard([], []) == 0.0
 
 
 def test_v1_engine_estimate_skips_non_dict_and_non_string_id_tasks() -> None:
@@ -1804,17 +1804,37 @@ def test_catalog_discover_propagates_import_errors(
 def test_sse_to_jsonable_placeholder_when_encoded_not_json_serializable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``jsonable_encoder`` can return a structure ``json.dumps`` rejects."""
+    """Top-level scalar fast-path returns the value directly; non-fast-path
+    objects whose ``jsonable_encoder`` raises fall back to the placeholder.
+
+    The redundant ``json.dumps`` probe was removed (Fix 1); unserializable
+    results from ``jsonable_encoder`` are now caught at the ``encode_sse``
+    level.  This test covers the scalar fast-path (line 63) and the
+    ``jsonable_encoder`` raise branch on a non-fast-path input.
+    """
 
     from app.agents import sse as sse_module
 
+    # --- Scalar fast-path (covers the ``return value`` on line 63) ---
+    assert sse_module._to_jsonable(42) == 42
+    assert sse_module._to_jsonable("hello") == "hello"
+    assert sse_module._to_jsonable(None) is None
+    assert sse_module._to_jsonable(True) is True
+
+    # --- jsonable_encoder raise path on a non-fast-path input ---
+    # A bare object() is not in _FAST_PATH_TYPES and is not a plain-scalar dict,
+    # so it reaches jsonable_encoder.  When that raises, we get the placeholder.
     monkeypatch.setattr(
         sse_module,
         "jsonable_encoder",
-        lambda _v: {"nested": object()},
+        lambda _v: (_ for _ in ()).throw(TypeError("not encodable")),
     )
-    out = sse_module._to_jsonable({"ignored": True})
-    assert out == {"__unserializable__": "dict"}
+
+    class _Opaque:
+        pass
+
+    out = sse_module._to_jsonable(_Opaque())
+    assert out == {"__unserializable__": "_Opaque"}
 
 
 def test_sse_to_jsonable_falls_back_when_encoder_raises_but_json_dumps_works(
@@ -1907,7 +1927,7 @@ def test_catalog_register_all_fatal_on_broken_factory(
 def test_triage_truncate_snapshot_caps_oversized_lists() -> None:
     """Bulky tasks/columns/members lists are clipped before LLM dispatch."""
 
-    from app.agents.catalog.triage import _truncate_snapshot
+    from app.agents.catalog._shared import truncate_snapshot
 
     snapshot = {
         "tasks": list(range(50)),
@@ -1915,7 +1935,7 @@ def test_triage_truncate_snapshot_caps_oversized_lists() -> None:
         "members": list(range(40)),
         "project_id": "p1",
     }
-    out = _truncate_snapshot(snapshot)
+    out = truncate_snapshot(snapshot)
     assert len(out["tasks"]) == 20
     assert len(out["columns"]) == 12
     assert len(out["members"]) == 25
@@ -1923,9 +1943,9 @@ def test_triage_truncate_snapshot_caps_oversized_lists() -> None:
 
 
 def test_truncate_snapshot_passthrough_for_non_dict() -> None:
-    from app.agents.catalog.triage import _truncate_snapshot
+    from app.agents.catalog._shared import truncate_snapshot
 
-    assert _truncate_snapshot("nope") == "nope"  # type: ignore[arg-type]
+    assert truncate_snapshot("nope") == "nope"  # type: ignore[arg-type]
 
 
 def test_be_tools_detect_drift_honours_explicit_per_column_wip_limit() -> None:
@@ -2026,29 +2046,29 @@ def test_v1_chat_returns_504_on_timeout(
 
 
 def test_task_drafting_jaccard_non_empty_inputs() -> None:
-    """_jaccard returns the correct Jaccard score for non-empty token sets."""
-    from app.agents.catalog.task_drafting import _jaccard
+    """jaccard returns the correct Jaccard score for non-empty token sets."""
+    from app.agents.catalog._shared import jaccard
 
-    assert _jaccard(["a", "b"], ["b", "c"]) == pytest.approx(1 / 3)
+    assert jaccard(["a", "b"], ["b", "c"]) == pytest.approx(1 / 3)
 
 
 def test_task_drafting_clamp_fibonacci_midpoint() -> None:
-    """_clamp_fibonacci takes the closest candidate, updating both variables."""
-    from app.agents.catalog.task_drafting import _clamp_fibonacci
+    """clamp_fibonacci takes the closest candidate, updating both variables."""
+    from app.agents.catalog._shared import clamp_fibonacci
 
     # 4 is equidistant between 3 and 5; 5 wins because the loop updates closest
     # as soon as a strictly-smaller delta is found -- but the result is 5.
-    result = _clamp_fibonacci(4)
+    result = clamp_fibonacci(4)
     assert result in (3, 5)  # Either is a valid Fibonacci snap.
     # 7 is closest to 8.
-    assert _clamp_fibonacci(7) == 8
+    assert clamp_fibonacci(7) == 8
 
 
 def test_task_estimation_jaccard_est_zero_for_empty() -> None:
-    """_jaccard_est returns 0.0 when both sets are empty."""
-    from app.agents.catalog.task_estimation import _jaccard_est
+    """jaccard returns 0.0 when both sets are empty."""
+    from app.agents.catalog._shared import jaccard
 
-    assert _jaccard_est(set(), set()) == 0.0
+    assert jaccard(set(), set()) == 0.0
 
 
 def test_search_jaccard_zero_for_empty() -> None:
