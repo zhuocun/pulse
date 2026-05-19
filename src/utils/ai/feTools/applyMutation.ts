@@ -1,13 +1,23 @@
-import { message } from "antd";
-import type { CSSProperties } from "react";
-import React from "react";
-
-import type { MutationDiff, TaskUpdate } from "../../../interfaces/agent";
-import { ANALYTICS_EVENTS, track } from "../../../constants/analytics";
-import { microcopy } from "../../../constants/microcopy";
-import filterRequest from "../../filterRequest";
+import type { MutationDiff } from "../../../interfaces/agent";
 import type { FeTool } from "./types";
+import { applyApprovedMutationTool } from "./applyApprovedMutation";
+import { requestMutationApprovalTool } from "./requestMutationApproval";
 
+/**
+ * @deprecated Use `fe.requestMutationApproval` / `fe.applyApprovedMutation`
+ * for new agent code paths. This compatibility shim is preserved for
+ * (a) older agent prompts that still emit `fe.applyMutation` and
+ * (b) the existing FE call sites and test fixtures that pre-date the
+ * BE split (see PRD §5.5).
+ *
+ * The shim dispatches by the `stage` field:
+ *   - `stage: "approval"` → registers the pending mutation via
+ *     `fe.requestMutationApproval` and returns `{skipped: true}` so the
+ *     HITL pause in `useAgentToolResolver` still fires.
+ *   - `stage: "apply"`    → consumes the cached approval (synthesising
+ *     a one-shot approval id derived from the proposal id) and forwards
+ *     to `fe.applyApprovedMutation`.
+ */
 export type ApplyMutationArgs = {
     proposal_id: string;
     stage: "approval" | "apply";
@@ -15,14 +25,10 @@ export type ApplyMutationArgs = {
     diff?: MutationDiff;
 };
 
-const buildUndoPayload = (taskUpdates: TaskUpdate[]): MutationDiff => ({
-    task_updates: taskUpdates.map((u) => ({
-        task_id: u.task_id,
-        field: u.field,
-        from: u.from,
-        to: u.to
-    }))
-});
+const SHIM_APPROVAL_PREFIX = "shim::";
+
+const shimApprovalId = (proposalId: string): string =>
+    `${SHIM_APPROVAL_PREFIX}${proposalId}`;
 
 export const applyMutationTool: FeTool<
     ApplyMutationArgs,
@@ -30,100 +36,39 @@ export const applyMutationTool: FeTool<
 > = {
     name: "fe.applyMutation",
     description:
-        "Executes an approved board mutation (stage=apply) via task APIs and records server undo metadata.",
+        "Deprecated two-stage shim. Use fe.requestMutationApproval and fe.applyApprovedMutation instead.",
     run: async (args, ctx) => {
-        if (args.stage !== "apply") {
+        if (args.stage === "approval") {
+            // Register the pending diff via the new tool so the apply
+            // stage can hydrate from the same store.
+            requestMutationApprovalTool.run(
+                {
+                    approval_id: shimApprovalId(args.proposal_id),
+                    proposal_id: args.proposal_id,
+                    project_id: args.project_id,
+                    diff: args.diff
+                },
+                ctx
+            );
+            // Preserve the legacy return shape — the resolver treats this
+            // tool's "approval" stage as a HITL pause and the response is
+            // discarded.
             return { skipped: true as const };
         }
-        const api = ctx.apiRequest;
-        const projectId = (args.project_id || ctx.projectId || "").trim();
-        if (!api) {
-            return { error: "api_unavailable" as const };
-        }
-        if (!projectId) {
-            return { error: "missing_project_id" as const };
-        }
-        const taskUpdates = args.diff?.task_updates ?? [];
-        for (const u of taskUpdates) {
-            const body: Record<string, unknown> = {
-                _id: u.task_id,
-                projectId,
-                [u.field]: u.to
-            };
-            await api("tasks", {
-                method: "PUT",
-                data: filterRequest(body)
-            });
-        }
-        const undo = buildUndoPayload(taskUpdates);
-        await api("agents/mutations/record", {
-            method: "POST",
-            data: filterRequest({
+        const result = await applyApprovedMutationTool.run(
+            {
+                approval_id: shimApprovalId(args.proposal_id),
                 proposal_id: args.proposal_id,
-                project_id: projectId,
-                undo
-            })
-        });
-        await ctx.queryClient.invalidateQueries({
-            queryKey: ["tasks", { projectId }]
-        });
-        const key = `copilot-mutation-${args.proposal_id}`;
-        const undoBtnStyle: CSSProperties = {
-            background: "transparent",
-            border: 0,
-            color: "var(--ant-color-primary, #EA580C)",
-            cursor: "pointer",
-            font: "inherit",
-            fontWeight: 500,
-            marginInlineStart: 8,
-            minHeight: 44,
-            padding: "4px 8px",
-            textDecoration: "underline"
-        };
-        message.open({
-            type: "info",
-            duration: 10,
-            content: React.createElement(
-                "span",
-                null,
-                microcopy.mutation.applyToast,
-                " ",
-                React.createElement("button", {
-                    type: "button",
-                    style: undoBtnStyle,
-                    onClick: async () => {
-                        try {
-                            track(ANALYTICS_EVENTS.AGENT_PROPOSAL_UNDONE, {
-                                id: args.proposal_id,
-                                risk: "low"
-                            });
-                            await api("agents/mutations/undo", {
-                                method: "POST",
-                                data: filterRequest({
-                                    proposal_id: args.proposal_id,
-                                    project_id: projectId
-                                })
-                            });
-                            await ctx.queryClient.invalidateQueries({
-                                queryKey: ["tasks", { projectId }]
-                            });
-                            message.destroy(key);
-                            message.success(
-                                microcopy.mutation.undoApplied,
-                                1.5
-                            );
-                        } catch {
-                            message.error(
-                                microcopy.feedback.operationFailed,
-                                2
-                            );
-                        }
-                    },
-                    children: microcopy.ai.undoLabel
-                })
-            ),
-            key
-        });
-        return { ok: true as const, applied: true as const };
+                project_id: args.project_id,
+                diff: args.diff
+            },
+            ctx
+        );
+        if (result.status === "applied") {
+            return { ok: true as const, applied: true as const };
+        }
+        // Map the new failure envelope back to the legacy `{error: code}`
+        // shape so the existing call sites keep working.
+        return { error: result.details.error };
     }
 };
