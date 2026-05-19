@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.tools.fe_tool_names import (
+    FE_APPLY_APPROVED_MUTATION,
     FE_APPLY_MUTATION,
     FE_BOARD_SNAPSHOT,
     FE_FORM_DRAFT,
@@ -25,6 +26,7 @@ from app.tools.fe_tool_names import (
     FE_LIST_PROJECTS,
     FE_LIST_TASKS,
     FE_RECENT_ACTIVITY,
+    FE_REQUEST_MUTATION_APPROVAL,
     FE_SEARCH_CANDIDATES,
     FE_SIMILAR_TASKS,
     FE_VIEWER_CONTEXT,
@@ -298,8 +300,12 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["candidates"],
         },
     },
+    # DEPRECATED — multi-stage tool; new code uses the split pair below.
+    # Kept in the schema registry only so existing clients can still resolve
+    # legacy interrupt payloads while they migrate.
     FE_APPLY_MUTATION: {
         "description": (
+            "DEPRECATED — use requestMutationApproval + applyApprovedMutation. "
             "Board mutation HITL: ``stage=approval`` waits for "
             "``Command(resume={\"accepted\": <bool>})``; ``stage=apply`` "
             "executes ``diff`` on the FE against authenticated task APIs."
@@ -322,6 +328,80 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "applied": {"type": "boolean"},
                 "journal_replay": {"type": "boolean"},
             },
+        },
+    },
+    FE_REQUEST_MUTATION_APPROVAL: {
+        "description": (
+            "Request human approval for a board mutation. Pauses the graph "
+            "via interrupt; the FE renders a review card for the viewer and "
+            "resumes with ``Command(resume={'accepted': <bool>, "
+            "'edited_diff': <diff>?})``. Returns a stable approval_id the "
+            "agent must redeem via applyApprovedMutation."
+        ),
+        "args_schema": {
+            "type": "object",
+            "properties": {
+                "proposal_id": {"type": "string"},
+                "project_id": {"type": "string"},
+                "mutation": {
+                    "type": "object",
+                    "description": (
+                        "Full mutation payload (diff, description, risk, "
+                        "undoable). Mirrors the proposal shape on the "
+                        "mutation_proposal event."
+                    ),
+                },
+            },
+            "required": ["proposal_id"],
+            "additionalProperties": True,
+        },
+        "result_schema": {
+            "type": "object",
+            "properties": {
+                "approval_id": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": ["pending", "rejected", "approved"],
+                },
+                "explanation": {"type": "string"},
+            },
+            "required": ["approval_id", "status"],
+        },
+    },
+    FE_APPLY_APPROVED_MUTATION: {
+        "description": (
+            "Apply a mutation that has already been approved via "
+            "requestMutationApproval. The approval_id is the value returned "
+            "by that prior call; the FE re-validates the id against its "
+            "pending-approval cache and refuses if the viewer never accepted."
+        ),
+        "args_schema": {
+            "type": "object",
+            "properties": {
+                "approval_id": {"type": "string"},
+                "project_id": {"type": "string"},
+                "diff": {
+                    "type": "object",
+                    "description": (
+                        "Optional override of the approved diff; the FE "
+                        "rejects this if it does not match the approval's "
+                        "edited_diff (if any)."
+                    ),
+                },
+            },
+            "required": ["approval_id"],
+            "additionalProperties": True,
+        },
+        "result_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["applied", "failed"],
+                },
+                "details": {"type": "object"},
+            },
+            "required": ["status"],
         },
     },
 }

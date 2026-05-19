@@ -71,11 +71,16 @@ def test_chat_accept_applies_second_interrupt_then_finishes(chat_graph) -> None:
     async def run() -> None:
         cfg = {"configurable": {"thread_id": "mut-app-1"}}
         ctx = _ctx()
-        await chat_graph.ainvoke(
+        first = await chat_graph.ainvoke(
             {"messages": [HumanMessage(content="__PROPOSE_MUTATION__")]},
             config=cfg,
             context=ctx,
         )
+        # The approval interrupt now uses the split tool name.
+        first_interrupts = first.get("__interrupt__") or []
+        assert first_interrupts
+        first_payload = first_interrupts[0].value
+        assert first_payload["tool"] == "fe.requestMutationApproval"
         mid = await chat_graph.ainvoke(
             Command(resume={"accepted": True}),
             config=cfg,
@@ -84,10 +89,11 @@ def test_chat_accept_applies_second_interrupt_then_finishes(chat_graph) -> None:
         interrupts = mid.get("__interrupt__", [])
         assert interrupts
         payload = interrupts[0].value
-        assert payload["tool"] == "fe.applyMutation"
-        assert payload["args"]["stage"] == "apply"
+        assert payload["tool"] == "fe.applyApprovedMutation"
+        # New apply contract carries an approval_id, not a stage.
+        assert payload["args"]["approval_id"]
         final = await chat_graph.ainvoke(
-            Command(resume={"ok": True, "applied": True}),
+            Command(resume={"status": "applied", "details": {}}),
             config=cfg,
             context=ctx,
         )
@@ -117,7 +123,7 @@ def test_mutation_applied_ids_records_once(chat_graph) -> None:
             context=ctx,
         )
         done = await chat_graph.ainvoke(
-            Command(resume={"ok": True, "applied": True}),
+            Command(resume={"status": "applied", "details": {}}),
             config=cfg,
             context=ctx,
         )
@@ -227,7 +233,7 @@ def test_chat_apply_with_edited_diff_reaches_fe_apply(chat_graph) -> None:
         interrupts = mid.get("__interrupt__") or []
         assert interrupts, "expected the apply-stage interrupt"
         payload = interrupts[0].value
-        assert payload["args"]["stage"] == "apply"
+        assert payload["tool"] == "fe.applyApprovedMutation"
         assert payload["args"]["diff"] == edited
 
     asyncio.run(run())

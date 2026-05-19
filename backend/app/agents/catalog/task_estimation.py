@@ -41,9 +41,11 @@ from app.agents.catalog._shared import (
     token_set,
 )
 from app.agents.context import ChatContext
+from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.state import TaskEstimationState
+from app.agents.tool_envelope import wrap_tool_result
 from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
@@ -159,7 +161,9 @@ def _build_readiness_prompt(state: dict[str, Any]) -> str:
     safe_draft = redact_task_fields(draft)
     safe_issues = redact_dict(issues)
     return (
-        "Rewrite the message and suggestion strings for each readiness "
+        COPILOT_IDENTITY
+        + "\n\n"
+        + "Rewrite the message and suggestion strings for each readiness "
         "issue below so they are specific and actionable for this Jira-"
         "style task draft. Keep each string <=160 chars and on a single "
         "line. Preserve the field id verbatim; do not invent new fields. "
@@ -223,13 +227,16 @@ def _build_rationale_prompt(state: dict[str, Any]) -> str:
     neighbours = state["_neighbours"]
     safe_draft = redact_task_fields(draft)
     safe_neighbours = redact_dict(neighbours[:3])
+    fenced_neighbours = wrap_tool_result(FE_SIMILAR_TASKS, safe_neighbours)
     return (
-        "Write a single-line, <=180-character rationale for this story-point "
+        COPILOT_IDENTITY
+        + "\n\n"
+        + "Write a single-line, <=180-character rationale for this story-point "
         "estimate. Keep tone factual; reference the provided neighbours "
         "if helpful. Do not propose a different point value. Return the "
         "structured schema.\n\n"
         f"Draft: {json.dumps(safe_draft)}\nPoints: {points}\n"
-        f"Neighbours: {json.dumps(safe_neighbours)}"
+        f"Neighbours: {fenced_neighbours}"
     )
 
 
