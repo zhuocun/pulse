@@ -30,7 +30,18 @@ import {
 
 import useApi from "./useApi";
 
-const MAX_TOOL_ROUNDS = 5;
+/**
+ * Client-side defensive cap on tool-call rounds within a single chat turn.
+ *
+ * The BE now enforces a stricter `MAX_SERVER_TOOL_ROUNDS = 8` and emits a
+ * `tool_round_limit_exceeded` error when the agent loops past it. We keep
+ * the FE cap looser (10) so the FE doesn't preempt the server's typed
+ * error response — when the server hits its cap first the FE surfaces a
+ * specific user-friendly message via the error handler; when the FE cap
+ * trips first (e.g. local engine, BE unreachable) the legacy "too many
+ * steps" fallback still applies.
+ */
+const MAX_TOOL_ROUNDS = 10;
 
 const humanizeTool = (name: string) =>
     name.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
