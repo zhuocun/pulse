@@ -399,15 +399,15 @@
       "dependsOn": [
         "fix-be-resume-budget"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-42f537f9-e625-40ae-a8d2-772f6217d5de",
+      "runId": "run-bd25e0dc-798e-459d-a336-489115944fce",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:32:00.317Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:32:00.317Z",
+      "lastUpdate": "2026-05-19T05:32:02.777Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -622,17 +622,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:32:02.779Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:32:02.779Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     }
   ],
   "attention": [
@@ -787,6 +788,10 @@
     {
       "at": "2026-05-19T05:32:00.316Z",
       "message": "verify-fix-be-resume-budget: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:32:02.779Z",
+      "message": "merge-bug-sweep: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
