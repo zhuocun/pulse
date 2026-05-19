@@ -169,15 +169,15 @@
       "dependsOn": [
         "fix-task-assist-estimate-deps"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-9ced81ce-87e2-4eda-a18f-a075cda8f27c",
+      "runId": "run-5708e58f-e9c6-4794-95e2-3bb98e477875",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:29:12.023Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:29:12.023Z",
+      "lastUpdate": "2026-05-19T05:29:14.995Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -218,17 +218,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:29:14.997Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:29:14.997Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-i18n-select-placeholders",
@@ -737,6 +738,10 @@
     {
       "at": "2026-05-19T05:29:12.023Z",
       "message": "verify-fix-task-assist-estimate-deps: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:29:14.996Z",
+      "message": "verify-fix-ai-draft-modal-guards: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
