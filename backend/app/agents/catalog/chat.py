@@ -526,6 +526,7 @@ class ChatAgent(BaseAgent):
                     "events": [event],
                     "mutation_pending": proposal_dict,
                     "mutation_decision": None,
+                    "tool_rounds_used": tool_rounds_used,
                 }
 
             if is_stub_model(chat_model):
@@ -535,6 +536,7 @@ class ChatAgent(BaseAgent):
                     "messages": [response],
                     "mutation_pending": None,
                     "mutation_decision": None,
+                    "tool_rounds_used": tool_rounds_used,
                 }
 
             # Token-budget trim with two safety properties beyond the prior
@@ -610,6 +612,7 @@ class ChatAgent(BaseAgent):
                     "messages": [response],
                     "mutation_pending": None,
                     "mutation_decision": None,
+                    "tool_rounds_used": tool_rounds_used,
                 }
             if isinstance(raw, AIMessage):
                 response = raw

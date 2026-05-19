@@ -32,11 +32,15 @@ from typing import Any
 
 # Action verbs we treat as "executing": present-tense or first-person.
 # "Will/about to/going to/proceed to/then" stays on the verb side because we
-# want to flag promises of future action, not narrative past tense.
+# want to flag promises of future action, not narrative past tense.  The
+# optional ``also``/``then``/``and`` slot in front of the verb catches
+# secondary actions that share an earlier intent prefix, e.g.
+# "I'll rename ... and then archive ...".
 _ACTION_VERB_RE = re.compile(
     r"\b(?:i'll|i\s+will|i\s+am\s+going\s+to|i'm\s+going\s+to|going\s+to|"
     r"about\s+to|proceed\s+to|next\s+(?:i'll|i\s+will)|then\s+i'll|"
-    r"also\s+(?:i'll|i\s+will|going\s+to|about\s+to))\s+"
+    r"also\s+(?:i'll|i\s+will|going\s+to|about\s+to))"
+    r"(?:\s+(?:also|then|and|also\s+then|then\s+also))?\s+"
     r"(?:delete|remove|archive|reassign|rename|move|update|create|"
     r"change|edit|drop|clear|reset|merge|split|close|reopen|assign)\b",
     re.IGNORECASE,
