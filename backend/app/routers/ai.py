@@ -204,59 +204,6 @@ def _maybe_unwrap_legacy_payload(
     return _unwrap_envelope(payload, key)
 
 
-def _gate(
-    request: Request,
-    user_id: str,
-    project_id: Optional[str],
-    *,
-    rate_limiter: RateLimitBackend,
-    budget_tracker: BudgetBackend,
-    metadata: Optional[AgentMetadata] = None,
-    agent_label: str = "v1-shim",
-) -> None:
-    """Run project access + rate-limit + budget gates for a v1 request.
-
-    The rate-limit budget is read from ``metadata.rate_limit`` when
-    available so a chat call shares the same allowance as the
-    ``chat-agent`` v2 surface. Without metadata (the structured routes
-    aren't backed by an agent today) the limiter falls back to the
-    default ``(60, 600)``.
-
-    Rate-limit / budget rejections are also surfaced to the
-    Prometheus counter using ``agent_label`` as the agent dimension --
-    operators can then SLO ``rate_limited`` / ``budget_exhausted`` per
-    v1 route the same way they would for a v2 agent.
-    """
-
-    if not is_project_ai_enabled(project_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "AI is disabled for this project"},
-        )
-    if project_id and not is_project_manager(project_id, user_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Forbidden"},
-        )
-    limits = metadata.rate_limit if metadata is not None else DEFAULT_LIMIT
-    allowed, retry_after = rate_limiter.check(agent_label, user_id, limits=limits)
-    if not allowed:
-        record_invocation(agent_label, "rate_limited")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"error": "rate limit exceeded"},
-            headers={"Retry-After": str(retry_after)},
-        )
-    if project_id and not budget_tracker.can_spend(project_id, tokens=1):
-        record_invocation(agent_label, "budget_exhausted")
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={"error": "project budget exhausted"},
-            headers={"X-Reason": "budget"},
-        )
-    request.state.redaction_spans = []
-
-
 def _gate_with_reservation(
     request: Request,
     user_id: str,

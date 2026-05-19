@@ -194,7 +194,9 @@ describe("ProjectModal", () => {
         renderProjectModal({ type: "open" });
 
         expect(
-            await screen.findByRole("dialog", { name: zhCN.actions.createProject })
+            await screen.findByRole("dialog", {
+                name: zhCN.actions.createProject
+            })
         ).toBeInTheDocument();
         expect(
             screen.getByText(zhCN.placeholders.selectManager)

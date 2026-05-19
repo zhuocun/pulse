@@ -113,9 +113,7 @@ describe("AiTaskDraftModal", () => {
 
         const taskNameInput = await screen.findByDisplayValue(/./);
         fireEvent.change(taskNameInput, { target: { value: "   " } });
-        fireEvent.click(
-            screen.getByRole("button", { name: /create task/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /create task/i }));
 
         await waitFor(() => {
             expect(fetchMock).not.toHaveBeenCalled();

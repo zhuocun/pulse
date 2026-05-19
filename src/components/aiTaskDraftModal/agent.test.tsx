@@ -211,13 +211,10 @@ describe("AiTaskDraftModal — remote agent path", () => {
             }
         });
 
-        const taskNameInput = await screen.findByDisplayValue(
-            "Agent-drafted task"
-        );
+        const taskNameInput =
+            await screen.findByDisplayValue("Agent-drafted task");
         fireEvent.change(taskNameInput, { target: { value: "   " } });
-        fireEvent.click(
-            screen.getByRole("button", { name: /create task/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /create task/i }));
 
         await waitFor(() => {
             expect(fetchMock).not.toHaveBeenCalled();

@@ -203,7 +203,9 @@ describe("TaskModal", () => {
         expect(
             screen.getByText(zhCN.placeholders.selectStoryPoints)
         ).toBeInTheDocument();
-        expect(screen.queryByText(/Select story points/i)).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(/Select story points/i)
+        ).not.toBeInTheDocument();
     });
 
     it("opens from the URL, populates fields, and renders cached select options", async () => {

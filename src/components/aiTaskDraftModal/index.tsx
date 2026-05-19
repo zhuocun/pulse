@@ -26,10 +26,7 @@ import { microcopy } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
 import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
-import {
-    validateBreakdown,
-    validateDraft
-} from "../../utils/ai/validate";
+import { validateBreakdown, validateDraft } from "../../utils/ai/validate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useApi from "../../utils/hooks/useApi";
@@ -667,8 +664,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                             {
                                 required: true,
                                 whitespace: true,
-                                message:
-                                    microcopy.validation.taskNameRequired
+                                message: microcopy.validation.taskNameRequired
                             }
                         ]}
                     >

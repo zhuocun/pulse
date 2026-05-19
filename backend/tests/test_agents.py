@@ -3379,6 +3379,168 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     ai_rate_limit_backend.reset()
 
 
+def test_async_resolve_project_id_reads_sync_checkpoint_tuple() -> None:
+    """Checkpointers with only ``get_tuple`` still supply resume ``project_id``."""
+
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _CheckpointTuple:
+        metadata = {"project_id": "p-from-sync-checkpoint"}
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> _CheckpointTuple:
+            return _CheckpointTuple()
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) == "p-from-sync-checkpoint"
+
+
+def test_async_resolve_project_id_sync_checkpoint_without_get_tuple() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _NoTupleCheckpointer:
+        pass
+
+    class _StubRuntime:
+        checkpointer = _NoTupleCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_sync_checkpoint_lookup_failure() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _BrokenCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> Any:
+            raise RuntimeError("checkpoint read failed")
+
+    class _StubRuntime:
+        checkpointer = _BrokenCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_sync_checkpoint_returns_none_tuple() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> None:
+            return None
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_ignores_empty_checkpoint_metadata() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _CheckpointTuple:
+        metadata = "not-a-dict"
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> _CheckpointTuple:
+            return _CheckpointTuple()
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
 def test_router_invoke_resume_returns_402_when_budget_exhausted_without_client_project_id(
     client: TestClient,
     auth_headers: dict[str, str],

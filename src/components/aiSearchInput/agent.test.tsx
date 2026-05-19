@@ -343,13 +343,11 @@ describe("AiSearchInput — remote agent path", () => {
         const clearSuggestion = jest.fn();
         const submittedQuery = "fix flaky login button issue";
 
-        let agentState: Pick<
-            UseAgentResult,
-            "isStreaming" | "lastSuggestion"
-        > = {
-            isStreaming: false,
-            lastSuggestion: null
-        };
+        let agentState: Pick<UseAgentResult, "isStreaming" | "lastSuggestion"> =
+            {
+                isStreaming: false,
+                lastSuggestion: null
+            };
 
         mockedUseAgent.mockImplementation(() =>
             baseAgent({

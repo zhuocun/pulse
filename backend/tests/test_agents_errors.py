@@ -148,6 +148,14 @@ def test_agent_app_error_content_legacy_string_payload() -> None:
     }
 
 
+def test_agent_app_error_content_non_nested_dict_payload() -> None:
+    err = AgentError("plain", status_code=418)
+    err.detail = {"foo": "bar"}
+    content = agent_app_error_content(err)
+    assert content["error"]["code"] == "agent_error"
+    assert content["error"]["message"] == str(err)
+
+
 def test_agent_execution_error_cause_kind_database() -> None:
     err = AgentExecutionError("svc", cause=_OperationalError("conn reset"))
     assert err.detail["error"]["details"]["cause_kind"] == "database_error"

@@ -1245,6 +1245,93 @@ def test_resolve_polish_model_falls_back_when_agent_missing(
     assert ai_router  # module under test
 
 
+def test_estimate_returns_404_when_catalog_agent_not_registered(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Routes without ``agent_error_fallback`` propagate ``AgentNotFoundError``."""
+
+    from app.agents.errors import AgentNotFoundError
+
+    runtime = client.app.state.agent_runtime
+    original_get = runtime.get
+
+    def boom(name: str) -> Any:
+        if name == "task-estimation-agent":
+            raise AgentNotFoundError(name)
+        return original_get(name)
+
+    monkeypatch.setattr(runtime, "get", boom, raising=False)
+    response = client.post(
+        "/api/ai/estimate",
+        headers=auth_headers,
+        json={
+            "context": _project_context(),
+            "task_draft": {"taskName": "Fix login bug"},
+        },
+    )
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "agent_not_found"
+
+
+def test_task_draft_returns_502_when_agent_missing_and_stub_returns_none(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing catalog agent with a null stub fallback is a 502, not a 404."""
+
+    from app.agents.errors import AgentNotFoundError
+
+    runtime = client.app.state.agent_runtime
+    original_get = runtime.get
+
+    def boom(name: str) -> Any:
+        if name == "task-drafting-agent":
+            raise AgentNotFoundError(name)
+        return original_get(name)
+
+    monkeypatch.setattr(runtime, "get", boom, raising=False)
+    monkeypatch.setattr(td_module, "draft_task", lambda _p: None, raising=True)
+    response = client.post(
+        "/api/ai/task-draft",
+        headers=auth_headers,
+        json={"context": _project_context(), "prompt": "Fix login bug"},
+    )
+    assert response.status_code == HTTPStatus.BAD_GATEWAY
+    assert response.json()["error"]["code"] == "agent_unavailable"
+
+
+def test_task_draft_refunds_reservation_on_agent_error_fallback_success(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend: BudgetTracker,
+) -> None:
+    """Stub fallback after ``AgentError`` must not debit the monthly budget."""
+
+    from app.agents.errors import AgentError
+
+    project_id = "p-1"
+    before = ai_budget_backend.remaining(project_id)
+
+    async def _raise_agent_error(*args: Any, **kwargs: Any) -> Any:
+        raise AgentError("agent unavailable for test")
+
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "arun_with_events", _raise_agent_error, raising=False)
+
+    response = client.post(
+        "/api/ai/task-draft",
+        headers=auth_headers,
+        json={"context": _project_context(), "prompt": "Fix login bug"},
+    )
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["rationale"] == "Heuristic draft from prompt keywords."
+    assert ai_budget_backend.remaining(project_id) == before
+
+
 def test_polish_and_record_no_op_when_project_id_is_none(
     client: TestClient,
     auth_headers: dict[str, str],
@@ -2177,7 +2264,7 @@ def test_unwrap_envelope_ignores_non_dict_value(
 
 
 # ---------------------------------------------------------------------------
-# _gate rate_limited path (lines 169-170 in ai.py)
+# _gate_with_reservation rate_limited path
 # ---------------------------------------------------------------------------
 
 
@@ -2187,7 +2274,7 @@ def test_gate_records_rate_limited_on_429(
     monkeypatch: pytest.MonkeyPatch,
     ai_rate_limit_backend: RateLimiter,
 ) -> None:
-    """_gate emits record_invocation('rate_limited') and returns 429."""
+    """V1 gate emits record_invocation('rate_limited') and returns 429."""
     from app.observability import metrics as metrics_module
     from app.config import settings as app_settings
 
