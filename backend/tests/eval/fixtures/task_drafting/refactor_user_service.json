@@ -1,0 +1,26 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Refactor user_service.py — it has 1200 lines and four classes mixing storage and business logic.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Auth service split", "type": "feature", "epic": "Refactor", "storyPoints": 13, "columnId": "c-todo"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Extract repository layer from project_service"},
+      {"id": "t-old-2", "text": "Split task_service into modules"}
+    ]
+  },
+  "must_have": ["refactor", "user_service"],
+  "must_not": [],
+  "notes": "Refactor epic; large points (5-13)."
+}

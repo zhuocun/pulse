@@ -1,0 +1,29 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Set up CI for the staging branch so PRs get linted and tested before merge.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Fix login regression", "type": "bug", "epic": "Bug Fix", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-1"}
+      ],
+      "members": [
+        {"id": "m-1", "username": "alice"},
+        {"id": "m-2", "username": "bob"}
+      ]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Wire up GitHub Actions for the main branch"},
+      {"id": "t-old-2", "text": "Add lint step to PR pipeline"}
+    ]
+  },
+  "must_have": ["CI", "staging"],
+  "must_not": ["TODO", "lorem ipsum"],
+  "notes": "Typical infra task; should classify as Testing / Refactor / General with medium points."
+}

@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "Please reassign the unowned login bug to alice."}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Mutation request. With a real model the agent should propose a mutation (HITL); with the stub it just describes the change. Either way, the reply must not pretend the change happened."
+}

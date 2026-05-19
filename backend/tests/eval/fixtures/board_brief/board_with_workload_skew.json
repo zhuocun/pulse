@@ -1,0 +1,24 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Task A", "type": "feature", "epic": "General", "storyPoints": 8, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-2", "taskName": "Task B", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-3", "taskName": "Task C", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-1"},
+        {"id": "t-4", "taskName": "Task D", "type": "feature", "epic": "General", "storyPoints": 1, "columnId": "c-todo", "coordinatorId": "m-2"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    }
+  },
+  "must_have": ["alice"],
+  "must_not": [],
+  "notes": "Alice has 16 open points vs bob's 1. The workload list should expose this."
+}

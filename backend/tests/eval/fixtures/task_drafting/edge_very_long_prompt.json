@@ -1,0 +1,24 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "We need to migrate every legacy authentication path to use the new identity provider. This includes the SAML SSO flow, the legacy username/password local accounts, the OAuth integrations with GitHub and Google, the API token authentication used by service accounts, the magic-link email login used by customer support, and all related session management and token refresh flows. Each path must keep working during the migration window with a feature flag, telemetry must distinguish old and new paths, and we need a rollback plan that does not require a database restore. The new identity provider's API is documented but limits us to 100 requests per second per client which may force us to add a caching tier. Coordinate with security review and have a dry run on staging at least one week before the production cutover.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Auth provider migration plan"},
+      {"id": "t-old-2", "text": "Add feature flag to login"}
+    ]
+  },
+  "must_have": ["migrat"],
+  "must_not": [],
+  "notes": "Edge case: very long prompt. Title must be <=80 chars; estimate should be large (>=13)."
+}

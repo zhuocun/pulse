@@ -1,0 +1,15 @@
+{
+  "agent": "board_brief",
+  "input": {
+    "project_id": "p-eval-empty",
+    "board_snapshot": {
+      "project_id": "p-eval-empty",
+      "columns": [],
+      "tasks": [],
+      "members": []
+    }
+  },
+  "must_have": ["empty"],
+  "must_not": [],
+  "notes": "Edge: empty board. Brief should surface the empty-state headline, not zero counts."
+}

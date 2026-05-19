@@ -1,0 +1,17 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "onbording",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Onboarding tour for new users"},
+      {"id": "t-2", "text": "Fix login bug"},
+      {"id": "t-3", "text": "Empty state for backlog"},
+      {"id": "t-4", "text": "Walkthrough modal"}
+    ]
+  },
+  "must_have": ["t-1"],
+  "must_not": [],
+  "notes": "Typo: 'onbording' should still rank the onboarding task in the top result(s)."
+}

@@ -1,0 +1,18 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "slow dashboard performance",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Dashboard load time exceeds 5s"},
+      {"id": "t-2", "text": "Cache board snapshot to reduce queries"},
+      {"id": "t-3", "text": "Fix typo in copy"},
+      {"id": "t-4", "text": "Add pagination to task list"},
+      {"id": "t-5", "text": "Improve table rendering speed"}
+    ]
+  },
+  "must_have": ["t-1"],
+  "must_not": [],
+  "notes": "Multi-concept query. Top-ranked should be t-1; t-2, t-4, t-5 also relevant."
+}

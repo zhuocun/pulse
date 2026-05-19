@@ -1,0 +1,15 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval-empty",
+    "board_snapshot": {
+      "project_id": "p-eval-empty",
+      "columns": [],
+      "tasks": [],
+      "members": []
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: empty board. No nudges; must not crash."
+}

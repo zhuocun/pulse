@@ -1,0 +1,16 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "SSO Okta",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "SSO with Okta - configure SAML"},
+      {"id": "t-2", "text": "Login with Google"},
+      {"id": "t-3", "text": "Update README"}
+    ]
+  },
+  "must_have": ["t-1"],
+  "must_not": [],
+  "notes": "Direct match query; t-1 must be top."
+}

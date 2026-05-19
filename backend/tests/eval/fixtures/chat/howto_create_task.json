@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "How do I create a new task in this app?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Procedural question. Reply should be a short walkthrough; no tool calls required."
+}

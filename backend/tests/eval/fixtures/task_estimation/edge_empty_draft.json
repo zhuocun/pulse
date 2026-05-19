@@ -1,0 +1,14 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "",
+      "note": ""
+    },
+    "similar_tasks": []
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge: empty draft. storyPoints should default to a small Fibonacci, low confidence."
+}

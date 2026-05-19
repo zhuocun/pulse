@@ -1,0 +1,16 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "kubernetes operator",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Fix login bug"},
+      {"id": "t-2", "text": "Add docs"},
+      {"id": "t-3", "text": "Update copy"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Query has no real match; ranking should reflect low confidence and not invent matches."
+}

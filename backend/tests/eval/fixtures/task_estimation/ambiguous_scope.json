@@ -1,0 +1,14 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Improve checkout",
+      "note": "Make checkout better."
+    },
+    "similar_tasks": []
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Ambiguous scope, no neighbours. Confidence should be low; rationale should mention the ambiguity."
+}

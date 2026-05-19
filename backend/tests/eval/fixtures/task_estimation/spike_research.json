@@ -1,0 +1,16 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Spike: evaluate row-level security alternatives",
+      "note": "Compare Postgres RLS vs application-layer enforcement for multi-tenant access control. Produce a short doc with recommendation."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Spike: evaluate caching layers"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Time-boxed spike; magnitude ~ 3 points."
+}

@@ -1,0 +1,18 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "auth not working",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Fix login 500 on Safari"},
+      {"id": "t-2", "text": "Add onboarding tour"},
+      {"id": "t-3", "text": "SSO callback fails"},
+      {"id": "t-4", "text": "Update README"},
+      {"id": "t-5", "text": "Session cookie missing after redirect"}
+    ]
+  },
+  "must_have": ["t-1"],
+  "must_not": [],
+  "notes": "Synonym query: 'auth not working' should rank login/SSO/session tasks high."
+}

@@ -1,0 +1,22 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Feature A", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-todo", "coordinatorId": "m-1"},
+        {"id": "t-2", "taskName": "Feature B", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-doing", "coordinatorId": "m-2"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Healthy board; triage should emit 0 or low-severity nudges."
+}

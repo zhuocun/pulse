@@ -1,0 +1,17 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Migrate auth provider from in-house to Auth0",
+      "note": "Replace all auth code paths (SAML SSO, OAuth, magic-link, password) with Auth0 equivalents. Maintain feature parity, dual-mode flag, zero-downtime rollout, telemetry, rollback plan. Coordinate with security review."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Migrate sessions to new store"},
+      {"id": "t-old-2", "text": "Replace queue system"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Large effort (L). storyPoints should be >= 8."
+}

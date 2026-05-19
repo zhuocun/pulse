@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "I want to talk about the future of agile workflows. There are too many ceremonies, too many tickets, too many meetings, and not enough actual coding. The team is unhappy with the standup cadence. We have three projects in flight, two of which keep slipping their deadlines. Engineering wants to switch to async-only communication for everything except production incidents. The PMs want to stick with synchronous standups twice a week. Leadership wants a 30% reduction in cycle time. I would like to set up some experiments to figure out which of these directions actually moves cycle time, with metrics to back it up. Can you help me think through the experimental design and the metrics to capture?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Long open-ended question. Reply should be helpful and concise; do not parrot the question back."
+}
