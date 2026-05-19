@@ -529,15 +529,15 @@
       "dependsOn": [
         "fix-be-mutation-undo"
       ],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-7fc802d7-8c69-4bf8-b825-cea2055c2c10",
+      "runId": "run-0245084e-617e-4272-9be1-f06d6e03c4c4",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:28:44.665Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:28:44.665Z",
+      "lastUpdate": "2026-05-19T05:28:47.101Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -559,12 +559,12 @@
       "handoffPath": "handoffs/fix-be-thread-id-strict.md",
       "startedAt": "2026-05-19T05:27:04.019Z",
       "finishedAt": "2026-05-19T05:28:46.050Z",
-      "lastUpdate": "2026-05-19T05:28:46.051Z",
+      "lastUpdate": "2026-05-19T05:28:47.055Z",
       "note": null,
       "slackTs": null,
       "prNumber": 258,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -578,17 +578,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:28:47.103Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:28:47.103Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "merge-bug-sweep",
@@ -706,6 +707,14 @@
     {
       "at": "2026-05-19T05:28:44.665Z",
       "message": "verify-fix-be-mutation-undo: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:28:47.055Z",
+      "message": "fix-be-thread-id-strict: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:28:47.102Z",
+      "message": "verify-fix-be-thread-id-strict: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
