@@ -49,6 +49,8 @@ from app.agents.catalog._shared import (
     augment_items_with_vector_neighbours,
     cap_polished_text,
     filter_to_allowed_ids,
+    make_usage_message,
+    resolve_chat_model,
 )
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
@@ -331,18 +333,7 @@ async def _polish_search(
         return deterministic, None, 0, 0
     _state = {"_deterministic": deterministic, "_query": query, "_candidates": candidates}
     update, tokens_in, tokens_out = await _search_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -562,11 +553,7 @@ class SearchAgent(BaseAgent):
 
         async def polish(state: SearchState) -> dict[str, Any]:
             """LLM-polish the deterministic ranking."""
-            # Prefer the per-call context model; fall back to the default.
-            _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             candidates = state.get("candidates") or []
             query = state.get("query") or ""
             deterministic = state.get("ranking") or {"ids": [], "rationale": ""}

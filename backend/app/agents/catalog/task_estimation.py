@@ -32,8 +32,13 @@ from app.agents.catalog._schemas import (
 from app.agents.catalog._shared import (
     augment_items_with_vector_neighbours,
     build_citation_refs,
+    clamp_fibonacci,
     fetch_similar_node,
+    jaccard,
+    make_usage_message,
     merge_keyed_string_updates,
+    resolve_chat_model,
+    token_set,
 )
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
@@ -46,45 +51,6 @@ from app.tools.fe_tool_names import FE_SIMILAR_TASKS
 from app.tools.redaction import redact_dict, redact_task_fields
 
 
-# ---------------------------------------------------------------------------
-# v1-compatible deterministic helpers (ported from v1_engine.py).
-# These produce the exact same wire shapes as v1_engine.estimate /
-# v1_engine.readiness so the route can skip pre-calling v1_engine and the
-# parity tests continue to pass byte-identically.
-# ---------------------------------------------------------------------------
-
-import re as _re  # noqa: E402 — placed here to avoid polluting module top
-
-_TOKEN_RE_EST = _re.compile(r"[A-Za-z0-9]+")
-
-
-def _tokens_est(text: str) -> list[str]:
-    return [m.group(0).lower() for m in _TOKEN_RE_EST.finditer(text or "")]
-
-
-def _token_set_est(text: str) -> set[str]:
-    return set(_tokens_est(text))
-
-
-def _jaccard_est(a: set[str], b: set[str]) -> float:
-    union = a | b
-    if not union:
-        return 0.0
-    return len(a & b) / len(union)
-
-
-def _clamp_fibonacci_est(value: int) -> int:
-    """Snap ``value`` to the nearest Fibonacci point."""
-    closest = FIBONACCI_STORY_POINTS[0]
-    best = abs(value - closest)
-    for point in FIBONACCI_STORY_POINTS[1:]:
-        delta = abs(value - point)
-        if delta < best:
-            closest = point
-            best = delta
-    return closest
-
-
 def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Return an ``IEstimateSuggestion`` matching v1_engine.estimate wire shape.
 
@@ -95,7 +61,7 @@ def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     description = (payload.get("note") or "") + (payload.get("taskName") or "")
     context = payload.get("context") or {}
     tasks = context.get("tasks") or []
-    query_tokens = _token_set_est(description)
+    query_tokens = token_set(description)
     similars: list[tuple[str, float, str]] = []
     for task in tasks if isinstance(tasks, list) else []:
         if not isinstance(task, dict):
@@ -103,9 +69,9 @@ def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         task_id = task.get("_id")
         if not isinstance(task_id, str):
             continue
-        score = _jaccard_est(
+        score = jaccard(
             query_tokens,
-            _token_set_est((task.get("taskName") or "") + " " + (task.get("note") or "")),
+            token_set((task.get("taskName") or "") + " " + (task.get("note") or "")),
         )
         if score:
             reason = f"shares {int(score * 100)}% keywords"
@@ -113,9 +79,9 @@ def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     similars.sort(key=lambda triple: triple[1], reverse=True)
     top = similars[:3]
     avg_neighbour_points = (
-        sum(_clamp_fibonacci_est(point) for point in (3, 5, 3)) / 3 if top else 3
+        sum(clamp_fibonacci(point) for point in (3, 5, 3)) / 3 if top else 3
     )
-    points = _clamp_fibonacci_est(
+    points = clamp_fibonacci(
         int(round((len(description) / 80) + avg_neighbour_points))
     )
     confidence = 0.7 if top else 0.45
@@ -247,18 +213,7 @@ async def _polish_readiness(
         return deterministic, None, 0, 0
     _state = {"_deterministic": deterministic, "_draft": draft, "_issues": issues}
     update, tokens_in, tokens_out = await _readiness_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -304,18 +259,7 @@ async def _polish_rationale(
         "_neighbours": neighbours,
     }
     update, tokens_in, tokens_out = await _rationale_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -451,15 +395,28 @@ class TaskEstimationAgent(BaseAgent):
             query_text = draft.get("taskName", "")
             from app.config import settings as app_settings
 
+            # Fix 7: project_id is now in context, not state (F-43 convention).
+            _rt = get_runtime(ChatContext)
+            project_id = str((_rt.context or {}).get("project_id") or "")
+
             similar = await augment_items_with_vector_neighbours(
                 similar,
                 query_text=query_text,
-                project_id=str(state.get("project_id") or ""),
+                project_id=project_id,
                 settings=app_settings,
                 failure_log_message=(
                     "Vector-augmented similar merge failed; using FE list only."
                 ),
             )
+            # Fix 6: skip embedding when stub embedder is active AND vector
+            # search is disabled, OR the augmented corpus is empty -- calling
+            # embed_async in that case wastes a batch round-trip and produces
+            # scores that are meaningless for downstream confidence labels.
+            if not similar or (
+                be_tools.using_stub_embeddings()
+                and not getattr(app_settings, "agent_vector_search_enabled", False)
+            ):
+                return {"embedding_neighbors": []}
             corpus_texts = [item.get("text", "") for item in similar]
             corpus_ids = [item.get("id", str(idx)) for idx, item in enumerate(similar)]
             # Embed query and corpus in a single batched call so a load-
@@ -480,11 +437,7 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def estimate(state: TaskEstimationState) -> dict[str, Any]:
-            # Prefer the per-call context model; fall back to the default.
-            _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             pre_estimate = state.get("estimate")
             # ------------------------------------------------------------------
             # v1-shim path: route passes raw ``context_tasks`` (and the task
@@ -544,11 +497,7 @@ class TaskEstimationAgent(BaseAgent):
             }
 
         async def readiness(state: TaskEstimationState) -> dict[str, Any]:
-            # Prefer the per-call context model; fall back to the default.
-            _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             pre_readiness = state.get("readiness")
             # ------------------------------------------------------------------
             # v1-shim path: route passes raw ``context_tasks`` and the task

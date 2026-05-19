@@ -38,14 +38,166 @@ not standalone agents.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any, Callable, Optional
+
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage
 
 # Re-exported for backward compatibility; canonical implementations are in
 # app.agents.polish so all polish-related machinery lives in one module.
 from app.agents.polish import cap_polished_text, merge_keyed_string_updates
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Text-utility helpers shared across catalog agents (Fix 1).
+# Previously duplicated as _tokens/_token_set/_jaccard/_clamp_fibonacci in
+# task_drafting.py and _tokens_est/_token_set_est/_jaccard_est/
+# _clamp_fibonacci_est in task_estimation.py.
+# ---------------------------------------------------------------------------
+
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def tokens(text: str) -> list[str]:
+    """Return a lowercase token list for ``text``."""
+    return [m.group(0).lower() for m in _TOKEN_RE.finditer(text or "")]
+
+
+def token_set(text: str) -> set[str]:
+    """Return a set of lowercase tokens for ``text``."""
+    return set(tokens(text))
+
+
+def jaccard(a: Any, b: Any) -> float:
+    """Jaccard similarity between two token collections (sets or iterables)."""
+    a_set = set(a)
+    b_set = set(b)
+    union = a_set | b_set
+    if not union:
+        return 0.0
+    return len(a_set & b_set) / len(union)
+
+
+def clamp_fibonacci(value: int) -> int:
+    """Snap ``value`` to the nearest Fibonacci story-point (PRD §5.2)."""
+    from app.domain.story_points import FIBONACCI_STORY_POINTS
+
+    closest = FIBONACCI_STORY_POINTS[0]
+    best = abs(value - closest)
+    for point in FIBONACCI_STORY_POINTS[1:]:
+        delta = abs(value - point)
+        if delta < best:
+            closest = point
+            best = delta
+    return closest
+
+
+# ---------------------------------------------------------------------------
+# Usage-message helper (Fix 2).
+# Previously inlined as a 10-line AIMessage(...) block in every polish helper.
+# ---------------------------------------------------------------------------
+
+
+def make_usage_message(tokens_in: int, tokens_out: int) -> Optional[AIMessage]:
+    """Return an ``AIMessage`` carrying ``usage_metadata``, or ``None`` if both zero.
+
+    Callers include it in the node's ``messages`` return value so budget
+    tracking can aggregate token counts from the state without the 10-line
+    inline block being repeated in every polish function.
+    """
+    if not (tokens_in or tokens_out):
+        return None
+    return AIMessage(
+        content="",
+        usage_metadata={
+            "input_tokens": tokens_in,
+            "output_tokens": tokens_out,
+            "total_tokens": tokens_in + tokens_out,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shared chat-model resolution (Fix 3).
+# Previously inlined as three lines in every node that preferred a per-call
+# context model over the build-time default.
+# ---------------------------------------------------------------------------
+
+
+def resolve_chat_model(default_model: BaseChatModel) -> BaseChatModel:
+    """Return the per-call context chat model, or ``default_model`` as fallback.
+
+    The per-call model is injected by the runtime via
+    ``ChatContext.chat_model``; if the context is absent or the key is not
+    set, ``default_model`` (captured at build time) is returned.
+    """
+    from app.agents.context import ChatContext
+    from langgraph.runtime import get_runtime
+
+    _rt = get_runtime(ChatContext)
+    return (_rt.context or {}).get("chat_model") or default_model
+
+
+# ---------------------------------------------------------------------------
+# Shared suggestion-terminal helper (Fix 4).
+# Collects extra events and the payload AIMessage into a single dict return.
+# ---------------------------------------------------------------------------
+
+
+def emit_suggestion_terminal(
+    surface: str,
+    payload: dict,
+    *,
+    extra_events: Optional[list[dict]] = None,
+) -> dict:
+    """Return a ``{messages, events}`` dict for a terminal suggestion node.
+
+    Combines ``extra_events`` (e.g. citation events) with the mandatory
+    ``{"kind": "suggestion", "surface": surface, "payload": payload}`` event
+    and wraps ``payload`` in an ``AIMessage`` so the ``messages`` channel also
+    carries the result for callers that don't consume SSE events.
+    """
+    events: list[dict] = list(extra_events or [])
+    events.append({"kind": "suggestion", "surface": surface, "payload": payload})
+    return {
+        "messages": [AIMessage(content=json.dumps(payload))],
+        "events": events,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Snapshot truncation (Fix 10).
+# Previously only in triage.py as _SNAPSHOT_TRUNCATION + _truncate_snapshot.
+# board_brief.py now calls this too so the same cap is applied consistently.
+# ---------------------------------------------------------------------------
+
+
+def truncate_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    max_tasks: int = 20,
+    max_columns: int = 12,
+    max_members: int = 25,
+) -> dict[str, Any]:
+    """Return a copy of ``snapshot`` with bulky list fields capped.
+
+    Cap how much board snapshot we forward to the provider. Real boards can
+    carry hundreds of tasks; the headline / nudge prompt only needs enough
+    context to recognise drift, and a 200 kB snapshot wastes the context window.
+    """
+    if not isinstance(snapshot, dict):
+        return snapshot
+    caps = {"tasks": max_tasks, "columns": max_columns, "members": max_members}
+    out = dict(snapshot)
+    for key, cap in caps.items():
+        items = snapshot.get(key)
+        if isinstance(items, list) and len(items) > cap:
+            out[key] = items[:cap]
+    return out
 
 
 def filter_to_allowed_ids(
@@ -274,11 +426,19 @@ __all__ = [
     "augment_items_with_vector_neighbours",
     "build_citation_refs",
     "cap_polished_text",
+    "clamp_fibonacci",
     "detect_drift_node",
+    "emit_suggestion_terminal",
     "fetch_similar_node",
     "fetch_snapshot_node",
     "filter_to_allowed_ids",
+    "jaccard",
+    "make_usage_message",
     "merge_keyed_string_updates",
+    "resolve_chat_model",
+    "token_set",
+    "tokens",
+    "truncate_snapshot",
     "unpack_similar_payload",
     "unpack_structured_response",
 ]

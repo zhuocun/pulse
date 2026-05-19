@@ -11,6 +11,7 @@ with the deterministic stub the headline falls back to
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections import Counter
@@ -33,6 +34,9 @@ from app.agents.catalog._shared import (
     build_citation_refs,
     detect_drift_node,
     fetch_snapshot_node,
+    make_usage_message,
+    resolve_chat_model,
+    truncate_snapshot,
 )
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
@@ -162,7 +166,7 @@ def _compute_board_brief(context: dict[str, Any]) -> dict[str, Any]:
             "Reassign unowned bugs first; chunk large unstarted cards."
         )
     return {
-        "headline": headline[:140],
+        "headline": headline[:HEADLINE_MAX],
         "counts": counts,
         "largestUnstarted": largest_unstarted,
         "unowned": unowned,
@@ -356,18 +360,7 @@ async def _polish_headline(
     """
     _state = {"_deterministic": deterministic, "_facts": facts}
     update, tokens_in, tokens_out = await _headline_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -439,14 +432,14 @@ class BoardBriefAgent(BaseAgent):
         async def generate_brief(state: BoardBriefState) -> dict[str, Any]:
             # Prefer the per-call context model; fall back to the default
             # captured at build time for callers that don't inject a context.
-            _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             snapshot = state.get("board_snapshot") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
-            tasks = snapshot.get("tasks") or []
-            columns = snapshot.get("columns") or []
+            # Truncate snapshot before forwarding to provider context window
+            # (same cap as triage: tasks<=20, columns<=12, members<=25).
+            snapshot_for_prompt = truncate_snapshot(snapshot)
+            tasks = snapshot_for_prompt.get("tasks") or []
+            columns = snapshot_for_prompt.get("columns") or []
             # Build the set of done column ids using the same logic as the
             # drift detector (_is_done_column checks isDone flag + synonym set)
             # so boards with columns named "Completed", "Finished", etc. are
@@ -495,7 +488,7 @@ class BoardBriefAgent(BaseAgent):
                 **({"messages": extra_messages} if extra_messages else {}),
             }
 
-        def emit_citations(state: BoardBriefState) -> dict[str, Any]:
+        async def emit_citations(state: BoardBriefState) -> dict[str, Any]:
             brief = state.get("brief") or {}
             drift = state.get("drift_result") or {"signals": [], "severity": "info"}
             severity = drift.get("severity", "info")
@@ -509,18 +502,22 @@ class BoardBriefAgent(BaseAgent):
                 and project_id.strip()
             ):
                 ns = namespaces.project_profile(project_id.strip())
-                store.put(
-                    ns,
-                    "last_board_brief",
-                    {
-                        "drift_severity": severity,
-                        "signal_types": [
-                            s.get("type")
-                            for s in drift.get("signals", [])
-                            if isinstance(s, dict)
-                        ],
-                    },
-                )
+                put_value = {
+                    "drift_severity": severity,
+                    "signal_types": [
+                        s.get("type")
+                        for s in drift.get("signals", [])
+                        if isinstance(s, dict)
+                    ],
+                }
+                # Use aput when available to avoid blocking the event loop on
+                # Postgres writes; fall back to to_thread for sync-only stores.
+                if hasattr(store, "aput"):
+                    await store.aput(ns, "last_board_brief", put_value)
+                else:
+                    await asyncio.to_thread(
+                        store.put, ns, "last_board_brief", put_value
+                    )
             snapshot = state.get("board_snapshot") or {}
             tasks = snapshot.get("tasks") or []
             columns = snapshot.get("columns") or []

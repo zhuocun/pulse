@@ -15,8 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-import re
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
@@ -34,15 +33,17 @@ from app.agents.catalog._schemas import (
     TASKNAME_MAX,
 )
 from app.agents.catalog._shared import (
+    clamp_fibonacci,
     fetch_similar_node,
     fetch_snapshot_node,
+    make_usage_message,
+    resolve_chat_model,
+    token_set,
 )
 from app.agents.context import ChatContext
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
 from app.agents.polish import PolishStep
 from app.agents.state import TaskDraftingState
-from langgraph.runtime import get_runtime
-from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT, FE_SIMILAR_TASKS
 from app.tools.redaction import redact, redact_dict, redact_task_fields
 
@@ -85,52 +86,19 @@ _EPIC_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Testing", ("test", "tests", "coverage", "spec", "qa", "e2e")),
 )
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
-
-
-def _tokens(text: str) -> list[str]:
-    return [m.group(0).lower() for m in _TOKEN_RE.finditer(text or "")]
-
-
-def _token_set(text: str) -> set[str]:
-    return set(_tokens(text))
-
-
-def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
-    """Jaccard similarity between two token collections."""
-    a_set = set(a)
-    b_set = set(b)
-    union = a_set | b_set
-    if not union:
-        return 0.0
-    return len(a_set & b_set) / len(union)
-
-
-def _clamp_fibonacci(value: int) -> int:
-    """Snap ``value`` to the nearest Fibonacci point (PRD §5.2)."""
-    closest = FIBONACCI_STORY_POINTS[0]
-    best = abs(value - closest)
-    for point in FIBONACCI_STORY_POINTS[1:]:
-        delta = abs(value - point)
-        if delta < best:
-            closest = point
-            best = delta
-    return closest
-
-
 def _epic_for(prompt: str) -> str:
-    tokens = _token_set(prompt)
+    toks = token_set(prompt)
     for epic, hints in _EPIC_HINTS:
-        if tokens & set(hints):
+        if toks & set(hints):
             return epic
     return "General"
 
 
 def _type_for(prompt: str) -> str:
-    tokens = _token_set(prompt)
-    if tokens & set(_BUG_HINTS):
+    toks = token_set(prompt)
+    if toks & set(_BUG_HINTS):
         return "bug"
-    if tokens & {"spike", "investigate", "research"}:
+    if toks & {"spike", "investigate", "research"}:
         return "spike"
     return "feature"
 
@@ -188,7 +156,7 @@ def draft_task(payload: dict[str, Any]) -> dict[str, Any]:
     prompt = (payload.get("prompt") or "").strip()
     epic = _epic_for(prompt)
     type_ = _type_for(prompt)
-    points = _clamp_fibonacci(max(1, len(prompt) // 60))
+    points = clamp_fibonacci(max(1, len(prompt) // 60))
     column_id = _safe_id(payload.get("columnId")) or _default_column(context) or ""
     coordinator_id = (
         _safe_id(payload.get("coordinatorId")) or _least_loaded_member(context) or ""
@@ -244,7 +212,7 @@ def _draft_from_prompt(prompt: str) -> dict[str, Any]:
         "note": prompt,
         "columnId": None,
         "coordinatorId": None,
-        "confidence": "moderate",
+        "confidence": 0.55,
         "rationale": "Deterministic Phase A draft derived from prompt + similar tasks.",
     }
 
@@ -311,18 +279,7 @@ async def _polish_draft(
     """
     _state = {"_deterministic": deterministic, "_prompt": prompt, "_similar": similar}
     update, tokens_in, tokens_out = await _draft_step.run(_state, model)
-    raw_msg: Optional[AIMessage] = (
-        AIMessage(
-            content="",
-            usage_metadata={
-                "input_tokens": tokens_in,
-                "output_tokens": tokens_out,
-                "total_tokens": tokens_in + tokens_out,
-            },
-        )
-        if (tokens_in or tokens_out)
-        else None
-    )
+    raw_msg = make_usage_message(tokens_in, tokens_out)
     return update["_result"], raw_msg, tokens_in, tokens_out
 
 
@@ -389,11 +346,7 @@ class TaskDraftingAgent(BaseAgent):
         fetch_similar = fetch_similar_node
 
         async def generate_draft(state: TaskDraftingState) -> dict[str, Any]:
-            # Prefer the per-call context model; fall back to the default.
-            _rt = get_runtime(ChatContext)
-            chat_model: BaseChatModel = (
-                (_rt.context or {}).get("chat_model") or _default_model
-            )
+            chat_model: BaseChatModel = resolve_chat_model(_default_model)
             prompt = state.get("prompt") or ""
             similar = state.get("similar_tasks") or []
             pre_draft = state.get("draft")
