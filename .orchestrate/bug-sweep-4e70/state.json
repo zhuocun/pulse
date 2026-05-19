@@ -240,15 +240,15 @@
       "agentId": "bc-9809ed18-523c-46f5-8fdc-34b3d11bb743",
       "runId": "run-4ba4740a-c7b5-4d81-909f-c6c43bb4e343",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/fix-i18n-select-placeholders.md",
       "startedAt": "2026-05-19T05:26:44.528Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:47.119Z",
+      "finishedAt": "2026-05-19T05:29:36.865Z",
+      "lastUpdate": "2026-05-19T05:29:36.865Z",
       "note": null,
       "slackTs": null,
-      "prNumber": null,
+      "prNumber": 264,
       "failureMode": null,
       "verification": null,
       "attempts": 1
@@ -426,12 +426,12 @@
       "handoffPath": "handoffs/fix-be-v1-budget-gate.md",
       "startedAt": "2026-05-19T05:26:54.797Z",
       "finishedAt": "2026-05-19T05:29:28.669Z",
-      "lastUpdate": "2026-05-19T05:29:28.670Z",
+      "lastUpdate": "2026-05-19T05:29:29.745Z",
       "note": null,
       "slackTs": null,
       "prNumber": 263,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -742,6 +742,10 @@
     {
       "at": "2026-05-19T05:29:14.996Z",
       "message": "verify-fix-ai-draft-modal-guards: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:29:29.745Z",
+      "message": "fix-be-v1-budget-gate: verification self-reported (unit-test-verified)"
     }
   ]
 }
