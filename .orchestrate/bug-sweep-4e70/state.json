@@ -7,15 +7,15 @@
       "branch": "orch/bug-sweep-4e70/fix-drag-reorder-empty-ref",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-72f01a0f-260b-47e0-bde7-ba8afbaa5c87",
+      "runId": "run-2fa383b2-384f-4b0a-baa3-efc51754e4f4",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:31.797Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:31.797Z",
+      "lastUpdate": "2026-05-19T05:26:34.605Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -55,17 +55,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:34.608Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:34.608Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-board-brief-remote",
@@ -614,6 +615,10 @@
     {
       "at": "2026-05-19T05:26:31.792Z",
       "message": "fix-drag-reorder-empty-ref: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:34.607Z",
+      "message": "fix-board-brief-remote: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
