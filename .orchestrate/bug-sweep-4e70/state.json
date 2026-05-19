@@ -97,15 +97,15 @@
       "branch": "orch/bug-sweep-4e70/fix-ai-search-remote-query",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-020fe87e-da42-4365-967d-74b82067b6ea",
+      "runId": "run-af896ad1-c9ae-40ed-81d4-e8510d0d11e1",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:37.038Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:37.038Z",
+      "lastUpdate": "2026-05-19T05:26:39.557Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -145,17 +145,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:39.558Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:39.558Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-task-assist-estimate-deps",
@@ -624,6 +625,10 @@
     {
       "at": "2026-05-19T05:26:37.038Z",
       "message": "fix-ai-search-remote-query: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:39.558Z",
+      "message": "fix-task-assist-estimate-deps: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
