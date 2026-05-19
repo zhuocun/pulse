@@ -1,0 +1,16 @@
+# Verifier: fix-ai-search-remote-query (B3)
+# Date: 2026-05-19
+# Branch: orch/bug-sweep-4e70/fix-ai-search-remote-query
+
+## Recipe runs
+1. `CI=true npm test -- --watchAll=false --runInBand src/components/aiSearchInput`
+   - PASS: 4 suites, 20 tests (includes "uses submitted query for reformulations when draft changes before remote result returns")
+2. `npx tsc --noEmit`
+   - PASS: exit 0
+
+## Code cross-check (read-only)
+- `lastSubmittedQueryRef` set in remote `performSearch` before `startRemoteSearch`
+- Remote suggestion effect: `applyResult(result, lastSubmittedQueryRef.current)`; `draft` not in deps
+
+## Verdict signal
+unit-test-verified
