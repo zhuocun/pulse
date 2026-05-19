@@ -314,51 +314,59 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         ]
     );
     useEffect(() => {
+        if (trimmedName) return;
         // Skip the state write when the set is already empty so an unstable
         // dep (e.g. a useAi mock returning fresh ``run``/``reset`` refs on
         // every render) cannot drive this effect into a re-render loop.
         const clearDismissed = () =>
             setDismissedKeys((prev) => (prev.size === 0 ? prev : new Set()));
-        if (!trimmedName) {
-            resetEstimate();
-            resetReadiness();
-            clearDismissed();
-            if (isRemote) {
-                abortRemoteEstimate();
-                clearRemoteSuggestion();
-            }
-            return;
-        }
+        resetEstimate();
+        resetReadiness();
         clearDismissed();
         if (isRemote) {
-            void startRemoteEstimate(remoteInput, { autonomy: "plan" });
-        } else {
-            void runEstimate(
-                buildLocalEstimateRunPayload(localDraftFields, {
-                    tasks,
-                    excludeTaskId,
-                    context: localAiContext
-                })
-            ).catch(absorbUseAiRunRejection);
-            void runReadiness(
-                buildLocalReadinessRunPayload(localDraftFields, localAiContext)
-            ).catch(absorbUseAiRunRejection);
+            abortRemoteEstimate();
+            clearRemoteSuggestion();
         }
     }, [
         trimmedName,
+        isRemote,
+        resetEstimate,
+        resetReadiness,
+        abortRemoteEstimate,
+        clearRemoteSuggestion
+    ]);
+
+    useEffect(() => {
+        if (!trimmedName || !isRemote) return;
+        const clearDismissed = () =>
+            setDismissedKeys((prev) => (prev.size === 0 ? prev : new Set()));
+        clearDismissed();
+        void startRemoteEstimate(remoteInput, { autonomy: "plan" });
+    }, [trimmedName, isRemote, remoteInput, startRemoteEstimate]);
+
+    useEffect(() => {
+        if (!trimmedName || isRemote) return;
+        const clearDismissed = () =>
+            setDismissedKeys((prev) => (prev.size === 0 ? prev : new Set()));
+        clearDismissed();
+        void runEstimate(
+            buildLocalEstimateRunPayload(localDraftFields, {
+                tasks: localAiContext.tasks,
+                excludeTaskId,
+                context: localAiContext
+            })
+        ).catch(absorbUseAiRunRejection);
+        void runReadiness(
+            buildLocalReadinessRunPayload(localDraftFields, localAiContext)
+        ).catch(absorbUseAiRunRejection);
+    }, [
+        trimmedName,
+        isRemote,
         localDraftFields,
         localAiContext,
         excludeTaskId,
-        tasks,
-        isRemote,
-        remoteInput,
-        startRemoteEstimate,
-        abortRemoteEstimate,
-        clearRemoteSuggestion,
         runEstimate,
-        runReadiness,
-        resetEstimate,
-        resetReadiness
+        runReadiness
     ]);
 
     // Abort the remote agent and clear its suggestion on unmount.
@@ -432,7 +440,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         } else {
             void runEstimate(
                 buildLocalEstimateRunPayload(localDraftFields, {
-                    tasks,
+                    tasks: localAiContext.tasks,
                     excludeTaskId,
                     context: localAiContext
                 })
@@ -443,7 +451,6 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         localDraftFields,
         localAiContext,
         excludeTaskId,
-        tasks,
         isRemote,
         remoteInput,
         startRemoteEstimate,

@@ -9,7 +9,7 @@
  * Mirrors the pattern from boardBriefDrawer/agent.test.tsx.
  */
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -323,6 +323,142 @@ describe("AiTaskAssistPanel — remote agent path", () => {
             expect.objectContaining({
                 task_draft: expect.objectContaining({
                     taskName: "Implement OAuth login"
+                })
+            }),
+            expect.objectContaining({ autonomy: "plan" })
+        );
+    });
+
+    it("does not restart the remote agent when unrelated tasks cache updates leave the draft unchanged", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const queryClient = new QueryClient();
+        const initialTasks: ITask[] = [
+            {
+                _id: "t1",
+                columnId: "c1",
+                coordinatorId: "m1",
+                epic: "Auth",
+                index: 0,
+                note: "old",
+                projectId: "p1",
+                storyPoints: 5,
+                taskName: "Old login bug",
+                type: "Bug"
+            }
+        ];
+        queryClient.setQueryData(["tasks", { projectId: "p1" }], initialTasks);
+
+        const TasksCacheBumper = () => {
+            useEffect(() => {
+                queryClient.setQueryData(
+                    ["tasks", { projectId: "p1" }],
+                    [
+                        ...initialTasks,
+                        {
+                            _id: "t2",
+                            columnId: "c1",
+                            coordinatorId: "m1",
+                            epic: "Auth",
+                            index: 1,
+                            note: "new",
+                            projectId: "p1",
+                            storyPoints: 2,
+                            taskName: "Unrelated board update",
+                            type: "Task"
+                        }
+                    ]
+                );
+            }, []);
+
+            return (
+                <AiTaskAssistPanel
+                    onApplyStoryPoints={jest.fn()}
+                    onApplySuggestion={jest.fn()}
+                    onOpenSimilarTask={jest.fn()}
+                    values={{ taskName: "Implement OAuth login" }}
+                />
+            );
+        };
+
+        mockedUseAgent.mockReturnValue(baseAgent({ start }));
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<TasksCacheBumper />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+
+        act(() => {
+            jest.advanceTimersByTime(1000);
+        });
+
+        await waitFor(() => {
+            expect(start).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it("restarts the remote agent when debounced draft fields change", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        mockedUseAgent.mockReturnValue(baseAgent({ start }));
+
+        const DraftChanger = () => {
+            const [taskName, setTaskName] = useState("Implement OAuth login");
+            const values = useMemo(() => ({ taskName }), [taskName]);
+
+            return (
+                <>
+                    <button
+                        onClick={() => setTaskName("Implement OAuth login v2")}
+                        type="button"
+                    >
+                        Change draft
+                    </button>
+                    <AiTaskAssistPanel
+                        onApplyStoryPoints={jest.fn()}
+                        onApplySuggestion={jest.fn()}
+                        onOpenSimilarTask={jest.fn()}
+                        values={values}
+                    />
+                </>
+            );
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<DraftChanger />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+
+        act(() => {
+            screen.getByRole("button", { name: "Change draft" }).click();
+        });
+        act(() => {
+            jest.advanceTimersByTime(1000);
+        });
+
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+        expect(start).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                task_draft: expect.objectContaining({
+                    taskName: "Implement OAuth login v2"
                 })
             }),
             expect.objectContaining({ autonomy: "plan" })
