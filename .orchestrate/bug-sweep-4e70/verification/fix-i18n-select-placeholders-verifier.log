@@ -1,0 +1,21 @@
+# Verifier: fix-i18n-select-placeholders (B8)
+# Date: 2026-05-19
+# Branch: orch/bug-sweep-4e70/fix-i18n-select-placeholders
+
+## Static checks
+- `src/components/taskModal/index.tsx` + `projectModal/index.tsx`: no `placeholder={\`Select` or `Select a ${...}` templates (0 matches).
+- `microcopy.placeholders.selectCoordinator|selectType|selectManager|selectStoryPoints` present in `en.ts` and `zh-CN.ts` (4 keys each).
+
+## Recipe runs
+1. `CI=true npm test -- --watchAll=false --runInBand src/components/taskModal src/components/projectModal`
+   - OK: 3 suites, 28 tests passed (10.938s).
+2. `npx tsc --noEmit`
+   - exit 0.
+
+## Test coverage for zh-CN placeholders
+- `taskModal/index.test.tsx`: asserts `zhCN.placeholders.selectStoryPoints`; negates `/Select story points/i`.
+- `projectModal/index.test.tsx`: asserts `zhCN.placeholders.selectManager`; negates `/Select a manager/i`.
+- Coordinator/type placeholders wired via microcopy but not individually asserted in zh-CN tests (compile + component grep only).
+
+## Verdict signal
+unit-test-verified (no live browser run).
