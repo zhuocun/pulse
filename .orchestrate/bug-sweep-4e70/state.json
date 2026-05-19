@@ -394,7 +394,7 @@
     {
       "name": "verify-fix-be-resume-budget",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-be-resume-budget",
+      "branch": "`orch/bug-sweep-4e70/fix-be-resume-budget` (no verifier commits; verification-only run)",
       "startingRef": "orch/bug-sweep-4e70/fix-be-resume-budget",
       "dependsOn": [
         "fix-be-resume-budget"
@@ -402,12 +402,12 @@
       "agentId": "bc-42f537f9-e625-40ae-a8d2-772f6217d5de",
       "runId": "run-bd25e0dc-798e-459d-a336-489115944fce",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-be-resume-budget.md",
       "startedAt": "2026-05-19T05:32:00.317Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:32:02.777Z",
+      "finishedAt": "2026-05-19T05:33:58.501Z",
+      "lastUpdate": "2026-05-19T05:33:58.502Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
