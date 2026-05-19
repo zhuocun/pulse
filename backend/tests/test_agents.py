@@ -3339,6 +3339,55 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     ai_rate_limit_backend.reset()
 
 
+def test_router_invoke_resume_returns_402_when_budget_exhausted_without_client_project_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend,
+) -> None:
+    """Resume must enforce budget using project_id from the initial checkpoint."""
+
+    from app.middleware.budget import DEFAULT_MONTHLY_TOKEN_CAP
+
+    agent = _InterruptingAgent()
+    global_registry.register(agent)
+    thread_id = "http-resume-budget-no-project-id"
+    try:
+        ai_budget_backend.reset()
+        first = client.post(
+            "/api/v1/agents/interrupting/invoke",
+            json={
+                "inputs": {"started": False, "project_id": "p-budget-agent"},
+                "thread_id": thread_id,
+            },
+            headers=auth_headers,
+        )
+        assert first.status_code == HTTPStatus.OK
+        assert "__interrupt__" in first.json()["result"]
+
+        ai_budget_backend.reset()
+        monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
+
+        second = client.post(
+            "/api/v1/agents/interrupting/invoke",
+            json={
+                "command": {"resume": "value-from-fe"},
+                "thread_id": thread_id,
+            },
+            headers=auth_headers,
+        )
+        assert second.status_code == HTTPStatus.PAYMENT_REQUIRED
+        assert second.headers.get("X-Reason") == "budget"
+    finally:
+        global_registry.unregister(agent.name)
+        monkeypatch.setattr(
+            ai_budget_backend,
+            "monthly_cap",
+            DEFAULT_MONTHLY_TOKEN_CAP,
+        )
+        ai_budget_backend.reset()
+
+
 def test_router_invoke_returns_402_when_budget_exhausted(
     client: TestClient,
     echo_in_global_registry: EchoAgent,
