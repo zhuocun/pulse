@@ -26,6 +26,10 @@ import { microcopy } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
 import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import {
+    validateBreakdown,
+    validateDraft
+} from "../../utils/ai/validate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useApi from "../../utils/hooks/useApi";
@@ -174,6 +178,17 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         }
     }, [open, reset]);
 
+    const draftValidateContext = useMemo(
+        () => ({
+            columns,
+            members,
+            tasks,
+            fallbackColumnId: columnId,
+            fallbackCoordinatorId: user?._id
+        }),
+        [columns, members, tasks, columnId, user?._id]
+    );
+
     // React to incoming agent suggestions after streaming completes.
     // Using a useEffect on lastSuggestion ensures state flush before we read.
     useEffect(() => {
@@ -183,17 +198,29 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             | IDraftTaskSuggestion
             | { axis: string; items: IDraftTaskSuggestion[] };
         if ("items" in payload && Array.isArray(payload.items)) {
+            const validated = validateBreakdown(
+                { items: payload.items },
+                draftValidateContext
+            );
             setBreakdownMode(true);
-            setBreakdownItems(payload.items);
-            setBreakdownChecked(payload.items.map(() => true));
+            setBreakdownItems(validated.items);
+            setBreakdownChecked(validated.items.map(() => true));
         } else {
-            const draft = payload as IDraftTaskSuggestion;
+            const draft = validateDraft(
+                payload as IDraftTaskSuggestion,
+                draftValidateContext
+            );
             form.setFieldsValue(draft);
             setAiFields(new Set(AI_FIELDS as string[]));
             setRemoteDraft(draft);
         }
         remoteClearSuggestion();
-    }, [remoteLastSuggestion, form, remoteClearSuggestion]);
+    }, [
+        remoteLastSuggestion,
+        form,
+        remoteClearSuggestion,
+        draftValidateContext
+    ]);
 
     const aiContext = useMemo(
         () => ({
@@ -636,7 +663,14 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         label={microcopy.fields.taskName}
                         name="taskName"
                         required
-                        rules={[{ required: true }]}
+                        rules={[
+                            {
+                                required: true,
+                                whitespace: true,
+                                message:
+                                    microcopy.validation.taskNameRequired
+                            }
+                        ]}
                     >
                         <Input
                             autoComplete="off"
