@@ -502,15 +502,15 @@
       "branch": "orch/bug-sweep-4e70/fix-be-mutation-undo",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-c9e532f7-b58d-48f9-93ec-057f83057ef8",
+      "runId": "run-151e2edb-32bc-4366-bed4-8280d892693f",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:27:01.632Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:27:01.632Z",
+      "lastUpdate": "2026-05-19T05:27:04.017Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -550,17 +550,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:27:04.019Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:27:04.019Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-be-thread-id-strict",
@@ -669,6 +670,10 @@
     {
       "at": "2026-05-19T05:27:01.631Z",
       "message": "fix-be-mutation-undo: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:27:04.018Z",
+      "message": "fix-be-thread-id-strict: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
