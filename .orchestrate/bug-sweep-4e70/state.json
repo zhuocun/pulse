@@ -256,7 +256,7 @@
     {
       "name": "verify-fix-i18n-select-placeholders",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-i18n-select-placeholders",
+      "branch": "`orch/bug-sweep-4e70/fix-i18n-select-placeholders` (commit `38444c3`)",
       "startingRef": "orch/bug-sweep-4e70/fix-i18n-select-placeholders",
       "dependsOn": [
         "fix-i18n-select-placeholders"
@@ -264,12 +264,12 @@
       "agentId": "bc-6058829c-8b07-4614-a740-fe48bc76f6e7",
       "runId": "run-f12e617b-4114-45a8-9963-0291897a9b49",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-i18n-select-placeholders.md",
       "startedAt": "2026-05-19T05:29:37.798Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:29:40.347Z",
+      "finishedAt": "2026-05-19T05:31:17.369Z",
+      "lastUpdate": "2026-05-19T05:31:17.369Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
