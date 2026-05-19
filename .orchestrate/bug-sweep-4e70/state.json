@@ -302,7 +302,7 @@
     {
       "name": "verify-fix-chat-drawer-focus",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-chat-drawer-focus",
+      "branch": "orch/bug-sweep-4e70/fix-chat-drawer-focus",
       "startingRef": "orch/bug-sweep-4e70/fix-chat-drawer-focus",
       "dependsOn": [
         "fix-chat-drawer-focus"
@@ -310,12 +310,12 @@
       "agentId": "bc-efb05b35-6ffe-46d6-8602-706181c49380",
       "runId": "run-3dc9065a-1e5f-4a2e-b374-fb99c646db62",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-chat-drawer-focus.md",
       "startedAt": "2026-05-19T05:30:03.504Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:30:07.364Z",
+      "finishedAt": "2026-05-19T05:32:03.797Z",
+      "lastUpdate": "2026-05-19T05:32:03.797Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
