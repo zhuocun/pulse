@@ -98,6 +98,15 @@ describe("HomePage", () => {
         expect(screen.getByTestId("main-layout")).toBeInTheDocument();
     });
 
+    it("renders the main layout when a token exists but the user profile is still hydrating", () => {
+        renderHome({
+            path: "/projects",
+            token: "jwt-1"
+        });
+
+        expect(screen.getByTestId("main-layout")).toBeInTheDocument();
+    });
+
     it("renders the auth layout for anonymous auth routes", () => {
         renderHome({
             path: "/register",

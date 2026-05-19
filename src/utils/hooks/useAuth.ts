@@ -7,12 +7,20 @@ import {
     readAuthToken,
     subscribeAuthToken
 } from "../tokenStorage";
+import useCachedQueryData from "./useCachedQueryData";
+
+const userQueryKey = ["users"] as const;
+
+const isUnauthorizedError = (error: unknown): boolean => {
+    const message =
+        error instanceof Error ? error.message : String(error ?? "");
+    return /unauthorized/i.test(message);
+};
 
 const useAuth = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const userQueryKey = ["users"];
-    const user = queryClient.getQueryData<IUser>(userQueryKey);
+    const user = useCachedQueryData<IUser>(userQueryKey);
     const token = useSyncExternalStore(
         subscribeAuthToken,
         readAuthToken,
@@ -41,7 +49,17 @@ const useAuth = () => {
                     ...refreshed,
                     jwt: token
                 });
-            } catch {
+            } catch (err) {
+                const cached = queryClient.getQueryData<IUser>(userQueryKey);
+                // Keep the session on transient failures when profile data is
+                // already cached (common right after login on mobile Safari).
+                if (cached && !isUnauthorizedError(err)) {
+                    queryClient.setQueryData<IUser>(userQueryKey, {
+                        ...cached,
+                        jwt: token
+                    });
+                    return;
+                }
                 await clear();
                 navigate("/login", { viewTransition: true });
             }

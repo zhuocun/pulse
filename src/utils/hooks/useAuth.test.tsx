@@ -102,6 +102,19 @@ describe("useAuth", () => {
         localStorage.clear();
     });
 
+    it("re-renders when the cached user is written after mount", () => {
+        const queryClient = createQueryClient();
+        renderAuthProbe(queryClient);
+
+        expect(screen.getByTestId("user")).toHaveTextContent("none");
+
+        act(() => {
+            queryClient.setQueryData(["users"], user());
+        });
+
+        expect(screen.getByTestId("user")).toHaveTextContent("Alice");
+    });
+
     it("re-renders when the stored token is written after mount", () => {
         const queryClient = createQueryClient();
         localStorage.clear();
@@ -293,5 +306,43 @@ describe("useAuth", () => {
             expect(refetchSpy).toHaveBeenCalledWith({ queryKey: ["users"] })
         );
         await waitFor(() => expect(localStorage.getItem("Token")).toBeNull());
+    });
+
+    it("keeps the session when refreshUser fails transiently but profile data is cached", async () => {
+        const queryClient = createQueryClient();
+        const cached = user({ jwt: "stale-jwt" });
+        queryClient.setQueryData(["users"], cached);
+        jest.spyOn(queryClient, "refetchQueries").mockImplementation(() =>
+            Promise.resolve()
+        );
+        jest.spyOn(queryClient, "getQueryState").mockReturnValue({
+            data: cached,
+            dataUpdateCount: 1,
+            dataUpdatedAt: Date.now(),
+            error: new Error("Network request failed"),
+            errorUpdateCount: 1,
+            errorUpdatedAt: Date.now(),
+            fetchFailureCount: 1,
+            fetchFailureReason: new Error("Network request failed"),
+            fetchMeta: null,
+            isInvalidated: false,
+            status: "error",
+            fetchStatus: "idle"
+        });
+        localStorage.setItem("Token", "stored-token");
+
+        const { result } = renderHook(() => useAuth(), {
+            wrapper: createWrapper(queryClient)
+        });
+
+        await act(async () => {
+            await result.current.refreshUser();
+        });
+
+        expect(localStorage.getItem("Token")).toBe("stored-token");
+        expect(queryClient.getQueryData(["users"])).toEqual({
+            ...cached,
+            jwt: "stored-token"
+        });
     });
 });

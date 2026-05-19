@@ -8,6 +8,8 @@ import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import nativeNavigate from "../../utils/nativeNavigate";
+import { isMacLike } from "../../utils/platform";
 import { writeAiProxyToken, writeAuthToken } from "../../utils/tokenStorage";
 
 import AuthErrorSummary from "../authErrorSummary";
@@ -75,11 +77,19 @@ const LoginForm: React.FC<{
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
-            // Defer SPA navigation to the next turn so WebKit (iOS Safari) has
-            // committed `localStorage` before the `/projects` tree mounts.
-            queueMicrotask(() => {
+            // iOS Safari WebKit can advance the URL via `pushState` without
+            // re-rendering routes after login; use a full document navigation
+            // (same escape hatch as project cards). Desktop keeps SPA nav.
+            const goToProjects = () => {
+                if (isMacLike()) {
+                    nativeNavigate("/projects");
+                    return;
+                }
                 navigate("/projects", { viewTransition: true });
-            });
+            };
+            // Defer navigation so WebKit has committed `localStorage` before
+            // the `/projects` tree mounts (or before the full reload reads it).
+            queueMicrotask(goToProjects);
         } catch {
             // Error state is set by useReactMutation's onError callback.
         }
