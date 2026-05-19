@@ -165,7 +165,7 @@ def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
 def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
     order_type = data.get("type")
     from_id = data.get("fromId")
-    reference_id = data.get("referenceId")
+    reference_id = data.get("referenceId") or None
     from_column_id = data.get("fromColumnId")
     reference_column_id = data.get("referenceColumnId")
 
