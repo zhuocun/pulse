@@ -118,7 +118,7 @@
     {
       "name": "verify-fix-ai-search-remote-query",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-ai-search-remote-query",
+      "branch": "orch/bug-sweep-4e70/fix-ai-search-remote-query",
       "startingRef": "orch/bug-sweep-4e70/fix-ai-search-remote-query",
       "dependsOn": [
         "fix-ai-search-remote-query"
@@ -126,12 +126,12 @@
       "agentId": "bc-ccb939f2-e23c-40e0-bbeb-3340a916707e",
       "runId": "run-93beb483-0bc7-4617-831e-8f697c322296",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-ai-search-remote-query.md",
       "startedAt": "2026-05-19T05:28:32.261Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:28:34.662Z",
+      "finishedAt": "2026-05-19T05:30:02.366Z",
+      "lastUpdate": "2026-05-19T05:30:02.366Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
