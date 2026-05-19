@@ -1,0 +1,16 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "payments rewrite",
+    "kind": "projects",
+    "candidates": [
+      {"id": "p-1", "text": "Payments service v2 rebuild"},
+      {"id": "p-2", "text": "Internal admin tooling"},
+      {"id": "p-3", "text": "Mobile app prototype"}
+    ]
+  },
+  "must_have": ["p-1"],
+  "must_not": [],
+  "notes": "Project-kind search; p-1 must be top."
+}

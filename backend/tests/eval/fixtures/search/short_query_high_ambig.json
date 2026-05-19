@@ -1,0 +1,17 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "fix",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Fix login regression"},
+      {"id": "t-2", "text": "Fix payments retry loop"},
+      {"id": "t-3", "text": "Add new feature"},
+      {"id": "t-4", "text": "Fix typo in README"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Very short ambiguous query. Top three should all be 'fix' tasks; t-3 should be last."
+}

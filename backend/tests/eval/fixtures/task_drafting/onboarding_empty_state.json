@@ -1,0 +1,24 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Improve the onboarding empty state — new users land on a blank board and bounce.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [],
+      "members": [{"id": "m-1", "username": "alice"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Add guided tour for first-time users"},
+      {"id": "t-old-2", "text": "Skeleton screen for empty backlog"}
+    ]
+  },
+  "must_have": ["onboarding", "empty"],
+  "must_not": [],
+  "notes": "Product / UI work; epic should map to UI Polish or General."
+}

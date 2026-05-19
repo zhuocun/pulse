@@ -1,0 +1,25 @@
+{
+  "agent": "triage",
+  "input": {
+    "project_id": "p-eval",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-backlog", "name": "Backlog"},
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Old task A", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-backlog", "updatedAt": "2022-05-01T00:00:00Z"},
+        {"id": "t-2", "taskName": "Old task B", "type": "feature", "epic": "General", "storyPoints": 3, "columnId": "c-backlog", "updatedAt": "2022-06-01T00:00:00Z"},
+        {"id": "t-3", "taskName": "Old task C", "type": "feature", "epic": "General", "storyPoints": 2, "columnId": "c-backlog", "updatedAt": "2022-07-01T00:00:00Z"},
+        {"id": "t-4", "taskName": "Active", "type": "feature", "epic": "General", "storyPoints": 5, "columnId": "c-doing", "coordinatorId": "m-1"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    }
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Large backlog with stale tasks; multiple warn nudges expected."
+}

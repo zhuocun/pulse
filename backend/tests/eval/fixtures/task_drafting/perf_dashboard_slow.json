@@ -1,0 +1,26 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Dashboard takes 8+ seconds to first paint with > 500 tasks. Add server-side pagination and a skeleton.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-1", "taskName": "Cache board snapshot", "type": "feature", "epic": "Performance", "storyPoints": 5, "columnId": "c-doing"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Add Redis cache for project list"},
+      {"id": "t-old-2", "text": "Virtualise long task list"}
+    ]
+  },
+  "must_have": ["dashboard"],
+  "must_not": [],
+  "notes": "Performance epic; non-trivial points (5-8)."
+}

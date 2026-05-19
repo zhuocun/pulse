@@ -1,0 +1,17 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [{"id": "c-todo", "name": "To Do"}],
+      "tasks": [],
+      "members": []
+    },
+    "similar_tasks": []
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Edge case: empty prompt. Agent should produce a safe placeholder draft, not crash."
+}

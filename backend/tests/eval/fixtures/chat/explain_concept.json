@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "What does WIP overflow mean in this board?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Explanatory question. Reply should define WIP overflow briefly and may reference the board's drift detection."
+}

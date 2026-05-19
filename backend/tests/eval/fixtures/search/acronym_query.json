@@ -1,0 +1,17 @@
+{
+  "agent": "search",
+  "input": {
+    "project_id": "p-eval",
+    "query": "CI",
+    "kind": "tasks",
+    "candidates": [
+      {"id": "t-1", "text": "Set up continuous integration for the staging branch"},
+      {"id": "t-2", "text": "Fix UI bug"},
+      {"id": "t-3", "text": "GitHub Actions pipeline failing"},
+      {"id": "t-4", "text": "Read the docs"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Acronym query. CI = continuous integration. Top ranks should include t-1 and t-3."
+}

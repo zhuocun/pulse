@@ -1,0 +1,26 @@
+{
+  "agent": "task_drafting",
+  "input": {
+    "project_id": "p-eval",
+    "prompt": "Fix SSO login — Okta users get a 500 after the redirect, only on Safari.",
+    "board_snapshot": {
+      "project_id": "p-eval",
+      "columns": [
+        {"id": "c-todo", "name": "To Do"},
+        {"id": "c-doing", "name": "In Progress"},
+        {"id": "c-done", "name": "Done", "isDone": true}
+      ],
+      "tasks": [
+        {"id": "t-existing", "taskName": "Auth refactor", "type": "feature", "epic": "Auth", "storyPoints": 8, "columnId": "c-doing"}
+      ],
+      "members": [{"id": "m-1", "username": "alice"}, {"id": "m-2", "username": "bob"}]
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "SAML callback session cookie missing"},
+      {"id": "t-old-2", "text": "Safari blocks third-party auth cookies"}
+    ]
+  },
+  "must_have": ["SSO", "Safari"],
+  "must_not": [],
+  "notes": "Auth bug; epic should be Auth or Bug Fix."
+}

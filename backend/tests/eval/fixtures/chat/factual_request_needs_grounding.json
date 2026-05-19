@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "How many open tasks do I have right now?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Reply should call listTasks (or note the grounding need). It must NOT invent a number."
+}

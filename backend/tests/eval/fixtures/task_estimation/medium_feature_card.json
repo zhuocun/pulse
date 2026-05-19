@@ -1,0 +1,17 @@
+{
+  "agent": "task_estimation",
+  "input": {
+    "project_id": "p-eval",
+    "task_draft": {
+      "taskName": "Add CSV export to the task list",
+      "note": "Add a button on the task list view that exports the currently filtered set as CSV. Must include taskName, type, epic, storyPoints, columnName, coordinatorUsername. Stream rather than buffer for large boards."
+    },
+    "similar_tasks": [
+      {"id": "t-old-1", "text": "Add export to JSON for projects"},
+      {"id": "t-old-2", "text": "Stream large query results"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Medium effort (M). storyPoints should be 3 or 5."
+}

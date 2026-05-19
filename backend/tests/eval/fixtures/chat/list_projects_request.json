@@ -1,0 +1,12 @@
+{
+  "agent": "chat",
+  "input": {
+    "project_id": "p-eval",
+    "messages": [
+      {"role": "user", "content": "What projects am I a member of?"}
+    ]
+  },
+  "must_have": [],
+  "must_not": [],
+  "notes": "Should call listProjects tool or note the grounding need. Must not invent project names."
+}
