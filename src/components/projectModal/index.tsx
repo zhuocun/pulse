@@ -216,7 +216,7 @@ const ProjectModal: React.FC = () => {
                                 label: member.username,
                                 value: member._id
                             }))}
-                            placeholder={`Select a ${microcopy.fields.manager.toLowerCase()}`}
+                            placeholder={microcopy.placeholders.selectManager}
                             showSearch
                             optionFilterProp="label"
                         />
