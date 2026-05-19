@@ -214,16 +214,93 @@ def test_undo_mutation_applies_task_updates_and_skips_malformed(
             proposal_id="pr1",
         )
 
-    assert (ok, status_txt) == (True, "undone")
+    assert (ok, status_txt) == (False, "partial_failure")
     # Only the two well-formed rows reach ``task_service.update``.
     assert [c["body"]["_id"] for c in calls] == ["t1", "t-missing"]
     # ``projectId`` is forwarded from the journal row.
     assert all(c["body"]["projectId"] == "p1" for c in calls)
-    # The journal row is marked undone via update_one.
+    # Partial failure must leave the journal reversible (no ``undoneAt``).
+    assert fake_collection.updates == []
+    assert fake_collection.documents[0]["undoneAt"] is None
+    assert any("Undo task update missed" in rec.message for rec in caplog.records)
+
+
+def test_undo_mutation_partial_failure_leaves_journal_reversible(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_collection: FakeJournalCollection,
+) -> None:
+    """When some valid undo rows miss, the journal must stay reversible."""
+
+    def fake_update(body: Dict[str, Any], user_id: str) -> Optional[str]:
+        if body["_id"] == "t-ok":
+            return "Task updated"
+        return None
+
+    monkeypatch.setattr(
+        agent_mutation_journal.task_service, "update", fake_update
+    )
+
+    fake_collection.documents.append(
+        {
+            "_id": ObjectId(),
+            "user_id": "u1",
+            "project_id": "p1",
+            "proposal_id": "pr1",
+            "undo_diff": {
+                "task_updates": [
+                    {"task_id": "t-ok", "field": "taskName", "from": "a"},
+                    {"task_id": "t-miss", "field": "taskName", "from": "b"},
+                ],
+            },
+            "undoneAt": None,
+        }
+    )
+
+    ok, status_txt = agent_mutation_journal.undo_mutation(
+        user_id="u1",
+        project_id="p1",
+        proposal_id="pr1",
+    )
+    assert (ok, status_txt) == (False, "partial_failure")
+    assert fake_collection.updates == []
+    assert fake_collection.documents[0]["undoneAt"] is None
+
+
+def test_undo_mutation_marks_undone_when_all_valid_rows_succeed(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_collection: FakeJournalCollection,
+) -> None:
+    monkeypatch.setattr(
+        agent_mutation_journal.task_service,
+        "update",
+        lambda body, user_id: "Task updated",
+    )
+
+    fake_collection.documents.append(
+        {
+            "_id": ObjectId(),
+            "user_id": "u1",
+            "project_id": "p1",
+            "proposal_id": "pr1",
+            "undo_diff": {
+                "task_updates": [
+                    {"task_id": "t1", "field": "taskName", "from": "old"},
+                    {"task_id": "t2", "field": "note", "from": "n"},
+                ],
+            },
+            "undoneAt": None,
+        }
+    )
+
+    ok, status_txt = agent_mutation_journal.undo_mutation(
+        user_id="u1",
+        project_id="p1",
+        proposal_id="pr1",
+    )
+    assert (ok, status_txt) == (True, "undone")
     assert fake_collection.updates and "undoneAt" in (
         fake_collection.updates[-1][1]["$set"]
     )
-    assert any("Undo task update missed" in rec.message for rec in caplog.records)
 
 
 def test_undo_mutation_returns_forbidden_when_update_blocked(

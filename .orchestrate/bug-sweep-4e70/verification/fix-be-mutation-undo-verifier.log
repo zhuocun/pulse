@@ -1,0 +1,20 @@
+# Verifier: fix-be-mutation-undo (B14 partial undo)
+# Branch: orch/bug-sweep-4e70/fix-be-mutation-undo
+# Date: 2026-05-19
+
+## Recipe
+cd /workspace/backend && /workspace/.venv/bin/python -m pytest tests/ -q -k mutation --no-cov
+
+## Output
+49 passed, 1190 deselected in 0.83s
+
+## B14-focused subset
+cd /workspace/backend && /workspace/.venv/bin/python -m pytest tests/test_agent_mutation_journal.py -v --no-cov -k "partial_failure or marks_undone_when_all or applies_task_updates"
+
+3 passed:
+- test_undo_mutation_applies_task_updates_and_skips_malformed
+- test_undo_mutation_partial_failure_leaves_journal_reversible
+- test_undo_mutation_marks_undone_when_all_valid_rows_succeed
+
+## Note
+Default pytest (with coverage) on -k mutation subset exits 1 due to fail-under=100% on partial run; tests themselves pass (49/49).
