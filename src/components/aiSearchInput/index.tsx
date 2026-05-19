@@ -176,6 +176,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
     const announcerId = useId();
     const semanticActive = hasActiveSemanticFilter(props.semanticIds);
     const abortRef = useRef<AbortController | null>(null);
+    const lastSubmittedQueryRef = useRef("");
 
     useEffect(() => {
         if (!semanticActive) {
@@ -276,15 +277,9 @@ const AiSearchInput: React.FC<Props> = (props) => {
             rationale: agentSearchPayload.rationale,
             expandedTerms: agentSearchPayload.expandedTerms ?? []
         };
-        applyResult(result, draft);
+        applyResult(result, lastSubmittedQueryRef.current);
         clearRemoteSuggestion();
-    }, [
-        agentSearchPayload,
-        applyResult,
-        draft,
-        isRemote,
-        clearRemoteSuggestion
-    ]);
+    }, [agentSearchPayload, applyResult, isRemote, clearRemoteSuggestion]);
 
     const performSearch = useCallback(
         async (rawQuery: string) => {
@@ -330,6 +325,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 return;
             }
             if (isRemote) {
+                lastSubmittedQueryRef.current = query;
                 void startRemoteSearch(
                     {
                         query,
