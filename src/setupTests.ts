@@ -115,3 +115,24 @@ Object.defineProperty(globalThis, "ResizeObserver", {
         }
     }
 });
+
+// Clear cookies between tests so the new auth-token cookie fallback
+// (see `src/utils/tokenStorage.ts`) does not leak a value from one
+// test into the next. jsdom keeps `document.cookie` set across cases
+// even when `localStorage.clear()` runs in a per-test `beforeEach`.
+if (typeof afterEach === "function" && typeof document !== "undefined") {
+    afterEach(() => {
+        try {
+            const cookies = document.cookie;
+            if (!cookies) return;
+            for (const part of cookies.split(";")) {
+                const name = part.split("=")[0]?.trim();
+                if (name) {
+                    document.cookie = `${name}=; Path=/; Max-Age=0`;
+                }
+            }
+        } catch {
+            // Some isolated test envs disable `document.cookie`; ignore.
+        }
+    });
+}
