@@ -474,12 +474,12 @@
       "handoffPath": "handoffs/fix-be-error-envelopes.md",
       "startedAt": "2026-05-19T05:26:58.910Z",
       "finishedAt": "2026-05-19T05:30:18.609Z",
-      "lastUpdate": "2026-05-19T05:30:18.609Z",
+      "lastUpdate": "2026-05-19T05:30:19.607Z",
       "note": null,
       "slackTs": null,
       "prNumber": 266,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -576,7 +576,7 @@
     {
       "name": "verify-fix-be-thread-id-strict",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-be-thread-id-strict",
+      "branch": "`orch/bug-sweep-4e70/fix-be-thread-id-strict` (no verifier commits)",
       "startingRef": "orch/bug-sweep-4e70/fix-be-thread-id-strict",
       "dependsOn": [
         "fix-be-thread-id-strict"
@@ -584,12 +584,12 @@
       "agentId": "bc-7248cb60-9b41-44f1-8a90-b54b590e3fae",
       "runId": "run-de127792-aec2-45fd-a3fc-ec594c715d34",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-be-thread-id-strict.md",
       "startedAt": "2026-05-19T05:28:47.103Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:28:49.515Z",
+      "finishedAt": "2026-05-19T05:30:20.883Z",
+      "lastUpdate": "2026-05-19T05:30:20.884Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -765,6 +765,10 @@
     {
       "at": "2026-05-19T05:30:03.503Z",
       "message": "verify-fix-chat-drawer-focus: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:30:19.608Z",
+      "message": "fix-be-error-envelopes: verification self-reported (unit-test-verified)"
     }
   ]
 }
