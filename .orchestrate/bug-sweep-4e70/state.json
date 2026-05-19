@@ -322,15 +322,15 @@
       "branch": "orch/bug-sweep-4e70/fix-project-list-date-sort",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-0a9bc6da-f413-4022-a039-eaa7690d9de4",
+      "runId": "run-bef4001e-743f-49ba-8d91-280534f02816",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:49.590Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:49.590Z",
+      "lastUpdate": "2026-05-19T05:26:52.376Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -370,17 +370,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:52.377Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:52.377Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-be-resume-budget",
@@ -649,6 +650,10 @@
     {
       "at": "2026-05-19T05:26:49.590Z",
       "message": "fix-project-list-date-sort: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:52.377Z",
+      "message": "fix-be-resume-budget: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
