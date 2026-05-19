@@ -439,7 +439,7 @@
     {
       "name": "verify-fix-be-v1-budget-gate",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-be-v1-budget-gate",
+      "branch": "`orch/bug-sweep-4e70/fix-be-v1-budget-gate` (commit `13f6553` — verifier log only)",
       "startingRef": "orch/bug-sweep-4e70/fix-be-v1-budget-gate",
       "dependsOn": [
         "fix-be-v1-budget-gate"
@@ -447,12 +447,12 @@
       "agentId": "bc-0b86f7b7-d1b2-4c8b-b090-26c9aeeb4cf0",
       "runId": "run-3bc19f66-e759-45f4-955f-cc455fbb9be4",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-be-v1-budget-gate.md",
       "startedAt": "2026-05-19T05:29:40.349Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:29:43.113Z",
+      "finishedAt": "2026-05-19T05:31:15.416Z",
+      "lastUpdate": "2026-05-19T05:31:15.416Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
