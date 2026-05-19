@@ -22,10 +22,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 from typing import Any, List, Literal, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.messages.utils import trim_messages
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -43,16 +44,23 @@ from app.agents.events import (
     MutationDiffWire,
     TaskUpdateWire,
 )
+from app.agents.identity import COPILOT_IDENTITY, mutation_policy_reminder
 from app.agents.llm import is_stub_model
+from app.agents.output_guard import classify_pre_mutation
 from app.agents.state import ChatState
+from app.agents.tool_envelope import wrap_tool_result
 from app.tools import be_tools
-from app.tools.fe_tool_names import FE_APPLY_MUTATION
+from app.tools.fe_tool_names import (
+    FE_APPLY_APPROVED_MUTATION,
+    FE_APPLY_MUTATION,
+    FE_REQUEST_MUTATION_APPROVAL,
+)
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.observability.metrics import record_agent_mutation_event
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
+_CHAT_AGENT_PROMPT = (
     "You are Board Copilot, an assistant embedded in a Jira-style project "
     "management tool. Answer concisely. To inspect board, project, task, "
     "or member data, call one of the listProjects / listMembers / "
@@ -60,6 +68,20 @@ _SYSTEM_PROMPT = (
     "execute the call and return the result. Never invent ids or counts; "
     "ground every factual claim in a tool result."
 )
+
+# COPILOT_IDENTITY is the shared system-prompt prefix; the chat-specific
+# block extends it with FE-tool guidance.  The combined block is cached
+# server-side via Anthropic's ``cache_control: ephemeral`` marker.
+_SYSTEM_PROMPT = COPILOT_IDENTITY + "\n\n" + _CHAT_AGENT_PROMPT
+
+
+# Server-side defensive cap on FE tool-call rounds.  Matches the FE's
+# defensive cap of 8 from ``useAgentToolResolver.ts``; without a
+# server-side mirror a misbehaving client could remove the FE guard and
+# force unbounded provider loops.  Set high enough that legitimate
+# multi-tool chats are unaffected but low enough that a runaway is
+# bounded in well under a minute of provider time.
+MAX_SERVER_TOOL_ROUNDS: int = 8
 
 # Fix 12: Anthropic prompt-caching marker on the system message.
 # langchain-anthropic >=1.4.3 serialises the ``cache_control`` key in
@@ -152,6 +174,18 @@ def _after_respond(state: ChatState) -> Literal["mutation_hitl", "end"]:
     return "end"
 
 
+def _new_approval_id(proposal_id: str) -> str:
+    """Generate a unique approval_id for the two-step mutation handshake.
+
+    Includes the proposal id as a prefix so logs / events can pair
+    approval ids back to their originating proposal without a database
+    lookup; the random suffix prevents collisions if the same proposal
+    is re-issued in a different thread.
+    """
+
+    return f"appr-{proposal_id}-{secrets.token_hex(4)}"
+
+
 def _mutation_hitl(state: ChatState) -> dict[str, Any]:
     proposal = state.get("mutation_pending")
     if not proposal:
@@ -170,10 +204,15 @@ def _mutation_hitl(state: ChatState) -> dict[str, Any]:
             "mutation_pending": None,
             "mutation_decision": None,
         }
+    approval_id = _new_approval_id(pid)
     raw = interrupt(
         interrupt_payload(
-            FE_APPLY_MUTATION,
-            {"proposal_id": pid, "stage": "approval"},
+            FE_REQUEST_MUTATION_APPROVAL,
+            {
+                "proposal_id": pid,
+                "approval_id": approval_id,
+                "mutation": proposal,
+            },
         )
     )
     # Resume payload contract: ``Command(resume={"accepted": <bool>})``.
@@ -185,16 +224,29 @@ def _mutation_hitl(state: ChatState) -> dict[str, Any]:
             "chat-agent: malformed resume payload (%r); treating as rejection.",
             type(raw).__name__,
         )
-        decision = {"accepted": False, "reason": "malformed_resume"}
+        decision: dict[str, Any] = {"accepted": False, "reason": "malformed_resume"}
     else:
         decision = {"accepted": bool(raw.get("accepted"))}
         # Preserve optional editor-modified diff if the FE sends one.
         if "edited_diff" in raw:
             decision["edited_diff"] = raw["edited_diff"]
+    decision["approval_id"] = approval_id
     record_agent_mutation_event(
         "proposal_resumed_accept" if decision["accepted"] else "proposal_resumed_reject"
     )
-    return {"mutation_decision": decision}
+    update: dict[str, Any] = {"mutation_decision": decision}
+    if decision["accepted"]:
+        # Persist the approval payload so applyApprovedMutation can redeem it
+        # against the same approval_id even if the runtime is checkpointed
+        # and resumed between the approval interrupt and the apply call.
+        update["pending_approvals"] = {
+            approval_id: {
+                "proposal_id": pid,
+                "mutation": proposal,
+                "edited_diff": decision.get("edited_diff"),
+            }
+        }
+    return update
 
 
 def _mutation_finalize(state: ChatState) -> dict[str, Any]:
@@ -234,17 +286,85 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
             "mutation_decision": None,
         }
 
+    approval_id = str(decision.get("approval_id") or "")
+    pending = state.get("pending_approvals") or {}
+    if not approval_id or approval_id not in pending:
+        # The applyApprovedMutation contract requires a redeemable approval
+        # id; without one the apply is not authorised even if the prior
+        # interrupt fired (the FE may have lost the approval cache).
+        logger.warning(
+            "chat-agent: apply requested without a redeemable approval_id "
+            "(id=%r, known=%r); refusing.",
+            approval_id,
+            list(pending.keys()),
+        )
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "Could not apply: approval id is missing or expired. "
+                        "Please re-issue the proposal."
+                    )
+                )
+            ],
+            "mutation_pending": None,
+            "mutation_decision": None,
+        }
+
     # ``decision["edited_diff"]`` is populated when the FE resume payload
     # carried a user-edited diff (PRD §5.3 resume shape).  Prefer it over
     # the original proposal so an in-flight edit during approval actually
     # reaches the apply stage instead of being silently dropped.
     diff = decision.get("edited_diff") or proposal.get("diff") or {}
+
+    # Output-guard pre-apply check: scan the recent reasoning text + the
+    # approved mutation for the four classifier patterns.  A flagged apply
+    # is refused with a clear error message rather than silently passed
+    # through.
+    recent_text = ""
+    for msg in reversed(state.get("messages") or []):
+        if isinstance(msg, AIMessage):
+            content = msg.content
+            if isinstance(content, str):
+                recent_text = content
+                break
+    guard = classify_pre_mutation(recent_text, proposal)
+    if not guard.get("safe", True):
+        logger.warning(
+            "chat-agent: output_guard refused apply for proposal=%r reasons=%r",
+            pid,
+            guard.get("reasons"),
+        )
+        record_agent_mutation_event("output_guard_refused")
+        reasons = ", ".join(guard.get("reasons") or []) or "policy_violation"
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "Refusing to apply this mutation -- the planned action "
+                        f"failed safety checks ({reasons}). Please rephrase or "
+                        "re-issue a narrower proposal."
+                    )
+                )
+            ],
+            "events": [
+                {
+                    "kind": "error",
+                    "scope": "mutation",
+                    "code": "output_guard_refused",
+                    "reasons": guard.get("reasons") or [],
+                }
+            ],
+            "mutation_pending": None,
+            "mutation_decision": None,
+        }
+
     fe_result = interrupt(
         interrupt_payload(
-            FE_APPLY_MUTATION,
+            FE_APPLY_APPROVED_MUTATION,
             {
+                "approval_id": approval_id,
                 "proposal_id": pid,
-                "stage": "apply",
                 "project_id": str(ctx.get("project_id") or ""),
                 "diff": diff,
             },
@@ -258,15 +378,20 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
             "mutation_pending": None,
             "mutation_decision": None,
         }
-    # Require the documented success shape from ``fe.applyMutation`` (see
-    # ``src/utils/ai/feTools/applyMutation.ts`` -> ``{ok, applied}``).  An
-    # empty dict or any other non-success shape used to be treated as
-    # "Applied!" which silently lies to the user when the FE bailed out
-    # without setting ``error``.
-    applied_ok = isinstance(fe_result, dict) and fe_result.get("applied") is True
+    # Two valid success shapes are accepted:
+    #   * new split contract: ``{"status": "applied", "details": {...}}``
+    #   * legacy FE_APPLY_MUTATION contract: ``{"applied": True}``
+    # The legacy form is kept so an in-flight FE that has not yet shipped
+    # the split tool names doesn't break the apply turn.  Anything else
+    # (empty dict, non-dict, ``{"applied": False}``) is treated as a
+    # failure so the user is not told an apply succeeded when it didn't.
+    applied_ok = isinstance(fe_result, dict) and (
+        fe_result.get("status") == "applied"
+        or fe_result.get("applied") is True
+    )
     if not applied_ok:
         logger.warning(
-            "chat-agent: fe.applyMutation returned non-success shape %r; "
+            "chat-agent: applyApprovedMutation returned non-success shape %r; "
             "treating as failure.",
             fe_result,
         )
@@ -347,6 +472,46 @@ class ChatAgent(BaseAgent):
             project_id = _ctx.get("project_id") or "unknown"
             messages = list(state.get("messages") or [])
 
+            # Server-side defensive cap on FE tool-call rounds.  Counted by
+            # how many AIMessages in the history carry ``tool_calls`` -- one
+            # entry per round.  Past the cap we refuse to invoke the model
+            # again and surface an error frame so the FE can show a clear
+            # state instead of looping forever.
+            tool_rounds_used = sum(
+                1
+                for msg in messages
+                if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None)
+            )
+            if tool_rounds_used >= MAX_SERVER_TOOL_ROUNDS:
+                logger.warning(
+                    "chat-agent: server-side tool-round cap reached "
+                    "(rounds=%d, cap=%d); aborting respond.",
+                    tool_rounds_used,
+                    MAX_SERVER_TOOL_ROUNDS,
+                )
+                record_agent_mutation_event("tool_round_cap_reached")
+                return {
+                    "messages": [
+                        AIMessage(
+                            content=(
+                                "Tool round limit reached -- please rephrase "
+                                "your request or break it into smaller steps."
+                            )
+                        )
+                    ],
+                    "events": [
+                        {
+                            "kind": "error",
+                            "scope": "chat",
+                            "code": "tool_round_cap_reached",
+                            "limit": MAX_SERVER_TOOL_ROUNDS,
+                        }
+                    ],
+                    "tool_rounds_used": tool_rounds_used,
+                    "mutation_pending": None,
+                    "mutation_decision": None,
+                }
+
             if is_stub_model(chat_model) and _STUB_MUTATION_TRIGGER in user_text:
                 proposal_model = _stub_mutation_proposal(user_text, project_id)
                 proposal_dict = proposal_model.model_dump(mode="json", by_alias=True)
@@ -403,7 +568,26 @@ class ChatAgent(BaseAgent):
                         trimmed = [msg]
                         break
             conversation: List[Any] = [_SYSTEM_MESSAGE]
-            conversation.extend(trimmed)
+            # Trust boundary: re-fence every ToolMessage in the trimmed window
+            # so the provider treats its content as untrusted data, and
+            # re-anchor the mutation policy after each tool result so a
+            # long multi-round conversation can't drift past the guardrails.
+            for msg in trimmed:
+                if isinstance(msg, ToolMessage):
+                    tool_name = getattr(msg, "name", None) or msg.tool_call_id or "tool"
+                    fenced = wrap_tool_result(tool_name, msg.content)
+                    conversation.append(
+                        ToolMessage(
+                            content=fenced,
+                            tool_call_id=msg.tool_call_id,
+                            name=getattr(msg, "name", None),
+                        )
+                    )
+                    conversation.append(
+                        SystemMessage(content=mutation_policy_reminder())
+                    )
+                else:
+                    conversation.append(msg)
             bound = _get_bound(chat_model)
             try:
                 raw = await bound.ainvoke(conversation)
@@ -432,10 +616,14 @@ class ChatAgent(BaseAgent):
             else:
                 response = AIMessage(content=str(getattr(raw, "content", raw)))
 
+            new_rounds = tool_rounds_used + (
+                1 if getattr(response, "tool_calls", None) else 0
+            )
             return {
                 "messages": [response],
                 "mutation_pending": None,
                 "mutation_decision": None,
+                "tool_rounds_used": new_rounds,
             }
 
         graph: StateGraph = StateGraph(ChatState, context_schema=ChatContext)

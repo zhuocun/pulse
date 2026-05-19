@@ -149,6 +149,21 @@ class TaskEstimationState(BaseAgentState, WithSimilarTasks):
     context_tasks: NotRequired[list[dict[str, Any]] | None]
 
 
+def merge_pending_approvals(
+    left: dict[str, dict[str, Any]] | None,
+    right: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Reducer: right-bias merge of the ``pending_approvals`` map.
+
+    Right values overwrite left for the same ``approval_id``.  Both
+    sides may be ``None`` on the first superstep.
+    """
+
+    out: dict[str, dict[str, Any]] = dict(left or {})
+    out.update(right or {})
+    return out
+
+
 class ChatState(BaseAgentState):
     """State for ``chat-agent`` (PRD §5A.6).
 
@@ -157,11 +172,26 @@ class ChatState(BaseAgentState):
     ``mutation_decision`` stores the ``Command(resume=…)`` payload after
     the approval interrupt, and ``mutation_applied_ids`` records proposals
     whose apply interrupt has completed once (idempotent replay guard).
+
+    ``tool_rounds_used`` is the server-side counterpart of the FE-side
+    defensive cap (``useAgentToolResolver.ts`` -> 8 rounds).  Each
+    ``respond`` superstep that emits ``tool_calls`` increments the
+    counter; the chat graph routes to END with an error frame once it
+    crosses :data:`~app.agents.catalog.chat.MAX_SERVER_TOOL_ROUNDS`.
+
+    ``pending_approvals`` tracks the two-step mutation handshake: keyed
+    by ``approval_id`` -> the original proposal dict the model passed to
+    ``requestMutationApproval``.  ``applyApprovedMutation`` validates
+    the id is in this map before applying.
     """
 
     mutation_pending: NotRequired[dict[str, Any] | None]
     mutation_decision: NotRequired[dict[str, Any] | None]
     mutation_applied_ids: NotRequired[Annotated[list[str], merge_mutation_applied_ids]]
+    tool_rounds_used: NotRequired[int]
+    pending_approvals: NotRequired[
+        Annotated[dict[str, dict[str, Any]], merge_pending_approvals]
+    ]
 
 
 class TriageState(BaseAgentState, WithBoardSnapshot, WithDriftResult):
