@@ -569,6 +569,7 @@ class AgentRuntime:
         *,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
+        autonomy_level: Optional[str] = None,
     ) -> Any:
         """Resolve a context object for one agent call.
 
@@ -607,6 +608,8 @@ class AgentRuntime:
             ctx["user_id"] = user_id
         if project_id is not None:
             ctx["project_id"] = project_id
+        if autonomy_level is not None:
+            ctx["autonomy_level"] = autonomy_level
         return ctx
 
     def build_config(
@@ -666,7 +669,11 @@ class AgentRuntime:
             tags=tags,
         )
         resolved_context = self._build_context(
-            agent, context, user_id=user_id, project_id=_project_id(inputs)
+            agent,
+            context,
+            user_id=user_id,
+            project_id=_project_id(inputs),
+            autonomy_level=_autonomy(inputs),
         )
         try:
             return agent.invoke(
@@ -740,15 +747,17 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        proj_id = _project_id(inputs)
+        autonomy = _autonomy(inputs)
         resolved_context = self._build_context(
-            agent, context, user_id=user_id, project_id=_project_id(inputs)
+            agent, context, user_id=user_id, project_id=proj_id, autonomy_level=autonomy
         )
         with start_run_span(
             operation="invoke_agent",
             agent_name=name,
             model_id=self._model_id,
-            project_id=_project_id(inputs),
-            autonomy=_autonomy(inputs),
+            project_id=proj_id,
+            autonomy=autonomy,
         ) as run_span:
             try:
                 result = await agent.ainvoke(
@@ -804,17 +813,22 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        proj_id = _project_id(inputs)
+        autonomy = _autonomy(inputs)
         resolved_context = self._build_context(
-            agent, context, user_id=user_id, project_id=_project_id(inputs)
+            agent, context, user_id=user_id, project_id=proj_id, autonomy_level=autonomy
         )
         final_state: Any = None
         with start_run_span(
             operation="run_agent_with_events",
             agent_name=name,
             model_id=self._model_id,
-            project_id=_project_id(inputs),
-            autonomy=_autonomy(inputs),
+            project_id=proj_id,
+            autonomy=autonomy,
         ) as run_span:
+            # custom_events accumulates payloads delivered via the ``custom``
+            # stream mode (Fix 1: these were silently discarded before).
+            custom_events: list[Any] = []
             try:
                 async for mode, payload in agent.astream(
                     graph_input,
@@ -828,6 +842,8 @@ class AgentRuntime:
                         # ``values`` yields after every superstep; the last
                         # one is the final state.  Overwriting is correct.
                         final_state = payload
+                    elif mode == "custom":
+                        custom_events.append(payload)
             except AgentError:
                 raise
             except GraphRecursionError as exc:
@@ -842,14 +858,31 @@ class AgentRuntime:
             run_span.set_result(final_state)
             # Source events from state (Phase 2); fall back to empty list when
             # the agent pre-dates the ``events`` field (e.g. test-only agents).
-            raw_events: list[Any] = list(
-                (final_state or {}).get("events") or []
-            )
+            raw_events: list[Any] = (final_state or {}).get("events") or []
             # Validate suggestion payloads at the emit boundary (Task 1).
             # Pass-through semantics: validation errors are logged but never
             # drop events so a schema bug cannot break a streaming response.
             events_out: list[Any] = []
+            state_event_ids: set[int] = set()
             for evt in raw_events:
+                state_event_ids.add(id(evt))
+                if isinstance(evt, dict) and evt.get("kind") == "suggestion":
+                    events_out.append(validate_suggestion_payload(evt, agent=name))
+                elif (
+                    isinstance(evt, dict)
+                    and evt.get("kind") == "mutation_proposal"
+                ):
+                    events_out.append(
+                        validate_mutation_proposal_event(evt, agent=name)
+                    )
+                else:
+                    events_out.append(evt)
+            # Merge custom-mode payloads not already in state["events"]
+            # (de-dup by object identity: Phase 2 agents that echo state events
+            # through the custom channel should not double-emit them).
+            for evt in custom_events:
+                if id(evt) in state_event_ids:
+                    continue
                 if isinstance(evt, dict) and evt.get("kind") == "suggestion":
                     events_out.append(validate_suggestion_payload(evt, agent=name))
                 elif (
@@ -885,12 +918,16 @@ class AgentRuntime:
             tags=tags,
         )
         graph_input = self._resume_input(inputs, resume, thread_id)
+        proj_id = _project_id(inputs)
+        autonomy = _autonomy(inputs)
         resolved_context = self._build_context(
-            agent, context, user_id=user_id, project_id=_project_id(inputs)
+            agent, context, user_id=user_id, project_id=proj_id, autonomy_level=autonomy
         )
         # Track how many events we have already surfaced as ``custom`` chunks
         # so we can emit exactly the new ones after each superstep.
         _emitted_event_count = 0
+        # Track the last ``values`` payload to avoid an extra aget_state call.
+        _last_values_payload: Any = None
         # Determine which modes to request from LangGraph. We always add
         # ``"values"`` so we can diff the ``events`` list after each superstep
         # and re-emit new entries as ``custom`` chunks (Phase 2 SSE re-emission).
@@ -902,8 +939,8 @@ class AgentRuntime:
             operation="stream_agent",
             agent_name=name,
             model_id=self._model_id,
-            project_id=_project_id(inputs),
-            autonomy=_autonomy(inputs),
+            project_id=proj_id,
+            autonomy=autonomy,
         ) as run_span:
             try:
                 async for event in agent.astream(
@@ -920,10 +957,9 @@ class AgentRuntime:
                         # ``custom`` chunks so SSE consumers see the same
                         # wire shape regardless of whether the node used
                         # ``emit_custom`` or returned ``{"events": [...]}``.
-                        current_events: list[Any] = list(
-                            (payload or {}).get("events") or []
-                        )
-                        for evt in current_events[_emitted_event_count:]:
+                        _last_values_payload = payload
+                        state_events = (payload or {}).get("events") or []
+                        for evt in state_events[_emitted_event_count:]:
                             # Validate suggestion payloads at the re-emission
                             # boundary (Task 1). Pass-through: validation errors
                             # logged but never drop events.
@@ -937,40 +973,37 @@ class AgentRuntime:
                                     evt, agent=name
                                 )
                             yield ("custom", evt)
-                        _emitted_event_count = len(current_events)
+                        _emitted_event_count = len(state_events)
                         if _need_values:
                             # Caller did not ask for ``values``; skip it.
                             continue
                     yield event
             except AgentError:
                 await self._aggregate_astream_tokens_no_propagate(
-                    agent, config, run_span
+                    agent, config, run_span, _last_values_payload
                 )
                 raise
             except GraphRecursionError as exc:
                 await self._aggregate_astream_tokens_no_propagate(
-                    agent, config, run_span
+                    agent, config, run_span, _last_values_payload
                 )
                 raise AgentRecursionError(
                     name, self._resolved_recursion_limit(agent)
                 ) from exc
             except Exception as exc:  # noqa: BLE001 -- intentional translation boundary
                 await self._aggregate_astream_tokens_no_propagate(
-                    agent, config, run_span
+                    agent, config, run_span, _last_values_payload
                 )
                 logger.exception("Agent %r failed during astream.", name)
                 raise AgentExecutionError(name, cause=exc) from exc
             else:
-                # On a successful stream, aggregate token usage from the
-                # final graph state so OTel and Prometheus see real token
-                # counts instead of always 0. AgentError from aggregation
-                # surfaces normally on this path so a misbehaving graph is
-                # visible; on the failure paths above we suppress it to
-                # preserve the original exception cause.
+                # On a successful stream, aggregate token usage from the last
+                # ``values`` payload captured during the loop — avoids an extra
+                # ``aget_state`` Postgres round-trip on every successful stream.
                 if self._checkpointer is not None:
                     try:
-                        await self._aggregate_astream_tokens(
-                            agent, config, run_span
+                        self._aggregate_tokens_from_payload(
+                            _last_values_payload, run_span
                         )
                     except AgentError:
                         raise
@@ -979,6 +1012,28 @@ class AgentRuntime:
                             "astream token aggregation failed; span will show 0 tokens.",
                             exc_info=True,
                         )
+
+    def _aggregate_tokens_from_payload(
+        self,
+        payload: Any,
+        run_span: Any,
+    ) -> None:
+        """Aggregate token usage from a ``values`` payload and report on span.
+
+        Called on the success path of :meth:`astream` using the last captured
+        ``values`` payload, avoiding a separate ``aget_state`` Postgres
+        round-trip.  Raises on bad payload shapes so the caller can decide
+        whether to swallow (best-effort) or propagate.
+        """
+
+        messages = (payload or {}).get("messages") or []
+        tokens_in = 0
+        tokens_out = 0
+        for msg in messages:
+            ti, to = extract_token_usage(msg)
+            tokens_in += ti
+            tokens_out += to
+        run_span.set_token_usage(tokens_in, tokens_out)
 
     async def _aggregate_astream_tokens(
         self,
@@ -992,6 +1047,9 @@ class AgentRuntime:
         (failure paths) or surface (success path).  Callers must gate on
         ``self._checkpointer is not None`` — no checkpointer means no
         persisted final state to read back.
+
+        Used on failure paths when no ``values`` payload was captured before
+        the error (i.e. the error occurred before the first superstep).
         """
 
         graph = await agent.acompile(
@@ -1013,18 +1071,26 @@ class AgentRuntime:
         agent: BaseAgent,
         config: Mapping[str, Any],
         run_span: Any,
+        last_payload: Any = None,
     ) -> None:
         """Best-effort aggregation on failure paths.
 
         Runs after a translated exception is in flight; the original cause
         must win, so any aggregation failure (including AgentError) is
         swallowed.  Without a checkpointer there's no state to read.
+
+        When ``last_payload`` is available (a ``values`` chunk was emitted
+        before the error), tokens are read from it directly.  Otherwise falls
+        back to ``aget_state`` for the pre-first-superstep error case.
         """
 
         if self._checkpointer is None:
             return
         try:
-            await self._aggregate_astream_tokens(agent, config, run_span)
+            if last_payload is not None:
+                self._aggregate_tokens_from_payload(last_payload, run_span)
+            else:
+                await self._aggregate_astream_tokens(agent, config, run_span)
         except (AgentError, LookupError, KeyError, ValueError, RuntimeError):
             logger.debug(
                 "Token aggregation during failure cleanup failed; span will show 0 tokens.",
