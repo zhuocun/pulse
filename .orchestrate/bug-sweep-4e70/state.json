@@ -210,7 +210,7 @@
     {
       "name": "verify-fix-ai-draft-modal-guards",
       "type": "verifier",
-      "branch": "orch/bug-sweep-4e70/verify-fix-ai-draft-modal-guards",
+      "branch": "`orch/bug-sweep-4e70/fix-ai-draft-modal-guards` (no verifier commits; read-only verification)",
       "startingRef": "orch/bug-sweep-4e70/fix-ai-draft-modal-guards",
       "dependsOn": [
         "fix-ai-draft-modal-guards"
@@ -218,12 +218,12 @@
       "agentId": "bc-7709f116-51d3-47c5-b91a-b5ba0894e8d7",
       "runId": "run-52faaa4b-0fa5-4b15-9772-0b85c00e4088",
       "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
-      "status": "running",
-      "resultStatus": null,
-      "handoffPath": null,
+      "status": "handed-off",
+      "resultStatus": "finished",
+      "handoffPath": "handoffs/verify-fix-ai-draft-modal-guards.md",
       "startedAt": "2026-05-19T05:29:14.997Z",
-      "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:29:17.724Z",
+      "finishedAt": "2026-05-19T05:31:03.755Z",
+      "lastUpdate": "2026-05-19T05:31:03.755Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
