@@ -187,15 +187,15 @@
       "branch": "orch/bug-sweep-4e70/fix-ai-draft-modal-guards",
       "startingRef": "main",
       "dependsOn": [],
-      "agentId": null,
-      "runId": null,
-      "parentAgentId": null,
+      "agentId": "bc-9278e642-0de3-4c14-af79-34db7e3aac05",
+      "runId": "run-373228cb-e705-46df-b59b-62fa2a8f1db3",
+      "parentAgentId": "bc-0b93e682-5c6d-4704-b82c-706bb94a2538",
       "status": "running",
       "resultStatus": null,
       "handoffPath": null,
       "startedAt": "2026-05-19T05:26:41.974Z",
       "finishedAt": null,
-      "lastUpdate": "2026-05-19T05:26:41.974Z",
+      "lastUpdate": "2026-05-19T05:26:44.526Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
@@ -235,17 +235,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:26:44.528Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:26:44.528Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "verify-fix-i18n-select-placeholders",
@@ -634,6 +635,10 @@
     {
       "at": "2026-05-19T05:26:41.973Z",
       "message": "fix-ai-draft-modal-guards: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
+    },
+    {
+      "at": "2026-05-19T05:26:44.527Z",
+      "message": "fix-i18n-select-placeholders: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
