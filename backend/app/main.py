@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.agents import AgentRuntime
 from app.agents.checkpointing import resolve_agent_postgres_uri
-from app.agents.errors import AgentConfigurationError
+from app.agents.errors import AgentConfigurationError, AgentError, agent_app_error_content
 from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
 from app.agents.llm import assert_provider_available
 from app.config import Settings, settings
@@ -597,10 +597,11 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=unwrap_error_detail(exc.detail),
-    )
+    if isinstance(exc, AgentError):
+        content = agent_app_error_content(exc)
+    else:
+        content = unwrap_error_detail(exc.detail)
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 @app.exception_handler(Exception)

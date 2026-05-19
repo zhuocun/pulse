@@ -110,6 +110,12 @@ const buildSortOptions = (): { label: string; value: SortOrder }[] => [
     { label: microcopy.options.sort.oldest, value: "oldest" }
 ];
 
+const projectCreatedAtTime = (raw?: string): number => {
+    if (!raw) return 0;
+    const time = new Date(raw).getTime();
+    return Number.isNaN(time) ? 0 : time;
+};
+
 const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
     const out = [...projects];
     const locale = getActiveLocaleCode();
@@ -122,15 +128,15 @@ const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
         case "newest":
             out.sort(
                 (a, b) =>
-                    new Date(b.createdAt ?? 0).getTime() -
-                    new Date(a.createdAt ?? 0).getTime()
+                    projectCreatedAtTime(b.createdAt) -
+                    projectCreatedAtTime(a.createdAt)
             );
             break;
         case "oldest":
             out.sort(
                 (a, b) =>
-                    new Date(a.createdAt ?? 0).getTime() -
-                    new Date(b.createdAt ?? 0).getTime()
+                    projectCreatedAtTime(a.createdAt) -
+                    projectCreatedAtTime(b.createdAt)
             );
             break;
         case "name-asc":

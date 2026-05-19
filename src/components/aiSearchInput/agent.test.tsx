@@ -337,4 +337,81 @@ describe("AiSearchInput — remote agent path", () => {
             screen.queryByText("Search agent timed out")
         ).not.toBeInTheDocument();
     });
+
+    it("uses submitted query for reformulations when draft changes before remote result returns", async () => {
+        const start = jest.fn().mockResolvedValue(undefined);
+        const clearSuggestion = jest.fn();
+        const submittedQuery = "fix flaky login button issue";
+
+        let agentState: Pick<UseAgentResult, "isStreaming" | "lastSuggestion"> =
+            {
+                isStreaming: false,
+                lastSuggestion: null
+            };
+
+        mockedUseAgent.mockImplementation(() =>
+            baseAgent({
+                start,
+                clearSuggestion,
+                isStreaming: agentState.isStreaming,
+                lastSuggestion: agentState.lastSuggestion
+            })
+        );
+
+        const queryClient = new QueryClient();
+        const setSemanticIds = jest.fn();
+
+        const Harness = ({ revision }: { revision: number }) => (
+            <QueryClientProvider client={queryClient}>
+                <span data-revision={revision} hidden />
+                <AiSearchInput
+                    kind="tasks"
+                    projectContext={projectContext}
+                    semanticIds={undefined}
+                    setSemanticIds={setSemanticIds}
+                />
+            </QueryClientProvider>
+        );
+
+        const { rerender } = render(<Harness revision={0} />);
+
+        const input = screen.getByRole("textbox", {
+            name: /Find related tasks with AI/i
+        });
+        fireEvent.change(input, { target: { value: submittedQuery } });
+        fireEvent.click(
+            screen.getByRole("button", { name: /Find related tasks/i })
+        );
+
+        expect(start).toHaveBeenCalledWith(
+            { query: submittedQuery, kind: "tasks" },
+            { autonomy: "suggest" }
+        );
+
+        fireEvent.change(input, {
+            target: { value: "quantum entanglement" }
+        });
+
+        agentState = {
+            isStreaming: false,
+            lastSuggestion: {
+                surface: "search",
+                payload: {
+                    ids: [],
+                    rationale: "No tasks matched your query.",
+                    expandedTerms: []
+                }
+            }
+        };
+        rerender(<Harness revision={1} />);
+
+        await waitFor(() => {
+            expect(setSemanticIds).toHaveBeenCalledWith(undefined);
+        });
+
+        expect(screen.getByText("fix flaky")).toBeInTheDocument();
+        expect(
+            screen.queryByText("tasks about quantum entanglement")
+        ).not.toBeInTheDocument();
+    });
 });

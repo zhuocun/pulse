@@ -84,6 +84,8 @@ def undo_mutation(
 
     undo_diff = doc.get("undo_diff") or {}
     task_updates = undo_diff.get("task_updates") or []
+    attempted = 0
+    succeeded = 0
     if isinstance(task_updates, list):
         for row in task_updates:
             if not isinstance(row, dict):
@@ -97,6 +99,7 @@ def undo_mutation(
                 or not field
             ):
                 continue
+            attempted += 1
             body: dict[str, Any] = {"_id": task_id, field: prior}
             if doc.get("project_id"):
                 body["projectId"] = doc["project_id"]
@@ -110,6 +113,12 @@ def undo_mutation(
                 )
             elif result == "Forbidden":
                 return False, "forbidden"
+            else:
+                succeeded += 1
+
+    if attempted > 0 and succeeded < attempted:
+        record_agent_mutation_event("undo_partial_failure")
+        return False, "partial_failure"
 
     coll.update_one(
         {"_id": doc["_id"]},

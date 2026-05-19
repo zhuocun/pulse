@@ -1551,6 +1551,19 @@ def test_remaining_ordering_branches(client: TestClient, store: FakeStore) -> No
         )
         is None
     )
+    assert (
+        task_service.reorder(
+            {
+                "type": "before",
+                "fromId": ids["task_a"],
+                "referenceId": "",
+                "fromColumnId": ids["todo_id"],
+                "referenceColumnId": ids["done_id"],
+            },
+            ids["user_id"],
+        )
+        == "Task reordered"
+    )
     missing_ref = "000000000000000000000001"
     assert (
         task_service.reorder(

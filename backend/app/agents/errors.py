@@ -11,6 +11,45 @@ from typing import Any, Optional
 from app.errors import AppError
 
 
+def agent_http_error_detail(code: str, message: str) -> dict[str, Any]:
+    """Nested ``HTTPException.detail`` for agent routes (FE ``mapErrorResponse``)."""
+
+    return {"error": {"code": code, "message": message}}
+
+
+def _agent_error_payload(
+    code: str,
+    message: str,
+    *,
+    details: Any = None,
+) -> dict[str, Any]:
+    error: dict[str, Any] = {"code": code, "message": message}
+    if details is not None:
+        error["details"] = details
+    return {"error": error}
+
+
+def agent_app_error_content(exc: "AgentError") -> dict[str, Any]:
+    """Normalize :class:`AgentError` detail for :func:`app.main.app_error_handler`."""
+
+    detail = exc.detail
+    if isinstance(detail, dict):
+        nested = detail.get("error")
+        if (
+            isinstance(nested, dict)
+            and isinstance(nested.get("code"), str)
+            and isinstance(nested.get("message"), str)
+        ):
+            return detail
+        if isinstance(nested, str):
+            return _agent_error_payload(
+                exc.code,
+                nested,
+                details=detail.get("details"),
+            )
+    return _agent_error_payload(exc.code, str(exc))
+
+
 def _safe_cause_kind(exc: BaseException) -> str:
     """Map an internal exception to a safe, public-facing error category.
 
@@ -63,10 +102,10 @@ class AgentError(AppError):
         status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR,
         details: Any = None,
     ) -> None:
-        payload: dict[str, Any] = {"error": message}
-        if details is not None:
-            payload["details"] = details
-        super().__init__(status_code, payload)
+        super().__init__(
+            status_code,
+            _agent_error_payload(self.code, message, details=details),
+        )
         self.message = message
         self.details = details
 

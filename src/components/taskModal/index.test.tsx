@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
+import zhCN from "../../i18n/locales/zh-CN";
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
@@ -177,6 +179,33 @@ describe("TaskModal", () => {
 
     afterAll(() => {
         fetchMock.mockRestore();
+    });
+
+    afterEach(() => {
+        setActiveLocale(DEFAULT_LOCALE);
+    });
+
+    it("renders localized select placeholders when zh-CN is active and story points are unset", async () => {
+        setActiveLocale("zh-CN");
+        renderModal({
+            initialTasks: [
+                task({
+                    storyPoints: undefined as unknown as ITask["storyPoints"]
+                })
+            ]
+        });
+
+        expect(
+            await screen.findByText(
+                new RegExp(`${zhCN.actions.editTask} · build task`, "i")
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(zhCN.placeholders.selectStoryPoints)
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/Select story points/i)
+        ).not.toBeInTheDocument();
     });
 
     it("opens from the URL, populates fields, and renders cached select options", async () => {

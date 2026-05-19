@@ -29,17 +29,19 @@ The SSE wire format matches the FE's ``StreamPart`` discriminator
 """
 
 import asyncio
+import contextvars
+from contextlib import contextmanager
 from dataclasses import is_dataclass
 import logging
-from typing import Any, AsyncIterator, Dict, Mapping, Optional, get_type_hints
+from typing import Any, AsyncIterator, Dict, Iterator, Mapping, Optional, get_type_hints
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents import AgentConfigurationError, AgentRuntime
-from app.agents.base import AgentMetadata
-from app.agents.errors import AgentError
+from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.errors import AgentError, agent_http_error_detail
 from app.agents.limits import enforce_request_limits
 from app.agents.llm import estimate_text_tokens, result_token_usage_from_graph_result
 from app.agents.sse import (
@@ -69,6 +71,53 @@ from app.validation import api_error
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# LangGraph persists ``config.configurable`` keys into checkpoint metadata.
+# The runtime's ``build_config`` omits ``project_id``; the router injects it
+# per request via this context var so resume turns can recover the id from
+# checkpoint when the client omits it.
+_PROJECT_ID_FOR_RUN: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "_PROJECT_ID_FOR_RUN",
+    default=None,
+)
+_ORIGINAL_BUILD_CONFIG = AgentRuntime.build_config
+
+
+def _build_config_with_project_id(
+    self: AgentRuntime,
+    agent: BaseAgent,
+    *,
+    thread_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    assistant_id: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+) -> Dict[str, Any]:
+    config = _ORIGINAL_BUILD_CONFIG(
+        self,
+        agent,
+        thread_id=thread_id,
+        user_id=user_id,
+        assistant_id=assistant_id,
+        tags=tags,
+    )
+    project_id = _PROJECT_ID_FOR_RUN.get()
+    if project_id:
+        configurable = config.setdefault("configurable", {})
+        if isinstance(configurable, dict):
+            configurable["project_id"] = project_id
+    return config
+
+
+AgentRuntime.build_config = _build_config_with_project_id  # type: ignore[method-assign]
+
+
+@contextmanager
+def _agent_turn_project_scope(project_id: Optional[str]) -> Iterator[None]:
+    token = _PROJECT_ID_FOR_RUN.set(project_id)
+    try:
+        yield
+    finally:
+        _PROJECT_ID_FOR_RUN.reset(token)
 
 
 def get_runtime(request: Request) -> AgentRuntime:
@@ -187,9 +236,12 @@ def _resolve_autonomy(
     if cleaned not in metadata.allowed_autonomy:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"autonomy '{cleaned}' is not allowed for agent '{metadata.name}' "
-                f"(allowed: {', '.join(metadata.allowed_autonomy)})"
+            detail=agent_http_error_detail(
+                "autonomy_forbidden",
+                (
+                    f"autonomy '{cleaned}' is not allowed for agent '{metadata.name}' "
+                    f"(allowed: {', '.join(metadata.allowed_autonomy)})"
+                ),
             ),
         )
     return cleaned
@@ -283,6 +335,68 @@ def _project_id_from_agent_payload(payload: Mapping[str, Any]) -> Optional[str]:
             raw2 = conf.get("project_id")
             if isinstance(raw2, str) and raw2.strip():
                 return raw2.strip()
+    return None
+
+
+async def _async_resolve_project_id_for_turn(
+    runtime: AgentRuntime,
+    name: str,
+    user_id: str,
+    payload: Mapping[str, Any],
+    inputs: Mapping[str, Any],
+    *,
+    resuming: bool,
+) -> Optional[str]:
+    """Resolve ``project_id`` for policy gates on initial and resume turns.
+
+    Order: ``inputs`` → request ``config.configurable`` → checkpoint metadata
+    (resume only, keyed by ``thread_id``).
+    """
+
+    if isinstance(inputs, Mapping):
+        raw = inputs.get("project_id")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    from_payload = _project_id_from_agent_payload(payload)
+    if from_payload:
+        return from_payload
+
+    if not resuming or runtime.checkpointer is None:
+        return None
+
+    thread_id = _optional_str(payload, "thread_id")
+    if not thread_id:
+        return None
+
+    try:
+        agent = runtime.get(name)
+        config = runtime.build_config(agent, thread_id=thread_id, user_id=user_id)
+        getter = getattr(runtime.checkpointer, "aget_tuple", None)
+        if getter is not None:
+            checkpoint_tuple = await getter(config)
+        else:
+            sync_get = getattr(runtime.checkpointer, "get_tuple", None)
+            if sync_get is None:
+                return None
+            checkpoint_tuple = sync_get(config)
+    except Exception:  # noqa: BLE001 -- best-effort lookup; gates treat missing as no project
+        logger.debug(
+            "Failed to read project_id from checkpoint for agent %r thread %r",
+            name,
+            thread_id,
+            exc_info=True,
+        )
+        return None
+
+    if checkpoint_tuple is None:
+        return None
+    metadata = checkpoint_tuple.metadata
+    if not isinstance(metadata, dict):
+        return None
+    stored = metadata.get("project_id")
+    if isinstance(stored, str) and stored.strip():
+        return stored.strip()
     return None
 
 
@@ -382,7 +496,9 @@ def _enforce_rate_limit(
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"error": "rate limit exceeded"},
+            detail=agent_http_error_detail(
+                "rate_limit_exceeded", "rate limit exceeded"
+            ),
             headers={"Retry-After": str(retry_after)},
         )
 
@@ -406,7 +522,9 @@ def _enforce_budget(
     if not budget_tracker.reserve(project_id, requested):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={"error": "project budget exhausted"},
+            detail=agent_http_error_detail(
+                "budget_exhausted", "project budget exhausted"
+            ),
             headers={"X-Reason": "budget"},
         )
     return requested
@@ -418,7 +536,9 @@ def _enforce_project_access(project_id: Optional[str]) -> None:
     if not is_project_ai_enabled(project_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "AI is disabled for this project"},
+            detail=agent_http_error_detail(
+                "forbidden", "AI is disabled for this project"
+            ),
         )
 
 
@@ -430,7 +550,7 @@ def _require_project_manager(project_id: Optional[str], user_id: str) -> None:
     if not is_project_manager(project_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Forbidden"},
+            detail=agent_http_error_detail("forbidden", "Forbidden"),
         )
 
 
@@ -841,11 +961,14 @@ async def invoke_agent(
         inputs, resume, resuming = _resolve_resume_and_inputs(
             payload, request, metadata
         )
-        project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
-        if resuming and project_id is None:
-            project_id = (
-                payload.get("config", {}).get("configurable", {}).get("project_id")
-            )
+        project_id = await _async_resolve_project_id_for_turn(
+            runtime,
+            name,
+            user_id,
+            payload,
+            inputs,
+            resuming=resuming,
+        )
         if not resuming:
             _autonomy_into_inputs(inputs, autonomy)
 
@@ -870,20 +993,24 @@ async def invoke_agent(
         context = _merge_autonomy_into_context(context, autonomy)
         timeout = settings.agent_request_timeout_seconds
         try:
-            result = await asyncio.wait_for(
-                runtime.ainvoke(
-                    name,
-                    inputs,
-                    context=context,
-                    resume=resume,
-                    **_run_options(payload, user_id=user_id),
-                ),
-                timeout=timeout,
-            )
+            with _agent_turn_project_scope(project_id):
+                result = await asyncio.wait_for(
+                    runtime.ainvoke(
+                        name,
+                        inputs,
+                        context=context,
+                        resume=resume,
+                        **_run_options(payload, user_id=user_id),
+                    ),
+                    timeout=timeout,
+                )
         except asyncio.TimeoutError as exc:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail={"error": f"Agent run exceeded {timeout}s timeout"},
+                detail=agent_http_error_detail(
+                    "timeout",
+                    f"Agent run exceeded {timeout}s timeout",
+                ),
             ) from exc
 
         tokens_in, tokens_out = result_token_usage_from_graph_result(result)
@@ -948,11 +1075,14 @@ async def stream_agent(
     inputs, resume, resuming = _resolve_resume_and_inputs(
         payload, request, metadata
     )
-    project_id = inputs.get("project_id") if isinstance(inputs, dict) else None
-    if resuming and project_id is None:
-        project_id = (
-            payload.get("config", {}).get("configurable", {}).get("project_id")
-        )
+    project_id = await _async_resolve_project_id_for_turn(
+        runtime,
+        name,
+        user_id,
+        payload,
+        inputs,
+        resuming=resuming,
+    )
     if not resuming:
         _autonomy_into_inputs(inputs, autonomy)
 
@@ -1038,85 +1168,86 @@ async def stream_agent(
         timeout = settings.agent_request_timeout_seconds
 
         async def event_generator() -> AsyncIterator[bytes]:
-            tokens_in_total = 0
-            tokens_out_total = 0
-            completed_ok = False
-            failure_budget_settled = False
+            with _agent_turn_project_scope(project_id):
+                tokens_in_total = 0
+                tokens_out_total = 0
+                completed_ok = False
+                failure_budget_settled = False
 
-            def settle_failure_budget() -> None:
-                nonlocal failure_budget_settled
-                if failure_budget_settled or not reserved_budget:
+                def settle_failure_budget() -> None:
+                    nonlocal failure_budget_settled
+                    if failure_budget_settled or not reserved_budget:
+                        return
+                    _record_real_usage(
+                        project_id,
+                        tokens_in_total,
+                        tokens_out_total,
+                        budget_tracker=budget_tracker,
+                        prebooked=reserved_budget,
+                        failure=True,
+                    )
+                    failure_budget_settled = True
+
+                try:
+                    stream = runtime.astream(
+                        name,
+                        inputs,
+                        context=context,
+                        resume=resume,
+                        **options,
+                    )
+                    async for mode, chunk in _with_disconnect(request, stream, timeout):
+                        for envelope in translate_event(mode, chunk):
+                            yield encode_sse(envelope)
+                            if envelope.get("type") == "custom":
+                                usage = _maybe_capture_usage(envelope)
+                                if usage is not None:
+                                    tokens_in_total += usage[0]
+                                    tokens_out_total += usage[1]
+                except AgentError as exc:
+                    yield encode_sse(
+                        error_envelope(
+                            str(exc),
+                            recoverable=False,
+                            code=getattr(exc, "code", "agent_error"),
+                        )
+                    )
+                except asyncio.TimeoutError:
+                    yield encode_sse(
+                        error_envelope(
+                            f"Agent run exceeded {timeout}s timeout",
+                            recoverable=False,
+                            code="timeout",
+                        )
+                    )
+                except _ClientDisconnected:
+                    settle_failure_budget()
+                    if idem is not None:
+                        idem.release()
                     return
-                _record_real_usage(
-                    project_id,
-                    tokens_in_total,
-                    tokens_out_total,
-                    budget_tracker=budget_tracker,
-                    prebooked=reserved_budget,
-                    failure=True,
-                )
-                failure_budget_settled = True
-
-            try:
-                stream = runtime.astream(
-                    name,
-                    inputs,
-                    context=context,
-                    resume=resume,
-                    **options,
-                )
-                async for mode, chunk in _with_disconnect(request, stream, timeout):
-                    for envelope in translate_event(mode, chunk):
-                        yield encode_sse(envelope)
-                        if envelope.get("type") == "custom":
-                            usage = _maybe_capture_usage(envelope)
-                            if usage is not None:
-                                tokens_in_total += usage[0]
-                                tokens_out_total += usage[1]
-            except AgentError as exc:
-                yield encode_sse(
-                    error_envelope(
-                        str(exc),
-                        recoverable=False,
-                        code=getattr(exc, "code", "agent_error"),
+                except Exception:  # noqa: BLE001 -- intentional translation boundary
+                    logger.exception("Agent %r failed mid-stream.", name)
+                    yield encode_sse(
+                        error_envelope(
+                            "Agent run failed; see server logs for details.",
+                            recoverable=False,
+                            code="agent_error",
+                        )
                     )
-                )
-            except asyncio.TimeoutError:
-                yield encode_sse(
-                    error_envelope(
-                        f"Agent run exceeded {timeout}s timeout",
-                        recoverable=False,
-                        code="timeout",
+                else:
+                    if tokens_in_total or tokens_out_total:
+                        yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
+                    _record_real_usage(
+                        project_id,
+                        tokens_in_total,
+                        tokens_out_total,
+                        budget_tracker=budget_tracker,
+                        prebooked=reserved_budget,
+                        failure=False,
                     )
-                )
-            except _ClientDisconnected:
-                settle_failure_budget()
-                if idem is not None:
-                    idem.release()
-                return
-            except Exception:  # noqa: BLE001 -- intentional translation boundary
-                logger.exception("Agent %r failed mid-stream.", name)
-                yield encode_sse(
-                    error_envelope(
-                        "Agent run failed; see server logs for details.",
-                        recoverable=False,
-                        code="agent_error",
-                    )
-                )
-            else:
-                if tokens_in_total or tokens_out_total:
-                    yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
-                _record_real_usage(
-                    project_id,
-                    tokens_in_total,
-                    tokens_out_total,
-                    budget_tracker=budget_tracker,
-                    prebooked=reserved_budget,
-                    failure=False,
-                )
-                completed_ok = True
-            if not completed_ok:
-                settle_failure_budget()
+                    completed_ok = True
+                if not completed_ok:
+                    settle_failure_budget()
             # On a clean stream completion we leave a sentinel in the cache
             # so an immediate retry with the same key replays as a 200 JSON
             # marker rather than restarting the run; on any error path we

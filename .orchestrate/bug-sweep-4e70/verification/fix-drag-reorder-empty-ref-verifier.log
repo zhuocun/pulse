@@ -1,0 +1,26 @@
+# Verifier: fix-drag-reorder-empty-ref (B1)
+# Date: 2026-05-19
+# Branch: orch/bug-sweep-4e70/fix-drag-reorder-empty-ref
+# Target: fix-drag-reorder-empty-ref
+
+## Independent code review (referenceId contract)
+- `src/utils/hooks/useDragEnd.ts`: spreads `referenceId` only when `referenceTask?._id` is truthy (empty-column drop omits key).
+- `backend/app/services/task_service.py`: `reference_id = data.get("referenceId") or None` so `""` is treated as no reference.
+- `src/utils/optimisticUpdate/reorder.ts`: unchanged; `if (!referenceId)` already handles missing/empty.
+
+## Recipe runs
+1. `CI=true npm test -- --watchAll=false --runInBand src/utils/hooks/useDragEnd src/utils/optimisticUpdate/reorder`
+   → 2 suites, 28 tests passed (exit 0).
+
+2. `cd backend && source /workspace/.venv/bin/activate && python -m pytest tests/test_api_features.py -q -k reorder`
+   → 1 passed, 28 deselected; exit 1 due to repo 100% coverage gate (33% total when subset runs). Test assertion succeeded.
+   → Same command with `--no-cov`: 1 passed (exit 0).
+
+3. `npx tsc --noEmit` → exit 0.
+
+## Additional targeted runs
+- `pytest tests/test_api_features.py::test_remaining_ordering_branches --no-cov -v` → PASSED (includes `referenceId: ""` cross-column regression).
+- `pytest tests/test_api_features.py::test_full_feature_flow --no-cov -q` → PASSED (HTTP PUT `/api/v1/tasks/orders` with `referenceId: null`).
+
+## Verdict signal
+unit-test-verified

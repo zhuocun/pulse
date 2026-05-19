@@ -267,7 +267,7 @@ describe("useDragEnd", () => {
         });
     });
 
-    it("passes an empty reference id for empty target-column drops", () => {
+    it("omits referenceId for empty target-column drops", () => {
         renderProbe();
 
         drop(
@@ -279,7 +279,6 @@ describe("useDragEnd", () => {
             fromColumnId: "column-1",
             fromId: "task-1",
             referenceColumnId: "column-3",
-            referenceId: "",
             type: "before"
         });
     });

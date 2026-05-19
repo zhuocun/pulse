@@ -234,8 +234,8 @@ def _try_verify_signed_thread_key(
       call (prefix-injection attempt; surfaced upstream as
       :class:`InvalidThreadKeyError`).
 
-    Callers that receive ``None`` should fall back to the iterative-strip
-    path for backwards compatibility with unsigned thread IDs.
+    Callers that receive ``None`` for a prefixed token must reject it
+    (see :meth:`AgentRuntime._namespaced_thread`).
     """
     if token.startswith(_SIGNED_PREFIX_V2):
         return _verify_sigv2(token, agent_name, scope)
@@ -508,15 +508,11 @@ class AgentRuntime:
             except ValueError as exc:
                 raise InvalidThreadKeyError(str(exc)) from exc
             if original is None:
-                # Malformed envelope; treat as an unsigned id to preserve
-                # rolling-restart safety (the new server code may restart
-                # while old clients are mid-flight with a plain id that
-                # coincidentally starts with "sigv1." -- extremely unlikely
-                # but handle gracefully).
-                pass
-            else:
-                base = original.strip() or self._default_thread_id
-                return f"{prefix}{base}"
+                raise InvalidThreadKeyError(
+                    "Signed thread key rejected: invalid or tampered token"
+                )
+            base = original.strip() or self._default_thread_id
+            return f"{prefix}{base}"
 
         # ------------------------------------------------------------------
         # Unsigned fallback: iterative-strip (backwards compat).

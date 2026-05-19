@@ -1321,15 +1321,20 @@ def test_env_positive_int_rejects_non_positive(
 def test_agent_configuration_error_without_details() -> None:
     err = AgentConfigurationError("boom")
     assert err.details is None
-    assert err.detail == {"error": "boom"}
+    assert err.detail == {
+        "error": {"code": "agent_configuration", "message": "boom"},
+    }
 
 
 def test_agent_recursion_error_payload() -> None:
     err = AgentRecursionError("x", 7)
     assert err.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert err.detail == {
-        "error": "Agent 'x' exceeded recursion limit of 7",
-        "details": {"name": "x", "recursion_limit": 7},
+        "error": {
+            "code": "agent_recursion",
+            "message": "Agent 'x' exceeded recursion limit of 7",
+            "details": {"name": "x", "recursion_limit": 7},
+        },
     }
     assert err.recursion_limit == 7
 
@@ -1338,12 +1343,12 @@ def test_agent_execution_error_records_cause() -> None:
     cause = ValueError("nope")
     err = AgentExecutionError("x", cause=cause)
     assert err.cause is cause
-    assert err.detail["details"]["cause"] == "ValueError"
+    assert err.detail["error"]["details"]["cause"] == "ValueError"
     assert err.message == "Agent 'x' failed: Execution failed"
     assert "nope" not in err.message
 
     err_no_cause = AgentExecutionError("x")
-    assert err_no_cause.detail["details"]["cause"] is None
+    assert err_no_cause.detail["error"]["details"]["cause"] is None
 
 
 def test_agent_runtime_defaults_use_global_registry() -> None:
@@ -1596,22 +1601,52 @@ def test_try_verify_returns_none_on_invalid_hmac() -> None:
     assert result is None
 
 
-def test_namespaced_thread_treats_malformed_sigv1_as_unsigned(
+def test_namespaced_thread_rejects_malformed_sigv1(
     fresh_registry: AgentRegistry,
 ) -> None:
-    """A ``sigv1.`` token that returns None from verification falls back to unsigned path."""
+    """A ``sigv1.`` token that fails verification raises ``InvalidThreadKeyError``."""
+    from app.agents.errors import InvalidThreadKeyError
     from app.agents.runtime import _SIGNED_PREFIX
 
     fresh_registry.register(EchoAgent())
     runtime = AgentRuntime(registry=fresh_registry)
     agent = runtime.get("echo")
 
-    # Construct a token that starts with sigv1. but has invalid base64 body.
     malformed_token = f"{_SIGNED_PREFIX}!!!invalid!!!"
-    # Should not raise; falls back to iterative-strip treating the whole
-    # token as a plain thread id.
-    cfg = runtime.build_config(agent, thread_id=malformed_token, user_id="u1")
-    assert cfg["configurable"]["thread_id"].startswith("echo:u1:")
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        runtime.build_config(agent, thread_id=malformed_token, user_id="u1")
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
+
+
+def test_tampered_signed_thread_key_rejected(
+    fresh_registry: AgentRegistry,
+) -> None:
+    """A valid-looking ``sigv1.`` token with a bad HMAC is rejected, not unsigned."""
+    import base64
+
+    from app.agents.errors import InvalidThreadKeyError
+    from app.agents.runtime import sign_thread_key, _SEP, _SIGNED_PREFIX
+
+    fresh_registry.register(EchoAgent())
+    runtime = AgentRuntime(registry=fresh_registry)
+    agent = runtime.get("echo")
+
+    token = sign_thread_key("echo", "u1", "my-thread")
+    encoded = token[len(_SIGNED_PREFIX) :]
+    payload = base64.urlsafe_b64decode(encoded.encode()).decode()
+    parts = payload.split(_SEP, 3)
+    parts[3] = "0" * 64
+    tampered = f"{_SIGNED_PREFIX}{base64.urlsafe_b64encode(_SEP.join(parts).encode()).decode()}"
+
+    with pytest.raises(InvalidThreadKeyError) as exc_info:
+        runtime.build_config(agent, thread_id=tampered, user_id="u1")
+
+    err = exc_info.value
+    assert err.code == "invalid_thread_key"
+    assert err.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -2865,7 +2900,9 @@ def test_router_context_coercion_branches(
             headers=auth_headers,
         )
         assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
-        assert "Unsupported context schema" in response.json()["error"]
+        err_body = response.json()["error"]
+        assert err_body["code"] == "agent_configuration"
+        assert "Unsupported context schema" in err_body["message"]
     finally:
         global_registry.unregister(echo.name)
         global_registry.unregister(plain.name)
@@ -3336,7 +3373,221 @@ def test_router_invoke_returns_429_with_retry_after_when_rate_limited(
     assert second.status_code == HTTPStatus.TOO_MANY_REQUESTS
     assert "Retry-After" in second.headers
     assert int(second.headers["Retry-After"]) >= 1
+    rate_body = second.json()
+    assert rate_body["error"]["code"] == "rate_limit_exceeded"
+    assert rate_body["error"]["message"] == "rate limit exceeded"
     ai_rate_limit_backend.reset()
+
+
+def test_async_resolve_project_id_reads_sync_checkpoint_tuple() -> None:
+    """Checkpointers with only ``get_tuple`` still supply resume ``project_id``."""
+
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _CheckpointTuple:
+        metadata = {"project_id": "p-from-sync-checkpoint"}
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> _CheckpointTuple:
+            return _CheckpointTuple()
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) == "p-from-sync-checkpoint"
+
+
+def test_async_resolve_project_id_sync_checkpoint_without_get_tuple() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _NoTupleCheckpointer:
+        pass
+
+    class _StubRuntime:
+        checkpointer = _NoTupleCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_sync_checkpoint_lookup_failure() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _BrokenCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> Any:
+            raise RuntimeError("checkpoint read failed")
+
+    class _StubRuntime:
+        checkpointer = _BrokenCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_sync_checkpoint_returns_none_tuple() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> None:
+            return None
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_async_resolve_project_id_ignores_empty_checkpoint_metadata() -> None:
+    from app.routers.agents import _async_resolve_project_id_for_turn
+
+    class _CheckpointTuple:
+        metadata = "not-a-dict"
+
+    class _SyncOnlyCheckpointer:
+        def get_tuple(self, _config: dict[str, Any]) -> _CheckpointTuple:
+            return _CheckpointTuple()
+
+    class _StubRuntime:
+        checkpointer = _SyncOnlyCheckpointer()
+
+        def get(self, _name: str) -> object:
+            return object()
+
+        def build_config(
+            self, _agent: object, *, thread_id: str, user_id: str
+        ) -> dict[str, Any]:
+            return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+    async def _run() -> Optional[str]:
+        return await _async_resolve_project_id_for_turn(
+            _StubRuntime(),  # type: ignore[arg-type]
+            "echo",
+            "user-1",
+            {"thread_id": "resume-thread"},
+            {},
+            resuming=True,
+        )
+
+    assert asyncio.run(_run()) is None
+
+
+def test_router_invoke_resume_returns_402_when_budget_exhausted_without_client_project_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    ai_budget_backend,
+) -> None:
+    """Resume must enforce budget using project_id from the initial checkpoint."""
+
+    from app.middleware.budget import DEFAULT_MONTHLY_TOKEN_CAP
+
+    agent = _InterruptingAgent()
+    global_registry.register(agent)
+    thread_id = "http-resume-budget-no-project-id"
+    try:
+        ai_budget_backend.reset()
+        first = client.post(
+            "/api/v1/agents/interrupting/invoke",
+            json={
+                "inputs": {"started": False, "project_id": "p-budget-agent"},
+                "thread_id": thread_id,
+            },
+            headers=auth_headers,
+        )
+        assert first.status_code == HTTPStatus.OK
+        assert "__interrupt__" in first.json()["result"]
+
+        ai_budget_backend.reset()
+        monkeypatch.setattr(ai_budget_backend, "monthly_cap", 0)
+
+        second = client.post(
+            "/api/v1/agents/interrupting/invoke",
+            json={
+                "command": {"resume": "value-from-fe"},
+                "thread_id": thread_id,
+            },
+            headers=auth_headers,
+        )
+        assert second.status_code == HTTPStatus.PAYMENT_REQUIRED
+        assert second.headers.get("X-Reason") == "budget"
+    finally:
+        global_registry.unregister(agent.name)
+        monkeypatch.setattr(
+            ai_budget_backend,
+            "monthly_cap",
+            DEFAULT_MONTHLY_TOKEN_CAP,
+        )
+        ai_budget_backend.reset()
 
 
 def test_router_invoke_returns_402_when_budget_exhausted(
@@ -3358,6 +3609,9 @@ def test_router_invoke_returns_402_when_budget_exhausted(
     )
     assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
     assert response.headers.get("X-Reason") == "budget"
+    budget_body = response.json()
+    assert budget_body["error"]["code"] == "budget_exhausted"
+    assert budget_body["error"]["message"] == "project budget exhausted"
     monkeypatch.setattr(
         ai_budget_backend,
         "monthly_cap",
@@ -3410,6 +3664,32 @@ def test_router_records_usage_after_stream_completes(
         < DEFAULT_MONTHLY_TOKEN_CAP
     )
     ai_budget_backend.reset()
+
+
+def test_router_invoke_agent_error_returns_nested_code(
+    client: TestClient,
+    echo_in_global_registry: EchoAgent,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.agents.errors import AgentConfigurationError
+
+    runtime = client.app.state.agent_runtime
+
+    async def boom(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AgentConfigurationError("misconfigured")
+
+    monkeypatch.setattr(runtime, "ainvoke", boom, raising=False)
+
+    response = client.post(
+        "/api/v1/agents/echo/invoke",
+        json={"inputs": {"text": "x"}},
+        headers=auth_headers,
+    )
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    body = response.json()
+    assert body["error"]["code"] == "agent_configuration"
+    assert body["error"]["message"] == "misconfigured"
 
 
 def test_router_returns_403_when_project_ai_is_disabled(
@@ -3922,7 +4202,7 @@ def test_agent_execution_error_classifies_module_based_error() -> None:
     from app.agents.errors import AgentExecutionError
 
     exc = AgentExecutionError("echo", cause=_ApiIoFailure("api failed"))
-    assert exc.detail["details"]["cause_kind"] == "network_error"
+    assert exc.detail["error"]["details"]["cause_kind"] == "network_error"
 
 
 # ---------------------------------------------------------------------------

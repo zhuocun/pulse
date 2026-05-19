@@ -197,6 +197,52 @@ describe("AiTaskDraftModal — remote agent path", () => {
         expect(opts?.autonomy).toBe("plan");
     });
 
+    it("rejects a whitespace-only task name on create", async () => {
+        const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue({
+            json: jest.fn().mockResolvedValue({ _id: "task-new" }),
+            ok: true,
+            status: 200
+        } as unknown as Response);
+
+        renderModal(true, jest.fn(), {
+            lastSuggestion: {
+                surface: "draft",
+                payload: draftPayload
+            }
+        });
+
+        const taskNameInput =
+            await screen.findByDisplayValue("Agent-drafted task");
+        fireEvent.change(taskNameInput, { target: { value: "   " } });
+        fireEvent.click(screen.getByRole("button", { name: /create task/i }));
+
+        await waitFor(() => {
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+        fetchMock.mockRestore();
+    });
+
+    it("clamps invalid column and coordinator ids from remote draft suggestions", async () => {
+        renderModal(true, jest.fn(), {
+            lastSuggestion: {
+                surface: "draft",
+                payload: {
+                    ...draftPayload,
+                    columnId: "invalid-column",
+                    coordinatorId: "invalid-member"
+                }
+            }
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.getByDisplayValue("Agent-drafted task")
+            ).toBeInTheDocument()
+        );
+        expect(screen.getByText("Todo")).toBeInTheDocument();
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
     it("populates form fields after surface:draft single suggestion", async () => {
         renderModal(true, jest.fn(), {
             lastSuggestion: {

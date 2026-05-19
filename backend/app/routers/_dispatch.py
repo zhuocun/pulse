@@ -18,10 +18,10 @@ The optional ``agent_error_fallback(payload) -> Any | None`` lets a
 route supply a deterministic result when the agent is unavailable
 (``AgentError``).  When omitted the ``AgentError`` propagates normally.
 
-The chat route is *not* handled here because it uses
-``_gate_with_reservation`` (reserve-based budget) and an
-``asyncio.wait_for`` timeout, which are unique to the multi-round chat
-loop.
+The chat route is *not* handled here because it uses an
+``asyncio.wait_for`` timeout unique to the multi-round chat loop.
+Structured routes share the same reserve-at-gate + reconcile-after-run
+budget path implemented below.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import HTTPException, Request, status
 
 from app.agents import AgentRuntime
-from app.agents.errors import AgentError
+from app.agents.errors import AgentError, AgentNotFoundError
 from app.agents.limits import enforce_request_limits
 from app.agents.llm import is_chat_model_allowed, make_chat_model_for_id
 from app.config import settings as default_settings
@@ -176,7 +176,7 @@ async def run_v1_route(
     """
     # Import helpers from the parent module here to avoid circular imports.
     from app.routers.ai import (  # noqa: PLC0415
-        _gate,
+        _gate_with_reservation,
         _idem_fail,
         _idempotent_replay,
         _legacy_ai_route_meta,
@@ -200,17 +200,47 @@ async def run_v1_route(
     replay = _idempotent_replay(idem, route=route_path, agent_label=agent_label)
     if replay is not None:
         return replay
+    reserved_budget = 0
+    budget_reconciled = False
+    project_id: Optional[str] = None
     try:
         project_id = _project_id_from_payload(payload)
-        _gate(
+        agent_missing = False
+        route_metadata = None
+        try:
+            route_metadata = runtime.get(meta.catalog_agent_name).metadata
+        except AgentNotFoundError:
+            if agent_error_fallback is None:
+                raise
+            agent_missing = True
+        reserved_budget = _gate_with_reservation(
             request,
             user_id,
             project_id,
             rate_limiter=rate_limiter,
             budget_tracker=budget_tracker,
+            metadata=route_metadata,
             agent_label=agent_label,
         )
         enforce_request_limits(payload, request=request)
+
+        if agent_missing:
+            body = agent_error_fallback(payload)
+            if body is None:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={
+                        "error": {
+                            "code": "agent_unavailable",
+                            "message": "Agent did not emit an expected result.",
+                        }
+                    },
+                )
+            if reserved_budget and project_id:
+                budget_tracker.refund(project_id, tokens=reserved_budget)
+            idem.store(status_code=status.HTTP_200_OK, body=body)
+            record_idempotency(route_path, "miss")
+            return body
 
         inputs: Dict[str, Any] = project_inputs(payload, project_id)
         # Per-request chat-model override (``X-Pulse-Model`` header).  When
@@ -262,13 +292,26 @@ async def run_v1_route(
                     },
                 )
             _reconcile_token_budget(
-                project_id, budget_tracker, final_state, custom_events
+                project_id,
+                budget_tracker,
+                final_state,
+                custom_events,
+                prebooked=reserved_budget,
             )
+            budget_reconciled = True
+        elif reserved_budget and project_id:
+            # Deterministic fallback bypasses provider usage reconciliation;
+            # release the gate reservation so behavior matches the old
+            # read-only ``can_spend`` gate (no debit on stub fallback).
+            budget_tracker.refund(project_id, tokens=reserved_budget)
+            budget_reconciled = True
 
         idem.store(status_code=status.HTTP_200_OK, body=body)
         record_idempotency(route_path, "miss")
         return body
     except BaseException as exc:
+        if not budget_reconciled and reserved_budget and project_id:
+            budget_tracker.refund(project_id, tokens=reserved_budget)
         _idem_fail(idem, exc)
 
 

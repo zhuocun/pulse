@@ -104,6 +104,22 @@ describe("AiTaskDraftModal", () => {
         );
     });
 
+    it("rejects a whitespace-only task name on create", async () => {
+        mountModal();
+        fireEvent.change(screen.getByLabelText("Task prompt"), {
+            target: { value: "Investigate flaky login on Safari" }
+        });
+        fireEvent.click(screen.getByLabelText("Draft task with Copilot"));
+
+        const taskNameInput = await screen.findByDisplayValue(/./);
+        fireEvent.change(taskNameInput, { target: { value: "   " } });
+        fireEvent.click(screen.getByRole("button", { name: /create task/i }));
+
+        await waitFor(() => {
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+    });
+
     it("drafts a task, lets the user submit it, and closes", async () => {
         const onClose = jest.fn();
         mountModal(onClose);
