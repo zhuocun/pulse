@@ -217,7 +217,7 @@ export const writeAuthTokenWithStatus = (
     if (storage) {
         try {
             storage.setItem(TOKEN_STORAGE_KEY, token);
-            storageOk = true;
+            storageOk = storage.getItem(TOKEN_STORAGE_KEY) === token;
         } catch {
             // Falls through to the cookie path.
         }

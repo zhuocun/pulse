@@ -181,6 +181,46 @@ describe("tokenStorage", () => {
         }
     });
 
+    it("does not report persistence when localStorage silently ignores writes and cookies are unavailable", () => {
+        const getItemSpy = jest
+            .spyOn(Storage.prototype, "getItem")
+            .mockReturnValue(null);
+        const setItemSpy = jest
+            .spyOn(Storage.prototype, "setItem")
+            .mockImplementation(() => {
+                // Some restricted storage modes accept setItem but do not
+                // retain the value for the next read.
+            });
+        const cookieDescriptor = Object.getOwnPropertyDescriptor(
+            Document.prototype,
+            "cookie"
+        );
+        Object.defineProperty(document, "cookie", {
+            configurable: true,
+            get() {
+                return "";
+            },
+            set() {
+                // Simulates a browser policy that silently drops cookie writes.
+            }
+        });
+
+        try {
+            expect(writeAuthToken("jwt-1")).toBe(false);
+            expect(readAuthToken()).toBeNull();
+            expect(setItemSpy).toHaveBeenCalledWith("Token", "jwt-1");
+            expect(getItemSpy).toHaveBeenCalledWith("Token");
+        } finally {
+            if (cookieDescriptor) {
+                Object.defineProperty(document, "cookie", cookieDescriptor);
+            } else {
+                delete (document as unknown as { cookie?: string }).cookie;
+            }
+            getItemSpy.mockRestore();
+            setItemSpy.mockRestore();
+        }
+    });
+
     it("fails closed when both storage and cookie access are blocked", () => {
         const getItemSpy = jest
             .spyOn(Storage.prototype, "getItem")
