@@ -6,7 +6,13 @@ fields added to :class:`AgentExecutionError` in the cost/correctness hardening p
 
 from __future__ import annotations
 
-from app.agents.errors import AgentExecutionError, _safe_cause_kind
+from app.agents.errors import (
+    AgentError,
+    AgentExecutionError,
+    _safe_cause_kind,
+    agent_app_error_content,
+    agent_http_error_detail,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -120,39 +126,61 @@ def test_safe_cause_kind_unknown_for_runtime_error() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_agent_http_error_detail_shape() -> None:
+    detail = agent_http_error_detail("rate_limit_exceeded", "rate limit exceeded")
+    assert detail == {
+        "error": {"code": "rate_limit_exceeded", "message": "rate limit exceeded"},
+    }
+
+
+def test_agent_app_error_content_nested_payload() -> None:
+    err = AgentError("boom", status_code=418)
+    assert agent_app_error_content(err) == {
+        "error": {"code": "agent_error", "message": "boom"},
+    }
+
+
+def test_agent_app_error_content_legacy_string_payload() -> None:
+    err = AgentError("legacy", status_code=418)
+    err.detail = {"error": "legacy", "details": {"x": 1}}
+    assert agent_app_error_content(err) == {
+        "error": {"code": "agent_error", "message": "legacy", "details": {"x": 1}},
+    }
+
+
 def test_agent_execution_error_cause_kind_database() -> None:
     err = AgentExecutionError("svc", cause=_OperationalError("conn reset"))
-    assert err.detail["details"]["cause_kind"] == "database_error"
+    assert err.detail["error"]["details"]["cause_kind"] == "database_error"
 
 
 def test_agent_execution_error_cause_kind_unknown() -> None:
     err = AgentExecutionError("svc", cause=ValueError("bad value"))
-    assert err.detail["details"]["cause_kind"] == "unknown_error"
+    assert err.detail["error"]["details"]["cause_kind"] == "unknown_error"
 
 
 def test_agent_execution_error_cause_kind_none_when_no_cause() -> None:
     err = AgentExecutionError("svc")
-    assert err.detail["details"]["cause_kind"] is None
+    assert err.detail["error"]["details"]["cause_kind"] is None
 
 
 def test_agent_execution_error_cause_message_truncated() -> None:
     long_msg = "x" * 300
     err = AgentExecutionError("svc", cause=ValueError(long_msg))
-    assert len(err.detail["details"]["cause_message"]) == 200
+    assert len(err.detail["error"]["details"]["cause_message"]) == 200
 
 
 def test_agent_execution_error_cause_message_short_passthrough() -> None:
     err = AgentExecutionError("svc", cause=ValueError("short"))
-    assert err.detail["details"]["cause_message"] == "short"
+    assert err.detail["error"]["details"]["cause_message"] == "short"
 
 
 def test_agent_execution_error_cause_message_none_when_no_cause() -> None:
     err = AgentExecutionError("svc")
-    assert err.detail["details"]["cause_message"] is None
+    assert err.detail["error"]["details"]["cause_message"] is None
 
 
 def test_agent_execution_error_backward_compat_cause_field() -> None:
     """``details["cause"]`` still holds the raw class name for existing callers."""
 
     err = AgentExecutionError("svc", cause=ValueError("oops"))
-    assert err.detail["details"]["cause"] == "ValueError"
+    assert err.detail["error"]["details"]["cause"] == "ValueError"

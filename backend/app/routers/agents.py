@@ -39,7 +39,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents import AgentConfigurationError, AgentRuntime
 from app.agents.base import AgentMetadata
-from app.agents.errors import AgentError
+from app.agents.errors import AgentError, agent_http_error_detail
 from app.agents.limits import enforce_request_limits
 from app.agents.llm import estimate_text_tokens, result_token_usage_from_graph_result
 from app.agents.sse import (
@@ -187,9 +187,12 @@ def _resolve_autonomy(
     if cleaned not in metadata.allowed_autonomy:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"autonomy '{cleaned}' is not allowed for agent '{metadata.name}' "
-                f"(allowed: {', '.join(metadata.allowed_autonomy)})"
+            detail=agent_http_error_detail(
+                "autonomy_forbidden",
+                (
+                    f"autonomy '{cleaned}' is not allowed for agent '{metadata.name}' "
+                    f"(allowed: {', '.join(metadata.allowed_autonomy)})"
+                ),
             ),
         )
     return cleaned
@@ -382,7 +385,9 @@ def _enforce_rate_limit(
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"error": "rate limit exceeded"},
+            detail=agent_http_error_detail(
+                "rate_limit_exceeded", "rate limit exceeded"
+            ),
             headers={"Retry-After": str(retry_after)},
         )
 
@@ -406,7 +411,9 @@ def _enforce_budget(
     if not budget_tracker.reserve(project_id, requested):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={"error": "project budget exhausted"},
+            detail=agent_http_error_detail(
+                "budget_exhausted", "project budget exhausted"
+            ),
             headers={"X-Reason": "budget"},
         )
     return requested
@@ -418,7 +425,9 @@ def _enforce_project_access(project_id: Optional[str]) -> None:
     if not is_project_ai_enabled(project_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "AI is disabled for this project"},
+            detail=agent_http_error_detail(
+                "forbidden", "AI is disabled for this project"
+            ),
         )
 
 
@@ -430,7 +439,7 @@ def _require_project_manager(project_id: Optional[str], user_id: str) -> None:
     if not is_project_manager(project_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Forbidden"},
+            detail=agent_http_error_detail("forbidden", "Forbidden"),
         )
 
 
@@ -883,7 +892,10 @@ async def invoke_agent(
         except asyncio.TimeoutError as exc:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail={"error": f"Agent run exceeded {timeout}s timeout"},
+                detail=agent_http_error_detail(
+                    "timeout",
+                    f"Agent run exceeded {timeout}s timeout",
+                ),
             ) from exc
 
         tokens_in, tokens_out = result_token_usage_from_graph_result(result)
