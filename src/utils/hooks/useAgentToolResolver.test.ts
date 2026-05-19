@@ -5,8 +5,13 @@ import type {
     AgentStreamRequest,
     InterruptPayload
 } from "../../interfaces/agent";
+import { AgentTransportError } from "../ai/agentErrors";
 import type { FeToolContext } from "../ai/feTools";
-import useAgentToolResolver from "./useAgentToolResolver";
+import useAgentToolResolver, {
+    TOOL_ROUND_LIMIT_USER_MESSAGE,
+    hookErrorFromAgentStreamErrorData,
+    isToolRoundLimitErrorCode
+} from "./useAgentToolResolver";
 
 const baseRequest: AgentStreamRequest = {
     input: { messages: [] },
@@ -80,6 +85,37 @@ describe("useAgentToolResolver", () => {
         expect(resumeValue).toEqual({ error: "tool exploded" });
         expect(result.current.status).toBe("error");
         expect(result.current.error?.message).toBe("tool exploded");
+    });
+
+    it("does not auto-run fe.requestMutationApproval (HITL pause for the split tool)", async () => {
+        const run = jest.fn().mockResolvedValue({ ok: true });
+        const { result } = renderHook(() => useAgentToolResolver());
+
+        let resumeValue: unknown;
+        await act(async () => {
+            resumeValue = await result.current.resolveInterrupt({
+                registry: {
+                    "fe.requestMutationApproval": {
+                        name: "fe.requestMutationApproval",
+                        description: "approval",
+                        run
+                    }
+                },
+                autoResume: true,
+                autonomy: "plan",
+                threadId: "t_1",
+                lastInterrupt: null,
+                interrupt: {
+                    tool: "fe.requestMutationApproval",
+                    args: { proposal_id: "p1", mutation: { task_updates: [] } }
+                },
+                ctx: makeContext()
+            });
+        });
+
+        expect(run).not.toHaveBeenCalled();
+        expect(resumeValue).toBeUndefined();
+        expect(result.current.status).toBe("idle");
     });
 
     it("does not auto-run fe.applyMutation when stage is approval (HITL pause)", async () => {
@@ -172,5 +208,47 @@ describe("useAgentToolResolver", () => {
             turnErrored: false,
             loopExhausted: true
         });
+    });
+});
+
+describe("hookErrorFromAgentStreamErrorData", () => {
+    it("maps tool_round_limit_exceeded to a friendly transport error", () => {
+        const err = hookErrorFromAgentStreamErrorData({
+            message: "Server tool round limit reached after 8 rounds",
+            code: "tool_round_limit_exceeded"
+        });
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect(err.message).toBe(TOOL_ROUND_LIMIT_USER_MESSAGE);
+        expect((err as AgentTransportError).code).toBe(
+            "tool_round_limit_exceeded"
+        );
+    });
+
+    it("also accepts the shorter tool_round_limit code", () => {
+        const err = hookErrorFromAgentStreamErrorData({
+            message: "limit hit",
+            code: "tool_round_limit"
+        });
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect(err.message).toBe(TOOL_ROUND_LIMIT_USER_MESSAGE);
+    });
+
+    it("isToolRoundLimitErrorCode flags both code variants", () => {
+        expect(isToolRoundLimitErrorCode("tool_round_limit_exceeded")).toBe(
+            true
+        );
+        expect(isToolRoundLimitErrorCode("tool_round_limit")).toBe(true);
+        expect(isToolRoundLimitErrorCode("budget_exhausted")).toBe(false);
+        expect(isToolRoundLimitErrorCode(undefined)).toBe(false);
+    });
+
+    it("keeps other error codes flowing through to AgentTransportError unchanged", () => {
+        const err = hookErrorFromAgentStreamErrorData({
+            message: "some other failure",
+            code: "unknown_code"
+        });
+        expect(err).toBeInstanceOf(AgentTransportError);
+        expect(err.message).toBe("some other failure");
+        expect((err as AgentTransportError).code).toBe("unknown_code");
     });
 });

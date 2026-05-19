@@ -1,0 +1,311 @@
+{
+    "schemaVersion": 1,
+    "description": "FE engine vs BE deterministic baseline parity fixtures. Each entry feeds the same prompt/context to both engines; key_fields selects which signals must agree (others are explicitly not byte-identical and intentionally NOT compared). Update generate_parity_golden.py whenever this file changes.",
+    "fixtures": [
+        {
+            "id": "draft-bug-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Fix login crash on Safari when token expires"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-bug-002",
+            "kind": "draft",
+            "input": {
+                "prompt": "Regression: dashboard charts render with broken axes after the metrics refactor"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-feature-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Add export-to-CSV on the analytics report page"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-perf-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Improve query latency on the board endpoint; cache project metadata"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-auth-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Investigate session token refresh on the login redirect path"
+            },
+            "key_fields": ["type", "epic"],
+            "expected_drift": {
+                "type": "FE has no spike detection; the prompt's 'Investigate' hint trips the BE _type_for branch only. Same root cause as draft-spike-001."
+            }
+        },
+        {
+            "id": "draft-ui-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Polish styling and spacing on the create-task modal"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-refactor-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Refactor the storage adapter; deprecate the legacy v1 wire helpers"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-docs-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Documentation: update README and contributor guide for the new agent"
+            },
+            "key_fields": ["type", "epic"],
+            "expected_drift": {
+                "epic": "FE uses substring matching (`lower.includes(hint)`) for epic hints, so the 'ui' substring inside 'guide' trips the UI Polish branch before Documentation can match. BE uses token-set matching, which is the correct behaviour. Tracked as a real FE bug to fix in engine.ts; the parity test intentionally pins the divergence so removing the bug fix removes the expected_drift entry."
+            }
+        },
+        {
+            "id": "draft-testing-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Add e2e tests covering the board reorder flow and coverage report"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-spike-001",
+            "kind": "draft",
+            "input": {
+                "prompt": "Investigate which embedding model gives the best ranking on internal search"
+            },
+            "key_fields": ["type"],
+            "expected_drift": {
+                "type": "FE has no spike-type detection; the FE engine returns 'Task' for spike-shaped prompts while the BE returns 'spike'. Tracked as a known divergence; the FE engine would need to be extended (or the BE simplified) to remove it."
+            }
+        },
+        {
+            "id": "draft-empty-prompt",
+            "kind": "draft",
+            "input": {
+                "prompt": ""
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-very-short",
+            "kind": "draft",
+            "input": {
+                "prompt": "fix"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "draft-no-keyword-match",
+            "kind": "draft",
+            "input": {
+                "prompt": "Send weekly digest email to admins"
+            },
+            "key_fields": ["type"]
+        },
+        {
+            "id": "draft-bug-mixed-hints",
+            "kind": "draft",
+            "input": {
+                "prompt": "Memory leak crashing the production worker; ship a fix this week"
+            },
+            "key_fields": ["type", "epic"]
+        },
+        {
+            "id": "search-tasks-001",
+            "kind": "search",
+            "input": {
+                "kind": "tasks",
+                "query": "login authentication bug",
+                "context": {
+                    "tasks": [
+                        {
+                            "_id": "t1",
+                            "taskName": "Fix login crash",
+                            "note": "user cannot sign in after token refresh",
+                            "type": "Bug",
+                            "epic": "Auth"
+                        },
+                        {
+                            "_id": "t2",
+                            "taskName": "Add CSV export",
+                            "note": "analytics page export-to-csv",
+                            "type": "Task",
+                            "epic": "Reports"
+                        },
+                        {
+                            "_id": "t3",
+                            "taskName": "Auth session refresh",
+                            "note": "investigate token lifecycle",
+                            "type": "Spike",
+                            "epic": "Auth"
+                        },
+                        {
+                            "_id": "t4",
+                            "taskName": "Onboarding tour",
+                            "note": "tour for new users",
+                            "type": "Task",
+                            "epic": "Onboarding"
+                        }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set"]
+        },
+        {
+            "id": "search-tasks-002",
+            "kind": "search",
+            "input": {
+                "kind": "tasks",
+                "query": "memory leak performance",
+                "context": {
+                    "tasks": [
+                        {
+                            "_id": "t10",
+                            "taskName": "Memory leak in worker",
+                            "note": "investigate leaking sessions",
+                            "type": "Bug",
+                            "epic": "Performance"
+                        },
+                        {
+                            "_id": "t11",
+                            "taskName": "Cache project metadata",
+                            "note": "improve latency",
+                            "type": "Task",
+                            "epic": "Performance"
+                        },
+                        {
+                            "_id": "t12",
+                            "taskName": "Color polish",
+                            "note": "spacing on modal",
+                            "type": "Task",
+                            "epic": "UI Polish"
+                        }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set"]
+        },
+        {
+            "id": "search-tasks-empty",
+            "kind": "search",
+            "input": {
+                "kind": "tasks",
+                "query": "",
+                "context": {
+                    "tasks": [
+                        {
+                            "_id": "t1",
+                            "taskName": "anything",
+                            "note": "",
+                            "type": "Task",
+                            "epic": ""
+                        }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set"]
+        },
+        {
+            "id": "search-tasks-noresults",
+            "kind": "search",
+            "input": {
+                "kind": "tasks",
+                "query": "xyz123 nonsensequery",
+                "context": {
+                    "tasks": [
+                        {
+                            "_id": "t1",
+                            "taskName": "Fix login",
+                            "note": "",
+                            "type": "Bug",
+                            "epic": "Auth"
+                        },
+                        {
+                            "_id": "t2",
+                            "taskName": "Add export",
+                            "note": "",
+                            "type": "Task",
+                            "epic": "Reports"
+                        }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set"]
+        },
+        {
+            "id": "search-projects-001",
+            "kind": "search",
+            "input": {
+                "kind": "projects",
+                "query": "roadmap planning",
+                "context": {
+                    "projects": [
+                        {
+                            "_id": "p1",
+                            "projectName": "Roadmap",
+                            "organization": "Acme",
+                            "managerId": "m1"
+                        },
+                        {
+                            "_id": "p2",
+                            "projectName": "Marketing",
+                            "organization": "Acme",
+                            "managerId": "m2"
+                        },
+                        {
+                            "_id": "p3",
+                            "projectName": "Planning board",
+                            "organization": "Acme",
+                            "managerId": "m1"
+                        }
+                    ],
+                    "members": [
+                        { "_id": "m1", "username": "alice" },
+                        { "_id": "m2", "username": "bob" }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set"]
+        },
+        {
+            "id": "search-tasks-strong-match",
+            "kind": "search",
+            "input": {
+                "kind": "tasks",
+                "query": "redesign onboarding tour",
+                "context": {
+                    "tasks": [
+                        {
+                            "_id": "t1",
+                            "taskName": "Onboarding tour redesign",
+                            "note": "completely refresh the onboarding tour for new users",
+                            "type": "Task",
+                            "epic": "Onboarding"
+                        },
+                        {
+                            "_id": "t2",
+                            "taskName": "Fix login",
+                            "note": "broken redirect",
+                            "type": "Bug",
+                            "epic": "Auth"
+                        }
+                    ]
+                }
+            },
+            "key_fields": ["ids_set", "ids_order"]
+        }
+    ]
+}
