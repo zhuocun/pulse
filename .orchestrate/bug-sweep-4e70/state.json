@@ -172,17 +172,18 @@
       "agentId": null,
       "runId": null,
       "parentAgentId": null,
-      "status": "pending",
+      "status": "running",
       "resultStatus": null,
       "handoffPath": null,
-      "startedAt": null,
+      "startedAt": "2026-05-19T05:29:12.023Z",
       "finishedAt": null,
-      "lastUpdate": null,
+      "lastUpdate": "2026-05-19T05:29:12.023Z",
       "note": null,
       "slackTs": null,
       "prNumber": null,
       "failureMode": null,
-      "verification": null
+      "verification": null,
+      "attempts": 1
     },
     {
       "name": "fix-ai-draft-modal-guards",
@@ -198,12 +199,12 @@
       "handoffPath": "handoffs/fix-ai-draft-modal-guards.md",
       "startedAt": "2026-05-19T05:26:41.974Z",
       "finishedAt": "2026-05-19T05:29:06.170Z",
-      "lastUpdate": "2026-05-19T05:29:06.170Z",
+      "lastUpdate": "2026-05-19T05:29:07.198Z",
       "note": null,
       "slackTs": null,
       "prNumber": 262,
       "failureMode": null,
-      "verification": null,
+      "verification": "unit-test-verified",
       "attempts": 1
     },
     {
@@ -728,6 +729,14 @@
     {
       "at": "2026-05-19T05:29:03.211Z",
       "message": "fix-task-assist-estimate-deps: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:29:07.198Z",
+      "message": "fix-ai-draft-modal-guards: verification self-reported (unit-test-verified)"
+    },
+    {
+      "at": "2026-05-19T05:29:12.023Z",
+      "message": "verify-fix-task-assist-estimate-deps: model \"composer-2.5\" not in MODEL_CATALOG (spawning anyway). Run `bun cli.ts models` to see known slugs."
     }
   ]
 }
