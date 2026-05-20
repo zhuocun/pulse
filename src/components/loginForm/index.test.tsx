@@ -230,6 +230,62 @@ describe("LoginForm", () => {
         expect(tokenStorage.readAuthToken()).toBe("jwt-login");
     });
 
+    it("suppresses the in-tab auth notification on the iOS hard-nav path", async () => {
+        // Regression for the iPhone iOS 26.5 stuck-on-login bug: if
+        // `notifyAuthTokenChanged()` fires, `useSyncExternalStore` in
+        // `useAuth` schedules a re-render that commits
+        // `<Navigate to="/projects" replace />` and runs
+        // `history.replaceState("/projects")` before the browser has a
+        // chance to process the queued `window.location.assign("/projects")`.
+        // WebKit then treats the queued document load as a same-URL
+        // no-op and the user stays on the still-mounted login form.
+        (isMacLike as jest.Mock).mockReturnValue(true);
+        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        const listener = jest.fn();
+        const unsub = tokenStorage.subscribeAuthToken(listener);
+
+        try {
+            renderLoginForm();
+            await changeField(/^email$/i, "alice@example.com");
+            await changeField(/^password$/i, "secret");
+            await submitLogin();
+
+            await waitFor(() => {
+                expect(nativeNavigate).toHaveBeenCalledWith("/projects");
+            });
+            expect(listener).not.toHaveBeenCalled();
+            // The token still has to land in storage so the freshly
+            // mounted tree on the next page can read it.
+            expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+        } finally {
+            unsub();
+        }
+    });
+
+    it("still notifies in-tab subscribers on the non-iOS SPA-nav path", async () => {
+        // Mirror of the iOS-only suppression. On platforms where SPA
+        // nav is reliable, the notify is what wakes `useAuth` so the
+        // React tree re-renders without a full document reload.
+        (isMacLike as jest.Mock).mockReturnValue(false);
+        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        const listener = jest.fn();
+        const unsub = tokenStorage.subscribeAuthToken(listener);
+
+        try {
+            renderLoginForm();
+            await changeField(/^email$/i, "alice@example.com");
+            await changeField(/^password$/i, "secret");
+            await submitLogin();
+
+            await waitFor(() => {
+                expect(window.location.pathname).toBe("/projects");
+            });
+            expect(listener).toHaveBeenCalled();
+        } finally {
+            unsub();
+        }
+    });
+
     it("still uses a full document navigation on iOS when the cookie mirror is unavailable", async () => {
         // The sessionStorage handoff carries the token across the reload
         // even when WebKit ITP dropped the cookie, so iOS should still

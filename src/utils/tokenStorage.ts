@@ -266,9 +266,24 @@ export const readAuthToken = (): string | null => {
  * individually; the detailed status lets login decide whether the
  * post-login full-document navigation will be able to recover the
  * token on the next page.
+ *
+ * `silent: true` skips the in-tab subscriber notification. The login
+ * form sets this on iPhone iOS, where the same-tab React re-render
+ * that `notifyAuthTokenChanged()` schedules causes `LoginPage` to
+ * commit `<Navigate to="/projects" replace />`, whose effect runs
+ * `history.replaceState({}, "", "/projects")` between the
+ * `window.location.assign("/projects")` call and the browser actually
+ * processing the document load. WebKit then observes the URL is
+ * already at the assign target and treats the pending navigation as a
+ * no-op, leaving the user on the still-mounted login form. Suppressing
+ * the notify keeps the React tree on `/login` until the document
+ * reload tears it down; the freshly mounted tree on `/projects` reads
+ * the token from storage at boot. Cross-tab `storage` events are
+ * unaffected — they go through the browser, not this notifier.
  */
 export const writeAuthTokenWithStatus = (
-    token: string
+    token: string,
+    options: { silent?: boolean } = {}
 ): AuthTokenWriteStatus => {
     let storageOk = false;
     const storage = getLocalStorage();
@@ -283,7 +298,7 @@ export const writeAuthTokenWithStatus = (
     const cookieOk = writeAuthCookie(token);
     const sessionOk = writeAuthSessionStorage(token);
     const persisted = storageOk || cookieOk || sessionOk;
-    if (persisted) {
+    if (persisted && !options.silent) {
         notifyAuthTokenChanged();
     }
     return {

@@ -70,9 +70,41 @@ const LoginForm: React.FC<{
             if (!res.jwt) {
                 throw new Error(microcopy.feedback.loginFailedNoToken);
             }
-            // Safari / private mode can refuse `localStorage`; do not navigate
-            // without a persisted REST bearer or the app will look "logged out".
-            const authTokenWrite = writeAuthTokenWithStatus(res.jwt);
+            // iOS Safari WebKit reaches /projects via a full-document
+            // navigation rather than React Router's `pushState` (the
+            // same escape hatch as project cards). Decide once whether
+            // this login is on the iOS/macOS path so we can also
+            // suppress the in-tab auth-token notification — see below.
+            const needsHardNav = isMacLike();
+            // Safari / private mode can refuse `localStorage`; do not
+            // navigate without a persisted REST bearer or the app will
+            // look "logged out".
+            //
+            // On the hard-nav path, pass `silent: true`. Without it,
+            // `writeAuthTokenWithStatus` calls `notifyAuthTokenChanged()`
+            // synchronously, which wakes the `useSyncExternalStore`
+            // subscriber in `useAuth` and schedules a React re-render.
+            // Even though `nativeNavigate(...)` is invoked immediately
+            // afterwards, `window.location.assign("/projects")` only
+            // QUEUES a document load — the current task continues. When
+            // the task ends, microtasks drain, React commits the re-
+            // render, `LoginPage` returns `<Navigate to="/projects"
+            // replace />`, and its effect runs `history.replaceState({},
+            // "", "/projects")`. WebKit on iPhone iOS 26.5 then observes
+            // the URL bar already matches the assign target and treats
+            // the queued navigation as a same-URL no-op — neither a
+            // reload nor a document load fires, and the user stays on
+            // the still-mounted login form with `/projects` in the URL.
+            // Suppressing the notify keeps `useAuth.token` null on this
+            // tab until the document is torn down; the freshly mounted
+            // tree on `/projects` re-reads the token from storage at
+            // boot (sessionStorage carries it across the reload even
+            // when localStorage hasn't flushed and the cookie was
+            // dropped by WebKit ITP). Cross-tab `storage` events are
+            // unaffected — they go through the browser.
+            const authTokenWrite = writeAuthTokenWithStatus(res.jwt, {
+                silent: needsHardNav
+            });
             if (!authTokenWrite.persisted) {
                 message.error(microcopy.feedback.loginCouldNotPersistSession);
                 return;
@@ -81,31 +113,7 @@ const LoginForm: React.FC<{
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
-            // iOS Safari WebKit can advance the URL via `pushState` without
-            // re-rendering routes after login (the same escape hatch as
-            // project cards). Always full-document navigate on iOS/macOS —
-            // `writeAuthTokenWithStatus` also writes the JWT to
-            // `sessionStorage` so the token survives the reload even when
-            // localStorage hasn't flushed and the cookie was dropped by
-            // WebKit ITP. Desktop non-Safari keeps SPA nav.
-            //
-            // Invoke synchronously — do NOT defer with `queueMicrotask`.
-            // `writeAuthTokenWithStatus` calls `notifyAuthTokenChanged()`
-            // synchronously, which wakes the `useSyncExternalStore`
-            // subscriber in `useAuth` and schedules a re-render. If
-            // navigation is deferred, that re-render commits first and
-            // both `LoginPage` and `HomePage` short-circuit to
-            // `<Navigate to="/projects" replace />`, whose effect calls
-            // `history.replaceState({}, "", "/projects")`. The pending
-            // `window.location.assign("/projects")` then runs against an
-            // already-matching URL — observed on iPhone iOS 25.5 to be a
-            // no-op (neither a reload nor a document load fires) — and
-            // the user is stuck on the still-mounted `LoginPage` while
-            // the URL bar reads `/projects`. Issuing the assign before
-            // React commits the redirect preempts the race; the
-            // `sessionStorage` mirror is synchronous in-memory so we do
-            // not need a microtask to wait for any flush.
-            if (isMacLike()) {
+            if (needsHardNav) {
                 nativeNavigate("/projects");
                 return;
             }
