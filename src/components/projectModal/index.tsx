@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, lineHeight, modalWidthCss, space } from "../../theme/tokens";
+import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
-import useReactQuery from "../../utils/hooks/useReactQuery";
 import ErrorBox from "../errorBox";
 
 /**
@@ -89,7 +89,14 @@ const ProjectModal: React.FC = () => {
         form.setFieldsValue(editingProject);
     }, [editingProject, form]);
 
-    const { data: members } = useReactQuery<IMember[]>("users/members");
+    /*
+     * Route the manager dropdown through the shared `useMembersList` hook so
+     * we hit the same `["users/members"]` cache as the page header,
+     * MemberPopover, TaskModal, etc., and inherit the 5-minute staleTime —
+     * otherwise opening the modal more than 30 s after page load fired an
+     * unnecessary refetch under the default staleTime.
+     */
+    const { data: members } = useMembersList();
 
     return (
         <Modal

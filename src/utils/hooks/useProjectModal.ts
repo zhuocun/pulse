@@ -33,10 +33,19 @@ const useProjectModal = () => {
         (s) => s.projectModal.editingProjectId
     );
 
+    /*
+     * Reuse the canonical `["projects", { projectId }]` cache key so the
+     * modal hits the same entry that `pages/projectDetail.tsx` and
+     * `pages/board.tsx` already populated when the user navigated to the
+     * project. A separate `"editingProject"` key would have triggered a
+     * duplicate `/api/v1/projects?projectId=…` fetch every time the modal
+     * opened, and mutations on `["projects"]` would have left the modal
+     * staring at stale data.
+     */
     const { data: editingProject, isLoading } = useReactQuery<IProject>(
         "projects",
         { projectId: editingProjectId },
-        "editingProject",
+        undefined,
         undefined,
         undefined,
         Boolean(editingProjectId)

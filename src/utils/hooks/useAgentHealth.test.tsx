@@ -1,7 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
-import useAgentHealth from "./useAgentHealth";
+import useAgentHealth, {
+    activeAgentHealthPollerCountForTests,
+    agentHealthSubscriberCountForTests,
+    resetAgentHealthForTests
+} from "./useAgentHealth";
 
 const okResponse = (data: unknown) =>
     ({
@@ -17,11 +21,15 @@ describe("useAgentHealth", () => {
 
     beforeEach(() => {
         fetchSpy = jest.spyOn(global, "fetch");
+        // The poller is module-singleton; reset between tests so leftover
+        // state from a previous case can't bleed into the next.
+        resetAgentHealthForTests();
     });
 
     afterEach(() => {
         fetchSpy.mockRestore();
         jest.useRealTimers();
+        resetAgentHealthForTests();
     });
 
     it("reports offline when baseUrl is omitted (does not fetch)", () => {
@@ -48,6 +56,46 @@ describe("useAgentHealth", () => {
         });
         expect(result.current.latencyMs).toBeLessThanOrEqual(1500);
         expect(result.current.lastChecked).not.toBeNull();
+    });
+
+    it("shares one poller across consumers with the same baseUrl + interval", async () => {
+        fetchSpy.mockResolvedValue(okResponse({ ok: true, latencyMs: 50 }));
+        // Mount the hook twice — header + chat drawer pattern in the app.
+        const header = renderHook(() =>
+            useAgentHealth("https://agents.example", {
+                intervalMs: 60_000,
+                agentName: "header"
+            })
+        );
+        const drawer = renderHook(() =>
+            useAgentHealth("https://agents.example", {
+                intervalMs: 60_000,
+                agentName: "chat-agent"
+            })
+        );
+        await waitFor(() => {
+            expect(header.result.current.status).toBe("ok");
+            expect(drawer.result.current.status).toBe("ok");
+        });
+        // Both consumers should observe the same probe — at most one fetch.
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(activeAgentHealthPollerCountForTests()).toBe(1);
+        expect(
+            agentHealthSubscriberCountForTests("https://agents.example", 60_000)
+        ).toBe(2);
+
+        // Unmounting one consumer must NOT tear the poller down — the other
+        // is still subscribed.
+        drawer.unmount();
+        expect(activeAgentHealthPollerCountForTests()).toBe(1);
+        expect(
+            agentHealthSubscriberCountForTests("https://agents.example", 60_000)
+        ).toBe(1);
+
+        // The last unmount tears the singleton down so a future mount
+        // starts from a clean slate.
+        header.unmount();
+        expect(activeAgentHealthPollerCountForTests()).toBe(0);
     });
 
     it("reports offline on a network error", async () => {
