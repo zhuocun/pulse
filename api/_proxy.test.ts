@@ -14,6 +14,7 @@ import {
     RESPONSE_HOP_HEADERS,
     buildOutgoingHeaders,
     handleProxyRequest,
+    readRequestBody,
     writeUpstreamHeaders
 } from "./_proxy";
 
@@ -290,5 +291,62 @@ describe("api proxy request lifecycle", () => {
 
         const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
         expect(init.redirect).toBe("manual");
+    });
+});
+
+describe("api proxy body extraction", () => {
+    // The Vercel Node runtime drains the request stream before our
+    // handler sees it, so we have to round-trip through ``req.body``;
+    // these cases exercise the formats that Vercel hands us.
+
+    const reqWithParsedBody = (parsed: unknown, method = "POST") =>
+        Object.assign(Readable.from([]), {
+            method,
+            url: "/api/v1/auth/login",
+            headers: { "content-type": "application/json" },
+            body: parsed
+        }) as unknown as IncomingMessage;
+
+    it("re-serializes a parsed JSON object back to bytes", async () => {
+        const req = reqWithParsedBody({
+            email: "alice@example.com",
+            password: "secret"
+        });
+        const body = await readRequestBody(req);
+        expect(body).toBeInstanceOf(Uint8Array);
+        const decoded = JSON.parse(Buffer.from(body!).toString("utf-8"));
+        expect(decoded).toEqual({
+            email: "alice@example.com",
+            password: "secret"
+        });
+    });
+
+    it("passes a string body through unchanged", async () => {
+        const req = reqWithParsedBody("raw-text-payload");
+        const body = await readRequestBody(req);
+        expect(Buffer.from(body!).toString("utf-8")).toBe("raw-text-payload");
+    });
+
+    it("passes a Buffer body through unchanged", async () => {
+        const buf = Buffer.from([1, 2, 3, 4]);
+        const req = reqWithParsedBody(buf);
+        const body = await readRequestBody(req);
+        expect(Array.from(body!)).toEqual([1, 2, 3, 4]);
+    });
+
+    it("returns undefined for GET requests regardless of body", async () => {
+        const req = reqWithParsedBody({ ignored: true }, "GET");
+        expect(await readRequestBody(req)).toBeUndefined();
+    });
+
+    it("falls back to streaming when req.body is absent", async () => {
+        const stream = Readable.from([Buffer.from("from-the-stream")]);
+        const req = Object.assign(stream, {
+            method: "POST",
+            url: "/api/v1/auth/login",
+            headers: { "content-type": "application/octet-stream" }
+        }) as unknown as IncomingMessage;
+        const body = await readRequestBody(req);
+        expect(Buffer.from(body!).toString("utf-8")).toBe("from-the-stream");
     });
 });
