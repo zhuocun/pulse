@@ -138,7 +138,7 @@ describe("useProjectModal (Redux-only)", () => {
         expect(mockedUseReactQuery).toHaveBeenCalledWith(
             "projects",
             { projectId: "p2" },
-            "editingProject",
+            undefined,
             undefined,
             undefined,
             true
