@@ -37,9 +37,10 @@ export default defineConfig(({ mode }) => {
                 JSON.stringify(errorReportEndpoint)
         },
         server: {
-            // Mirror Vercel's `/api/*` rewrite (see `vercel.json`) in
-            // dev so the frontend and backend appear at one origin in
-            // both environments. Without this the dev FE would hit
+            // Mirror the prod ``api/[...path].ts`` Vercel function (the
+            // FE same-origin proxy that the cookie handshake relies on)
+            // in dev so the frontend and backend appear at one origin
+            // in both environments. Without this the dev FE would hit
             // ``http://localhost:8000`` directly, cookies issued by
             // ``/auth/login`` would be third-party from the browser's
             // perspective, and iOS 26.5's ITP would silently drop

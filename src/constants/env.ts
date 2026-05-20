@@ -87,12 +87,17 @@ const validateAiBaseUrl = (raw: string): string => {
 const apiOrigin = readEnv("REACT_APP_API_URL")?.trim() || DEFAULT_API_ORIGIN;
 /**
  * REST calls live at a same-origin `/api/v1/*` prefix in both prod
- * (Vercel rewrite) and dev (Vite dev-server proxy) so the HttpOnly
- * session cookie issued by ``POST /auth/login`` rides every request
- * automatically. The previous absolute `${apiOrigin}/api/v1` URL made
- * REST cross-origin from the FE, which on iOS 26.5 forced WebKit's
- * ITP to silently drop the JS-set cookie across a document teardown
- * (`vercel.json` + `vite.config.ts` set the rewrites).
+ * (Vercel ``api/[...path].ts`` proxy function) and dev (Vite dev-
+ * server proxy) so the HttpOnly session cookie issued by
+ * ``POST /auth/login`` rides every request automatically. The previous
+ * absolute `${apiOrigin}/api/v1` URL made REST cross-origin from the
+ * FE, which on iOS 26.5 forced WebKit's ITP to silently drop the
+ * JS-set cookie across a document teardown. An earlier same-origin
+ * setup used a Vercel ``rewrites`` entry pointing at the BE; that
+ * dropped the ``Set-Cookie`` / ``Cookie`` roundtrip in production
+ * (login completed but every subsequent ``/api/v1/*`` call 401'd
+ * across every browser, not just iOS) which is why we proxy through
+ * an explicit Node function instead.
  */
 const apiBaseUrl = "/api/v1";
 

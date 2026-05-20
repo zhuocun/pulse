@@ -1,0 +1,294 @@
+/**
+ * @jest-environment node
+ *
+ * The proxy is a Node serverless function; it operates on real
+ * ``IncomingMessage`` / ``ServerResponse`` instances and relies on
+ * ``Headers.getSetCookie``, none of which are well-modelled by jsdom.
+ */
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+
+import {
+    BACKEND_URL,
+    REQUEST_HOP_HEADERS,
+    RESPONSE_HOP_HEADERS,
+    buildOutgoingHeaders,
+    handleProxyRequest,
+    writeUpstreamHeaders
+} from "./_proxy";
+
+type FakeRequest = Readable & {
+    method: string;
+    url: string;
+    headers: Record<string, string | string[]>;
+};
+
+type FakeResponse = {
+    statusCode: number;
+    headersSent: boolean;
+    setHeader: jest.Mock;
+    end: jest.Mock;
+};
+
+const fakeReq = (init: {
+    method?: string;
+    url?: string;
+    headers?: Record<string, string | string[]>;
+    body?: string;
+}): FakeRequest => {
+    const stream = init.body
+        ? Readable.from([Buffer.from(init.body)])
+        : Readable.from([]);
+    return Object.assign(stream, {
+        method: init.method ?? "GET",
+        url: init.url ?? "/api/v1/users",
+        headers: init.headers ?? {}
+    }) as FakeRequest;
+};
+
+const fakeRes = (): FakeResponse => ({
+    statusCode: 200,
+    headersSent: false,
+    setHeader: jest.fn(),
+    end: jest.fn()
+});
+
+const upstreamResponse = (init: {
+    status?: number;
+    headers?: Record<string, string>;
+    setCookies?: string[];
+    body?: string;
+}) => {
+    const headers = new Headers(init.headers ?? {});
+    for (const cookie of init.setCookies ?? []) {
+        headers.append("Set-Cookie", cookie);
+    }
+    return {
+        status: init.status ?? 200,
+        headers,
+        arrayBuffer: async () =>
+            new TextEncoder().encode(init.body ?? "").buffer
+    } as unknown as Response;
+};
+
+describe("api proxy header policy", () => {
+    it("forwards application headers including Cookie", () => {
+        const req = fakeReq({
+            headers: {
+                cookie: "Token=abc123",
+                "user-agent": "agent/1.0",
+                accept: "application/json"
+            }
+        });
+        const headers = buildOutgoingHeaders(req as unknown as IncomingMessage);
+        expect(headers.get("cookie")).toBe("Token=abc123");
+        expect(headers.get("user-agent")).toBe("agent/1.0");
+        expect(headers.get("accept")).toBe("application/json");
+    });
+
+    it("strips hop-by-hop request headers", () => {
+        const req = fakeReq({
+            headers: {
+                host: "pulse-react-app.vercel.app",
+                connection: "keep-alive",
+                "content-length": "42",
+                "x-vercel-id": "edge-1",
+                cookie: "Token=x"
+            }
+        });
+        const headers = buildOutgoingHeaders(req as unknown as IncomingMessage);
+        for (const banned of REQUEST_HOP_HEADERS) {
+            // The set covers a broader header list than this test
+            // populates, but every header we DID pass that's in the
+            // set must have been stripped.
+            if (req.headers[banned] !== undefined) {
+                expect(headers.get(banned)).toBeNull();
+            }
+        }
+        // Application headers still pass through.
+        expect(headers.get("cookie")).toBe("Token=x");
+    });
+
+    it("always asserts X-Forwarded-Proto: https", () => {
+        // Override an incoming http value -- the BE's
+        // ``_session_cookie_secure`` only sets ``Secure`` when this
+        // says https, so we cannot let a stale dev header through.
+        const req = fakeReq({ headers: { "x-forwarded-proto": "http" } });
+        const headers = buildOutgoingHeaders(req as unknown as IncomingMessage);
+        expect(headers.get("x-forwarded-proto")).toBe("https");
+    });
+});
+
+describe("api proxy response header policy", () => {
+    it("relays Set-Cookie response headers as a multi-value array", () => {
+        const upstream = new Headers();
+        upstream.append(
+            "Set-Cookie",
+            "Token=jwt-value; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400"
+        );
+        upstream.append("Set-Cookie", "other=val; Path=/");
+        upstream.set("content-type", "application/json");
+        const res = fakeRes();
+
+        writeUpstreamHeaders(upstream, res as unknown as ServerResponse);
+
+        // Set-Cookie must be forwarded as an array; a single string
+        // would collapse the two cookies into one mis-parsed value.
+        expect(res.setHeader).toHaveBeenCalledWith(
+            "Set-Cookie",
+            expect.arrayContaining([
+                expect.stringContaining("Token=jwt-value"),
+                expect.stringContaining("other=val")
+            ])
+        );
+        expect(res.setHeader).toHaveBeenCalledWith(
+            "content-type",
+            "application/json"
+        );
+    });
+
+    it("strips hop-by-hop response headers", () => {
+        const upstream = new Headers();
+        upstream.set("content-encoding", "gzip");
+        upstream.set("connection", "keep-alive");
+        upstream.set("content-type", "application/json");
+        const res = fakeRes();
+
+        writeUpstreamHeaders(upstream, res as unknown as ServerResponse);
+
+        const seen = res.setHeader.mock.calls.map(([name]) =>
+            String(name).toLowerCase()
+        );
+        for (const banned of RESPONSE_HOP_HEADERS) {
+            expect(seen).not.toContain(banned);
+        }
+        expect(seen).toContain("content-type");
+    });
+});
+
+describe("api proxy request lifecycle", () => {
+    const mockFetch = jest.fn();
+    const originalFetch = global.fetch;
+
+    beforeEach(() => {
+        mockFetch.mockReset();
+        (global as { fetch: typeof fetch }).fetch =
+            mockFetch as unknown as typeof fetch;
+    });
+
+    afterEach(() => {
+        (global as { fetch: typeof fetch }).fetch = originalFetch;
+    });
+
+    it("forwards GET requests to BACKEND_URL preserving the path", async () => {
+        mockFetch.mockResolvedValue(upstreamResponse({ body: '{"ok":true}' }));
+        const req = fakeReq({
+            method: "GET",
+            url: "/api/v1/projects?projectId=p1"
+        });
+        const res = fakeRes();
+
+        await handleProxyRequest(
+            req as unknown as IncomingMessage,
+            res as unknown as ServerResponse
+        );
+
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        const [target, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+        expect(target).toBe(`${BACKEND_URL}/api/v1/projects?projectId=p1`);
+        expect(init.method).toBe("GET");
+        expect(init.body).toBeUndefined();
+    });
+
+    it("forwards POST bodies to the BE as a binary payload", async () => {
+        mockFetch.mockResolvedValue(upstreamResponse({ body: "{}" }));
+        const req = fakeReq({
+            method: "POST",
+            url: "/api/v1/auth/login",
+            headers: { "content-type": "application/json" },
+            body: '{"email":"a@b.c","password":"x"}'
+        });
+        const res = fakeRes();
+
+        await handleProxyRequest(
+            req as unknown as IncomingMessage,
+            res as unknown as ServerResponse
+        );
+
+        const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+        expect(init.method).toBe("POST");
+        expect(init.body).toBeInstanceOf(Uint8Array);
+        expect(Buffer.from(init.body as Uint8Array).toString("utf-8")).toBe(
+            '{"email":"a@b.c","password":"x"}'
+        );
+    });
+
+    it("relays the upstream status code and body to the FE response", async () => {
+        mockFetch.mockResolvedValue(
+            upstreamResponse({
+                status: 401,
+                headers: { "content-type": "application/json" },
+                body: '{"error":"empty JWT"}'
+            })
+        );
+        const req = fakeReq({ url: "/api/v1/users" });
+        const res = fakeRes();
+
+        await handleProxyRequest(
+            req as unknown as IncomingMessage,
+            res as unknown as ServerResponse
+        );
+
+        expect(res.statusCode).toBe(401);
+        const lastEnd = res.end.mock.calls.at(-1) as [Buffer];
+        expect(Buffer.isBuffer(lastEnd[0])).toBe(true);
+        expect(lastEnd[0].toString("utf-8")).toBe('{"error":"empty JWT"}');
+    });
+
+    it("falls back to 502 when the upstream fetch throws", async () => {
+        mockFetch.mockRejectedValue(new Error("network down"));
+        const req = fakeReq({ url: "/api/v1/users" });
+        const res = fakeRes();
+        // The proxy logs the underlying error before returning 502;
+        // that log is part of the contract (operators see why the
+        // proxy declined to relay) but it noisies the test output.
+        const errorSpy = jest
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        try {
+            await handleProxyRequest(
+                req as unknown as IncomingMessage,
+                res as unknown as ServerResponse
+            );
+
+            expect(res.statusCode).toBe(502);
+            expect(res.setHeader).toHaveBeenCalledWith(
+                "content-type",
+                "application/json"
+            );
+            const lastEnd = res.end.mock.calls.at(-1) as [string];
+            expect(lastEnd[0]).toContain("Bad gateway");
+            expect(errorSpy).toHaveBeenCalledWith(
+                "[api proxy] forwarding error",
+                expect.any(Error)
+            );
+        } finally {
+            errorSpy.mockRestore();
+        }
+    });
+
+    it('requests redirect: "manual" so 30x stays on the proxy boundary', async () => {
+        mockFetch.mockResolvedValue(upstreamResponse({ status: 204 }));
+        const req = fakeReq({ url: "/api/v1/auth/logout", method: "POST" });
+        const res = fakeRes();
+
+        await handleProxyRequest(
+            req as unknown as IncomingMessage,
+            res as unknown as ServerResponse
+        );
+
+        const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+        expect(init.redirect).toBe("manual");
+    });
+});

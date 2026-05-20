@@ -53,8 +53,9 @@ def login(
     # Pop the REST JWT off the service result and move it into an
     # HttpOnly cookie. The FE never sees this token in JS -- it rides
     # back to the backend automatically on every same-origin request
-    # via the Vercel ``/api/*`` rewrite (and the Vite dev-server proxy
-    # in development). See ``auth_service.login`` for the rationale.
+    # via the FE's ``api/[...path].ts`` Vercel proxy function (and the
+    # Vite dev-server proxy in development). See
+    # ``auth_service.login`` for the rationale.
     rest_jwt = result.pop("rest_jwt", "")
     if rest_jwt:
         _set_session_cookie(response, request, rest_jwt)
