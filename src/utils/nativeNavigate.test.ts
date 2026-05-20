@@ -50,4 +50,18 @@ describe("nativeNavigate", () => {
             expect(() => fresh("/x")).not.toThrow();
         });
     });
+
+    it("does not throw when the target URL already matches the current location", () => {
+        // Same-URL guard: on iPhone iOS 25.5 the post-login `<Navigate>`
+        // race can `replaceState` the URL to the target before this
+        // helper runs, and `location.assign(currentURL)` is a silent
+        // no-op on mobile Safari. The implementation falls back to
+        // `location.reload()` in that case. jsdom marks
+        // `window.location` non-configurable so we can't spy on the
+        // call directly (same limitation flagged in the module
+        // docblock); verify the boundary by re-using jsdom's existing
+        // pathname ("/") as the target and confirming no throw. The
+        // end-to-end iOS flow is exercised by `loginForm/index.test.tsx`.
+        expect(() => nativeNavigate(window.location.pathname)).not.toThrow();
+    });
 });

@@ -88,16 +88,28 @@ const LoginForm: React.FC<{
             // `sessionStorage` so the token survives the reload even when
             // localStorage hasn't flushed and the cookie was dropped by
             // WebKit ITP. Desktop non-Safari keeps SPA nav.
-            const goToProjects = () => {
-                if (isMacLike()) {
-                    nativeNavigate("/projects");
-                    return;
-                }
-                navigate("/projects", { viewTransition: true });
-            };
-            // Defer navigation so WebKit has committed `localStorage` before
-            // the `/projects` tree mounts (or before the full reload reads it).
-            queueMicrotask(goToProjects);
+            //
+            // Invoke synchronously — do NOT defer with `queueMicrotask`.
+            // `writeAuthTokenWithStatus` calls `notifyAuthTokenChanged()`
+            // synchronously, which wakes the `useSyncExternalStore`
+            // subscriber in `useAuth` and schedules a re-render. If
+            // navigation is deferred, that re-render commits first and
+            // both `LoginPage` and `HomePage` short-circuit to
+            // `<Navigate to="/projects" replace />`, whose effect calls
+            // `history.replaceState({}, "", "/projects")`. The pending
+            // `window.location.assign("/projects")` then runs against an
+            // already-matching URL — observed on iPhone iOS 25.5 to be a
+            // no-op (neither a reload nor a document load fires) — and
+            // the user is stuck on the still-mounted `LoginPage` while
+            // the URL bar reads `/projects`. Issuing the assign before
+            // React commits the redirect preempts the race; the
+            // `sessionStorage` mirror is synchronous in-memory so we do
+            // not need a microtask to wait for any flush.
+            if (isMacLike()) {
+                nativeNavigate("/projects");
+                return;
+            }
+            navigate("/projects", { viewTransition: true });
         } catch {
             // Error state is set by useReactMutation's onError callback.
         }
