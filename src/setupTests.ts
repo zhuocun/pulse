@@ -136,3 +136,20 @@ if (typeof afterEach === "function" && typeof document !== "undefined") {
         }
     });
 }
+
+// Reset the in-flight API dedup registry between tests. The `api()`
+// helper coalesces concurrent identical GET / HEAD calls onto a single
+// fetch and self-cleans on settle, but a test that mocks fetch with
+// a `new Promise(...)` it never resolves leaves the entry pinned;
+// the next test's identical call would silently reuse the dead promise.
+if (typeof afterEach === "function") {
+    afterEach(() => {
+        // Lazy require — the module is the same singleton seen by app
+        // code, so the registry is the one that needs clearing.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mod = require("./utils/hooks/useApi") as {
+            resetInFlightApiCallsForTests?: () => void;
+        };
+        mod.resetInFlightApiCallsForTests?.();
+    });
+}
