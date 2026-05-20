@@ -166,10 +166,19 @@ describe("tokenStorage", () => {
             expect(writeAuthTokenWithStatus("jwt-1")).toEqual({
                 persisted: true,
                 storage: true,
-                cookie: false
+                cookie: false,
+                session: true
             });
             expect(readAuthToken()).toBe("jwt-1");
 
+            // sessionStorage is the per-tab handoff; clearing localStorage
+            // still leaves the session readable because the read path falls
+            // back to sessionStorage and self-heals.
+            localStorage.clear();
+            expect(readAuthToken()).toBe("jwt-1");
+
+            // Clearing sessionStorage too finally drops the token.
+            sessionStorage.clear();
             localStorage.clear();
             expect(readAuthToken()).toBeNull();
         } finally {
@@ -179,6 +188,34 @@ describe("tokenStorage", () => {
                 delete (document as unknown as { cookie?: string }).cookie;
             }
         }
+    });
+
+    it("survives the iOS post-login reload via the sessionStorage handoff", () => {
+        // Simulate the iOS Safari Mobile failure mode that the other two
+        // paths don't cover: WebKit accepted the cookie write at login
+        // time but ITP dropped it during the document teardown, and the
+        // localStorage `setItem` hadn't flushed to disk before the
+        // `window.location.assign("/projects")` reload. The next page
+        // sees an empty cookie jar AND an empty localStorage — only the
+        // in-memory sessionStorage entry survived.
+        sessionStorage.setItem("TokenSession", "jwt-handoff");
+        expect(localStorage.getItem("Token")).toBeNull();
+        expect(document.cookie).not.toContain("Token=");
+
+        expect(readAuthToken()).toBe("jwt-handoff");
+        // The read should also promote the value back into the durable
+        // stores so a later page refresh (which clears sessionStorage when
+        // the tab closes) still finds the session.
+        expect(localStorage.getItem("Token")).toBe("jwt-handoff");
+        expect(document.cookie).toContain("Token=jwt-handoff");
+    });
+
+    it("clears the sessionStorage handoff alongside the localStorage entry", () => {
+        writeAuthToken("jwt-1");
+        expect(sessionStorage.getItem("TokenSession")).toBe("jwt-1");
+
+        clearAuthToken();
+        expect(sessionStorage.getItem("TokenSession")).toBeNull();
     });
 
     it("does not report persistence when localStorage silently ignores writes and cookies are unavailable", () => {

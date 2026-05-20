@@ -9,6 +9,17 @@ const AI_PROXY_TOKEN_KEY = "AiProxyJwt";
  */
 const TOKEN_COOKIE_NAME = TOKEN_STORAGE_KEY;
 const TOKEN_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
+/**
+ * `sessionStorage` handoff key. Same tab, in-memory, synchronous — the
+ * only one of the three write paths that is reliably readable on iOS
+ * Safari Mobile immediately after `window.location.assign(...)`:
+ * `localStorage` is disk-backed and commits asynchronously (the next
+ * page's read races the flush), and `document.cookie` set via JS can be
+ * silently dropped by WebKit's ITP after the document teardown. The
+ * sessionStorage entry is mirrored back into `localStorage` on the next
+ * read so cross-tab subscribers and a later refresh still find it.
+ */
+const TOKEN_SESSION_KEY = "TokenSession";
 
 type AuthTokenListener = () => void;
 const authTokenListeners = new Set<AuthTokenListener>();
@@ -17,6 +28,7 @@ export type AuthTokenWriteStatus = {
     persisted: boolean;
     storage: boolean;
     cookie: boolean;
+    session: boolean;
 };
 
 /**
@@ -164,20 +176,55 @@ const mirrorTokenToLocalStorage = (token: string): void => {
     }
 };
 
+const readAuthSessionStorage = (): string | null => {
+    const storage = getSessionStorageSafe();
+    if (!storage) return null;
+    try {
+        return storage.getItem(TOKEN_SESSION_KEY);
+    } catch {
+        return null;
+    }
+};
+
+const writeAuthSessionStorage = (token: string): boolean => {
+    const storage = getSessionStorageSafe();
+    if (!storage) return false;
+    try {
+        storage.setItem(TOKEN_SESSION_KEY, token);
+        return storage.getItem(TOKEN_SESSION_KEY) === token;
+    } catch {
+        return false;
+    }
+};
+
+const clearAuthSessionStorage = (): void => {
+    const storage = getSessionStorageSafe();
+    if (!storage) return;
+    try {
+        storage.removeItem(TOKEN_SESSION_KEY);
+    } catch {
+        // sessionStorage access can fail in private / restricted modes.
+    }
+};
+
 /**
- * Read the REST bearer with redundancy across `localStorage` and a
- * same-origin cookie.
+ * Read the REST bearer with redundancy across `localStorage`, a
+ * same-origin cookie, and a per-tab `sessionStorage` handoff.
  *
- * Why both: iOS Safari Mobile commits `localStorage.setItem` to its
+ * Why all three: iOS Safari Mobile commits `localStorage.setItem` to its
  * disk-backed store asynchronously. When the login flow follows
  * `setItem` with `window.location.assign("/projects")`, the document
  * tear-down can race the disk flush — the next page's `localStorage`
  * comes up empty and the route guard bounces the user back to `/login`,
- * even though the login succeeded. The cookie write is durable across
- * the same navigation, so we mirror the token there and self-heal the
- * `localStorage` entry on the next read. The cookie is `Path=/`,
- * `SameSite=Lax`, `Secure` on https, with a 24h `Max-Age` matching the
- * JWT expiry.
+ * even though the login succeeded. The cookie covers this for most
+ * setups, but WebKit's ITP has been observed to silently drop a
+ * JavaScript-set cookie after the document teardown (the write-then-
+ * readback check passes, the post-reload `document.cookie` is empty).
+ * `sessionStorage` is in-memory per-tab, synchronous, and survives the
+ * full-document navigation that login triggers, so it is the most
+ * reliable handoff on iOS. The cookie is still useful for tab restores
+ * and refresh; `localStorage` is still the primary source so a fresh
+ * tab opened later finds the session.
  */
 export const readAuthToken = (): string | null => {
     const fromStorage = (() => {
@@ -198,16 +245,27 @@ export const readAuthToken = (): string | null => {
         mirrorTokenToLocalStorage(fromCookie);
         return fromCookie;
     }
+    const fromSession = readAuthSessionStorage();
+    if (fromSession) {
+        // The iOS post-login handoff: localStorage hadn't flushed and
+        // the cookie didn't survive teardown, but sessionStorage did.
+        // Promote it back into the durable stores so a later refresh
+        // (which clears sessionStorage when the tab closes) still works.
+        mirrorTokenToLocalStorage(fromSession);
+        writeAuthCookie(fromSession);
+        return fromSession;
+    }
     return null;
 };
 
 /**
- * Persist the REST bearer to both `localStorage` and a same-origin
- * cookie. Success is reported when AT LEAST ONE write path is readable
- * after the write attempt. Safari Mobile private mode and sandboxed
- * iframes can disable either mechanism individually; the detailed status
- * lets login avoid full document navigation when only localStorage is
- * available.
+ * Persist the REST bearer to `localStorage`, a same-origin cookie, and
+ * a per-tab `sessionStorage` slot. Success is reported when AT LEAST
+ * ONE write path is readable after the write attempt. Safari Mobile
+ * private mode and sandboxed iframes can disable any of the three
+ * individually; the detailed status lets login decide whether the
+ * post-login full-document navigation will be able to recover the
+ * token on the next page.
  */
 export const writeAuthTokenWithStatus = (
     token: string
@@ -219,18 +277,20 @@ export const writeAuthTokenWithStatus = (
             storage.setItem(TOKEN_STORAGE_KEY, token);
             storageOk = storage.getItem(TOKEN_STORAGE_KEY) === token;
         } catch {
-            // Falls through to the cookie path.
+            // Falls through to the cookie / session paths.
         }
     }
     const cookieOk = writeAuthCookie(token);
-    const persisted = storageOk || cookieOk;
+    const sessionOk = writeAuthSessionStorage(token);
+    const persisted = storageOk || cookieOk || sessionOk;
     if (persisted) {
         notifyAuthTokenChanged();
     }
     return {
         persisted,
         storage: storageOk,
-        cookie: cookieOk
+        cookie: cookieOk,
+        session: sessionOk
     };
 };
 
@@ -278,6 +338,7 @@ export const clearAuthToken = (): void => {
         }
     }
     clearAuthCookie();
+    clearAuthSessionStorage();
     clearAiProxyToken();
     notifyAuthTokenChanged();
 };

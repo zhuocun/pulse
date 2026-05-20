@@ -190,6 +190,11 @@ describe("Board AI integration (App + local engine)", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         localStorage.clear();
+        sessionStorage.clear();
+        for (const part of document.cookie.split(";")) {
+            const name = part.split("=")[0]?.trim();
+            if (name) document.cookie = `${name}=; Path=/; Max-Age=0`;
+        }
         window.history.pushState({}, "Reset", "/");
         store.dispatch(overlaysActions.closeChatDrawer());
         store.dispatch(overlaysActions.closeBoardBrief());

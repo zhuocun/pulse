@@ -97,6 +97,7 @@ describe("LoginForm", () => {
 
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue(user());
         (isMacLike as jest.Mock).mockReturnValue(false);
@@ -229,17 +230,23 @@ describe("LoginForm", () => {
         expect(tokenStorage.readAuthToken()).toBe("jwt-login");
     });
 
-    it("keeps iOS login in the SPA when the cookie mirror is unavailable", async () => {
+    it("still uses a full document navigation on iOS when the cookie mirror is unavailable", async () => {
+        // The sessionStorage handoff carries the token across the reload
+        // even when WebKit ITP dropped the cookie, so iOS should still
+        // prefer the full-document navigation that React Router's
+        // pushState bug can't break.
         (isMacLike as jest.Mock).mockReturnValue(true);
         mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
         const tokenWriteSpy = jest
             .spyOn(tokenStorage, "writeAuthTokenWithStatus")
             .mockImplementation((token) => {
                 localStorage.setItem("Token", token);
+                sessionStorage.setItem("TokenSession", token);
                 return {
                     persisted: true,
                     storage: true,
-                    cookie: false
+                    cookie: false,
+                    session: true
                 };
             });
         try {
@@ -250,9 +257,8 @@ describe("LoginForm", () => {
             await submitLogin();
 
             await waitFor(() => {
-                expect(window.location.pathname).toBe("/projects");
+                expect(nativeNavigate).toHaveBeenCalledWith("/projects");
             });
-            expect(nativeNavigate).not.toHaveBeenCalled();
             expect(tokenStorage.readAuthToken()).toBe("jwt-login");
         } finally {
             tokenWriteSpy.mockRestore();
@@ -271,7 +277,8 @@ describe("LoginForm", () => {
             .mockReturnValue({
                 persisted: false,
                 storage: false,
-                cookie: false
+                cookie: false,
+                session: false
             });
         const errSpy = jest
             .spyOn(message, "error")
