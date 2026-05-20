@@ -73,8 +73,7 @@ describe("AiChatDrawer UI branches (mocked chat hook)", () => {
     beforeEach(() => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
         Object.defineProperty(HTMLElement.prototype, "offsetHeight", {

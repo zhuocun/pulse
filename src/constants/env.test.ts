@@ -13,7 +13,13 @@ describe("environment", () => {
         process.env.REACT_APP_AI_USE_LOCAL = originalAiUseLocal;
     });
 
-    it("builds the API base URL from the React app API URL", () => {
+    it("uses a same-origin REST prefix regardless of REACT_APP_API_URL", () => {
+        // REST calls go through ``/api/v1/*`` on the FE's own origin
+        // (Vercel rewrite in prod, Vite proxy in dev). ``REACT_APP_API_URL``
+        // still drives ``aiBaseUrl`` for direct-to-backend AI calls,
+        // but the REST base is no longer derived from it -- that's
+        // what makes the HttpOnly session cookie same-origin and
+        // immune to iOS 26.5's ITP-driven cross-origin cookie drop.
         process.env.REACT_APP_API_URL = "https://jira-api.example";
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
@@ -22,10 +28,10 @@ describe("environment", () => {
         jest.resetModules();
         const environment = require("./env").default;
 
-        expect(environment.apiBaseUrl).toBe("https://jira-api.example/api/v1");
+        expect(environment.apiBaseUrl).toBe("/api/v1");
     });
 
-    it("defaults the API origin when REACT_APP_API_URL is unset", () => {
+    it("keeps the same-origin REST prefix when REACT_APP_API_URL is unset", () => {
         delete process.env.REACT_APP_API_URL;
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
@@ -34,12 +40,10 @@ describe("environment", () => {
         jest.resetModules();
         const environment = require("./env").default;
 
-        expect(environment.apiBaseUrl).toBe(
-            "https://pulse-python-server.vercel.app/api/v1"
-        );
+        expect(environment.apiBaseUrl).toBe("/api/v1");
     });
 
-    it("reflects the environment value at module load time", () => {
+    it("ignores REACT_APP_API_URL for the REST base URL at module load time", () => {
         process.env.REACT_APP_API_URL = "http://localhost:8080";
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
@@ -48,7 +52,7 @@ describe("environment", () => {
         jest.resetModules();
         const environment = require("./env").default;
 
-        expect(environment.apiBaseUrl).toBe("http://localhost:8080/api/v1");
+        expect(environment.apiBaseUrl).toBe("/api/v1");
     });
 
     it("defaults AI to enabled with the local engine when REACT_APP_AI_USE_LOCAL=true", () => {

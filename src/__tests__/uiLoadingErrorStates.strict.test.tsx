@@ -96,7 +96,6 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -133,8 +132,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token: "jwt-1",
+        isAuthenticated: true,
         user: user()
     });
     mockedUseAiEnabled.mockReturnValue({

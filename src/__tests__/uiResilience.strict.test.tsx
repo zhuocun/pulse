@@ -137,7 +137,6 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
 
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     ...member(),
-    jwt: "token",
     likedProjects: [],
     ...overrides
 });
@@ -162,8 +161,7 @@ describe("UI quality :: ProjectList resilience", () => {
     const renderList = (dataSource: IProject[]) => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "token",
+            isAuthenticated: true,
             user: user()
         });
         mockedUseProjectModal.mockReturnValue({

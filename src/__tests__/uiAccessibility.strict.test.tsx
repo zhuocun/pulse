@@ -91,7 +91,6 @@ const installAntdBrowserMocks = () => {
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -105,8 +104,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token: "jwt-1",
+        isAuthenticated: true,
         user: user()
     });
     mockedUseAiEnabled.mockReturnValue({
@@ -234,8 +232,7 @@ describe("UI quality :: text overflow safety", () => {
     it("Header doesn't horizontally overflow with a very long username", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "jwt-1",
+            isAuthenticated: true,
             user: user({ username: "A".repeat(200) })
         });
 
@@ -264,8 +261,7 @@ describe("UI quality :: header user fallbacks", () => {
     it("Header doesn't render the literal string 'undefined' when user is missing username", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "jwt-1",
+            isAuthenticated: true,
             user: user({ username: "" })
         });
 
@@ -289,8 +285,7 @@ describe("UI quality :: header user fallbacks", () => {
     it("Header account trigger has a descriptive aria-label that survives a missing username", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "jwt-1",
+            isAuthenticated: true,
             user: user({ username: undefined as unknown as string })
         });
 

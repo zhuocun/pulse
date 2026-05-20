@@ -1,17 +1,22 @@
 import environment from "../constants/env";
-import { microcopy } from "../constants/microcopy";
 
 import getAuthErrorMessage from "./getAuthErrorMessage";
 import { rewriteNetworkFetchError } from "./networkFetchError";
 import { parseFetchBody } from "./parseFetchBody";
-import { writeAiProxyToken, writeAuthToken } from "./tokenStorage";
+import { writeAiProxyToken } from "./tokenStorage";
 
 const authFetch = async (
     endpoint: string,
     init: RequestInit
 ): Promise<Response> => {
     try {
-        return await fetch(`${environment.apiBaseUrl}/${endpoint}`, init);
+        return await fetch(`${environment.apiBaseUrl}/${endpoint}`, {
+            ...init,
+            // Same-origin REST -- the HttpOnly ``Token`` cookie issued
+            // by ``POST /auth/login`` rides with every subsequent
+            // request thanks to the Vercel rewrite / Vite dev proxy.
+            credentials: "include"
+        });
     } catch (err) {
         const rewritten = rewriteNetworkFetchError(err);
         if (rewritten) throw rewritten;
@@ -32,20 +37,13 @@ const login = async (param: { email: string; password: string }) => {
     });
     const body = await parseFetchBody(res);
     if (res.ok) {
+        // The REST JWT is no longer in the body -- the backend writes
+        // it into the HttpOnly ``Token`` cookie which the browser
+        // attaches automatically on every subsequent same-origin
+        // call. We only stash ``ai_jwt`` (narrow-scope, short-TTL,
+        // for the cross-origin AI proxy) so AI calls keep working
+        // outside the cookie's reach.
         const user = body as IUser;
-        // Defend against a malformed login envelope: storing
-        // `"undefined"` would poison every subsequent request with
-        // `Authorization: Bearer undefined` and the user would only
-        // discover it after the next 401. Reject the response loudly
-        // so the auth form can surface a real error.
-        if (typeof user?.jwt !== "string" || user.jwt.length === 0) {
-            return Promise.reject(new Error("Login response missing token"));
-        }
-        if (!writeAuthToken(user.jwt)) {
-            return Promise.reject(
-                new Error(microcopy.feedback.loginCouldNotPersistSession)
-            );
-        }
         if (typeof user.ai_jwt === "string" && user.ai_jwt.length > 0) {
             writeAiProxyToken(user.ai_jwt);
         }

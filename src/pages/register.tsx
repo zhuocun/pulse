@@ -22,10 +22,10 @@ const SwitchAuthLink = styled(Link)`
 
 const RegisterPage = () => {
     useTitle(microcopy.actions.signUp);
-    const { token } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [error, setError] = useState<Error | null | IError>(null);
 
-    if (token) {
+    if (isAuthenticated) {
         return <Navigate to="/projects" replace />;
     }
     return (

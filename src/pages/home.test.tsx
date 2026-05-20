@@ -31,7 +31,6 @@ const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -39,17 +38,16 @@ const user = (overrides: Partial<IUser> = {}): IUser => ({
 
 const renderHome = ({
     path,
-    token,
+    isAuthenticated,
     currentUser
 }: {
     path: string;
-    token: string | null;
+    isAuthenticated: boolean;
     currentUser?: IUser;
 }) => {
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token,
+        isAuthenticated,
         user: currentUser
     });
 
@@ -71,7 +69,7 @@ describe("HomePage", () => {
         renderHome({
             currentUser: user(),
             path: "/login",
-            token: "jwt-1"
+            isAuthenticated: true
         });
 
         expect(window.location.pathname).toBe("/projects");
@@ -81,7 +79,7 @@ describe("HomePage", () => {
     it("redirects anonymous users from protected routes to login", () => {
         renderHome({
             path: "/projects",
-            token: null
+            isAuthenticated: false
         });
 
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
@@ -92,7 +90,7 @@ describe("HomePage", () => {
         renderHome({
             currentUser: user(),
             path: "/projects",
-            token: "jwt-1"
+            isAuthenticated: true
         });
 
         expect(screen.getByTestId("main-layout")).toBeInTheDocument();
@@ -101,7 +99,7 @@ describe("HomePage", () => {
     it("renders the main layout when a token exists but the user profile is still hydrating", () => {
         renderHome({
             path: "/projects",
-            token: "jwt-1"
+            isAuthenticated: true
         });
 
         expect(screen.getByTestId("main-layout")).toBeInTheDocument();
@@ -110,7 +108,7 @@ describe("HomePage", () => {
     it("renders the auth layout for anonymous auth routes", () => {
         renderHome({
             path: "/register",
-            token: null
+            isAuthenticated: false
         });
 
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
@@ -119,7 +117,7 @@ describe("HomePage", () => {
     it("treats /auth/forgot-password as an auth route", () => {
         renderHome({
             path: "/auth/forgot-password",
-            token: null
+            isAuthenticated: false
         });
 
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();

@@ -61,8 +61,7 @@ describe("useAiChat remote transport", () => {
         });
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
         mockApi.mockResolvedValue([]);

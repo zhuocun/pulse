@@ -48,7 +48,7 @@ jest.mock("../memberPopover", () => {
 jest.mock("../../constants/env", () => ({
     __esModule: true,
     default: {
-        apiBaseUrl: "https://pulse-python-server.vercel.app/api/v1",
+        apiBaseUrl: "/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
         aiUseLocalEngine: true
@@ -72,7 +72,6 @@ const mockedUseNavigate = useNavigate as jest.MockedFunction<
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -110,8 +109,7 @@ const renderHeader = (
 
     mockedUseAuth.mockReturnValue({
         logout,
-        refreshUser: jest.fn(),
-        token: "jwt-1",
+        isAuthenticated: true,
         user: user()
     });
     mockedUseAiEnabled.mockReturnValue({

@@ -79,10 +79,13 @@ describe("api() repetition — sequential GETs", () => {
     });
 
     it("does not leak headers between successive calls", async () => {
+        // Two GETs with no body and one POST with a body. Auth is on
+        // the cookie now -- no Authorization header is ever
+        // constructed -- so headers come down to the JSON content
+        // type, present only when there is a body to send.
         fetchMock().mockResolvedValue(jsonResponse({ ok: true }));
 
-        // First call has a token; second has none; third has data.
-        await api("users", { method: "GET", token: "tk-1" });
+        await api("users", { method: "GET" });
         await api("users", { method: "GET" });
         await api("tasks", {
             method: "POST",
@@ -93,11 +96,8 @@ describe("api() repetition — sequential GETs", () => {
         const headers2 = fetchMock().mock.calls[1][1]?.headers;
         const headers3 = fetchMock().mock.calls[2][1]?.headers;
 
-        expect(headers1).toEqual({ Authorization: "Bearer tk-1" });
-        // Second call has no token and no data — both auth and
-        // content-type headers must be absent.
+        expect(headers1).toEqual({});
         expect(headers2).toEqual({});
-        // Third call has data but no token — only content-type.
         expect(headers3).toEqual({ "Content-Type": "application/json" });
     });
 });
@@ -269,23 +269,23 @@ describe("api() repetition — interleaved endpoints", () => {
     });
 });
 
-describe("api() repetition — same endpoint, varying tokens", () => {
-    it("uses the per-call token, not a previous-call token", async () => {
+describe("api() repetition — Authorization header is never constructed", () => {
+    it("does not attach an Authorization header on any repeated call", async () => {
+        // The REST session moved to an HttpOnly cookie that the
+        // browser carries automatically; the FE no longer has a
+        // bearer token to write into the header.
         fetchMock().mockResolvedValue(jsonResponse({ ok: true }));
 
-        const tokens = ["tk-A", "tk-B", "tk-C", undefined, "tk-D"];
-        for (const token of tokens) {
-            await api("users", { method: "GET", token });
+        for (let i = 0; i < 5; i += 1) {
+            // eslint-disable-next-line no-await-in-loop
+            await api("users", { method: "GET" });
         }
 
-        tokens.forEach((token, i) => {
-            const headers = (fetchMock().mock.calls[i][1] as RequestInit)
-                .headers as Record<string, string>;
-            if (token) {
-                expect(headers.Authorization).toBe(`Bearer ${token}`);
-            } else {
-                expect(headers.Authorization).toBeUndefined();
-            }
+        fetchMock().mock.calls.forEach((call) => {
+            const init = call[1] as RequestInit;
+            const headers = init.headers as Record<string, string>;
+            expect(headers.Authorization).toBeUndefined();
+            expect(init.credentials).toBe("include");
         });
     });
 });
@@ -327,9 +327,7 @@ describe("api() repetition — error stability under load", () => {
         }
 
         const results = await Promise.allSettled(
-            Array.from({ length: N }, () =>
-                api("users", { method: "GET", token: "stale" })
-            )
+            Array.from({ length: N }, () => api("users", { method: "GET" }))
         );
 
         results.forEach((r) => {

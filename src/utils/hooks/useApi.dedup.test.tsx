@@ -123,16 +123,22 @@ describe("api() in-flight dedup — GET / HEAD coalescing", () => {
         expect(fetchMock()).toHaveBeenCalledTimes(3);
     });
 
-    it("does NOT coalesce when the token differs (logged-in user A vs user B)", async () => {
+    it("coalesces identical GETs even though we no longer key on a bearer token", async () => {
+        // The session identity moved from a JS-readable token (which
+        // we used to fold into the dedup key) to an HttpOnly cookie
+        // attached by ``credentials: "include"``. The browser carries
+        // the same cookie for every concurrent request fired from one
+        // tab, so two identical fetches racing in the same window are
+        // always for the same viewer -- coalescing is safe.
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u" }));
 
         await Promise.all([
-            api("users", { method: "GET", token: "tk-A" }),
-            api("users", { method: "GET", token: "tk-B" }),
+            api("users", { method: "GET" }),
+            api("users", { method: "GET" }),
             api("users", { method: "GET" })
         ]);
 
-        expect(fetchMock()).toHaveBeenCalledTimes(3);
+        expect(fetchMock()).toHaveBeenCalledTimes(1);
     });
 
     it("coalesces HEAD requests too", async () => {

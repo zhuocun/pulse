@@ -113,8 +113,7 @@ const renderDrawer = (
     const onClose = jest.fn();
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token: null,
+        isAuthenticated: false,
         user: undefined
     });
     mockApi.mockResolvedValue([]);

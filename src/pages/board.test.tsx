@@ -99,7 +99,6 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
 
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     ...member(),
-    jwt: "token",
     likedProjects: [],
     ...overrides
 });

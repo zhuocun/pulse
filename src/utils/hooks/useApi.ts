@@ -7,11 +7,8 @@ import extractErrorMessage from "../extractErrorMessage";
 import { parseFetchBody } from "../parseFetchBody";
 import { rewriteNetworkFetchError } from "../networkFetchError";
 
-import useAuth from "./useAuth";
-
 interface IConfig extends RequestInit {
     data?: object;
-    token?: string | null;
     /**
      * Opt out of in-flight de-duplication. By default identical
      * concurrent GET / HEAD calls coalesce onto a single fetch; pass
@@ -44,14 +41,16 @@ export const resetInFlightApiCallsForTests = (): void => {
 const buildDedupKey = (
     endpoint: string,
     method: string,
-    data: object | undefined,
-    token: string | null | undefined
+    data: object | undefined
 ): string =>
-    // Token is part of the identity: a logout / login mid-burst MUST
-    // start a new fetch rather than handing viewer A's response to
-    // viewer B. JSON.stringify is stable for plain data objects sent
-    // by FE call-sites; the helper never receives Maps/Sets/Dates here.
-    `${method} ${endpoint} ${token ?? ""} ${JSON.stringify(data ?? {})}`;
+    // With cookie-based REST auth the session identity is on the
+    // request implicitly (the browser attaches the HttpOnly ``Token``
+    // cookie for every same-origin call). Login / logout each pivot
+    // the URL into and out of the auth-required tree, which restarts
+    // the React Query observers and reissues the dedup keys, so a
+    // stale viewer-A response can no longer race in front of viewer
+    // B without going through a route change first.
+    `${method} ${endpoint} ${JSON.stringify(data ?? {})}`;
 
 /**
  * Sliding-window rate limiter for the central `api()` helper.
@@ -157,32 +156,30 @@ export const restoreApiRateLimitDefaultsForTests = (): void => {
 
 const performFetch = async (
     endpoint: string,
-    {
-        data,
-        token,
-        dedup: _dedup,
-        rateLimit: _rateLimit,
-        ...customConfig
-    }: IConfig
+    { data, dedup: _dedup, rateLimit: _rateLimit, ...customConfig }: IConfig
 ): Promise<unknown> => {
     let apiEndpoint = endpoint;
     const headers: Record<string, string> = {};
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
-    }
     if (data) {
         headers["Content-Type"] = "application/json";
     }
-    const config = {
+    const config: RequestInit = {
         method: "GET",
         headers,
+        // Same-origin in prod (Vercel rewrite) and dev (Vite proxy) so
+        // the browser auto-attaches the HttpOnly ``Token`` session
+        // cookie issued by ``POST /auth/login``. ``"include"`` is
+        // belt-and-braces: explicit at the call site, and a no-op for
+        // the same-origin path that the fetch default would have
+        // covered anyway. Kept explicit so a future tweak that points
+        // `apiBaseUrl` at an absolute URL (in a fork, a Storybook,
+        // a preview-of-a-preview) does not silently drop the cookie.
+        credentials: "include",
         ...customConfig
     };
 
-    if (
-        config.method.toUpperCase() === "GET" ||
-        config.method.toUpperCase() === "DELETE"
-    ) {
+    const method = (config.method ?? "GET").toString().toUpperCase();
+    if (method === "GET" || method === "DELETE") {
         const qsString = qs.stringify(data ?? {});
         if (qsString) {
             apiEndpoint += `?${qsString}`;
@@ -222,7 +219,7 @@ export const api = (
     config: IConfig = {}
 ): Promise<unknown> => {
     const method = (config.method ?? "GET").toString().toUpperCase();
-    const key = buildDedupKey(endpoint, method, config.data, config.token);
+    const key = buildDedupKey(endpoint, method, config.data);
 
     // Only idempotent reads coalesce. POST / PUT / DELETE / PATCH all
     // mutate server state, so a rapid double-tap on "Create" must hit
@@ -275,14 +272,15 @@ export const api = (
 };
 
 const useApi = () => {
-    const { user, token } = useAuth();
+    // No per-request auth wiring: the session cookie rides every
+    // same-origin request automatically. Kept as a hook (vs. a plain
+    // export of ``api``) so we can swap the transport in tests and so
+    // call sites that compose other request-time concerns later have
+    // a single seam to bolt onto.
     return useCallback(
         (...[endpoint, config]: Parameters<typeof api>) =>
-            api(endpoint, {
-                ...config,
-                token: user?.jwt ?? token
-            }),
-        [token, user?.jwt]
+            api(endpoint, config),
+        []
     );
 };
 

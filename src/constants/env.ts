@@ -2,7 +2,14 @@
  * Environment configuration for the Jira React App.
  *
  * Environment variables (all optional unless noted):
- *   REACT_APP_API_URL          — Base URL for the REST API (default: Vercel deployment).
+ *   REACT_APP_API_URL          — Origin of the REST API. Used only to
+ *                                resolve `apiOrigin` (referenced by the
+ *                                AI proxy default and a few cross-origin
+ *                                hooks). REST calls always go through
+ *                                the same-origin `/api/v1/*` prefix so
+ *                                the HttpOnly session cookie set by
+ *                                `/auth/login` rides automatically.
+ *                                Default: Vercel deployment.
  *   REACT_APP_AI_BASE_URL      — Base URL for the AI proxy.
  *                                Must be a valid https: URL in production, or http: in dev.
  *                                Invalid URLs are rejected and local engine is forced.
@@ -78,7 +85,16 @@ const validateAiBaseUrl = (raw: string): string => {
 };
 
 const apiOrigin = readEnv("REACT_APP_API_URL")?.trim() || DEFAULT_API_ORIGIN;
-const apiBaseUrl = `${apiOrigin}/api/v1`;
+/**
+ * REST calls live at a same-origin `/api/v1/*` prefix in both prod
+ * (Vercel rewrite) and dev (Vite dev-server proxy) so the HttpOnly
+ * session cookie issued by ``POST /auth/login`` rides every request
+ * automatically. The previous absolute `${apiOrigin}/api/v1` URL made
+ * REST cross-origin from the FE, which on iOS 26.5 forced WebKit's
+ * ITP to silently drop the JS-set cookie across a document teardown
+ * (`vercel.json` + `vite.config.ts` set the rewrites).
+ */
+const apiBaseUrl = "/api/v1";
 
 /**
  * Resolve the AI base URL with the following precedence:
