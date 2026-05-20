@@ -99,7 +99,7 @@ describe("iOS login hard-nav race (real useAuth tree)", () => {
         // Mirror `useReactMutation(..., setCache: true)` — onSuccess writes
         // the login payload into the users cache, which wakes every
         // `useCachedQueryData(["users"])` subscriber (including `useAuth`).
-        mutateAsync.mockImplementation(async (input) => {
+        mutateAsync.mockImplementation(async () => {
             const result = user();
             queryClient.setQueryData(["users"], result);
             return result;
