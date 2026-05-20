@@ -100,6 +100,11 @@ const renderAuthProbe = (queryClient: QueryClient, route = "/") =>
 describe("useAuth", () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
+        for (const part of document.cookie.split(";")) {
+            const name = part.split("=")[0]?.trim();
+            if (name) document.cookie = `${name}=; Path=/; Max-Age=0`;
+        }
     });
 
     it("re-renders when the cached user is written after mount", () => {

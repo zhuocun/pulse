@@ -82,10 +82,14 @@ const LoginForm: React.FC<{
             }
             message.success(microcopy.feedback.welcomeBack);
             // iOS Safari WebKit can advance the URL via `pushState` without
-            // re-rendering routes after login; use a full document navigation
-            // (same escape hatch as project cards). Desktop keeps SPA nav.
+            // re-rendering routes after login (the same escape hatch as
+            // project cards). Always full-document navigate on iOS/macOS —
+            // `writeAuthTokenWithStatus` also writes the JWT to
+            // `sessionStorage` so the token survives the reload even when
+            // localStorage hasn't flushed and the cookie was dropped by
+            // WebKit ITP. Desktop non-Safari keeps SPA nav.
             const goToProjects = () => {
-                if (isMacLike() && authTokenWrite.cookie) {
+                if (isMacLike()) {
                     nativeNavigate("/projects");
                     return;
                 }
