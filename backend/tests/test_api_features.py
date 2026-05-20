@@ -465,6 +465,45 @@ def test_logout_clears_the_session_cookie(client: TestClient) -> None:
     assert client.get("/api/v1/users/").status_code == 401
 
 
+def test_login_session_cookie_is_secure_when_forwarded_proto_is_https(
+    client: TestClient,
+) -> None:
+    """Vercel terminates TLS upstream and forwards as plain http to the
+    lambda, advertising the original scheme via ``X-Forwarded-Proto``.
+    The cookie must still carry ``Secure`` in that case -- otherwise a
+    MITM on a coffee-shop wifi could downgrade subsequent requests to
+    http and steal the session.
+    """
+
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "forwarded",
+            "email": "forwarded@example.com",
+            "password": "secret",
+        },
+    )
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "forwarded@example.com", "password": "secret"},
+        headers={"X-Forwarded-Proto": "https"},
+    )
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "secure" in set_cookie
+    # And the inverse: when the forwarded scheme is http (or the chain
+    # is malformed), the cookie must NOT be Secure -- otherwise dev
+    # behind a non-HTTPS proxy would have an unreachable cookie.
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "forwarded@example.com", "password": "secret"},
+        headers={"X-Forwarded-Proto": "http, https"},
+    )
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "secure" not in set_cookie
+
+
 def test_login_handles_unserializable_user_info(
     client: TestClient,
     monkeypatch,
