@@ -10,7 +10,7 @@
  *   - API calls: NetworkOnly (handled by React Query)
  */
 
-const CACHE_VERSION = "pulse-v1";
+const CACHE_VERSION = "pulse-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const FONT_CACHE = `${CACHE_VERSION}-fonts`;

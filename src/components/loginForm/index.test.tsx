@@ -98,6 +98,7 @@ describe("LoginForm", () => {
     beforeEach(() => {
         localStorage.clear();
         sessionStorage.clear();
+        tokenStorage.resetLoginHardNavPendingForTests();
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue(user());
         (isMacLike as jest.Mock).mockReturnValue(false);
@@ -227,7 +228,8 @@ describe("LoginForm", () => {
         await waitFor(() => {
             expect(nativeNavigate).toHaveBeenCalledWith("/projects");
         });
-        expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+        expect(localStorage.getItem("Token")).toBe("jwt-login");
+        expect(tokenStorage.readAuthToken()).toBeNull();
     });
 
     it("suppresses the in-tab auth notification on the iOS hard-nav path", async () => {
@@ -256,7 +258,8 @@ describe("LoginForm", () => {
             expect(listener).not.toHaveBeenCalled();
             // The token still has to land in storage so the freshly
             // mounted tree on the next page can read it.
-            expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+            expect(localStorage.getItem("Token")).toBe("jwt-login");
+            expect(tokenStorage.readAuthToken()).toBeNull();
         } finally {
             unsub();
         }
@@ -315,7 +318,8 @@ describe("LoginForm", () => {
             await waitFor(() => {
                 expect(nativeNavigate).toHaveBeenCalledWith("/projects");
             });
-            expect(tokenStorage.readAuthToken()).toBe("jwt-login");
+            expect(sessionStorage.getItem("TokenSession")).toBe("jwt-login");
+            expect(tokenStorage.readAuthToken()).toBeNull();
         } finally {
             tokenWriteSpy.mockRestore();
         }
@@ -354,6 +358,26 @@ describe("LoginForm", () => {
 
         spy.mockRestore();
         errSpy.mockRestore();
+    });
+
+    it("skips the welcome-back toast on the iOS hard-nav path", async () => {
+        (isMacLike as jest.Mock).mockReturnValue(true);
+        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        const successSpy = jest
+            .spyOn(message, "success")
+            .mockImplementation(() => "" as never);
+        renderLoginForm();
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(nativeNavigate).toHaveBeenCalledWith("/projects");
+        });
+        expect(successSpy).not.toHaveBeenCalled();
+
+        successSpy.mockRestore();
     });
 
     it("shows a welcome-back toast on successful login", async () => {

@@ -1,8 +1,10 @@
 import {
     clearAiProxyToken,
     clearAuthToken,
+    markLoginHardNavPending,
     readAiProxyToken,
     readAuthToken,
+    resetLoginHardNavPendingForTests,
     subscribeAuthToken,
     writeAiProxyToken,
     writeAuthToken,
@@ -22,6 +24,7 @@ describe("tokenStorage", () => {
         localStorage.clear();
         sessionStorage.clear();
         clearAllCookies();
+        resetLoginHardNavPendingForTests();
         jest.restoreAllMocks();
     });
 
@@ -40,6 +43,16 @@ describe("tokenStorage", () => {
         unsub();
         expect(writeAuthToken("jwt-2")).toBe(true);
         expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("hides the token from readAuthToken while login hard-nav is pending", () => {
+        writeAuthTokenWithStatus("jwt-pending", { silent: true });
+        expect(readAuthToken()).toBe("jwt-pending");
+
+        markLoginHardNavPending();
+        expect(readAuthToken()).toBeNull();
+        // Storage is untouched — the next document load reads it normally.
+        expect(localStorage.getItem("Token")).toBe("jwt-pending");
     });
 
     it("skips the in-tab notification when called with silent: true", () => {

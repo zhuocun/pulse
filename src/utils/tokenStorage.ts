@@ -23,6 +23,24 @@ const TOKEN_SESSION_KEY = "TokenSession";
 
 type AuthTokenListener = () => void;
 const authTokenListeners = new Set<AuthTokenListener>();
+/**
+ * Set while the iOS/macOS post-login `nativeNavigate` is in flight.
+ * `readAuthToken` returns `null` until the document tears down so any
+ * React re-render (Ant Design `message`, query-cache subscribers, etc.)
+ * cannot commit `<Navigate replace />` and `history.replaceState` the
+ * URL to the assign target before WebKit processes the queued document
+ * load. Module state resets on the next full page load.
+ */
+let loginHardNavPending = false;
+
+export const markLoginHardNavPending = (): void => {
+    loginHardNavPending = true;
+};
+
+/** Clears the in-flight hard-nav guard — for unit tests only. */
+export const resetLoginHardNavPendingForTests = (): void => {
+    loginHardNavPending = false;
+};
 
 export type AuthTokenWriteStatus = {
     persisted: boolean;
@@ -227,6 +245,7 @@ const clearAuthSessionStorage = (): void => {
  * tab opened later finds the session.
  */
 export const readAuthToken = (): string | null => {
+    if (loginHardNavPending) return null;
     const fromStorage = (() => {
         const storage = getLocalStorage();
         if (!storage) return null;

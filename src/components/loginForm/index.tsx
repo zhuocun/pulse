@@ -11,6 +11,7 @@ import useReactMutation from "../../utils/hooks/useReactMutation";
 import nativeNavigate from "../../utils/nativeNavigate";
 import { isMacLike } from "../../utils/platform";
 import {
+    markLoginHardNavPending,
     writeAiProxyToken,
     writeAuthTokenWithStatus
 } from "../../utils/tokenStorage";
@@ -95,13 +96,20 @@ const LoginForm: React.FC<{
             // the queued navigation as a same-URL no-op — neither a
             // reload nor a document load fires, and the user stays on
             // the still-mounted login form with `/projects` in the URL.
-            // Suppressing the notify keeps `useAuth.token` null on this
-            // tab until the document is torn down; the freshly mounted
-            // tree on `/projects` re-reads the token from storage at
-            // boot (sessionStorage carries it across the reload even
-            // when localStorage hasn't flushed and the cookie was
-            // dropped by WebKit ITP). Cross-tab `storage` events are
-            // unaffected — they go through the browser.
+            // Suppressing the notify avoids the dedicated
+            // `subscribeAuthToken` wake-up, and `markLoginHardNavPending`
+            // hides the persisted JWT from `readAuthToken()` on any other
+            // re-render (Ant Design `message`, query-cache subscribers,
+            // etc.) until the document tears down. Together they stop
+            // `LoginPage` / `HomePage` from committing
+            // `<Navigate to="/projects" replace />` after
+            // `window.location.assign` has been queued — WebKit on iPhone
+            // iOS 26.5 treats that `replaceState` race as a same-URL no-op
+            // and leaves the still-mounted login form visible. The freshly
+            // mounted tree on `/projects` re-reads the token from storage at
+            // boot (sessionStorage carries it across the reload even when
+            // localStorage hasn't flushed and the cookie was dropped by
+            // WebKit ITP). Cross-tab `storage` events are unaffected.
             const authTokenWrite = writeAuthTokenWithStatus(res.jwt, {
                 silent: needsHardNav
             });
@@ -112,11 +120,12 @@ const LoginForm: React.FC<{
             if (typeof res.ai_jwt === "string" && res.ai_jwt.length > 0) {
                 writeAiProxyToken(res.ai_jwt);
             }
-            message.success(microcopy.feedback.welcomeBack);
             if (needsHardNav) {
+                markLoginHardNavPending();
                 nativeNavigate("/projects");
                 return;
             }
+            message.success(microcopy.feedback.welcomeBack);
             navigate("/projects", { viewTransition: true });
         } catch {
             // Error state is set by useReactMutation's onError callback.
