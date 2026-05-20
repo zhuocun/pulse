@@ -21,6 +21,14 @@ interface IConfig extends RequestInit {
      * deduped — see comment on `isIdempotentRead` below.
      */
     dedup?: boolean;
+    /**
+     * Opt out of the sliding-window rate limiter. Identical calls
+     * keyed on (method, endpoint, token, params) trip the limiter
+     * when they exceed `RATE_LIMIT_THRESHOLD` within
+     * `RATE_LIMIT_WINDOW_MS`. Pass `rateLimit: false` for known-hot
+     * legitimate paths where this guard would be a footgun.
+     */
+    rateLimit?: boolean;
 }
 
 const inFlight = new Map<string, Promise<unknown>>();
@@ -45,9 +53,117 @@ const buildDedupKey = (
     // by FE call-sites; the helper never receives Maps/Sets/Dates here.
     `${method} ${endpoint} ${token ?? ""} ${JSON.stringify(data ?? {})}`;
 
+/**
+ * Sliding-window rate limiter for the central `api()` helper.
+ *
+ * The dedup layer above collapses *concurrent* identical calls onto a
+ * single fetch. That defends against render-burst duplicates but does
+ * NOT defend against a real bug: a `useEffect` with the wrong deps, a
+ * stuck `setInterval`, or an agent loop that re-fires the same call
+ * after each response settles. Those issue serial calls that the
+ * dedup map can't see (each one starts after the previous resolves).
+ *
+ * The limiter tracks call timestamps per dedup key over a rolling
+ * window. Once a key crosses the threshold inside the window, every
+ * further call rejects with `ApiRateLimitError` until enough
+ * timestamps age out. It also `console.warn`s once per key per hot
+ * episode so the underlying bug surfaces loudly during development.
+ *
+ * Tunables (intentionally module-private; tests override via the
+ * `setApiRateLimitConfigForTests` helper):
+ *   - WINDOW_MS: how long a timestamp counts toward the budget.
+ *   - THRESHOLD: how many calls per key are allowed inside one window.
+ */
+let RATE_LIMIT_WINDOW_MS = 2000;
+let RATE_LIMIT_THRESHOLD = 10;
+
+const callTimestamps = new Map<string, number[]>();
+const warnedKeys = new Set<string>();
+
+export class ApiRateLimitError extends Error {
+    readonly status = 429;
+
+    constructor(
+        readonly key: string,
+        readonly callCount: number,
+        readonly windowMs: number
+    ) {
+        super(
+            `API rate limit exceeded: ${callCount} identical calls in ${windowMs}ms ` +
+                `for ${key}. Likely a runaway loop — check effect dependency ` +
+                `arrays at the call-site.`
+        );
+        this.name = "ApiRateLimitError";
+    }
+}
+
+const recordCallAndCheckRateLimit = (
+    key: string,
+    now: number
+): ApiRateLimitError | null => {
+    const cutoff = now - RATE_LIMIT_WINDOW_MS;
+    const entries = (callTimestamps.get(key) ?? []).filter((t) => t > cutoff);
+    entries.push(now);
+
+    if (entries.length > RATE_LIMIT_THRESHOLD) {
+        callTimestamps.set(key, entries);
+        if (!warnedKeys.has(key)) {
+            warnedKeys.add(key);
+            // eslint-disable-next-line no-console
+            console.warn(
+                `[api] Possible runaway loop: ${entries.length} identical calls to ` +
+                    `\`${key}\` within ${RATE_LIMIT_WINDOW_MS}ms. Throttling further ` +
+                    `calls until the burst subsides. Inspect the call-site's effect ` +
+                    `dependency array, polling timer, or agent loop.`
+            );
+        }
+        return new ApiRateLimitError(key, entries.length, RATE_LIMIT_WINDOW_MS);
+    }
+
+    // We're back below threshold — clear the "warned" flag so the next
+    // time the same key crosses, we warn again rather than going silent.
+    warnedKeys.delete(key);
+    if (entries.length === 0) {
+        callTimestamps.delete(key);
+    } else {
+        callTimestamps.set(key, entries);
+    }
+    return null;
+};
+
+/** Test-only: drop the rate-limit registry between cases. */
+export const resetApiRateLimitForTests = (): void => {
+    callTimestamps.clear();
+    warnedKeys.clear();
+};
+
+/** Test-only: tweak the window / threshold so tests don't need to fire 11+ calls. */
+export const setApiRateLimitConfigForTests = (
+    config: Partial<{ windowMs: number; threshold: number }>
+): void => {
+    if (typeof config.windowMs === "number") {
+        RATE_LIMIT_WINDOW_MS = config.windowMs;
+    }
+    if (typeof config.threshold === "number") {
+        RATE_LIMIT_THRESHOLD = config.threshold;
+    }
+};
+
+/** Test-only: restore the production tunables after a test override. */
+export const restoreApiRateLimitDefaultsForTests = (): void => {
+    RATE_LIMIT_WINDOW_MS = 2000;
+    RATE_LIMIT_THRESHOLD = 10;
+};
+
 const performFetch = async (
     endpoint: string,
-    { data, token, dedup: _dedup, ...customConfig }: IConfig
+    {
+        data,
+        token,
+        dedup: _dedup,
+        rateLimit: _rateLimit,
+        ...customConfig
+    }: IConfig
 ): Promise<unknown> => {
     let apiEndpoint = endpoint;
     const headers: Record<string, string> = {};
@@ -106,37 +222,55 @@ export const api = (
     config: IConfig = {}
 ): Promise<unknown> => {
     const method = (config.method ?? "GET").toString().toUpperCase();
+    const key = buildDedupKey(endpoint, method, config.data, config.token);
+
     // Only idempotent reads coalesce. POST / PUT / DELETE / PATCH all
     // mutate server state, so a rapid double-tap on "Create" must hit
     // the backend twice — collapsing them would silently drop user
     // actions and confuse optimistic-update rollback.
     const isIdempotentRead = method === "GET" || method === "HEAD";
     const dedupEnabled = config.dedup !== false && isIdempotentRead;
-    if (!dedupEnabled) {
-        return performFetch(endpoint, config);
-    }
-    const key = buildDedupKey(endpoint, method, config.data, config.token);
-    const existing = inFlight.get(key);
-    if (existing) {
-        return existing;
-    }
-    const promise = performFetch(endpoint, config);
-    inFlight.set(key, promise);
-    // Self-cleaning registry. Attach the cleanup BEFORE returning so
-    // the handler is registered first and runs before any awaiter's
-    // continuation — the inFlight entry is gone by the time the
-    // caller observes the result. Use a handler pair (not `.finally`)
-    // so the cleanup branch never produces an unhandled rejection on
-    // its own; the original promise's rejection still propagates to
-    // the caller via the returned reference.
-    promise.then(
-        () => {
-            inFlight.delete(key);
-        },
-        () => {
-            inFlight.delete(key);
+
+    if (dedupEnabled) {
+        const existing = inFlight.get(key);
+        if (existing) {
+            // A concurrent burst — share the in-flight promise. We
+            // intentionally DO NOT count coalesced callers toward the
+            // rate limit; only network round-trips matter, and the
+            // burst is collapsing onto a single one.
+            return existing;
         }
-    );
+    }
+
+    if (config.rateLimit !== false) {
+        const rateLimitErr = recordCallAndCheckRateLimit(key, Date.now());
+        if (rateLimitErr) {
+            return Promise.reject(rateLimitErr);
+        }
+    }
+
+    const promise = performFetch(endpoint, config);
+
+    if (dedupEnabled) {
+        inFlight.set(key, promise);
+        // Self-cleaning registry. Attach the cleanup BEFORE returning
+        // so the handler is registered first and runs before any
+        // awaiter's continuation — the inFlight entry is gone by the
+        // time the caller observes the result. Use a handler pair
+        // (not `.finally`) so the cleanup branch never produces an
+        // unhandled rejection on its own; the original promise's
+        // rejection still propagates to the caller via the returned
+        // reference.
+        promise.then(
+            () => {
+                inFlight.delete(key);
+            },
+            () => {
+                inFlight.delete(key);
+            }
+        );
+    }
+
     return promise;
 };
 

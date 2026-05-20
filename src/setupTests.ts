@@ -149,7 +149,11 @@ if (typeof afterEach === "function") {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const mod = require("./utils/hooks/useApi") as {
             resetInFlightApiCallsForTests?: () => void;
+            resetApiRateLimitForTests?: () => void;
+            restoreApiRateLimitDefaultsForTests?: () => void;
         };
         mod.resetInFlightApiCallsForTests?.();
+        mod.resetApiRateLimitForTests?.();
+        mod.restoreApiRateLimitDefaultsForTests?.();
     });
 }
