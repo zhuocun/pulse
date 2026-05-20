@@ -17,9 +17,9 @@ const jsonResponse = (body: unknown, ok = true, status = ok ? 200 : 500) =>
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
+    ai_jwt: "ai-1",
     ...overrides
 });
 
@@ -34,12 +34,7 @@ describe("auth API helpers", () => {
 
     beforeEach(() => {
         fetchMock().mockReset();
-        localStorage.clear();
         sessionStorage.clear();
-        for (const part of document.cookie.split(";")) {
-            const name = part.split("=")[0]?.trim();
-            if (name) document.cookie = `${name}=; Path=/; Max-Age=0`;
-        }
     });
 
     afterAll(() => {
@@ -50,8 +45,14 @@ describe("auth API helpers", () => {
         });
     });
 
-    it("posts login credentials, stores the returned JWT, and returns the user", async () => {
-        const returnedUser = user();
+    it("posts login credentials with cookie credentials and stores only the AI proxy token", async () => {
+        // The REST JWT now lives in an HttpOnly cookie the backend set
+        // on this response. ``credentials: "include"`` is what tells
+        // the browser to (a) accept that cookie and (b) attach it on
+        // every subsequent same-origin call. The narrow-scope
+        // ``ai_jwt`` still rides JSON because AI endpoints may live
+        // on a different origin from the cookie's host.
+        const returnedUser = user({ ai_jwt: "ai-token" });
         fetchMock().mockResolvedValue(jsonResponse(returnedUser));
 
         await expect(
@@ -60,18 +61,28 @@ describe("auth API helpers", () => {
 
         expect(fetchMock()).toHaveBeenCalledWith(
             `${environment.apiBaseUrl}/auth/login`,
-            {
+            expect.objectContaining({
                 body: JSON.stringify({
                     email: "alice@example.com",
                     password: "secret"
                 }),
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                method: "POST"
-            }
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+                credentials: "include"
+            })
         );
-        expect(tokenStorage.readAuthToken()).toBe("jwt-1");
+        expect(tokenStorage.readAiProxyToken()).toBe("ai-token");
+    });
+
+    it("does not fail when the login response omits ai_jwt", async () => {
+        fetchMock().mockResolvedValue(
+            jsonResponse(user({ ai_jwt: undefined }))
+        );
+
+        await expect(
+            login({ email: "alice@example.com", password: "secret" })
+        ).resolves.toBeTruthy();
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
     it("maps a login 404 to a connection failure", async () => {
@@ -81,7 +92,7 @@ describe("auth API helpers", () => {
             login({ email: "alice@example.com", password: "secret" })
         ).rejects.toThrow("Failed to connect");
 
-        expect(tokenStorage.readAuthToken()).toBeNull();
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
     it("rejects other login failures with the response JSON message", async () => {
@@ -94,7 +105,7 @@ describe("auth API helpers", () => {
         ).rejects.toThrow("Invalid credentials");
     });
 
-    it("posts register data and returns the response JSON", async () => {
+    it("posts register data with cookie credentials and returns the response JSON", async () => {
         const response = { ok: true };
         fetchMock().mockResolvedValue(jsonResponse(response));
 
@@ -108,17 +119,16 @@ describe("auth API helpers", () => {
 
         expect(fetchMock()).toHaveBeenCalledWith(
             `${environment.apiBaseUrl}/auth/register`,
-            {
+            expect.objectContaining({
                 body: JSON.stringify({
                     email: "alice@example.com",
                     password: "secret",
                     username: "Alice"
                 }),
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                method: "POST"
-            }
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+                credentials: "include"
+            })
         );
     });
 
@@ -172,21 +182,7 @@ describe("auth API helpers", () => {
         await expect(
             login({ email: "alice@example.com", password: "secret" })
         ).rejects.toThrow(/unable to connect/i);
-        expect(tokenStorage.readAuthToken()).toBeNull();
-    });
-
-    it("rejects login when the JWT cannot be persisted to storage", async () => {
-        fetchMock().mockResolvedValue(jsonResponse(user()));
-        const spy = jest
-            .spyOn(tokenStorage, "writeAuthToken")
-            .mockReturnValue(false);
-
-        await expect(
-            login({ email: "alice@example.com", password: "secret" })
-        ).rejects.toThrow(/private browsing|allow site data/i);
-
-        expect(tokenStorage.readAuthToken()).toBeNull();
-        spy.mockRestore();
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
     it("converts a register network failure into a friendly error message", async () => {

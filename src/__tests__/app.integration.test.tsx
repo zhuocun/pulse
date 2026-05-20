@@ -160,8 +160,7 @@ const testTask = (overrides: Partial<ITask> = {}): ITask => ({
 
 const testUser = (): IUser => ({
     ...member(),
-    likedProjects: [],
-    jwt: "jwt-integration"
+    likedProjects: []
 });
 
 describe("App integration (full providers + routes)", () => {
@@ -192,11 +191,18 @@ describe("App integration (full providers + routes)", () => {
         window.history.pushState({}, "Reset", "/");
     });
 
+    // Stateful session mock: ``GET /users`` 401s before login (the
+    // ``AuthProvider`` probe sees an empty cache and the route guard
+    // sends the visitor to /login), then 200s with the user record
+    // once ``POST /auth/login`` succeeds -- mirroring the cookie
+    // path's "the browser carries the HttpOnly Token cookie now"
+    // handshake without needing jsdom to actually honor Set-Cookie.
     const setupAuthenticatedSessionMocks = () => {
         const user = testUser();
         const proj = testProject();
         const col = testColumn();
         const task = testTask();
+        let loggedIn = false;
 
         fetchMock.mockImplementation((input: RequestInfo) => {
             const url = typeof input === "string" ? input : input.url;
@@ -204,9 +210,17 @@ describe("App integration (full providers + routes)", () => {
             const path = u.pathname;
 
             if (path.endsWith("/auth/login")) {
+                loggedIn = true;
                 return mockJsonResponse(user);
             }
+            if (path.endsWith("/auth/logout")) {
+                loggedIn = false;
+                return mockJsonResponse(null, true, 204);
+            }
             if (path.endsWith("/users") && !path.includes("/members")) {
+                if (!loggedIn) {
+                    return mockJsonResponse({ error: "empty JWT" }, false, 401);
+                }
                 return mockJsonResponse(user);
             }
             if (path.endsWith("/users/members")) {
@@ -236,14 +250,21 @@ describe("App integration (full providers + routes)", () => {
         setupAuthenticatedSessionMocks();
         renderAppAt("/");
 
-        await waitFor(() => {
-            expect(window.location.pathname).toBe("/login");
-        });
+        await waitFor(
+            () => {
+                expect(window.location.pathname).toBe("/login");
+            },
+            { timeout: 5000 }
+        );
 
         expect(
-            await screen.findByRole("heading", {
-                name: /log in to your account/i
-            })
+            await screen.findByRole(
+                "heading",
+                {
+                    name: /log in to your account/i
+                },
+                { timeout: 5000 }
+            )
         ).toBeInTheDocument();
     });
 
@@ -281,7 +302,10 @@ describe("App integration (full providers + routes)", () => {
             expect(window.location.pathname).toBe("/projects");
         });
 
-        expect(localStorage.getItem("Token")).toBe("jwt-integration");
+        // The REST JWT now rides an HttpOnly cookie that JS cannot
+        // read, so the previous ``localStorage.getItem("Token")``
+        // assertion is meaningless. The route-level transition is
+        // the observable proof that auth landed.
 
         expect(
             await screen.findByRole(
@@ -387,7 +411,9 @@ describe("App integration (full providers + routes)", () => {
         await waitFor(() => {
             expect(window.location.pathname).toBe("/login");
         });
-
-        expect(localStorage.getItem("Token")).toBeNull();
+        // No ``localStorage.getItem("Token")`` check -- the REST JWT
+        // lives in an HttpOnly cookie that ``POST /auth/logout``
+        // cleared at the backend. The route transition back to
+        // ``/login`` is the user-visible signal.
     }, 20000);
 });

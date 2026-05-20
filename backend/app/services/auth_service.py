@@ -125,11 +125,18 @@ def login(data: Dict[str, Any]) -> Dict[str, Any]:
     if user_info is None:
         api_error(HTTPStatus.UNAUTHORIZED, "Invalid credentials")
 
+    # The REST JWT is intentionally NOT in the response body. The router
+    # writes it into an HttpOnly cookie so JS never gets to see it --
+    # this is the change that ends the iOS Safari 26.5 stuck-on-login
+    # loop, where the FE's previous client-managed handoff across a full
+    # document reload was unreliable on WebKit. The narrow-scope
+    # ``ai_jwt`` keeps riding the body because the AI proxy is bearer-
+    # auth'd (often a different origin from the REST API).
     return {
         "_id": user_info["_id"],
         "username": user_info.get("username"),
         "likedProjects": user_info.get("likedProjects") or [],
         "email": user_info.get("email"),
-        "jwt": create_token(user_info["_id"]),
+        "rest_jwt": create_token(user_info["_id"]),
         "ai_jwt": create_ai_proxy_token(user_info["_id"]),
     }

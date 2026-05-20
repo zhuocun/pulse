@@ -36,8 +36,8 @@ const BoardPage = lazy(() => import("../pages/board"));
  * login-screen flash for users who already had a session.
  */
 const RootRedirect = () => {
-    const { token } = useAuth();
-    return token ? (
+    const { isAuthenticated } = useAuth();
+    return isAuthenticated ? (
         <Navigate to="/projects" replace />
     ) : (
         <Navigate to="/login" replace />

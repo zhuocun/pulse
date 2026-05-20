@@ -215,7 +215,6 @@ describe("FE_TOOL_REGISTRY", () => {
         qc.setQueryData<IUser>(["users"], {
             _id: "u1",
             email: "alice@example.com",
-            jwt: "tok",
             likedProjects: [],
             username: "alice"
         });

@@ -111,7 +111,6 @@ const installAntdBrowserMocks = () => {
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -196,8 +195,7 @@ describe("UI quality :: microcopy compliance", () => {
     it("login page switch link uses microcopy.actions.registerCta verbatim", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -213,8 +211,7 @@ describe("UI quality :: microcopy compliance", () => {
     it("register page switch link uses microcopy.actions.loginCta verbatim", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -243,8 +240,7 @@ describe("UI quality :: form input hygiene", () => {
 
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "jwt-1",
+            isAuthenticated: true,
             user: user()
         });
         mockedUseAiEnabled.mockReturnValue({
@@ -376,8 +372,7 @@ describe("UI quality :: user identity fallbacks", () => {
     const renderHeader = (currentUser: IUser | undefined) => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: currentUser ? "jwt-1" : null,
+            isAuthenticated: Boolean(currentUser ? "jwt-1" : null),
             user: currentUser
         });
         mockedUseAiEnabled.mockReturnValue({
@@ -596,8 +591,7 @@ describe("UI quality :: focus management for inline errors", () => {
     const renderLoginAndTriggerError = (errorMsg: string) => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 

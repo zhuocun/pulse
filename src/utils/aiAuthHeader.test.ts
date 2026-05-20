@@ -2,41 +2,26 @@ import { getStoredBearerAuthHeader } from "./aiAuthHeader";
 
 describe("getStoredBearerAuthHeader", () => {
     afterEach(() => {
-        localStorage.clear();
         sessionStorage.clear();
     });
 
-    it("returns Bearer when a token exists", () => {
-        localStorage.setItem("Token", "abc");
-        expect(getStoredBearerAuthHeader()).toBe("Bearer abc");
-    });
-
-    it("prefers the narrow AI proxy token when present", () => {
-        localStorage.setItem("Token", "rest-wide");
+    it("returns Bearer when the narrow AI proxy token is present", () => {
         sessionStorage.setItem("AiProxyJwt", "narrow-ai");
         expect(getStoredBearerAuthHeader()).toBe("Bearer narrow-ai");
     });
 
-    it("returns an empty string when no token is stored", () => {
+    it("returns an empty string when the AI proxy token is absent", () => {
+        // The REST JWT is no longer JS-readable -- it lives in an
+        // HttpOnly cookie -- so AI calls that need an explicit bearer
+        // must fall through to "no auth" rather than a stale fallback.
         expect(getStoredBearerAuthHeader()).toBe("");
     });
 
-    it("returns an empty string when localStorage is unavailable", () => {
-        const original = global.localStorage;
-        // @ts-expect-error simulate non-browser environments
-        delete global.localStorage;
-        expect(getStoredBearerAuthHeader()).toBe("");
-        global.localStorage = original;
-    });
-
-    it("returns an empty string when reading localStorage throws", () => {
-        const originalGetItem = Storage.prototype.getItem;
+    it("returns an empty string when reading sessionStorage throws", () => {
         jest.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
             throw new Error("denied");
         });
 
         expect(getStoredBearerAuthHeader()).toBe("");
-
-        Storage.prototype.getItem = originalGetItem;
     });
 });

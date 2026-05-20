@@ -161,7 +161,6 @@ const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
 const SAMPLE_USER: IUser = {
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice"
 };
@@ -284,8 +283,7 @@ describe("AiCopilotSurfaceFeedback integration", () => {
     const setupGlobalHooks = (): void => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "jwt-1",
+            isAuthenticated: true,
             user: SAMPLE_USER
         });
         mockedUseAiEnabled.mockReturnValue({

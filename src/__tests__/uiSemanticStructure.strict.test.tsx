@@ -100,7 +100,6 @@ const installAntdBrowserMocks = () => {
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -114,8 +113,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token: "jwt-1",
+        isAuthenticated: true,
         user: user()
     });
     mockedUseAiEnabled.mockReturnValue({
@@ -164,8 +162,7 @@ describe("UI quality :: auth pages heading hierarchy", () => {
     it("LoginPage renders exactly one h1", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -182,8 +179,7 @@ describe("UI quality :: auth pages heading hierarchy", () => {
     it("LoginPage h1 announces 'Log in' or 'Sign in', never the literal 'Login'", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -203,8 +199,7 @@ describe("UI quality :: auth pages heading hierarchy", () => {
     it("RegisterPage renders exactly one h1", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -280,8 +275,7 @@ describe("UI quality :: document title per page", () => {
     it("LoginPage updates the document title to identify the page", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -302,8 +296,7 @@ describe("UI quality :: document title per page", () => {
     it("RegisterPage updates the document title to identify the page", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 
@@ -370,8 +363,7 @@ describe("UI quality :: auth pages landmarks", () => {
     it("LoginPage exposes a main landmark when rendered as a page", () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 

@@ -162,8 +162,7 @@ const testTask = (overrides: Partial<ITask> = {}): ITask => ({
 
 const testUser = (): IUser => ({
     ...member(),
-    likedProjects: [],
-    jwt: "jwt-board-ai"
+    likedProjects: []
 });
 
 describe("Board AI integration (App + local engine)", () => {
@@ -208,6 +207,11 @@ describe("Board AI integration (App + local engine)", () => {
         const proj = testProject();
         const col = testColumn();
         const task = testTask();
+        // Stateful: the ``AuthProvider`` probe must 401 before login
+        // (otherwise the route guard redirects /login → /projects and
+        // the form never renders) and 200 after, mirroring the
+        // cookie path the FE relies on in real browsers.
+        let loggedIn = false;
 
         fetchMock.mockImplementation((input: RequestInfo) => {
             const url = typeof input === "string" ? input : input.url;
@@ -215,9 +219,17 @@ describe("Board AI integration (App + local engine)", () => {
             const path = u.pathname;
 
             if (path.endsWith("/auth/login")) {
+                loggedIn = true;
                 return mockJsonResponse(user);
             }
+            if (path.endsWith("/auth/logout")) {
+                loggedIn = false;
+                return mockJsonResponse(null, true, 204);
+            }
             if (path.endsWith("/users") && !path.includes("/members")) {
+                if (!loggedIn) {
+                    return mockJsonResponse({ error: "empty JWT" }, false, 401);
+                }
                 return mockJsonResponse(user);
             }
             if (path.endsWith("/users/members")) {

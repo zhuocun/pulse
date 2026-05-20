@@ -64,7 +64,6 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
 
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     ...member(),
-    jwt: "token",
     likedProjects: [],
     ...overrides
 });
@@ -89,7 +88,6 @@ const members = [
 
 const likeProject = jest.fn();
 const removeProject = jest.fn();
-const refreshUser = jest.fn();
 const startEditing = jest.fn();
 
 const installAntdBrowserMocks = () => {
@@ -129,8 +127,7 @@ const renderList = ({
     window.history.pushState({}, "Projects", "/projects");
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser,
-        token: "token",
+        isAuthenticated: true,
         user: currentUser
     });
     mockedUseProjectModal.mockReturnValue({
@@ -184,7 +181,12 @@ describe("ProjectList", () => {
         expect(screen.getByText("Design System")).toBeInTheDocument();
         expect(screen.getByText(/no manager/i)).toBeInTheDocument();
         expect(screen.getAllByText(/no date/i).length).toBeGreaterThan(0);
-        await waitFor(() => expect(refreshUser).toHaveBeenCalledTimes(1));
+        // The pre-cookie design called ``refreshUser`` from this
+        // component on mount to reconcile the cached user with the
+        // stored bearer. Cookie auth makes that handshake the
+        // responsibility of ``AuthProvider`` -- a single ``GET
+        // /users`` probe at app boot -- so nothing on this surface
+        // should re-fetch when the project list mounts.
     });
 
     it("shows the empty state when there are no projects", () => {

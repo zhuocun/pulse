@@ -1,11 +1,17 @@
-import { readAiProxyToken, readAuthToken } from "./tokenStorage";
+import { readAiProxyToken } from "./tokenStorage";
 
-/** Bearer for AI/agent routes: narrow proxy token when present, else REST JWT. */
+/**
+ * Bearer for AI / agent routes.
+ *
+ * The REST JWT now lives in an HttpOnly ``Token`` cookie that JS
+ * cannot read, so it can no longer serve as a fallback here. AI
+ * routes need an explicit bearer because they often live on a
+ * different origin from the cookie's host (configurable via
+ * ``REACT_APP_AI_BASE_URL``); when the call resolves to the same
+ * origin via the Vercel rewrite the cookie also rides along, and
+ * the backend accepts whichever transport arrives.
+ */
 export const getStoredBearerAuthHeader = (): string => {
     const narrow = readAiProxyToken();
-    if (narrow) {
-        return `Bearer ${narrow}`;
-    }
-    const token = readAuthToken();
-    return token ? `Bearer ${token}` : "";
+    return narrow ? `Bearer ${narrow}` : "";
 };

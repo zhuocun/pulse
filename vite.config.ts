@@ -36,6 +36,26 @@ export default defineConfig(({ mode }) => {
             "process.env.VITE_ERROR_REPORT_ENDPOINT":
                 JSON.stringify(errorReportEndpoint)
         },
+        server: {
+            // Mirror Vercel's `/api/*` rewrite (see `vercel.json`) in
+            // dev so the frontend and backend appear at one origin in
+            // both environments. Without this the dev FE would hit
+            // ``http://localhost:8000`` directly, cookies issued by
+            // ``/auth/login`` would be third-party from the browser's
+            // perspective, and iOS 26.5's ITP would silently drop
+            // them -- defeating the whole point of the cookie move.
+            proxy: {
+                "/api": {
+                    target: apiUrl,
+                    changeOrigin: true,
+                    // ``Set-Cookie`` rewrite: backend issues the
+                    // cookie without a ``Domain`` so the browser
+                    // scopes it to the proxy origin (localhost) --
+                    // exactly what we want, no transformation needed.
+                    secure: false
+                }
+            }
+        },
         plugins: [react(), svgr()]
     };
 });

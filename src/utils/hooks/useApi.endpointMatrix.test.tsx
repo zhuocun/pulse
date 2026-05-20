@@ -13,8 +13,10 @@ const jsonResponse = (body: unknown, ok = true, status = ok ? 200 : 500) =>
         json: jest.fn().mockResolvedValue(body)
     } as unknown as Response);
 
-const baseHeaders = (token?: string | null) => ({
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+const baseHeaders = () => ({
+    // Cookie-based REST auth -- the browser attaches the HttpOnly
+    // ``Token`` cookie on every same-origin call, so no Authorization
+    // header is constructed by the FE.
     "Content-Type": "application/json"
 });
 
@@ -110,13 +112,14 @@ describe("FE API endpoint matrix — projects", () => {
             organization: "Acme",
             managerId: "u1"
         };
-        await api("projects", { method: "POST", data: payload, token: "tk" });
+        await api("projects", { method: "POST", data: payload });
 
         expect(lastFetchUrl()).toBe(`${environment.apiBaseUrl}/projects`);
         expect(lastFetchInit()).toEqual({
             body: JSON.stringify(payload),
-            headers: baseHeaders("tk"),
-            method: "POST"
+            headers: baseHeaders(),
+            method: "POST",
+            credentials: "include"
         });
     });
 
@@ -225,11 +228,11 @@ describe("FE API endpoint matrix — tasks", () => {
             storyPoints: 1,
             note: "No note yet"
         };
-        await api("tasks", { method: "POST", data: payload, token: "tk" });
+        await api("tasks", { method: "POST", data: payload });
 
         expect(lastFetchInit().method).toBe("POST");
         expect(JSON.parse(lastFetchInit().body as string)).toEqual(payload);
-        expect(lastFetchInit().headers).toEqual(baseHeaders("tk"));
+        expect(lastFetchInit().headers).toEqual(baseHeaders());
     });
 
     it("PUT /tasks updates a task in place", async () => {
@@ -303,10 +306,13 @@ describe("FE API endpoint matrix — tasks", () => {
 describe("FE API endpoint matrix — users", () => {
     it("GET /users fetches the authenticated viewer record", async () => {
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
-        await api("users", { method: "GET", token: "tk" });
+        await api("users", { method: "GET" });
 
         expect(lastFetchUrl()).toBe(`${environment.apiBaseUrl}/users`);
-        expect(lastFetchInit().headers).toEqual({ Authorization: "Bearer tk" });
+        // No Authorization header is constructed by the FE -- the
+        // browser carries the HttpOnly ``Token`` cookie automatically.
+        expect(lastFetchInit().headers).toEqual({});
+        expect(lastFetchInit().credentials).toBe("include");
     });
 
     it("GET /users/members returns the org member directory", async () => {
@@ -321,15 +327,14 @@ describe("FE API endpoint matrix — users", () => {
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
         await api("users/likes", {
             method: "PUT",
-            data: { projectId: "p1" },
-            token: "tk"
+            data: { projectId: "p1" }
         });
 
         expect(lastFetchUrl()).toBe(`${environment.apiBaseUrl}/users/likes`);
         expect(JSON.parse(lastFetchInit().body as string)).toEqual({
             projectId: "p1"
         });
-        expect(lastFetchInit().headers).toEqual(baseHeaders("tk"));
+        expect(lastFetchInit().headers).toEqual(baseHeaders());
     });
 });
 
@@ -352,8 +357,7 @@ describe("FE API endpoint matrix — agent mutations", () => {
         };
         await api("agents/mutations/record", {
             method: "POST",
-            data: payload,
-            token: "tk"
+            data: payload
         });
 
         expect(lastFetchUrl()).toBe(
@@ -463,27 +467,25 @@ describe("FE API endpoint matrix — payload edge cases", () => {
         expect(headers["Content-Type"]).toBeUndefined();
     });
 
-    it("attaches both Authorization and Content-Type when token + data are supplied", async () => {
+    it("attaches Content-Type when data is supplied; no Authorization header is ever constructed", async () => {
         fetchMock().mockResolvedValue(jsonResponse({ ok: true }));
         await api("tasks", {
             method: "POST",
-            data: { taskName: "x" },
-            token: "tk"
+            data: { taskName: "x" }
         });
 
         expect(lastFetchInit().headers).toEqual({
-            Authorization: "Bearer tk",
             "Content-Type": "application/json"
         });
+        expect(lastFetchInit().credentials).toBe("include");
     });
 
-    it("attaches only Authorization (no Content-Type) when token is present but no data", async () => {
+    it("sends no headers at all when a GET has no body and cookie auth carries identity", async () => {
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
-        await api("users", { method: "GET", token: "tk" });
+        await api("users", { method: "GET" });
 
-        expect(lastFetchInit().headers).toEqual({
-            Authorization: "Bearer tk"
-        });
+        expect(lastFetchInit().headers).toEqual({});
+        expect(lastFetchInit().credentials).toBe("include");
     });
 });
 

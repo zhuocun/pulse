@@ -10,17 +10,11 @@ import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
-import nativeNavigate from "../../utils/nativeNavigate";
-import { isMacLike } from "../../utils/platform";
 import * as tokenStorage from "../../utils/tokenStorage";
 
 import LoginForm from ".";
 
 jest.mock("../../utils/hooks/useReactMutation");
-jest.mock("../../utils/nativeNavigate");
-jest.mock("../../utils/platform", () => ({
-    isMacLike: jest.fn(() => false)
-}));
 
 const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
     typeof useReactMutation
@@ -47,9 +41,9 @@ const installAntdBrowserMocks = () => {
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
+    ai_jwt: "ai-1",
     ...overrides
 });
 
@@ -96,12 +90,9 @@ describe("LoginForm", () => {
     });
 
     beforeEach(() => {
-        localStorage.clear();
         sessionStorage.clear();
-        tokenStorage.resetLoginHardNavPendingForTests();
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue(user());
-        (isMacLike as jest.Mock).mockReturnValue(false);
     });
 
     it("wires the login mutation with cache and error handling", () => {
@@ -195,8 +186,14 @@ describe("LoginForm", () => {
         expect(onError).toHaveBeenCalledWith(null);
     });
 
-    it("submits credentials, stores the jwt, and navigates to projects", async () => {
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+    it("submits credentials, stores the AI proxy token, and SPA-navigates to projects", async () => {
+        // The REST JWT itself rides an HttpOnly cookie the backend set
+        // on the login response -- ``credentials: "include"`` on every
+        // subsequent same-origin fetch picks it up automatically, and
+        // JS never sees it. ``setCache: true`` on the mutation hook
+        // mirrors the response body into the ``["users"]`` query cache
+        // so ``useAuth.isAuthenticated`` flips to true synchronously.
+        mutateAsync.mockResolvedValue(user({ ai_jwt: "ai-token" }));
         renderLoginForm();
 
         await changeField(/^email$/i, "alice@example.com");
@@ -212,13 +209,14 @@ describe("LoginForm", () => {
         await waitFor(() => {
             expect(window.location.pathname).toBe("/projects");
         });
-        expect(tokenStorage.readAuthToken()).toBe("jwt-login");
-        expect(nativeNavigate).not.toHaveBeenCalled();
+        expect(tokenStorage.readAiProxyToken()).toBe("ai-token");
     });
 
-    it("uses a full document navigation on iOS after login", async () => {
-        (isMacLike as jest.Mock).mockReturnValue(true);
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+    it("does not crash when the login response omits the AI proxy token", async () => {
+        // Login may legitimately come back without ``ai_jwt`` (AI
+        // disabled, restricted account). The route guard's source of
+        // truth is the cached user, not this optional field.
+        mutateAsync.mockResolvedValue(user({ ai_jwt: undefined }));
         renderLoginForm();
 
         await changeField(/^email$/i, "alice@example.com");
@@ -226,103 +224,9 @@ describe("LoginForm", () => {
         await submitLogin();
 
         await waitFor(() => {
-            expect(nativeNavigate).toHaveBeenCalledWith("/projects");
+            expect(window.location.pathname).toBe("/projects");
         });
-        expect(localStorage.getItem("Token")).toBe("jwt-login");
-        expect(tokenStorage.readAuthToken()).toBeNull();
-    });
-
-    it("suppresses the in-tab auth notification on the iOS hard-nav path", async () => {
-        // Regression for the iPhone iOS 26.5 stuck-on-login bug: if
-        // `notifyAuthTokenChanged()` fires, `useSyncExternalStore` in
-        // `useAuth` schedules a re-render that commits
-        // `<Navigate to="/projects" replace />` and runs
-        // `history.replaceState("/projects")` before the browser has a
-        // chance to process the queued `window.location.assign("/projects")`.
-        // WebKit then treats the queued document load as a same-URL
-        // no-op and the user stays on the still-mounted login form.
-        (isMacLike as jest.Mock).mockReturnValue(true);
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
-        const listener = jest.fn();
-        const unsub = tokenStorage.subscribeAuthToken(listener);
-
-        try {
-            renderLoginForm();
-            await changeField(/^email$/i, "alice@example.com");
-            await changeField(/^password$/i, "secret");
-            await submitLogin();
-
-            await waitFor(() => {
-                expect(nativeNavigate).toHaveBeenCalledWith("/projects");
-            });
-            expect(listener).not.toHaveBeenCalled();
-            // The token still has to land in storage so the freshly
-            // mounted tree on the next page can read it.
-            expect(localStorage.getItem("Token")).toBe("jwt-login");
-            expect(tokenStorage.readAuthToken()).toBeNull();
-        } finally {
-            unsub();
-        }
-    });
-
-    it("still notifies in-tab subscribers on the non-iOS SPA-nav path", async () => {
-        // Mirror of the iOS-only suppression. On platforms where SPA
-        // nav is reliable, the notify is what wakes `useAuth` so the
-        // React tree re-renders without a full document reload.
-        (isMacLike as jest.Mock).mockReturnValue(false);
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
-        const listener = jest.fn();
-        const unsub = tokenStorage.subscribeAuthToken(listener);
-
-        try {
-            renderLoginForm();
-            await changeField(/^email$/i, "alice@example.com");
-            await changeField(/^password$/i, "secret");
-            await submitLogin();
-
-            await waitFor(() => {
-                expect(window.location.pathname).toBe("/projects");
-            });
-            expect(listener).toHaveBeenCalled();
-        } finally {
-            unsub();
-        }
-    });
-
-    it("still uses a full document navigation on iOS when the cookie mirror is unavailable", async () => {
-        // The sessionStorage handoff carries the token across the reload
-        // even when WebKit ITP dropped the cookie, so iOS should still
-        // prefer the full-document navigation that React Router's
-        // pushState bug can't break.
-        (isMacLike as jest.Mock).mockReturnValue(true);
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
-        const tokenWriteSpy = jest
-            .spyOn(tokenStorage, "writeAuthTokenWithStatus")
-            .mockImplementation((token) => {
-                localStorage.setItem("Token", token);
-                sessionStorage.setItem("TokenSession", token);
-                return {
-                    persisted: true,
-                    storage: true,
-                    cookie: false,
-                    session: true
-                };
-            });
-        try {
-            renderLoginForm();
-
-            await changeField(/^email$/i, "alice@example.com");
-            await changeField(/^password$/i, "secret");
-            await submitLogin();
-
-            await waitFor(() => {
-                expect(nativeNavigate).toHaveBeenCalledWith("/projects");
-            });
-            expect(sessionStorage.getItem("TokenSession")).toBe("jwt-login");
-            expect(tokenStorage.readAuthToken()).toBeNull();
-        } finally {
-            tokenWriteSpy.mockRestore();
-        }
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
     it("sets autoComplete=username on the email field for password managers", () => {
@@ -331,57 +235,8 @@ describe("LoginForm", () => {
         expect(email).toHaveAttribute("autocomplete", "username");
     });
 
-    it("stays on login with an error toast when JWT persistence fails", async () => {
-        const spy = jest
-            .spyOn(tokenStorage, "writeAuthTokenWithStatus")
-            .mockReturnValue({
-                persisted: false,
-                storage: false,
-                cookie: false,
-                session: false
-            });
-        const errSpy = jest
-            .spyOn(message, "error")
-            .mockImplementation(() => "" as never);
-        renderLoginForm();
-
-        await changeField(/^email$/i, "alice@example.com");
-        await changeField(/^password$/i, "secret");
-        await submitLogin();
-
-        await waitFor(() => expect(errSpy).toHaveBeenCalledTimes(1));
-        expect(errSpy.mock.calls[0][0]).toMatch(
-            /private browsing|allow site data/i
-        );
-        expect(window.location.pathname).toBe("/login");
-        expect(tokenStorage.readAuthToken()).toBeNull();
-
-        spy.mockRestore();
-        errSpy.mockRestore();
-    });
-
-    it("skips the welcome-back toast on the iOS hard-nav path", async () => {
-        (isMacLike as jest.Mock).mockReturnValue(true);
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
-        const successSpy = jest
-            .spyOn(message, "success")
-            .mockImplementation(() => "" as never);
-        renderLoginForm();
-
-        await changeField(/^email$/i, "alice@example.com");
-        await changeField(/^password$/i, "secret");
-        await submitLogin();
-
-        await waitFor(() => {
-            expect(nativeNavigate).toHaveBeenCalledWith("/projects");
-        });
-        expect(successSpy).not.toHaveBeenCalled();
-
-        successSpy.mockRestore();
-    });
-
     it("shows a welcome-back toast on successful login", async () => {
-        mutateAsync.mockResolvedValue(user({ jwt: "jwt-login" }));
+        mutateAsync.mockResolvedValue(user());
         const successSpy = jest
             .spyOn(message, "success")
             .mockImplementation(() => "" as never);
@@ -412,7 +267,7 @@ describe("LoginForm", () => {
             });
         });
         expect(window.location.pathname).toBe("/login");
-        expect(tokenStorage.readAuthToken()).toBeNull();
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
     it("shows the submitting state from the mutation", () => {

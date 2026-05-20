@@ -34,7 +34,15 @@ def register_and_login(client: TestClient) -> Dict[str, Any]:
     body = response.json()
     assert body["email"] == "alice@example.com"
     assert body["likedProjects"] == []
-    assert body["jwt"]
+    # The REST JWT now rides an HttpOnly cookie instead of the response
+    # body. Tests that explicitly send ``Authorization: Bearer`` pull
+    # the cookie value out here so the existing ``auth_headers(...)``
+    # call sites keep compiling -- the alternative is letting the
+    # ``TestClient`` cookie jar do it automatically, which most of this
+    # file does not opt into because it builds requests by hand.
+    cookie_token = client.cookies.get("Token")
+    assert cookie_token, "POST /auth/login must set the Token cookie"
+    body["jwt"] = cookie_token
     return body
 
 
@@ -58,7 +66,11 @@ def register_and_login_user(
         json={"email": email, "password": "secret"},
     )
     assert response.status_code == 200
-    return response.json()
+    body = response.json()
+    cookie_token = client.cookies.get("Token")
+    assert cookie_token, "POST /auth/login must set the Token cookie"
+    body["jwt"] = cookie_token
+    return body
 
 
 def create_project_board_and_task(
@@ -398,6 +410,61 @@ def test_auth_and_validation_errors(client: TestClient) -> None:
     )
 
 
+def test_login_sets_session_cookie_and_omits_rest_jwt_from_body(
+    client: TestClient,
+) -> None:
+    """The REST JWT must ride an HttpOnly cookie, not the JSON body.
+
+    Pins the iOS 26.5 fix: the FE no longer has to hand the JWT
+    across a WebKit document teardown via JS-managed storage.
+    Body still carries the narrow-scope ``ai_jwt`` because the AI
+    proxy stays bearer-authed and lives on a (potentially) different
+    origin from the REST API.
+    """
+
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "cookie",
+            "email": "cookie@example.com",
+            "password": "secret",
+        },
+    )
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "cookie@example.com", "password": "secret"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "rest_jwt" not in body and "jwt" not in body
+    assert body["ai_jwt"]
+    cookie_token = client.cookies.get("Token")
+    assert cookie_token
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+    assert "path=/" in set_cookie
+
+    # The cookie alone authorises subsequent requests; httpx forwards
+    # it automatically and the FE will do the same via the Vercel
+    # rewrite + ``credentials: "include"``.
+    me = client.get("/api/v1/users/")
+    assert me.status_code == 200
+    assert me.json()["email"] == "cookie@example.com"
+
+
+def test_logout_clears_the_session_cookie(client: TestClient) -> None:
+    register_and_login(client)
+    assert client.cookies.get("Token")
+
+    response = client.post("/api/v1/auth/logout")
+    assert response.status_code == 204
+    # The browser side: ``Set-Cookie`` with Max-Age=0 removes the
+    # cookie. httpx mirrors that and the next ``users.get`` 401s.
+    assert not client.cookies.get("Token")
+    assert client.get("/api/v1/users/").status_code == 401
+
+
 def test_login_handles_unserializable_user_info(
     client: TestClient,
     monkeypatch,
@@ -545,6 +612,11 @@ def test_project_board_task_error_paths(client: TestClient) -> None:
         client.delete("/api/v1/tasks/?taskId=bad-id", headers=headers).status_code
         == 400
     )
+    # The login earlier in this test put a session cookie in the
+    # TestClient jar that httpx now sends automatically. Clear it so
+    # this assertion exercises the unauthenticated path it was
+    # written for.
+    client.cookies.clear()
     assert (
         client.put("/api/v1/tasks/orders", json={"fromId": "bad-id"}).status_code == 401
     )

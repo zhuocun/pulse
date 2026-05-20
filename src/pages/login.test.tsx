@@ -43,7 +43,6 @@ const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     _id: "u1",
     email: "alice@example.com",
-    jwt: "jwt-1",
     likedProjects: [],
     username: "Alice",
     ...overrides
@@ -51,15 +50,14 @@ const user = (overrides: Partial<IUser> = {}): IUser => ({
 
 const renderLoginPage = ({
     currentUser,
-    token = null
+    isAuthenticated = false
 }: {
     currentUser?: IUser;
-    token?: string | null;
+    isAuthenticated?: boolean;
 } = {}) => {
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
-        refreshUser: jest.fn(),
-        token,
+        isAuthenticated,
         user: currentUser
     });
 
@@ -109,8 +107,8 @@ describe("LoginPage", () => {
 
     it("redirects an already authenticated user to projects", async () => {
         renderLoginPage({
-            currentUser: user(),
-            token: "jwt-1"
+            isAuthenticated: true,
+            currentUser: user()
         });
 
         await waitFor(() => {

@@ -193,7 +193,7 @@ def test_repeated_failed_logins_do_not_lock_out_the_correct_password(
         json={"email": "alice@example.com", "password": "secret"},
     )
     assert response.status_code == HTTPStatus.OK
-    assert response.json()["jwt"]
+    assert client.cookies.get("Token")
 
 
 def test_repeated_logins_issue_independent_usable_tokens(client: TestClient) -> None:
@@ -212,7 +212,9 @@ def test_repeated_logins_issue_independent_usable_tokens(client: TestClient) -> 
             json={"email": "alice@example.com", "password": "secret"},
         )
         assert response.status_code == HTTPStatus.OK
-        tokens.append(response.json()["jwt"])
+        token = client.cookies.get("Token")
+        assert token, "login response must set the session cookie"
+        tokens.append(token)
     assert len(set(tokens)) >= 1  # tokens may differ across calls (exp varies)
     for token in tokens:
         response = client.get("/api/v1/users/", headers=auth_headers(token))
@@ -265,7 +267,7 @@ def test_register_validation_matrix_returns_400_for_every_case(
     )
     assert response.status_code == HTTPStatus.OK
     response = client.get(
-        "/api/v1/users/members", headers=auth_headers(response.json()["jwt"])
+        "/api/v1/users/members", headers=auth_headers(client.cookies["Token"])
     )
     assert response.status_code == HTTPStatus.OK
     assert [member["email"] for member in response.json()] == ["first@example.com"]
@@ -1533,7 +1535,7 @@ def test_register_followed_by_immediate_login_is_consistent_across_n_users(
         assert body["email"] == f"sequential{index}@example.com"
         # GET /users/ with the freshly-minted token must round-trip.
         response = client.get(
-            "/api/v1/users/", headers=auth_headers(body["jwt"])
+            "/api/v1/users/", headers=auth_headers(client.cookies["Token"])
         )
         assert response.status_code == HTTPStatus.OK
         assert response.json()["_id"] == body["_id"]
@@ -1912,14 +1914,13 @@ def test_repeated_options_does_not_change_state(client: TestClient) -> None:
     """
 
     register_and_login(client)
+    client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "secret"},
+    )
     base_members = client.get(
         "/api/v1/users/members",
-        headers=auth_headers(
-            client.post(
-                "/api/v1/auth/login",
-                json={"email": "alice@example.com", "password": "secret"},
-            ).json()["jwt"]
-        ),
+        headers=auth_headers(client.cookies["Token"]),
     ).json()
 
     for _ in range(20):
@@ -1936,7 +1937,8 @@ def test_repeated_options_does_not_change_state(client: TestClient) -> None:
         "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "secret"},
     )
+    assert response.status_code == HTTPStatus.OK
     new_members = client.get(
-        "/api/v1/users/members", headers=auth_headers(response.json()["jwt"])
+        "/api/v1/users/members", headers=auth_headers(client.cookies["Token"])
     ).json()
     assert new_members == base_members

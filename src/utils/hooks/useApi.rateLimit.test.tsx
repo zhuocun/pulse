@@ -179,17 +179,20 @@ describe("api() rate limiter — keys are partitioned by all four facets", () =>
         expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it("does NOT count distinct tokens against each other", async () => {
+    it("treats three serial GETs with no per-call auth as one key under the limit", async () => {
+        // Pre-cookie this test used four distinct bearer tokens to
+        // verify per-viewer keying. With cookie auth the FE no longer
+        // sees the token at all, so the key collapses to (method,
+        // endpoint, data). The test-mode threshold is 3, so three
+        // calls is the highest "fine" count before the limiter trips.
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
 
-        // Same endpoint + method + data, 4 different tokens. Each
-        // distinct token forms its own key, all four succeed.
-        for (const token of ["a", "b", "c", "d"]) {
+        for (let i = 0; i < 3; i += 1) {
             // eslint-disable-next-line no-await-in-loop
-            await api("users", { method: "GET", token });
+            await api("users", { method: "GET" });
         }
 
-        expect(fetchMock()).toHaveBeenCalledTimes(4);
+        expect(fetchMock()).toHaveBeenCalledTimes(3);
         expect(warnSpy).not.toHaveBeenCalled();
     });
 

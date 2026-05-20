@@ -65,8 +65,7 @@ describe("useAiChat", () => {
         localStorage.removeItem("boardCopilot:disabledProjectIds");
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
         mockApi.mockImplementation(async (endpoint: string) => {

@@ -18,7 +18,6 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
 const user = (overrides: Partial<IUser> = {}): IUser => ({
     ...member(),
     likedProjects: [],
-    jwt: "token",
     ...overrides
 });
 
@@ -123,8 +122,7 @@ describe("TaskSearchPanel", () => {
     beforeEach(() => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "token",
+            isAuthenticated: true,
             user: user()
         });
     });
@@ -224,8 +222,7 @@ describe("TaskSearchPanel", () => {
     it("falls back to the current user and default task types", async () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "token",
+            isAuthenticated: true,
             user: user({
                 _id: "current-user",
                 email: "current@example.com",
@@ -256,8 +253,7 @@ describe("TaskSearchPanel", () => {
     it("does not add a coordinator fallback when there is no current user", async () => {
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
+            isAuthenticated: false,
             user: undefined
         });
 

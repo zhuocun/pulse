@@ -1,7 +1,7 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Button, message, Modal, Select } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
@@ -154,7 +154,7 @@ const ProjectList: React.FC<Props> = ({
     error,
     loading
 }) => {
-    const { user, refreshUser } = useAuth();
+    const { user } = useAuth();
     const [pendingLikeId, setPendingLikeId] = useState("");
     const [sortOrder, setSortOrder] = useState<SortOrder>("name-asc");
     const showSkeleton = Boolean(loading) && !error;
@@ -174,10 +174,6 @@ const ProjectList: React.FC<Props> = ({
         () => {}
     );
     const { startEditing, openModal } = useProjectModal();
-
-    useEffect(() => {
-        refreshUser();
-    }, [refreshUser]);
 
     const sortedProjects = useMemo(
         () => sortProjects(dataSource ?? [], sortOrder),

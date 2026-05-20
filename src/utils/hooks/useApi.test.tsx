@@ -1,13 +1,9 @@
 import { renderHook } from "@testing-library/react";
 
 import * as useApiModule from "./useApi";
-import useAuth from "./useAuth";
-
-jest.mock("./useAuth");
 
 const { api } = useApiModule;
 const useApi = useApiModule.default;
-const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const originalFetch = global.fetch;
 
 const fetchMock = () => global.fetch as jest.MockedFunction<typeof fetch>;
@@ -18,20 +14,6 @@ const jsonResponse = (body: unknown, ok = true, status = ok ? 200 : 500) =>
         status,
         json: jest.fn().mockResolvedValue(body)
     } as unknown as Response);
-
-const member = (overrides: Partial<IMember> = {}): IMember => ({
-    _id: "u1",
-    email: "alice@example.com",
-    username: "Alice",
-    ...overrides
-});
-
-const user = (overrides: Partial<IUser> = {}): IUser => ({
-    ...member(),
-    jwt: "user-jwt",
-    likedProjects: [],
-    ...overrides
-});
 
 describe("api", () => {
     beforeAll(() => {
@@ -44,12 +26,6 @@ describe("api", () => {
 
     beforeEach(() => {
         fetchMock().mockReset();
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: null,
-            user: undefined
-        });
     });
 
     afterAll(() => {
@@ -60,14 +36,17 @@ describe("api", () => {
         });
     });
 
-    it("serializes GET params and sends a bearer token when one is supplied", async () => {
+    it("serializes GET params and rides the session cookie via credentials: include", async () => {
+        // Bearer auth is gone -- the REST JWT lives in an HttpOnly
+        // cookie set by ``POST /auth/login`` that the browser attaches
+        // automatically on every same-origin call. ``credentials:
+        // "include"`` is what tells fetch to participate.
         fetchMock().mockResolvedValue(jsonResponse([{ _id: "p1" }]));
 
         await expect(
             api("projects", {
                 data: { page: 0, projectName: "Roadmap" },
-                method: "GET",
-                token: "token-1"
+                method: "GET"
             })
         ).resolves.toEqual([{ _id: "p1" }]);
 
@@ -75,13 +54,11 @@ describe("api", () => {
             expect.stringContaining(
                 "/api/v1/projects?page=0&projectName=Roadmap"
             ),
-            {
-                headers: {
-                    Authorization: "Bearer token-1",
-                    "Content-Type": "application/json"
-                },
-                method: "GET"
-            }
+            expect.objectContaining({
+                headers: { "Content-Type": "application/json" },
+                method: "GET",
+                credentials: "include"
+            })
         );
     });
 
@@ -90,19 +67,16 @@ describe("api", () => {
 
         await api("projects", {
             data: { projectId: "p1" },
-            method: "DELETE",
-            token: "token-1"
+            method: "DELETE"
         });
 
         expect(fetchMock()).toHaveBeenCalledWith(
             expect.stringContaining("/api/v1/projects?projectId=p1"),
-            {
-                headers: {
-                    Authorization: "Bearer token-1",
-                    "Content-Type": "application/json"
-                },
-                method: "DELETE"
-            }
+            expect.objectContaining({
+                headers: { "Content-Type": "application/json" },
+                method: "DELETE",
+                credentials: "include"
+            })
         );
     });
 
@@ -116,13 +90,12 @@ describe("api", () => {
 
         expect(fetchMock()).toHaveBeenCalledWith(
             expect.stringContaining("/api/v1/projects"),
-            {
+            expect.objectContaining({
                 body: JSON.stringify({ projectName: "Roadmap" }),
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                method: "POST"
-            }
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+                credentials: "include"
+            })
         );
     });
 
@@ -212,49 +185,19 @@ describe("api", () => {
         await expect(api("projects")).rejects.toBe(otherError);
     });
 
-    it("uses the authenticated user's JWT before the localStorage token fallback", async () => {
+    it("never attaches an Authorization header -- the HttpOnly cookie is the auth", async () => {
         fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "stored-token",
-            user: user({ jwt: "fresh-user-jwt" })
-        });
 
         const { result } = renderHook(() => useApi());
 
         await result.current("users", { method: "GET" });
 
-        expect(fetchMock()).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({
-                headers: expect.objectContaining({
-                    Authorization: "Bearer fresh-user-jwt"
-                })
-            })
-        );
-    });
-
-    it("uses the stored token when no user is cached", async () => {
-        fetchMock().mockResolvedValue(jsonResponse({ _id: "u1" }));
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            refreshUser: jest.fn(),
-            token: "stored-token",
-            user: undefined
-        });
-
-        const { result } = renderHook(() => useApi());
-
-        await result.current("users", { method: "GET" });
-
-        expect(fetchMock()).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({
-                headers: expect.objectContaining({
-                    Authorization: "Bearer stored-token"
-                })
-            })
-        );
+        const config = fetchMock().mock.calls[0]?.[1] as
+            | (RequestInit & {
+                  headers?: Record<string, string>;
+              })
+            | undefined;
+        expect(config?.headers?.Authorization).toBeUndefined();
+        expect(config?.credentials).toBe("include");
     });
 });
