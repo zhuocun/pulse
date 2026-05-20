@@ -42,6 +42,31 @@ describe("tokenStorage", () => {
         expect(listener).not.toHaveBeenCalled();
     });
 
+    it("skips the in-tab notification when called with silent: true", () => {
+        // The login form opts in to silent: true on iOS so the
+        // post-login full-document `window.location.assign("/projects")`
+        // is not racing a React re-render that would commit
+        // `<Navigate to="/projects" replace />` and `replaceState`
+        // before the browser fires the queued document load — see the
+        // long comment in `loginForm/index.tsx`. The token itself MUST
+        // still be persisted so the freshly mounted tree on the next
+        // page can read it.
+        const listener = jest.fn();
+        const unsub = subscribeAuthToken(listener);
+
+        try {
+            const status = writeAuthTokenWithStatus("jwt-silent", {
+                silent: true
+            });
+            expect(status.persisted).toBe(true);
+            expect(listener).not.toHaveBeenCalled();
+            // Token still readable for the post-reload boot.
+            expect(readAuthToken()).toBe("jwt-silent");
+        } finally {
+            unsub();
+        }
+    });
+
     it("reads, writes, and clears the auth token", () => {
         expect(readAuthToken()).toBeNull();
         expect(writeAuthToken("jwt-1")).toBe(true);
