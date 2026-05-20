@@ -166,14 +166,15 @@ const performFetch = async (
     const config: RequestInit = {
         method: "GET",
         headers,
-        // Same-origin in prod (Vercel rewrite) and dev (Vite proxy) so
-        // the browser auto-attaches the HttpOnly ``Token`` session
-        // cookie issued by ``POST /auth/login``. ``"include"`` is
-        // belt-and-braces: explicit at the call site, and a no-op for
-        // the same-origin path that the fetch default would have
-        // covered anyway. Kept explicit so a future tweak that points
-        // `apiBaseUrl` at an absolute URL (in a fork, a Storybook,
-        // a preview-of-a-preview) does not silently drop the cookie.
+        // Same-origin in prod (Vercel ``api/[...path].ts`` proxy
+        // function) and dev (Vite proxy) so the browser auto-attaches
+        // the HttpOnly ``Token`` session cookie issued by
+        // ``POST /auth/login``. ``"include"`` is belt-and-braces:
+        // explicit at the call site, and a no-op for the same-origin
+        // path that the fetch default would have covered anyway. Kept
+        // explicit so a future tweak that points `apiBaseUrl` at an
+        // absolute URL (in a fork, a Storybook, a preview-of-a-preview)
+        // does not silently drop the cookie.
         credentials: "include",
         ...customConfig
     };

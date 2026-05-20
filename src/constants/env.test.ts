@@ -15,11 +15,12 @@ describe("environment", () => {
 
     it("uses a same-origin REST prefix regardless of REACT_APP_API_URL", () => {
         // REST calls go through ``/api/v1/*`` on the FE's own origin
-        // (Vercel rewrite in prod, Vite proxy in dev). ``REACT_APP_API_URL``
-        // still drives ``aiBaseUrl`` for direct-to-backend AI calls,
-        // but the REST base is no longer derived from it -- that's
-        // what makes the HttpOnly session cookie same-origin and
-        // immune to iOS 26.5's ITP-driven cross-origin cookie drop.
+        // (``api/[...path].ts`` Vercel proxy function in prod, Vite
+        // proxy in dev). ``REACT_APP_API_URL`` still drives
+        // ``aiBaseUrl`` for direct-to-backend AI calls, but the REST
+        // base is no longer derived from it -- that's what makes the
+        // HttpOnly session cookie same-origin and immune to iOS 26.5's
+        // ITP-driven cross-origin cookie drop.
         process.env.REACT_APP_API_URL = "https://jira-api.example";
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
