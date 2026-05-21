@@ -71,11 +71,40 @@ export const RESPONSE_HOP_HEADERS = new Set([
     "content-length"
 ]);
 
-const readRequestBody = async (
+export const readRequestBody = async (
     req: IncomingMessage
 ): Promise<Uint8Array | undefined> => {
     const method = (req.method ?? "GET").toUpperCase();
     if (method === "GET" || method === "HEAD") return undefined;
+
+    // Vercel's Node runtime auto-parses JSON / form bodies on
+    // ingress and exposes the result as ``req.body`` -- the
+    // underlying stream is already drained by the time the handler
+    // runs, so reading it would silently give us nothing and the
+    // BE would see a body-less POST (400 validation errors that
+    // the FE surfaces as the generic "Operation failed"). Prefer
+    // ``req.body`` when present and re-serialize it back to bytes
+    // so the BE deserializes the exact same shape; fall back to
+    // streaming for cases where the runtime did not pre-parse
+    // (raw binary uploads, future content types we add).
+    const parsedBody = (req as IncomingMessage & { body?: unknown }).body;
+    if (parsedBody !== undefined && parsedBody !== null) {
+        if (typeof parsedBody === "string") {
+            return new Uint8Array(Buffer.from(parsedBody));
+        }
+        if (Buffer.isBuffer(parsedBody)) {
+            return new Uint8Array(parsedBody);
+        }
+        if (parsedBody instanceof Uint8Array) {
+            return parsedBody;
+        }
+        // Parsed JSON object / array -- re-encode. JSON.stringify on
+        // a parsed structure preserves semantics even if not byte-
+        // identical to what the client sent (key order, whitespace),
+        // which the BE doesn't care about.
+        return new Uint8Array(Buffer.from(JSON.stringify(parsedBody), "utf-8"));
+    }
+
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
         chunks.push(
