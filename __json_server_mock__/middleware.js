@@ -23,7 +23,10 @@ const parseCookies = (header) => {
 
 const sessionTokenFromRequest = (req) => {
     const authorization = req.headers.authorization;
-    if (typeof authorization === "string" && authorization.startsWith("Bearer ")) {
+    if (
+        typeof authorization === "string" &&
+        authorization.startsWith("Bearer ")
+    ) {
         const bearer = authorization.slice(7).trim();
         if (bearer) {
             return bearer;

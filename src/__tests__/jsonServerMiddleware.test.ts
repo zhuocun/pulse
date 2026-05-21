@@ -209,7 +209,9 @@ describe("json-server middleware", () => {
     });
 
     it("parses cookie headers for session lookup helpers", () => {
-        expect(parseCookies(`${SESSION_COOKIE}=alice%40example.com; other=1`)).toEqual({
+        expect(
+            parseCookies(`${SESSION_COOKIE}=alice%40example.com; other=1`)
+        ).toEqual({
             [SESSION_COOKIE]: "alice@example.com",
             other: "1"
         });
