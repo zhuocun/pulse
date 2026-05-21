@@ -291,6 +291,69 @@ describe("Header", () => {
         expect(setPreference).toHaveBeenCalledWith("dark");
     });
 
+    // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
+    // least 24×24 CSS px, with AAA at 44×44. The header's account `PillTrigger`
+    // is the dominant always-on chrome control on every authenticated route;
+    // the styled component declares a coarse-pointer `height: 44px` so a thumb
+    // can land it. Walk the rendered stylesheet (same approach as
+    // `src/layouts/authLayout.test.tsx` for `AuthButton`) and assert the 44 px
+    // declaration is still emitted — a future style refactor that drops it
+    // below 44 must fail CI.
+    it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
+        renderHeader();
+        const button = accountTrigger();
+        // styled-components hashes the rule into a class like `css-mcde2a`
+        // (without the `dev-only` / `var-root` cssinjs naming). Pick that
+        // out so the search below is anchored to the exact emitted rule.
+        const styledCls = button.className
+            .split(/\s+/)
+            .find(
+                (tok) =>
+                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
+                    !tok.startsWith("css-var-") &&
+                    !tok.startsWith("css-dev-only-")
+            );
+        expect(styledCls).toBeTruthy();
+
+        // Walk every stylesheet's rules (including nested rules inside
+        // `@media` blocks — `PillTrigger`'s 44 px rule lives behind
+        // `@media (pointer: coarse)`) and collect every `height: <N>px`
+        // declaration on a rule that mentions the styled class.
+        const heights: number[] = [];
+        const visit = (rule: CSSRule) => {
+            if (rule instanceof CSSStyleRule) {
+                if (!styledCls || !rule.selectorText.includes(styledCls))
+                    return;
+                const re = /(?<!-)height:\s*(\d+(?:\.\d+)?)px/gi;
+                let m: RegExpExecArray | null = re.exec(rule.cssText);
+                while (m !== null) {
+                    heights.push(parseFloat(m[1] ?? "0"));
+                    m = re.exec(rule.cssText);
+                }
+            } else if ("cssRules" in rule) {
+                for (const child of Array.from(
+                    (rule as CSSGroupingRule).cssRules
+                )) {
+                    visit(child);
+                }
+            }
+        };
+        Array.from(document.styleSheets).forEach((sheet) => {
+            let rules: CSSRuleList;
+            try {
+                rules = sheet.cssRules;
+            } catch {
+                return;
+            }
+            for (const rule of Array.from(rules)) visit(rule);
+        });
+
+        // The styled component's `@media (pointer: coarse) { height: 44px }`
+        // rule must be one of them. A regression to a smaller value or a
+        // removed rule fails loudly.
+        expect(heights).toContain(44);
+    });
+
     describe("AgentHealthBadge", () => {
         // Re-require the module after mutating the mock so we get the
         // new environment shape. Restore after each test.

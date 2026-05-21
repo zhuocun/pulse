@@ -72,8 +72,7 @@ class AgentMetadata:
         allowed_autonomy: Subset of ``("suggest", "plan", "auto")`` levels
             the agent supports (PRD §5A.5).
         tools: Names of FE / BE tools the agent talks to. Surfaced in the
-            metadata so the FE knows what permissions the agent needs and
-            so MCP wiring can publish a stable schema.
+            metadata so the FE knows what permissions the agent needs.
     """
 
     name: str

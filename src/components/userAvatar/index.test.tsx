@@ -35,6 +35,22 @@ describe("gradientFor", () => {
     it("is deterministic for a given id", () => {
         expect(gradientFor("project-7")).toBe(gradientFor("project-7"));
     });
+
+    it("returns a non-empty gradient for edge-case ids (empty, very long, emoji, CJK)", () => {
+        ["", "0".repeat(200), "🤖", "你好"].forEach((id) => {
+            const gradient = gradientFor(id);
+            expect(typeof gradient).toBe("string");
+            expect(gradient.length).toBeGreaterThan(0);
+        });
+    });
+});
+
+describe("initialsOf — edge cases", () => {
+    it("returns a non-empty string for emoji-only names", () => {
+        const result = initialsOf("🤖");
+        expect(typeof result).toBe("string");
+        expect(result.length).toBeGreaterThan(0);
+    });
 });
 
 describe("UserAvatar", () => {

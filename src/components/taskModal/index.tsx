@@ -11,7 +11,6 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import isEqual from "lodash/isEqual";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -25,6 +24,37 @@ import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import ErrorBox from "../errorBox";
+
+// Replaces lodash/isEqual for the modal's diff check. ITask is a flat
+// object (see src/interfaces/task.d.ts) — every field is a primitive, so
+// a shallow comparison is sufficient. Arrays are still handled
+// element-by-element in case the shape evolves to include one.
+function shallowEqual<T>(a: T, b: T): boolean {
+    if (a === b) return true;
+    if (
+        a === null ||
+        b === null ||
+        typeof a !== "object" ||
+        typeof b !== "object"
+    ) {
+        return false;
+    }
+    const ka = Object.keys(a as object);
+    const kb = Object.keys(b as object);
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) {
+        const va = (a as Record<string, unknown>)[k];
+        const vb = (b as Record<string, unknown>)[k];
+        if (Array.isArray(va) && Array.isArray(vb)) {
+            if (va.length !== vb.length) return false;
+            for (let i = 0; i < va.length; i++)
+                if (va[i] !== vb[i]) return false;
+        } else if (va !== vb) {
+            return false;
+        }
+    }
+    return true;
+}
 
 const TASK_TYPE_OPTIONS = [
     { label: microcopy.options.taskTypes.task, value: "Task" },
@@ -158,7 +188,7 @@ const TaskModal: React.FC<{
             ...fieldValues,
             taskName: trimmedName
         };
-        if (isEqual(merged, editingTask)) {
+        if (shallowEqual(merged, editingTask)) {
             closeModal();
             return;
         }

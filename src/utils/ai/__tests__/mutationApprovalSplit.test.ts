@@ -11,7 +11,6 @@ import {
     requestMutationApprovalTool,
     type RequestMutationApprovalArgs
 } from "../feTools/requestMutationApproval";
-import { applyMutationTool } from "../feTools/applyMutation";
 import type { FeToolContext } from "../feTools/types";
 
 jest.mock("antd", () => {
@@ -284,8 +283,8 @@ describe("applyApprovedMutationTool", () => {
 
     it("falls through to explicit args when no pending approval is registered", async () => {
         // No prior approval registration — the apply call carries the
-        // diff/proposal_id/project_id explicitly (mirrors the legacy
-        // applyMutation shim and the route that handles BE-issued ids).
+        // diff/proposal_id/project_id explicitly (mirrors the route that
+        // handles BE-issued ids).
         const apiRequest = jest.fn().mockResolvedValue({});
         const ctx = buildCtx({ apiRequest });
         const result = await applyApprovedMutationTool.run(
@@ -308,112 +307,5 @@ describe("applyApprovedMutationTool", () => {
         );
         expect(result.status).toBe("applied");
         expect(apiRequest).toHaveBeenCalledTimes(2);
-    });
-});
-
-describe("applyMutationTool (deprecation shim)", () => {
-    it("approval stage registers a pending approval and returns {skipped: true}", async () => {
-        const ctx = buildCtx({ apiRequest: jest.fn() });
-        const result = await applyMutationTool.run(
-            {
-                proposal_id: "prop-shim",
-                stage: "approval",
-                project_id: "p1",
-                diff: {
-                    task_updates: [
-                        {
-                            task_id: "t1",
-                            field: "storyPoints",
-                            from: 1,
-                            to: 2
-                        }
-                    ]
-                }
-            },
-            ctx
-        );
-        expect(result).toEqual({ skipped: true });
-        expect(peekPendingApproval("shim::prop-shim")).toEqual({
-            proposalId: "prop-shim",
-            projectId: "p1",
-            diff: {
-                task_updates: [
-                    {
-                        task_id: "t1",
-                        field: "storyPoints",
-                        from: 1,
-                        to: 2
-                    }
-                ]
-            }
-        });
-        expect(ctx.apiRequest).not.toHaveBeenCalled();
-    });
-
-    it("apply stage forwards to applyApprovedMutationTool and maps to legacy shape", async () => {
-        const apiRequest = jest.fn().mockResolvedValue({});
-        const ctx = buildCtx({ apiRequest });
-        // Pre-register via approval stage so the apply finds the cached diff.
-        await applyMutationTool.run(
-            {
-                proposal_id: "prop-pair",
-                stage: "approval",
-                project_id: "p1",
-                diff: {
-                    task_updates: [
-                        {
-                            task_id: "t1",
-                            field: "storyPoints",
-                            from: 1,
-                            to: 2
-                        }
-                    ]
-                }
-            },
-            ctx
-        );
-        const result = await applyMutationTool.run(
-            {
-                proposal_id: "prop-pair",
-                stage: "apply",
-                project_id: "p1",
-                diff: {
-                    task_updates: [
-                        {
-                            task_id: "t1",
-                            field: "storyPoints",
-                            from: 1,
-                            to: 2
-                        }
-                    ]
-                }
-            },
-            ctx
-        );
-        expect(result).toEqual({ ok: true, applied: true });
-        expect(apiRequest).toHaveBeenCalledTimes(2);
-    });
-
-    it("apply stage maps api_unavailable failure back to legacy {error} shape", async () => {
-        const ctx = buildCtx({ apiRequest: undefined });
-        const result = await applyMutationTool.run(
-            {
-                proposal_id: "prop-noapi",
-                stage: "apply",
-                project_id: "p1",
-                diff: {
-                    task_updates: [
-                        {
-                            task_id: "t1",
-                            field: "columnId",
-                            from: "c1",
-                            to: "c2"
-                        }
-                    ]
-                }
-            },
-            ctx
-        );
-        expect(result).toEqual({ error: "api_unavailable" });
     });
 });

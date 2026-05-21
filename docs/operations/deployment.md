@@ -208,10 +208,6 @@ live.
       Otherwise keep one worker per container and scale out horizontally.
 - [ ] **Memory-backend warning awareness:** if `AGENT_CHECKPOINT_BACKEND`, `AGENT_STORE_BACKEND`, `IDEMPOTENCY_BACKEND`, `RATE_LIMIT_BACKEND`, or `BUDGET_BACKEND` is left at the `memory` default, the server logs WARNINGs at lifespan startup on any production-shaped host (Vercel / Render / Fly / Railway / Kubernetes) and on any process where `WEB_CONCURRENCY` or `UVICORN_WORKERS` parses to an integer > 1. These warnings do not block boot by themselves, but they identify production-unsafe split state: interrupt checkpoints, idempotency keys, rate limits, and budgets stay process-local. Set the corresponding `=postgres` / `=redis` env vars (and the matching connection strings) before the deploy completes, or — only if you knowingly want a single-worker deploy — keep `WEB_CONCURRENCY` unset. The code still hard-fails for actual invalid backend configuration, such as unsupported backend names or selecting `postgres` / `redis` without a usable connection string.
 - [ ] (Optional) `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT` for trace export. The server re-exports both `LANGSMITH_*` and `LANGCHAIN_*` env vars at startup so LangChain 0.3.x picks them up regardless of subpackage.
-- [ ] (Optional) `MCP_ENABLED=true` exposes Streamable HTTP MCP at `/mcp`
-      (read-only `fe.*` tools). Clients must send a **`scp=rest`**
-      bearer JWT — the narrower `ai_proxy` token is rejected on this
-      surface. Leave unset (default) when no MCP client is wired.
 - [ ] (Optional) `AGENT_PROJECT_CHAT_MODEL_MAP=project_id:model_id,...`
       assigns a default chat model per project on v1 + v2.1 routes;
       `X-Pulse-Model` still overrides when sent. Entries must satisfy
@@ -256,9 +252,9 @@ browsers fetch the new bundle reference. Subsequent deploys are clean.
 The AI proxy accepts **`ai_jwt`** (`scp=ai_proxy`, session-oriented TTL)
 from `sessionStorage` for `/api/ai/*` and `/api/v1/agents/*` requests while
 full **`jwt`** (`scp=rest`) remains in `localStorage` for REST CRUD.
-**Direct `/mcp` calls still need the REST-scoped token.** Limit XSS blast
-radius by keeping proxy tokens short-lived and renewing on login — see
-Beta §3 closure in [`../todo/release-todo.md`](../todo/release-todo.md).
+Limit XSS blast radius by keeping proxy tokens short-lived and renewing
+on login — see Beta §3 closure in
+[`../todo/release-todo.md`](../todo/release-todo.md).
 
 ---
 
@@ -330,8 +326,16 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 
 ---
 
+## Post-merge verification checklist
+
+- [ ] FE Vercel project still builds and serves the app at its existing URL.
+- [ ] BE Vercel project, after the Root Directory change, builds and `GET /api/v1/health` returns 200.
+- [ ] `Backend CI` workflow runs green on a PR that touches `backend/**`.
+- [ ] FE-only and BE-only PRs trigger only the relevant Vercel project (verify in the Vercel deployments tab).
+
+---
+
 ## See also
 
-- [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — historical structural reviews (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps).
 - [`../todo/release-todo.md`](../todo/release-todo.md) — current GA blockers, soft blockers, and operational backlog.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

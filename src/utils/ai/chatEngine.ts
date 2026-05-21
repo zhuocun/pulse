@@ -10,11 +10,11 @@ export interface AiChatMessage {
     toolCallId?: string;
     toolName?: ChatToolName;
     /**
-     * Sources backing this assistant turn (Optimization Plan §3 P0-3).
-     * Persisted on the message so older turns keep their citations after
-     * later turns arrive — the previous implementation derived citations
-     * from the latest tool messages and dropped them on subsequent turns.
-     * `[]` is meaningful: the engine answered without consulting any tool.
+     * Sources backing this assistant turn. Persisted on the message so
+     * older turns keep their citations after later turns arrive — the
+     * previous implementation derived citations from the latest tool
+     * messages and dropped them on subsequent turns. `[]` is meaningful:
+     * the engine answered without consulting any tool.
      */
     citations?: CitationRef[];
     /**
@@ -247,9 +247,9 @@ const isTaskArray = (x: unknown): x is ITask[] =>
     x.every((t) => t && typeof (t as ITask)._id === "string");
 
 /**
- * Extract structured citations from a tool result payload (Optimization
- * Plan §3 P0-3). Returns at most three refs so the UI doesn't flood the
- * bubble with chips for list-style queries.
+ * Extract structured citations from a tool result payload. Returns at
+ * most three refs so the UI doesn't flood the bubble with chips for
+ * list-style queries.
  *
  * Citations are inferred from object shape rather than tool name so
  * remote engines that emit a richer mix of payloads (tasks + members in
@@ -295,7 +295,7 @@ export const citationsFromToolResult = (
 };
 
 /**
- * Build a user-facing summary of a tool result (Optimization Plan §3 P2-2).
+ * Build a user-facing summary of a tool result.
  *
  * Tool messages are rendered inline in the chat transcript and are visible
  * to non-technical users — they should read like evidence ("Checked 12

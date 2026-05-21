@@ -76,10 +76,9 @@ const generateApprovalId = (proposalId: string): string => {
  * to surface a proposed mutation; the FE persists it transiently and
  * pauses so the user can accept or reject the diff in the approval UI.
  *
- * Behaviour mirrors the legacy `fe.applyMutation` flow when called with
- * `stage: "approval"` — no API calls happen here, only registration of
- * the pending diff. The HITL pause is enforced by
- * `useAgentToolResolver.ts`, which never auto-resumes this tool.
+ * No API calls happen here, only registration of the pending diff. The
+ * HITL pause is enforced by `useAgentToolResolver.ts`, which never
+ * auto-resumes this tool.
  */
 export const requestMutationApprovalTool: FeTool<
     RequestMutationApprovalArgs,

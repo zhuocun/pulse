@@ -321,7 +321,6 @@ const zhCN: Dictionary = {
         swipeHint: "滑动查看更多列",
         copilotMenuAsk: "询问 Copilot",
         copilotMenuBrief: "看板简报",
-        copilotMenuOpenPanel: "打开 Copilot 面板",
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
     },
@@ -687,24 +686,6 @@ const zhCN: Dictionary = {
             "总结一下这个看板",
             "谁未完成的工作最多?"
         ]
-    },
-    copilotShell: {
-        title: "看板 Copilot",
-        tabs: {
-            chat: "聊天",
-            brief: "简报",
-            activity: "动态",
-            settings: "设置"
-        },
-        placeholders: {
-            chat: "向看板 Copilot 提问，了解任务、阻塞、优先级等任何与看板相关的问题。",
-            brief: "获取由 AI 生成的看板健康度、阻塞与工作负载分布摘要。",
-            activity: "智能体活动与分流提醒将显示在此处。"
-        },
-        settingsBody:
-            "Copilot 的设置（自主程度、隐私及按项目控制）请在看板设置菜单中管理。",
-        ctaOpenChat: "打开聊天",
-        ctaOpenBrief: "打开简报"
     },
     brief: {
         title: "看板 Copilot 简报",

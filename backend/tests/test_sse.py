@@ -61,7 +61,7 @@ def test_translate_updates_lifts_interrupt_with_remainder() -> None:
         translate_event(
             "updates",
             {
-                "__interrupt__": {"tool": "fe.viewerContext", "args": {}},
+                "__interrupt__": {"tool": "fe.boardSnapshot", "args": {}},
                 "node": {"step": 1},
             },
         )

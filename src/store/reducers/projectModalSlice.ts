@@ -5,8 +5,10 @@ interface State {
     /**
      * `null` when creating a new project, project id when editing an
      * existing one. Lives in Redux (not just on the URL) so the modal's
-     * `open` flag flips synchronously on click — see `useProjectModal`
-     * for why URL-derived state alone was unreliable on iOS Safari.
+     * `open` flag flips synchronously on click — see
+     * `utils/hooks/_createOverlayHook.ts` for the iOS Safari +
+     * cross-subtree-propagation rationale that drove the whole overlay
+     * family off URL state.
      */
     editingProjectId: string | null;
 }

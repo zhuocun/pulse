@@ -227,14 +227,14 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         TASK_ASSIST_DELAYED_SPINNER_MS
     );
     /**
-     * Dismissed readiness issues (T-R5). Cleared whenever the task name
-     * changes so a new run shows fresh issues. The set holds composite
+     * Dismissed readiness issues. Cleared whenever the task name changes
+     * so a new run shows fresh issues. The set holds composite
      * `field + message` keys to handle multiple issues per field.
      */
     const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(
         () => new Set()
     );
-    /** Most recently applied story-point value, captured for Undo (T-R1). */
+    /** Most recently applied story-point value, captured for Undo. */
     const previousPointsRef = useRef<number | undefined>(values.storyPoints);
     const [showAlternative, setShowAlternative] = useState(false);
     const undoToast = useUndoToast();
@@ -242,12 +242,12 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const readinessErrorView = aiErrorView(readinessError);
 
     /**
-     * Stale-data guard (T-R7, T-R9). When the trimmed task name is empty,
-     * clear both AI state hooks so the panel renders the empty-state copy
-     * instead of the previous task's estimate. Whitespace-only changes
-     * to the *name* are skipped, but real context changes (board / tasks
-     * /members loading in after mount) still re-fire so cold caches
-     * don't strand the panel.
+     * Stale-data guard. When the trimmed task name is empty, clear both
+     * AI state hooks so the panel renders the empty-state copy instead
+     * of the previous task's estimate. Whitespace-only changes to the
+     * *name* are skipped, but real context changes (board / tasks /
+     * members loading in after mount) still re-fire so cold caches don't
+     * strand the panel.
      */
     const trimmedName = taskName.trim();
 

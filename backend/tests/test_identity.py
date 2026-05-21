@@ -37,10 +37,17 @@ def test_identity_locks_mutation_handshake_to_split_tools() -> None:
     assert "applyApprovedMutation" in COPILOT_IDENTITY
 
 
-def test_identity_marks_applymutation_as_deprecated() -> None:
-    """The legacy tool must not be the recommended path."""
-    assert "applyMutation" in COPILOT_IDENTITY
-    assert "deprecated" in COPILOT_IDENTITY.lower()
+def test_identity_does_not_mention_legacy_apply_mutation() -> None:
+    """The legacy single-stage tool name must not appear in the prompt.
+
+    ``applyMutation`` (without the ``Approved`` qualifier) was the
+    deprecated multiplexed tool; mentioning it in the system prompt
+    invites the model to call a tool the FE no longer handles.
+    """
+    # Allow the legitimate split tool name ``applyApprovedMutation``;
+    # forbid the bare legacy form.
+    stripped = COPILOT_IDENTITY.replace("applyApprovedMutation", "")
+    assert "applyMutation" not in stripped
 
 
 def test_identity_teaches_untrusted_tool_result_block() -> None:

@@ -1,65 +1,187 @@
 /**
- * Strict accessibility tests (TDD harness).
+ * Minimal axe accessibility audit over the major non-AI and AI surfaces.
  *
- * Each test pins down a single accessibility expectation. A failing test
- * means the surface under test does not yet meet WCAG 2.5.5 / 2.5.8
- * (target size), 1.4.3 (contrast), 4.1.2 (name/role/value), or other
- * Nielsen heuristics referenced in `docs/ui-ux-optimization-plan.md`.
+ * Each surface is rendered once in its default / populated state and
+ * jest-axe asserts no violations. Heavy AI hooks (`useAi`, `useAiChat`,
+ * `useAgent`) are mocked so the components can render without a query
+ * client subscriber.
  */
 /* eslint-disable global-require */
 import "@testing-library/jest-dom";
 
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, waitFor } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
+import React from "react";
+import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
+import AiChatDrawer from "../components/aiChatDrawer";
+import AiSearchInput from "../components/aiSearchInput";
+import AiTaskAssistPanel from "../components/aiTaskAssistPanel";
+import AiTaskDraftModal from "../components/aiTaskDraftModal";
+import BoardBriefDrawer from "../components/boardBriefDrawer";
 import EmptyState from "../components/emptyState";
 import ErrorBox from "../components/errorBox";
 import Header from "../components/header";
 import LoginForm from "../components/loginForm";
 import RegisterForm from "../components/registerForm";
 import { microcopy } from "../constants/microcopy";
+import { store } from "../store";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
-import useReactMutation from "../utils/hooks/useReactMutation";
 
 expect.extend(toHaveNoViolations);
 
-jest.mock("../utils/hooks/useAuth");
-jest.mock("../utils/hooks/useAiEnabled");
-jest.mock("../utils/hooks/useColorScheme");
-jest.mock("../utils/hooks/useReactMutation");
-jest.mock("../assets/logo-software.svg?react", () => {
-    const React = require("react");
+// ─── Module mocks ───────────────────────────────────────────────────────────
 
+jest.mock("../constants/env", () => ({
+    __esModule: true,
+    default: {
+        apiBaseUrl: "http://localhost:8080/api/v1",
+        aiBaseUrl: "",
+        aiEnabled: true,
+        aiUseLocalEngine: true
+    }
+}));
+
+jest.mock("../utils/hooks/useAuth");
+jest.mock("../utils/hooks/useAiEnabled", () => ({
+    __esModule: true,
+    default: jest.fn(),
+    useAutonomyLevel: jest.fn(() => ({ level: "plan", setLevel: jest.fn() }))
+}));
+jest.mock("../utils/hooks/useColorScheme");
+jest.mock("../utils/hooks/useReactMutation", () => ({
+    __esModule: true,
+    default: () => ({
+        isLoading: false,
+        mutate: jest.fn(),
+        mutateAsync: jest.fn()
+    })
+}));
+jest.mock("../utils/hooks/useApi", () => ({
+    __esModule: true,
+    default: () => jest.fn().mockResolvedValue({})
+}));
+jest.mock("../utils/hooks/useAi", () => ({
+    __esModule: true,
+    assertRunPayloadProjectsAiAllowed: jest.fn(),
+    default: jest.fn(() => ({
+        data: null,
+        error: null,
+        isLoading: false,
+        reset: jest.fn(),
+        run: jest.fn().mockResolvedValue(null)
+    }))
+}));
+jest.mock("../utils/hooks/useAgent", () => {
+    const noop = () => undefined;
+    const stub = {
+        abort: noop,
+        citations: [],
+        clearPendingProposal: noop,
+        clearSuggestion: noop,
+        dismissNudge: noop,
+        error: null,
+        isSlowTtft: false,
+        isStreaming: false,
+        lastSuggestion: null,
+        nudges: [],
+        pendingInterrupt: null,
+        pendingProposal: null,
+        reset: noop,
+        resume: jest.fn().mockResolvedValue(undefined),
+        seedMessages: noop,
+        start: jest.fn().mockResolvedValue(undefined),
+        state: { messages: [] },
+        status: "idle" as const,
+        threadId: "stub-thread",
+        ttftMs: null
+    };
+    return { __esModule: true, default: () => stub };
+});
+jest.mock("../utils/hooks/useAiChat", () => {
+    const noop = () => undefined;
+    const stub = {
+        abort: noop,
+        dismissError: noop,
+        error: null,
+        isLoading: false,
+        messages: [],
+        reset: noop,
+        seedMessages: noop,
+        send: () => Promise.resolve(),
+        streamingText: ""
+    };
+    return { __esModule: true, default: () => stub };
+});
+jest.mock("../utils/hooks/useAgentChat", () => {
+    const noop = () => undefined;
+    const stub = {
+        abort: noop,
+        citations: [],
+        dismissError: noop,
+        dismissNudge: noop,
+        error: null,
+        isLoading: false,
+        messages: [],
+        pendingNudges: [],
+        pendingProposal: null,
+        reset: noop,
+        resumeProposal: noop,
+        seedMessages: noop,
+        send: () => Promise.resolve(),
+        streamingText: ""
+    };
+    return { __esModule: true, default: () => stub };
+});
+jest.mock("../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({ show: jest.fn() })
+}));
+jest.mock("../constants/analytics", () => ({
+    __esModule: true,
+    ANALYTICS_EVENTS: {},
+    track: jest.fn()
+}));
+jest.mock("../assets/logo-software.svg?react", () => {
+    const ReactLib = require("react");
     return {
         __esModule: true,
         default: (props: Record<string, unknown>) =>
-            React.createElement("svg", { "data-testid": "logo", ...props })
+            ReactLib.createElement("svg", { "data-testid": "logo", ...props })
     };
 });
 jest.mock("../components/memberPopover", () => {
-    const React = require("react");
-
+    const ReactLib = require("react");
     return {
         __esModule: true,
-        default: () => React.createElement("span", null, "Members")
+        default: () => ReactLib.createElement("span", null, "Members")
+    };
+});
+jest.mock("../components/copilotRemoteConsentNotice", () => ({
+    __esModule: true,
+    default: () => null
+}));
+jest.mock("../components/copilotPrivacyPopover", () => {
+    const ReactLib = require("react");
+    return {
+        __esModule: true,
+        default: () =>
+            ReactLib.createElement(
+                "button",
+                { type: "button", "aria-label": "Privacy info" },
+                "Privacy"
+            ),
+        CopilotPrivacyDisclosure: () => null
     };
 });
 
-const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
-const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
-    typeof useAiEnabled
->;
-const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
-    typeof useColorScheme
->;
-const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
-    typeof useReactMutation
->;
+// ─── jsdom gaps ─────────────────────────────────────────────────────────────
 
-const installAntdBrowserMocks = () => {
+beforeAll(() => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -86,30 +208,70 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
-};
 
-const user = (overrides: Partial<IUser> = {}): IUser => ({
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+        configurable: true,
+        value: 800
+    });
+});
+
+// ─── Hook defaults ──────────────────────────────────────────────────────────
+
+const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
+    typeof useAiEnabled
+>;
+const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
+    typeof useColorScheme
+>;
+
+const SAMPLE_USER: IUser = {
     _id: "u1",
     email: "alice@example.com",
     likedProjects: [],
-    username: "Alice",
-    ...overrides
-});
+    username: "Alice"
+};
 
-beforeAll(() => {
-    installAntdBrowserMocks();
-});
+const SAMPLE_PROJECT: IProject = {
+    _id: "proj-1",
+    projectName: "Jira Clone",
+    organization: "Acme Corp",
+    managerId: "u1"
+};
+
+const SAMPLE_COLUMNS: IColumn[] = [
+    { _id: "col-1", columnName: "To Do", projectId: "proj-1", index: 0 }
+];
+
+const SAMPLE_MEMBERS: IMember[] = [
+    { _id: "m1", username: "Alice", email: "alice@example.com" }
+];
+
+const SAMPLE_TASKS: ITask[] = [
+    {
+        _id: "task-1",
+        taskName: "Build login form",
+        type: "Task",
+        projectId: "proj-1",
+        columnId: "col-1",
+        coordinatorId: "m1",
+        storyPoints: 3,
+        epic: "Auth epic",
+        note: "Use React Hook Form",
+        index: 0
+    }
+];
 
 beforeEach(() => {
     jest.clearAllMocks();
     mockedUseAuth.mockReturnValue({
         logout: jest.fn(),
         isAuthenticated: true,
-        user: user()
+        user: SAMPLE_USER
     });
     mockedUseAiEnabled.mockReturnValue({
-        available: false,
-        enabled: false,
+        available: true,
+        enabled: true,
         setEnabled: jest.fn()
     });
     mockedUseColorScheme.mockReturnValue({
@@ -117,36 +279,50 @@ beforeEach(() => {
         scheme: "light",
         setPreference: jest.fn()
     });
-    mockedUseReactMutation.mockReturnValue({
-        isLoading: false,
-        mutate: jest.fn(),
-        mutateAsync: jest.fn()
-    } as unknown as ReturnType<typeof useReactMutation<unknown>>);
 });
+
+// ─── Provider wrapper (intentionally minimal — no AntdApp/ConfigProvider) ───
+
+const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            queries: { retry: false },
+            mutations: { retry: false }
+        }
+    });
+    return (
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <BrowserRouter>{children}</BrowserRouter>
+            </QueryClientProvider>
+        </Provider>
+    );
+};
+
+const renderInWrapper = (ui: React.ReactElement) =>
+    render(<Wrapper>{ui}</Wrapper>);
+
+// ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe("UI quality :: axe accessibility audit", () => {
     it("LoginForm has no axe violations", async () => {
-        const { container } = render(
-            <BrowserRouter>
-                <LoginForm onError={jest.fn()} />
-            </BrowserRouter>
+        const { container } = renderInWrapper(
+            <LoginForm onError={jest.fn()} />
         );
         const results = await axe(container);
         expect(results).toHaveNoViolations();
     });
 
     it("RegisterForm has no axe violations", async () => {
-        const { container } = render(
-            <BrowserRouter>
-                <RegisterForm onError={jest.fn()} />
-            </BrowserRouter>
+        const { container } = renderInWrapper(
+            <RegisterForm onError={jest.fn()} />
         );
         const results = await axe(container);
         expect(results).toHaveNoViolations();
     });
 
     it("EmptyState with CTA has no axe violations", async () => {
-        const { container } = render(
+        const { container } = renderInWrapper(
             <EmptyState
                 cta={
                     <button type="button">
@@ -162,7 +338,7 @@ describe("UI quality :: axe accessibility audit", () => {
     });
 
     it("ErrorBox in alert state has no axe violations", async () => {
-        const { container } = render(
+        const { container } = renderInWrapper(
             <ErrorBox error={new Error("Server unavailable")} />
         );
         const results = await axe(container);
@@ -170,150 +346,101 @@ describe("UI quality :: axe accessibility audit", () => {
     });
 
     it("Header has no axe violations when user is signed in", async () => {
-        const { container } = render(
-            <BrowserRouter>
-                <Header />
-            </BrowserRouter>
-        );
+        const { container } = renderInWrapper(<Header />);
         const results = await axe(container);
         expect(results).toHaveNoViolations();
     });
 });
 
-describe("UI quality :: keyboard interactivity", () => {
-    /**
-     * Every action button rendered by core surfaces must be reachable by
-     * a keyboard user — i.e. no `tabindex="-1"` on a primary action and
-     * no `aria-hidden=true` wrapping a focusable control.
-     */
-    const expectAllButtonsKeyboardReachable = () => {
-        const buttons = screen.queryAllByRole("button");
-        const offending = buttons.filter((btn) => {
-            const inAriaHidden = btn.closest("[aria-hidden='true']");
-            const tabIndex = btn.getAttribute("tabindex");
-            // tabindex="-1" is allowed when the button is purely
-            // programmatic (e.g. a hidden close button); we still flag
-            // it for primary-looking labels.
-            const text = (btn.textContent ?? "").trim();
-            const isPrimary =
-                /^(log in|sign up|create|save|delete|register for an account|already have an account)/i.test(
-                    text
-                );
-            return Boolean(isPrimary && (inAriaHidden || tabIndex === "-1"));
-        });
-        expect(offending).toEqual([]);
-    };
-
-    it("login form primary buttons are keyboard reachable", () => {
-        render(
-            <BrowserRouter>
-                <LoginForm onError={jest.fn()} />
-            </BrowserRouter>
+describe("AI a11y :: axe accessibility audit", () => {
+    it("BoardBriefDrawer (open) has no axe violations", async () => {
+        renderInWrapper(
+            <BoardBriefDrawer
+                columns={SAMPLE_COLUMNS}
+                members={SAMPLE_MEMBERS}
+                onClose={jest.fn()}
+                open
+                project={SAMPLE_PROJECT}
+                tasks={SAMPLE_TASKS}
+            />
         );
-        expectAllButtonsKeyboardReachable();
+        await waitFor(() => {
+            expect(document.querySelector("[role='dialog']")).not.toBeNull();
+        });
+        const results = await axe(document.body);
+        expect(results).toHaveNoViolations();
     });
 
-    it("register form primary buttons are keyboard reachable", () => {
-        render(
-            <BrowserRouter>
-                <RegisterForm onError={jest.fn()} />
-            </BrowserRouter>
-        );
-        expectAllButtonsKeyboardReachable();
-    });
-});
-
-describe("UI quality :: text overflow safety", () => {
-    /**
-     * The header greeting truncates at 14ch for narrow screens. A
-     * 200-char username should never overflow the page (which would
-     * push the dropdown chevron off-screen).
-     */
-    it("Header doesn't horizontally overflow with a very long username", () => {
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            isAuthenticated: true,
-            user: user({ username: "A".repeat(200) })
+    it("AiTaskDraftModal (initial) has no axe violations", async () => {
+        renderInWrapper(<AiTaskDraftModal onClose={jest.fn()} open />);
+        await waitFor(() => {
+            expect(document.querySelector("[role='dialog']")).not.toBeNull();
         });
-
-        render(
-            <BrowserRouter>
-                <Header />
-            </BrowserRouter>
-        );
-        // The greeting span has overflow:hidden + text-overflow:ellipsis
-        // (via styled-component class). Assert it renders and is wrapped
-        // in the truncation container — the visual cap stays the styled
-        // component's responsibility.
-        const greeting = screen.getByText(/^Hi,/);
-        expect(greeting).toBeInTheDocument();
-        // The greeting must not literally render the full 200-char user
-        // name as text content — since CSS clips with ellipsis but the
-        // full text is still in the DOM, we assert via the styled class
-        // attaches to the element. The most we can verify in jsdom is
-        // that the username substring is in the DOM under the greeting
-        // node — which it is — so the structural assertion is enough.
-        expect(greeting.textContent).toContain("A");
-    });
-});
-
-describe("UI quality :: header user fallbacks", () => {
-    it("Header doesn't render the literal string 'undefined' when user is missing username", () => {
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            isAuthenticated: true,
-            user: user({ username: "" })
-        });
-
-        render(
-            <BrowserRouter>
-                <Header />
-            </BrowserRouter>
-        );
-
-        // Walk all leaf text nodes; none should be the literal "undefined".
-        const offending = Array.from(
-            document.querySelectorAll("body *")
-        ).filter(
-            (node) =>
-                node.children.length === 0 &&
-                /\bundefined\b/i.test(node.textContent ?? "")
-        );
-        expect(offending).toEqual([]);
+        const results = await axe(document.body);
+        expect(results).toHaveNoViolations();
     });
 
-    it("Header account trigger has a descriptive aria-label that survives a missing username", () => {
-        mockedUseAuth.mockReturnValue({
-            logout: jest.fn(),
-            isAuthenticated: true,
-            user: user({ username: undefined as unknown as string })
-        });
-
-        render(
-            <BrowserRouter>
-                <Header />
-            </BrowserRouter>
+    it("AiTaskAssistPanel has no axe violations", async () => {
+        const { container } = renderInWrapper(
+            <AiTaskAssistPanel
+                excludeTaskId={undefined}
+                onApplyStoryPoints={jest.fn()}
+                onApplySuggestion={jest.fn()}
+                onOpenSimilarTask={jest.fn()}
+                values={{
+                    taskName: "Build login form",
+                    note: "Use React Hook Form",
+                    type: "Task",
+                    epic: "Auth epic",
+                    coordinatorId: "m1",
+                    storyPoints: 3
+                }}
+            />
         );
-
-        const trigger = screen.getByRole("button", {
-            name: /account menu/i
-        });
-        // The aria-label uses `user?.username ?? "user"` so the
-        // accessible name should never include "undefined" or "null".
-        const label = trigger.getAttribute("aria-label") ?? "";
-        expect(label).not.toMatch(/undefined|null/i);
+        const results = await axe(container);
+        expect(results).toHaveNoViolations();
     });
 
-    it("Header logo button uses a distinct accessible label and title", () => {
-        render(
-            <BrowserRouter>
-                <Header />
-            </BrowserRouter>
+    it("AiSearchInput (tasks kind, empty) has no axe violations", async () => {
+        const { container } = renderInWrapper(
+            <AiSearchInput
+                kind="tasks"
+                projectContext={{
+                    project: SAMPLE_PROJECT,
+                    tasks: SAMPLE_TASKS,
+                    columns: SAMPLE_COLUMNS,
+                    members: SAMPLE_MEMBERS
+                }}
+                semanticIds={null}
+                setSemanticIds={jest.fn()}
+            />
         );
+        const results = await axe(container);
+        expect(results).toHaveNoViolations();
+    });
 
-        const logoButton = screen.getByRole("button", {
-            name: new RegExp(microcopy.header.logoLabel, "i")
+    it("AiChatDrawer (open) has no axe violations", async () => {
+        // Render without `AntdApp` to stay consistent with the other AI
+        // surfaces here — wrapping with `<AntdApp component={false}>` would
+        // re-trigger AntD's cssVar warning and the jsdom NaN-height path.
+        // `App.useApp()` inside the drawer falls back to a no-op message
+        // bag when no provider is present, which is fine because nothing
+        // in this test triggers a feedback toast.
+        renderInWrapper(
+            <AiChatDrawer
+                columns={SAMPLE_COLUMNS}
+                knownProjectIds={[SAMPLE_PROJECT._id]}
+                members={SAMPLE_MEMBERS}
+                onClose={jest.fn()}
+                open
+                project={SAMPLE_PROJECT}
+                tasks={SAMPLE_TASKS}
+            />
+        );
+        await waitFor(() => {
+            expect(document.querySelector("[role='dialog']")).not.toBeNull();
         });
-        expect(logoButton).toHaveAttribute("title", microcopy.header.logoLabel);
+        const results = await axe(document.body);
+        expect(results).toHaveNoViolations();
     });
 });

@@ -3,21 +3,97 @@
 Short, durable gotchas for anyone (human or AI) editing this repo. Add an entry
 when a fix is non-obvious from the code alone.
 
-## Keep the backlog current
+## Coding harness
 
-`docs/todo/` is the single source of truth for open and shipped work. When
-your change closes or opens a backlog item, update `status/` in the same PR:
+Aim for code that is **precise · efficient · readable · scalable ·
+well-architected · well-designed · testable · robust · rigorous ·
+decompositional · smart · high-coverage**. Each quality below is one
+concrete rule plus the canonical anchor that demonstrates it.
 
-- **Closing work.** Strike or remove the entry from the matching `*-todo.md`
-  (`release-todo.md` for GA blockers / soft blockers / polish,
-  `architecture-todo.md` for agent-runtime themes, `ui-todo.md` for the UI
-  plan) **and** add a one-liner under the relevant table in
-  [`docs/todo/product-done.md`](docs/todo/product-done.md).
-- **Opening work.** Add the new item to the matching `*-todo.md`. If nothing
-  fits, ask before creating a new tracking doc.
-- **Don't restate blockers inline** in `README.md`, `backend/README.md`, or
-  PR descriptions — link to the `status/` entry so there's exactly one place
-  to update when the item closes.
+- **Precise** — Types are the contract. No `any` in production; use `unknown`
+  with narrowing. Validate at system edges (HTTP, env, FE↔BE wire) and trust
+  internal calls.
+- **Efficient** — No silent N² patterns. Memoise only the expensive thing;
+  premature `useMemo` is clutter. Guardrails: bundle chunks ≤1 MB unminified,
+  `vite build` ≤5 s (currently 559 KB / 1.86 s — keep the slack).
+- **Readable** — A function reads cold: name says *what*, body says *how*.
+  Default to **zero comments**; only comment a non-obvious WHY. Never embed
+  PR IDs, optimisation-plan tags (`P2-D`, `B-R11`), or "added for #123" —
+  meaningless after merge (`9a182ec` scrubbed 62 such refs).
+- **Scalable** — One source of truth for shared strings: tool names live in
+  `backend/app/tools/fe_tool_names.py` (`FE_*` constants — never a bare
+  `"fe.foo"` literal); microcopy in `src/constants/microcopy.ts`. A change
+  should not require touching N similar files.
+- **Well-architected** — Boundaries are explicit. Agent runtime owns the
+  gates (rate limit, budget, idempotency, redaction); routers wire HTTP;
+  the repository owns persistence. `api/index.ts` is the **only** edge into
+  the backend in deploy builds.
+- **Well-designed** — Smallest API the caller actually needs. Don't
+  pre-design for futures you can't see. Three similar lines beats a
+  premature factory; abstract only when the third caller arrives and the
+  shape is stable (`src/utils/hooks/_createOverlayHook.ts` is the model).
+- **Testable** — No module-level mutable state. If unavoidable, expose
+  `reset*ForTests` and document the constraint (`useApi.ts` rate-limiter
+  is the cautionary example). Inject dependencies; don't fetch from the
+  global.
+- **Robust** — Fail fast at boot for misconfiguration (BE settings
+  validation raises before the first request handles). Fail soft at
+  runtime for transient errors. Every async call respects
+  `AbortController`/unmount.
+- **Rigorous** — Wire contracts pinned by tests on both sides:
+  `FE_TOOL_REGISTRY.size` (currently 11) matches `ALL_FE_TOOL_NAMES`
+  matches `FE_TOOL_SCHEMAS`. Every BE-advertised tool has an FE
+  resolver; every `interrupt(NAME, …)` reaches a registry entry or an
+  explicit HITL special case (`useAgentToolResolver.ts:241-243`).
+- **Decompositional** — Split by responsibility, not by cosmetic file
+  count. >800 LOC of business code in one file is a smell; <50 LOC files
+  that always travel together should fold back. Outliers
+  (`aiChatDrawer/index.tsx`, `useAgent.ts`) are tracked debt, not models.
+- **Smart** — Don't defend against scenarios that can't happen. No
+  compat shims for refactors that completed (the `fe.applyMutation`
+  cleanup is the template). Fix root causes, not symptoms.
+- **High-coverage** — Backend gate is `--cov-fail-under=85`; real
+  coverage runs ~98%. Write a test for every branch you add — never a
+  test purely to hit a coverage line (deleted `test_coverage_filling.py`
+  is why the gate was lowered).
+
+## Other guardrails
+
+- **Dependencies** — `@types/*` and test/build tooling live in
+  `devDependencies`. Before adding a dep, grep
+  `src/ vite.config.ts jest.config.cjs` for an existing equivalent. If a
+  candidate dep has one call site, inline (lodash `isEqual` → inlined
+  `shallowEqual` in `taskModal/index.tsx` is the model).
+- **Configuration coherence** — One source per concern. Node version in
+  `.nvmrc` only (not `.node-version` + `engines.node` + `.nvmrc`). Pick
+  `pyproject.toml` *or* `requirements.txt` *or* `uv.lock` — three sources
+  of truth means three places to drift.
+- **Doc–code coherence** — When you delete code, update every doc that
+  names it **in the same PR**. A `✅ Resolved` entry linking to files
+  that no longer exist is worse than the deletion. Tracking files
+  (`docs/todo/*.md`) live in the same PR as the work they describe;
+  never restate blockers in `README.md` or PR bodies — link to the
+  entry. Orchestrator scratch (`.orchestrate/`), verifier logs, and
+  dated status snapshots belong in `.gitignore`, not the repo.
+- **Deprecation discipline** — A compat shim ships with a removal date.
+  After sunset: delete on both sides. Don't preserve "for older
+  clients" indefinitely.
+- **Backwards compat at boundaries only** — Internal refactors don't
+  need shims. External surfaces (wire contracts, env vars, public APIs)
+  do, until the next major.
+- **Accessibility minimums** — Every interactive control declares
+  ≥44 px touch-target under `@media (pointer: coarse)` (WCAG 2.5.8);
+  the `declares a touch-target height` tests in
+  `src/components/*/index.test.tsx` and `layouts/authLayout.test.tsx`
+  pin this. Every top-level surface passes `axe-core` clean
+  (`src/__tests__/uiAccessibility.strict.test.tsx`). Button labels
+  flow through `src/constants/microcopy.ts` — ESLint
+  `no-restricted-syntax` blocks raw `Submit`/`OK`/`Login`/`Signup`/
+  `Edit Task`/`Create Project` as `<Button>` children or `okText`/
+  `cancelText` props.
+- **Observability** — Pick one telemetry stack. OTel and Prometheus
+  side-by-side doubles the dimension surface for half the value;
+  current code carries both as tech debt, not as a template.
 
 ## v2.1 agent surface (`useAgent`)
 
@@ -93,8 +169,3 @@ GA blockers and ship sequence live in
   `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
   inspection" subsection.
 
-## Cursor Cloud
-
-VM-specific gotchas (mongod `--fork` workaround, NVM bootstrap, Jest
-heap bump, vendored `cursor-sdk` / `orchestrate` skills) live in
-[`docs/operations/cursor-cloud.md`](docs/operations/cursor-cloud.md).

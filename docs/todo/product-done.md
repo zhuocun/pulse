@@ -7,7 +7,7 @@ open. Per-PR history lives in git log.
 
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes; architecture-theme backlog closed on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout`` ([`architecture-todo.md`](architecture-todo.md)); **GA §1 partial** — stub LangGraph HITL + FE interrupts verified; **sign-off** tracks organic proposals + Mongo/Jest/replay proof ([`release-todo.md`](release-todo.md) §1; [`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md); [`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md)). |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes; architecture-theme backlog closed on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; **GA §1 partial** — stub LangGraph HITL + FE interrupts verified; **sign-off** tracks organic proposals + Mongo/Jest/replay proof ([`release-todo.md`](release-todo.md) §1; see git log for verifier transcripts). |
 | Last updated | 2026-05-21                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
@@ -31,19 +31,19 @@ For the live GA / blocker / soft-blocker / polish status see
 | Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | — | ✅ |
 | v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode) | — | ✅ |
 | v2.1 UI surface — agent health badge, chat-drawer cards | — | ✅ |
-| Unified Copilot shell scaffold (`CopilotShell`) | — | ✅ Shipped as a phase-1 drawer scaffold; in-shell tab content remains deferred |
+| Unified Copilot shell scaffold (`CopilotShell`) | — | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
 | v2.1 chat path migrated to SSE streaming | — | ✅ |
 | v2.1 triage nudges mounted in board page | — | ✅ |
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
 | Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
-| Backend release gates | — | ⏳ **GA §1 partial:** stub LangGraph mutation lifecycle + journal APIs on integrate branch; **sign-off** for organic chat + Mongo-backed undo/record + apply/replay Jest proof — [`release-todo.md`](release-todo.md) §1; [`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md) |
+| Backend release gates | — | ⏳ **GA §1 partial:** stub LangGraph mutation lifecycle + journal APIs on integrate branch; **sign-off** for organic chat + Mongo-backed undo/record + apply/replay Jest proof — [`release-todo.md`](release-todo.md) §1; see git log for verifier transcripts |
 | Cross-provider chat failover (`with_fallbacks`, `AGENT_CHAT_MODEL_FAILOVER`) | [`release-todo.md`](release-todo.md) §2 | ✅ Anthropic/OpenAI retryable-error failover with OTel hooks; `tests/test_llm_failover.py` |
 | Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; operator embeddings backfill remains |
 | Polish-step JSON schema (`PolishStep`, `method="json_schema"` when supported) | [`release-todo.md`](release-todo.md) §5 | ✅ Provider-level polish validation ahead of FE validators |
 | Hermetic vs real-stack tests (`integration` marker, `RUN_INTEGRATION=1`) | [`release-todo.md`](release-todo.md) §6 | ✅ Default CI stays 100%-coverage hermetic; integration suite opt-in for ops |
-| Backend CI matrix + `workflow_dispatch` modes | [`release-todo.md`](release-todo.md) §7 | ✅ Workflow definitions; numeric evidence via reruns + [`verification-logs/`](verification-logs/) (not inline totals in status docs) |
+| Backend CI matrix + `workflow_dispatch` modes | [`release-todo.md`](release-todo.md) §7 | ✅ Workflow definitions; numeric evidence via reruns (not inline totals in status docs) |
 | Fly.io default `app` in `backend/fly.toml` | [`release-todo.md`](release-todo.md) §16e | ✅ Repo default `pulse-backend` with explicit rename-before-deploy header; deployment guide + `backend/README.md` aligned |
 | Frontend CI (Prettier, ESLint check, tsc, Jest, Vite build on FE paths) | [`release-todo.md`](release-todo.md) §7b | ✅ `.github/workflows/frontend-ci.yml` |
 | `custom/suggestion` event handler (`lastSuggestion` / `clearSuggestion`) | — | ✅ |
@@ -65,33 +65,33 @@ For the live GA / blocker / soft-blocker / polish status see
 | Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
 | Copilot About — `chat-agent` `rate_limit` / `allowed_autonomy` in UI | [`release-todo.md`](release-todo.md) §14 | ✅ Remote-only `useChatAgentMetadata` + session `getSessionCachedAgentMetadata`; loading/empty/error handling in `CopilotAboutPopover` |
-| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | ✅ `en` / `zh-CN` keys; component + tests read from `microcopy` |
+| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
 | Task card type icons — decorative img a11y (`TaskTypeBadge`) | UX ([`ui-todo.md`](ui-todo.md) §21) | ✅ `<img alt="" aria-hidden>` beside visible type labels; regression test in `column/index.test.tsx` |
-| `useAgent` nudge-inbox extracted into `useNudgeInbox` hook | [`release-todo.md`](release-todo.md) §16b / [`architecture-todo.md`](architecture-todo.md) Theme 3 | ✅ AC-V14 reducer + state moved to `src/utils/hooks/useNudgeInbox.ts`; `useAgent` re-exports `reduceNudgeInbox` / `NUDGE_INBOX_MAX` / `NUDGE_EXPIRY_MS` for compatibility |
+| `useAgent` nudge-inbox extracted into `useNudgeInbox` hook | [`release-todo.md`](release-todo.md) §16b | ✅ AC-V14 reducer + state moved to `src/utils/hooks/useNudgeInbox.ts`; `useAgent` re-exports `reduceNudgeInbox` / `NUDGE_INBOX_MAX` / `NUDGE_EXPIRY_MS` for compatibility |
 | Members popover avatars + count badge + shared cached query | UX ([`ui-todo.md`](ui-todo.md) §14, §19 remaining) | ✅ `useMembersList()` centralizes the `users/members` React Query (5-minute `staleTime`); 4 consumers migrated; popover trigger renders avatar group + count badge; no refetch on open |
 | Throttled spinners across AI surfaces | UX ([`ui-todo.md`](ui-todo.md) Phase 3.5 / 2.A.7) | ✅ `useDelayedFlag(active, 250)` hook gates visible spinners in `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer`; underlying loading state and analytics unchanged |
 | Microcopy / casing sentence-case sweep | UX ([`ui-todo.md`](ui-todo.md) §17 / Phase 3.1) | ✅ Value-only update across `src/i18n/locales/en.ts` (`Login` → `Log in`, `Register` → `Sign up`, `Open Chat` → `Open chat`, `Board Brief` → `Board brief`, etc.); zh-CN parity preserved; affected tests updated |
 | `CopilotAboutPopover` + wire `AgentMetadata` (budget cap, limits, tags, schema keys) | [`release-todo.md`](release-todo.md) §13–§14 | ✅ BE `as_dict()` + `monthly_token_budget_cap`; FE shows cap line, `recursion_limit`, `tags`, `context_schema` shape; i18n `en`/`zh-CN` |
-| MCP streamable HTTP `/mcp` + read-only `fe.*` tools | [`release-todo.md`](release-todo.md) §15 | ✅ `MCP_ENABLED` gates mount; FastMCP + REST JWT middleware (`app/mcp_server.py`, `mcp_tools.py`); tests `test_mcp_wiring.py`, `test_mcp_mount_fn.py` |
+| MCP streamable HTTP `/mcp` + read-only `fe.*` tools | [`release-todo.md`](release-todo.md) §15 | **Reverted 2026-05-21** — MCP module deleted (opt-in, no consumers); see release-todo.md §15. |
 | LangGraph store hint: brief drift → triage | [`release-todo.md`](release-todo.md) §16 | ✅ `project_profile` / `last_board_brief` written in `board_brief.py`, read in `triage.py` for polish context |
 | `useAgent` SSE stream consumer extraction | [`release-todo.md`](release-todo.md) §16b | ✅ `useAgentStreamConsumer.ts` (`forEachAgentStreamPart`) + `useAgentStreamConsumer.test.ts`; `useAgent.ts` delegates loop |
 | Per-project chat model map + header merge | [`release-todo.md`](release-todo.md) §16c | ✅ `AGENT_PROJECT_CHAT_MODEL_MAP` + `X-Pulse-Model` precedence in `_dispatch.py` / `agents.py`; tests `test_dispatch_chat_context_merge.py`, `test_agents_request_context_merge.py` |
 | Multi-worker Uvicorn guard + Docker `UVICORN_WORKERS` | [`release-todo.md`](release-todo.md) §16d | ✅ Boot raises if workers>1 without Redis rate/budget/idempotency + `REDIS_URI`; Dockerfile passes `${UVICORN_WORKERS:-1}`; tests `test_production_backend_guards.py` |
 | Task card keyboard-drag affordance hint | UX ([`ui-todo.md`](ui-todo.md) Phase 3.4 / 2.A.9 — WCAG 2.5.7) | ✅ Task-card button exposes `title={microcopy.dragHints.taskCardKeyboard}` + `aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"`; en + zh-CN parity; column test asserts the hint |
-| `useAgent` FE-tool resolver extracted into `useAgentToolResolver` hook | [`release-todo.md`](release-todo.md) §16b / [`architecture-todo.md`](architecture-todo.md) Theme 3 | ✅ FE-tool registry lookup + 8-round auto-resume loop + stream-part reducer + mid-stream typed-error mapping moved to `src/utils/hooks/useAgentToolResolver.ts`; focused tests in `useAgentToolResolver.test.ts` |
+| `useAgent` FE-tool resolver extracted into `useAgentToolResolver` hook | [`release-todo.md`](release-todo.md) §16b | ✅ FE-tool registry lookup + 8-round auto-resume loop + stream-part reducer + mid-stream typed-error mapping moved to `src/utils/hooks/useAgentToolResolver.ts`; focused tests in `useAgentToolResolver.test.ts` |
 | Header logo a11y label + AI assist / brief drawer live regions | UX ([`ui-todo.md`](ui-todo.md) §21 / Phase 3.4 4.1.3) | ✅ `microcopy.header.logoLabel` (`Pulse home` / `Pulse 首页`) wired to logo button `aria-label` + `title`; `AiTaskAssistPanel` and `BoardBriefDrawer` expose discrete polite live regions for loading/ready/error status without leaking raw payloads |
 | Board page error + empty parity with project list | UX ([`ui-todo.md`](ui-todo.md) §16) | ✅ Top-of-board `<Alert>` + Retry on `boards`/`tasks` query failure; zero-column board renders `EmptyState` with `Create your first column` CTA that focuses the inline column creator; new error-state test covers Retry behavior |
 | Task modal Type select uses canonical Task / Bug constant | UX ([`ui-todo.md`](ui-todo.md) §10 / Phase 2.6) | ✅ `TASK_TYPE_OPTIONS` mirrors the schema regardless of dataset shape (still localized via `microcopy.options.taskTypes.*`); regression tests added for empty + single-type datasets |
 | `Suggested by Copilot` badge on AI story-points Apply | UX ([`ui-todo.md`](ui-todo.md) 2.A.8 partial) | ✅ `appliedFieldOrigin` provenance tracked in `TaskModal`; `microcopy.ai.suggestedByCopilot` (en + zh-CN) renders next to Story points after Apply and clears on user edit; unit test covers both branches |
 | Forgot-password link + placeholder `/auth/forgot-password` route | UX ([`ui-todo.md`](ui-todo.md) §11 / Phase 2.7) | ✅ Right-aligned `Forgot password?` link in `LoginForm` (i18n + accessible name); placeholder page in `src/pages/forgotPassword/` with title + body keys; route + auth-route gating wired; tests cover link presence, route render, and gating |
-| Architecture / UI status backlog reconciled vs codebase | [`architecture-todo.md`](architecture-todo.md), [`ui-todo.md`](ui-todo.md) | ✅ 2026-05-11 closure snapshot on integrate branch — themes dispositioned to shipped vs archive deferrals; verification pointers in [`architecture-todo.md`](architecture-todo.md); former per-theme action tables retired |
-| Architecture integrate branch (Theme 5 + remaining themes) | [`architecture-todo.md`](architecture-todo.md) | ✅ ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout`` merges verified Theme 5 + Themes 2–4/6 hygiene — evidence via [`verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md`](verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md) + [`../verification/integrate-architecture-backlog-closeout-verification.log`](../verification/integrate-architecture-backlog-closeout-verification.log) |
-| Theme 5 — stub mutation HITL graph + `fe.applyMutation` wiring | [`architecture-todo.md`](architecture-todo.md) Theme 5 / [`release-todo.md`](release-todo.md) §1 | ✅ LangGraph pytest `test_chat_mutation_lifecycle.py` + targeted Jest — commands in [`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md) and [`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md) |
-| Theme 2 — mid-stream transport errors (`408`/`504`) | [`architecture-todo.md`](architecture-todo.md) Theme 2 | ✅ `mapErrorResponse` + `coerceAgentTransportError` + SSE consumer wiring + tests — transcript [`../verification/close-remaining-architecture-themes-verifier-036a.log`](../verification/close-remaining-architecture-themes-verifier-036a.log) |
-| Theme 3 — metadata autonomy allow-list + stable chat deps | [`architecture-todo.md`](architecture-todo.md) Theme 3 | ✅ `useAiEnabled` clamp + `AiChatDrawer` picker + `useAgentChat` dependency hygiene — same verifier log as Theme 2 |
-| Theme 4 — operator SSE resume / idempotency runbook | [`architecture-todo.md`](architecture-todo.md) Theme 4 | ✅ [`../operations/agent-stream-resume.md`](../operations/agent-stream-resume.md); FE depth deferrals in [`../archive/architecture-theme4-fe-deferred.md`](../archive/architecture-theme4-fe-deferred.md) |
-| Theme 6 — intelligence depth explicitly deferred | [`architecture-todo.md`](architecture-todo.md) Theme 6 | ✅ [`../archive/architecture-theme6-deferred.md`](../archive/architecture-theme6-deferred.md) |
-| Integration verifier log (merged baseline) | [`verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md`](verification-logs/2026-05-11-integrate-architecture-backlog-closeout-verifier.md) | ✅ Post-merge typecheck + targeted Jest + pytest (see file); alternate transcript [`../verification/integrate-architecture-backlog-closeout-verification.log`](../verification/integrate-architecture-backlog-closeout-verification.log) |
+| Architecture / UI status backlog reconciled vs codebase | [`ui-todo.md`](ui-todo.md) | ✅ 2026-05-11 closure snapshot on integrate branch — themes dispositioned to shipped vs archived deferrals (see git log); former per-theme action tables retired |
+| Architecture integrate branch (Theme 5 + remaining themes) | — | ✅ ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout`` merges verified Theme 5 + Themes 2–4/6 hygiene — see git log for verifier transcripts |
+| Theme 5 — stub mutation HITL graph + `fe.applyMutation` wiring | [`release-todo.md`](release-todo.md) §1 | ✅ LangGraph pytest `test_chat_mutation_lifecycle.py` + targeted Jest — see git log for verifier transcripts |
+| Theme 2 — mid-stream transport errors (`408`/`504`) | — | ✅ `mapErrorResponse` + `coerceAgentTransportError` + SSE consumer wiring + tests — see git log for verifier transcript |
+| Theme 3 — metadata autonomy allow-list + stable chat deps | — | ✅ `useAiEnabled` clamp + `AiChatDrawer` picker + `useAgentChat` dependency hygiene — same verifier transcript as Theme 2 |
+| Theme 4 — operator SSE resume / idempotency runbook | — | ✅ [`../operations/agent-stream-resume.md`](../operations/agent-stream-resume.md); FE depth deferrals explicitly closed |
+| Theme 6 — intelligence depth explicitly deferred | — | ✅ Closed with rationale; see git log |
+| Integration verifier log (merged baseline) | — | ✅ Post-merge typecheck + targeted Jest + pytest; see git log for transcripts |
 | Project detail shell collapse + `Breadcrumb` + board redirect | UX ([`ui-todo.md`](ui-todo.md) §1.1 item 5, Phase 1.3, Phase 2.5 §5) | ✅ `orch/todo-sweep-566b/fix-project-detail-shell` — `src/pages/projectDetail.tsx`, `src/pages/projectDetail.test.tsx`, `src/__tests__/projectDetailPage.breadcrumb.test.tsx`, `microcopy.breadcrumb.projects` en/zh-CN |
 | `AiChatDrawer` polish (tool payload disclosure, timestamps, copy, char cap) | UX ([`ui-todo.md`](ui-todo.md) §12 / §2.A.8) | ✅ `orch/todo-sweep-566b/chat-drawer-polish` — `src/components/aiChatDrawer`, `src/__tests__/aiAccessibility.strict.test.tsx` |
 | Auth forms — `AuthErrorSummary`, paste/`inputMode`/`enterKeyHint`, fluid card, bottom `Link` CTAs | UX ([`ui-todo.md`](ui-todo.md) §11, Phase 2.7) | ✅ `orch/todo-sweep-566b/auth-form-completion` — `loginForm`, `registerForm`, `authErrorSummary`, `authLayout.test.tsx`, `uiQuality.strict.test.tsx` slice |
@@ -200,10 +200,9 @@ JSON shim remains for local/fallback compatibility.
   `useAgentHealth` status dot in remote mode.
 - `src/components/aiSparkleIcon/index.tsx` — single shared "AI"
   affordance.
-- `src/components/copilotShell/index.tsx` — unified right-rail
-  scaffold with `chat`, `brief`, `activity`, and `settings` tabs.
-  Current board-page wiring opens the shell, but the tab bodies still
-  delegate to the existing drawers or render placeholder copy.
+- `src/components/copilotShell/index.tsx` — **Reverted 2026-05-21** —
+  placeholder shell deleted; Phase-2 right-rail will be built from
+  scratch when design lands.
 
 ### AI UX Phase 1 — trust and privacy corrections
 
@@ -333,8 +332,7 @@ first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
 
 Do **not** treat narrative counts in this section as authoritative — they go
 stale quickly. Use [`release-todo.md`](release-todo.md) (**FE verification**
-and **BE verification** snippets), the latest run in
-[`verification-logs/`](verification-logs/), and local `npm test` /
+and **BE verification** snippets) and local `npm test` /
 `pytest --cov` output for current suite sizes and coverage percentages.
 
 Coverage on the runtime AI scope from the last archived summary still reads

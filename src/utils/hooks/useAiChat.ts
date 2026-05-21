@@ -181,11 +181,11 @@ const useAiChat = (ctx: UseAiChatContext | null) => {
             setMessages(thread);
 
             /*
-             * Per-turn citation buffer (Optimization Plan §3 P0-3). Each
-             * tool result populated by the loop below contributes typed
-             * citations; we attach the deduped set to the assistant
-             * message that finalizes the turn so older messages keep their
-             * sources after later turns arrive.
+             * Per-turn citation buffer. Each tool result populated by the
+             * loop below contributes typed citations; we attach the
+             * deduped set to the assistant message that finalizes the
+             * turn so older messages keep their sources after later turns
+             * arrive.
              */
             const turnCitations: CitationRef[] = [];
             const seenCitationKey = new Set<string>();

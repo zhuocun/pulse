@@ -140,19 +140,19 @@ export interface UseAgentResult {
     error: Error | null;
     reset: () => void;
     /**
-     * Stable thread id for the current run (PRD v3 UA-R4). Surfaces use
-     * this for share/export links; resets on `reset()`.
+     * Stable thread id for the current run. Surfaces use this for
+     * share/export links; resets on `reset()`.
      */
     threadId: string;
     /**
-     * Time-To-First-Token in ms for the most recent turn (PRD v3 UA-R2).
-     * Null until the first `messages` chunk arrives. Surfaces compare
-     * against `TTFT_TARGET_MS` to detect slow turns; analytics fires
-     * `AGENT_TTFT` automatically when the value lands.
+     * Time-To-First-Token in ms for the most recent turn. Null until the
+     * first `messages` chunk arrives. Surfaces compare against
+     * `TTFT_TARGET_MS` to detect slow turns; analytics fires `AGENT_TTFT`
+     * automatically when the value lands.
      */
     ttftMs: number | null;
     /**
-     * True when the most recent TTFT exceeded {@link TTFT_SLO_MS} (P2-I).
+     * True when the most recent TTFT exceeded {@link TTFT_SLO_MS}.
      * Null/false until TTFT is measured. Surfaces use this to show slow-
      * response affordances like "Still thinking…".
      */
@@ -160,7 +160,7 @@ export interface UseAgentResult {
     /**
      * Clears `pendingProposal` without leaving the agent run going (used
      * after a user accepts/rejects from a UI surface and the parent has
-     * already wired the resume call). PRD v3 UA-R3.
+     * already wired the resume call).
      */
     clearPendingProposal: () => void;
     /**
@@ -267,7 +267,7 @@ const useAgent = (
     /**
      * TTFT bookkeeping. `streamStartRef` records the `performance.now()`
      * that consumeStream began; `ttftSeenRef` flips after the first
-     * `messages` chunk so we only emit once per turn (UA-R2).
+     * `messages` chunk so we only emit once per turn.
      */
     const streamStartRef = useRef<number | null>(null);
     const ttftSeenRef = useRef(false);
@@ -317,7 +317,7 @@ const useAgent = (
             let pendingResume: unknown | undefined;
             let terminatedByStreamError = false;
             // Watchdog: if no stream chunk arrives for STREAM_WATCHDOG_MS,
-            // abort the run and surface a "took too long" error (UA-R1).
+            // abort the run and surface a "took too long" error.
             const armWatchdog = () => {
                 clearWatchdog();
                 watchdogRef.current = setTimeout(() => {
@@ -476,12 +476,12 @@ const useAgent = (
             setIsStreaming(true);
             setFirstChunkReceived(false);
             setHasEverStarted(true);
-            // Reset TTFT bookkeeping for the new turn (UA-R2).
+            // Reset TTFT bookkeeping for the new turn.
             streamStartRef.current = performance.now();
             ttftSeenRef.current = false;
             if (mountedRef.current) setTtftMs(null);
 
-            // Observability P2-5: fire AGENT_TURN_STARTED when the stream opens.
+            // Fire AGENT_TURN_STARTED when the stream opens.
             lastUsageRef.current = null;
             track(ANALYTICS_EVENTS.AGENT_TURN_STARTED, { agentName: name });
 
@@ -549,9 +549,9 @@ const useAgent = (
                 void err;
             } finally {
                 clearWatchdog();
-                // Observability P2-5: fire AGENT_TURN_COMPLETED on natural
-                // completion or terminal error. Do NOT fire on aborts
-                // (user-initiated, not turn outcomes).
+                // Fire AGENT_TURN_COMPLETED on natural completion or
+                // terminal error. Do NOT fire on aborts (user-initiated,
+                // not turn outcomes).
                 if (!controller.signal.aborted) {
                     const durationMs =
                         streamStartRef.current !== null
@@ -622,12 +622,12 @@ const useAgent = (
             lastInterruptRef.current = null;
             setPendingInterrupt(null);
             setPendingProposal(null);
-            // Per-turn reset (review follow-up #10): citations, nudges, and
-            // lastSuggestion are scoped to a single user turn, so each new
-            // `start()` call discards the previous turn's surfaces. Multi-turn
-            // within one `start()` (auto-resume loop) continues to accumulate
-            // inside `consumeStream` so the agent can stream multiple citations
-            // for a single answer.
+            // Per-turn reset: citations, nudges, and lastSuggestion are
+            // scoped to a single user turn, so each new `start()` call
+            // discards the previous turn's surfaces. Multi-turn within
+            // one `start()` (auto-resume loop) continues to accumulate
+            // inside `consumeStream` so the agent can stream multiple
+            // citations for a single answer.
             setCitations([]);
             resetNudges();
             setLastSuggestion(null);

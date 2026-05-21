@@ -236,16 +236,8 @@ const useAgentToolResolver = (): UseAgentToolResolverResult => {
                 lastInterrupt
             };
 
-            const stage = (interrupt.args as { stage?: string } | undefined)
-                ?.stage;
             // HITL pause: never auto-resume a mutation-approval request. The
             // user must explicitly accept or reject in the proposal card.
-            // Covers both the legacy `fe.applyMutation` two-stage shape
-            // (stage="approval") and the new split tool name
-            // (`fe.requestMutationApproval`).
-            if (interrupt.tool === "fe.applyMutation" && stage === "approval") {
-                return undefined;
-            }
             if (interrupt.tool === "fe.requestMutationApproval") {
                 return undefined;
             }

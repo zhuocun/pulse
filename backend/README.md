@@ -33,18 +33,10 @@ python -m pip install ".[dev]"
 cp .env.example .env
 ```
 
-Set `DATABASE` and the matching database environment variables in
-`.env`, then run:
+Set `MONGO_URI` / `MONGO_DB` in `.env`, then run:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
-```
-
-MongoDB support is installed by default. DynamoDB and PostgreSQL
-drivers are optional:
-
-```bash
-python -m pip install ".[databases]"
 ```
 
 `langchain-anthropic` and `langchain-openai` are base dependencies —
@@ -71,7 +63,7 @@ cp scripts/git-hooks/commit-msg .git/hooks/commit-msg
 chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
 ```
 
-- `pre-commit` runs `python -m pytest`, which is configured to fail below `100%` coverage.
+- `pre-commit` runs `python -m pytest`, which is configured to fail below `85%` coverage (real coverage is ~98%; the gate is a floor, not a target).
 - `commit-msg` enforces Conventional Commits with these types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 Examples:
@@ -115,11 +107,14 @@ opt-out, rate limit, budget, autonomy), idempotency replay, redaction,
 SSE wire format, and observability (OpenTelemetry / Prometheus /
 LangSmith), see
 [`../docs/prd/v2.1-agent.md`](../docs/prd/v2.1-agent.md). Open
-architectural work (provider gateway, vector store / RAG, MCP mount,
-mutation lifecycle, supervisor / shared subgraph) is tracked in
-[`../docs/todo/architecture-todo.md`](../docs/todo/architecture-todo.md)
-and operationally in
+operational work is tracked in
 [`../docs/todo/release-todo.md`](../docs/todo/release-todo.md).
+
+Future architectural themes (not in current backlog): provider gateway,
+vector store / pgvector RAG, supervisor / shared subgraph, and mutation
+lifecycle hardening. None of these are active work; they are named here
+so the engineering vocabulary survives even after the per-theme tracking
+files were retired.
 
 ### Adding a new agent
 

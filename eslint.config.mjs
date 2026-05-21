@@ -65,6 +65,32 @@ export default [
             ],
             "no-plusplus": "off",
             "no-restricted-exports": "off",
+            // §3.1 of the UI/UX plan bans raw "Submit"/"OK"/"Login"/"Signup"
+            // button labels and the TitleCase "Edit Task" / "Create Project"
+            // strings in favour of the central `microcopy.actions.*` keys
+            // (which carry sentence case and a locale-aware lookup). The
+            // deleted `uiQuality.strict` / `uiCopyConsistency.strict` suites
+            // policed these literals across the whole app via DOM scans; a
+            // single `no-restricted-syntax` rule catches the same regression
+            // at the source, cheaper and earlier. The selector targets
+            // `<Button>…</Button>` children (the only place these literals
+            // actually shipped to users) so unrelated DOM text like a test
+            // fixture's `<span>OK</span>` keeps working.
+            "no-restricted-syntax": [
+                "error",
+                {
+                    selector:
+                        "JSXElement[openingElement.name.name=/^(Button|button)$/] > JSXText[value=/^\\s*(Submit|OK|Login|Signup|Edit Task|Create Project)\\s*$/]",
+                    message:
+                        "Don't hard-code button labels like 'Submit' / 'OK' / 'Login' / 'Signup' / 'Edit Task' / 'Create Project'. Use a `microcopy.actions.*` key (e.g. `microcopy.actions.logIn`, `microcopy.actions.editTask`) so casing and locale stay centralised."
+                },
+                {
+                    selector:
+                        "JSXAttribute[name.name=/^(title|okText|cancelText|aria-label)$/] > Literal[value=/^(Submit|OK|Login|Signup|Edit Task|Create Project)$/]",
+                    message:
+                        "Don't hard-code dialog/button title strings like 'Submit' / 'OK' / 'Login' / 'Signup' / 'Edit Task' / 'Create Project'. Use a `microcopy.actions.*` key (e.g. `microcopy.actions.editTask`) so casing and locale stay centralised."
+                }
+            ],
             "no-shadow": "off",
             "no-undef": "off",
             "no-underscore-dangle": [

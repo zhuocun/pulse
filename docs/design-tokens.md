@@ -36,4 +36,3 @@ Contributor reference for the app design system. **Implementation source of trut
 ## Related docs
 
 - UI plan and backlog: [`docs/todo/ui-todo.md`](todo/ui-todo.md)
-- Archived UI audit: [`docs/archive/ai-ux-optimization-plan.md`](archive/ai-ux-optimization-plan.md)

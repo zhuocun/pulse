@@ -129,4 +129,16 @@ describe("AuthErrorSummary", () => {
         expect(screen.queryByRole("link")).not.toBeInTheDocument();
         expect(screen.getByRole("alert")).toHaveTextContent(/boom/i);
     });
+
+    // The 1×1 clipped SrOnly announcer inside the alert sits absolute over
+    // the visible submit button on auth pages. Without `pointer-events: none`
+    // the invisible box would intercept clicks targeted at the button below.
+    // Mirrors the invariant the deleted srOnlyLiveRegions strict file held.
+    it("the SR-only announcer inside the alert is non-interactive", () => {
+        render(<Harness serverError={new Error("Boom")} />);
+        const alert = screen.getByRole("alert");
+        const srOnly = alert.querySelector("#auth-error-summary-sr-only");
+        expect(srOnly).not.toBeNull();
+        expect(srOnly).toHaveStyle({ pointerEvents: "none" });
+    });
 });

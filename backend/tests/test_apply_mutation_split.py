@@ -1,13 +1,13 @@
 """Wire-contract tests for the split mutation handshake.
 
-The single-stage fe.applyMutation tool is an anti-pattern (the model can
-be coaxed to skip the approval stage via the ``stage`` argument).
-:mod:`app.tools.fe_tool_names` now exposes the split pair:
+A single-stage tool that multiplexed approval + apply via a ``stage``
+argument is an anti-pattern (the model can be coaxed to skip the
+approval stage by manipulating ``stage`` directly).
+:mod:`app.tools.fe_tool_names` exposes the split pair:
 
 * ``fe.requestMutationApproval`` -- triggers HITL pause
 * ``fe.applyApprovedMutation`` -- redeems an approval_id
 
-Plus the legacy ``fe.applyMutation`` constant retained as deprecated.
 These tests pin the constants, the schema shapes, and the chat-agent
 interrupt payloads so the FE wire contract is stable.
 """
@@ -27,7 +27,6 @@ from app.agents.llm import make_stub_chat_model
 from app.tools.fe_tool_names import (
     ALL_FE_TOOL_NAMES,
     FE_APPLY_APPROVED_MUTATION,
-    FE_APPLY_MUTATION,
     FE_REQUEST_MUTATION_APPROVAL,
 )
 from app.tools.fe_tool_schemas import FE_TOOL_SCHEMAS, interrupt_payload
@@ -36,12 +35,8 @@ from app.tools.fe_tool_schemas import FE_TOOL_SCHEMAS, interrupt_payload
 def test_constants_exist_with_canonical_wire_names() -> None:
     assert FE_REQUEST_MUTATION_APPROVAL == "fe.requestMutationApproval"
     assert FE_APPLY_APPROVED_MUTATION == "fe.applyApprovedMutation"
-
-
-def test_legacy_apply_mutation_constant_retained() -> None:
-    """Old clients must still resolve the legacy name (deprecated)."""
-    assert FE_APPLY_MUTATION == "fe.applyMutation"
-    assert FE_APPLY_MUTATION in ALL_FE_TOOL_NAMES
+    assert FE_REQUEST_MUTATION_APPROVAL in ALL_FE_TOOL_NAMES
+    assert FE_APPLY_APPROVED_MUTATION in ALL_FE_TOOL_NAMES
 
 
 def test_both_split_tools_registered_in_schema() -> None:
@@ -67,12 +62,6 @@ def test_apply_approved_schema_requires_approval_id() -> None:
     assert "status" in result_props
     enum = result_props["status"]["enum"]
     assert enum == ["applied", "failed"]
-
-
-def test_legacy_apply_mutation_schema_marked_deprecated() -> None:
-    """The deprecation note must be discoverable on the schema description."""
-    schema = FE_TOOL_SCHEMAS[FE_APPLY_MUTATION]
-    assert "DEPRECATED" in schema["description"]
 
 
 def test_request_approval_payload_round_trips_through_interrupt_payload() -> None:

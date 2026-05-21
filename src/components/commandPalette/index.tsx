@@ -23,15 +23,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 interface CommandPaletteProps {
     open: boolean;
     onClose: () => void;
-    /**
-     * P1-A / P3-A: optional callback invoked when the user wants to open
-     * Board Copilot with a pre-filled query. When provided:
-     *   - AI mode (Enter) calls this instead of dispatching the legacy
-     *     `boardCopilot:openChat` custom event (keeps backward compat).
-     *   - No-results state (query ≥ 3 chars) shows a "Try asking Board
-     *     Copilot" CTA that calls this with the current query.
-     */
-    onOpenCopilot?: (query: string) => void;
 }
 
 interface PaletteEntry {
@@ -275,11 +266,7 @@ const groupByKind = (entries: PaletteEntry[]): RenderedItem[] => {
  * Mobile (CP-R5): below the `md` breakpoint the palette renders as an
  * AntD bottom-sheet Drawer with the same search + results semantics.
  */
-const CommandPalette: React.FC<CommandPaletteProps> = ({
-    open,
-    onClose,
-    onOpenCopilot
-}) => {
+const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [query, setQuery] = useState("");
@@ -379,34 +366,25 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
     );
 
     /**
-     * AI invocation (CP-R6 / P1-A). When `onOpenCopilot` is provided (P1-A),
-     * calls it directly so the parent can open the CopilotShell Chat tab with
-     * the prompt pre-filled. Falls back to dispatching the legacy
-     * `boardCopilot:openChat` custom event so non-board routes continue
-     * to work without changes.
+     * AI invocation (CP-R6). Dispatches a `boardCopilot:openChat` custom
+     * event that the board / project pages handle by opening the chat
+     * drawer with the input pre-populated.
      */
     const dispatchAiPrompt = useCallback(
         (prompt: string) => {
             track(ANALYTICS_EVENTS.COPILOT_PALETTE_INVOKE, {
                 length: prompt.length
             });
-            if (onOpenCopilot) {
-                // P1-A: route through the Copilot shell prop when available
-                onClose();
-                onOpenCopilot(prompt);
-            } else {
-                // Legacy fallback: custom event for non-board routes
-                if (typeof window !== "undefined") {
-                    window.dispatchEvent(
-                        new CustomEvent("boardCopilot:openChat", {
-                            detail: { prompt }
-                        })
-                    );
-                }
-                onClose();
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                    new CustomEvent("boardCopilot:openChat", {
+                        detail: { prompt }
+                    })
+                );
             }
+            onClose();
         },
-        [onClose, onOpenCopilot]
+        [onClose]
     );
 
     const toggleAiMode = useCallback((next?: boolean) => {
@@ -599,33 +577,29 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                                     : microcopy.empty.commandPalette.empty}
                             </Typography.Paragraph>
                             {/* P3-A: No-results → "Ask Board Copilot" CTA */}
-                            {!isColdCache &&
-                                onOpenCopilot &&
-                                query.trim().length >= 3 && (
-                                    <div
-                                        style={{
-                                            borderTop:
-                                                "1px solid var(--ant-color-border-secondary)",
-                                            padding: `${space.xs}px ${space.sm}px`
+                            {!isColdCache && query.trim().length >= 3 && (
+                                <div
+                                    style={{
+                                        borderTop:
+                                            "1px solid var(--ant-color-border-secondary)",
+                                        padding: `${space.xs}px ${space.sm}px`
+                                    }}
+                                >
+                                    <Button
+                                        icon={<AiSparkleIcon aria-hidden />}
+                                        onClick={() => {
+                                            dispatchAiPrompt(query.trim());
                                         }}
+                                        size="small"
+                                        type="link"
                                     >
-                                        <Button
-                                            icon={<AiSparkleIcon aria-hidden />}
-                                            onClick={() => {
-                                                const trimmed = query.trim();
-                                                onClose();
-                                                onOpenCopilot(trimmed);
-                                            }}
-                                            size="small"
-                                            type="link"
-                                        >
-                                            {
-                                                microcopy.commandPalette
-                                                    .noResultsCopilotCta
-                                            }
-                                        </Button>
-                                    </div>
-                                )}
+                                        {
+                                            microcopy.commandPalette
+                                                .noResultsCopilotCta
+                                        }
+                                    </Button>
+                                </div>
+                            )}
                         </>
                     ) : (
                         renderedItems.map((item, index) => {

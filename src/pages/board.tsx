@@ -24,7 +24,6 @@ import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
-import CopilotShell from "../components/copilotShell";
 import Column from "../components/column";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
@@ -449,8 +448,6 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
-    // P1-A: Unified Copilot shell state
-    const [copilotShellOpen, setCopilotShellOpen] = useState(false);
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -662,23 +659,6 @@ const BoardPage = () => {
                                                         ),
                                                         onClick: () =>
                                                             openBriefDrawer()
-                                                    },
-                                                    {
-                                                        type: "divider"
-                                                    },
-                                                    {
-                                                        key: "shell",
-                                                        label: microcopy.board
-                                                            .copilotMenuOpenPanel,
-                                                        icon: (
-                                                            <AiSparkleIcon
-                                                                aria-hidden
-                                                            />
-                                                        ),
-                                                        onClick: () =>
-                                                            setCopilotShellOpen(
-                                                                true
-                                                            )
                                                     }
                                                 ] satisfies MenuProps["items"]
                                             }}
@@ -995,18 +975,6 @@ const BoardPage = () => {
                                     ? triageAgent.nudges
                                     : undefined
                             }
-                            project={currentProject ?? null}
-                            tasks={visibleTasks}
-                        />
-                        {/* P1-A: Unified Copilot shell */}
-                        <CopilotShell
-                            columns={board ?? []}
-                            knownProjectIds={projectId ? [projectId] : []}
-                            members={members ?? []}
-                            onClose={() => setCopilotShellOpen(false)}
-                            onOpenBrief={openBriefDrawer}
-                            onOpenChat={() => openChatDrawer()}
-                            open={copilotShellOpen}
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />

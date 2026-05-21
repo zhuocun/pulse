@@ -88,9 +88,11 @@ class Settings:
     database: str = os.getenv("DATABASE", "mongoDB")
     mongo_uri: str = os.getenv("MONGO_URI", "mongodb://localhost:27017/jira")
     mongo_db: str = os.getenv("MONGO_DB", "jira")
-    aws_region: str = os.getenv("AWS_REGION", "us-east-1")
-    dynamodb_endpoint_url: str = os.getenv("DYNAMODB_ENDPOINT_URL", "")
-    dynamodb_table_prefix: str = os.getenv("DYNAMODB_TABLE_PREFIX", "")
+    # Postgres settings retained for the *agent* checkpoint/store backends
+    # (langgraph), which are independent of the application data store
+    # (now Mongo-only).  ``DATABASE`` only accepts ``mongoDB`` after the
+    # DDB/PG application repositories were removed; the postgres_* fields
+    # below are read by ``app.agents.checkpointing``.
     postgres_uri: str = os.getenv("POSTGRES_URI", "")
     postgres_user: str = os.getenv("POSTGRES_USER", "")
     postgres_host: str = os.getenv("POSTGRES_HOST", "localhost")
@@ -163,17 +165,6 @@ class Settings:
     agent_chat_model_allowlist: tuple[str, ...] = env_csv(
         "AGENT_CHAT_MODEL_ALLOWLIST", ""
     )
-    # Comma-separated kid:secret pairs for signed-thread-key rotation.
-    # Format: ``kid1:secret1,kid2:secret2``.  When set, signing emits the
-    # ``sigv2.`` envelope using the *last* listed kid (the active key) and
-    # verification accepts any kid in the registry; when empty, signing
-    # falls back to the legacy ``sigv1.`` envelope (HMAC over ``jwt_secret``)
-    # and verification accepts both ``sigv1`` and ``sigv2`` for rolling
-    # restarts.  Production rotation: append the new ``kid:secret`` and
-    # restart; remove the old entry once all in-flight tokens have expired.
-    agent_thread_signing_keys: tuple[str, ...] = env_csv(
-        "AGENT_THREAD_SIGNING_KEYS", ""
-    )
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     # Embeddings provider. Selection mirrors AGENT_CHAT_MODEL_PROVIDER.
@@ -208,7 +199,6 @@ class Settings:
             _env_value("AGENT_PROJECT_CHAT_MODEL_MAP", "")
         )
     )
-    mcp_enabled: bool = env_bool("MCP_ENABLED")
 
 
 settings = Settings()

@@ -12,9 +12,11 @@ repeats until the model returns plain text (max 5 rounds, enforced FE-
 side in ``useAiChat.ts``).
 
 GA §1: stub turns that include ``__PROPOSE_MUTATION__`` emit a typed
-``mutation_proposal`` custom event, pause on ``fe.applyMutation`` stage
-``approval``, resume with ``Command(resume={"accepted": <bool>})``, then
-optionally run stage ``apply`` (FE ``fe.applyMutation`` tool).
+``mutation_proposal`` custom event, pause on
+``fe.requestMutationApproval`` for the HITL review card, resume with
+``Command(resume={"accepted": <bool>})``, then -- when accepted --
+emit a second interrupt for ``fe.applyApprovedMutation`` which the FE
+redeems against the approval id the agent issued.
 """
 
 from __future__ import annotations
@@ -52,7 +54,6 @@ from app.agents.tool_envelope import wrap_tool_result
 from app.tools import be_tools
 from app.tools.fe_tool_names import (
     FE_APPLY_APPROVED_MUTATION,
-    FE_APPLY_MUTATION,
     FE_REQUEST_MUTATION_APPROVAL,
 )
 from app.tools.fe_tool_schemas import interrupt_payload
@@ -379,12 +380,13 @@ def _mutation_finalize(state: ChatState) -> dict[str, Any]:
             "mutation_decision": None,
         }
     # Two valid success shapes are accepted:
-    #   * new split contract: ``{"status": "applied", "details": {...}}``
-    #   * legacy FE_APPLY_MUTATION contract: ``{"applied": True}``
-    # The legacy form is kept so an in-flight FE that has not yet shipped
-    # the split tool names doesn't break the apply turn.  Anything else
-    # (empty dict, non-dict, ``{"applied": False}``) is treated as a
-    # failure so the user is not told an apply succeeded when it didn't.
+    #   * canonical contract: ``{"status": "applied", "details": {...}}``
+    #   * legacy contract:    ``{"applied": True}``
+    # The legacy form is kept as a defensive shield for operator-managed
+    # deploys where an older FE bundle may still be cached client-side;
+    # current FE always sends the canonical shape.  Anything else (empty
+    # dict, non-dict, ``{"applied": False}``) is treated as a failure so
+    # the user is not told an apply succeeded when it didn't.
     applied_ok = isinstance(fe_result, dict) and (
         fe_result.get("status") == "applied"
         or fe_result.get("applied") is True
@@ -435,7 +437,8 @@ class ChatAgent(BaseAgent):
             "listBoard",
             "listTasks",
             "getTask",
-            FE_APPLY_MUTATION,
+            FE_REQUEST_MUTATION_APPROVAL,
+            FE_APPLY_APPROVED_MUTATION,
         ),
         rationale={
             "recursion_limit": (
