@@ -40,12 +40,44 @@ const readBody = (req) =>
     });
 
 const collectionForPath = (pathname) => {
-    const segments = pathname.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean);
+    const segments = pathname
+        .replace(/^\/api\/v1\/?/, "")
+        .split("/")
+        .filter(Boolean);
     const name = segments[0];
     if (!name || !(name in db)) {
         return null;
     }
     return { name, records: db[name] };
+};
+
+const normalizeMember = (user) => ({
+    _id: String(user._id ?? user.id ?? user.email),
+    email:
+        user.email ??
+        `${String(user.name ?? user.username ?? "member").toLowerCase()}@example.com`,
+    username: user.username ?? user.name ?? String(user.id)
+});
+
+const normalizeProject = (project) => ({
+    _id: String(project._id ?? project.id),
+    projectName: project.projectName ?? project.name,
+    managerId: String(project.managerId ?? project.personId ?? ""),
+    organization: project.organization ?? project.department ?? "",
+    createdAt:
+        typeof project.createdAt === "number"
+            ? new Date(project.createdAt).toISOString()
+            : project.createdAt
+});
+
+const recordsForCollection = ({ name, records }) => {
+    if (name === "users") {
+        return records.map(normalizeMember);
+    }
+    if (name === "projects") {
+        return records.map(normalizeProject);
+    }
+    return records;
 };
 
 const handleResource = (req, res, pathname) => {
@@ -58,7 +90,7 @@ const handleResource = (req, res, pathname) => {
         sendJson(res, 405, { error: "Method Not Allowed" });
         return;
     }
-    sendJson(res, 200, collection.records);
+    sendJson(res, 200, recordsForCollection(collection));
 };
 
 const server = http.createServer(async (req, res) => {
