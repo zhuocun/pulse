@@ -107,10 +107,7 @@ opt-out, rate limit, budget, autonomy), idempotency replay, redaction,
 SSE wire format, and observability (OpenTelemetry / Prometheus /
 LangSmith), see
 [`../docs/prd/v2.1-agent.md`](../docs/prd/v2.1-agent.md). Open
-architectural work (provider gateway, vector store / RAG, MCP mount,
-mutation lifecycle, supervisor / shared subgraph) is tracked in
-[`../docs/todo/architecture-todo.md`](../docs/todo/architecture-todo.md)
-and operationally in
+operational work is tracked in
 [`../docs/todo/release-todo.md`](../docs/todo/release-todo.md).
 
 ### Adding a new agent
