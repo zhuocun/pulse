@@ -5,110 +5,95 @@ when a fix is non-obvious from the code alone.
 
 ## Coding harness
 
-Code in this repo should be **precise · efficient · readable · scalable ·
+Aim for code that is **precise · efficient · readable · scalable ·
 well-architected · well-designed · testable · robust · rigorous ·
-decompositional · smart · approaching 100% coverage**. Concretely:
+decompositional · smart · high-coverage**. Each quality below is one
+concrete rule plus the canonical anchor that demonstrates it.
 
-- **Precise.** Types are the contract. No `any` in production; use `unknown` +
-  narrowing at boundaries. Validate at edges (HTTP, FE↔BE wire, env, user
-  input); trust internal calls — don't double-guard. Constants for every wire
-  string (see `backend/app/tools/fe_tool_names.py`; never a bare `"fe.foo"`
-  literal).
-- **Efficient.** No silent N² patterns. React: memoize only the expensive
-  thing — premature `useMemo` clutters more than it helps. Backend: prefer
-  streaming/iterators over materialising. Bundle chunks stay under 1 MB
-  unminified; `vite build` under 5 s.
-- **Readable.** A function should be readable cold. Name says what; body says
-  how. Default to **zero comments** — they rot. Only comment the WHY of a
-  non-obvious constraint, subtle invariant, or workaround. **Never** embed PR
-  IDs, optimisation-plan tags (`P2-D`, `B-R11`, `review follow-up #N`), or
-  "added for issue #123" — meaningless after the PR merges.
-- **Scalable.** A change should not require touching N similar files. If you
-  edit the same shape in 5 places, factor it (see
-  `src/utils/hooks/_createOverlayHook.ts`). Single source of truth: tool names
-  (`FE_*` constants), microcopy (`src/constants/microcopy.ts`), routes, env
-  config. The Mongo-only repository keeps the `Repository` protocol as a seam
-  for future stores.
-- **Well-architected.** Boundaries are explicit. The agent runtime owns gates
-  (rate limit, budget, idempotency, redaction); routers wire HTTP; the
-  repository owns persistence. Don't smear concerns across modules. The Vercel
-  proxy at `api/index.ts` is the **only** edge into the backend in deploy
-  builds.
-- **Well-designed.** APIs are the smallest thing the caller actually needs.
-  Don't pre-design for futures you can't see. Three similar lines beats a
-  premature factory; abstract only when the third caller appears and the shape
-  is stable.
-- **Testable.** No module-level mutable singletons. If unavoidable, expose
-  `reset*ForTests` and document why (see `useApi` rate-limiter as the
-  cautionary tale). Inject dependencies; don't fetch them from the global.
-  Hooks have one job — split by responsibility, not by file count.
-- **Robust.** Fail fast at startup for misconfiguration (BE `_validate_settings`
-  raises before the first request). Fail soft at runtime for transient errors.
-  Every async call respects `AbortController`/unmount. Every interrupt has a
-  defined resolver or an explicit HITL pause.
-- **Rigorous.** Wire contracts are pinned by tests on both sides:
-  `FE_TOOL_REGISTRY` count matches `ALL_FE_TOOL_NAMES` matches
-  `FE_TOOL_SCHEMAS`. Every BE-advertised tool has an FE resolver. Every
-  `interrupt(NAME, ...)` callsite resolves to a registry entry or an explicit
-  HITL special case.
-- **Decompositional.** A file over 800 LOC of business code is a smell;
-  extract subcomponents along functional seams. A hook with 5 single-call
-  siblings is over-split — inline them. Decompose by responsibility, not
-  cosmetic file count.
-- **Smart.** Don't add error handling, fallbacks, or validation for cases
-  that can't happen. Don't paper over inconsistency with defensive shims —
-  fix the root cause. Trust framework guarantees; only validate at system
-  boundaries.
-- **100% coverage as aspiration, 85% as floor.** Backend `pytest` runs
-  `--cov-fail-under=85`; real coverage sits ~98%. Write tests for every
-  branch you add — never write tests purely to hit a coverage line (see the
-  deleted `test_coverage_filling.py`). The gate is a floor, not a target.
+- **Precise** — Types are the contract. No `any` in production; use `unknown`
+  with narrowing. Validate at system edges (HTTP, env, FE↔BE wire) and trust
+  internal calls.
+- **Efficient** — No silent N² patterns. Memoise only the expensive thing;
+  premature `useMemo` is clutter. Guardrails: bundle chunks ≤1 MB unminified,
+  `vite build` ≤5 s (currently 559 KB / 1.86 s — keep the slack).
+- **Readable** — A function reads cold: name says *what*, body says *how*.
+  Default to **zero comments**; only comment a non-obvious WHY. Never embed
+  PR IDs, optimisation-plan tags (`P2-D`, `B-R11`), or "added for #123" —
+  meaningless after merge (`9a182ec` scrubbed 62 such refs).
+- **Scalable** — One source of truth for shared strings: tool names live in
+  `backend/app/tools/fe_tool_names.py` (`FE_*` constants — never a bare
+  `"fe.foo"` literal); microcopy in `src/constants/microcopy.ts`. A change
+  should not require touching N similar files.
+- **Well-architected** — Boundaries are explicit. Agent runtime owns the
+  gates (rate limit, budget, idempotency, redaction); routers wire HTTP;
+  the repository owns persistence. `api/index.ts` is the **only** edge into
+  the backend in deploy builds.
+- **Well-designed** — Smallest API the caller actually needs. Don't
+  pre-design for futures you can't see. Three similar lines beats a
+  premature factory; abstract only when the third caller arrives and the
+  shape is stable (`src/utils/hooks/_createOverlayHook.ts` is the model).
+- **Testable** — No module-level mutable state. If unavoidable, expose
+  `reset*ForTests` and document the constraint (`useApi.ts` rate-limiter
+  is the cautionary example). Inject dependencies; don't fetch from the
+  global.
+- **Robust** — Fail fast at boot for misconfiguration (BE settings
+  validation raises before the first request handles). Fail soft at
+  runtime for transient errors. Every async call respects
+  `AbortController`/unmount.
+- **Rigorous** — Wire contracts pinned by tests on both sides:
+  `FE_TOOL_REGISTRY.size` (currently 11) matches `ALL_FE_TOOL_NAMES`
+  matches `FE_TOOL_SCHEMAS`. Every BE-advertised tool has an FE
+  resolver; every `interrupt(NAME, …)` reaches a registry entry or an
+  explicit HITL special case (`useAgentToolResolver.ts:241-243`).
+- **Decompositional** — Split by responsibility, not by cosmetic file
+  count. >800 LOC of business code in one file is a smell; <50 LOC files
+  that always travel together should fold back. Outliers
+  (`aiChatDrawer/index.tsx`, `useAgent.ts`) are tracked debt, not models.
+- **Smart** — Don't defend against scenarios that can't happen. No
+  compat shims for refactors that completed (the `fe.applyMutation`
+  cleanup is the template). Fix root causes, not symptoms.
+- **High-coverage** — Backend gate is `--cov-fail-under=85`; real
+  coverage runs ~98%. Write a test for every branch you add — never a
+  test purely to hit a coverage line (deleted `test_coverage_filling.py`
+  is why the gate was lowered).
 
 ## Other guardrails
 
-- **Dependencies.** Test/build tooling lives in `devDependencies`; `@types/*`
-  always in devDeps. Before adding a dep: is it used in source? If a dep has
-  one call site, inline it (see lodash `isEqual` → inlined `shallowEqual` in
-  `taskModal/index.tsx`). Audit periodically with
-  `grep -rn "from \"$pkg" src/`.
-- **Configuration coherence.** One source per concern: Node version in
-  `.nvmrc` only. Don't ship `requirements.txt` *and* `pyproject.toml` *and*
-  `uv.lock` all racing each other — pick the canonical one. Three sources of
-  truth means three places to drift.
-- **Doc–code coherence.** When you delete code, update or delete every doc
-  that names it **in the same PR**. A stale "✅ Resolved" entry pointing at
-  files that no longer exist is a worse lie than the deletion itself.
-  Verifier logs, orchestrator scratch (`.orchestrate/`), and dated status
-  snapshots belong in `.gitignore` — never in the repo.
-- **Deprecation discipline.** A compat shim deserves a removal date. After
-  sunset: delete, don't preserve "for older clients" forever (see the
-  `fe.applyMutation` removal across FE and BE). Mark deprecated entries
-  with the date they should disappear.
-- **Backwards compat at boundaries only.** Internal refactors don't need
-  shims. External-facing surfaces (wire contracts, env vars, public APIs)
-  do — and only until the next major version.
-- **Accessibility minimums.** Every interactive control declares a 44px
-  touch target under `@media (pointer: coarse)` (WCAG 2.5.8); see the
-  `*/index.test.tsx` "declares a touch-target height" tests. Every
-  top-level surface passes `axe-core` without violations (see
-  `src/__tests__/uiAccessibility.strict.test.tsx`). Button microcopy
-  flows through `src/constants/microcopy.ts` — never hard-code `Submit`,
-  `OK`, `Login`, `Signup`, `Edit Task`, `Create Project` as labels.
-  ESLint enforces this via `no-restricted-syntax`.
-- **Observability.** Pick one telemetry stack and commit. Running OTel
-  and Prometheus side-by-side doubles the dimension surface for half
-  the value.
-- **No god components / god tests.** Production components or test files
-  over 800 LOC are smells — split by topic. The current outliers
-  (`aiChatDrawer/index.tsx`, `useAgent.ts`) are tech debt, not models.
-- **Heritage tracking is debt.** `docs/todo/*.md` drifts by design — keep
-  it slim; remove shipped entries; never duplicate PR history that lives
-  in `git log` and `git blame`.
-
-## Keep the backlog current
-
-Add or remove items in the relevant `docs/todo/*.md` in the same PR. Don't
-restate blockers in `README.md` or PR descriptions — link to the entry.
+- **Dependencies** — `@types/*` and test/build tooling live in
+  `devDependencies`. Before adding a dep, grep
+  `src/ vite.config.ts jest.config.cjs` for an existing equivalent. If a
+  candidate dep has one call site, inline (lodash `isEqual` → inlined
+  `shallowEqual` in `taskModal/index.tsx` is the model).
+- **Configuration coherence** — One source per concern. Node version in
+  `.nvmrc` only (not `.node-version` + `engines.node` + `.nvmrc`). Pick
+  `pyproject.toml` *or* `requirements.txt` *or* `uv.lock` — three sources
+  of truth means three places to drift.
+- **Doc–code coherence** — When you delete code, update every doc that
+  names it **in the same PR**. A `✅ Resolved` entry linking to files
+  that no longer exist is worse than the deletion. Tracking files
+  (`docs/todo/*.md`) live in the same PR as the work they describe;
+  never restate blockers in `README.md` or PR bodies — link to the
+  entry. Orchestrator scratch (`.orchestrate/`), verifier logs, and
+  dated status snapshots belong in `.gitignore`, not the repo.
+- **Deprecation discipline** — A compat shim ships with a removal date.
+  After sunset: delete on both sides. Don't preserve "for older
+  clients" indefinitely.
+- **Backwards compat at boundaries only** — Internal refactors don't
+  need shims. External surfaces (wire contracts, env vars, public APIs)
+  do, until the next major.
+- **Accessibility minimums** — Every interactive control declares
+  ≥44 px touch-target under `@media (pointer: coarse)` (WCAG 2.5.8);
+  the `declares a touch-target height` tests in
+  `src/components/*/index.test.tsx` and `layouts/authLayout.test.tsx`
+  pin this. Every top-level surface passes `axe-core` clean
+  (`src/__tests__/uiAccessibility.strict.test.tsx`). Button labels
+  flow through `src/constants/microcopy.ts` — ESLint
+  `no-restricted-syntax` blocks raw `Submit`/`OK`/`Login`/`Signup`/
+  `Edit Task`/`Create Project` as `<Button>` children or `okText`/
+  `cancelText` props.
+- **Observability** — Pick one telemetry stack. OTel and Prometheus
+  side-by-side doubles the dimension surface for half the value;
+  current code carries both as tech debt, not as a template.
 
 ## v2.1 agent surface (`useAgent`)
 
