@@ -87,7 +87,7 @@ const validateAiBaseUrl = (raw: string): string => {
 const apiOrigin = readEnv("REACT_APP_API_URL")?.trim() || DEFAULT_API_ORIGIN;
 /**
  * REST calls live at a same-origin `/api/v1/*` prefix in both prod
- * (Vercel ``api/[...path].ts`` proxy function) and dev (Vite dev-
+ * (Vercel ``api/index.ts`` proxy function) and dev (Vite dev-
  * server proxy) so the HttpOnly session cookie issued by
  * ``POST /auth/login`` rides every request automatically. The previous
  * absolute `${apiOrigin}/api/v1` URL made REST cross-origin from the

@@ -166,7 +166,7 @@ const performFetch = async (
     const config: RequestInit = {
         method: "GET",
         headers,
-        // Same-origin in prod (Vercel ``api/[...path].ts`` proxy
+        // Same-origin in prod (Vercel ``api/index.ts`` proxy
         // function) and dev (Vite proxy) so the browser auto-attaches
         // the HttpOnly ``Token`` session cookie issued by
         // ``POST /auth/login``. ``"include"`` is belt-and-braces:

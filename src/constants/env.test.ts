@@ -15,7 +15,7 @@ describe("environment", () => {
 
     it("uses a same-origin REST prefix regardless of REACT_APP_API_URL", () => {
         // REST calls go through ``/api/v1/*`` on the FE's own origin
-        // (``api/[...path].ts`` Vercel proxy function in prod, Vite
+        // (``api/index.ts`` Vercel proxy function in prod, Vite
         // proxy in dev). ``REACT_APP_API_URL`` still drives
         // ``aiBaseUrl`` for direct-to-backend AI calls, but the REST
         // base is no longer derived from it -- that's what makes the
