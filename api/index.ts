@@ -17,7 +17,11 @@
  * ``fetch`` reference) was not reliably invoked on this Vite static
  * deploy and surfaced as Vercel ``FUNCTION_INVOCATION_FAILED``.
  */
-import { handleProxyRequest } from "./_proxy";
+// ``.js`` suffix is mandatory under Node ESM (see ``api/package.json``
+// ``type: module`` and the Vercel runtime error we hit without it:
+// ``ERR_MODULE_NOT_FOUND ... file:///var/task/api/_proxy``). TypeScript
+// resolves the suffix back to ``_proxy.ts`` at compile time.
+import { handleProxyRequest } from "./_proxy.js";
 
 export default handleProxyRequest;
 

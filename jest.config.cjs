@@ -3,6 +3,12 @@ module.exports = {
     restoreMocks: true,
     collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
     moduleNameMapper: {
+        // Strip the ``.js`` suffix from relative TS imports so Jest can
+        // resolve to the matching ``.ts`` file. Required because
+        // ``api/index.ts`` imports ``./_proxy.js`` (mandatory under
+        // Node ESM at runtime); without this Jest's CJS resolver
+        // looks for a literal ``_proxy.js`` and fails.
+        "^(\\.{1,2}/.*)\\.js$": "$1",
         "^@rc-component/picker/(.*)$":
             "<rootDir>/node_modules/@rc-component/picker/lib/$1",
         "^@rc-component/picker/locale/(.*)$":
