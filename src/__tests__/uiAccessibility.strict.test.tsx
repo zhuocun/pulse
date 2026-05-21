@@ -16,6 +16,7 @@ import React from "react";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
+import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import AiTaskAssistPanel from "../components/aiTaskAssistPanel";
 import AiTaskDraftModal from "../components/aiTaskDraftModal";
@@ -101,6 +102,41 @@ jest.mock("../utils/hooks/useAgent", () => {
     };
     return { __esModule: true, default: () => stub };
 });
+jest.mock("../utils/hooks/useAiChat", () => {
+    const noop = () => undefined;
+    const stub = {
+        abort: noop,
+        dismissError: noop,
+        error: null,
+        isLoading: false,
+        messages: [],
+        reset: noop,
+        seedMessages: noop,
+        send: () => Promise.resolve(),
+        streamingText: ""
+    };
+    return { __esModule: true, default: () => stub };
+});
+jest.mock("../utils/hooks/useAgentChat", () => {
+    const noop = () => undefined;
+    const stub = {
+        abort: noop,
+        citations: [],
+        dismissError: noop,
+        dismissNudge: noop,
+        error: null,
+        isLoading: false,
+        messages: [],
+        pendingNudges: [],
+        pendingProposal: null,
+        reset: noop,
+        resumeProposal: noop,
+        seedMessages: noop,
+        send: () => Promise.resolve(),
+        streamingText: ""
+    };
+    return { __esModule: true, default: () => stub };
+});
 jest.mock("../utils/hooks/useUndoToast", () => ({
     __esModule: true,
     default: () => ({ show: jest.fn() })
@@ -171,6 +207,11 @@ beforeAll(() => {
     Object.defineProperty(window, "ResizeObserver", {
         writable: true,
         value: ResizeObserverMock
+    });
+
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+        configurable: true,
+        value: 800
     });
 });
 
@@ -375,6 +416,31 @@ describe("AI a11y :: axe accessibility audit", () => {
             />
         );
         const results = await axe(container);
+        expect(results).toHaveNoViolations();
+    });
+
+    it("AiChatDrawer (open) has no axe violations", async () => {
+        // Render without `AntdApp` to stay consistent with the other AI
+        // surfaces here — wrapping with `<AntdApp component={false}>` would
+        // re-trigger AntD's cssVar warning and the jsdom NaN-height path.
+        // `App.useApp()` inside the drawer falls back to a no-op message
+        // bag when no provider is present, which is fine because nothing
+        // in this test triggers a feedback toast.
+        renderInWrapper(
+            <AiChatDrawer
+                columns={SAMPLE_COLUMNS}
+                knownProjectIds={[SAMPLE_PROJECT._id]}
+                members={SAMPLE_MEMBERS}
+                onClose={jest.fn()}
+                open
+                project={SAMPLE_PROJECT}
+                tasks={SAMPLE_TASKS}
+            />
+        );
+        await waitFor(() => {
+            expect(document.querySelector("[role='dialog']")).not.toBeNull();
+        });
+        const results = await axe(document.body);
         expect(results).toHaveNoViolations();
     });
 });
