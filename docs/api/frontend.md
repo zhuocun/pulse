@@ -26,7 +26,7 @@ the local-engine fallback that activates when `REACT_APP_AI_BASE_URL` is unset.
 | `build`        | `vite build`                                           | Production bundle                |
 | `test`         | `jest`                                                 | Unit + integration tests (jsdom) |
 | `typecheck`    | `tsc --noEmit`                                         | TypeScript type check, no emit   |
-| `server`       | `json-server __json_server_mock__/db.json --port 8080` | Mock REST server on port 8080    |
+| `server`       | `node __json_server_mock__/server.cjs`                 | Mock REST server on port 8080    |
 | `prettier`     | `prettier --check .`                                   | Format check                     |
 | `prettier:fix` | `prettier --write .`                                   | Format fix                       |
 | `eslint`       | `eslint src … --fix`                                   | Lint + auto-fix                  |
@@ -44,7 +44,7 @@ _Source: `src/constants/env.ts:1`_
 
 | Variable                     | Default                                   | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REACT_APP_API_URL`          | `https://pulse-python-server.vercel.app`  | Origin of the REST API. The FE appends `/api/v1/` to form `apiBaseUrl`.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `REACT_APP_API_URL`          | `https://pulse-python-server.vercel.app`  | Backend origin used by the Vite dev proxy. Browser REST calls stay same-origin at `/api/v1/*` so the HttpOnly session cookie can ride automatically.                                                                                                                                                                                                                                                                                                                                                 |
 | `REACT_APP_AI_BASE_URL`      | `""` (empty string)                       | Origin of the AI service (highest priority). When set and non-empty, all AI requests go here; validated at module load (`javascript:`, `file:`, `data:`, and malformed URLs are rejected and fall back to the local engine; trailing slashes trimmed; `http:` only accepted in DEV builds). When unset, the 3-way fallback applies: if `REACT_APP_AI_USE_LOCAL=true` or `NODE_ENV==="test"` → local engine; otherwise → `apiOrigin` (so deployed builds reach the backend without setting this var). |
 | `REACT_APP_AI_USE_LOCAL`     | —                                         | Set to `"true"` to force the local deterministic engine when `REACT_APP_AI_BASE_URL` is unset. `.env.development` sets this automatically so `npm start` always uses the local engine. Jest short-circuits to local regardless of this flag (`NODE_ENV==="test"` guard).                                                                                                                                                                                                                             |
 | `REACT_APP_AI_ENABLED`       | `"true"` (any value other than `"false"`) | Global AI feature gate. Set `"false"` to disable all AI UI and hooks.                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -55,26 +55,28 @@ The `environment` singleton exported from `src/constants/env.ts` has the shape:
 
 ```ts
 interface Environment {
-    apiBaseUrl: string; // e.g. "https://pulse-python-server.vercel.app/api/v1"
+    apiBaseUrl: string; // "/api/v1"
     aiBaseUrl: string; // e.g. "https://my-ai.example.com" or ""
     aiEnabled: boolean; // false only when REACT_APP_AI_ENABLED === "false"
     aiUseLocalEngine: boolean; // true when resolved aiBaseUrl === "" (local flag, test env, or invalid URL)
 }
 ```
 
-### Auth token storage
+### Auth session storage
 
-_Source: `src/utils/tokenStorage.ts:1`_
+_Source: `src/utils/authProvider.tsx:1`, `src/utils/hooks/useApi.ts:1`_
 
-The JWT returned by `POST /api/v1/auth/login` is stored in `localStorage` under the
-key `"Token"`. All REST calls attach it as `Authorization: Bearer <token>`. AI proxy
-calls use the same token via `getStoredBearerAuthHeader()` (`src/utils/aiAuthHeader.ts`).
+`POST /api/v1/auth/login` sets the REST JWT in an HttpOnly `Token` cookie.
+Frontend code cannot read that cookie; all REST calls use same-origin
+`/api/v1/*` with `credentials: "include"` so the browser attaches it. The
+optional `ai_jwt` response field is stored separately in `sessionStorage` for
+AI proxy calls that may live outside the cookie origin.
 
 ### localStorage keys
 
 | Key                                      | Owner                 | Content                                                      |
 | ---------------------------------------- | --------------------- | ------------------------------------------------------------ |
-| `"Token"`                                | `tokenStorage.ts`     | Raw JWT string                                               |
+| `"AiProxyJwt"`                           | `tokenStorage.ts`     | Narrow AI proxy JWT from login response                      |
 | `"boardCopilot:enabled"`                 | `useAiEnabled.ts`     | `"true"` / `"false"` — per-browser AI toggle                 |
 | `"boardCopilot:autonomy"`                | `useAiEnabled.ts`     | `"suggest"` / `"plan"` / `"auto"`                            |
 | `"boardCopilot:disabledProjectIds"`      | `projectAiStorage.ts` | JSON array of project ids opted-out of AI                    |
@@ -1733,8 +1735,9 @@ Run with:
 npm run server
 ```
 
-This starts `json-server` on `http://localhost:8080` with a custom `middleware.js` and
-seeds data from `db.json`. Point the FE at it by setting `REACT_APP_API_URL=http://localhost:8080`.
+This starts the cookie-aware mock API on `http://localhost:8080` with
+`middleware.js` in front of `db.json`. Point the Vite proxy at it by setting
+`REACT_APP_API_URL=http://localhost:8080` before starting the FE.
 
 ### Auth routes (handled by middleware)
 
@@ -1747,9 +1750,10 @@ router sees them.
 { "email": "alice@example.com", "password": "any" }
 ```
 
-Success (200): returns a synthetic `IUser` with `_id = email`, `jwt = email`,
-`username = email.split("@")[0]`. Any `email` containing the substring `"wrong"`
-returns a 400 with `{ "error": "Invalid credential, please try again" }`.
+Success (200): sets `Set-Cookie: Token=<email>; HttpOnly; SameSite=Lax` and
+returns a synthetic `IUser` with `_id = email` and
+`username = email.split("@")[0]`. Any `email` containing the substring
+`"wrong"` returns a 400 with `{ "error": "Invalid credential, please try again" }`.
 
 #### `POST /register` and `POST /api/v1/auth/register`
 
@@ -1761,12 +1765,14 @@ Success (201): `{ "message": "User created" }`. Emails containing `"wrong"` retu
 
 #### `GET /userInfo` and `GET /api/v1/users`
 
-Requires `Authorization: Bearer <token>` header. Reconstructs the user from the token
-value (treated as email). Missing auth header returns 401.
+Requires the `Token` cookie set by login. The mock also accepts the legacy
+`Authorization: Bearer <token>` header for older tests. It reconstructs the
+user from the token value (treated as email). Missing auth returns 401.
 
 ### Auth guard
 
-All other routes require `Authorization` header. Requests without it return:
+All other routes require the `Token` cookie or legacy `Authorization` header.
+Requests without auth return:
 
 ```json
 { "error": "Unauthorized" }
@@ -1774,9 +1780,10 @@ All other routes require `Authorization` header. Requests without it return:
 
 ### Resource routes (handled by json-server)
 
-`db.json` seeds `users` and `projects` collections. `json-server` auto-generates REST
-routes for them. The seed data does not include `boards`, `tasks`, or `columns`
-collections — those need to be created at runtime or the seed file extended.
+`db.json` seeds `users` and `projects` collections. The local mock serves them
+under `/api/v1/*`. The seed data does not include `boards`, `tasks`, or
+`columns` collections — those need to be created at runtime or the seed file
+extended.
 
 ```json
 {

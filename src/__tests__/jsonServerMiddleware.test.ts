@@ -1,4 +1,8 @@
-import middleware from "../../__json_server_mock__/middleware";
+import middleware, {
+    SESSION_COOKIE,
+    parseCookies,
+    sessionTokenFromRequest
+} from "../../__json_server_mock__/middleware";
 
 type MockRequest = {
     body: Record<string, string>;
@@ -7,8 +11,11 @@ type MockRequest = {
 };
 
 type MockResponse = {
+    end: jest.Mock;
     json: jest.Mock;
+    setHeader: jest.Mock;
     status: jest.Mock;
+    statusCode: number;
 };
 
 const createRequest = (overrides: Partial<MockRequest> = {}): MockRequest => ({
@@ -19,10 +26,17 @@ const createRequest = (overrides: Partial<MockRequest> = {}): MockRequest => ({
 });
 
 const createResponse = (): MockResponse => {
-    const response = {} as MockResponse;
+    const response = {
+        statusCode: 200
+    } as MockResponse;
 
-    response.status = jest.fn((_code: number) => response);
+    response.status = jest.fn((code: number) => {
+        response.statusCode = code;
+        return response;
+    });
     response.json = jest.fn((_body?: unknown) => response);
+    response.setHeader = jest.fn();
+    response.end = jest.fn(() => response);
 
     return response;
 };
@@ -34,12 +48,12 @@ const runMiddleware = (request: Partial<MockRequest>) => {
 
     middleware(req, res, next);
 
-    return { next, res };
+    return { next, req, res };
 };
 
 describe("json-server middleware", () => {
     it.each(["/login", "/api/v1/auth/login"])(
-        "returns a login user when credentials are present for %s",
+        "returns a login user and sets the HttpOnly session cookie for %s",
         (path) => {
             const { next, res } = runMiddleware({
                 body: { email: "alice@example.com", password: "pw" },
@@ -50,10 +64,17 @@ describe("json-server middleware", () => {
             expect(res.json).toHaveBeenCalledWith({
                 _id: "alice@example.com",
                 email: "alice@example.com",
-                jwt: "alice@example.com",
                 likedProjects: [],
                 username: "alice"
             });
+            expect(res.setHeader).toHaveBeenCalledWith(
+                "Set-Cookie",
+                expect.stringContaining(`${SESSION_COOKIE}=alice%40example.com`)
+            );
+            expect(res.setHeader).toHaveBeenCalledWith(
+                "Set-Cookie",
+                expect.stringMatching(/HttpOnly/i)
+            );
             expect(next).not.toHaveBeenCalled();
         }
     );
@@ -114,7 +135,21 @@ describe("json-server middleware", () => {
         expect(next).not.toHaveBeenCalled();
     });
 
-    it("rejects non-auth routes without an authorization header", () => {
+    it("clears the session cookie on logout", () => {
+        const { next, res } = runMiddleware({
+            path: "/api/v1/auth/logout"
+        });
+
+        expect(res.status).toHaveBeenCalledWith(204);
+        expect(res.setHeader).toHaveBeenCalledWith(
+            "Set-Cookie",
+            expect.stringMatching(/Max-Age=0/i)
+        );
+        expect(res.end).toHaveBeenCalled();
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-auth routes without a session cookie or bearer token", () => {
         const { next, res } = runMiddleware({ path: "/projects" });
 
         expect(res.status).toHaveBeenCalledWith(401);
@@ -123,7 +158,28 @@ describe("json-server middleware", () => {
     });
 
     it.each(["/userInfo", "/api/v1/users"])(
-        "returns user info from a bearer authorization header for %s",
+        "returns user info from the HttpOnly session cookie for %s",
+        (path) => {
+            const { next, res } = runMiddleware({
+                headers: {
+                    cookie: `${SESSION_COOKIE}=alice%40example.com`
+                },
+                path
+            });
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                _id: "alice@example.com",
+                email: "alice@example.com",
+                likedProjects: [],
+                username: "alice"
+            });
+            expect(next).not.toHaveBeenCalled();
+        }
+    );
+
+    it.each(["/userInfo", "/api/v1/users"])(
+        "still accepts bearer authorization for non-browser callers on %s",
         (path) => {
             const { next, res } = runMiddleware({
                 headers: { authorization: "Bearer alice@example.com" },
@@ -134,7 +190,6 @@ describe("json-server middleware", () => {
             expect(res.json).toHaveBeenCalledWith({
                 _id: "alice@example.com",
                 email: "alice@example.com",
-                jwt: "alice@example.com",
                 likedProjects: [],
                 username: "alice"
             });
@@ -144,12 +199,26 @@ describe("json-server middleware", () => {
 
     it("passes authorized non-special routes through", () => {
         const { next, res } = runMiddleware({
-            headers: { authorization: "Bearer token-1" },
+            headers: { cookie: `${SESSION_COOKIE}=token-1` },
             path: "/projects"
         });
 
         expect(res.status).not.toHaveBeenCalled();
         expect(res.json).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it("parses cookie headers for session lookup helpers", () => {
+        expect(
+            parseCookies(`${SESSION_COOKIE}=alice%40example.com; other=1`)
+        ).toEqual({
+            [SESSION_COOKIE]: "alice@example.com",
+            other: "1"
+        });
+        expect(
+            sessionTokenFromRequest({
+                headers: { cookie: `${SESSION_COOKIE}=alice%40example.com` }
+            })
+        ).toBe("alice@example.com");
     });
 });
