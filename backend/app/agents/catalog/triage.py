@@ -42,6 +42,7 @@ from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
 from app.agents.polish import PolishStep
 from app.agents.state import TriageState
+from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT
 from app.tools.redaction import redact_dict
 from app.store import namespaces
 from langgraph.runtime import get_runtime
@@ -267,7 +268,7 @@ class TriageAgent(BaseAgent):
         status="active",
         rate_limit=(10, 60),
         allowed_autonomy=("suggest",),
-        tools=("fe.boardSnapshot", "be.detect_drift"),
+        tools=(FE_BOARD_SNAPSHOT, "be.detect_drift"),
         redactable_dict_fields=("context",),
         rationale={
             "recursion_limit": (
