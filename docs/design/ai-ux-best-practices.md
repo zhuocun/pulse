@@ -1,7 +1,7 @@
 # AI Web App UX Best Practices — Research Reference
 
 **Created:** 2026-05-05  
-**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the active AI UX PRD; the original audit is archived at [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md)) and [`../todo/ui-todo.md`](../todo/ui-todo.md) (general UX plan).  
+**Scope:** Foundational research synthesis for AI-powered web applications, contextualized to the Board Copilot feature in `pulse`. Complements [`../prd/v3-ai-ux.md`](../prd/v3-ai-ux.md) (the active AI UX PRD) and [`../todo/ui-todo.md`](../todo/ui-todo.md) (general UX plan).  
 **Primary sources:** Google PAIR Guidebook, Microsoft HAX Toolkit, Nielsen Norman Group AI UX research, NIST AI RMF, Anthropic model card & safety guidance, IBM Design for AI, OpenAI product design guidance, W3C accessibility, Apple ML/privacy design.
 
 ---
@@ -441,7 +441,7 @@ Never log tool output content or the data payloads sent to the AI.
 
 ## 13. Board Copilot — Principle-to-Implementation Mapping
 
-This table maps the principles above to the current implementation state and the items in the archived [`../archive/ai-ux-optimization-plan.md`](../archive/ai-ux-optimization-plan.md) (the audit that informed the v3 PRD) for traceability.
+This table maps the principles above to the current implementation state for traceability.
 
 | Principle area              | Implementation state                                  | See also                                  |
 | --------------------------- | ----------------------------------------------------- | ----------------------------------------- |

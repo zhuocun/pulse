@@ -29,10 +29,6 @@ the whole backlog without folder-hopping.
 - [`todo/release-todo.md`](todo/release-todo.md) — GA blockers,
   soft blockers, polish, and the recommended internal-beta →
   design-partner → public ship sequence.
-- [`todo/architecture-todo.md`](todo/architecture-todo.md) —
-  agent-runtime themes (contract hardening, stream errors, mutation
-  lifecycle, durable resume, FE simplification, BE
-  intelligence/resilience) with phased execution.
 - [`todo/ui-todo.md`](todo/ui-todo.md) — phased UI plan
   (foundations, surfaces, polish, stretch).
 - [`todo/product-done.md`](todo/product-done.md) — implementation
@@ -50,8 +46,7 @@ the whole backlog without folder-hopping.
   Jest / BE pytest / shared infra audit; ranked flaky-test suspects
   and recommended follow-ups.
 - [`operations/cursor-cloud.md`](operations/cursor-cloud.md) — VM
-  setup notes for Cursor Cloud (mongod, NVM, Jest heap bump,
-  vendored `cursor-sdk` / `orchestrate` skills).
+  setup notes for Cursor Cloud (mongod, NVM, Jest heap bump).
 
 ## Design
 
@@ -60,18 +55,3 @@ the whole backlog without folder-hopping.
   RMF, etc.).
 - [`design/mobile-native-best-practices.md`](design/mobile-native-best-practices.md)
   — mobile responsive patterns and red flags.
-
-## Archive
-
-Historical traceability — design decisions, shipped audit trails,
-superseded PRDs. **Not** the current source of truth.
-
-- [`archive/README.md`](archive/README.md) — index of archived docs
-  and what each was superseded by.
-- [`archive/agent-architecture-reviews.md`](archive/agent-architecture-reviews.md)
-  — consolidated 2026-05-01 / 2026-05-08 / 2026-05-09 structural
-  reviews.
-- [`archive/ai-ux-optimization-plan.md`](archive/ai-ux-optimization-plan.md)
-  — original AI UX audit (all five phases shipped 2026-05-05).
-- [`archive/prd-v1.md`](archive/prd-v1.md) — the v1 PRD (superseded
-  by v2.1 + v3).

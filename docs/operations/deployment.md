@@ -330,8 +330,16 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 
 ---
 
+## Post-merge verification checklist
+
+- [ ] FE Vercel project still builds and serves the app at its existing URL.
+- [ ] BE Vercel project, after the Root Directory change, builds and `GET /api/v1/health` returns 200.
+- [ ] `Backend CI` workflow runs green on a PR that touches `backend/**`.
+- [ ] FE-only and BE-only PRs trigger only the relevant Vercel project (verify in the Vercel deployments tab).
+
+---
+
 ## See also
 
-- [`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md) — historical structural reviews (provider fallback, multi-agent orchestration, MCP, real embeddings/vector store, test-strategy gaps).
 - [`../todo/release-todo.md`](../todo/release-todo.md) — current GA blockers, soft blockers, and operational backlog.
 - `Dockerfile`, `fly.toml`, `docker-compose.yml` in the `backend/` directory.

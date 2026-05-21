@@ -22,13 +22,8 @@ below was previously split between the root `AGENTS.md` and
   authenticated project and board flows.
 - If changing `REACT_APP_API_URL`, restart Vite because
   `vite.config.ts` inlines the value into `process.env.REACT_APP_API_URL`.
-- The full Jest suite (142 suites / ~980 tests) completes in ~90–100 s
-  with:
-  ```bash
-  NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit --detectOpenHandles
-  ```
-  Without the heap bump and `--forceExit`, the suite may hang or OOM
-  on this VM.
+- `CI=true npm test` runs the FE Jest suite; bump
+  `NODE_OPTIONS=--max-old-space-size=4096` if OOM.
 - The frontend's remote API
   (`https://pulse-python-server.vercel.app`) works from this
   environment for basic CRUD (registration, login, projects, tasks).
@@ -102,8 +97,7 @@ entire suite to pass (observability tests need `opentelemetry-*` and
 pip install -e ".[dev,ai]"
 ```
 
-Backend tests (801 passing) use in-memory fakes and do **not** require
-MongoDB.
+Backend tests use in-memory fakes and do **not** require MongoDB.
 
 ### Key gotchas
 
@@ -137,30 +131,3 @@ MongoDB.
 | `AI_MAX_MESSAGE_CONTENT_BYTES` | `8192` (8 KiB) | Maximum byte length for a single message `content` field. |
 | `EMBEDDINGS_DIMENSIONS` | `16` | Dimensions passed to `OpenAIEmbeddings(dimensions=...)`. Default `16` preserves backward compat with the SHA-256 stub. Set `512` or higher when using real OpenAI embeddings in production. The stub path ignores this and always returns 16-dim vectors. |
 
-## Cursor SDK & Orchestrate skills
-
-Two plugin skills from [cursor/plugins](https://github.com/cursor/plugins)
-are vendored under `.cursor/skills/`:
-
-| Skill | Path | Purpose |
-|-------|------|---------|
-| `cursor-sdk` | `.cursor/skills/cursor-sdk/` | Guide for building with `@cursor/sdk` (programmatic agent spawning). |
-| `orchestrate` | `.cursor/skills/orchestrate/` | `/orchestrate` fan-out across parallel cloud agents via a plan.json → cli.ts loop. |
-
-- **Bun** is required by orchestrate scripts. Install via
-  `curl -fsSL https://bun.sh/install | bash`. Load with
-  `export BUN_INSTALL="$HOME/.bun"; export PATH="$BUN_INSTALL/bin:$PATH"`.
-- Orchestrate script dependencies live in
-  `.cursor/skills/orchestrate/scripts/`. Run `bun install` there after
-  cloning. The scripts are self-contained and do not affect the host
-  project's `node_modules`.
-- `CURSOR_API_KEY` (user key from
-  [cursor.com/dashboard/integrations](https://cursor.com/dashboard/integrations))
-  must be set to spawn cloud agents. Without it the skills load as
-  documentation-only.
-- `SLACK_BOT_TOKEN` is optional; when set, orchestrate mirrors task
-  status to a Slack thread. Without it orchestrate runs headless
-  (git+disk are authoritative).
-- Orchestrate tests:
-  `cd .cursor/skills/orchestrate/scripts && bun test` (206/207 pass;
-  1 pre-existing failure in `writeFailureHandoff`).

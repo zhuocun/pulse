@@ -5,19 +5,8 @@ when a fix is non-obvious from the code alone.
 
 ## Keep the backlog current
 
-`docs/todo/` is the single source of truth for open and shipped work. When
-your change closes or opens a backlog item, update `status/` in the same PR:
-
-- **Closing work.** Strike or remove the entry from the matching `*-todo.md`
-  (`release-todo.md` for GA blockers / soft blockers / polish,
-  `architecture-todo.md` for agent-runtime themes, `ui-todo.md` for the UI
-  plan) **and** add a one-liner under the relevant table in
-  [`docs/todo/product-done.md`](docs/todo/product-done.md).
-- **Opening work.** Add the new item to the matching `*-todo.md`. If nothing
-  fits, ask before creating a new tracking doc.
-- **Don't restate blockers inline** in `README.md`, `backend/README.md`, or
-  PR descriptions — link to the `status/` entry so there's exactly one place
-  to update when the item closes.
+Add or remove items in the relevant `docs/todo/*.md` in the same PR. Don't
+restate blockers in `README.md` or PR descriptions — link to the entry.
 
 ## v2.1 agent surface (`useAgent`)
 
@@ -93,8 +82,3 @@ GA blockers and ship sequence live in
   `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
   inspection" subsection.
 
-## Cursor Cloud
-
-VM-specific gotchas (mongod `--fork` workaround, NVM bootstrap, Jest
-heap bump, vendored `cursor-sdk` / `orchestrate` skills) live in
-[`docs/operations/cursor-cloud.md`](docs/operations/cursor-cloud.md).

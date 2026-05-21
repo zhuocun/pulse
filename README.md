@@ -44,38 +44,11 @@ npx vercel@latest inspect <url>    # build + routing details
 npx vercel@latest env ls           # env vars (scope with --environment)
 ```
 
-### Post-merge verification checklist
+## Stack
 
-- [ ] FE Vercel project still builds and serves the app at its existing URL.
-- [ ] BE Vercel project, after the Root Directory change, builds and `GET /api/v1/health` returns 200.
-- [ ] `Backend CI` workflow runs green on a PR that touches `backend/**`.
-- [ ] FE-only and BE-only PRs trigger only the relevant Vercel project (verify in the Vercel deployments tab).
-
-## Technologies
-
-The project utilizes the following technologies:
-
-- **React**: A JavaScript library for building user interfaces, used as the main UI library.
-- **Redux**: A predictable state container for JavaScript apps, used for managing the application state.
-- **React-Query**: A data-fetching library for React, used for fetching, caching, and syncing server data in the app.
-- **Ant Design**: A popular design system and UI library for React, used for building the application components.
-- **Emotion**: A CSS-in-JS library (`@emotion/react`, `@emotion/styled`) for styling components.
-- **Hello Pangea DnD**: A drag-and-drop library for React, used for implementing drag-and-drop functionality.
-- **React Router**: A collection of navigational components for creating single-page applications with navigation.
-
-## Configuration
-
-This project uses a combination of dependencies and devDependencies to ensure smooth development and efficient production builds. Some of the key packages include:
-
-- **Vite**: A development server and production bundler used for local development and production builds.
-- **eslint**: A pluggable JavaScript linter used for identifying and reporting patterns in code.
-- **prettier**: An opinionated code formatter for consistent code style across the project.
-- **husky**: A tool for managing Git hooks, ensuring code quality before committing changes.
-- **lint-staged**: A package to run linters on Git staged files, used in conjunction with Husky for pre-commit checks.
-
-The project is configured with scripts to streamline the development process, including scripts for starting the app, building production bundles, running tests, and performing pre-commit checks.
-
-For a full list of dependencies, please refer to the `package.json` file.
+Stack: React 19 + Vite + Redux Toolkit + React Query + AntD + Emotion.
+Backend: FastAPI + LangGraph. See `package.json` / `backend/pyproject.toml`
+for full deps.
 
 ## Board Copilot (AI features)
 

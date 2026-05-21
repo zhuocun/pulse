@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; 🛑 **GA §1** — stub LangGraph HITL + `fe.applyMutation` wiring shipped; **sign-off** tracks organic chat proposals + apply/replay/Mongo proof — §1; command transcripts in [`verification-logs/`](verification-logs/), [`../verification/`](../verification/) incl. [`../verification/integrate-architecture-backlog-closeout-verification.log`](../verification/integrate-architecture-backlog-closeout-verification.log); rerun recipes below when pinning numeric totals.)
+Last updated: 2026-05-11 (architecture themes integrated on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; 🛑 **GA §1** — stub LangGraph HITL + `fe.applyMutation` wiring shipped; **sign-off** tracks organic chat proposals + apply/replay/Mongo proof — §1; command transcripts see git log; rerun recipes below when pinning numeric totals.)
 
 ## TL;DR
 
@@ -95,8 +95,7 @@ stub proposal trigger.
   `agents/mutations/undo`).
 - **Frontend:** `fe.applyMutation` interrupt registration, proposal resume wiring,
   and registry behavior covered by targeted Jest (`useAgentToolResolver`, `feTools/index`,
-  `useAgent` suites — exact commands in
-  [`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md)).
+  `useAgent` suites — see git log for exact commands).
 
 **Still outstanding before treating §1 as fully closed for design-partner / public GA:**
 
@@ -114,9 +113,7 @@ stub proposal trigger.
 default `false`). Enable only in internal environments until §1’s remaining scope
 closes.
 
-**References:** [`architecture-todo.md`](architecture-todo.md) Theme 5 disposition;
-[`verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md`](verification-logs/2026-05-11-close-theme5-mutation-lifecycle-verifier.md);
-[`../verification/close-theme5-mutation-lifecycle-verifier-report.md`](../verification/close-theme5-mutation-lifecycle-verifier-report.md).
+**References:** Theme 5 disposition — see git log for verifier transcripts.
 
 ## Beta blockers — must close before design-partner expansion
 
@@ -187,10 +184,7 @@ re-passing the flag) and `test-slim` (install `.[dev]`, import smoke).
 fixed pass / skip / warning integers in this file as contracts** — totals
 move when tests, markers, or installed extras change (for example a venv
 without `[ai]` / `mcp` runs fewer modules than CI `test-full`). For dated
-snapshots see [`verification-logs/`](verification-logs/), including
-[`2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md`](verification-logs/2026-05-10-integrate-non-ga-closeout-and-doc-hygiene.md)
-and the independent slim-venv audit
-[`2026-05-10-release-todo-doc-hygiene-indep-verifier.md`](verification-logs/2026-05-10-release-todo-doc-hygiene-indep-verifier.md).
+snapshots see git log.
 Use `python -m pytest -q -rs --tb=no` after a `test-full`-equivalent install
 to list opt-in skips (`RUN_INTEGRATION=1`, `PYTEST_AGENT_POSTGRES_URI`).
 
@@ -366,7 +360,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` logs or warns on checkpoint/store memory. **Multi-worker:** `_configure_middleware_backends` **raises** when `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 unless rate + budget + idempotency are Redis-backed with `REDIS_URI` (§16d). Memory-backed middleware still **warns** under multi-instance heuristics. |
 | Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |
 | Vercel SSE timeout (`maxDuration: 300`) | ✅ | Resolved 2026-05-05 |
-| CI matrix (slim + full install) | ✅ | Push/PR + `workflow_dispatch` wired; rerun BE verification + see §7 / [`verification-logs/`](verification-logs/) (pinned Actions URL ops-owned) |
+| CI matrix (slim + full install) | ✅ | Push/PR + `workflow_dispatch` wired; rerun BE verification + see §7 (pinned Actions URL ops-owned) |
 
 ### Frontend
 
@@ -442,8 +436,7 @@ Open work above Tier 9 that this file still tracks: **GA §1** (mutation
 proposal lifecycle — stub HITL + interrupts ship on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``;
 **sign-off** still tracks organic LLM coverage + hardened HTTP undo/record and replay/apply proof — §1). **§4** optional pgvector path is shipped; production
 retrieval **depth** still depends on operator embeddings backfill and env
-alignment — not a separate numbered blocker. Historical structural notes live in
-[`../archive/agent-architecture-reviews.md`](../archive/agent-architecture-reviews.md).
+alignment — not a separate numbered blocker.
 
 ## Recommended ship sequence
 
@@ -481,7 +474,7 @@ alignment — not a separate numbered blocker. Historical structural notes live 
 npm install
 npm run eslint                                              # must be clean (--max-warnings 0)
 npx tsc --noEmit                                            # must be clean
-CI=true npm test -- --watchAll=false --runInBand            # Jest prints suite + test totals at end; compare to verification-logs/
+CI=true npm test -- --watchAll=false --runInBand            # Jest prints suite + test totals at end
 npx vite build                                              # must succeed
 ```
 
