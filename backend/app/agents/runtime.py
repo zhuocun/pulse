@@ -68,24 +68,14 @@ logger = logging.getLogger(__name__)
 # Signed thread-key helpers (Phase 6C)
 # ---------------------------------------------------------------------------
 
-# Token prefixes for signed envelope formats.
+# Token prefix for the signed envelope.
 #
-# - ``sigv1.`` — original (Phase 6C).  Payload: agent NUL scope NUL original
-#   NUL hmac.  Signed with the single ``jwt_secret``.
-# - ``sigv2.`` — kid-aware envelope.  Payload: kid NUL agent NUL scope NUL
-#   original NUL hmac.  Signed with the kid-indexed secret from
-#   ``AGENT_THREAD_SIGNING_KEYS`` (or ``jwt_secret`` under kid ``"v1"`` when
-#   that env is empty).  Verification is kid-driven so an operator can
-#   roll a new secret in alongside the old one and accept both for the
-#   token-lifetime overlap.
+# ``sigv1.`` — payload: agent NUL scope NUL original NUL hmac.  Signed with
+# the single ``jwt_secret``.
 _SIGNED_PREFIX = "sigv1."
-_SIGNED_PREFIX_V2 = "sigv2."
 # NUL byte used as a field separator inside the payload (never valid in a
 # thread ID so it cannot be injected).
 _SEP = "\x00"
-# Implicit kid used when ``AGENT_THREAD_SIGNING_KEYS`` is empty so sigv2
-# tokens issued in that mode still round-trip after a future rotation.
-_LEGACY_KID = "v1"
 
 
 def _signing_key() -> bytes:
@@ -95,59 +85,6 @@ def _signing_key() -> bytes:
     return _settings.jwt_secret.encode()
 
 
-def _thread_signing_keyring() -> dict[str, bytes]:
-    """Resolve the configured ``{kid: secret}`` map.
-
-    Pulls from ``settings.agent_thread_signing_keys`` (a tuple of
-    ``"kid:secret"`` entries).  When the env is empty, returns
-    ``{_LEGACY_KID: jwt_secret}`` so verification of sigv2 tokens still
-    works in the no-rotation default.
-
-    Empty kids and entries without a ``:`` separator are skipped with a
-    warning rather than raising — a typo in the env should not take down
-    the runtime.
-    """
-    from app.config import settings as _settings
-
-    raw = getattr(_settings, "agent_thread_signing_keys", ())
-    keyring: dict[str, bytes] = {}
-    for entry in raw:
-        if not entry or ":" not in entry:
-            logger.warning(
-                "AGENT_THREAD_SIGNING_KEYS entry %r is malformed (expected "
-                "'kid:secret'); skipping.",
-                entry,
-            )
-            continue
-        kid, _, secret = entry.partition(":")
-        kid = kid.strip()
-        if not kid:
-            logger.warning(
-                "AGENT_THREAD_SIGNING_KEYS entry %r has an empty kid; skipping.",
-                entry,
-            )
-            continue
-        keyring[kid] = secret.encode()
-    if not keyring:
-        keyring[_LEGACY_KID] = _signing_key()
-    return keyring
-
-
-def _active_signing_kid(keyring: dict[str, bytes]) -> str:
-    """Return the kid the signer should use for new tokens.
-
-    The active kid is the *last* entry in ``AGENT_THREAD_SIGNING_KEYS`` so
-    operators can roll forward by appending the new key without losing
-    verification of the old one.  When the env is empty,
-    :func:`_thread_signing_keyring` returns the implicit ``v1`` kid so
-    this still produces a usable result.
-    """
-
-    # ``dict`` preserves insertion order from Python 3.7+, mirroring the
-    # comma-separated env order.
-    return next(reversed(keyring))
-
-
 def sign_thread_key(
     agent_name: str,
     scope: str,
@@ -155,58 +92,22 @@ def sign_thread_key(
 ) -> str:
     """Return an opaque signed token for ``(agent_name, scope, original_thread_id)``.
 
-    Envelope selection:
-
-    - When ``AGENT_THREAD_SIGNING_KEYS`` is configured, the token is a
-      ``sigv2.<base64url>`` string whose payload encodes
-      ``kid NUL agent_name NUL scope NUL original_thread_id NUL hmac_hex``.
-      The HMAC is computed over ``kid NUL agent NUL scope NUL original``
-      using the kid-indexed secret.
-    - Otherwise the legacy ``sigv1.<base64url>`` envelope is emitted (no
-      kid; HMAC over ``agent NUL scope NUL original`` using the JWT
-      secret) so the no-rotation default keeps the on-the-wire shape used
-      by existing clients.
-
-    Both verifiers (sigv1 *and* sigv2) accept tokens created in either
-    mode, so operators can flip the env on a rolling restart without
-    invalidating in-flight tokens.
+    Emits a ``sigv1.<base64url>`` envelope whose payload encodes
+    ``agent_name NUL scope NUL original_thread_id NUL hmac_hex``.  The HMAC
+    is computed over ``agent NUL scope NUL original`` using the JWT secret.
 
     Signing is deterministic: same inputs → same token regardless of call
     order.
     """
-    from app.config import settings as _settings
-
-    explicit_keyring_configured = bool(
-        getattr(_settings, "agent_thread_signing_keys", ())
-    )
-
-    if not explicit_keyring_configured:
-        # Legacy default: keep emitting sigv1 so already-deployed verifiers
-        # that only know sigv1 (older code) still accept tokens from this
-        # signer during a rolling restart.
-        message = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}"
-        digest = _hmac.new(
-            _signing_key(), message.encode(), hashlib.sha256
-        ).hexdigest()
-        payload = (
-            f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}{_SEP}{digest}"
-        )
-        encoded = base64.urlsafe_b64encode(payload.encode()).decode()
-        return f"{_SIGNED_PREFIX}{encoded}"
-
-    # Explicit keyring: emit sigv2 with the active kid so future rotation
-    # is a single env append.
-    keyring = _thread_signing_keyring()
-    kid = _active_signing_kid(keyring)
-    secret = keyring[kid]
-    message = f"{kid}{_SEP}{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}"
-    digest = _hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
+    message = f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}"
+    digest = _hmac.new(
+        _signing_key(), message.encode(), hashlib.sha256
+    ).hexdigest()
     payload = (
-        f"{kid}{_SEP}{agent_name}{_SEP}{scope}{_SEP}"
-        f"{original_thread_id}{_SEP}{digest}"
+        f"{agent_name}{_SEP}{scope}{_SEP}{original_thread_id}{_SEP}{digest}"
     )
     encoded = base64.urlsafe_b64encode(payload.encode()).decode()
-    return f"{_SIGNED_PREFIX_V2}{encoded}"
+    return f"{_SIGNED_PREFIX}{encoded}"
 
 
 def _try_verify_signed_thread_key(
@@ -216,17 +117,12 @@ def _try_verify_signed_thread_key(
 ) -> Optional[str]:
     """Validate a signed token and return the original thread_id, or ``None``.
 
-    Accepts both the legacy ``sigv1.`` envelope (HMAC over ``jwt_secret``)
-    and the kid-aware ``sigv2.`` envelope (HMAC over the kid-indexed
-    secret).  This dual support is intentional so a rolling restart that
-    flips ``AGENT_THREAD_SIGNING_KEYS`` for the first time keeps
-    in-flight sigv1 tokens valid.
+    Accepts the ``sigv1.`` envelope (HMAC over ``jwt_secret``).
 
     Returns ``None`` when:
-    - the token has neither prefix,
+    - the token does not have the ``sigv1.`` prefix,
     - base64 decoding fails,
-    - the payload does not have the expected field count,
-    - the embedded kid (sigv2 only) is unknown to the keyring, or
+    - the payload does not have the expected field count, or
     - the HMAC signature is invalid (constant-time comparison).
 
     Raises :class:`ValueError` when:
@@ -237,15 +133,13 @@ def _try_verify_signed_thread_key(
     Callers that receive ``None`` for a prefixed token must reject it
     (see :meth:`AgentRuntime._namespaced_thread`).
     """
-    if token.startswith(_SIGNED_PREFIX_V2):
-        return _verify_sigv2(token, agent_name, scope)
     if token.startswith(_SIGNED_PREFIX):
         return _verify_sigv1(token, agent_name, scope)
     return None
 
 
 def _verify_sigv1(token: str, agent_name: str, scope: str) -> Optional[str]:
-    """Verify a legacy ``sigv1.`` envelope (no kid)."""
+    """Verify a ``sigv1.`` envelope."""
 
     encoded = token[len(_SIGNED_PREFIX):]
     try:
@@ -266,44 +160,6 @@ def _verify_sigv1(token: str, agent_name: str, scope: str) -> Optional[str]:
     expected = _hmac.new(
         _signing_key(), message.encode(), hashlib.sha256
     ).hexdigest()
-    if not _hmac.compare_digest(expected, tok_digest):
-        return None
-    return tok_original
-
-
-def _verify_sigv2(token: str, agent_name: str, scope: str) -> Optional[str]:
-    """Verify a kid-aware ``sigv2.`` envelope.
-
-    The kid identifies which secret in the keyring signed the token; an
-    unknown kid is a soft failure (returns ``None``) so a stale client
-    pointing at a retired secret falls through to the unsigned-fallback
-    path rather than crashing.
-    """
-
-    encoded = token[len(_SIGNED_PREFIX_V2):]
-    try:
-        payload = base64.urlsafe_b64decode(encoded.encode()).decode()
-    except Exception:  # noqa: BLE001 -- malformed base64
-        return None
-    parts = payload.split(_SEP, 4)
-    if len(parts) != 5:
-        return None
-    tok_kid, tok_agent, tok_scope, tok_original, tok_digest = parts
-    if tok_agent != agent_name or tok_scope != scope:
-        raise ValueError(
-            f"Signed thread key rejected: token was issued for "
-            f"agent={tok_agent!r} scope={tok_scope!r}, but the current "
-            f"call is agent={agent_name!r} scope={scope!r}."
-        )
-    keyring = _thread_signing_keyring()
-    secret = keyring.get(tok_kid)
-    if secret is None:
-        # Unknown kid — secret was rotated out.  Treat as a soft failure
-        # so the caller falls through to the unsigned path; an attacker
-        # cannot forge a token for an unknown kid anyway.
-        return None
-    message = f"{tok_kid}{_SEP}{tok_agent}{_SEP}{tok_scope}{_SEP}{tok_original}"
-    expected = _hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()
     if not _hmac.compare_digest(expected, tok_digest):
         return None
     return tok_original
@@ -500,9 +356,9 @@ class AgentRuntime:
         prefix = f"{agent.name}:{scope}:"
 
         # ------------------------------------------------------------------
-        # Signed path: validate and unwrap the HMAC envelope (sigv1 or sigv2).
+        # Signed path: validate and unwrap the HMAC envelope (sigv1).
         # ------------------------------------------------------------------
-        if raw.startswith(_SIGNED_PREFIX) or raw.startswith(_SIGNED_PREFIX_V2):
+        if raw.startswith(_SIGNED_PREFIX):
             try:
                 original = _try_verify_signed_thread_key(raw, agent.name, scope)
             except ValueError as exc:

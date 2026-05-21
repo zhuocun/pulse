@@ -39,14 +39,6 @@ from app.validation import unwrap_error_detail
 logger = logging.getLogger(__name__)
 
 
-def _mount_mcp_if_enabled(application: FastAPI, cfg: Settings) -> None:
-    if not cfg.mcp_enabled:
-        return
-    from app.mcp_server import build_mcp_asgi_stack
-
-    application.mount("/mcp", build_mcp_asgi_stack())
-
-
 def _validate_cors_origin_regex(pattern: str) -> None:
     """Reject obviously-permissive CORS regexes at boot.
 
@@ -640,5 +632,3 @@ app.include_router(ai_router.router, prefix="/api/v1/ai", tags=["ai-v1"])
 # prefixes serve identical routes; once the FE migrates we can drop it.
 app.include_router(ai_router.router, prefix="/api/ai", include_in_schema=False)
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
-
-_mount_mcp_if_enabled(app, settings)

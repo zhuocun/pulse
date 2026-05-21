@@ -33,18 +33,10 @@ python -m pip install ".[dev]"
 cp .env.example .env
 ```
 
-Set `DATABASE` and the matching database environment variables in
-`.env`, then run:
+Set `MONGO_URI` / `MONGO_DB` in `.env`, then run:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
-```
-
-MongoDB support is installed by default. DynamoDB and PostgreSQL
-drivers are optional:
-
-```bash
-python -m pip install ".[databases]"
 ```
 
 `langchain-anthropic` and `langchain-openai` are base dependencies —
