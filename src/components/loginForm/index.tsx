@@ -1,8 +1,8 @@
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { useQueryClient } from "@tanstack/react-query";
+import { QueryClientContext } from "@tanstack/react-query";
 import { Form, Input, message } from "antd";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
@@ -45,7 +45,7 @@ const LoginForm: React.FC<{
 }> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
     const api = useApi();
-    const queryClient = useQueryClient();
+    const queryClient = useContext(QueryClientContext);
     const [form] = Form.useForm<{ email: string; password: string }>();
     const [capsLockOn, setCapsLockOn] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -77,14 +77,14 @@ const LoginForm: React.FC<{
                 dedup: false,
                 rateLimit: false
             })) as IUser;
-            queryClient.setQueryData(userQueryKey, verifiedUser);
+            queryClient?.setQueryData(userQueryKey, verifiedUser);
             if (typeof res.ai_jwt === "string" && res.ai_jwt.length > 0) {
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
             navigate("/projects", { viewTransition: true });
         } catch {
-            queryClient.setQueryData(userQueryKey, undefined);
+            queryClient?.setQueryData(userQueryKey, undefined);
             onError(new Error(microcopy.feedback.loginCouldNotPersistSession));
         } finally {
             setIsVerifyingSession(false);
