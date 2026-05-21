@@ -435,4 +435,32 @@ describe("api proxy fetch handler", () => {
         expect(outgoing.get("x-vercel-id")).toBeNull();
         expect(outgoing.get("x-forwarded-proto")).toBe("https");
     });
+
+    it("forwards path-only request.url values from Vercel rewrites", async () => {
+        mockFetch.mockResolvedValue(
+            upstreamResponse({
+                status: 401,
+                body: '{"error":"Invalid credentials"}'
+            })
+        );
+        const request = {
+            method: "POST",
+            url: "/api/v1/auth/login",
+            headers: new Headers({ "content-type": "application/json" }),
+            arrayBuffer: async () =>
+                new TextEncoder().encode(
+                    JSON.stringify({
+                        email: "probe@example.com",
+                        password: "wrongpassword"
+                    })
+                ).buffer
+        } as unknown as Request;
+
+        const response = await handleProxyFetch(request);
+
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        const [target] = mockFetch.mock.calls[0] as [string, RequestInit];
+        expect(target).toBe(`${BACKEND_URL}/api/v1/auth/login`);
+        expect(response.status).toBe(401);
+    });
 });

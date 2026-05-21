@@ -230,16 +230,18 @@ export const handleProxyRequest = async (
 };
 
 /**
- * Web Standard handler used by ``api/index.ts`` on Vercel. Vite
- * static deployments only pick up ``/api`` routes that export a
- * ``fetch`` method; the legacy ``(req, res)`` export was ignored in
- * production, so ``POST /api/v1/auth/login`` fell through to the SPA
- * ``index.html`` rewrite and returned 405 -- surfaced in the UI as
- * "Operation failed".
+ * Web Standard handler retained for local regression coverage and future
+ * runtimes that invoke ``fetch(request)`` directly. Production Vercel
+ * currently enters through the Node ``handleProxyRequest`` export in
+ * ``api/index.ts``.
  */
 export const handleProxyFetch = async (request: Request): Promise<Response> => {
     try {
-        const url = new URL(request.url);
+        // Vercel rewrites can leave ``request.url`` path-only; ``new URL``
+        // needs an absolute base. Pathname + search are all the proxy uses.
+        const url = request.url.startsWith("http")
+            ? new URL(request.url)
+            : new URL(request.url, "https://proxy.local");
         const target = `${BACKEND_URL}${url.pathname}${url.search}`;
         const headers = buildOutgoingHeadersFromWeb(request.headers);
         const method = request.method.toUpperCase();
