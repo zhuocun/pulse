@@ -26,7 +26,7 @@ export const config = {
     // runtime's Headers shim collapses duplicate Set-Cookie values into
     // one comma-joined string, which the browser then mis-parses) and
     // for full IncomingMessage/ServerResponse semantics.
-    runtime: "nodejs" as const,
+    runtime: "nodejs",
     api: {
         // Vercel auto-parses JSON / form bodies on ingress, which
         // drains the underlying stream before the handler runs --
