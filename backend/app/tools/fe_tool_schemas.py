@@ -16,7 +16,6 @@ from typing import Any
 
 from app.tools.fe_tool_names import (
     FE_APPLY_APPROVED_MUTATION,
-    FE_APPLY_MUTATION,
     FE_BOARD_SNAPSHOT,
     FE_FORM_DRAFT,
     FE_GET_PROJECT,
@@ -298,36 +297,6 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
             },
             "required": ["candidates"],
-        },
-    },
-    # DEPRECATED — multi-stage tool; new code uses the split pair below.
-    # Kept in the schema registry only so existing clients can still resolve
-    # legacy interrupt payloads while they migrate.
-    FE_APPLY_MUTATION: {
-        "description": (
-            "DEPRECATED — use requestMutationApproval + applyApprovedMutation. "
-            "Board mutation HITL: ``stage=approval`` waits for "
-            "``Command(resume={\"accepted\": <bool>})``; ``stage=apply`` "
-            "executes ``diff`` on the FE against authenticated task APIs."
-        ),
-        "args_schema": {
-            "type": "object",
-            "properties": {
-                "proposal_id": {"type": "string"},
-                "stage": {"type": "string", "enum": ["approval", "apply"]},
-                "project_id": {"type": "string"},
-                "diff": {"type": "object"},
-            },
-            "required": ["proposal_id", "stage"],
-            "additionalProperties": True,
-        },
-        "result_schema": {
-            "type": "object",
-            "properties": {
-                "ok": {"type": "boolean"},
-                "applied": {"type": "boolean"},
-                "journal_replay": {"type": "boolean"},
-            },
         },
     },
     FE_REQUEST_MUTATION_APPROVAL: {

@@ -198,7 +198,7 @@ def test_chat_apply_non_success_shape_treated_as_failure(chat_graph) -> None:
 
 
 def test_chat_apply_with_edited_diff_reaches_fe_apply(chat_graph) -> None:
-    """A user-edited diff on the accept resume must reach ``fe.applyMutation``.
+    """A user-edited diff on the accept resume must reach ``fe.applyApprovedMutation``.
 
     Pre-fix the decision dict preserved ``edited_diff`` but the finalize node
     used the original proposal diff for the apply stage, so any user edit

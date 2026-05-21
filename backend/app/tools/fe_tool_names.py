@@ -20,15 +20,11 @@ FE_RECENT_ACTIVITY = "fe.recentActivity"
 FE_FORM_DRAFT = "fe.formDraft"
 FE_SEARCH_CANDIDATES = "fe.searchCandidates"
 
-# DEPRECATED: ``fe.applyMutation`` was a single tool that multiplexed
-# the approval pause and the apply step via a ``stage`` parameter — a
-# multi-stage tool is an anti-pattern (the model can be coaxed to skip
-# the approval stage by manipulating ``stage`` directly).  Use the
-# split pair instead: ``fe.requestMutationApproval`` triggers the HITL
-# review card; ``fe.applyApprovedMutation`` redeems the approval id the
-# runtime returned.  The legacy name is kept here so older clients
-# still resolve their interrupt payloads while they migrate.
-FE_APPLY_MUTATION = "fe.applyMutation"
+# Split mutation handshake (PRD §5.4.1): a single multi-stage tool is an
+# anti-pattern (the model can be coaxed to skip the approval stage by
+# manipulating the stage argument), so the contract is two tools:
+# ``fe.requestMutationApproval`` triggers the HITL review card;
+# ``fe.applyApprovedMutation`` redeems the approval id the runtime returned.
 FE_REQUEST_MUTATION_APPROVAL = "fe.requestMutationApproval"
 FE_APPLY_APPROVED_MUTATION = "fe.applyApprovedMutation"
 
@@ -46,7 +42,6 @@ ALL_FE_TOOL_NAMES: frozenset[str] = frozenset(
         FE_RECENT_ACTIVITY,
         FE_FORM_DRAFT,
         FE_SEARCH_CANDIDATES,
-        FE_APPLY_MUTATION,
         FE_REQUEST_MUTATION_APPROVAL,
         FE_APPLY_APPROVED_MUTATION,
     )
@@ -55,7 +50,6 @@ ALL_FE_TOOL_NAMES: frozenset[str] = frozenset(
 __all__ = [
     "ALL_FE_TOOL_NAMES",
     "FE_APPLY_APPROVED_MUTATION",
-    "FE_APPLY_MUTATION",
     "FE_BOARD_SNAPSHOT",
     "FE_FORM_DRAFT",
     "FE_GET_PROJECT",
