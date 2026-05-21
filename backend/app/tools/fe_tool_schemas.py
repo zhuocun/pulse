@@ -17,18 +17,15 @@ from typing import Any
 from app.tools.fe_tool_names import (
     FE_APPLY_APPROVED_MUTATION,
     FE_BOARD_SNAPSHOT,
-    FE_FORM_DRAFT,
     FE_GET_PROJECT,
     FE_GET_TASK,
     FE_LIST_BOARD,
     FE_LIST_MEMBERS,
     FE_LIST_PROJECTS,
     FE_LIST_TASKS,
-    FE_RECENT_ACTIVITY,
     FE_REQUEST_MUTATION_APPROVAL,
     FE_SEARCH_CANDIDATES,
     FE_SIMILAR_TASKS,
-    FE_VIEWER_CONTEXT,
 )
 
 # Common reusable schemas
@@ -205,59 +202,6 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
             },
             "required": ["similar"],
-        },
-    },
-    FE_VIEWER_CONTEXT: {
-        "description": "Return the current viewer's identity, role and preferences.",
-        "args_schema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-        "result_schema": {
-            "type": "object",
-            "properties": {
-                "user_id": {"type": "string"},
-                "role": {"type": "string"},
-                "preferences": {"type": "object"},
-            },
-        },
-    },
-    FE_RECENT_ACTIVITY: {
-        "description": "Return recent activity entries for a project.",
-        "args_schema": {
-            "type": "object",
-            "properties": {
-                "project_id": _PROJECT_ID,
-                "limit": _LIMIT,
-            },
-            "required": ["project_id"],
-            "additionalProperties": False,
-        },
-        "result_schema": {
-            "type": "object",
-            "properties": {
-                "activity": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                },
-            },
-            "required": ["activity"],
-        },
-    },
-    FE_FORM_DRAFT: {
-        "description": "Return any draft the user has in-flight in a task creation form.",
-        "args_schema": {
-            "type": "object",
-            "properties": {"project_id": _PROJECT_ID},
-            "required": ["project_id"],
-            "additionalProperties": False,
-        },
-        "result_schema": {
-            "type": "object",
-            "properties": {
-                "draft": {"type": ["object", "null"]},
-            },
         },
     },
     FE_SEARCH_CANDIDATES: {

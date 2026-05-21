@@ -7,7 +7,6 @@ import { boardSnapshotTool } from "./boardSnapshot";
 import { getProjectTool } from "./getProject";
 import { listProjectsTool } from "./listProjects";
 import type { FeToolContext } from "./types";
-import { viewerContextTool } from "./viewerContext";
 
 const expectedNames = [
     "fe.applyApprovedMutation",
@@ -20,9 +19,6 @@ const expectedNames = [
     "fe.getTask",
     "fe.boardSnapshot",
     "fe.similarTasks",
-    "fe.viewerContext",
-    "fe.recentActivity",
-    "fe.formDraft",
     "fe.searchCandidates"
 ];
 
@@ -37,10 +33,10 @@ const buildCtx = (
 });
 
 describe("FE_TOOL_REGISTRY", () => {
-    it("contains the expected 14 tool names", () => {
+    it("contains the expected 11 tool names", () => {
         const actual = Object.keys(FE_TOOL_REGISTRY).sort();
         expect(actual).toEqual([...expectedNames].sort());
-        expect(actual).toHaveLength(14);
+        expect(actual).toHaveLength(11);
     });
 
     it("each tool's run handles a missing-cache fallback without throwing", async () => {
@@ -51,8 +47,7 @@ describe("FE_TOOL_REGISTRY", () => {
                 {
                     project_id: "p-missing",
                     task_id: "t1",
-                    query: "x",
-                    formId: "form-1"
+                    query: "x"
                 } as unknown as never,
                 ctx
             );
@@ -207,23 +202,6 @@ describe("FE_TOOL_REGISTRY", () => {
             autoCtx
         );
         expect(autoResult.unowned[0]?.note).toBe(longNote);
-    });
-
-    it('viewerContext reads the IUser cache under the ["users"] key', async () => {
-        const qc = new QueryClient();
-        qc.setQueryData<IUser>(["users"], {
-            _id: "u1",
-            email: "alice@example.com",
-            likedProjects: [],
-            username: "alice"
-        });
-        const result = await viewerContextTool.run(undefined, buildCtx(qc));
-        expect(result.user).toEqual({
-            id: "u1",
-            username: "alice",
-            email: "alice@example.com"
-        });
-        expect(result.role).toBeNull();
     });
 
     it("listProjects merges every parametric ['projects', *] cache entry", async () => {
@@ -411,23 +389,6 @@ describe("FE_TOOL_REGISTRY", () => {
         );
         expect(result).toHaveLength(1);
         expect(result[0]._id).toBe("m1");
-    });
-
-    it("recentActivity returns {activity: []} shape", async () => {
-        const { recentActivityTool } = await import("./recentActivity");
-        const qc = new QueryClient();
-        const result = await recentActivityTool.run(undefined, buildCtx(qc));
-        expect(result).toEqual({ activity: [] });
-    });
-
-    it("formDraft returns {draft: null} shape", async () => {
-        const { formDraftTool } = await import("./formDraft");
-        const qc = new QueryClient();
-        const result = await formDraftTool.run(
-            { formId: "create-task" },
-            buildCtx(qc)
-        );
-        expect(result).toEqual({ draft: null });
     });
 
     it("searchCandidates returns task candidates from the cache for kind=tasks", async () => {

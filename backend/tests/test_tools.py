@@ -154,9 +154,6 @@ _EXPECTED_TOOLS = {
     "fe.getTask",
     "fe.boardSnapshot",
     "fe.similarTasks",
-    "fe.viewerContext",
-    "fe.recentActivity",
-    "fe.formDraft",
 }
 
 

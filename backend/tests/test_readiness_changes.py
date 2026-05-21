@@ -55,7 +55,7 @@ def test_list_fe_tools_returns_full_catalogue(
     # Sanity-check a couple of well-known names so a future drift between
     # the BE catalogue and the FE registry surfaces here.
     names = {entry["name"] for entry in body["tools"]}
-    assert {"fe.boardSnapshot", "fe.similarTasks", "fe.viewerContext"} <= names
+    assert {"fe.boardSnapshot", "fe.similarTasks", "fe.searchCandidates"} <= names
 
 
 def test_list_fe_tools_requires_authentication(client: TestClient) -> None:

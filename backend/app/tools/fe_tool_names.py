@@ -15,9 +15,6 @@ FE_LIST_TASKS = "fe.listTasks"
 FE_GET_TASK = "fe.getTask"
 FE_BOARD_SNAPSHOT = "fe.boardSnapshot"
 FE_SIMILAR_TASKS = "fe.similarTasks"
-FE_VIEWER_CONTEXT = "fe.viewerContext"
-FE_RECENT_ACTIVITY = "fe.recentActivity"
-FE_FORM_DRAFT = "fe.formDraft"
 FE_SEARCH_CANDIDATES = "fe.searchCandidates"
 
 # Split mutation handshake (PRD §5.4.1): a single multi-stage tool is an
@@ -38,9 +35,6 @@ ALL_FE_TOOL_NAMES: frozenset[str] = frozenset(
         FE_GET_TASK,
         FE_BOARD_SNAPSHOT,
         FE_SIMILAR_TASKS,
-        FE_VIEWER_CONTEXT,
-        FE_RECENT_ACTIVITY,
-        FE_FORM_DRAFT,
         FE_SEARCH_CANDIDATES,
         FE_REQUEST_MUTATION_APPROVAL,
         FE_APPLY_APPROVED_MUTATION,
@@ -51,16 +45,13 @@ __all__ = [
     "ALL_FE_TOOL_NAMES",
     "FE_APPLY_APPROVED_MUTATION",
     "FE_BOARD_SNAPSHOT",
-    "FE_FORM_DRAFT",
     "FE_GET_PROJECT",
     "FE_GET_TASK",
     "FE_LIST_BOARD",
     "FE_LIST_MEMBERS",
     "FE_LIST_PROJECTS",
     "FE_LIST_TASKS",
-    "FE_RECENT_ACTIVITY",
     "FE_REQUEST_MUTATION_APPROVAL",
     "FE_SEARCH_CANDIDATES",
     "FE_SIMILAR_TASKS",
-    "FE_VIEWER_CONTEXT",
 ]

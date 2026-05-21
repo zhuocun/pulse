@@ -1,17 +1,14 @@
 import { applyApprovedMutationTool } from "./applyApprovedMutation";
 import { boardSnapshotTool } from "./boardSnapshot";
-import { formDraftTool } from "./formDraft";
 import { getProjectTool } from "./getProject";
 import { getTaskTool } from "./getTask";
 import { listBoardTool } from "./listBoard";
 import { listMembersTool } from "./listMembers";
 import { listProjectsTool } from "./listProjects";
 import { listTasksTool } from "./listTasks";
-import { recentActivityTool } from "./recentActivity";
 import { requestMutationApprovalTool } from "./requestMutationApproval";
 import { searchCandidatesTool } from "./searchCandidates";
 import { similarTasksTool } from "./similarTasks";
-import { viewerContextTool } from "./viewerContext";
 import type { FeTool } from "./types";
 
 const tools: Array<FeTool<never, unknown>> = [
@@ -25,9 +22,6 @@ const tools: Array<FeTool<never, unknown>> = [
     getTaskTool,
     boardSnapshotTool,
     similarTasksTool,
-    viewerContextTool,
-    recentActivityTool,
-    formDraftTool,
     searchCandidatesTool
 ] as Array<FeTool<never, unknown>>;
 
