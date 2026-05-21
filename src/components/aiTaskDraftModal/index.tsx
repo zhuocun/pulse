@@ -61,7 +61,7 @@ const BREAKDOWN_AXES: BreakdownAxis[] = [
 
 /**
  * Form fields the AI draft populates. After Apply, each populated field
- * shows the "Suggested by Copilot" badge until the user edits it (D-R2).
+ * shows the "Suggested by Copilot" badge until the user edits it.
  */
 const AI_FIELDS: ReadonlyArray<keyof IDraftTaskSuggestion> = [
     "taskName",
@@ -101,7 +101,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         current: number;
         total: number;
     } | null>(null);
-    /** Track which fields are still AI-suggested vs. user-edited (D-R2). */
+    /** Track which fields are still AI-suggested vs. user-edited. */
     const [aiFields, setAiFields] = useState<Set<string>>(new Set());
     /** Remote-agent path: stores the last applied single draft for confidence/rationale display. */
     const [remoteDraft, setRemoteDraft] = useState<IDraftTaskSuggestion | null>(
@@ -158,7 +158,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     ]);
 
     /**
-     * Modal state reset (D-R7). Clearing on close is correct, but the
+     * Modal state reset on close. Clearing on close is correct, but the
      * previous implementation also reset on every effect run after open
      * because of stale dependencies — guarded with a ref so it only fires
      * once per open→close transition.
@@ -363,12 +363,12 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                 analyticsTag: "copilot.draft.bulk",
                 undo: async () => {
                     /*
-                     * Per-task undo (Optimization Plan §3 P1-5). Routing
-                     * each delete through `useApi` gives us auth, base-URL,
-                     * and error normalization — the previous raw `fetch`
-                     * silently swallowed network failures. We tally the
-                     * outcome per-id so a partial undo can be surfaced to
-                     * the user instead of pretending everything reverted.
+                     * Per-task undo. Routing each delete through `useApi`
+                     * gives us auth, base-URL, and error normalization —
+                     * the previous raw `fetch` silently swallowed network
+                     * failures. We tally the outcome per-id so a partial
+                     * undo can be surfaced to the user instead of
+                     * pretending everything reverted.
                      */
                     let removed = 0;
                     let failed = 0;

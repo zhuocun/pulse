@@ -173,7 +173,7 @@ const fingerprintBoard = (
 
 /**
  * Format a relative timestamp like "3 minutes ago". Used by the brief
- * footer (B-R11). Re-renders every 30 s while the drawer is open.
+ * footer. Re-renders every 30 s while the drawer is open.
  */
 const formatRelative = (then: number, now: number): string => {
     const seconds = Math.max(0, Math.round((now - then) / 1000));
@@ -398,7 +398,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     const lastFingerprintRef = useRef<string>("");
 
     /**
-     * Smart caching (B-R1, B-R13). Reuse the cached brief while:
+     * Smart caching. Reuse the cached brief while:
      *   - it's fresher than `BRIEF_CACHE_TTL_MS` (5 minutes), AND
      *   - the board fingerprint hasn't changed since we cached.
      * Otherwise re-run the agent. The cache survives drawer close so a
@@ -500,9 +500,9 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     ]);
 
     /**
-     * Drawer close (B-R13): preserve the cached brief so reopening
-     * within the TTL is instant. We still need to clear the in-flight
-     * `useAi` state so a stale spinner doesn't render after reopen.
+     * On drawer close, preserve the cached brief so reopening within
+     * the TTL is instant. We still need to clear the in-flight `useAi`
+     * state so a stale spinner doesn't render after reopen.
      */
     useEffect(() => {
         if (!open) {
@@ -539,7 +539,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         return "";
     }, [open, error, briefData, activeIsLoading]);
 
-    /** Compute "what changed" headline (B-R3) when we have a baseline. */
+    /** Compute "what changed" headline when we have a baseline. */
     const headline = useMemo(() => {
         if (!briefData) return "";
         const totalTasks = tasks.length;
@@ -568,8 +568,8 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
     }, [briefData, tasks.length]);
 
     const openTaskFromBrief = (taskId: string) => {
-        // B-R8: keep the drawer open so the user can keep scanning the
-        // brief while drilling into a task. Previously closed the drawer.
+        // Keep the drawer open so the user can keep scanning the brief
+        // while drilling into a task. Previously closed the drawer.
         startEditing(taskId);
     };
 

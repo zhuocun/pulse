@@ -141,9 +141,9 @@ export interface DraftRequest {
     coordinatorId?: string;
     context: AiContextProject;
     /**
-     * Optional breakdown axis (PRD v3 D-R3). When the agent supports it
-     * the server picks the cut accordingly; the local fallback ignores
-     * the value and returns its default split.
+     * Optional breakdown axis. When the agent supports it the server
+     * picks the cut accordingly; the local fallback ignores the value
+     * and returns its default split.
      */
     axis?: "by_phase" | "by_surface" | "by_risk" | "freeform";
 }
@@ -510,11 +510,10 @@ const scoreByJaccard = (queryTokens: Set<string>, text: string): number => {
 };
 
 /**
- * Bucket a raw Jaccard score into a user-facing match strength
- * (Optimization Plan §3 P1-2). Thresholds are calibrated to the
- * deterministic engine: ≥0.45 is a near-literal hit, 0.20–0.45 is a
- * partial overlap, anything else is "weak" and should prompt the user to
- * refine the query.
+ * Bucket a raw Jaccard score into a user-facing match strength.
+ * Thresholds are calibrated to the deterministic engine: ≥0.45 is a
+ * near-literal hit, 0.20–0.45 is a partial overlap, anything else is
+ * "weak" and should prompt the user to refine the query.
  */
 const matchStrengthFromScore = (score: number): AiSearchMatchStrength => {
     if (score >= 0.45) return "strong";
@@ -524,7 +523,7 @@ const matchStrengthFromScore = (score: number): AiSearchMatchStrength => {
 
 /**
  * Deterministic semantic-style ranking: token overlap (Jaccard) over
- * task/project text, with PM-synonym expansion (Optimization Plan §3 P1-2).
+ * task/project text, with PM-synonym expansion.
  *
  * Returns per-result match strength bands so the UI can flag weak matches
  * instead of presenting the entire ranking as "similar". Also returns the

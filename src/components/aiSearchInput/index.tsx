@@ -60,11 +60,11 @@ const hasActiveSemanticFilter = (semanticIds: string | null | undefined) =>
     Boolean(semanticIds?.trim());
 
 /**
- * Minimal-effort "Did you mean?" reformulator (SR-R9). Generates up to
- * three rephrasings the user can click to retry — synonyms, broader
- * scope, and a verb shift. The output is intentionally lo-fi: when the
- * agent server adds real reformulation we'll swap the implementation
- * but the surface stays the same.
+ * Minimal-effort "Did you mean?" reformulator. Generates up to three
+ * rephrasings the user can click to retry — synonyms, broader scope,
+ * and a verb shift. The output is intentionally lo-fi: when the agent
+ * server adds real reformulation we'll swap the implementation but the
+ * surface stays the same.
  */
 const reformulate = (query: string): string[] => {
     const trimmed = query.trim();
@@ -217,7 +217,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
     /**
      * Track whether the underlying scope has any data at all so the
      * empty-state copy can disambiguate between "no AI hits" and "no
-     * tasks at all" (SR-R7).
+     * tasks at all".
      */
     useEffect(() => {
         if (props.kind === "tasks") {
@@ -253,7 +253,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
             setMatchSummary(summarizeMatches(result.matches));
             setExpandedTerms(result.expandedTerms ?? []);
             // Stash per-result bands so the card layer can render a small
-            // strength chip on each filtered task/project (P1-2 per-result).
+            // strength chip on each filtered task/project.
             setAiSearchStrengths(props.kind, result.matches);
             props.setSemanticIds((result.ids ?? []).join(","));
         },
@@ -285,8 +285,8 @@ const AiSearchInput: React.FC<Props> = (props) => {
         async (rawQuery: string) => {
             const query = rawQuery.trim();
             if (!query) return;
-            // SR-R3: don't disable the input. Cancel any in-flight request
-            // so the latest query wins, then start a fresh one.
+            // Don't disable the input. Cancel any in-flight request so
+            // the latest query wins, then start a fresh one.
             abortRef.current?.abort();
             const controller = new AbortController();
             abortRef.current = controller;
@@ -554,7 +554,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                         fontSize: 12,
                         marginBottom: 0,
                         marginTop: themeSpace.xs,
-                        maxWidth: `${maxLineLengthCh}ch` // P3-E: maxLineLengthCh applied to expanded-terms prose
+                        maxWidth: `${maxLineLengthCh}ch` // Applied to expanded-terms prose
                     }}
                     type="secondary"
                 >
@@ -577,7 +577,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                         style={{
                             marginBottom: 0,
                             marginTop: themeSpace.xs,
-                            maxWidth: `${maxLineLengthCh}ch` // P3-E: maxLineLengthCh applied to rationale prose
+                            maxWidth: `${maxLineLengthCh}ch` // Applied to rationale prose
                         }}
                         type="secondary"
                     >

@@ -223,28 +223,28 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     );
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
-    /** P2-E: tracks which assistant messages are expanded (prose > 300 words). */
+    /** Tracks which assistant messages are expanded (prose > 300 words). */
     const [expandedMessages, setExpandedMessages] = useState<Set<number>>(
         () => new Set()
     );
-    /** P2-A: screen-reader announcement for streaming state. */
+    /** Screen-reader announcement for streaming state. */
     const [streamingAnnouncement, setStreamingAnnouncement] = useState("");
-    /** P2-D: whether to show the scroll-to-bottom FAB. */
+    /** Whether to show the scroll-to-bottom FAB. */
     const [showScrollFab, setShowScrollFab] = useState(false);
-    /** P2-D: ref for the messages scroll container. */
+    /** Ref for the messages scroll container. */
     const messagesContainerRef = useRef<HTMLDivElement | null>(null);
-    /** P2-B: ref for the last assistant message for focus management. */
+    /** Ref for the last assistant message for focus management. */
     const lastAssistantRef = useRef<HTMLDivElement | null>(null);
     /** When true, the next loading→idle transition focuses the assistant bubble. */
     const shouldFocusAssistantOnCompleteRef = useRef(false);
     const prevIsLoadingRef = useRef(false);
-    /** P1-C: whether the budget warn alert has been dismissed by user. */
+    /** Whether the budget warn alert has been dismissed by user. */
     const [budgetWarnDismissed, setBudgetWarnDismissed] = useState(false);
 
     /**
      * Set of message indices that arrived as the result of a Regenerate
-     * click (P1-2). Tracked instead of derived so an out-of-band reset or
-     * a stream interruption can't desync the badge from the bubble it
+     * click. Tracked instead of derived so an out-of-band reset or a
+     * stream interruption can't desync the badge from the bubble it
      * decorates. The set is wiped on `resetAll`.
      */
     const [regeneratedIndices, setRegeneratedIndices] = useState<Set<number>>(
@@ -310,7 +310,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
      */
     const pendingRegenAfter = useRef<number | null>(null);
     /**
-     * Citations indexed by assistant turn (C-R7). The drawer renders a
+     * Citations indexed by assistant turn. The drawer renders a
      * `CitationChip` superscript for each item right after the bubble.
      * Until the agent emits real citations on the chat route, we extract
      * citations from inline `[cite:taskId]` markers in the assistant
@@ -538,9 +538,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [reset]);
 
     /**
-     * "New conversation" voluntary reset (C-R1). The drawer no longer
-     * destroys the transcript on close — the previous `destroyOnHidden`
-     * flag wiped the panel even on accidental clicks.
+     * Voluntary reset only. The drawer no longer destroys the transcript
+     * on close — the previous `destroyOnHidden` flag wiped the panel even
+     * on accidental clicks.
      */
     const handleClose = () => {
         abort();
@@ -564,9 +564,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     );
 
     /**
-     * Auto-fire the initial prompt dispatched from the command palette
-     * (CP-R6). Keep a ref of the last prompt we handled so a re-render
-     * doesn't re-send it.
+     * Auto-fire the initial prompt dispatched from the command palette.
+     * Keep a ref of the last prompt we handled so a re-render doesn't
+     * re-send it.
      */
     useEffect(() => {
         if (!open || !initialPrompt) return;
@@ -598,7 +598,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             surface: "chat-drawer"
         });
         // Mark the next assistant message as regenerated so the user can
-        // tell which bubble is the fresh answer (P1-2).
+        // tell which bubble is the fresh answer.
         pendingRegenAfter.current = messages.length;
         shouldFocusAssistantOnCompleteRef.current = true;
         dispatch(previous.content);
@@ -628,10 +628,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading, messages]);
 
     /**
-     * Index of the assistant message whose thumbs-down popover is open
-     * (Optimization Plan §3 P1-3). `null` keeps every popover closed; this
-     * lets a click on one bubble's button close another bubble's panel
-     * cleanly without managing a per-row open state.
+     * Index of the assistant message whose thumbs-down popover is open.
+     * `null` keeps every popover closed; this lets a click on one bubble's
+     * button close another bubble's panel cleanly without managing a
+     * per-row open state.
      */
     const [feedbackOpenFor, setFeedbackOpenFor] = useState<number | null>(null);
 
@@ -698,7 +698,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
         setFeedbackOpenFor(null);
     };
 
-    // P1-C: approximate token count for context-window budget warnings.
+    // Approximate token count for context-window budget warnings.
     const approxTokenCount = messages.reduce(
         (acc, m) => acc + Math.ceil(m.content.length / 4),
         0
@@ -707,7 +707,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     const errorView = error ? aiErrorView(error) : null;
 
     /**
-     * Fix 9 — Rate-limit countdown. When the error template exposes a
+     * Rate-limit countdown. When the error template exposes a
      * `disabledForSeconds` hint, count down to zero so the retry button
      * re-enables itself automatically without a reload.
      */
@@ -732,7 +732,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [error]);
 
     /**
-     * P2-I: Track elapsed ms while in the pre-token loading phase so we can
+     * Track elapsed ms while in the pre-token loading phase so we can
      * show "Still thinking…" after 3 s without a first token.
      */
     const [loadingMs, setLoadingMs] = useState(0);
@@ -847,8 +847,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading]);
 
     /**
-     * P2-A: Announce "Board Copilot is responding." when streaming starts
-     * and clear it on completion (the completion region handles success).
+     * Announce "Board Copilot is responding." when streaming starts and
+     * clear it on completion (the completion region handles success).
      */
     useEffect(() => {
         if (isLoading) {
@@ -861,8 +861,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading]);
 
     /**
-     * P2-B: After streaming completes, keep focus on the composer when the
-     * user is composing a follow-up. Only move focus to the last assistant
+     * After streaming completes, keep focus on the composer when the user
+     * is composing a follow-up. Only move focus to the last assistant
      * bubble after an explicit Regenerate; completion announcements still
      * notify screen-reader users without stealing the text field.
      */
@@ -888,9 +888,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     }, [isLoading]);
 
     /**
-     * P2-C (Phase B): persist history to localStorage whenever messages
-     * change and we have a project ID. History is restored on open via the
-     * seedMessages effect above.
+     * Persist history to localStorage whenever messages change and we have
+     * a project ID. History is restored on open via the seedMessages
+     * effect above.
      */
     useEffect(() => {
         if (project?._id && messages.length > 0) {
@@ -1038,7 +1038,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             }
         >
             <CopilotRemoteConsentNotice route="chat" />
-            {/* P2-G: Inline health status alert */}
+            {/* Inline health status alert */}
             {remoteHealthEnabled &&
                 (healthStatus === "degraded" || healthStatus === "offline") && (
                     <Alert
@@ -1078,7 +1078,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             >
                 {completionAnnouncement}
             </div>
-            {/* P2-A: Streaming state announcement for screen readers */}
+            {/* Streaming state announcement for screen readers */}
             <div
                 aria-live="polite"
                 role="status"
@@ -1096,21 +1096,21 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             >
                 {streamingAnnouncement}
             </div>
-            {/* P2-D: relative wrapper for the scroll-to-bottom FAB */}
+            {/* Relative wrapper for the scroll-to-bottom FAB */}
             <div
                 style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}
             >
-                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- P2-B: Escape refocuses composer from scroll container */}
+                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape refocuses composer from scroll container */}
                 <div
                     aria-busy={isLoading}
                     onKeyDown={(e) => {
-                        /* P2-B: Escape from message area refocuses input */
+                        /* Escape from message area refocuses input */
                         if (e.key === "Escape") {
                             inputRef.current?.focus({ cursor: "end" });
                         }
                     }}
                     onScroll={() => {
-                        /* P2-D: show FAB when user scrolls up during streaming */
+                        /* Show FAB when user scrolls up during streaming */
                         const el = messagesContainerRef.current;
                         if (!el) return;
                         const atBottom =
@@ -1130,7 +1130,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                         overscrollBehavior: "contain"
                     }}
                 >
-                    {/* P1-C: context-window budget warnings */}
+                    {/* Context-window budget warnings */}
                     {approxTokenCount >= BUDGET_CRITICAL_THRESHOLD ? (
                         <Alert
                             action={
@@ -1182,7 +1182,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     </SamplePrompt>
                                 ))}
                             </Space>
-                            {/* P2-C Phase A: sessions not persisted notice */}
+                            {/* Sessions not persisted notice */}
                             <Text
                                 type="secondary"
                                 style={{ fontSize: fontSize.xs }}
@@ -1290,7 +1290,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 ? `${microcopy.ai.copilotLabel} · ${microcopy.ai.regeneratedBadge}`
                                 : microcopy.ai.copilotLabel
                             : undefined;
-                        // P2-E: progressive disclosure for long prose responses
+                        // Progressive disclosure for long prose responses
                         const wordCount = m.content
                             .split(/\s+/)
                             .filter(Boolean).length;
@@ -1299,7 +1299,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             wordCount > 300 &&
                             !/^[#\-*]/.test(m.content.trim());
                         const isExpanded = expandedMessages.has(index);
-                        // P3-B: simple inline markdown renderer for assistant messages
+                        // Simple inline markdown renderer for assistant messages
                         const renderMarkdown = (
                             text: string
                         ): React.ReactNode => {
@@ -1531,7 +1531,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                         </time>
                                     </AssistantAttribution>
                                 )}
-                                {/* P3-D: Edit button for user messages */}
+                                {/* Edit button for user messages */}
                                 {isUser && !isLoading && (
                                     <Button
                                         aria-label={microcopy.a11y.editMessage}
@@ -1628,13 +1628,11 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                     {overflow > 0 && (
                                                         /*
                                                          * Show-more affordance for
-                                                         * citation-heavy answers
-                                                         * (P0-3 / AI UX best
-                                                         * practices §2.9): keep
-                                                         * the inline chip rail
-                                                         * scannable, but never
-                                                         * hide a source from
-                                                         * verification — one
+                                                         * citation-heavy answers.
+                                                         * Keep the inline chip
+                                                         * rail scannable, but
+                                                         * never hide a source
+                                                         * from verification — one
                                                          * click reveals the rest
                                                          * inline rather than
                                                          * sending the user to a
@@ -1682,12 +1680,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                     m.citations?.length === 0 &&
                                     !assistantHadToolStep(index) && (
                                         /*
-                                         * No-source caveat (Optimization Plan
-                                         * §3 P0-3). When the assistant answered
-                                         * without consulting any read-only tool
-                                         * we say so explicitly so absence of a
-                                         * chip is informative, not a missing
-                                         * affordance the user has to interpret.
+                                         * No-source caveat. When the assistant
+                                         * answered without consulting any
+                                         * read-only tool we say so explicitly
+                                         * so absence of a chip is informative,
+                                         * not a missing affordance the user
+                                         * has to interpret.
                                          */
                                         <Typography.Text
                                             style={{
@@ -1819,13 +1817,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                             <Tooltip
                                                 /*
                                                  * Surface the "what feedback
-                                                 * actually does" copy on hover so
-                                                 * users know up front their
-                                                 * message text is not sent
-                                                 * (Optimization Plan §3 P1-3).
-                                                 * Previously this disclaimer was
-                                                 * buried inside the popover —
-                                                 * users had to commit to the
+                                                 * actually does" copy on hover
+                                                 * so users know up front their
+                                                 * message text is not sent.
+                                                 * Previously this disclaimer
+                                                 * was buried inside the popover
+                                                 * — users had to commit to the
                                                  * thumbs-down click to see it.
                                                  */
                                                 title={
@@ -1906,7 +1903,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             ))}
                         </>
                     )}
-                    {/* C-R5: re-show contextual sample prompts after each turn so
+                    {/* Re-show contextual sample prompts after each turn so
                     the user always has a quick next-step. */}
                     {!isLoading && messages.length > 0 && (
                         <Space
@@ -1994,7 +1991,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                                 }}
                                                 title={false}
                                             />
-                                            {/* P2-I: "Still thinking…" after 3 s in the pre-token phase */}
+                                            {/* "Still thinking…" after 3 s in the pre-token phase */}
                                             {loadingMs >= 3000 && (
                                                 <Text
                                                     style={{
@@ -2016,7 +2013,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             </MessageRow>
                         )}
                 </div>
-                {/* P2-D: scroll-to-bottom FAB shown when user scrolls up during streaming */}
+                {/* Scroll-to-bottom FAB shown when user scrolls up during streaming */}
                 {showScrollFab && isLoading && (
                     <Button
                         onClick={() => {
@@ -2069,7 +2066,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             : errorView.body || undefined
                     }
                     onClose={() => {
-                        // P1-C: preserve last user message in input on budget error
+                        // Preserve last user message in input on budget error
                         if (error instanceof AgentBudgetError) {
                             const lastUser = [...messages]
                                 .reverse()
