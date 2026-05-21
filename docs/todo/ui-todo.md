@@ -132,9 +132,8 @@ Every recommendation in this plan is anchored to one or more of these external r
 20e. ~~**Design-token reference docs missing.**~~
     ~~`src/theme/tokens.ts` and `src/theme/antdTheme.ts` are the implementation source of truth, but `docs/design-tokens.md` does not exist even though Section 2.C tells contributors to use it. Add a concise token reference (spacing, color, typography, motion, AntD mapping) or change Section 2.C to point only at the code modules.~~ **[Complete: `docs/design-tokens.md` is the contributor reference (scales + `buildAntdTheme` mapping); Section 2.C and this item updated.]**
 
-20f. **Unified `CopilotShell` is only a scaffold.**
-    `src/components/copilotShell/index.tsx` now ships a real tabbed drawer (`chat`, `brief`, `activity`, `settings`), but `chat` and `brief` still bounce the user into the legacy drawers while `activity` and `settings` are placeholder copy. This is now a visible product surface on `src/pages/board.tsx`, so it needs either full in-shell content or a tighter rollout gate until phase 2 is ready. Fold the autonomy/privacy/per-project controls from item 20a into the real Settings tab instead of leaving the shell half-owned.
-    - ~~**i18n debt is concrete.** Tab keys (`"Chat"`, `"Brief"`, `"Activity"`, `"Settings"` at `copilotShell/index.tsx:109, 120, 131, 138`), the title `"Board Copilot"` (`:101`), and the four placeholder bodies (`:112, 123, 133, 149–152`) plus the CTA labels (`"Open Chat"`, `"Open Brief"` at `:113, 124`) are all hardcoded English. Lift them to `microcopy.copilotShell.*` (or reuse existing keys where they overlap with the legacy drawers) before this becomes the canonical surface.~~ **[Complete: strings live in `microcopy.copilotShell.*` with `zh-CN` parity (`src/i18n/locales/en.ts` / `zh-CN.ts`), wired in `copilotShell/index.tsx`.]**
+20f. **Unified `CopilotShell` — placeholder deleted 2026-05-21.**
+    The placeholder shell at `src/components/copilotShell/index.tsx` was removed on 2026-05-21 (no in-shell content ever shipped beyond delegation to legacy drawers). The v3 PRD §7.1 design target — a unified right-rail with Chat / Brief / Inbox / History tabs — is preserved as a design goal but unimplemented; it will be built from scratch when the Phase-2 design lands.
 
 21. **Accessibility gaps.**
     - ~~Several `<a onClick>` patterns with `eslint-disable` (e.g. `taskCreator`, `column`).~~ **[Complete: `taskCreator`, `columnCreator`, and `column` now use real `<button type="button">` elements (`CreateLink`, `AddColumnButton`, `TaskCard`/`NoPaddingButton`); a repo-wide grep confirms no `<a onClick>` patterns remain in production components.]**
@@ -229,10 +228,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - ~~Make the card width adapt to viewport (`max-width: 40rem; width: min(40rem, 100% - 2rem)`).~~ **[Complete on branch `orch/todo-sweep-566b/auth-form-completion`: `authLayout.test.tsx` computed styles.]**
     - Replace the absolutely positioned background SVGs with a single subtle gradient or blurred shape that scales with the viewport — the current `calc()` math collapses on small screens.
 
-8. **Unified Copilot shell (`src/components/copilotShell/index.tsx`).**
-    - Replace the placeholder tab bodies with actual in-shell chat, brief, activity, and settings content, or keep the shell behind a tighter rollout gate until the phase-2 surface is real.
-    - Move autonomy/privacy/per-project controls into the real Settings tab (see §1.2 item 20a) instead of leaving them split across drawer-local state and placeholder copy.
-    - Route triage/activity state into the Activity tab and move hardcoded English strings into `microcopy.ai.*` before the shell becomes canonical.
+8. **Unified Copilot shell — placeholder deleted 2026-05-21.**
+    The placeholder `src/components/copilotShell/index.tsx` was removed on 2026-05-21. The v3 PRD §7.1 right-rail target (Chat / Brief / Inbox / History tabs hosting autonomy/privacy controls and triage/activity state) is preserved as a design goal but unimplemented; rebuild from scratch when the Phase-2 design lands rather than restoring the placeholder.
 
 ### Phase 3 — Polish, accessibility, microcopy
 

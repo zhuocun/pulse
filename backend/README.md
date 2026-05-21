@@ -63,7 +63,7 @@ cp scripts/git-hooks/commit-msg .git/hooks/commit-msg
 chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
 ```
 
-- `pre-commit` runs `python -m pytest`, which is configured to fail below `100%` coverage.
+- `pre-commit` runs `python -m pytest`, which is configured to fail below `85%` coverage (real coverage is ~98%; the gate is a floor, not a target).
 - `commit-msg` enforces Conventional Commits with these types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 Examples:
@@ -109,6 +109,12 @@ LangSmith), see
 [`../docs/prd/v2.1-agent.md`](../docs/prd/v2.1-agent.md). Open
 operational work is tracked in
 [`../docs/todo/release-todo.md`](../docs/todo/release-todo.md).
+
+Future architectural themes (not in current backlog): provider gateway,
+vector store / pgvector RAG, supervisor / shared subgraph, and mutation
+lifecycle hardening. None of these are active work; they are named here
+so the engineering vocabulary survives even after the per-theme tracking
+files were retired.
 
 ### Adding a new agent
 

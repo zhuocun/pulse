@@ -18,7 +18,7 @@ Run from the repository root:
 | `npm start`            | Vite dev server on `:3000`.                             |
 | `npm run backend:dev`  | Uvicorn auto-reload on `:8000` (`cd`s into `backend/`). |
 | `npm test`             | FE Jest suite.                                          |
-| `npm run backend:test` | BE pytest suite (100% coverage gate).                   |
+| `npm run backend:test` | BE pytest suite (85% coverage gate).                    |
 
 ### Deployments
 

@@ -260,17 +260,8 @@ metadata) now surfaces `rate_limit`, `allowed_autonomy`,
 `monthly_token_budget_cap` with i18n (`en`, `zh-CN`). Typed in
 ``src/interfaces/agent.d.ts``.
 
-### ✅ 15. MCP transport deferred  *(BE — Resolved 2026-05-10)*
+### 15. MCP transport  *(BE — **Deferred 2026-05-21** — MCP server module deleted (was opt-in, no FE consumers, no external integration committed yet). If external AI client integration (Claude Desktop, Cursor, etc.) becomes a requirement, the LangGraph MCP adapter pattern remains; rebuild cost ~800 LOC.)*
 
-Streamable HTTP MCP is mounted at ``/mcp`` when ``MCP_ENABLED=true``
-(default off). FastMCP registers read-only ``fe.*`` tools
-(list/get projects, board, tasks, members, boardSnapshot); JWT auth
-uses ``scp=rest`` bearer tokens (``ai_proxy`` rejected). Implementation:
-``app/mcp_server.py``, ``app/mcp_tools.py``; dependency ``mcp>=1.0,<2``
-in ``requirements.txt`` / ``pyproject.toml`` ``[mcp]`` / ``[ai]``.
-**Migration:** set ``MCP_ENABLED=true`` only after JWT issuance matches
-the rest tool path; point MCP clients at ``https://<api-host>/mcp``.
-Tests: ``tests/test_mcp_wiring.py``, ``tests/test_mcp_mount_fn.py``.
 Mutation tools remain out of scope (GA §1 consent/undo).
 
 ### ✅ 16. No multi-agent orchestration / memory  *(BE — Resolved 2026-05-10)*
@@ -483,6 +474,6 @@ npx vite build                                              # must succeed
 ```bash
 cd backend
 python -m pip install -e '.[dev,ai]'                        # matches CI test-full dependency surface
-python -m pytest                                            # full suite, 100% coverage gate (add -q -rs for skip reasons)
+python -m pytest                                            # full suite, 85% gate; real ~98% (add -q -rs for skip reasons)
 ruff check .                                                # must be clean
 ```

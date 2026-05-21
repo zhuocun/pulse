@@ -31,7 +31,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | — | ✅ |
 | v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode) | — | ✅ |
 | v2.1 UI surface — agent health badge, chat-drawer cards | — | ✅ |
-| Unified Copilot shell scaffold (`CopilotShell`) | — | ✅ Shipped as a phase-1 drawer scaffold; in-shell tab content remains deferred |
+| Unified Copilot shell scaffold (`CopilotShell`) | — | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
 | v2.1 chat path migrated to SSE streaming | — | ✅ |
 | v2.1 triage nudges mounted in board page | — | ✅ |
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
@@ -65,14 +65,14 @@ For the live GA / blocker / soft-blocker / polish status see
 | Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
 | Copilot About — `chat-agent` `rate_limit` / `allowed_autonomy` in UI | [`release-todo.md`](release-todo.md) §14 | ✅ Remote-only `useChatAgentMetadata` + session `getSessionCachedAgentMetadata`; loading/empty/error handling in `CopilotAboutPopover` |
-| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | ✅ `en` / `zh-CN` keys; component + tests read from `microcopy` |
+| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
 | Task card type icons — decorative img a11y (`TaskTypeBadge`) | UX ([`ui-todo.md`](ui-todo.md) §21) | ✅ `<img alt="" aria-hidden>` beside visible type labels; regression test in `column/index.test.tsx` |
 | `useAgent` nudge-inbox extracted into `useNudgeInbox` hook | [`release-todo.md`](release-todo.md) §16b | ✅ AC-V14 reducer + state moved to `src/utils/hooks/useNudgeInbox.ts`; `useAgent` re-exports `reduceNudgeInbox` / `NUDGE_INBOX_MAX` / `NUDGE_EXPIRY_MS` for compatibility |
 | Members popover avatars + count badge + shared cached query | UX ([`ui-todo.md`](ui-todo.md) §14, §19 remaining) | ✅ `useMembersList()` centralizes the `users/members` React Query (5-minute `staleTime`); 4 consumers migrated; popover trigger renders avatar group + count badge; no refetch on open |
 | Throttled spinners across AI surfaces | UX ([`ui-todo.md`](ui-todo.md) Phase 3.5 / 2.A.7) | ✅ `useDelayedFlag(active, 250)` hook gates visible spinners in `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer`; underlying loading state and analytics unchanged |
 | Microcopy / casing sentence-case sweep | UX ([`ui-todo.md`](ui-todo.md) §17 / Phase 3.1) | ✅ Value-only update across `src/i18n/locales/en.ts` (`Login` → `Log in`, `Register` → `Sign up`, `Open Chat` → `Open chat`, `Board Brief` → `Board brief`, etc.); zh-CN parity preserved; affected tests updated |
 | `CopilotAboutPopover` + wire `AgentMetadata` (budget cap, limits, tags, schema keys) | [`release-todo.md`](release-todo.md) §13–§14 | ✅ BE `as_dict()` + `monthly_token_budget_cap`; FE shows cap line, `recursion_limit`, `tags`, `context_schema` shape; i18n `en`/`zh-CN` |
-| MCP streamable HTTP `/mcp` + read-only `fe.*` tools | [`release-todo.md`](release-todo.md) §15 | ✅ `MCP_ENABLED` gates mount; FastMCP + REST JWT middleware (`app/mcp_server.py`, `mcp_tools.py`); tests `test_mcp_wiring.py`, `test_mcp_mount_fn.py` |
+| MCP streamable HTTP `/mcp` + read-only `fe.*` tools | [`release-todo.md`](release-todo.md) §15 | **Reverted 2026-05-21** — MCP module deleted (opt-in, no consumers); see release-todo.md §15. |
 | LangGraph store hint: brief drift → triage | [`release-todo.md`](release-todo.md) §16 | ✅ `project_profile` / `last_board_brief` written in `board_brief.py`, read in `triage.py` for polish context |
 | `useAgent` SSE stream consumer extraction | [`release-todo.md`](release-todo.md) §16b | ✅ `useAgentStreamConsumer.ts` (`forEachAgentStreamPart`) + `useAgentStreamConsumer.test.ts`; `useAgent.ts` delegates loop |
 | Per-project chat model map + header merge | [`release-todo.md`](release-todo.md) §16c | ✅ `AGENT_PROJECT_CHAT_MODEL_MAP` + `X-Pulse-Model` precedence in `_dispatch.py` / `agents.py`; tests `test_dispatch_chat_context_merge.py`, `test_agents_request_context_merge.py` |
@@ -200,10 +200,9 @@ JSON shim remains for local/fallback compatibility.
   `useAgentHealth` status dot in remote mode.
 - `src/components/aiSparkleIcon/index.tsx` — single shared "AI"
   affordance.
-- `src/components/copilotShell/index.tsx` — unified right-rail
-  scaffold with `chat`, `brief`, `activity`, and `settings` tabs.
-  Current board-page wiring opens the shell, but the tab bodies still
-  delegate to the existing drawers or render placeholder copy.
+- `src/components/copilotShell/index.tsx` — **Reverted 2026-05-21** —
+  placeholder shell deleted; Phase-2 right-rail will be built from
+  scratch when design lands.
 
 ### AI UX Phase 1 — trust and privacy corrections
 
