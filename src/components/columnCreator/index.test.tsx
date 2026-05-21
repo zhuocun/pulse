@@ -138,6 +138,74 @@ describe("ColumnCreator", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
+    // least 24×24 CSS px, with AAA at 44×44. The "Add column" affordance is
+    // the canvas-level commit point for adding a new column and must stay
+    // generous on touch. Its styled component declares `min-height: 3rem`
+    // (48 px in jsdom's default 16 px root). Walk the rendered stylesheet
+    // (same approach as `src/layouts/authLayout.test.tsx` for `AuthButton`)
+    // and assert the declaration is still emitted at >=44 px-equivalent so
+    // a future style refactor that drops it below the AAA target fails CI.
+    it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
+        renderCreator();
+        const button = screen.getByRole("button", { name: "Add column" });
+        const styledCls = button.className
+            .split(/\s+/)
+            .find(
+                (tok) =>
+                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
+                    !tok.startsWith("css-var-") &&
+                    !tok.startsWith("css-dev-only-")
+            );
+        expect(styledCls).toBeTruthy();
+
+        // Walk every stylesheet's rules and collect any `(min-)?height`
+        // declaration on a rule that mentions the styled class. Pixel
+        // values are kept as-is; `rem` values are converted with the
+        // jsdom default root font size of 16 px so the assertion can
+        // compare against the 44 px AAA target.
+        const heights: number[] = [];
+        const REM_PX = 16;
+        const visit = (rule: CSSRule) => {
+            if (rule instanceof CSSStyleRule) {
+                if (!styledCls || !rule.selectorText.includes(styledCls))
+                    return;
+                const pxRe =
+                    /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
+                let m: RegExpExecArray | null = pxRe.exec(rule.cssText);
+                while (m !== null) {
+                    heights.push(parseFloat(m[1] ?? "0"));
+                    m = pxRe.exec(rule.cssText);
+                }
+                const remRe =
+                    /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)rem/gi;
+                m = remRe.exec(rule.cssText);
+                while (m !== null) {
+                    heights.push(parseFloat(m[1] ?? "0") * REM_PX);
+                    m = remRe.exec(rule.cssText);
+                }
+            } else if ("cssRules" in rule) {
+                for (const child of Array.from(
+                    (rule as CSSGroupingRule).cssRules
+                )) {
+                    visit(child);
+                }
+            }
+        };
+        Array.from(document.styleSheets).forEach((sheet) => {
+            let rules: CSSRuleList;
+            try {
+                rules = sheet.cssRules;
+            } catch {
+                return;
+            }
+            for (const rule of Array.from(rules)) visit(rule);
+        });
+
+        expect(heights.length).toBeGreaterThan(0);
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+    });
+
     it("does not submit a named column just because the input blurs", async () => {
         renderCreator();
         const input = await expandIntoInput();
