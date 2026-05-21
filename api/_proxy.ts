@@ -115,6 +115,35 @@ export const readRequestBody = async (
     return new Uint8Array(Buffer.concat(chunks));
 };
 
+export const buildOutgoingHeadersFromWeb = (incoming: Headers): Headers => {
+    const headers = new Headers();
+    incoming.forEach((value, name) => {
+        if (REQUEST_HOP_HEADERS.has(name.toLowerCase())) return;
+        headers.append(name, value);
+    });
+    headers.set("x-forwarded-proto", "https");
+    return headers;
+};
+
+export const copyUpstreamHeaders = (upstream: Headers): Headers => {
+    const out = new Headers();
+    const headersWithSetCookie = upstream as Headers & {
+        getSetCookie?: () => string[];
+    };
+    if (typeof headersWithSetCookie.getSetCookie === "function") {
+        for (const cookie of headersWithSetCookie.getSetCookie()) {
+            out.append("set-cookie", cookie);
+        }
+    }
+    upstream.forEach((value, name) => {
+        const lower = name.toLowerCase();
+        if (lower === "set-cookie") return;
+        if (RESPONSE_HOP_HEADERS.has(lower)) return;
+        out.append(name, value);
+    });
+    return out;
+};
+
 export const buildOutgoingHeaders = (req: IncomingMessage): Headers => {
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
@@ -197,5 +226,45 @@ export const handleProxyRequest = async (
             res.setHeader("content-type", "application/json");
         }
         res.end(JSON.stringify({ error: "Bad gateway" }));
+    }
+};
+
+/**
+ * Web Standard handler used by ``api/[...path].ts`` on Vercel. Vite
+ * static deployments only pick up ``/api`` routes that export a
+ * ``fetch`` method; the legacy ``(req, res)`` export was ignored in
+ * production, so ``POST /api/v1/auth/login`` fell through to the SPA
+ * ``index.html`` rewrite and returned 405 -- surfaced in the UI as
+ * "Operation failed".
+ */
+export const handleProxyFetch = async (request: Request): Promise<Response> => {
+    try {
+        const url = new URL(request.url);
+        const target = `${BACKEND_URL}${url.pathname}${url.search}`;
+        const headers = buildOutgoingHeadersFromWeb(request.headers);
+        const method = request.method.toUpperCase();
+        const bodyBuffer =
+            method === "GET" || method === "HEAD"
+                ? undefined
+                : await request.arrayBuffer();
+        const body =
+            bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined;
+
+        const upstream = await fetch(target, {
+            method: request.method,
+            headers,
+            body,
+            redirect: "manual"
+        });
+
+        const buffer = await upstream.arrayBuffer();
+        return new Response(buffer, {
+            status: upstream.status,
+            headers: copyUpstreamHeaders(upstream.headers)
+        });
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[api proxy] forwarding error", err);
+        return Response.json({ error: "Bad gateway" }, { status: 502 });
     }
 };

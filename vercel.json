@@ -1,8 +1,20 @@
 {
+    "$schema": "https://openapi.vercel.sh/vercel.json",
     "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':(exclude)backend/'",
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "functions": {
+        "api/**/*.ts": {
+            "maxDuration": 30
+        }
+    },
     "rewrites": [
         {
-            "source": "/(.*)",
+            "source": "/api/:path*",
+            "destination": "/api/:path*"
+        },
+        {
+            "source": "/((?!api/).*)",
             "destination": "/index.html"
         }
     ]
