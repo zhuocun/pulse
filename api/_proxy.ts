@@ -239,7 +239,11 @@ export const handleProxyRequest = async (
  */
 export const handleProxyFetch = async (request: Request): Promise<Response> => {
     try {
-        const url = new URL(request.url);
+        // Vercel rewrites can leave ``request.url`` path-only; ``new URL``
+        // needs an absolute base. Pathname + search are all the proxy uses.
+        const url = request.url.startsWith("http")
+            ? new URL(request.url)
+            : new URL(request.url, "https://proxy.local");
         const target = `${BACKEND_URL}${url.pathname}${url.search}`;
         const headers = buildOutgoingHeadersFromWeb(request.headers);
         const method = request.method.toUpperCase();

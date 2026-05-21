@@ -11,9 +11,30 @@
  * ``vercel.json`` rewrites ``/api/:path*`` → ``/api`` so this one
  * function receives the full original URL in ``request.url`` and can
  * forward ``/api/v1/...`` to the Python backend with cookies intact.
+ *
+ * Uses the Node ``(req, res)`` default export — the Web Standard
+ * ``export default { fetch }`` object (especially with an imported
+ * ``fetch`` reference) was not reliably invoked on this Vite static
+ * deploy and surfaced as Vercel ``FUNCTION_INVOCATION_FAILED``.
  */
-import { handleProxyFetch } from "./_proxy";
+import { handleProxyRequest } from "./_proxy";
 
-export default {
-    fetch: handleProxyFetch
+export default handleProxyRequest;
+
+export const config = {
+    // Node runtime is necessary for ``Headers.getSetCookie`` (the Edge
+    // runtime's Headers shim collapses duplicate Set-Cookie values into
+    // one comma-joined string, which the browser then mis-parses) and
+    // for full IncomingMessage/ServerResponse semantics.
+    runtime: "nodejs" as const,
+    api: {
+        // Vercel auto-parses JSON / form bodies on ingress, which
+        // drains the underlying stream before the handler runs --
+        // leaving a body-less POST to forward to the BE (the bug
+        // that surfaced as "Operation failed" on the login screen).
+        // ``_proxy.ts`` ALSO handles a pre-parsed ``req.body`` for
+        // safety in case this flag is ignored by a future Vercel
+        // runtime change.
+        bodyParser: false
+    }
 };

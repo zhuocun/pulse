@@ -9,6 +9,7 @@ describe("vercel.json API routing", () => {
         readFileSync(join(__dirname, "..", "vercel.json"), "utf-8")
     ) as {
         rewrites?: Array<{ source: string; destination: string }>;
+        functions?: Record<string, { maxDuration?: number }>;
     };
 
     it("rewrites nested /api/* paths to the single api/index function", () => {
@@ -26,5 +27,18 @@ describe("vercel.json API routing", () => {
             rule.destination.includes("index.html")
         );
         expect(spaRewrite?.source).toMatch(/api/);
+    });
+
+    it("registers only api/index.ts as a serverless function", () => {
+        expect(Object.keys(config.functions ?? {})).toEqual(["api/index.ts"]);
+    });
+});
+
+describe("api/index Vercel entrypoint", () => {
+    it("default-exports the Node (req, res) proxy handler", async () => {
+        const entry = await import("./index");
+        expect(typeof entry.default).toBe("function");
+        expect(entry.config?.runtime).toBe("nodejs");
+        expect(entry.config?.api?.bodyParser).toBe(false);
     });
 });
