@@ -15,7 +15,7 @@
         "prettier:fix": "prettier --write .",
         "eslint": "eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js --fix",
         "pre-commit": "npm run prettier && npm run eslint && npm run typecheck",
-        "server": "json-server __json_server_mock__/db.json --port 8080",
+        "server": "node __json_server_mock__/server.cjs",
         "backend:dev": "cd backend && uvicorn app.main:app --reload --port 8000",
         "backend:test": "cd backend && pytest"
     },
