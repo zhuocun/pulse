@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
                 JSON.stringify(errorReportEndpoint)
         },
         server: {
-            // Mirror the prod ``api/[...path].ts`` Vercel function (the
+            // Mirror the prod ``api/index.ts`` Vercel function (the
             // FE same-origin proxy that the cookie handshake relies on)
             // in dev so the frontend and backend appear at one origin
             // in both environments. Without this the dev FE would hit

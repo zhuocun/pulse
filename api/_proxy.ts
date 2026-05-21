@@ -22,7 +22,7 @@
  * ``/api/v1/...`` prefix unconditionally.
  *
  * The underscore prefix excludes this file from Vercel's serverless
- * function discovery -- only ``[...path].ts`` is exposed as an
+ * function discovery -- only ``api/index.ts`` is exposed as an
  * endpoint; this file ships as a bundled dependency.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -230,7 +230,7 @@ export const handleProxyRequest = async (
 };
 
 /**
- * Web Standard handler used by ``api/[...path].ts`` on Vercel. Vite
+ * Web Standard handler used by ``api/index.ts`` on Vercel. Vite
  * static deployments only pick up ``/api`` routes that export a
  * ``fetch`` method; the legacy ``(req, res)`` export was ignored in
  * production, so ``POST /api/v1/auth/login`` fell through to the SPA

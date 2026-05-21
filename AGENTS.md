@@ -72,6 +72,15 @@ your change closes or opens a backlog item, update `status/` in the same PR:
   Do not coerce the board page's tasks query to `[]` before passing it into
   `TaskModal`, or deep-linked edits will close immediately during load.
 
+## Vercel API proxy (non-Next FE)
+
+- Catch-all filenames like ``api/[...path].ts`` are a **Next.js-only**
+  feature. On this Vite static deploy, only ``api/index.ts`` is wired
+  up; ``vercel.json`` must rewrite ``/api/:path*`` → ``/api`` so nested
+  paths such as ``/api/v1/auth/login`` hit the proxy. A missing rewrite
+  surfaces Vercel's plain-text ``NOT_FOUND`` page in the login error
+  summary ("The page could not be found").
+
 ## Deployment
 
 For required env vars, CDN cache-purge guidance, FE smoke tests after
