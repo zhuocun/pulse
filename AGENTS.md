@@ -89,12 +89,9 @@ deploy, and the BE companion-server prerequisites, see
 GA blockers and ship sequence live in
 [`docs/todo/release-todo.md`](docs/todo/release-todo.md).
 
-- Deploys are Git-driven via `vercel.json`; the Vercel CLI is **not** a
-  project dependency. For ad-hoc inspection (logs, env vars, deployment
-  status) use `npx vercel@latest <cmd>` — do **not** add `vercel` to
-  `devDependencies`, since it pulls ~330 packages and isn't on the build
-  path. Useful commands: `ls pulse`, `logs <url>`, `inspect <url>`,
-  `env ls`. README's "Ad-hoc Vercel inspection" subsection has the full list.
+- Access Vercel via `npx vercel@latest <cmd>` (e.g. `ls pulse`,
+  `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
+  inspection" subsection.
 
 ## Cursor Cloud
 
