@@ -6,20 +6,26 @@ import {
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { message } from "antd";
 import { BrowserRouter } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
+import useApi from "../../utils/hooks/useApi";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import * as tokenStorage from "../../utils/tokenStorage";
 
 import LoginForm from ".";
 
+jest.mock("../../utils/hooks/useApi");
 jest.mock("../../utils/hooks/useReactMutation");
 
+const mockedUseApi = useApi as jest.MockedFunction<typeof useApi>;
 const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
     typeof useReactMutation
 >;
 
+const api = jest.fn();
 const mutateAsync = jest.fn();
 
 const installAntdBrowserMocks = () => {
@@ -54,6 +60,13 @@ const renderLoginForm = ({
     isLoading?: boolean;
     onError?: jest.Mock;
 } = {}) => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            mutations: { retry: false },
+            queries: { retry: false }
+        }
+    });
+    mockedUseApi.mockReturnValue(api as unknown as ReturnType<typeof useApi>);
     mockedUseReactMutation.mockReturnValue({
         isLoading,
         mutateAsync
@@ -62,12 +75,14 @@ const renderLoginForm = ({
     window.history.pushState({}, "Login", "/login");
 
     render(
-        <BrowserRouter>
-            <LoginForm onError={onError} />
-        </BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+                <LoginForm onError={onError} />
+            </BrowserRouter>
+        </QueryClientProvider>
     );
 
-    return { onError };
+    return { onError, queryClient };
 };
 
 const changeField = async (label: RegExp, value: string) => {
@@ -93,6 +108,7 @@ describe("LoginForm", () => {
         sessionStorage.clear();
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue(user());
+        api.mockResolvedValue(user());
     });
 
     it("wires the login mutation with cache and error handling", () => {
@@ -105,8 +121,7 @@ describe("LoginForm", () => {
             "POST",
             "users",
             undefined,
-            onError,
-            true
+            onError
         );
     });
 
@@ -186,15 +201,15 @@ describe("LoginForm", () => {
         expect(onError).toHaveBeenCalledWith(null);
     });
 
-    it("submits credentials, stores the AI proxy token, and SPA-navigates to projects", async () => {
+    it("submits credentials, verifies the session, stores the AI proxy token, and SPA-navigates to projects", async () => {
         // The REST JWT itself rides an HttpOnly cookie the backend set
         // on the login response -- ``credentials: "include"`` on every
         // subsequent same-origin fetch picks it up automatically, and
-        // JS never sees it. ``setCache: true`` on the mutation hook
-        // mirrors the response body into the ``["users"]`` query cache
-        // so ``useAuth.isAuthenticated`` flips to true synchronously.
+        // JS never sees it. We force a fresh ``GET /users`` before
+        // navigating so a response body without a persisted cookie
+        // cannot strand the user on /projects with 401ing API calls.
         mutateAsync.mockResolvedValue(user({ ai_jwt: "ai-token" }));
-        renderLoginForm();
+        const { queryClient } = renderLoginForm();
 
         await changeField(/^email$/i, "alice@example.com");
         await changeField(/^password$/i, "secret");
@@ -207,8 +222,15 @@ describe("LoginForm", () => {
             });
         });
         await waitFor(() => {
+            expect(api).toHaveBeenCalledWith("users", {
+                dedup: false,
+                rateLimit: false
+            });
+        });
+        await waitFor(() => {
             expect(window.location.pathname).toBe("/projects");
         });
+        expect(queryClient.getQueryData(["users"])).toEqual(user());
         expect(tokenStorage.readAiProxyToken()).toBe("ai-token");
     });
 
@@ -268,6 +290,28 @@ describe("LoginForm", () => {
         });
         expect(window.location.pathname).toBe("/login");
         expect(tokenStorage.readAiProxyToken()).toBeNull();
+    });
+
+    it("stays on login and surfaces an error when the session cookie cannot be verified", async () => {
+        api.mockRejectedValue(new Error("empty JWT"));
+        const { onError, queryClient } = renderLoginForm();
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(api).toHaveBeenCalledWith("users", {
+                dedup: false,
+                rateLimit: false
+            });
+        });
+        expect(window.location.pathname).toBe("/login");
+        expect(queryClient.getQueryData(["users"])).toBeUndefined();
+        expect(tokenStorage.readAiProxyToken()).toBeNull();
+        expect(onError).toHaveBeenCalledWith(
+            new Error(microcopy.feedback.loginCouldNotPersistSession)
+        );
     });
 
     it("shows the submitting state from the mutation", () => {
