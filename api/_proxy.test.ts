@@ -393,9 +393,7 @@ describe("api proxy fetch handler", () => {
 
         expect(mockFetch).toHaveBeenCalledTimes(1);
         const [target, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-        expect(target).toBe(
-            `${BACKEND_URL}/api/v1/auth/login`
-        );
+        expect(target).toBe(`${BACKEND_URL}/api/v1/auth/login`);
         expect(init.method).toBe("POST");
         expect(init.redirect).toBe("manual");
         expect(await new Response(init.body).text()).toBe(
