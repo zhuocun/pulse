@@ -32,6 +32,18 @@ Both apps deploy through Vercel's GitHub integration on every push to the tracke
 
 `backend/Dockerfile` and `backend/fly.toml` are kept as a fallback — anyone can `cd backend && fly deploy` from a Fly-authenticated machine — but they're not on the active deploy path.
 
+### Ad-hoc Vercel inspection
+
+Deploys are Git-driven, so the Vercel CLI is not a project dependency. For one-off inspection (logs, env vars, deployment status) use `npx` instead of a global or dev-dep install:
+
+```bash
+npx vercel@latest login            # one-time, opens a browser
+npx vercel@latest ls pulse         # recent deployments
+npx vercel@latest logs <url>       # runtime logs for a deployment
+npx vercel@latest inspect <url>    # build + routing details
+npx vercel@latest env ls           # env vars (scope with --environment)
+```
+
 ### Post-merge verification checklist
 
 - [ ] FE Vercel project still builds and serves the app at its existing URL.

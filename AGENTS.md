@@ -89,6 +89,10 @@ deploy, and the BE companion-server prerequisites, see
 GA blockers and ship sequence live in
 [`docs/todo/release-todo.md`](docs/todo/release-todo.md).
 
+- Access Vercel via `npx vercel@latest <cmd>` (e.g. `ls pulse`,
+  `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
+  inspection" subsection.
+
 ## Cursor Cloud
 
 VM-specific gotchas (mongod `--fork` workaround, NVM bootstrap, Jest
