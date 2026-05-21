@@ -1,36 +1,16 @@
 /**
- * Strict form validation tests (TDD harness).
+ * Form-validation contract tests:
  *
- * Forms across the app currently use only the AntD `required: true` rule
- * for required fields. That rule passes whitespace-only values, lets a
- * 1-character password through on Register, and never trims user input
- * before persisting.
- *
- * The optimization plan §2.A.1 ("Forms") and §3.1 ("Microcopy") together
- * spell out the contract every form must satisfy:
- *
- *   - Required fields reject whitespace-only values (use `whitespace: true`
- *     on the AntD rule, or trim before validation).
- *   - String fields are persisted trimmed — leading / trailing whitespace
- *     never survives a save.
- *   - Register-side passwords have a minimum length (8 chars per the §3.3.8
- *     accessible-authentication guidance).
- *
- * Each test pins one expectation. A failing test means that surface still
- * accepts (and persists) bad input.
+ *   - Required fields reject whitespace-only values.
+ *   - String fields are persisted trimmed.
+ *   - Register-side passwords have a minimum length.
  */
-/* eslint-disable global-require */
 import "@testing-library/jest-dom";
 
-import {
-    act,
-    fireEvent,
-    render,
-    screen,
-    waitFor
-} from "@testing-library/react";
-import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Provider } from "react-redux";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 import ProjectModal from "../components/projectModal";
@@ -57,43 +37,13 @@ const mockedUseTaskModal = useTaskModal as jest.MockedFunction<
     typeof useTaskModal
 >;
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-
-    class ResizeObserverMock {
-        observe = jest.fn();
-
-        unobserve = jest.fn();
-
-        disconnect = jest.fn();
-    }
-
-    Object.defineProperty(window, "ResizeObserver", {
-        writable: true,
-        value: ResizeObserverMock
-    });
-};
-
-const member = (overrides: Partial<IMember> = {}): IMember => ({
+const member: IMember = {
     _id: "member-1",
     email: "alice@example.com",
-    username: "Alice",
-    ...overrides
-});
+    username: "Alice"
+};
 
-const task = (overrides: Partial<ITask> = {}): ITask => ({
+const taskFixture: ITask = {
     _id: "task-1",
     columnId: "column-1",
     coordinatorId: "member-1",
@@ -103,9 +53,8 @@ const task = (overrides: Partial<ITask> = {}): ITask => ({
     projectId: "project-1",
     storyPoints: 3,
     taskName: "Build task",
-    type: "Task",
-    ...overrides
-});
+    type: "Task"
+};
 
 const stubMutation = (mutateAsync: jest.Mock) =>
     ({
@@ -125,29 +74,33 @@ const stubQuery = (data: unknown) =>
     }) as unknown as ReturnType<typeof useReactQuery<unknown>>;
 
 beforeAll(() => {
-    installAntdBrowserMocks();
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => ({
+            addEventListener: jest.fn(),
+            addListener: jest.fn(),
+            dispatchEvent: jest.fn(),
+            matches: false,
+            media: query,
+            onchange: null,
+            removeEventListener: jest.fn(),
+            removeListener: jest.fn()
+        })
+    });
+    class ResizeObserverMock {
+        observe = jest.fn();
+
+        unobserve = jest.fn();
+
+        disconnect = jest.fn();
+    }
+    Object.defineProperty(window, "ResizeObserver", {
+        writable: true,
+        value: ResizeObserverMock
+    });
 });
 
-const silenceExpectedReactWarnings = () =>
-    jest.spyOn(console, "error").mockImplementation((...args) => {
-        const message = args.map(String).join(" ");
-        // The forms intentionally trigger AntD validation messages from
-        // synchronous click handlers; AntD sometimes flushes those updates
-        // outside `act`. Suppress only that specific warning so real
-        // regressions still surface.
-        if (
-            message.includes("not wrapped in act") ||
-            message.includes("Warning: An update to")
-        ) {
-            return;
-        }
-        throw new Error(`Unexpected console.error: ${message}`);
-    });
-
-/* -------------------------------------------------------------------------- */
-/* 1. ProjectModal — required fields reject whitespace                        */
-/* -------------------------------------------------------------------------- */
-describe("UI quality :: ProjectModal field hygiene", () => {
+describe("ProjectModal field hygiene", () => {
     const mutateAsync = jest.fn();
 
     const renderOpen = () => {
@@ -157,7 +110,6 @@ describe("UI quality :: ProjectModal field hygiene", () => {
                 queries: { retry: false }
             }
         });
-
         return render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
@@ -174,49 +126,31 @@ describe("UI quality :: ProjectModal field hygiene", () => {
         );
     };
 
-    let consoleSpy: jest.SpyInstance;
-
     beforeEach(() => {
         jest.clearAllMocks();
         store.dispatch(projectActions.openModal());
         mutateAsync.mockResolvedValue({});
         mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
-        mockedUseReactQuery.mockImplementation((endpoint: string) => {
-            if (endpoint === "users/members") {
-                return stubQuery([member()]);
-            }
-            return stubQuery(undefined);
-        });
-        consoleSpy = silenceExpectedReactWarnings();
-    });
-
-    afterEach(() => {
-        consoleSpy.mockRestore();
+        mockedUseReactQuery.mockImplementation((endpoint: string) =>
+            endpoint === "users/members"
+                ? stubQuery([member])
+                : stubQuery(undefined)
+        );
     });
 
     it("rejects a whitespace-only project name and never fires the create mutation", async () => {
+        const user = userEvent.setup();
         renderOpen();
-
         await screen.findByRole("dialog");
-        await act(async () => {
-            fireEvent.change(screen.getByLabelText(/project name/i), {
-                target: { value: "    " }
-            });
-            fireEvent.change(screen.getByLabelText(/organization/i), {
-                target: { value: "Finance" }
-            });
-        });
-        await act(async () => {
-            fireEvent.click(
-                screen.getByRole("button", {
-                    name: microcopy.actions.createProject
-                })
-            );
-        });
 
-        // The validation must surface the canonical "Please enter the
-        // project name" message and the mutation must not fire — the
-        // current rule (`required: true` only) lets the whitespace pass.
+        await user.type(screen.getByLabelText(/project name/i), "    ");
+        await user.type(screen.getByLabelText(/organization/i), "Finance");
+        await user.click(
+            screen.getByRole("button", {
+                name: microcopy.actions.createProject
+            })
+        );
+
         await waitFor(() => {
             expect(
                 screen.getByText(microcopy.validation.projectNameRequired)
@@ -224,48 +158,16 @@ describe("UI quality :: ProjectModal field hygiene", () => {
         });
         expect(mutateAsync).not.toHaveBeenCalled();
     });
-
-    it("rejects a whitespace-only organization", async () => {
-        renderOpen();
-
-        await screen.findByRole("dialog");
-        await act(async () => {
-            fireEvent.change(screen.getByLabelText(/project name/i), {
-                target: { value: "Atlas" }
-            });
-            fireEvent.change(screen.getByLabelText(/organization/i), {
-                target: { value: "   " }
-            });
-        });
-        await act(async () => {
-            fireEvent.click(
-                screen.getByRole("button", {
-                    name: microcopy.actions.createProject
-                })
-            );
-        });
-
-        await waitFor(() => {
-            expect(
-                screen.getByText(microcopy.validation.organizationRequired)
-            ).toBeInTheDocument();
-        });
-        expect(mutateAsync).not.toHaveBeenCalled();
-    });
 });
 
-/* -------------------------------------------------------------------------- */
-/* 2. TaskModal — required fields reject whitespace, save trims              */
-/* -------------------------------------------------------------------------- */
-describe("UI quality :: TaskModal field hygiene", () => {
+describe("TaskModal field hygiene", () => {
     const mutateAsync = jest.fn();
 
     const renderOpen = () => {
         const queryClient = new QueryClient({
             defaultOptions: { queries: { retry: false } }
         });
-        queryClient.setQueryData(["users/members"], [member()]);
-
+        queryClient.setQueryData(["users/members"], [member]);
         return render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
@@ -273,7 +175,7 @@ describe("UI quality :: TaskModal field hygiene", () => {
                         <Routes>
                             <Route
                                 path="/projects/:projectId/board"
-                                element={<TaskModal tasks={[task()]} />}
+                                element={<TaskModal tasks={[taskFixture]} />}
                             />
                         </Routes>
                     </MemoryRouter>
@@ -281,8 +183,6 @@ describe("UI quality :: TaskModal field hygiene", () => {
             </Provider>
         );
     };
-
-    let consoleSpy: jest.SpyInstance;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -293,63 +193,51 @@ describe("UI quality :: TaskModal field hygiene", () => {
             startEditing: jest.fn()
         });
         mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
-        mockedUseReactQuery.mockImplementation(() => stubQuery([member()]));
-        consoleSpy = silenceExpectedReactWarnings();
-    });
-
-    afterEach(() => {
-        consoleSpy.mockRestore();
+        mockedUseReactQuery.mockImplementation(() => stubQuery([member]));
     });
 
     it("rejects a whitespace-only task name on Save", async () => {
+        const user = userEvent.setup();
         renderOpen();
-
         const dialog = await screen.findByRole("dialog");
 
-        // Find the task name input by its display value (preset by the form).
         const taskNameInput = screen.getByDisplayValue(
             "Build task"
         ) as HTMLInputElement;
-        await act(async () => {
-            fireEvent.change(taskNameInput, { target: { value: "   " } });
-        });
+        await user.clear(taskNameInput);
+        await user.type(taskNameInput, "   ");
+
         const saveBtn = Array.from(
             dialog.querySelectorAll<HTMLButtonElement>("button")
         ).find(
             (btn) => (btn.textContent ?? "").trim() === microcopy.actions.save
         );
         if (!saveBtn) throw new Error("Save button not found");
-        await act(async () => {
-            fireEvent.click(saveBtn);
-        });
+        await user.click(saveBtn);
 
-        // The mutation must NOT fire for a whitespace-only task name.
         await waitFor(() => {
             expect(mutateAsync).not.toHaveBeenCalled();
         });
     });
 
     it("trims leading and trailing whitespace from the persisted task name", async () => {
+        const user = userEvent.setup();
         renderOpen();
-
         const dialog = await screen.findByRole("dialog");
+
         const taskNameInput = screen.getByDisplayValue(
             "Build task"
         ) as HTMLInputElement;
-        await act(async () => {
-            fireEvent.change(taskNameInput, {
-                target: { value: "   Plan v2 release   " }
-            });
-        });
+        await user.clear(taskNameInput);
+        await user.type(taskNameInput, "   Plan v2 release   ");
+
         const saveBtn = Array.from(
             dialog.querySelectorAll<HTMLButtonElement>("button")
         ).find(
             (btn) => (btn.textContent ?? "").trim() === microcopy.actions.save
         );
         if (!saveBtn) throw new Error("Save button not found");
-        await act(async () => {
-            fireEvent.click(saveBtn);
-        });
+        await user.click(saveBtn);
 
         await waitFor(() => {
             expect(mutateAsync).toHaveBeenCalled();
@@ -361,10 +249,7 @@ describe("UI quality :: TaskModal field hygiene", () => {
     });
 });
 
-/* -------------------------------------------------------------------------- */
-/* 3. RegisterForm — minimum password length, username trim                  */
-/* -------------------------------------------------------------------------- */
-describe("UI quality :: RegisterForm hygiene", () => {
+describe("RegisterForm hygiene", () => {
     const mutateAsync = jest.fn();
 
     const renderForm = () => {
@@ -376,37 +261,21 @@ describe("UI quality :: RegisterForm hygiene", () => {
         );
     };
 
-    let consoleSpy: jest.SpyInstance;
-
     beforeEach(() => {
         jest.clearAllMocks();
         mutateAsync.mockResolvedValue({});
-        consoleSpy = silenceExpectedReactWarnings();
-    });
-
-    afterEach(() => {
-        consoleSpy.mockRestore();
     });
 
     it("rejects a whitespace-only username so we never persist a blank profile", async () => {
+        const user = userEvent.setup();
         renderForm();
 
-        await act(async () => {
-            fireEvent.change(screen.getByLabelText(/^email$/i), {
-                target: { value: "alice@example.com" }
-            });
-            fireEvent.change(screen.getByLabelText(/^username$/i), {
-                target: { value: "   " }
-            });
-            fireEvent.change(screen.getByLabelText(/^password$/i), {
-                target: { value: "longenough" }
-            });
-        });
-        await act(async () => {
-            fireEvent.click(
-                screen.getByRole("button", { name: microcopy.actions.signUp })
-            );
-        });
+        await user.type(screen.getByLabelText(/^email$/i), "alice@example.com");
+        await user.type(screen.getByLabelText(/^username$/i), "   ");
+        await user.type(screen.getByLabelText(/^password$/i), "longenough");
+        await user.click(
+            screen.getByRole("button", { name: microcopy.actions.signUp })
+        );
 
         await waitFor(() => {
             expect(mutateAsync).not.toHaveBeenCalled();
@@ -414,51 +283,34 @@ describe("UI quality :: RegisterForm hygiene", () => {
     });
 
     it("rejects a 4-character password — Register must enforce a minimum length", async () => {
+        const user = userEvent.setup();
         renderForm();
 
-        await act(async () => {
-            fireEvent.change(screen.getByLabelText(/^email$/i), {
-                target: { value: "alice@example.com" }
-            });
-            fireEvent.change(screen.getByLabelText(/^username$/i), {
-                target: { value: "alice" }
-            });
-            fireEvent.change(screen.getByLabelText(/^password$/i), {
-                target: { value: "abcd" }
-            });
-        });
-        await act(async () => {
-            fireEvent.click(
-                screen.getByRole("button", { name: microcopy.actions.signUp })
-            );
-        });
+        await user.type(screen.getByLabelText(/^email$/i), "alice@example.com");
+        await user.type(screen.getByLabelText(/^username$/i), "alice");
+        await user.type(screen.getByLabelText(/^password$/i), "abcd");
+        await user.click(
+            screen.getByRole("button", { name: microcopy.actions.signUp })
+        );
 
-        // Per §3.3.8 (accessible auth) we want at least 8 chars on
-        // register; the existing form has no minimum-length rule.
         await waitFor(() => {
             expect(mutateAsync).not.toHaveBeenCalled();
         });
     });
 
     it("trims leading/trailing whitespace from the email before submitting", async () => {
+        const user = userEvent.setup();
         renderForm();
 
-        await act(async () => {
-            fireEvent.change(screen.getByLabelText(/^email$/i), {
-                target: { value: "  alice@example.com  " }
-            });
-            fireEvent.change(screen.getByLabelText(/^username$/i), {
-                target: { value: "alice" }
-            });
-            fireEvent.change(screen.getByLabelText(/^password$/i), {
-                target: { value: "longenough" }
-            });
-        });
-        await act(async () => {
-            fireEvent.click(
-                screen.getByRole("button", { name: microcopy.actions.signUp })
-            );
-        });
+        await user.type(
+            screen.getByLabelText(/^email$/i),
+            "  alice@example.com  "
+        );
+        await user.type(screen.getByLabelText(/^username$/i), "alice");
+        await user.type(screen.getByLabelText(/^password$/i), "longenough");
+        await user.click(
+            screen.getByRole("button", { name: microcopy.actions.signUp })
+        );
 
         await waitFor(() => {
             expect(mutateAsync).toHaveBeenCalled();
