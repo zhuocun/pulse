@@ -1,5 +1,6 @@
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
+import { useQueryClient } from "@tanstack/react-query";
 import { Form, Input, message } from "antd";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -7,6 +8,7 @@ import { Link, useNavigate } from "react-router";
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
+import useApi from "../../utils/hooks/useApi";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import { writeAiProxyToken } from "../../utils/tokenStorage";
 
@@ -14,6 +16,7 @@ import AuthErrorSummary from "../authErrorSummary";
 import { AuthTermsAgreement } from "../registerForm/termsAgreement";
 
 const inputSize = "large" as const;
+const userQueryKey = ["users"] as const;
 
 /**
  * Reserves a single line of vertical space for the Caps Lock warning so
@@ -41,36 +44,50 @@ const LoginForm: React.FC<{
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
+    const api = useApi();
+    const queryClient = useQueryClient();
     const [form] = Form.useForm<{ email: string; password: string }>();
     const [capsLockOn, setCapsLockOn] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
+    const [isVerifyingSession, setIsVerifyingSession] = useState(false);
     const { mutateAsync, isLoading } = useReactMutation<IUser>(
         "auth/login",
         "POST",
         "users",
         undefined,
-        onError,
-        true
+        onError
     );
     const handleSubmit = async (input: { email: string; password: string }) => {
         setSubmitAttempted(false);
+        let res: IUser;
         try {
-            const res = await mutateAsync(input);
-            // ``setCache: true`` already wrote the response into the
-            // ``["users"]`` query cache, which is the FE's source of
-            // truth for "am I logged in" (see ``useAuth``). The REST
-            // JWT itself rides an HttpOnly cookie the backend set on
-            // this response -- JS cannot read it, the browser sends
-            // it on the next same-origin call, and the iOS WebKit
-            // storage / hard-nav / Navigate-race workarounds the
-            // previous design needed are gone with it.
+            res = await mutateAsync(input);
+        } catch {
+            // Error state is set by useReactMutation's onError callback.
+            return;
+        }
+
+        setIsVerifyingSession(true);
+        try {
+            // The login response body is not enough to prove the
+            // HttpOnly cookie survived the proxy/browser roundtrip.
+            // Force a fresh post-login `/users` probe before routing
+            // into pages whose API calls require that cookie.
+            const verifiedUser = (await api("users", {
+                dedup: false,
+                rateLimit: false
+            })) as IUser;
+            queryClient.setQueryData(userQueryKey, verifiedUser);
             if (typeof res.ai_jwt === "string" && res.ai_jwt.length > 0) {
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
             navigate("/projects", { viewTransition: true });
         } catch {
-            // Error state is set by useReactMutation's onError callback.
+            queryClient.setQueryData(userQueryKey, undefined);
+            onError(new Error(microcopy.feedback.loginCouldNotPersistSession));
+        } finally {
+            setIsVerifyingSession(false);
         }
     };
 
@@ -177,11 +194,11 @@ const LoginForm: React.FC<{
             <AuthTermsAgreement variant="login" />
             <Form.Item>
                 <AuthButton
-                    loading={isLoading}
+                    loading={isLoading || isVerifyingSession}
                     htmlType="submit"
                     type="primary"
                 >
-                    {isLoading
+                    {isLoading || isVerifyingSession
                         ? microcopy.actions.loggingIn
                         : microcopy.actions.logIn}
                 </AuthButton>
