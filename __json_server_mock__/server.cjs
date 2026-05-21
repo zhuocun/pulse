@@ -109,7 +109,10 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const url = new URL(
+        req.url || "/",
+        `http://${req.headers.host || "localhost"}`
+    );
     const pathname = url.pathname;
     let body = {};
     if (req.method !== "GET" && req.method !== "HEAD") {
