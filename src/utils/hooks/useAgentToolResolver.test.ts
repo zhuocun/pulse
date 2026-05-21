@@ -118,37 +118,6 @@ describe("useAgentToolResolver", () => {
         expect(result.current.status).toBe("idle");
     });
 
-    it("does not auto-run fe.applyMutation when stage is approval (HITL pause)", async () => {
-        const run = jest.fn().mockResolvedValue({ ok: true });
-        const { result } = renderHook(() => useAgentToolResolver());
-
-        let resumeValue: unknown;
-        await act(async () => {
-            resumeValue = await result.current.resolveInterrupt({
-                registry: {
-                    "fe.applyMutation": {
-                        name: "fe.applyMutation",
-                        description: "mut",
-                        run
-                    }
-                },
-                autoResume: true,
-                autonomy: "plan",
-                threadId: "t_1",
-                lastInterrupt: null,
-                interrupt: {
-                    tool: "fe.applyMutation",
-                    args: { proposal_id: "p1", stage: "approval" }
-                },
-                ctx: makeContext()
-            });
-        });
-
-        expect(run).not.toHaveBeenCalled();
-        expect(resumeValue).toBeUndefined();
-        expect(result.current.status).toBe("idle");
-    });
-
     it("runs the auto-resume loop and threads resume commands into subsequent rounds", async () => {
         const consumeStreamRound = jest
             .fn()

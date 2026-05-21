@@ -10,7 +10,6 @@ import type { FeToolContext } from "./types";
 import { viewerContextTool } from "./viewerContext";
 
 const expectedNames = [
-    "fe.applyMutation",
     "fe.applyApprovedMutation",
     "fe.requestMutationApproval",
     "fe.listProjects",
@@ -38,10 +37,10 @@ const buildCtx = (
 });
 
 describe("FE_TOOL_REGISTRY", () => {
-    it("contains the expected 15 tool names", () => {
+    it("contains the expected 14 tool names", () => {
         const actual = Object.keys(FE_TOOL_REGISTRY).sort();
         expect(actual).toEqual([...expectedNames].sort());
-        expect(actual).toHaveLength(15);
+        expect(actual).toHaveLength(14);
     });
 
     it("each tool's run handles a missing-cache fallback without throwing", async () => {

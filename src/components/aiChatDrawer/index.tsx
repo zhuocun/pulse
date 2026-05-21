@@ -1876,8 +1876,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     always dismiss.
                     MutationProposalCard is gated behind
                     `environment.aiMutationProposalsEnabled` (defaults false)
-                    until the backend lifecycle and fe.applyMutation are
-                    ready. See REACT_APP_AI_MUTATION_PROPOSALS_ENABLED. */}
+                    until the backend lifecycle is ready. See
+                    REACT_APP_AI_MUTATION_PROPOSALS_ENABLED. */}
                     {environment.aiMutationProposalsEnabled &&
                         visibleProposal && (
                             <MutationProposalCard
