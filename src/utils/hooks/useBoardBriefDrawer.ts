@@ -1,25 +1,21 @@
-import { useCallback } from "react";
-
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
-import { useReduxDispatch, useReduxSelector } from "./useRedux";
+import createOverlayHook from "./_createOverlayHook";
 
 /**
- * Open/close state for the Board Brief drawer. Previously URL-driven
- * (`?brief=1`); migrated to Redux for cross-subtree propagation that
- * stays reliable on iOS Safari WebKit — see `useTaskModal` /
- * `useProjectModal` for the underlying symptom.
+ * Open/close state for the Board Brief drawer. See `_createOverlayHook`
+ * for the iOS Safari + cross-subtree-propagation rationale shared by
+ * the whole overlay family.
  */
+const useBoardBriefDrawerBase = createOverlayHook<boolean>({
+    select: (s) => s.overlays.boardBriefOpen,
+    openAction: overlaysActions.openBoardBrief,
+    closeAction: overlaysActions.closeBoardBrief
+});
+
 const useBoardBriefDrawer = () => {
-    const dispatch = useReduxDispatch();
-    const open = useReduxSelector((s) => s.overlays.boardBriefOpen);
-    const openDrawer = useCallback(() => {
-        dispatch(overlaysActions.openBoardBrief());
-    }, [dispatch]);
-    const closeDrawer = useCallback(() => {
-        dispatch(overlaysActions.closeBoardBrief());
-    }, [dispatch]);
-    return { open, openDrawer, closeDrawer };
+    const { value, open, close } = useBoardBriefDrawerBase();
+    return { open: value, openDrawer: open, closeDrawer: close };
 };
 
 export default useBoardBriefDrawer;

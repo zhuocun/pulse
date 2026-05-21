@@ -1,41 +1,33 @@
-import { useCallback } from "react";
-
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
-import { useReduxDispatch, useReduxSelector } from "./useRedux";
+import createOverlayHook from "./_createOverlayHook";
 
 /**
- * Open/close state for the AI Chat drawer.
- *
- * Previously URL-driven (`?chat=1[:prompt]`); migrated to Redux for the
- * same reason as the rest of the overlay family — see `useTaskModal` /
- * `useProjectModal` for the iOS Safari WebKit symptom that drove the
- * change.
+ * Open/close state for the AI Chat drawer. See `_createOverlayHook`
+ * for the iOS Safari + cross-subtree-propagation rationale shared by
+ * the whole overlay family.
  */
+interface ChatDrawerSnapshot {
+    open: boolean;
+    pendingPrompt: string | null;
+}
+
+const useAiChatDrawerBase = createOverlayHook<ChatDrawerSnapshot, string>({
+    select: (s) => s.overlays.chatDrawer,
+    openAction: (initialPrompt) =>
+        overlaysActions.openChatDrawer(
+            initialPrompt ? { pendingPrompt: initialPrompt } : undefined
+        ),
+    closeAction: overlaysActions.closeChatDrawer
+});
+
 const useAiChatDrawer = () => {
-    const dispatch = useReduxDispatch();
-    const open = useReduxSelector((s) => s.overlays.chatDrawer.open);
-    const pendingPrompt = useReduxSelector(
-        (s) => s.overlays.chatDrawer.pendingPrompt
-    );
-    const openDrawer = useCallback(
-        (initialPrompt?: string) => {
-            dispatch(
-                overlaysActions.openChatDrawer(
-                    initialPrompt ? { pendingPrompt: initialPrompt } : undefined
-                )
-            );
-        },
-        [dispatch]
-    );
-    const closeDrawer = useCallback(() => {
-        dispatch(overlaysActions.closeChatDrawer());
-    }, [dispatch]);
+    const { value, open, close } = useAiChatDrawerBase();
     return {
-        open,
-        openDrawer,
-        closeDrawer,
-        pendingPrompt: pendingPrompt ?? undefined
+        open: value.open,
+        pendingPrompt: value.pendingPrompt ?? undefined,
+        openDrawer: open as (initialPrompt?: string) => void,
+        closeDrawer: close
     };
 };
 

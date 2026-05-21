@@ -2,33 +2,33 @@ import { useCallback } from "react";
 
 import { projectActions } from "../../store/reducers/projectModalSlice";
 
+import createOverlayHook from "./_createOverlayHook";
 import useReactQuery from "./useReactQuery";
 import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
- * Project-modal open/close state — Redux only.
- *
- * Previous attempts bound `isModalOpened` to a URL search param so the
- * system back button could dismiss the overlay and deep links worked.
- * On iOS Safari WebKit, React Router's context propagation never
- * reached the modal's subtree after a `setSearchParams` write, so the
- * click updated the URL bar but the modal never opened. Three
- * intermediate fixes (local-state mirror, direct `useSearchParams`,
- * module-level pub/sub) all carried the same dependency.
- *
- * The whole modal family now lives in Redux only — `react-redux` uses
- * `useSyncExternalStore` internally and is the most reliable
- * cross-subtree subscription primitive in React. Dispatches are
- * synchronous, so the modal flips in the same render as the click.
+ * Project-modal open/close + editing-id state, plus the React Query
+ * hydration for the project being edited. See `_createOverlayHook` for
+ * the iOS Safari + cross-subtree-propagation rationale shared by the
+ * whole overlay family — `useProjectModal` was the first to migrate
+ * (see PR #226), and the rest now follow the same pattern.
  *
  * Trade-off accepted: deep links to `?modal=on` and the back-button
- * gesture no longer auto-open the modal. Sibling slices
- * (`useTaskModal` / `useAiChatDrawer` / `useBoardBriefDrawer` /
- * `useAiDraftModal`) follow the same pattern.
+ * gesture no longer auto-open the modal.
  */
+const useProjectModalBase = createOverlayHook<boolean>({
+    select: (s) => s.projectModal.isModalOpened,
+    openAction: projectActions.openModal,
+    closeAction: projectActions.closeModal
+});
+
 const useProjectModal = () => {
     const dispatch = useReduxDispatch();
-    const isModalOpened = useReduxSelector((s) => s.projectModal.isModalOpened);
+    const {
+        value: isModalOpened,
+        open: openModal,
+        close: closeModal
+    } = useProjectModalBase();
     const editingProjectId = useReduxSelector(
         (s) => s.projectModal.editingProjectId
     );
@@ -50,14 +50,6 @@ const useProjectModal = () => {
         undefined,
         Boolean(editingProjectId)
     );
-
-    const openModal = useCallback(() => {
-        dispatch(projectActions.openModal());
-    }, [dispatch]);
-
-    const closeModal = useCallback(() => {
-        dispatch(projectActions.closeModal());
-    }, [dispatch]);
 
     const startEditing = useCallback(
         (id: string) => {
