@@ -13,6 +13,9 @@ import {
     REQUEST_HOP_HEADERS,
     RESPONSE_HOP_HEADERS,
     buildOutgoingHeaders,
+    buildOutgoingHeadersFromWeb,
+    copyUpstreamHeaders,
+    handleProxyFetch,
     handleProxyRequest,
     readRequestBody,
     writeUpstreamHeaders
@@ -348,5 +351,90 @@ describe("api proxy body extraction", () => {
         }) as unknown as IncomingMessage;
         const body = await readRequestBody(req);
         expect(Buffer.from(body!).toString("utf-8")).toBe("from-the-stream");
+    });
+});
+
+describe("api proxy fetch handler", () => {
+    const originalFetch = global.fetch;
+    let mockFetch: jest.Mock;
+
+    beforeEach(() => {
+        mockFetch = jest.fn();
+        (global as { fetch: typeof fetch }).fetch = mockFetch;
+    });
+
+    afterEach(() => {
+        (global as { fetch: typeof fetch }).fetch = originalFetch;
+    });
+
+    it("forwards POST JSON to the backend with the request path intact", async () => {
+        mockFetch.mockResolvedValue(
+            upstreamResponse({
+                body: '{"_id":"u1"}',
+                headers: { "content-type": "application/json" }
+            })
+        );
+        const request = new Request(
+            "https://pulse-react-app.vercel.app/api/v1/auth/login",
+            {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                    cookie: "Token=abc"
+                },
+                body: JSON.stringify({
+                    email: "alice@example.com",
+                    password: "secret"
+                })
+            }
+        );
+
+        const response = await handleProxyFetch(request);
+
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        const [target, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+        expect(target).toBe(
+            `${BACKEND_URL}/api/v1/auth/login`
+        );
+        expect(init.method).toBe("POST");
+        expect(init.redirect).toBe("manual");
+        expect(await new Response(init.body).text()).toBe(
+            JSON.stringify({
+                email: "alice@example.com",
+                password: "secret"
+            })
+        );
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe('{"_id":"u1"}');
+    });
+
+    it("copies multiple Set-Cookie headers without collapsing them", () => {
+        const upstream = new Headers();
+        upstream.append(
+            "set-cookie",
+            "Token=a; Path=/; HttpOnly; Secure; SameSite=Lax"
+        );
+        upstream.append(
+            "set-cookie",
+            "Other=b; Path=/; HttpOnly; Secure; SameSite=Lax"
+        );
+        const copied = copyUpstreamHeaders(upstream);
+        expect(copied.getSetCookie()).toEqual([
+            "Token=a; Path=/; HttpOnly; Secure; SameSite=Lax",
+            "Other=b; Path=/; HttpOnly; Secure; SameSite=Lax"
+        ]);
+    });
+
+    it("strips hop-by-hop request headers from the Web handler", () => {
+        const incoming = new Headers({
+            cookie: "Token=x",
+            host: "pulse-react-app.vercel.app",
+            "x-vercel-id": "edge-1"
+        });
+        const outgoing = buildOutgoingHeadersFromWeb(incoming);
+        expect(outgoing.get("cookie")).toBe("Token=x");
+        expect(outgoing.get("host")).toBeNull();
+        expect(outgoing.get("x-vercel-id")).toBeNull();
+        expect(outgoing.get("x-forwarded-proto")).toBe("https");
     });
 });
