@@ -1097,7 +1097,9 @@ def test_board_brief_emit_citations_falls_back_to_thread_when_store_has_no_aput(
     cfg = {"configurable": {"thread_id": "brief-sync-store-1"}}
 
     async def run() -> dict[str, Any]:
-        result = await graph.ainvoke({"project_id": "p-sync-store-1"}, config=cfg, context=ctx)
+        await graph.ainvoke(
+            {"project_id": "p-sync-store-1"}, config=cfg, context=ctx
+        )
         return await graph.ainvoke(Command(resume=snapshot), config=cfg, context=ctx)
 
     final = asyncio.run(run())

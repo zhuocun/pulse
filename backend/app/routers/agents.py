@@ -1170,7 +1170,6 @@ async def stream_agent(
             with _agent_turn_project_scope(project_id):
                 tokens_in_total = 0
                 tokens_out_total = 0
-                last_values_payload: Any = None
                 completed_ok = False
                 failure_budget_settled = False
 
@@ -1194,12 +1193,15 @@ async def stream_agent(
                         inputs,
                         context=context,
                         resume=resume,
-                        stream_mode=("updates", "messages", "custom", "values"),
                         **options,
                     )
                     async for mode, chunk in _with_disconnect(request, stream, timeout):
-                        if mode == "values":
-                            last_values_payload = chunk
+                        if mode == "usage":
+                            usage = _maybe_capture_usage(
+                                {"data": chunk if isinstance(chunk, dict) else {}}
+                            )
+                            if usage is not None:
+                                tokens_in_total, tokens_out_total = usage
                             continue
                         for envelope in translate_event(mode, chunk):
                             yield encode_sse(envelope)
@@ -1239,9 +1241,6 @@ async def stream_agent(
                         )
                     )
                 else:
-                    final_tokens = result_token_usage_from_graph_result(last_values_payload)
-                    if final_tokens != (0, 0):
-                        tokens_in_total, tokens_out_total = final_tokens
                     if tokens_in_total or tokens_out_total:
                         yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
                     _record_real_usage(

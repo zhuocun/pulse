@@ -1183,12 +1183,10 @@ def test_task_create_minimal_body_defaults_optional_fields_server_side(
 def test_repeated_delete_of_same_task_returns_400_after_first(
     client: TestClient,
 ) -> None:
-    """Tasks delete handler responds 200 then 400 for stale ids.
+    """Tasks delete handler responds 200 then 404 for stale ids.
 
-    Distinct from projects (404): the service returns ``None`` (no
-    descriptive sentinel) for a missing task, which the router maps to
-    400. We pin the current contract so a future swap to 404 is an
-    explicit decision rather than a silent shift.
+    Task deletion now matches project and board deletion: stale resource
+    ids are not found, not malformed.
     """
 
     logged_in = register_and_login(client)
@@ -1203,7 +1201,7 @@ def test_repeated_delete_of_same_task_returns_400_after_first(
         response = client.delete(
             f"/api/v1/tasks/?taskId={ids['task_id']}", headers=headers
         )
-        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.status_code == HTTPStatus.NOT_FOUND
 
 
 # ---------------------------------------------------------------------------

@@ -23,12 +23,10 @@ idempotently by :meth:`setup`).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.middleware.budget import (
     DEFAULT_MONTHLY_TOKEN_CAP,
-    BudgetBackend,
     _current_month_key,
 )
 
