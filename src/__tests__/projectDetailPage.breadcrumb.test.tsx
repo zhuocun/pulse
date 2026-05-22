@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import { Navigate } from "react-router";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import ProjectDetailPage from "../pages/projectDetail";
@@ -24,6 +25,7 @@ const renderAt = (route: string) =>
                     path="/projects/:projectId"
                     element={<ProjectDetailPage />}
                 >
+                    <Route index element={<Navigate to="board" replace />} />
                     <Route path="board" element={<div>Board outlet</div>} />
                 </Route>
                 <Route path="*" element={<LocationProbe />} />
@@ -33,7 +35,7 @@ const renderAt = (route: string) =>
     );
 
 describe("ProjectDetailPage breadcrumb", () => {
-    it("renders an interactive breadcrumb (Projects link + current project), tokenized shadow, and redirects /projects/:id to board", async () => {
+    it("renders an interactive breadcrumb (Projects link + current project), tokenized shadow, and redirects /projects/:id to board", () => {
         const detailSource = fs.readFileSync(
             path.join(__dirname, "../pages/projectDetail.tsx"),
             "utf8"
@@ -59,10 +61,8 @@ describe("ProjectDetailPage breadcrumb", () => {
         const current = within(crumb as HTMLElement).getByText("Atlas");
         expect(current).toHaveAttribute("aria-current", "page");
 
-        await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent(
-                "/projects/project-1/board"
-            )
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "/projects/project-1/board"
         );
     });
 });

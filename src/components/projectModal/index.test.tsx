@@ -432,6 +432,48 @@ describe("ProjectModal", () => {
         );
     });
 
+    it("caps the modal body height with env(keyboard-inset-height) AND clamps it via max() so landscape + keyboard cannot produce a negative max-height (Bug 6)", async () => {
+        // Regression for QW-18 + Bug 6 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+        // The Modal body's inline style must subtract
+        // `env(keyboard-inset-height, 0px)` so the footer cannot drop
+        // below the viewport when the iOS software keyboard rises, and
+        // wrap the calc in `max(80px, …)` so the result cannot collapse
+        // to a negative max-height in landscape orientation.
+        renderProjectModal({ type: "open" });
+
+        const dialog = await screen.findByRole("dialog", {
+            name: "Create project"
+        });
+        const body = dialog.querySelector(
+            ".ant-modal-body"
+        ) as HTMLElement | null;
+        expect(body).not.toBeNull();
+        expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
+        expect(body!.style.maxHeight).toMatch(/max\(/);
+    });
+
+    it("stacks the phone footer Cancel → Save so the primary lands in the thumb zone", async () => {
+        // Regression for QW-19 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+        // The matchMedia mock returns `matches: false` so AntD resolves to
+        // phone mode. The footer must render Cancel above Save so the
+        // primary action is the bottom-most target a thumb can reach.
+        renderProjectModal({ type: "open" });
+        await screen.findByRole("dialog", { name: "Create project" });
+
+        const footerButtons = Array.from(
+            document.querySelectorAll(".ant-modal-footer button")
+        ) as HTMLButtonElement[];
+        const labels = footerButtons.map(
+            (btn) => btn.textContent?.trim() ?? ""
+        );
+        const cancelIdx = labels.findIndex((label) => /^cancel$/i.test(label));
+        const primaryIdx = labels.findIndex((label) =>
+            /^create project$/i.test(label)
+        );
+        expect(cancelIdx).toBeGreaterThanOrEqual(0);
+        expect(primaryIdx).toBeGreaterThan(cancelIdx);
+    });
+
     it("surfaces a save error and keeps the modal open when PUT fails", async () => {
         fetchMock.mockImplementation((input, init) => {
             const url = String(input);

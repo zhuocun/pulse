@@ -99,10 +99,25 @@ export const ToolPayloadPanel = styled.div`
     padding: ${space.xxs}px ${space.xs}px;
 `;
 
-export const SamplePrompt = styled(Tag.CheckableTag)`
+/**
+ * Underlying styled chip — bare `Tag.CheckableTag` with a pill radius
+ * and a focus ring re-painted so keyboard users have a visible target.
+ * Exported so the `SamplePrompt` wrapper (in `samplePrompt.tsx`) can
+ * compose it with the keyboard-activation behaviour.
+ *
+ * AntD's CheckableTag renders as a bare <span> with no tabIndex, role,
+ * or keyboard handler — the wrapper adds those a11y props (Bug 3 in
+ * `docs/design/ui-ux-comprehensive-review-2026-05.md`).
+ */
+export const StyledSamplePromptChip = styled(Tag.CheckableTag)`
     && {
         border-radius: ${radius.pill}px;
         font-weight: ${fontWeight.medium};
         padding: ${space.xxs}px ${space.sm}px;
+    }
+
+    &&:focus-visible {
+        outline: 2px solid var(--ant-color-primary, #ea580c);
+        outline-offset: 2px;
     }
 `;

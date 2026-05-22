@@ -25,13 +25,14 @@ import {
     radius,
     space
 } from "../theme/tokens";
+import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
 import useReactQuery from "../utils/hooks/useReactQuery";
-import useTitle from "../utils/hooks/useTitle";
+import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
 
 const PageHeader = styled.header`
@@ -237,7 +238,7 @@ const StatValue = styled.span`
 `;
 
 const ProjectPage = () => {
-    useTitle(microcopy.projectsPage.title, false);
+    useTitle(composeBrandedTitle(microcopy.pageTitle.projects), false);
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
     const {
@@ -299,6 +300,23 @@ const ProjectPage = () => {
         return { total, withManager: liked, organizations: orgs };
     }, [projects, members]);
 
+    /**
+     * Live-region announcement for the three stat cards. While the
+     * query is in flight, screen-reader users hear "Loading project
+     * stats"; once both queries resolve, the resolved counts replace
+     * the loading text (aria-atomic re-reads the whole block as one
+     * sentence). Replaces the previous `aria-hidden={pLoading}` on the
+     * StatRail, which blanked the stats from AT during load and never
+     * re-announced them when they returned. (QW-14.)
+     */
+    const statsBusy = pLoading || mLoading;
+    const statsAnnouncement = statsBusy
+        ? microcopy.projectsPage.loadingStats
+        : microcopy.projectsPage.statsAnnouncement
+              .replace("{total}", String(stats.total))
+              .replace("{organizations}", String(stats.organizations))
+              .replace("{members}", String(members?.length ?? 0));
+
     const filteredProjects = param.semanticIds
         ? (projects ?? []).filter((p) =>
               param.semanticIds!.split(",").filter(Boolean).includes(p._id)
@@ -337,7 +355,15 @@ const ProjectPage = () => {
                     </Button>
                 </Toolbar>
             </PageHeader>
-            <StatRail aria-hidden={pLoading}>
+            {/*
+             * Stat rail. `aria-busy` (was previously `aria-hidden`) lets
+             * the region stay in the AT tree during load — the visible
+             * cards still announce, but the polite live region below
+             * narrates the "loading" → "resolved counts" transition so
+             * SR users get a single sentence about the page instead of
+             * three separate stats. (QW-14.)
+             */}
+            <StatRail aria-busy={statsBusy}>
                 <StatCard>
                     <StatHeader>
                         <StatIcon aria-hidden>
@@ -376,6 +402,7 @@ const ProjectPage = () => {
                     </StatValue>
                 </StatCard>
             </StatRail>
+            <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
             <ProjectSearchPanel
                 param={param}
                 setParam={setParam}

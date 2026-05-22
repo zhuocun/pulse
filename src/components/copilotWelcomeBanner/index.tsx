@@ -55,7 +55,14 @@ const Body = styled.div`
 interface CopilotWelcomeBannerProps {
     /** Override the storage key for tests / multi-tenant boards. */
     storageKey?: string;
-    /** Called when the user clicks the primary CTA. */
+    /**
+     * Called when the user clicks the primary CTA. When omitted the
+     * banner dispatches a `window` event `boardCopilot:openChat` with
+     * the canonical "Summarize this board" prompt; the board/projects
+     * pages already listen for that event to open the chat drawer with
+     * the pre-filled prompt. Pass a callback to override the default
+     * (e.g. routing the click through a host-specific opener).
+     */
     onCta?: () => void;
 }
 
@@ -83,7 +90,27 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
     const handleCta = () => {
         track(ANALYTICS_EVENTS.COPILOT_ONBOARDING_CTA);
         dismiss();
-        onCta?.();
+        if (onCta) {
+            onCta();
+            return;
+        }
+        /*
+         * Default CTA path. Earlier the banner opened the brief drawer,
+         * which conflicted with the CTA's literal text ("Try: Summarize
+         * this board"). Dispatching the same custom event the command
+         * palette uses keeps a single chat-open hook on the page and
+         * pre-fills the composer with the prompt; users land in chat
+         * already mid-conversation about the board.
+         */
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(
+                new CustomEvent<{ prompt: string }>("boardCopilot:openChat", {
+                    detail: {
+                        prompt: microcopy.ai.welcomeBannerCtaPrompt as string
+                    }
+                })
+            );
+        }
     };
     return (
         <Wrap role="region" aria-label={microcopy.a11y.boardCopilotWelcome}>

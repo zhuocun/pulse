@@ -40,7 +40,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 
 interface AiTaskDraftModalProps {
     open: boolean;
@@ -458,7 +457,23 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             open={open}
             styles={{
                 body: {
-                    maxHeight: "calc(100dvh - 220px)",
+                    /*
+                     * Subtract `env(keyboard-inset-height)` so the modal
+                     * body shrinks above the iOS soft keyboard instead of
+                     * pushing the footer below the fold. Falls back to
+                     * `0px` on browsers without the env variable so the
+                     * desktop layout is unchanged. See QW-18 in
+                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                     *
+                     * The `max(80px, …)` wrapper clamps the result so the
+                     * body never collapses to a negative height in
+                     * landscape orientation with the keyboard up — a
+                     * 375 × 667 device in landscape reports `100dvh` ≈
+                     * 375 px and a ~260 px keyboard inset would otherwise
+                     * subtract past zero (Bug 6).
+                     */
+                    maxHeight:
+                        "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
                     overflowY: "auto"
                 }
             }}
@@ -469,7 +484,9 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         {microcopy.actions.draftWithAi}
                     </span>
                     <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    <EngineModeTag />
+                    {/*
+                     * EngineModeTag now mounts once in the global header.
+                     */}
                 </Space>
             }
             width={modalWidthCss(640)}
@@ -667,6 +684,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                                 message: microcopy.validation.taskNameRequired
                             }
                         ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
                     >
                         <Input
                             autoComplete="off"

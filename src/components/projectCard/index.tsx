@@ -279,55 +279,28 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 }) => {
     // Per-result strength badge (P1-2). Null when no AI search is active.
     const strength = getAiSearchStrength("projects", project._id);
+    /*
+     * MenuProps.items[].label used to wrap a nested `<button>` for each
+     * entry, which stacked two interactive elements inside a single
+     * `role="menuitem"` and required `stopPropagation` everywhere. The
+     * AntD menu (rc-menu) already exposes a per-item `onClick`
+     * handler that fires on both Enter/Space activation and mouse
+     * clicks; using it lets the items render as plain string labels
+     * with a single AT-readable name, and the Dropdown's own event
+     * handling manages propagation correctly without the nested
+     * stopPropagation calls.
+     */
     const items: MenuProps["items"] = [
         {
             key: "edit",
-            label: (
-                <button
-                    aria-label={`${microcopy.actions.edit} ${project.projectName}`}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit();
-                    }}
-                    style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        font: "inherit",
-                        padding: 0,
-                        textAlign: "left",
-                        width: "100%"
-                    }}
-                    type="button"
-                >
-                    {microcopy.actions.edit}
-                </button>
-            )
+            label: microcopy.actions.edit,
+            onClick: () => onEdit()
         },
         {
             key: "delete",
-            label: (
-                <button
-                    aria-label={`${microcopy.actions.delete} ${project.projectName}`}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete();
-                    }}
-                    style={{
-                        background: "transparent",
-                        border: "none",
-                        color: semantic.error,
-                        cursor: "pointer",
-                        font: "inherit",
-                        padding: 0,
-                        textAlign: "left",
-                        width: "100%"
-                    }}
-                    type="button"
-                >
-                    {microcopy.actions.delete}
-                </button>
-            )
+            label: microcopy.actions.delete,
+            danger: true,
+            onClick: () => onDelete()
         }
     ];
 

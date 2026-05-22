@@ -128,6 +128,7 @@ const LoginForm: React.FC<{
                         message: microcopy.validation.emailInvalid
                     }
                 ]}
+                validateTrigger={["onBlur", "onSubmit"]}
             >
                 {/*
                  * `username` (not `email`) pairs with `current-password` for
@@ -162,6 +163,7 @@ const LoginForm: React.FC<{
                         message: microcopy.validation.passwordRequired
                     }
                 ]}
+                validateTrigger={["onBlur", "onSubmit"]}
             >
                 <Input.Password
                     autoComplete="current-password"

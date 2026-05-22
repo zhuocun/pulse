@@ -30,8 +30,51 @@
         <meta name="apple-mobile-web-app-title" content="Pulse" />
         <meta name="format-detection" content="telephone=no" />
         <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+        <!--
+            QW-17 — iOS Safari ignores SVG `apple-touch-icon` and falls
+            back to a blurry page screenshot on Add-to-Home-Screen.
+            Ship real PNGs at the four sizes iOS uses (180 / 167 / 152 /
+            120) plus the precomposed alias for legacy iOS that strips
+            the system gloss.
+        -->
+        <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="/apple-touch-icon-180.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="167x167"
+            href="/apple-touch-icon-167.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="152x152"
+            href="/apple-touch-icon-152.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="120x120"
+            href="/apple-touch-icon-120.png"
+        />
+        <link
+            rel="apple-touch-icon-precomposed"
+            sizes="180x180"
+            href="/apple-touch-icon-180.png"
+        />
         <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="/icons/icon-192.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="512x512"
+            href="/icons/icon-512.png"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <title>Pulse · Project board</title>

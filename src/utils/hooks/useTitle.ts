@@ -1,15 +1,39 @@
 import { useEffect, useRef } from "react";
 
 /**
- * This is a React Hook that allows you to dynamically change the title of a web page.
- * The hook uses two useEffect hooks to manage the title of the web page:
-    1. The first useEffect hook sets the title of the web page to the value passed in as the title argument, every time title changes.
-    2. The second useEffect hook is used to restore the old title when the component using this hook unmounts. 
-       It does this by returning a cleanup function that sets the title back to the old title if keepOnMount is false.
- * @param title a string that represents the new title for the web page.
- * @param keepOnMount a boolean value that determines whether the title should be kept after the component using this hook unmounts. 
-                      If keepOnMount is set to true, the title will not change back to the old title after the component unmounts. 
-                      If it's set to false, the title will change back to the old title.
+ * Brand suffix appended to every page name composed via
+ * {@link composeBrandedTitle}. Centralised so the format stays in one
+ * place: callers pass the bare (localized) page name and the hook
+ * paints `${page} · Pulse` into `document.title`.
+ */
+export const BRAND_NAME = "Pulse";
+
+/**
+ * Composes the full `document.title` value: `${page} · Pulse`, or
+ * just `Pulse` when the page name is empty. Exported separately so
+ * tests can assert the composed string and so non-React call sites
+ * (e.g. service-worker UPDATE notifications) can mirror the format.
+ */
+export const composeBrandedTitle = (page: string): string =>
+    page ? `${page} · ${BRAND_NAME}` : BRAND_NAME;
+
+/**
+ * React Hook that dynamically updates `document.title`.
+ *
+ *  1. The first effect sets the title to whatever string is passed.
+ *     Pages that own brand-suffixed surfaces pass
+ *     `composeBrandedTitle(microcopy.pageTitle.X)`; legacy callers
+ *     pass the bare string (board, project-detail) and keep their
+ *     current titles unchanged.
+ *  2. The second effect restores the previous title when the
+ *     component unmounts, unless `keepOnMount` is true.
+ *
+ * @param title  Title string to write to `document.title`. Use
+ *               {@link composeBrandedTitle} on auth + project-list
+ *               surfaces to keep the `… · Pulse` format consistent.
+ * @param keepOnMount  When `true` (default), the new title persists
+ *               after the component unmounts. When `false`, the
+ *               previous title is restored on unmount.
  */
 const useTitle = (title: string, keepOnMount = true) => {
     const oldTitle = useRef(document.title).current;

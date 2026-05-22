@@ -182,13 +182,49 @@ describe("LoginForm", () => {
         renderLoginForm();
 
         await changeField(/^email$/i, "not-an-email");
-        await changeField(/^password$/i, "secret");
-        await submitLogin();
+        // Blur the field so the standardized
+        // `validateTrigger={["onBlur", "onSubmit"]}` fires the email
+        // format rule. Previously the default `onChange` trigger surfaced
+        // the error while the user was still typing — see the
+        // validateTrigger standardisation note in the comprehensive
+        // review.
+        await act(async () => {
+            fireEvent.blur(screen.getByLabelText(/^email$/i));
+        });
 
         expect(
             await screen.findByText("Please enter a valid email address")
         ).toBeInTheDocument();
         expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("does not surface required-field errors while the user is still typing", async () => {
+        // Regression for the validateTrigger standardisation
+        // (`["onBlur", "onSubmit"]`). With the default `onChange` trigger
+        // a mid-type error toast pops the moment the user clears the
+        // field; the explicit trigger keeps the field calm until blur
+        // or submit. See "Modals + forms review" §"Quick wins" in
+        // `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+        renderLoginForm();
+
+        // Type a value, then clear it, without ever blurring the input.
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^email$/i, "");
+
+        expect(
+            screen.queryByText("Please enter your email")
+        ).not.toBeInTheDocument();
+
+        // Blur the input — now the error is allowed to surface.
+        await act(async () => {
+            fireEvent.blur(screen.getByLabelText(/^email$/i));
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.getByText("Please enter your email")
+            ).toBeInTheDocument()
+        );
     });
 
     it("clears the parent error as fields change", async () => {

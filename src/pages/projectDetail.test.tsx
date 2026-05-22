@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import { Navigate } from "react-router";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import ProjectDetailPage from "./projectDetail";
@@ -32,6 +33,12 @@ const silenceExpectedConsoleErrors = (expectedMessages: string[][]) => {
         });
 };
 
+/*
+ * Mirrors the production route shape (`src/routes/index.tsx`): a declarative
+ * `index` redirect under `projects/:projectId` sends bare detail URLs to the
+ * board child. The previous `useEffect` force-redirect inside the page was
+ * removed alongside the single-tab Tabs row in QW-11.
+ */
 const renderDetail = (route: string) =>
     render(
         <MemoryRouter initialEntries={[route]}>
@@ -40,6 +47,7 @@ const renderDetail = (route: string) =>
                     path="/projects/:projectId"
                     element={<ProjectDetailPage />}
                 >
+                    <Route index element={<Navigate to="board" replace />} />
                     <Route path="board" element={<div>Board outlet</div>} />
                 </Route>
                 <Route path="*" element={<LocationProbe />} />
@@ -61,24 +69,18 @@ describe("ProjectDetailPage", () => {
         consoleErrorSpy.mockRestore();
     });
 
-    it("redirects a project detail route to the board child route", async () => {
+    it("redirects a project detail route to the board child via the index redirect", () => {
         renderDetail("/projects/project-1");
 
-        await waitFor(() =>
-            expect(screen.getByTestId("location")).toHaveTextContent(
-                "/projects/project-1/board"
-            )
+        expect(screen.getByTestId("location")).toHaveTextContent(
+            "/projects/project-1/board"
         );
         expect(screen.getByText("Board outlet")).toBeInTheDocument();
     });
 
-    it("renders breadcrumb, project name, board tab as a link, and the outlet", () => {
+    it("renders breadcrumb, current project, and the outlet content", () => {
         const { container } = renderDetail("/projects/project-1/board");
 
-        expect(screen.getByRole("link", { name: "Board" })).toHaveAttribute(
-            "href",
-            "/projects/project-1/board"
-        );
         const crumb = container.querySelector(".ant-breadcrumb");
         expect(crumb).toBeTruthy();
         expect(
@@ -86,5 +88,11 @@ describe("ProjectDetailPage", () => {
         ).toHaveAttribute("href", "/projects");
         expect(screen.getByText("Atlas")).toBeInTheDocument();
         expect(screen.getByText("Board outlet")).toBeInTheDocument();
+    });
+
+    it("no longer renders a Tabs row inside the project detail chrome", () => {
+        const { container } = renderDetail("/projects/project-1/board");
+
+        expect(container.querySelector(".ant-tabs")).toBeNull();
     });
 });

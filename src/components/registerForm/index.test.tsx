@@ -156,9 +156,15 @@ describe("RegisterForm", () => {
         renderRegisterForm();
 
         await changeField(/^email$/i, "not-an-email");
-        await changeField(/^username$/i, "Alice");
-        await changeField(/^password$/i, "secret-password");
-        await submitRegister();
+        // Blur the field so the standardised
+        // `validateTrigger={["onBlur", "onSubmit"]}` fires the email
+        // format rule. The previous default `onChange` trigger surfaced
+        // the error mid-type; the new pattern waits until blur or
+        // submit. See the validateTrigger standardisation note in the
+        // comprehensive review.
+        await act(async () => {
+            fireEvent.blur(screen.getByLabelText(/^email$/i));
+        });
 
         expect(
             await screen.findByText("Please enter a valid email address")
@@ -233,7 +239,10 @@ describe("RegisterForm", () => {
         expect(await screen.findByText(/Too short/i)).toBeInTheDocument();
 
         await changeField(/^password$/i, "Password99");
-        expect(screen.getByText(/Strong password/i)).toBeInTheDocument();
+        // `Form.useWatch` flushes its update through the form's macro-task
+        // batcher (rc-field-form), so the strength hint may land on the
+        // next tick when validation no longer fires on every change.
+        expect(await screen.findByText(/Strong password/i)).toBeInTheDocument();
     });
 
     it("exposes an accessible Terms of Service link inside the auth copy", async () => {

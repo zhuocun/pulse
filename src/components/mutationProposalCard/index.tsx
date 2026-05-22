@@ -371,15 +371,6 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                         }}
                         wrap
                     >
-                        {showCommittedUndo && (
-                            <Button
-                                aria-label={microcopy.mutation.undoAriaLabel}
-                                disabled={isLoading}
-                                onClick={handleCommittedUndo}
-                            >
-                                {microcopy.mutation.undoLabel}
-                            </Button>
-                        )}
                         <Button
                             aria-label={microcopy.a11y.rejectProposal}
                             disabled={isLoading}
@@ -400,6 +391,33 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                         {microcopy.mutation.undoAvailableAfterAccepting}
                     </FooterHint>
                 </>
+            )}
+
+            {/*
+             * Post-commit phase: the proposal has been applied. The card is
+             * otherwise read-only, but if the caller wired `onUndo` AND the
+             * proposal is undoable we surface a single Undo affordance so
+             * the footer hint ("Undo available after accepting") resolves to
+             * an actual visible control. See Bug 2 in
+             * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+             */}
+            {phase === "committed" && showCommittedUndo && (
+                <Space
+                    size={space.xs}
+                    style={{
+                        justifyContent: "flex-end",
+                        marginTop: space.sm
+                    }}
+                    wrap
+                >
+                    <Button
+                        aria-label={microcopy.mutation.undoAriaLabel}
+                        disabled={isLoading}
+                        onClick={handleCommittedUndo}
+                    >
+                        {microcopy.mutation.undoLabel}
+                    </Button>
+                </Space>
             )}
         </Wrap>
     );

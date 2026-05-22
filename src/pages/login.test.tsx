@@ -71,8 +71,23 @@ const renderLoginPage = ({
 };
 
 describe("LoginPage", () => {
+    const originalTitle = document.title;
+
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+        document.title = originalTitle;
+    });
+
+    // QW-20: every routable surface should advertise the brand in the
+    // browser tab via the `useTitle` hook. The login page passes
+    // `microcopy.pageTitle.login`; the hook composes "Log in · Pulse".
+    it("sets the document title with the ' · Pulse' brand suffix", () => {
+        renderLoginPage();
+
+        expect(document.title).toBe("Log in · Pulse");
     });
 
     it("renders title, form, error box, and the register link", () => {

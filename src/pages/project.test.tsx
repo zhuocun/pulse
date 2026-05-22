@@ -190,7 +190,7 @@ describe("ProjectPage", () => {
             "/projects?projectName=Road&managerId=member-1"
         );
 
-        expect(document.title).toBe("Projects");
+        expect(document.title).toBe("Projects · Pulse");
         expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(screen.getByText("Billing")).toBeInTheDocument();
         expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
@@ -239,6 +239,75 @@ describe("ProjectPage", () => {
         resolveMembers(response([]));
 
         expect(await screen.findByText(/no projects yet/i)).toBeInTheDocument();
+    });
+
+    // QW-14: the StatRail previously used `aria-hidden={pLoading}`, which
+    // blanked the three stat cards from AT during load and never
+    // re-announced them when they resolved. Swap to `aria-busy` and add a
+    // polite live region that narrates "Loading project stats" while in
+    // flight and the resolved counts once both queries land. Keyboard /
+    // SR users now hear the entire stat block as a single sentence.
+    it("uses aria-busy on the stat rail and announces the resolved counts", async () => {
+        let resolveProjects: (value: Response) => void = () => undefined;
+        let resolveMembers: (value: Response) => void = () => undefined;
+        fetchMock.mockImplementation((input) => {
+            const url = String(input);
+            if (url.includes("users/members")) {
+                return new Promise<Response>((resolve) => {
+                    resolveMembers = resolve;
+                });
+            }
+            if (url.includes("projects")) {
+                return new Promise<Response>((resolve) => {
+                    resolveProjects = resolve;
+                });
+            }
+            return Promise.resolve(response({}));
+        });
+
+        renderPage();
+
+        // Pre-resolve: the "Total projects" label always renders. Walk up
+        // its DOM to the StatRail container and assert `aria-busy="true"`
+        // (the page was previously stamped with `aria-hidden`, which
+        // would have wholly removed the rail from the AT tree).
+        const totalProjectsLabel = await screen.findByText(/total projects/i);
+        const statRail = totalProjectsLabel.closest('[aria-busy="true"]');
+        expect(statRail).toBeInTheDocument();
+
+        // The live region announces "Loading project stats" while busy.
+        await waitFor(() => {
+            const liveRegion = screen
+                .getAllByRole("status")
+                .find((node) =>
+                    node.textContent?.includes("Loading project stats")
+                );
+            expect(liveRegion).toBeDefined();
+            expect(liveRegion).toHaveAttribute("aria-live", "polite");
+        });
+
+        resolveProjects(response(projects));
+        resolveMembers(response(members));
+
+        // Once both queries land, the rail is no longer busy and the
+        // live region replays the resolved counts as one polite sentence
+        // ("2 projects across 2 organizations, 2 team members.").
+        await waitFor(() => {
+            expect(totalProjectsLabel.closest("[aria-busy]")).toHaveAttribute(
+                "aria-busy",
+                "false"
+            );
+        });
+        await waitFor(() => {
+            const liveRegion = screen
+                .getAllByRole("status")
+                .find((node) =>
+                    node.textContent?.includes(
+                        "2 projects across 2 organizations"
+                    )
+                );
+            expect(liveRegion).toBeDefined();
+        });
     });
 
     it("shows a shared error message when either query fails", async () => {

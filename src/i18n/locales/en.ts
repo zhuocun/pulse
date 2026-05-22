@@ -354,7 +354,24 @@ export const enSource = {
             "Browse the boards your team is shipping. Filter, search, or create a new project to start tracking work.",
         totalProjects: "Total projects",
         organizations: "Organizations",
-        teamMembers: "Team members"
+        teamMembers: "Team members",
+        loadingStats: "Loading project stats",
+        statsAnnouncement:
+            "{total} projects across {organizations} organizations, {members} team members."
+    },
+    /**
+     * Page-name microcopy fed to `useTitle`. The hook composes
+     * `${page} · Pulse` so every routable surface advertises the brand
+     * in the browser tab. Auth and project-list surfaces consume these
+     * keys; board / project-detail pages keep their dynamic project
+     * name since they're already context-specific.
+     */
+    pageTitle: {
+        login: "Log in",
+        register: "Sign up",
+        forgotPassword: "Reset your password",
+        terms: "Terms of Service",
+        projects: "Projects"
     },
     empty: {
         projects: {
@@ -409,6 +426,23 @@ export const enSource = {
             "Who has the most open tasks?",
             "Summarize this board"
         ] as readonly string[],
+        /*
+         * Contextual follow-up chips rendered after every assistant
+         * turn. The chat drawer chooses 2-3 from this group based on a
+         * deterministic keyword scan of `messages[lastUserIndex]`:
+         *   - mentions a due date / deadline → `riskFromDue`
+         *   - mentions a board member by username → `workOnPerson`
+         *   - otherwise the generic trio in `defaults`
+         */
+        followUpChips: {
+            riskFromDue: "Show what's at risk on this board",
+            workOnPerson: "What is {name} working on?",
+            defaults: [
+                "Summarize this board",
+                "What's blocked?",
+                "What changed today?"
+            ] as readonly string[]
+        },
         privacyTitle: "What Board Copilot sees",
         privacyDisclosure:
             "Board Copilot uses board and project names, columns, task names, types, story points, epics, notes when present, and member usernames, emails, or user IDs where needed.",
@@ -655,6 +689,13 @@ export const enSource = {
         welcomeBannerBody:
             "Draft tasks, estimate work, summarize the board, and answer questions — all from your board data.",
         welcomeBannerCta: "Try: Summarize this board",
+        /**
+         * The actual prompt sent to chat when the welcome banner CTA
+         * fires. Matches the user-facing wording of the suggestion in
+         * `chatSuggestions` so a user who picks the CTA gets the same
+         * experience as one who taps the chip in chat.
+         */
+        welcomeBannerCtaPrompt: "Summarize this board",
         welcomeBannerDismiss: "Dismiss",
         whyThisResult: "Why this result?",
         didYouMean: "Did you mean:",
@@ -864,6 +905,14 @@ export const enSource = {
             proposed: "Proposed"
         },
         columnFieldLabel: "Column {field}"
+    },
+    swUpdate: {
+        title: "New version available",
+        description:
+            "A new build of Pulse is ready. Reload to pick up the latest fixes.",
+        reload: "Reload",
+        dismiss: "Later",
+        ariaLabel: "New version available notification"
     }
 } as const;
 

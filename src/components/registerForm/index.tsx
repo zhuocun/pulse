@@ -102,6 +102,7 @@ const RegisterForm: React.FC<{
                         message: microcopy.validation.emailInvalid
                     }
                 ]}
+                validateTrigger={["onBlur", "onSubmit"]}
             >
                 <Input
                     autoComplete="email"
@@ -124,6 +125,7 @@ const RegisterForm: React.FC<{
                         message: microcopy.validation.usernameRequired
                     }
                 ]}
+                validateTrigger={["onBlur", "onSubmit"]}
             >
                 <Input
                     autoComplete="username"
@@ -160,6 +162,7 @@ const RegisterForm: React.FC<{
                         message: microcopy.validation.passwordTooShort
                     }
                 ]}
+                validateTrigger={["onBlur", "onSubmit"]}
             >
                 <Input.Password
                     autoComplete="new-password"

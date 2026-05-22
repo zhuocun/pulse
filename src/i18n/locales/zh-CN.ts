@@ -339,7 +339,17 @@ const zhCN: Dictionary = {
             "浏览您的团队正在推进的看板。筛选、搜索,或创建一个新项目来开始跟踪工作。",
         totalProjects: "项目总数",
         organizations: "组织数",
-        teamMembers: "团队成员"
+        teamMembers: "团队成员",
+        loadingStats: "正在加载项目统计",
+        statsAnnouncement:
+            "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。"
+    },
+    pageTitle: {
+        login: "登录",
+        register: "注册",
+        forgotPassword: "重置密码",
+        terms: "服务条款",
+        projects: "项目"
     },
     empty: {
         projects: {
@@ -386,6 +396,11 @@ const zhCN: Dictionary = {
             "谁的待办任务最多?",
             "总结一下这个看板"
         ],
+        followUpChips: {
+            riskFromDue: "看看这个看板上哪些任务有风险",
+            workOnPerson: "{name} 在做什么?",
+            defaults: ["总结这个看板", "有什么被阻塞?", "今天有哪些变化?"]
+        },
         privacyTitle: "看板 Copilot 可以看到的信息",
         privacyDisclosure:
             "看板 Copilot 使用看板和项目名称、列、任务名称、类型、故事点、史诗、备注(如有),以及成员的用户名、邮箱或必要的用户 ID。",
@@ -613,6 +628,7 @@ const zhCN: Dictionary = {
         welcomeBannerBody:
             "起草任务、估算工作量、总结看板、回答问题 — 全部基于您的看板数据。",
         welcomeBannerCta: "试试:总结这个看板",
+        welcomeBannerCtaPrompt: "总结这个看板",
         welcomeBannerDismiss: "关闭",
         whyThisResult: "为什么是这个结果?",
         didYouMean: "您是想搜索:",
@@ -814,6 +830,13 @@ const zhCN: Dictionary = {
             proposed: "建议值"
         },
         columnFieldLabel: "列{field}"
+    },
+    swUpdate: {
+        title: "新版本可用",
+        description: "Pulse 已发布新版本。刷新页面即可获得最新的修复。",
+        reload: "刷新",
+        dismiss: "稍后",
+        ariaLabel: "新版本可用通知"
     }
 };
 

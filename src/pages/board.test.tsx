@@ -308,11 +308,8 @@ describe("BoardPage", () => {
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", {
-                name: /Open Board Copilot brief/i
+                name: /Board Copilot menu/i
             })
-        ).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole("button", { name: /Ask Board Copilot/i })
         ).not.toBeInTheDocument();
         fireEvent.click(
             screen.getByRole("button", { name: /Board Copilot settings/i })
@@ -322,6 +319,26 @@ describe("BoardPage", () => {
                 name: /Board Copilot for this project/i
             })
         ).not.toBeChecked();
+    });
+
+    it("mounts MemberPopover in the BoardActions row, surfacing team avatars when members are present (QW-12)", async () => {
+        renderBoard();
+        // Wait for the board to settle so members query resolves.
+        await screen.findByText("Roadmap board");
+
+        // The MemberPopover trigger advertises itself with the
+        // "View team members" aria-label and shows the count + initials of
+        // the first three members as a small avatar stack. With two
+        // members in fixture data we expect both Alice (A) and Bob (B)
+        // initials rendered inside the trigger button.
+        const trigger = await screen.findByRole("button", {
+            name: /view team members/i
+        });
+        await waitFor(() => {
+            expect(trigger.textContent).toContain("2");
+        });
+        expect(trigger.textContent).toContain("A");
+        expect(trigger.textContent).toContain("B");
     });
 
     it("clears semanticIds from the URL when Project AI is off so the board is not stuck filtered", async () => {
@@ -340,7 +357,7 @@ describe("BoardPage", () => {
         });
     });
 
-    it("shows Brief and Ask again after turning Project AI back on", async () => {
+    it("shows the Copilot launcher again after turning Project AI back on", async () => {
         localStorage.setItem(
             "boardCopilot:disabledProjectIds",
             JSON.stringify(["project-1"])
@@ -359,11 +376,8 @@ describe("BoardPage", () => {
 
         expect(
             await screen.findByRole("button", {
-                name: /Open Board Copilot brief/i
+                name: /Board Copilot menu/i
             })
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: /Ask Board Copilot/i })
         ).toBeInTheDocument();
     });
 

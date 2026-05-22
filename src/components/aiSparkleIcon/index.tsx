@@ -13,42 +13,55 @@ import { sparkleSize, type SparkleSize } from "../../theme/aiTokens";
  * Vite HMR.
  *
  * Theming (S-R2): each gradient stop binds to a CSS custom property
- * (`--color-copilot-grad-*`) declared in `App.css`. Dark-mode shifts the
- * hue toward lavender so the icon stays readable on dark surfaces.
+ * (`--color-copilot-grad-*`) declared in `App.css` and resolved per
+ * palette via `cssVars.ts`. The raw orange literals used to live as
+ * inline `stopColor` fallbacks; we removed them so that on a non-orange
+ * palette (or before the CSS variables hydrate) the gradient does not
+ * flash brand orange for a frame. Browsers fall back to `currentColor`
+ * for unresolved `<stop>` colors, which inherits cleanly from the
+ * surrounding label.
  *
- * Accessibility (S-R3, S-R4): when `aria-hidden` is true the icon
- * contributes nothing to the AX tree. When the icon is meaningful, an
- * explicit `aria-label` is rendered with `role="img"`.
+ * Accessibility (S-R3, S-R4): the props form a discriminated union —
+ * either `aria-hidden` is `true` (decorative; SVG contributes nothing to
+ * the AX tree) or the caller supplies an explicit `aria-label` (image
+ * with that accessible name). There is no longer a hidden default of
+ * "Board Copilot" that leaks into surrounding labeled controls.
  */
-interface AiSparkleIconProps {
+type SparkleBaseProps = {
     /**
-     * Optional sizing token (S-R4). `sm` ≈ 14 px, `md` ≈ 18 px, `lg` ≈ 24 px.
+     * Optional sizing token. `sm` ≈ 14 px, `md` ≈ 18 px, `lg` ≈ 24 px.
      * Without this prop the icon scales to the surrounding font (`1em`).
      */
     size?: SparkleSize;
     style?: React.CSSProperties;
-    /**
-     * Accessible name when the icon stands alone as a meaningful image.
-     * If omitted (or `aria-hidden` is true) the icon is treated as
-     * decorative.
-     */
-    title?: string;
-    /**
-     * When true, the icon contributes nothing to the accessibility tree
-     * and the surrounding labeled control owns the accessible name. This
-     * prevents the icon's "Board Copilot" label from leaking into a
-     * button's accessible name (e.g. "Board Copilot Search").
-     */
-    "aria-hidden"?: boolean;
-}
+};
 
-const AiSparkleIcon: React.FC<AiSparkleIconProps> = ({
-    size,
-    style,
-    title,
-    "aria-hidden": ariaHidden
-}) => {
+type SparkleDecorativeProps = SparkleBaseProps & {
+    /**
+     * Marks the icon as decorative. The SVG is rendered with
+     * `aria-hidden="true"` and contributes no accessible name. Use this
+     * variant whenever the parent control (Button, link, drawer header)
+     * already carries the accessible name.
+     */
+    "aria-hidden": true;
+    "aria-label"?: never;
+};
+
+type SparkleLabeledProps = SparkleBaseProps & {
+    /**
+     * Accessible name for standalone interactive icons. Required when
+     * `aria-hidden` is not set so a screen reader hears a meaningful
+     * label instead of "graphic".
+     */
+    "aria-label": string;
+    "aria-hidden"?: false;
+};
+
+type AiSparkleIconProps = SparkleDecorativeProps | SparkleLabeledProps;
+
+const AiSparkleIcon: React.FC<AiSparkleIconProps> = (props) => {
     const id = useId();
+    const { size, style } = props;
     const dim = size ? sparkleSize[size] : undefined;
     const sizeProps =
         dim !== undefined
@@ -58,7 +71,8 @@ const AiSparkleIcon: React.FC<AiSparkleIconProps> = ({
         verticalAlign: "-0.125em",
         ...style
     };
-    if (ariaHidden) {
+    const isDecorative = props["aria-hidden"] === true;
+    if (isDecorative) {
         return (
             <svg
                 aria-hidden="true"
@@ -72,15 +86,15 @@ const AiSparkleIcon: React.FC<AiSparkleIconProps> = ({
                     <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop
                             offset="0%"
-                            stopColor="var(--color-copilot-grad-start, #EA580C)"
+                            stopColor="var(--color-copilot-grad-start)"
                         />
                         <stop
                             offset="60%"
-                            stopColor="var(--color-copilot-grad-mid, #EA580C)"
+                            stopColor="var(--color-copilot-grad-mid)"
                         />
                         <stop
                             offset="100%"
-                            stopColor="var(--color-copilot-grad-end, #F97316)"
+                            stopColor="var(--color-copilot-grad-end)"
                         />
                     </linearGradient>
                 </defs>
@@ -98,7 +112,7 @@ const AiSparkleIcon: React.FC<AiSparkleIconProps> = ({
     }
     return (
         <svg
-            aria-label={title ?? "Board Copilot"}
+            aria-label={props["aria-label"]}
             fill="none"
             role="img"
             style={baseStyle}
@@ -109,15 +123,15 @@ const AiSparkleIcon: React.FC<AiSparkleIconProps> = ({
                 <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop
                         offset="0%"
-                        stopColor="var(--color-copilot-grad-start, #EA580C)"
+                        stopColor="var(--color-copilot-grad-start)"
                     />
                     <stop
                         offset="60%"
-                        stopColor="var(--color-copilot-grad-mid, #EA580C)"
+                        stopColor="var(--color-copilot-grad-mid)"
                     />
                     <stop
                         offset="100%"
-                        stopColor="var(--color-copilot-grad-end, #F97316)"
+                        stopColor="var(--color-copilot-grad-end)"
                     />
                 </linearGradient>
             </defs>

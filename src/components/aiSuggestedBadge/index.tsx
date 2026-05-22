@@ -67,8 +67,17 @@ const AiSuggestedBadge: React.FC<AiSuggestedBadgeProps> = ({
             )}
         </div>
     );
+    /*
+     * Popover triggers — we deliberately omit `"focus"`. Form-fill
+     * surfaces tab through several badges in a row, and an
+     * auto-opening popover on focus narrates the rationale paragraph
+     * into the screen-reader stream mid-form-fill. `"hover"` keeps the
+     * tooltip-style preview for pointer users; `"click"` (and keyboard
+     * Enter/Space via `role="button"` + `tabIndex={0}`) is the explicit
+     * affordance that opens the Revert link.
+     */
     return (
-        <Popover content={popoverContent} trigger={["click", "focus"]}>
+        <Popover content={popoverContent} trigger={["hover", "click"]}>
             <BadgeTag
                 aria-label={microcopy.ai.appliedSuggestion}
                 role="button"

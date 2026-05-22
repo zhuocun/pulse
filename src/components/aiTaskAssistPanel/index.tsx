@@ -19,7 +19,7 @@ import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
-import { srOnlyLiveRegionStyle } from "../../utils/a11y/srOnlyLiveRegionStyle";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
@@ -31,7 +31,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 import {
@@ -527,20 +526,15 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         {microcopy.ai.copilotLabel}
                     </span>
                     <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    <EngineModeTag />
+                    {/*
+                     * EngineModeTag now mounts once in the global header.
+                     */}
                     <CopilotPrivacyPopover route="estimate" />
                 </Space>
             }
         >
             <CopilotRemoteConsentNotice route="estimate" />
-            <div
-                aria-atomic="true"
-                aria-live="polite"
-                role="status"
-                style={srOnlyLiveRegionStyle}
-            >
-                {suggestionStatusAnnouncement}
-            </div>
+            <SrOnlyLive>{suggestionStatusAnnouncement}</SrOnlyLive>
             <SectionHeading
                 right={
                     <Space align="center" wrap>
