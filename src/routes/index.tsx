@@ -1,9 +1,17 @@
 import { Button } from "antd";
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+    Navigate,
+    Outlet,
+    useLocation,
+    useNavigate,
+    useParams
+} from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
 import { PageSpin } from "../components/status";
+import TaskDetailPanel from "../components/taskDetailPanel";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import AuthLayout from "../layouts/authLayout";
 import MainLayout from "../layouts/mainLayout";
@@ -139,6 +147,48 @@ const SuspenseShell = () => (
 );
 
 /**
+ * Layout wrapper for `/projects/:projectId/board` and its sibling
+ * overlay route `/projects/:projectId/board/task/:taskId`. Renders
+ * `<BoardPage />` ALWAYS so the kanban stays mounted underneath, and
+ * the `<Outlet />` slot underneath mounts the panel when the task
+ * route matches. This is the canonical React Router 7 pattern for a
+ * "modal route" — the parent layout keeps state across children, and
+ * the child route lays the overlay on top.
+ *
+ * Only registered as a layout when `environment.taskPanelRouted` is
+ * true. When the flag is off, `board` keeps its leaf-route shape and
+ * the existing `TaskModal` overlay handles every task-open flow as
+ * today — see `routes` below.
+ */
+const BoardRouteShell = () => (
+    <>
+        <BoardPage />
+        <Outlet />
+    </>
+);
+
+/**
+ * Route-level adapter that reads `projectId` and `taskId` from the
+ * URL params and hands them to `<TaskDetailPanel />`. Kept separate
+ * from the panel component itself so the panel stays testable with
+ * direct prop wiring (the tests render it inside a `MemoryRouter`
+ * without needing to set up the params via the route shape).
+ */
+const TaskDetailPanelRoute = () => {
+    const { projectId, taskId } = useParams<{
+        projectId: string;
+        taskId: string;
+    }>();
+    if (!projectId || !taskId) {
+        // Defensive — the route shape guarantees both params are
+        // present, but render nothing if a future refactor breaks
+        // that contract.
+        return null;
+    }
+    return <TaskDetailPanel projectId={projectId} taskId={taskId} />;
+};
+
+/**
  * Single "/" match: index redirects via `RootRedirect`. Sibling branches
  * mount the auth-pages shell (`RequireGuest`) and the authenticated app
  * shell (`RequireAuth`) — each acts as both the layout and the guard, so
@@ -201,10 +251,41 @@ const routes = [
                                 index: true,
                                 element: <Navigate to="board" replace />
                             },
-                            {
-                                path: "board",
-                                element: <BoardPage />
-                            }
+                            /*
+                             * Phase 3 A2 — routed task panel. When the
+                             * flag is ON, `board` becomes a layout
+                             * route: `BoardRouteShell` always renders
+                             * `<BoardPage />` plus an `<Outlet />` slot,
+                             * the index renders nothing, and the
+                             * `task/:taskId` child mounts the
+                             * `<TaskDetailPanel />` overlay. React
+                             * Router 7 keeps the layout instance (and
+                             * thus the BoardPage mount) alive across
+                             * children, so swiping between tasks or
+                             * closing the drawer doesn't unmount the
+                             * kanban. When the flag is OFF, `board`
+                             * stays a plain leaf route — the existing
+                             * `TaskModal` overlay handles every task
+                             * open. See A2 in
+                             * `docs/design/ui-ux-comprehensive-review-
+                             * 2026-05.md`.
+                             */
+                            environment.taskPanelRouted
+                                ? {
+                                      path: "board",
+                                      element: <BoardRouteShell />,
+                                      children: [
+                                          { index: true, element: null },
+                                          {
+                                              path: "task/:taskId",
+                                              element: <TaskDetailPanelRoute />
+                                          }
+                                      ]
+                                  }
+                                : {
+                                      path: "board",
+                                      element: <BoardPage />
+                                  }
                         ]
                     },
                     /*
