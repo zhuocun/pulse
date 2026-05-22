@@ -328,6 +328,11 @@ const zhCN: Dictionary = {
         createDescription: "设置名称、组织和负责人,开始跟踪工作。",
         editDescription: "更新项目详情和分配信息。"
     },
+    taskModal: {
+        removedByOthersTitle: "此任务已被其他更改移除。",
+        removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
+        discardEdits: "丢弃更改"
+    },
     projectsPage: {
         title: "项目",
         subtitle:

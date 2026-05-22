@@ -479,6 +479,81 @@ describe("TaskModal", () => {
         ).not.toBeInTheDocument();
     });
 
+    it("keeps the modal open with a banner when the task disappears mid-edit", async () => {
+        // Regression for the data-loss bug surfaced in
+        // ui-ux-comprehensive-review-2026-05.md §"Critical bugs that ship
+        // today": a concurrent refetch that drops the editing task used
+        // to auto-close the modal and ``resetFields()`` the dirty
+        // payload silently. Now we keep the modal open with a sticky
+        // banner so the user can decide what to do with their edits.
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                mutations: { retry: false },
+                queries: { retry: false }
+            }
+        });
+        queryClient.setQueryData(["users/members"], members);
+        const route = "/projects/project-1/board";
+        store.dispatch(overlaysActions.startEditingTask("task-1"));
+
+        function Harness({ taskList }: { taskList: ITask[] | undefined }) {
+            return (
+                <Provider store={store}>
+                    <QueryClientProvider client={queryClient}>
+                        <MemoryRouter initialEntries={[route]}>
+                            <Routes>
+                                <Route
+                                    path="/projects/:projectId/board"
+                                    element={
+                                        <>
+                                            <TaskModal
+                                                boardAiOn={false}
+                                                tasks={taskList}
+                                            />
+                                            <LocationProbe />
+                                        </>
+                                    }
+                                />
+                            </Routes>
+                        </MemoryRouter>
+                    </QueryClientProvider>
+                </Provider>
+            );
+        }
+
+        const { rerender } = render(<Harness taskList={tasks} />);
+
+        const taskNameInput = await screen.findByDisplayValue("Build task");
+        await act(async () => {
+            fireEvent.change(taskNameInput, {
+                target: { value: "edited title" }
+            });
+        });
+
+        // Refetch resolves without our edited task — the dirty form must
+        // not be discarded.
+        await act(async () => {
+            rerender(<Harness taskList={[]} />);
+        });
+
+        expect(
+            await screen.findByText(/this task was removed by another change/i)
+        ).toBeInTheDocument();
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("edited title")).toBeInTheDocument();
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
+
+        // Discard restores the previous "close cleanly" behaviour.
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole("button", { name: /^discard edits$/i })
+            );
+        });
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+    });
+
     it("opens with loading UI while tasks are unresolved, then shows the full form once tasks resolve", async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
