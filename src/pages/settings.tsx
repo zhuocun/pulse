@@ -1,5 +1,6 @@
 import {
     DesktopOutlined,
+    GlobalOutlined,
     LogoutOutlined,
     MoonOutlined,
     SunOutlined
@@ -7,9 +8,9 @@ import {
 import styled from "@emotion/styled";
 import { Button, Card, Segmented, Space, Switch, Typography } from "antd";
 
-import LanguageSwitcher from "../components/languageSwitcher";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
+import { useLocale, type LocaleCode } from "../i18n";
 import {
     fontSize,
     fontWeight,
@@ -102,6 +103,7 @@ const SettingsPage = () => {
         scheme,
         setPreference
     } = useColorScheme();
+    const { locale, availableLocales, setLocale } = useLocale();
 
     return (
         <PageContainer>
@@ -155,10 +157,24 @@ const SettingsPage = () => {
                     />
                 </Row>
                 <Row data-testid="settings-row-language">
-                    {/* Re-uses the existing LanguageSwitcher component
-                        from the header dropdown so the control behaves
-                        identically across surfaces. */}
-                    <LanguageSwitcher />
+                    <RowLabel>
+                        <Space size={space.xs}>
+                            <GlobalOutlined aria-hidden />
+                            <RowText>{microcopy.settings.language}</RowText>
+                        </Space>
+                    </RowLabel>
+                    {/* Native names ("English", "中文") so the option you
+                     * want is always readable in its own script. */}
+                    <Segmented
+                        aria-label={microcopy.settings.changeLanguage}
+                        options={availableLocales.map((entry) => ({
+                            label: entry.nativeName,
+                            value: entry.code,
+                            title: entry.englishName
+                        }))}
+                        onChange={(value) => setLocale(value as LocaleCode)}
+                        value={locale}
+                    />
                 </Row>
                 {aiAvailable ? (
                     <Row data-testid="settings-row-ai">
