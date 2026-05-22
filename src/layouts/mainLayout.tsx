@@ -40,7 +40,7 @@ const Main = styled.main<{ $hasBottomNav: boolean }>`
     flex-direction: column;
     min-height: 0;
     min-width: 0;
-    scroll-padding-top: 64px;
+    scroll-padding-top: var(--header-height, 64px);
     /*
      * When the bottom tab bar mounts (phone + flag on), reserve space so
      * the fixed-position bar doesn't occlude the routed content. The
