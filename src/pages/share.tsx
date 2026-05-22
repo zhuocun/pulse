@@ -40,7 +40,6 @@ import newTaskCallback from "../utils/optimisticUpdate/createTask";
  *     "share_target": {
  *         "action": "/share",
  *         "method": "GET",
- *         "enctype": "application/x-www-form-urlencoded",
  *         "params": { "title": "title", "text": "text", "url": "url" }
  *     }
  *
