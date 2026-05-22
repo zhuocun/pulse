@@ -1,13 +1,31 @@
 ---
 name: subagent-orchestrator
-description: Orchestrates parallel subagents as the primary performers of research and implementation work — the orchestrator decomposes the task, scopes and configures each subagent (explicitly setting model and reasoning parameters), keeps only the immediate blocking step local, and reviews returned work as the quality gate before integrating. Use when the user authorizes subagents or asks to "parallelize", "orchestrate", "delegate", or "run agents in parallel"; when the task has 2+ independent workstreams or 3+ distinct subtasks; when it combines exploration with implementation, or implementation with verification; or when it is likely to take more than a few minutes. On Cursor, picks Composer for every subagent call. Do NOT use when no subagent launcher is available, when subagents are not authorized, or for tiny, fully serial, or tightly coupled tasks.
+description: Orchestrates parallel subagents as the primary performers of research and implementation work.
 ---
 
 # Subagent Orchestrator
 
 ## Role
 
-Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, codebase questions, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb research or implementation into itself unless the work is genuinely tiny or tightly coupled to the next local action.
+Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, lookups, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb that work itself unless it is genuinely tiny or tightly coupled to the next local action.
+
+## Tier
+
+Pick a tier up front and keep it consistent across the task unless the user changes it. State the chosen tier in your first orchestration update.
+
+### standard (default)
+
+Subagents run on **mid-tier, non-best** models — faster and cheaper than the orchestrator. The orchestrator absorbs the quality premium; subagents handle bounded, well-scoped work where mid-tier quality is sufficient. Optimizes for parallel throughput and cost.
+
+### max
+
+Subagents run on **top-tier** models and may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
+
+### Selecting the tier
+
+- Default to **standard**.
+- Switch to **max** when the user explicitly asks for it ("max mode", "use the best models", "highest quality"), when the slash-command is invoked with a `max` argument, or when the task is large and integration-sensitive enough that mid-tier subagents would force costly rework.
+- A single subtask inside an otherwise-standard task may be individually promoted to max-tier configuration if it is integration-sensitive enough to warrant it; the rest of the task stays standard.
 
 ## When to delegate
 
@@ -24,38 +42,31 @@ Stay local only for genuinely tiny or tightly coupled work, and for the immediat
 
 Prefer one subagent per distinct subtask. Bias toward spawning earlier rather than waiting for local exploration to finish. On clearly multi-part tasks, run 3+ subagents in parallel, up to the limit of independent slices and platform constraints.
 
-## How to delegate
-
-1. Form a short plan and identify the immediate blocking step to keep local.
-2. Push the remaining work — research strands (exploration, lookups, analysis) and development strands (implementation, fixes, tests, verification) — into bounded subtasks owned by subagents.
-3. For each subtask, give the subagent: the exact goal, the expected output, the owned files or scope, and a note that it is not alone in the codebase — it must adapt to concurrent edits and never revert other agents' work.
-4. Launch in parallel. Continue non-overlapping local work while subagents run; only block on a subagent when its output is the next dependency.
-5. Reuse a still-relevant agent for follow-up work; otherwise start fresh.
-
-Avoid duplicate or speculative delegation that does not materially advance the task.
-
 ## Model selection
 
-Match model and reasoning budget to subtask difficulty. Map the terminology to whatever the platform exposes — `model`, `subagent_type`, `reasoning_effort`, extended thinking / thinking budget, etc.
+Map the terminology to whatever the platform exposes — `model`, `subagent_type`, `reasoning_effort`, extended thinking / thinking budget, etc.
 
 **Always set these parameters explicitly on every subagent call.** Never accept the platform default: it can route to a forbidden tier, silently downgrade reasoning, or mirror the orchestrator's own config.
 
-Tier guidance:
+Forbidden tier (both modes): never use the smallest/distilled variants (`*-mini`, `*-haiku`-class) unless a higher-priority instruction requires them.
 
-- Lighter sidecar work (bounded exploration, summarization, lookups): mid-tier model, moderate reasoning budget.
-- Implementation, integration-sensitive, or risky code paths: top-tier model, high reasoning budget.
-- Pick the fastest model that still meets the quality bar; escalate only when correctness is at risk.
+### Standard tier
 
-Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-flash`, `*-haiku`-class) unless a higher-priority instruction requires them.
+Subagent model: mid-tier — cheaper or faster than the orchestrator, never the forbidden tier. The subagent must differ from the orchestrator in either model or reasoning budget. Apply the rule that fits your platform:
 
-The subagent must never run with the *exact same* model **and** reasoning budget as the orchestrator. Pick the first option below that is available and not in the forbidden tier:
+1. Anthropic / OpenAI: step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT).
+2. Cursor: choose the best Composer model.
+3. Fallback (no acceptable lower tier exists in your family): keep the orchestrator's model but drop the reasoning budget by at least one level (e.g. high → medium).
 
-1. Step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT). Keep the reasoning budget appropriate for the subtask.
-2. On Cursor, choose Composer.
-3. If no acceptable lower tier exists, keep the orchestrator's model but drop the reasoning budget by at least one level (e.g. high → medium).
-4. Escalation override: if the subtask itself is integration-sensitive and steps 1–2 would degrade quality unacceptably, fall back to step 3.
+Reasoning budget: moderate for sidecar/exploration/lookup work; high for implementation or integration-sensitive code paths. Pick the fastest setting that still meets the quality bar; escalate only when correctness is at risk.
 
-Intent: subagents cheaper or faster than the orchestrator, never weaker than the forbidden tier, never identical to the orchestrator.
+### Max tier
+
+Subagent model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. The subagent may run the same model and reasoning budget as the orchestrator; the standard-tier divergence rule does not apply here.
+
+Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of max tier.
+
+Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
 
 ## Review
 
@@ -70,6 +81,6 @@ The orchestrator is the final reviewer and quality gate. Subagent output is a dr
 
 ## Communication
 
-- Briefly tell the user what stays local on the critical path and what is being delegated.
+- Briefly tell the user what stays local on the critical path and what is being delegated. Include which tier (standard / max) you chose and why.
 - Keep progress updates short and integration-focused.
 - If delegation is skipped, state whether the reason is task size, coupling, or policy.
