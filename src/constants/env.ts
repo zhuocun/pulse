@@ -142,6 +142,19 @@ const aiKnowledgeCutoff =
  */
 const bottomNavEnabledFlag = readEnv("REACT_APP_BOTTOM_NAV_ENABLED");
 
+/**
+ * Phase 3 A2 — Routed inline task panel. Opt-in until validated: the
+ * new `<TaskDetailPanel>` route at `/projects/:projectId/board/task/:taskId`
+ * only registers when this flag is "true". When the flag is unset or
+ * "false" (default), the existing `<TaskModal>` overlay continues to
+ * handle every task-open flow exactly as today, including all callsites
+ * that go through `useTaskModal`. The migration plan is to flip the flag
+ * once the panel is validated, then a second-pass PR migrates callsites
+ * and removes the modal surface. Set `REACT_APP_TASK_PANEL_ROUTED=true`
+ * in a local `.env.development` or at deploy time to enable.
+ */
+const taskPanelRoutedFlag = readEnv("REACT_APP_TASK_PANEL_ROUTED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -162,7 +175,12 @@ const environment = {
      * tab bar mounts on phones and the header demotes its right
      * cluster; set `REACT_APP_BOTTOM_NAV_ENABLED=false` to roll back.
      */
-    bottomNavEnabled: bottomNavEnabledFlag === "false" ? false : true
+    bottomNavEnabled: bottomNavEnabledFlag === "false" ? false : true,
+    /**
+     * Phase 3 A2 routed-task-panel flag. Default false (opt-in) — see
+     * the `taskPanelRoutedFlag` block above for the rollout plan.
+     */
+    taskPanelRouted: taskPanelRoutedFlag === "true"
 };
 
 export default environment;
