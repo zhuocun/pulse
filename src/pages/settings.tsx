@@ -176,7 +176,7 @@ const SettingsPage = () => {
                     <RowLabel>
                         <Space size={space.xs}>
                             <LogoutOutlined aria-hidden />
-                            <RowText>{microcopy.settings.logout}</RowText>
+                            <RowText>{microcopy.actions.logOut}</RowText>
                         </Space>
                     </RowLabel>
                     <Button

@@ -157,7 +157,6 @@ export const enSource = {
         themeDark: "Dark",
         themeSystem: "System",
         aiEnabled: "Board Copilot",
-        logout: "Log out",
         pageTitle: "Settings",
         pageSubtitle: "Choose your theme, language, and Copilot preferences."
     },
@@ -965,8 +964,6 @@ export const enSource = {
         summaryUrl: "URL",
         projectLabel: "Project",
         columnLabel: "Column",
-        create: "Create task",
-        cancel: "Cancel",
         emptyTitle: "Create your first project to start sharing",
         emptyDescription:
             "Pulse needs at least one project before you can share content into it.",

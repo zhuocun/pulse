@@ -202,7 +202,7 @@ describe("SharePage", () => {
         );
 
         fireEvent.click(
-            screen.getByRole("button", { name: microcopy.share.create })
+            screen.getByRole("button", { name: microcopy.actions.createTask })
         );
 
         await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -248,7 +248,7 @@ describe("SharePage", () => {
         );
 
         fireEvent.click(
-            screen.getByRole("button", { name: microcopy.share.create })
+            screen.getByRole("button", { name: microcopy.actions.createTask })
         );
 
         await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -272,7 +272,7 @@ describe("SharePage", () => {
         ).toBeInTheDocument();
         // No form / submit affordance when there's nowhere to share into.
         expect(
-            screen.queryByRole("button", { name: microcopy.share.create })
+            screen.queryByRole("button", { name: microcopy.actions.createTask })
         ).not.toBeInTheDocument();
     });
 
@@ -288,7 +288,7 @@ describe("SharePage", () => {
             ""
         );
         expect(
-            screen.getByRole("button", { name: microcopy.share.create })
+            screen.getByRole("button", { name: microcopy.actions.createTask })
         ).toBeDisabled();
     });
 });

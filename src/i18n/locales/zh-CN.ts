@@ -170,7 +170,6 @@ const zhCN: Dictionary = {
         themeDark: "深色",
         themeSystem: "跟随系统",
         aiEnabled: "看板 Copilot",
-        logout: "退出登录",
         pageTitle: "设置",
         pageSubtitle: "选择您的主题、语言和 Copilot 偏好设置。"
     },
@@ -876,8 +875,6 @@ const zhCN: Dictionary = {
         summaryUrl: "链接",
         projectLabel: "项目",
         columnLabel: "列",
-        create: "创建任务",
-        cancel: "取消",
         emptyTitle: "请先创建您的第一个项目,以便开始分享内容",
         emptyDescription: "Pulse 需要至少一个项目才能将分享内容收入其中。",
         nothingTitle: "暂无分享内容",

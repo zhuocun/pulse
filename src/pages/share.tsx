@@ -459,7 +459,7 @@ const SharePage = () => {
                 <ActionsRow>
                     <Space>
                         <Button onClick={onCancel}>
-                            {microcopy.share.cancel}
+                            {microcopy.actions.cancel}
                         </Button>
                         <Button
                             disabled={!canSubmit}
@@ -467,7 +467,7 @@ const SharePage = () => {
                             onClick={onCreate}
                             type="primary"
                         >
-                            {microcopy.share.create}
+                            {microcopy.actions.createTask}
                         </Button>
                     </Space>
                 </ActionsRow>
