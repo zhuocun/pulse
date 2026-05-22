@@ -111,6 +111,12 @@ def _validate_settings(cfg: Settings) -> None:
     """Fail-fast bootstrap checks for security-critical configuration."""
 
     uuid_env = (os.getenv("UUID") or "").strip()
+    if not uuid_env and has_hosted_platform_env():
+        raise RuntimeError(
+            "UUID env var must be set to a stable secret of at least "
+            f"{JWT_SECRET_MIN_LENGTH} characters in hosted deployments; "
+            "ephemeral JWT secrets invalidate every session on cold start."
+        )
     if not uuid_env and len(cfg.jwt_secret) >= JWT_SECRET_MIN_LENGTH:
         logger.warning(
             "UUID env var is not set; using an ephemeral JWT secret. "
@@ -371,6 +377,12 @@ def _configure_middleware_backends(cfg: Settings) -> MiddlewareBackends:
     from app.middleware import redis_backends
 
     client = redis_backends.build_redis_client(cfg.redis_uri)
+    try:
+        client.ping()
+    except Exception as exc:  # noqa: BLE001 -- normalize redis client errors
+        raise RuntimeError(
+            "Redis middleware backend selected but REDIS_URI is not reachable."
+        ) from exc
     if rate_backend == "redis":
         rate_limiter = redis_backends.RedisRateLimitBackend(client)
     if budget_backend == "redis":

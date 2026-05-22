@@ -676,6 +676,57 @@ def test_invoke_returns_real_usage_when_chat_model_reports_tokens(
     assert body["usage"]["tokensOut"] == 8
 
 
+def test_stream_emits_real_usage_when_chat_model_reports_tokens(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    chat_agent = client.app.state.agent_runtime.get("chat-agent")
+
+    class _ScriptedModel:
+        async def ainvoke(self, _messages: Any, **_: Any) -> AIMessage:
+            return AIMessage(
+                content="ok",
+                usage_metadata={
+                    "input_tokens": 12,
+                    "output_tokens": 8,
+                    "total_tokens": 20,
+                },
+            )
+
+        def bind_tools(self, _tools: Any, **_: Any) -> "_ScriptedModel":
+            return self
+
+    chat_agent.set_chat_model(_ScriptedModel())
+    try:
+        with client.stream(
+            "POST",
+            "/api/v1/agents/chat-agent/stream",
+            json={
+                "inputs": {
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "project_id": "p-real",
+                }
+            },
+            headers=auth_headers,
+        ) as response:
+            assert response.status_code == HTTPStatus.OK
+            body = b"".join(response.iter_bytes()).decode("utf-8")
+    finally:
+        chat_agent.set_chat_model(None)
+        chat_agent._chat_model_resolved = False
+    usage_frames = [
+        frame
+        for frame in _frames(body)
+        if frame.get("type") == "custom"
+        and isinstance(frame.get("data"), dict)
+        and frame["data"].get("kind") == "usage"
+    ]
+    assert usage_frames[-1]["data"] == {
+        "kind": "usage",
+        "tokensIn": 12,
+        "tokensOut": 8,
+    }
+
+
 def test_invoke_records_usage_against_budget(
     client: TestClient,
     auth_headers: dict[str, str],

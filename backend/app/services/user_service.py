@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 from app.database import PROJECTS, USERS
 from app.repositories import repository
 from app.security import encrypt_password
-from app.validation import body_error, make_validation_error
+from app.validation import body_error, email_error, make_validation_error
 
 # DO NOT add privilege fields (roles, isAdmin, etc.) here. ``update``
 # below applies this whitelist directly to the storage layer, so any
@@ -33,29 +33,49 @@ def update_validation_errors(
             )
         )
 
-    email = update_data.get("email")
-    if email:
-        existing = repository.find_one(USERS, {"email": email})
-        if existing is not None and str(existing.get("_id")) != str(user_id):
-            errors.append(
-                make_validation_error(
-                    "Email has been registered",
-                    "email",
-                    email,
-                )
-            )
+    if "email" in update_data:
+        email = update_data.get("email")
+        if not isinstance(email, str) or email == "":
+            errors.append(body_error(update_data, "email", "Email cannot be empty"))
+        else:
+            error = email_error(email)
+            if error is not None:
+                errors.append(error)
+            else:
+                existing = repository.find_one(USERS, {"email": email})
+                if existing is not None and str(existing.get("_id")) != str(user_id):
+                    errors.append(
+                        make_validation_error(
+                            "Email has been registered",
+                            "email",
+                            email,
+                        )
+                    )
 
-    username = update_data.get("username")
-    if username:
-        existing = repository.find_one(USERS, {"username": username})
-        if existing is not None and str(existing.get("_id")) != str(user_id):
+    if "username" in update_data:
+        username = update_data.get("username")
+        if not isinstance(username, str) or username == "":
             errors.append(
-                make_validation_error(
-                    "Username has been registered",
+                body_error(update_data, "username", "Username cannot be empty")
+            )
+        elif len(username) < 3:
+            errors.append(
+                body_error(
+                    update_data,
                     "username",
-                    username,
+                    "Length of username cannot be less than 3",
                 )
             )
+        else:
+            existing = repository.find_one(USERS, {"username": username})
+            if existing is not None and str(existing.get("_id")) != str(user_id):
+                errors.append(
+                    make_validation_error(
+                        "Username has been registered",
+                        "username",
+                        username,
+                    )
+                )
 
     if "password" in update_data:
         password = update_data["password"]
@@ -80,7 +100,9 @@ def update(user_id: str, update_data: Dict[str, Any]) -> Union[Dict[str, Any], s
     if user is None:
         return "User not found"
 
-    payload = {key: value for key, value in update_data.items() if key in USER_UPDATE_FIELDS}
+    payload = {
+        key: value for key, value in update_data.items() if key in USER_UPDATE_FIELDS
+    }
     if "password" in payload:
         payload["password"] = encrypt_password(payload["password"])
 

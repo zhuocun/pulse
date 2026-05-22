@@ -168,6 +168,32 @@ def test_register_duplicate_email_is_rejected_every_time(client: TestClient) -> 
         }
 
 
+def test_register_duplicate_username_is_rejected_every_time(
+    client: TestClient,
+) -> None:
+    register_and_login(client)
+    for _ in range(8):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "alice",
+                "email": "alice2@example.com",
+                "password": "secret",
+            },
+        )
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.json() == {
+            "error": [
+                {
+                    "msg": "Username has already been registered",
+                    "value": "alice",
+                    "param": "username",
+                    "location": "body",
+                }
+            ]
+        }
+
+
 def test_repeated_failed_logins_do_not_lock_out_the_correct_password(
     client: TestClient,
 ) -> None:

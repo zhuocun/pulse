@@ -428,6 +428,27 @@ def test_configure_middleware_backends_requires_redis_uri_for_redis_backend() ->
         main._configure_middleware_backends(cfg)
 
 
+def test_configure_middleware_backends_pings_redis_at_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BrokenRedis:
+        def ping(self) -> None:
+            raise OSError("refused")
+
+    monkeypatch.setattr(
+        redis_backends, "build_redis_client", lambda _uri: _BrokenRedis()
+    )
+    cfg = replace(
+        app_settings,
+        rate_limit_backend="redis",
+        budget_backend="memory",
+        redis_uri="redis://stub",
+    )
+
+    with pytest.raises(RuntimeError, match="REDIS_URI is not reachable"):
+        main._configure_middleware_backends(cfg)
+
+
 def test_configure_middleware_backends_builds_redis_backends_via_fakeredis(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

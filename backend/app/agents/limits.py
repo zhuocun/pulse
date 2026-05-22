@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
@@ -21,6 +22,25 @@ _MAX_PROMPT_BYTES: int = int(os.getenv("AI_MAX_PROMPT_BYTES", "8192"))
 _MAX_MESSAGES: int = int(os.getenv("AI_MAX_MESSAGES", "50"))
 # Per-message ``content`` length: 8 KiB
 _MAX_MESSAGE_CONTENT_BYTES: int = int(os.getenv("AI_MAX_MESSAGE_CONTENT_BYTES", "8192"))
+
+
+def iter_message_content_texts(content: object) -> Iterator[str]:
+    if isinstance(content, str):
+        yield content
+        return
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        text = block.get("text")
+        if isinstance(text, str):
+            yield text
+        nested = block.get("content")
+        if isinstance(nested, str):
+            yield nested
+        elif isinstance(nested, list):
+            yield from iter_message_content_texts(nested)
 
 
 def enforce_request_limits(
@@ -87,8 +107,11 @@ def enforce_request_limits(
         for msg in messages:
             if not isinstance(msg, dict):
                 continue
-            content = msg.get("content")
-            if isinstance(content, str) and len(content.encode()) > _MAX_MESSAGE_CONTENT_BYTES:
+            content_size = sum(
+                len(text.encode())
+                for text in iter_message_content_texts(msg.get("content"))
+            )
+            if content_size > _MAX_MESSAGE_CONTENT_BYTES:
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail="Request payload too large",

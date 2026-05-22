@@ -42,7 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.agents import AgentConfigurationError, AgentRuntime
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.errors import AgentError, agent_http_error_detail
-from app.agents.limits import enforce_request_limits
+from app.agents.limits import enforce_request_limits, iter_message_content_texts
 from app.agents.llm import estimate_text_tokens, result_token_usage_from_graph_result
 from app.agents.sse import (
     DONE_FRAME,
@@ -773,9 +773,8 @@ def _input_token_estimate(inputs: Mapping[str, Any]) -> int:
     if isinstance(messages, list):
         for message in messages:
             if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, str):
-                    total += estimate_text_tokens(content)
+                for text in iter_message_content_texts(message.get("content")):
+                    total += estimate_text_tokens(text)
     return max(1, total)
 
 
@@ -1171,6 +1170,7 @@ async def stream_agent(
             with _agent_turn_project_scope(project_id):
                 tokens_in_total = 0
                 tokens_out_total = 0
+                last_values_payload: Any = None
                 completed_ok = False
                 failure_budget_settled = False
 
@@ -1194,9 +1194,13 @@ async def stream_agent(
                         inputs,
                         context=context,
                         resume=resume,
+                        stream_mode=("updates", "messages", "custom", "values"),
                         **options,
                     )
                     async for mode, chunk in _with_disconnect(request, stream, timeout):
+                        if mode == "values":
+                            last_values_payload = chunk
+                            continue
                         for envelope in translate_event(mode, chunk):
                             yield encode_sse(envelope)
                             if envelope.get("type") == "custom":
@@ -1235,6 +1239,9 @@ async def stream_agent(
                         )
                     )
                 else:
+                    final_tokens = result_token_usage_from_graph_result(last_values_payload)
+                    if final_tokens != (0, 0):
+                        tokens_in_total, tokens_out_total = final_tokens
                     if tokens_in_total or tokens_out_total:
                         yield encode_sse(usage_envelope(tokens_in_total, tokens_out_total))
                     _record_real_usage(

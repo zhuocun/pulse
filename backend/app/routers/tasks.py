@@ -64,6 +64,10 @@ def update_task(
     data: Dict[str, Any] = Body(default_factory=dict),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> str:
+    errors = task_service.update_validation_errors(data)
+    if errors:
+        validation_errors(errors)
+
     result = task_service.update(data, current_user_id(payload))
     if result is None:
         api_error(status.HTTP_404_NOT_FOUND, "Task not found")
@@ -82,6 +86,8 @@ def remove_task(
         return result
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
+    if result is None:
+        api_error(status.HTTP_404_NOT_FOUND, "Task not found")
     api_error(status.HTTP_400_BAD_REQUEST, result)
 
 
