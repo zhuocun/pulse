@@ -166,6 +166,64 @@ if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
         navigator.serviceWorker
             .register("/sw.js")
+            .then((registration) => {
+                /*
+                 * Update lifecycle (QW-16). The SW is registered with
+                 * `install` *not* calling `self.skipWaiting()`, so an
+                 * update parks in `waiting` until the user accepts the
+                 * reload toast. Here on the client we listen for
+                 * `updatefound` → `installed` and — only when there's
+                 * already a controlling SW (otherwise this is the
+                 * first install, no toast needed) — mount SwUpdateToast
+                 * inside the React tree so it picks up the AntD
+                 * notification context.
+                 *
+                 * Lazy-imported so the toast component (and its AntD
+                 * dependency surface) doesn't bloat the SW
+                 * registration codepath when no update is pending.
+                 */
+                const promptUpdate = async () => {
+                    if (!navigator.serviceWorker.controller) return;
+                    const { default: SwUpdateToast } =
+                        await import("./components/swUpdateToast");
+                    const host = document.createElement("div");
+                    host.setAttribute("data-pulse-sw-update-host", "");
+                    document.body.appendChild(host);
+                    const { createRoot } = await import("react-dom/client");
+                    const updateRoot = createRoot(host);
+                    const teardown = () => {
+                        updateRoot.unmount();
+                        host.remove();
+                    };
+                    updateRoot.render(
+                        <AppProviders>
+                            <SwUpdateToast
+                                registration={registration}
+                                onDismiss={teardown}
+                            />
+                        </AppProviders>
+                    );
+                };
+                registration.addEventListener("updatefound", () => {
+                    const installing = registration.installing;
+                    if (!installing) return;
+                    installing.addEventListener("statechange", () => {
+                        if (installing.state === "installed") {
+                            promptUpdate();
+                        }
+                    });
+                });
+                // The page might also load already pointing at a
+                // `waiting` SW (e.g. user closed/reopened the tab
+                // between install and activate). Surface the toast in
+                // that case too.
+                if (
+                    registration.waiting &&
+                    navigator.serviceWorker.controller
+                ) {
+                    promptUpdate();
+                }
+            })
             .catch((error) =>
                 warnOnServiceWorkerRegistrationFailure(
                     error,
