@@ -308,11 +308,8 @@ describe("BoardPage", () => {
         expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", {
-                name: /Open Board Copilot brief/i
+                name: /Board Copilot menu/i
             })
-        ).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole("button", { name: /Ask Board Copilot/i })
         ).not.toBeInTheDocument();
         fireEvent.click(
             screen.getByRole("button", { name: /Board Copilot settings/i })
@@ -340,7 +337,7 @@ describe("BoardPage", () => {
         });
     });
 
-    it("shows Brief and Ask again after turning Project AI back on", async () => {
+    it("shows the Copilot launcher again after turning Project AI back on", async () => {
         localStorage.setItem(
             "boardCopilot:disabledProjectIds",
             JSON.stringify(["project-1"])
@@ -359,11 +356,8 @@ describe("BoardPage", () => {
 
         expect(
             await screen.findByRole("button", {
-                name: /Open Board Copilot brief/i
+                name: /Board Copilot menu/i
             })
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: /Ask Board Copilot/i })
         ).toBeInTheDocument();
     });
 
