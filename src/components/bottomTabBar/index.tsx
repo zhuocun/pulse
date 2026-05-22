@@ -33,14 +33,16 @@ import {
  * `<NavLink>` itself emits the active state via `aria-current="page"`,
  * which AT consumers already recognize.
  *
- * Keyboard hide — we listen to `visualViewport.resize` and hide the bar
- * when `window.innerHeight - visualViewport.height > 150` (a rough
- * keyboard threshold; the OS reports the keyboard via the visual
- * viewport shrink on iOS Safari and Chrome Android). A graceful
- * fallback keeps the bar visible if `visualViewport` is undefined.
+ * Keyboard hide — we listen to `visualViewport.resize` AND `scroll` and
+ * hide the bar when `visualViewport.height < window.innerHeight * 0.75`
+ * AND a text input is focused. The ratio threshold tolerates Chrome
+ * Android's URL-bar collapse (~56–100 px) without false-firing, and the
+ * activeElement gate keeps us from hiding the bar when only the page
+ * scrolls. A graceful fallback keeps the bar visible if `visualViewport`
+ * is undefined.
  */
 
-const KEYBOARD_HEIGHT_THRESHOLD_PX = 150;
+const KEYBOARD_HEIGHT_RATIO = 0.75;
 
 /* `end={false}` on /projects keeps the Boards tab active on nested
  * routes ('/projects/:id/board'); the others require an exact match. */
@@ -188,22 +190,36 @@ const BottomTabBar: React.FC = () => {
 
     /*
      * Hide the bar while the soft keyboard is open. iOS Safari + Chrome
-     * Android both shrink `window.visualViewport.height` when the keyboard
-     * raises. When the difference exceeds the keyboard threshold (~150px),
-     * we treat the keyboard as open. The fallback path leaves the bar
-     * visible on UAs without `visualViewport`.
+     * Android shrink `window.visualViewport.height` when the keyboard
+     * raises. We use a ratio threshold (visualViewport < 75% of
+     * window.innerHeight) so Chrome Android's URL-bar collapse — which
+     * is ~56–100 px and trips a flat 150 px threshold on landscape
+     * phones — does not false-hide the bar. We also gate on an input
+     * actually being focused so a scroll-driven viewport shrink without
+     * a keyboard does not trigger the hide. Listen for both `resize`
+     * and `scroll` because Chrome Android emits the URL-bar / keyboard
+     * height delta on scroll, not resize.
      */
     useEffect(() => {
         if (typeof window === "undefined") return;
         const vv = window.visualViewport;
         if (!vv) return;
         const handler = () => {
-            const drop = window.innerHeight - vv.height;
-            setKeyboardOpen(drop > KEYBOARD_HEIGHT_THRESHOLD_PX);
+            const active = document.activeElement;
+            const inputFocused =
+                active instanceof HTMLInputElement ||
+                active instanceof HTMLTextAreaElement;
+            const shrunk =
+                vv.height < window.innerHeight * KEYBOARD_HEIGHT_RATIO;
+            setKeyboardOpen(inputFocused && shrunk);
         };
         handler();
         vv.addEventListener("resize", handler);
-        return () => vv.removeEventListener("resize", handler);
+        vv.addEventListener("scroll", handler);
+        return () => {
+            vv.removeEventListener("resize", handler);
+            vv.removeEventListener("scroll", handler);
+        };
     }, []);
 
     /*

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -134,15 +134,18 @@ describe("BottomTabBar", () => {
         expect(tabs[tabs.length - 1]).toHaveFocus();
     });
 
-    it("hides the bar when the soft keyboard raises (visualViewport shrinks past threshold)", () => {
-        // Simulate a visualViewport whose height has shrunk well below
-        // window.innerHeight — the rough keyboard-open signal.
+    it("hides the bar when the soft keyboard raises (visualViewport shrinks below ratio with input focused)", () => {
+        // The production handler fires on both `resize` and `scroll`,
+        // and requires an input to be focused before treating a viewport
+        // shrink as the keyboard. Capture the listener callback the
+        // component installs so we can drive the predicate end-to-end.
         const listeners: Array<() => void> = [];
         const mockViewport = {
-            height: 300,
+            height: 700,
             width: 375,
             addEventListener: (event: string, cb: () => void) => {
-                if (event === "resize") listeners.push(cb);
+                if (event === "resize" || event === "scroll")
+                    listeners.push(cb);
             },
             removeEventListener: jest.fn()
         };
@@ -156,10 +159,60 @@ describe("BottomTabBar", () => {
         });
 
         renderBar();
-        // Initial render evaluates the keyboard predicate via handler() —
-        // the bar should already be hidden (drop = 400 > 150).
         const nav = screen.getByTestId("bottom-tab-bar");
+        // Tall viewport + no input focused → bar visible.
+        expect(nav).toHaveAttribute("aria-hidden", "false");
+
+        // Focus a text input and shrink the visual viewport, then fire
+        // the captured handler. The bar should hide.
+        const input = document.createElement("input");
+        document.body.appendChild(input);
+        input.focus();
+        mockViewport.height = 300;
+        act(() => {
+            listeners.forEach((cb) => cb());
+        });
         expect(nav).toHaveAttribute("aria-hidden", "true");
+
+        // Restore the tall viewport (keyboard dismisses) → bar re-shows.
+        mockViewport.height = 700;
+        act(() => {
+            listeners.forEach((cb) => cb());
+        });
+        expect(nav).toHaveAttribute("aria-hidden", "false");
+        document.body.removeChild(input);
+    });
+
+    it("ignores a viewport shrink when no input is focused (URL-bar collapse, not keyboard)", () => {
+        // Chrome Android collapses the URL bar on scroll, shrinking
+        // visualViewport by ~56–100 px. Without an input focused that
+        // is not the keyboard and we must keep the bar visible.
+        const listeners: Array<() => void> = [];
+        const mockViewport = {
+            height: 600,
+            width: 375,
+            addEventListener: (event: string, cb: () => void) => {
+                if (event === "resize" || event === "scroll")
+                    listeners.push(cb);
+            },
+            removeEventListener: jest.fn()
+        };
+        Object.defineProperty(window, "visualViewport", {
+            configurable: true,
+            value: mockViewport
+        });
+        Object.defineProperty(window, "innerHeight", {
+            configurable: true,
+            value: 700
+        });
+
+        renderBar();
+        act(() => {
+            listeners.forEach((cb) => cb());
+        });
+        const nav = screen.getByTestId("bottom-tab-bar");
+        // 600 / 700 ≈ 0.86 > 0.75, AND no input focused → still visible.
+        expect(nav).toHaveAttribute("aria-hidden", "false");
     });
 
     it("keeps the bar visible when visualViewport is undefined", () => {
