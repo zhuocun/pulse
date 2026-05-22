@@ -324,10 +324,10 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # Chat-tool schemas (single source of truth for _chat_tools.py generation)
 # ---------------------------------------------------------------------------
 # These define the LangChain tool stubs that chat-agent declares so the LLM
-# can request FE-side execution. Names and arg shapes here must match the FE
-# dispatcher in ``src/utils/ai/chatTools.ts`` exactly. The generator in
-# ``app/agents/catalog/_chat_tools.py`` derives the ``@tool``-decorated
-# functions from this dict so the schema lives in one place.
+# can request FE-side execution. Names and arg shapes here are model-facing;
+# ``chat.py`` maps them to canonical ``fe.*`` interrupts before the FE registry
+# runs them. The generator in ``app/agents/catalog/_chat_tools.py`` derives the
+# ``@tool``-decorated functions from this dict so the schema lives in one place.
 
 CHAT_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "listProjects": {
@@ -395,6 +395,40 @@ CHAT_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "taskId": {
                 "type": "string",
                 "description": "Task identifier.",
+            },
+        },
+    },
+    "requestMutationApproval": {
+        "description": (
+            "Propose a reversible board change for human review. Use this "
+            "only after reading the relevant board/task data. The argument "
+            "must include a description, risk ('low', 'med', or 'high'), "
+            "and a diff with task_updates, column_updates, or bulk_apply. "
+            "The runtime will show an approval card and, if accepted, apply "
+            "the approved diff through the separate FE mutation stage."
+        ),
+        "args": {
+            "proposal_id": {
+                "type": "string",
+                "description": "Stable proposal id. Omit to let the server create one.",
+                "optional": True,
+            },
+            "description": {
+                "type": "string",
+                "description": "Plain-language summary of the proposed board change.",
+            },
+            "risk": {
+                "type": "string",
+                "description": "Risk label: low, med, or high.",
+            },
+            "diff": {
+                "type": "object",
+                "description": (
+                    "Mutation diff. Supported keys: task_updates "
+                    "([{task_id, field, from, to}]), column_updates "
+                    "([{column_id, field, from, to}]), and bulk_apply "
+                    "([{operation, targets, payload}])."
+                ),
             },
         },
     },

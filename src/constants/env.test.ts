@@ -4,6 +4,8 @@ describe("environment", () => {
     const originalAiBase = process.env.REACT_APP_AI_BASE_URL;
     const originalAiEnabled = process.env.REACT_APP_AI_ENABLED;
     const originalAiUseLocal = process.env.REACT_APP_AI_USE_LOCAL;
+    const originalMutationProposals =
+        process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED;
 
     afterEach(() => {
         jest.resetModules();
@@ -11,6 +13,8 @@ describe("environment", () => {
         process.env.REACT_APP_AI_BASE_URL = originalAiBase;
         process.env.REACT_APP_AI_ENABLED = originalAiEnabled;
         process.env.REACT_APP_AI_USE_LOCAL = originalAiUseLocal;
+        process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED =
+            originalMutationProposals;
     });
 
     it("uses a same-origin REST prefix regardless of REACT_APP_API_URL", () => {
@@ -99,6 +103,20 @@ describe("environment", () => {
         const environment = require("./env").default;
 
         expect(environment.aiEnabled).toBe(false);
+    });
+
+    it("enables mutation proposal cards by default and supports rollback opt-out", () => {
+        delete process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED;
+        process.env.REACT_APP_AI_USE_LOCAL = "true";
+
+        jest.resetModules();
+        const defaultEnv = require("./env").default;
+        expect(defaultEnv.aiMutationProposalsEnabled).toBe(true);
+
+        process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED = "false";
+        jest.resetModules();
+        const disabledEnv = require("./env").default;
+        expect(disabledEnv.aiMutationProposalsEnabled).toBe(false);
     });
 
     it("uses the remote proxy when an AI base URL is provided", () => {

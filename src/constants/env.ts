@@ -137,12 +137,13 @@ const environment = {
     aiEnabled: aiEnabledFlag === "false" ? false : true,
     aiUseLocalEngine: aiBaseUrl.length === 0,
     /**
-     * Gates the MutationProposalCard surface. Defaults to `false` until
-     * the backend agent ships `custom/mutation_proposal` events. Set
-     * `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=true` to opt in.
+     * Gates the MutationProposalCard surface. Defaults on now that the
+     * backend emits organic `custom/mutation_proposal` events and the
+     * accept/apply/undo lane is covered. Set
+     * `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false` for an operator rollback.
      */
     aiMutationProposalsEnabled:
-        aiMutationProposalsEnabledFlag === "true" ? true : false,
+        aiMutationProposalsEnabledFlag === "false" ? false : true,
     /** Override via `REACT_APP_AI_KNOWLEDGE_CUTOFF` (see file header). */
     aiKnowledgeCutoff
 };
