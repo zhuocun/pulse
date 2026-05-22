@@ -105,6 +105,18 @@ describe("MainLayout", () => {
         installMatchMediaPhone();
     });
 
+    afterEach(() => {
+        // Reset the matchMedia mock value to a benign stub between
+        // tests so a cross-file spec that Jest schedules on the same
+        // worker doesn't inherit our phone/desktop predicates. The
+        // property is defined `writable: true` above so we update the
+        // value via assignment rather than another defineProperty
+        // (which would reject a configurable=false→true descriptor
+        // change in JSDOM).
+        (window as { matchMedia?: typeof window.matchMedia }).matchMedia =
+            undefined;
+    });
+
     it("renders the header, main outlet, and project modal", () => {
         const { container } = render(
             <MemoryRouter initialEntries={["/projects"]}>
