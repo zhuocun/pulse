@@ -270,6 +270,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // Don't block self-navigation (StrictMode re-renders, or the
         // identity-equal re-entry that `blocker.reset()` triggers).
         if (currentLocation.pathname === nextLocation.pathname) return false;
+        // Always allow navigation to the parent board URL — that's the
+        // canonical self-initiated close target (B-M2).
+        if (nextLocation.pathname === `/projects/${projectId}/board`)
+            return false;
         return isFormDirtyRef.current;
     });
 
