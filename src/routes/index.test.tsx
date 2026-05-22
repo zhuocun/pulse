@@ -123,9 +123,15 @@ describe("routes", () => {
         expect(element(protectedBranch as { element?: unknown }).type).toBe(
             RequireAuth
         );
+        // The trailing "share" entry is the Web Share Target landing
+        // page (Phase 3 A4) — the browser navigates here with query
+        // params when an external app fires a share intent. Appended at
+        // the end of the protected branch so the existing /projects
+        // routes are unaffected.
         expect(protectedBranch?.children?.map((route) => route.path)).toEqual([
             "projects",
-            "projects/:projectId"
+            "projects/:projectId",
+            "share"
         ]);
 
         const catchAll = routes[0].children?.[4];

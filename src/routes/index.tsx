@@ -28,6 +28,7 @@ const TermsPage = lazy(() => import("../pages/terms"));
 const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
+const SharePage = lazy(() => import("../pages/share"));
 
 /**
  * Resolves the root URL by consulting authentication once, at the route
@@ -187,6 +188,21 @@ const routes = [
                                 element: <BoardPage />
                             }
                         ]
+                    },
+                    /*
+                     * Web Share Target landing page (Phase 3 A4). Wired to
+                     * the manifest's `share_target.action = "/share"`
+                     * entry — the browser navigates here with title / text
+                     * / url URL params when an external app shares into
+                     * Pulse. Guarded by `<RequireAuth>` because the page
+                     * needs an authenticated session to fetch projects +
+                     * post the resulting task; unauthenticated visitors
+                     * follow the same `/login` redirect path as every
+                     * other protected route.
+                     */
+                    {
+                        path: "share",
+                        element: <SharePage />
                     }
                 ]
             },
