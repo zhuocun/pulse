@@ -92,6 +92,98 @@ Object.defineProperty(globalThis, "fetch", {
     writable: true
 });
 
+/*
+ * Polyfill `Request` for tests that exercise react-router 7's data
+ * router (`createMemoryRouter` + `RouterProvider`). The data router
+ * builds `Request` instances internally on navigation, and jsdom
+ * doesn't ship the Fetch API constructors. We only need a class
+ * shaped like the real one — the data router reads `.url`,
+ * `.signal`, and `.method`. Other tests that don't touch the data
+ * router are unaffected.
+ */
+if (typeof globalThis.Request === "undefined") {
+    class TestRequest {
+        url: string;
+
+        method: string;
+
+        signal: AbortSignal;
+
+        headers: Headers;
+
+        body: ReadableStream<Uint8Array> | null = null;
+
+        bodyUsed = false;
+
+        cache = "default" as RequestCache;
+
+        credentials = "same-origin" as RequestCredentials;
+
+        destination = "" as RequestDestination;
+
+        integrity = "";
+
+        keepalive = false;
+
+        mode = "cors" as RequestMode;
+
+        redirect = "follow" as RequestRedirect;
+
+        referrer = "";
+
+        referrerPolicy = "" as ReferrerPolicy;
+
+        constructor(input: string | URL | Request, init?: RequestInit) {
+            this.url =
+                typeof input === "string"
+                    ? input
+                    : input instanceof URL
+                      ? input.toString()
+                      : (input as Request).url;
+            this.method = init?.method ?? "GET";
+            this.signal = init?.signal ?? new AbortController().signal;
+            this.headers = new Headers(init?.headers);
+        }
+
+        clone() {
+            return new TestRequest(this.url, {
+                method: this.method,
+                signal: this.signal,
+                headers: this.headers
+            });
+        }
+
+        arrayBuffer() {
+            return Promise.resolve(new ArrayBuffer(0));
+        }
+
+        blob() {
+            return Promise.resolve(new Blob());
+        }
+
+        formData() {
+            return Promise.resolve(new FormData());
+        }
+
+        json() {
+            return Promise.resolve({});
+        }
+
+        text() {
+            return Promise.resolve("");
+        }
+
+        bytes() {
+            return Promise.resolve(new Uint8Array());
+        }
+    }
+    Object.defineProperty(globalThis, "Request", {
+        configurable: true,
+        writable: true,
+        value: TestRequest
+    });
+}
+
 if (typeof window !== "undefined") {
     const getComputedStyle = window.getComputedStyle.bind(window);
 
