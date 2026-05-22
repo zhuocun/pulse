@@ -91,6 +91,20 @@ describe("AiTaskDraftModal", () => {
         fetchMock.mockRestore();
     });
 
+    it("caps the modal body height with env(keyboard-inset-height) so the footer stays above the iOS soft keyboard", async () => {
+        // Regression for QW-18 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+        // The Modal body's inline style must subtract
+        // `env(keyboard-inset-height, 0px)` so the footer cannot drop
+        // below the viewport when the iOS software keyboard rises.
+        mountModal();
+        const dialog = await screen.findByRole("dialog");
+        const body = dialog.querySelector(
+            ".ant-modal-body"
+        ) as HTMLElement | null;
+        expect(body).not.toBeNull();
+        expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
+    });
+
     it("disables the Draft button until a prompt is entered", async () => {
         mountModal();
         expect(screen.getByLabelText("Draft task with Copilot")).toBeDisabled();

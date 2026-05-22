@@ -615,6 +615,22 @@ describe("TaskModal", () => {
         expect(store.getState().overlays.editingTaskId).toBe("task-1");
     });
 
+    it("caps the modal body height with env(keyboard-inset-height) so the footer stays above the iOS soft keyboard", async () => {
+        // Regression for QW-18 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+        // The Modal body's inline style must subtract `env(keyboard-inset-height, 0px)`
+        // so the footer (Save / Cancel / Delete) cannot fall below the
+        // viewport when the iOS software keyboard pushes itself up
+        // through `interactive-widget=resizes-content`.
+        renderModal();
+
+        const dialog = await screen.findByRole("dialog");
+        const body = dialog.querySelector(
+            ".ant-modal-body"
+        ) as HTMLElement | null;
+        expect(body).not.toBeNull();
+        expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
+    });
+
     it("does not open the modal for optimistic placeholder ids while tasks are still loading", () => {
         renderModal({
             initialTasks: undefined,

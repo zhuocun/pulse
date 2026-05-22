@@ -436,11 +436,14 @@ const TaskModal: React.FC<{
                      * footer falls below the viewport on a 390 × 844
                      * device and the destructive Delete control becomes
                      * unreachable without scrolling the page behind the
-                     * modal.
+                     * modal. The extra `env(keyboard-inset-height)`
+                     * subtraction keeps the footer above the iOS soft
+                     * keyboard when it opens — see QW-18 in
+                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
                      */
                     maxHeight: screens.sm
-                        ? "calc(100dvh - 220px)"
-                        : "calc(100dvh - 320px)",
+                        ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
+                        : "calc(100dvh - 320px - env(keyboard-inset-height, 0px))",
                     overflowY: "auto"
                 }
             }}

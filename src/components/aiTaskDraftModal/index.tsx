@@ -458,7 +458,16 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             open={open}
             styles={{
                 body: {
-                    maxHeight: "calc(100dvh - 220px)",
+                    /*
+                     * Subtract `env(keyboard-inset-height)` so the modal
+                     * body shrinks above the iOS soft keyboard instead of
+                     * pushing the footer below the fold. Falls back to
+                     * `0px` on browsers without the env variable so the
+                     * desktop layout is unchanged. See QW-18 in
+                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                     */
+                    maxHeight:
+                        "calc(100dvh - 220px - env(keyboard-inset-height, 0px))",
                     overflowY: "auto"
                 }
             }}
