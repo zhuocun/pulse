@@ -20,6 +20,7 @@ import { useBlocker, useNavigate } from "react-router";
 import { microcopy } from "../../constants/microcopy";
 import { breakpoints, fontSize, fontWeight, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
@@ -110,48 +111,6 @@ interface TaskDetailPanelProps {
 }
 
 /**
- * Detects coarse-pointer phones so the drawer mounts as a bottom sheet.
- * Falls back to the AntD `Grid` breakpoints when the media query API is
- * unavailable (jsdom default). The two signals are OR'd because some
- * tablets report `pointer: coarse` but have `md` width — there a
- * right-side drawer is still the right call.
- */
-const useIsPhoneViewport = (): boolean => {
-    const screens = Grid.useBreakpoint();
-    const [coarse, setCoarse] = useState<boolean>(() => {
-        if (
-            typeof window === "undefined" ||
-            typeof window.matchMedia !== "function"
-        ) {
-            return false;
-        }
-        return window.matchMedia("(pointer: coarse)").matches;
-    });
-
-    useEffect(() => {
-        if (
-            typeof window === "undefined" ||
-            typeof window.matchMedia !== "function"
-        ) {
-            return;
-        }
-        const media = window.matchMedia("(pointer: coarse)");
-        const handler = (event: MediaQueryListEvent) =>
-            setCoarse(event.matches);
-        if (typeof media.addEventListener === "function") {
-            media.addEventListener("change", handler);
-            return () => media.removeEventListener("change", handler);
-        }
-        media.addListener(handler);
-        return () => media.removeListener(handler);
-    }, []);
-
-    // A phone is "coarse pointer AND not md-or-wider". A tablet hits md+
-    // even on a touch screen and we want the right drawer there.
-    return coarse && screens.md === false;
-};
-
-/**
  * Honors `prefers-reduced-motion: reduce` for the drawer entry. AntD
  * Drawer's motion is driven by `rc-motion`; passing `motion={null}` and
  * `maskMotion={null}` removes the transition entirely. We don't import
@@ -198,7 +157,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const [form] = useForm();
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
-    const isPhone = useIsPhoneViewport();
+    const isPhone = useIsPhoneChrome();
     const prefersReducedMotion = usePrefersReducedMotion();
     const screens = Grid.useBreakpoint();
     const [formTick, setFormTick] = useState(0);
@@ -599,34 +558,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         </div>
     );
 
-    /*
-     * Drawer width/height. Phone: bottom sheet at 92dvh — leaves a
-     * thin sliver of the board peeking so the user keeps spatial
-     * orientation. Tablet+: right-side drawer at 480px (the figure
-     * the review doc spec'd). Desktop "docked rail that reflows the
-     * columns" is a Phase 4 follow-up — for now the right drawer is
-     * sufficient.
-     */
-    /*
-     * AntD 6 deprecated the discrete `height`/`width` props on Drawer
-     * in favour of a single `size` prop (number | string | "default"
-     * | "large"). Both the bottom-sheet height and the right-drawer
-     * width flow through `size`; the `placement` prop disambiguates
-     * which axis it applies to. Phone: 92dvh leaves a visible sliver
-     * of the board behind the sheet so spatial orientation is
-     * preserved. Tablet+: 480 px is the figure A2 spec'd; we drop to
-     * 92vw on `sm`-width tablets in portrait so the panel doesn't
-     * exceed the screen.
-     */
+    // Placement matches the chassis `useIsPhoneChrome` signal so the
+    // bottom-tab bar and the panel never collide on touchscreen
+    // laptops / tablets (B-H1).
     const drawerProps = isPhone
-        ? {
-              placement: "bottom" as const,
-              size: "92dvh"
-          }
-        : {
-              placement: "right" as const,
-              size: screens.md ? 480 : ("92vw" as string | number)
-          };
+        ? { placement: "bottom" as const, size: "large" as const }
+        : { placement: "right" as const, size: "large" as const };
 
     return (
         <Drawer
