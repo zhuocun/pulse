@@ -395,6 +395,29 @@ describe("TaskDetailPanel", () => {
         ).toBeInTheDocument();
     });
 
+    it("links the confirm body to the dialog via aria-describedby (B-M4)", async () => {
+        renderPanelAt("/projects/project-1/board/task/task-1");
+
+        const input = await screen.findByDisplayValue("Build task");
+        fireEvent.change(input, { target: { value: "Edited" } });
+        fireEvent.click(document.querySelector(".ant-drawer-mask") as Element);
+
+        await screen.findByText(
+            microcopy.taskDetailPanel.confirmDiscardTitle as string
+        );
+
+        // The body wrapper exposes the explicit id used by aria-describedby.
+        const body = document.getElementById("task-detail-panel-discard-body");
+        expect(body).not.toBeNull();
+        // The aria-describedby attribute references the body id from
+        // within the rendered modal so screen readers announce the
+        // description after the title.
+        const describer = document.querySelector(
+            "[aria-describedby='task-detail-panel-discard-body']"
+        );
+        expect(describer).not.toBeNull();
+    });
+
     it("dismisses the confirm dialog and keeps the panel open when 'Keep editing' is clicked", async () => {
         renderPanelAt("/projects/project-1/board/task/task-1");
 
