@@ -1,11 +1,7 @@
 import { ReactElement } from "react";
 
-import routes, { RootRedirect } from ".";
+import routes, { RequireAuth, RequireGuest, RootRedirect } from ".";
 
-jest.mock("../pages/home", () => ({
-    __esModule: true,
-    default: () => null
-}));
 jest.mock("../pages/login", () => ({
     __esModule: true,
     default: () => null
@@ -51,31 +47,47 @@ describe("routes", () => {
             indexRedirect && "index" in indexRedirect && indexRedirect.index
         ).toBe(true);
         // The index renders <RootRedirect/>, which decides at runtime whether
-        // to send the visitor to /login or /projects. The previous test that
-        // hard-coded `/login` no longer applies.
+        // to send the visitor to /login or /projects.
         expect(element(indexRedirect as { element?: unknown }).type).toBe(
             RootRedirect
         );
     });
 
-    it("contains auth, project, and catch-all child routes under the home shell", () => {
-        const homeShell = routes[0].children?.[1];
-        expect(
-            homeShell && "path" in homeShell ? homeShell.path : undefined
-        ).toBe(undefined);
-        expect(homeShell?.children?.map((route) => route.path)).toEqual([
+    it("guards auth-only pages with <RequireGuest /> and protects app pages with <RequireAuth /> (QW-4)", () => {
+        // Layer 0: SuspenseShell. Layer 1 children are:
+        //   [0] index → RootRedirect
+        //   [1] RequireGuest wrapper for login / register / forgot / terms
+        //   [2] RequireAuth wrapper for projects / projects/:projectId
+        //   [3] "*" catch-all
+        const guestBranch = routes[0].children?.[1];
+        expect(element(guestBranch as { element?: unknown }).type).toBe(
+            RequireGuest
+        );
+        expect(guestBranch?.children?.map((route) => route.path)).toEqual([
             "register",
             "login",
             "auth/forgot-password",
-            "auth/terms",
-            "projects",
-            "projects/:projectId",
-            "*"
+            "auth/terms"
         ]);
+
+        const protectedBranch = routes[0].children?.[2];
+        expect(element(protectedBranch as { element?: unknown }).type).toBe(
+            RequireAuth
+        );
+        expect(protectedBranch?.children?.map((route) => route.path)).toEqual([
+            "projects",
+            "projects/:projectId"
+        ]);
+
+        const catchAll = routes[0].children?.[3];
+        expect(catchAll && "path" in catchAll ? catchAll.path : undefined).toBe(
+            "*"
+        );
     });
 
     it("nests an index redirect and the board route below project detail", () => {
-        const projectDetailRoute = routes[0].children?.[1]?.children?.find(
+        const protectedBranch = routes[0].children?.[2];
+        const projectDetailRoute = protectedBranch?.children?.find(
             (route) => route.path === "projects/:projectId"
         );
 
@@ -83,9 +95,9 @@ describe("routes", () => {
         // redirect (Navigate to "board"). The previous `useEffect`
         // force-redirect inside `ProjectDetailPage` was removed in QW-11.
         const children = projectDetailRoute?.children ?? [];
-        expect(children[0] && "index" in children[0] && children[0].index).toBe(
-            true
-        );
+        expect(
+            children[0] && "index" in children[0] && children[0].index
+        ).toBe(true);
         expect(children.slice(1).map((route) => route.path)).toEqual(["board"]);
     });
 });

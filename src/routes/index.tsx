@@ -5,13 +5,15 @@ import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import EmptyState from "../components/emptyState";
 import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
+import AuthLayout from "../layouts/authLayout";
+import MainLayout from "../layouts/mainLayout";
 import useAuth from "../utils/hooks/useAuth";
 
 /**
  * Route-level code splitting (Phase B). Each page becomes its own chunk so the
  * login screen does not have to download project / board / AI code on first
- * paint. The Suspense boundary lives one level above HomePage so the layout
- * chrome stays mounted while a page chunk fetches.
+ * paint. The Suspense boundary lives one level above the page elements so the
+ * layout chrome stays mounted while a page chunk fetches.
  *
  * Tests that exercise the routes (App.test, route integration suites) already
  * use `jest.mock("../pages/...")` to swap each page for a sync stub. Combined
@@ -19,7 +21,6 @@ import useAuth from "../utils/hooks/useAuth";
  * introduces. Page-only tests (board.test, project.test, projectDetail.test)
  * import the page directly and are not affected.
  */
-const HomePage = lazy(() => import("../pages/home"));
 const LoginPage = lazy(() => import("../pages/login"));
 const RegisterPage = lazy(() => import("../pages/register"));
 const ForgotPasswordPage = lazy(() => import("../pages/forgotPassword"));
@@ -42,6 +43,37 @@ const RootRedirect = () => {
     ) : (
         <Navigate to="/login" replace />
     );
+};
+
+/**
+ * Wraps protected routes: renders `<MainLayout />` (with its `<Outlet />`) for
+ * authenticated users, and redirects unauthenticated visitors to `/login`.
+ *
+ * Replaces the legacy `pages/home.tsx` wrapper that did the same job in a
+ * stray `<div>` and force-redirected on every render. Centralising the guard
+ * here means `RootRedirect`, the auth-pages branch, and any protected page
+ * no longer all independently re-implement the same predicate.
+ */
+const RequireAuth = () => {
+    const { isAuthenticated } = useAuth();
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+    return <MainLayout />;
+};
+
+/**
+ * Wraps guest-only routes (login / register / forgot-password / terms):
+ * renders `<AuthLayout />` (with its `<Outlet />`) for visitors without a
+ * session, and bounces authenticated users straight to `/projects`. Mirrors
+ * `RequireAuth` so the auth predicate is owned in exactly one place.
+ */
+const RequireGuest = () => {
+    const { isAuthenticated } = useAuth();
+    if (isAuthenticated) {
+        return <Navigate to="/projects" replace />;
+    }
+    return <AuthLayout />;
 };
 
 const NotFoundRoute = () => {
@@ -72,8 +104,12 @@ const SuspenseShell = () => (
 );
 
 /**
- * Single "/" match: index redirects to login; sibling branch renders the auth/main shell.
- * Nested paths use relative segments (e.g. projects/:projectId/board).
+ * Single "/" match: index redirects via `RootRedirect`. Sibling branches
+ * mount the auth-pages shell (`RequireGuest`) and the authenticated app
+ * shell (`RequireAuth`) — each acts as both the layout and the guard, so
+ * the redirect predicate lives in exactly one place.
+ *
+ * Nested paths use relative segments (e.g. `projects/:projectId/board`).
  */
 const routes = [
     {
@@ -82,7 +118,7 @@ const routes = [
         children: [
             { index: true, element: <RootRedirect /> },
             {
-                element: <HomePage />,
+                element: <RequireGuest />,
                 children: [
                     {
                         path: "register",
@@ -99,7 +135,12 @@ const routes = [
                     {
                         path: "auth/terms",
                         element: <TermsPage />
-                    },
+                    }
+                ]
+            },
+            {
+                element: <RequireAuth />,
+                children: [
                     {
                         path: "projects",
                         element: <ProjectPage />
@@ -125,16 +166,16 @@ const routes = [
                                 element: <BoardPage />
                             }
                         ]
-                    },
-                    {
-                        path: "*",
-                        element: <NotFoundRoute />
                     }
                 ]
+            },
+            {
+                path: "*",
+                element: <NotFoundRoute />
             }
         ]
     }
 ];
 
-export { RootRedirect };
+export { RequireAuth, RequireGuest, RootRedirect };
 export default routes;
