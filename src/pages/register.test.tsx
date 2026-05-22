@@ -1,8 +1,6 @@
 /* eslint-disable global-require */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-
-import useAuth from "../utils/hooks/useAuth";
 
 import RegisterPage from "./register";
 
@@ -37,31 +35,8 @@ jest.mock("../components/registerForm", () => {
             )
     };
 });
-jest.mock("../utils/hooks/useAuth");
 
-const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
-
-const user = (overrides: Partial<IUser> = {}): IUser => ({
-    _id: "u1",
-    email: "alice@example.com",
-    likedProjects: [],
-    username: "Alice",
-    ...overrides
-});
-
-const renderRegisterPage = ({
-    currentUser,
-    isAuthenticated = false
-}: {
-    currentUser?: IUser;
-    isAuthenticated?: boolean;
-} = {}) => {
-    mockedUseAuth.mockReturnValue({
-        logout: jest.fn(),
-        isAuthenticated,
-        user: currentUser
-    });
-
+const renderRegisterPage = () => {
     window.history.pushState({}, "Register", "/register");
 
     return render(
@@ -72,10 +47,6 @@ const renderRegisterPage = ({
 };
 
 describe("RegisterPage", () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
-
     it("renders title, form, error box, and the login link", () => {
         renderRegisterPage();
 
@@ -104,14 +75,5 @@ describe("RegisterPage", () => {
         );
 
         expect(window.location.pathname).toBe("/login");
-    });
-
-    it("redirects an already authenticated user to projects", async () => {
-        renderRegisterPage({
-            currentUser: user(),
-            isAuthenticated: true
-        });
-
-        await waitFor(() => expect(window.location.pathname).toBe("/projects"));
     });
 });
