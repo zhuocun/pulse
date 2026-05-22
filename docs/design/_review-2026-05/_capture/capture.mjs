@@ -256,8 +256,20 @@ const handle = (url, method) => {
     return { status: 200, body: {} };
 };
 
-const installMocks = async (context) => {
+const installMocks = async (context, { authed = true } = {}) => {
     await context.route("**/api/v1/**", async (route, request) => {
+        const u = new URL(request.url());
+        const p = u.pathname.replace(/^\/api\/v1\//, "");
+        // For unauth pages, mock the session probe with 401 so the
+        // user stays on /login or /register without being redirected.
+        if (!authed && p === "users") {
+            await route.fulfill({
+                status: 401,
+                contentType: "application/json",
+                body: JSON.stringify({ error: "Not authenticated" })
+            });
+            return;
+        }
         const r = handle(request.url(), request.method());
         await route.fulfill({
             status: r.status,
@@ -265,19 +277,10 @@ const installMocks = async (context) => {
             body: JSON.stringify(r.body)
         });
     });
-    // Block analytics and any external host (allow fonts.googleapis)
-    await context.route("**/*", async (route, request) => {
-        const url = request.url();
-        if (url.startsWith("http://localhost:3000") || url.startsWith("data:")) {
-            await route.continue();
-            return;
-        }
-        if (url.includes("fonts.googleapis") || url.includes("gstatic")) {
-            await route.continue();
-            return;
-        }
-        await route.fulfill({ status: 200, contentType: "text/plain", body: "" });
-    });
+    // Stub external font requests so cert errors don't slow us down
+    await context.route(/https:\/\/(fonts\.|cdn\.|api\.)/, (route) =>
+        route.fulfill({ status: 200, contentType: "text/plain", body: "" })
+    );
 };
 
 const setColorScheme = async (page, scheme) => {
@@ -318,6 +321,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const safeShot = async (page, name) => {
     const filePath = path.join(SHOTS_DIR, `${name}.png`);
     try {
+        // The app sets `body { overflow-y: auto }` (a side-effect of
+        // overflow-x: hidden on body), so the document scroller is body,
+        // not <html>. fullPage screenshots use documentElement.scrollHeight
+        // (== viewport height here), which clips content. Resize the
+        // viewport tall enough to render everything, take the shot, then
+        // restore.
+        const measure = await page.evaluate(() => ({
+            bodyHeight: document.body.scrollHeight,
+            innerHeight: window.innerHeight,
+            innerWidth: window.innerWidth
+        }));
+        const ts = Math.min(Math.max(measure.bodyHeight, measure.innerHeight), 6000);
+        if (ts > measure.innerHeight + 8) {
+            await page.setViewportSize({ width: measure.innerWidth, height: ts });
+            await page.waitForTimeout(200);
+        }
         await page.screenshot({
             path: filePath,
             fullPage: true,
@@ -403,25 +422,27 @@ const run = async () => {
                 : undefined
         };
         const context = await browser.newContext(contextOptions);
-        await seedAuth(context);
+        const isAuthedScenario = !!hook && hook.startsWith("auth");
+        if (isAuthedScenario) await seedAuth(context);
         await seedColorScheme(context, scheme);
-        await installMocks(context);
+        await installMocks(context, { authed: isAuthedScenario });
         const page = await context.newPage();
         page.on("console", (m) => {
-            if (m.type() === "error" || m.type() === "warning") {
-                // console.log("    >", m.type(), m.text().slice(0, 160));
-            }
+            // silence
         });
         await setColorScheme(page, scheme);
 
-        const url = `${BASE_URL}${urlPath}`;
+        const isAuthHook = !!hook && hook.startsWith("auth");
+        const initialUrl = isAuthHook
+            ? `${BASE_URL}/login`
+            : `${BASE_URL}${urlPath}`;
         try {
-            await page.goto(url, {
+            await page.goto(initialUrl, {
                 waitUntil: "domcontentloaded",
-                timeout: 15000
+                timeout: 20000
             });
-            await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-            // Wait for the AuthProvider spinner to clear (cached `users`).
+            await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+            // Wait for the spinner to clear.
             await page.waitForFunction(
                 () => {
                     const status = document.querySelectorAll('[role="status"]');
@@ -435,9 +456,45 @@ const run = async () => {
                     }
                     return true;
                 },
-                { timeout: 8000 }
+                { timeout: 12000 }
             ).catch(() => {});
             await sleep(800);
+
+            // For authed routes: SPA-navigate via react-router (we
+            // hit /login first to warm the cache and authenticate, then
+            // change the URL using history.pushState which react-router
+            // 7 picks up automatically via the BrowserRouter listener).
+            if (isAuthHook && urlPath !== "/projects" && urlPath !== "/login") {
+                try {
+                    // Use react-router's navigation via a synthetic click
+                    // on the Pulse brand mark which is itself a NavLink.
+                    // Fall back to history.pushState + popstate.
+                    await page.evaluate((u) => {
+                        // BrowserRouter listens to popstate, but pushState
+                        // alone does not fire popstate. Use replaceState +
+                        // dispatch a synthetic event that's the convention.
+                        window.history.pushState({}, "", u);
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                    }, urlPath);
+                    await sleep(2000);
+                    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+                    await page.waitForFunction(() => {
+                        const status = document.querySelectorAll('[role="status"]');
+                        for (const el of status) {
+                            if (
+                                el.textContent &&
+                                el.textContent.toLowerCase().includes("loading")
+                            ) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }, { timeout: 8000 }).catch(() => {});
+                    await sleep(800);
+                } catch (e) {
+                    console.log("    spa-nav failed:", e.message);
+                }
+            }
 
             if (hook === "auth-then-create") {
                 // Click "Create project" CTA
