@@ -12,6 +12,7 @@ import {
     BACKEND_URL,
     REQUEST_HOP_HEADERS,
     RESPONSE_HOP_HEADERS,
+    buildBackendTarget,
     buildOutgoingHeaders,
     buildOutgoingHeadersFromWeb,
     copyUpstreamHeaders,
@@ -123,6 +124,34 @@ describe("api proxy header policy", () => {
     });
 });
 
+describe("api proxy backend target normalization", () => {
+    it("targets the backend's trailing-slash users route without relaying a 307", () => {
+        expect(buildBackendTarget("/api/v1/users")).toBe(
+            `${BACKEND_URL}/api/v1/users/`
+        );
+    });
+
+    it("drops Vercel's rewrite path query while preserving real query params", () => {
+        expect(
+            buildBackendTarget(
+                "/api/v1/projects?projectId=p1&path=v1%2Fprojects"
+            )
+        ).toBe(`${BACKEND_URL}/api/v1/projects/?projectId=p1`);
+    });
+
+    it("reconstructs the API path if Vercel exposes only the rewritten /api URL", () => {
+        expect(buildBackendTarget("/api?path=v1%2Fusers")).toBe(
+            `${BACKEND_URL}/api/v1/users/`
+        );
+    });
+
+    it("keeps non-route path query params intact", () => {
+        expect(buildBackendTarget("/api/v1/agents?path=v1%2Fprojects")).toBe(
+            `${BACKEND_URL}/api/v1/agents?path=v1%2Fprojects`
+        );
+    });
+});
+
 describe("api proxy response header policy", () => {
     it("relays Set-Cookie response headers as a multi-value array", () => {
         const upstream = new Headers();
@@ -199,7 +228,7 @@ describe("api proxy request lifecycle", () => {
 
         expect(mockFetch).toHaveBeenCalledTimes(1);
         const [target, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-        expect(target).toBe(`${BACKEND_URL}/api/v1/projects?projectId=p1`);
+        expect(target).toBe(`${BACKEND_URL}/api/v1/projects/?projectId=p1`);
         expect(init.method).toBe("GET");
         expect(init.body).toBeUndefined();
     });
