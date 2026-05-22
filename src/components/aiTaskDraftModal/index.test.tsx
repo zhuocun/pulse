@@ -91,11 +91,13 @@ describe("AiTaskDraftModal", () => {
         fetchMock.mockRestore();
     });
 
-    it("caps the modal body height with env(keyboard-inset-height) so the footer stays above the iOS soft keyboard", async () => {
-        // Regression for QW-18 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+    it("caps the modal body height with env(keyboard-inset-height) AND clamps it via max() so landscape + keyboard cannot produce a negative max-height (Bug 6)", async () => {
+        // Regression for QW-18 + Bug 6 (docs/design/ui-ux-comprehensive-review-2026-05.md).
         // The Modal body's inline style must subtract
         // `env(keyboard-inset-height, 0px)` so the footer cannot drop
-        // below the viewport when the iOS software keyboard rises.
+        // below the viewport when the iOS software keyboard rises, and
+        // wrap the calc in `max(80px, …)` so the result cannot collapse
+        // to a negative max-height in landscape orientation.
         mountModal();
         const dialog = await screen.findByRole("dialog");
         const body = dialog.querySelector(
@@ -103,6 +105,7 @@ describe("AiTaskDraftModal", () => {
         ) as HTMLElement | null;
         expect(body).not.toBeNull();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
+        expect(body!.style.maxHeight).toMatch(/max\(/);
     });
 
     it("disables the Draft button until a prompt is entered", async () => {

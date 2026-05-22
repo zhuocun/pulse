@@ -152,9 +152,16 @@ const ProjectModal: React.FC = () => {
                      * `0px` on browsers without the env variable so the
                      * desktop layout is unchanged. See QW-18 in
                      * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                     *
+                     * The `max(80px, …)` wrapper clamps the result so the
+                     * body never collapses to a negative height in
+                     * landscape orientation with the keyboard up — a
+                     * 375 × 667 device in landscape reports `100dvh` ≈
+                     * 375 px and a ~260 px keyboard inset would otherwise
+                     * subtract past zero (Bug 6).
                      */
                     maxHeight:
-                        "calc(100dvh - 220px - env(keyboard-inset-height, 0px))",
+                        "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
                     overflowY: "auto"
                 }
             }}

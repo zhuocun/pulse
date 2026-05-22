@@ -443,10 +443,20 @@ const TaskModal: React.FC<{
                      * subtraction keeps the footer above the iOS soft
                      * keyboard when it opens — see QW-18 in
                      * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                     *
+                     * The phone branch wraps the calc in `max(80px, …)` so
+                     * the maxHeight never goes negative on landscape
+                     * orientation when the keyboard is up — a 375 × 667
+                     * iPhone in landscape with `interactive-widget=resizes-
+                     * content` reports `100dvh` ≈ 375 px, then the 320 px
+                     * chrome reserve plus a ~260 px keyboard inset would
+                     * push the result well past zero and collapse the
+                     * modal body. The 80 px floor leaves at least a sliver
+                     * of scrollable content in pathological cases (Bug 6).
                      */
                     maxHeight: screens.sm
                         ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
-                        : "calc(100dvh - 320px - env(keyboard-inset-height, 0px))",
+                        : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
                     overflowY: "auto"
                 }
             }}

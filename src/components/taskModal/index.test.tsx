@@ -615,12 +615,15 @@ describe("TaskModal", () => {
         expect(store.getState().overlays.editingTaskId).toBe("task-1");
     });
 
-    it("caps the modal body height with env(keyboard-inset-height) so the footer stays above the iOS soft keyboard", async () => {
-        // Regression for QW-18 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+    it("caps the modal body height with env(keyboard-inset-height) AND clamps it via max() so landscape + keyboard cannot produce a negative max-height (Bug 6)", async () => {
+        // Regression for QW-18 + Bug 6 (docs/design/ui-ux-comprehensive-review-2026-05.md).
         // The Modal body's inline style must subtract `env(keyboard-inset-height, 0px)`
         // so the footer (Save / Cancel / Delete) cannot fall below the
         // viewport when the iOS software keyboard pushes itself up
-        // through `interactive-widget=resizes-content`.
+        // through `interactive-widget=resizes-content`. The phone branch
+        // additionally wraps the calc in `max(80px, …)` so a 375 × 667
+        // device in landscape with the keyboard up cannot collapse the
+        // modal body to a negative max-height.
         renderModal();
 
         const dialog = await screen.findByRole("dialog");
@@ -629,6 +632,7 @@ describe("TaskModal", () => {
         ) as HTMLElement | null;
         expect(body).not.toBeNull();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
+        expect(body!.style.maxHeight).toMatch(/max\(/);
     });
 
     it("stacks the phone footer Delete → Cancel → Save so the primary lands in the thumb zone", async () => {
