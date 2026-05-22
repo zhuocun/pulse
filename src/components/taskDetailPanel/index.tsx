@@ -614,6 +614,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 }
             }}
             data-testid="task-detail-panel"
+            data-placement={drawerProps.placement}
         >
             <div style={{ position: "relative", width: "100%" }}>
                 {awaitingTaskResolution ? (
