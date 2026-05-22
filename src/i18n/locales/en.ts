@@ -426,6 +426,23 @@ export const enSource = {
             "Who has the most open tasks?",
             "Summarize this board"
         ] as readonly string[],
+        /*
+         * Contextual follow-up chips rendered after every assistant
+         * turn. The chat drawer chooses 2-3 from this group based on a
+         * deterministic keyword scan of `messages[lastUserIndex]`:
+         *   - mentions a due date / deadline → `riskFromDue`
+         *   - mentions a board member by username → `workOnPerson`
+         *   - otherwise the generic trio in `defaults`
+         */
+        followUpChips: {
+            riskFromDue: "Show what's at risk on this board",
+            workOnPerson: "What is {name} working on?",
+            defaults: [
+                "Summarize this board",
+                "What's blocked?",
+                "What changed today?"
+            ] as readonly string[]
+        },
         privacyTitle: "What Board Copilot sees",
         privacyDisclosure:
             "Board Copilot uses board and project names, columns, task names, types, story points, epics, notes when present, and member usernames, emails, or user IDs where needed.",

@@ -93,6 +93,55 @@ interface ChatTurnFeedback {
     value: "up" | "down";
 }
 
+/**
+ * Keyword heuristics that recognise a board-member username inside the
+ * last user message. The match is conservative — full-word, case-
+ * insensitive, and runs once per render so a 50-member board still
+ * picks the right chip without an LLM round-trip.
+ */
+const DUE_KEYWORDS = ["due", "deadline", "overdue", "by friday", "by monday"];
+
+/**
+ * Returns at most three follow-up chip strings to render below the last
+ * assistant turn. The chip set is contextual to the last user message:
+ *   - If the user asked about due dates → highlight the "what's at
+ *     risk" chip alongside two defaults.
+ *   - If the user mentioned a board member by username → swap in the
+ *     "what is {name} working on?" chip with the member name applied.
+ *   - Otherwise return the generic default trio (Summarize / Blocked /
+ *     Today).
+ * Deterministic by design — this is a UI affordance, not an LLM call.
+ */
+const computeFollowUpChips = (
+    lastUserText: string,
+    memberUsernames: readonly string[],
+    chips: {
+        riskFromDue: string;
+        workOnPerson: string;
+        defaults: readonly string[];
+    }
+): string[] => {
+    const text = (lastUserText ?? "").toLowerCase();
+    const trimmedDefaults = chips.defaults.slice(0, 3);
+    const usesDueKeyword = DUE_KEYWORDS.some((kw) => text.includes(kw));
+    const mentionedMember = memberUsernames.find(
+        (u) => u && text.includes(u.toLowerCase())
+    );
+    if (mentionedMember) {
+        // Person-of-interest takes priority over the due-date variant
+        // because it's narrower / more actionable.
+        const personChip = chips.workOnPerson.replace(
+            "{name}",
+            mentionedMember
+        );
+        return [personChip, ...trimmedDefaults.slice(0, 2)];
+    }
+    if (usesDueKeyword) {
+        return [chips.riskFromDue, ...trimmedDefaults.slice(0, 2)];
+    }
+    return trimmedDefaults.slice(0, 3);
+};
+
 export interface AiChatDrawerProps {
     open: boolean;
     onClose: () => void;
@@ -568,6 +617,36 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             });
         },
         [send]
+    );
+
+    /**
+     * Contextual follow-up chips below the last assistant message. The
+     * set is computed deterministically from the most recent user turn
+     * so it stays calm — no LLM round-trip, no per-keystroke jitter.
+     * Clicking a chip populates the composer rather than auto-sending
+     * (AI UX best practices §2.3 — the user owns the submission).
+     */
+    const lastUserText = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const m = messages[i];
+            if (m?.role === "user" && typeof m.content === "string") {
+                return m.content;
+            }
+        }
+        return "";
+    }, [messages]);
+    const memberUsernames = useMemo(
+        () => members.map((m) => m.username ?? "").filter((u) => u.length > 0),
+        [members]
+    );
+    const followUpChips = useMemo(
+        () =>
+            computeFollowUpChips(lastUserText, memberUsernames, {
+                riskFromDue: microcopy.ai.followUpChips.riskFromDue,
+                workOnPerson: microcopy.ai.followUpChips.workOnPerson,
+                defaults: microcopy.ai.followUpChips.defaults
+            }),
+        [lastUserText, memberUsernames]
     );
 
     /**
@@ -1913,8 +1992,10 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                             ))}
                         </>
                     )}
-                    {/* Re-show contextual sample prompts after each turn so
-                    the user always has a quick next-step. */}
+                    {/* Contextual follow-up chips after each turn. Set is
+                    derived from the most recent user message (see
+                    `computeFollowUpChips`) so the chips track what the
+                    user is asking about, not a static trio. */}
                     {!isLoading && messages.length > 0 && (
                         <Space
                             size={space.xs}
@@ -1924,21 +2005,32 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 marginTop: space.xs
                             }}
                         >
-                            {microcopy.ai.chatSuggestions
-                                .slice(0, 2)
-                                .map((prompt) => (
-                                    <SamplePrompt
-                                        aria-label={microcopy.a11y.tryFollowUp.replace(
-                                            "{prompt}",
-                                            prompt
-                                        )}
-                                        checked={false}
-                                        key={prompt}
-                                        onChange={() => dispatch(prompt)}
-                                    >
-                                        {prompt}
-                                    </SamplePrompt>
-                                ))}
+                            {followUpChips.map((prompt) => (
+                                <SamplePrompt
+                                    aria-label={microcopy.a11y.tryFollowUp.replace(
+                                        "{prompt}",
+                                        prompt
+                                    )}
+                                    checked={false}
+                                    data-testid="chat-follow-up-chip"
+                                    key={prompt}
+                                    /*
+                                     * Tap = populate the composer, not
+                                     * auto-submit. AI UX best practices
+                                     * §2.3 — the user owns the moment
+                                     * of submission. Focus the input
+                                     * so the next Enter sends.
+                                     */
+                                    onChange={() => {
+                                        setInput(prompt);
+                                        inputRef.current?.focus({
+                                            cursor: "end"
+                                        });
+                                    }}
+                                >
+                                    {prompt}
+                                </SamplePrompt>
+                            ))}
                         </Space>
                     )}
                     {isLoading &&

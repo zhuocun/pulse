@@ -396,6 +396,11 @@ const zhCN: Dictionary = {
             "谁的待办任务最多?",
             "总结一下这个看板"
         ],
+        followUpChips: {
+            riskFromDue: "看看这个看板上哪些任务有风险",
+            workOnPerson: "{name} 在做什么?",
+            defaults: ["总结这个看板", "有什么被阻塞?", "今天有哪些变化?"]
+        },
         privacyTitle: "看板 Copilot 可以看到的信息",
         privacyDisclosure:
             "看板 Copilot 使用看板和项目名称、列、任务名称、类型、故事点、史诗、备注(如有),以及成员的用户名、邮箱或必要的用户 ID。",

@@ -664,6 +664,82 @@ describe("AiChatDrawer", () => {
         expect(onUndoProposal).toHaveBeenCalledWith(proposal);
     });
 
+    it("renders the contextual 'at risk' follow-up chip after a question about due dates and clicking populates the composer", async () => {
+        // Seed a conversation that ends with a user turn mentioning a
+        // due date so the keyword heuristic picks the risk chip.
+        const history = [
+            { role: "user", content: "Which tasks are due this week?" },
+            { role: "assistant", content: "Two tasks are due Friday." }
+        ];
+        window.localStorage.setItem(
+            "copilot_history_p1",
+            JSON.stringify(history)
+        );
+        renderDrawer(true);
+        await waitFor(() => {
+            expect(
+                screen.getByText("Two tasks are due Friday.")
+            ).toBeInTheDocument();
+        });
+
+        // The keyword "due" routes the contextual heuristic to the
+        // "risk" chip. The chip's label is the user-visible prompt text.
+        const riskChipText = microcopy.ai.followUpChips
+            .riskFromDue as string;
+        const chip = screen.getByText(riskChipText);
+        expect(chip).toBeInTheDocument();
+
+        // Other default chips render alongside it (capped at 3).
+        const chipNodes = screen.getAllByTestId("chat-follow-up-chip");
+        expect(chipNodes.length).toBeGreaterThanOrEqual(2);
+        expect(chipNodes.length).toBeLessThanOrEqual(3);
+
+        // Click the risk chip — composer is populated, no auto-submit.
+        const input = screen.getByLabelText(
+            microcopy.a11y.messageBoardCopilot as string
+        ) as HTMLTextAreaElement;
+        expect(input.value).toBe("");
+        fireEvent.click(chip);
+        await waitFor(() => {
+            expect(input.value).toBe(riskChipText);
+        });
+        // No new turn was sent (transcript still has only the seeded
+        // user/assistant pair, plus the optional hint row from
+        // useAiChat). Specifically the risk chip text should NOT appear
+        // as a freshly-sent user bubble in the transcript.
+        const userBubbles = screen
+            .queryAllByText(riskChipText)
+            .filter((el) => el !== input);
+        expect(userBubbles.length).toBeLessThanOrEqual(1); // the chip itself
+    });
+
+    it("falls back to generic chips when the last user message has no recognisable keywords", async () => {
+        // The default trio (Summarize / Blocked / Today) wins when
+        // neither a person nor a due-date keyword is present.
+        const history = [
+            { role: "user", content: "How is the project going overall?" },
+            {
+                role: "assistant",
+                content: "Looks like steady progress on the board."
+            }
+        ];
+        window.localStorage.setItem(
+            "copilot_history_p1",
+            JSON.stringify(history)
+        );
+        renderDrawer(true);
+        await waitFor(() => {
+            expect(
+                screen.getByText(/Looks like steady progress/)
+            ).toBeInTheDocument();
+        });
+        const [firstDefault, secondDefault, thirdDefault] = microcopy.ai
+            .followUpChips.defaults as readonly string[];
+        expect(screen.getByText(firstDefault)).toBeInTheDocument();
+        expect(screen.getByText(secondDefault)).toBeInTheDocument();
+        expect(screen.getByText(thirdDefault)).toBeInTheDocument();
+    });
+
     it("hides the post-commit Undo when no onUndoProposal is supplied (preserves the existing fallback)", () => {
         // When the caller does not wire `onUndoProposal` the Undo button
         // is not rendered — same behaviour as before — so the change is
