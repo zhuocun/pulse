@@ -97,7 +97,40 @@ describe("SettingsPage", () => {
         expect(screen.queryByTestId("settings-row-ai")).not.toBeInTheDocument();
     });
 
-    it("toggles dark mode via the theme switch", () => {
+    /*
+     * The theme control is a 3-state Segmented (light / dark / system)
+     * so a user who flips to dark can return to "follow OS". The
+     * previous 2-state Switch dropped the system option entirely. We
+     * assert that:
+     *   1. All three options render.
+     *   2. Clicking another option calls setPreference with that value.
+     *   3. The user can return to `system` from any other state.
+     */
+    it("renders the 3-state theme Segmented control", () => {
+        mockedUseColorScheme.mockReturnValue({
+            preference: "system",
+            scheme: "light",
+            setPreference: jest.fn()
+        });
+        renderPage();
+        expect(
+            screen.getByRole("radio", {
+                name: microcopy.settings.themeLight
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("radio", {
+                name: microcopy.settings.themeDark
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("radio", {
+                name: microcopy.settings.themeSystem
+            })
+        ).toBeInTheDocument();
+    });
+
+    it("calls setPreference('dark') when the Dark option is picked", () => {
         const setPreference = jest.fn();
         mockedUseColorScheme.mockReturnValue({
             preference: "light",
@@ -105,11 +138,28 @@ describe("SettingsPage", () => {
             setPreference
         });
         renderPage();
-        const themeSwitch = screen.getByRole("switch", {
-            name: microcopy.settings.toggleDarkMode
+        const darkOption = screen.getByRole("radio", {
+            name: microcopy.settings.themeDark
         });
-        fireEvent.click(themeSwitch);
+        fireEvent.click(darkOption);
         expect(setPreference).toHaveBeenCalledWith("dark");
+    });
+
+    it("can return the user to the System (follow OS) preference", () => {
+        // Regression for the dropped 3rd state — once the user toggled
+        // away from `system` under the old Switch they couldn't return.
+        const setPreference = jest.fn();
+        mockedUseColorScheme.mockReturnValue({
+            preference: "dark",
+            scheme: "dark",
+            setPreference
+        });
+        renderPage();
+        const systemOption = screen.getByRole("radio", {
+            name: microcopy.settings.themeSystem
+        });
+        fireEvent.click(systemOption);
+        expect(setPreference).toHaveBeenCalledWith("system");
     });
 
     it("toggles AI enabled via the Board Copilot switch", () => {

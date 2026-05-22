@@ -1,6 +1,11 @@
-import { LogoutOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import {
+    DesktopOutlined,
+    LogoutOutlined,
+    MoonOutlined,
+    SunOutlined
+} from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Card, Space, Switch, Typography } from "antd";
+import { Button, Card, Segmented, Space, Switch, Typography } from "antd";
 
 import LanguageSwitcher from "../components/languageSwitcher";
 import PageContainer from "../components/pageContainer";
@@ -92,7 +97,11 @@ const SettingsPage = () => {
         enabled: aiEnabled,
         setEnabled: setAiEnabled
     } = useAiEnabled();
-    const { scheme, setPreference } = useColorScheme();
+    const {
+        preference: themePreference,
+        scheme,
+        setPreference
+    } = useColorScheme();
 
     return (
         <PageContainer>
@@ -107,15 +116,42 @@ const SettingsPage = () => {
                             ) : (
                                 <SunOutlined aria-hidden />
                             )}
-                            <RowText>{microcopy.settings.darkMode}</RowText>
+                            <RowText>{microcopy.settings.theme}</RowText>
                         </Space>
                     </RowLabel>
-                    <Switch
-                        aria-label={microcopy.settings.toggleDarkMode}
-                        checked={scheme === "dark"}
-                        onChange={(checked) =>
-                            setPreference(checked ? "dark" : "light")
+                    {/*
+                     * 3-state Segmented preserves the underlying
+                     * `useColorScheme()` contract (light / dark / system).
+                     * The previous 2-state Switch collapsed `system` to
+                     * either light or dark on toggle and left the user
+                     * no way back to "follow OS" once they touched it.
+                     * Aria-label stays on the wrapping group so screen
+                     * readers announce the control purpose; each item
+                     * carries its own visible label + icon.
+                     */}
+                    <Segmented
+                        aria-label={microcopy.settings.theme}
+                        options={[
+                            {
+                                label: microcopy.settings.themeLight,
+                                value: "light",
+                                icon: <SunOutlined aria-hidden />
+                            },
+                            {
+                                label: microcopy.settings.themeDark,
+                                value: "dark",
+                                icon: <MoonOutlined aria-hidden />
+                            },
+                            {
+                                label: microcopy.settings.themeSystem,
+                                value: "system",
+                                icon: <DesktopOutlined aria-hidden />
+                            }
+                        ]}
+                        onChange={(value) =>
+                            setPreference(value as "light" | "dark" | "system")
                         }
+                        value={themePreference}
                     />
                 </Row>
                 <Row data-testid="settings-row-language">
