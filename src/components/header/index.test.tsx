@@ -43,7 +43,8 @@ jest.mock("../../constants/env", () => ({
         apiBaseUrl: "/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        bottomNavEnabled: true
     }
 }));
 
@@ -374,6 +375,7 @@ describe("Header", () => {
                 aiBaseUrl: string;
                 aiEnabled: boolean;
                 aiUseLocalEngine: boolean;
+                bottomNavEnabled: boolean;
             };
         };
 
@@ -382,6 +384,7 @@ describe("Header", () => {
             envMod.default.aiEnabled = true;
             envMod.default.aiUseLocalEngine = true;
             envMod.default.aiBaseUrl = "";
+            envMod.default.bottomNavEnabled = true;
         });
 
         it("does not render the health badge when the local engine is active", () => {
@@ -411,6 +414,80 @@ describe("Header", () => {
                     name: /AI backend is slow \(degraded\)/i
                 })
             ).toBeInTheDocument();
+        });
+    });
+
+    /*
+     * Phase 3 A3 — phone demotion. The right-cluster account + theme
+     * cluster is wrapped in `<HiddenWhenDemoted $demoted={bottomNavEnabled}>`,
+     * which emits an `@media (pointer: coarse) { display: none; }`
+     * rule when the flag is on. We can't observe matchMedia in jsdom,
+     * but we can walk the stylesheet, find the styled-emotion class
+     * applied to the wrapper, and assert the rule is emitted (vs the
+     * fallback flag-off branch which emits no rule at all).
+     */
+    describe("phone demotion (flag-gated)", () => {
+        const envMod = jest.requireMock("../../constants/env") as {
+            default: {
+                apiBaseUrl: string;
+                aiBaseUrl: string;
+                aiEnabled: boolean;
+                aiUseLocalEngine: boolean;
+                bottomNavEnabled: boolean;
+            };
+        };
+
+        afterEach(() => {
+            envMod.default.bottomNavEnabled = true;
+        });
+
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it("emits a coarse-pointer hide rule for the demoted right-cluster when the flag is on", () => {
+            envMod.default.bottomNavEnabled = true;
+            renderHeader();
+            // The styled `HiddenWhenDemoted` $demoted=true branch
+            // inserts the `@media (pointer: coarse) { display: none; }`
+            // rule into the document's stylesheet. Anchor on the
+            // unmistakable selector text. Note: emotion shares the
+            // stylesheet across tests in the same module, so the
+            // negative case (no rule) can't be reliably asserted here
+            // — covered instead in the MainLayout test which observes
+            // the dependent BottomTabBar mount.
+            expect(sheetText()).toMatch(
+                /@media \(pointer: coarse\)[^}]*display:\s*none/i
+            );
+        });
+
+        it("wraps both the theme button and the account dropdown in the demotion span", () => {
+            renderHeader();
+            const themeButton = screen.getByRole("button", {
+                name: /switch to (dark|light) mode/i
+            });
+            const account = screen.getByRole("button", {
+                name: /account menu for alice/i
+            });
+            // Each control is wrapped in a `<HiddenWhenDemoted>` span;
+            // the nearest <span> ancestor is the demotion wrapper. We
+            // assert both have one (i.e., the JSX shape did not regress
+            // back to bare buttons inside RightCluster).
+            const themeSpan = themeButton.closest("span");
+            const accountSpan = account.closest("span");
+            expect(themeSpan).not.toBeNull();
+            expect(accountSpan).not.toBeNull();
         });
     });
 });

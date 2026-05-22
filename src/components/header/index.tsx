@@ -238,6 +238,23 @@ const HiddenOnTiny = styled.span`
 `;
 
 /**
+ * Phone-demotion wrapper (Phase 3 A3). When the bottom-tab chassis
+ * is enabled, the right-cluster account / settings dropdown collapses
+ * to nothing on coarse-pointer viewports — those controls now live on
+ * the routed Settings page reachable from the bottom-tab Profile
+ * entry. Desktop / mouse users keep the dropdown untouched.
+ *
+ * We prefer `display: none` over conditional rendering so the JSX
+ * shape stays identical across viewports — any consumer that mocks
+ * matchMedia in a test can still find the controls in the DOM tree
+ * if they query a non-visible scope.
+ */
+const HiddenWhenDemoted = styled.span<{ $demoted: boolean }>`
+    ${(props) =>
+        props.$demoted ? "@media (pointer: coarse) { display: none; }" : ""}
+`;
+
+/**
  * Small status dot that appears only when the AI backend is `degraded` or
  * `offline`. Hidden when the local engine is active or AI is disabled — no
  * point polling a server the FE doesn't use.
@@ -457,56 +474,70 @@ const Header: React.FC = () => {
                 {environment.aiEnabled && !environment.aiUseLocalEngine && (
                     <AgentHealthBadge />
                 )}
-                <IconButton
-                    aria-label={
-                        scheme === "dark"
-                            ? microcopy.a11y.useLightMode
-                            : microcopy.a11y.useDarkMode
-                    }
-                    onClick={() =>
-                        setPreference(scheme === "dark" ? "light" : "dark")
-                    }
-                    type="button"
-                >
-                    {scheme === "dark" ? (
-                        <SunOutlined aria-hidden />
-                    ) : (
-                        <MoonOutlined aria-hidden />
-                    )}
-                </IconButton>
-                <Dropdown menu={{ items }} trigger={["click"]}>
-                    <PillTrigger
-                        aria-label={microcopy.a11y.accountMenuFor.replace(
-                            "{name}",
-                            user?.username ?? ""
-                        )}
-                        onClick={(event) => event.preventDefault()}
+                {/*
+                 * Phone-demotion wrapper. With the bottom-tab chassis
+                 * active (Phase 3 A3, flag default ON), theme + account
+                 * controls move to the routed Settings page reachable
+                 * from the Profile tab. The right-cluster collapses to
+                 * just the EngineModeTag + AgentHealthBadge on phones.
+                 * Desktop / coarse-disabled builds keep the controls
+                 * inline as before — the flag falls back to the legacy
+                 * chrome with one env var.
+                 */}
+                <HiddenWhenDemoted $demoted={environment.bottomNavEnabled}>
+                    <IconButton
+                        aria-label={
+                            scheme === "dark"
+                                ? microcopy.a11y.useLightMode
+                                : microcopy.a11y.useDarkMode
+                        }
+                        onClick={() =>
+                            setPreference(scheme === "dark" ? "light" : "dark")
+                        }
                         type="button"
                     >
-                        <UserAvatar
-                            id={user?._id ?? user?.username ?? "anon"}
-                            name={user?.username}
-                            size="small"
-                        />
-                        <HiddenOnTiny>
-                            <Greeting>
-                                {microcopy.greeting.replace(
-                                    "{name}",
-                                    user?.username ?? ""
-                                )}
-                            </Greeting>
-                        </HiddenOnTiny>
-                        <HiddenOnNarrow>
-                            <DownOutlined
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-                                    fontSize: 10
-                                }}
+                        {scheme === "dark" ? (
+                            <SunOutlined aria-hidden />
+                        ) : (
+                            <MoonOutlined aria-hidden />
+                        )}
+                    </IconButton>
+                </HiddenWhenDemoted>
+                <HiddenWhenDemoted $demoted={environment.bottomNavEnabled}>
+                    <Dropdown menu={{ items }} trigger={["click"]}>
+                        <PillTrigger
+                            aria-label={microcopy.a11y.accountMenuFor.replace(
+                                "{name}",
+                                user?.username ?? ""
+                            )}
+                            onClick={(event) => event.preventDefault()}
+                            type="button"
+                        >
+                            <UserAvatar
+                                id={user?._id ?? user?.username ?? "anon"}
+                                name={user?.username}
+                                size="small"
                             />
-                        </HiddenOnNarrow>
-                    </PillTrigger>
-                </Dropdown>
+                            <HiddenOnTiny>
+                                <Greeting>
+                                    {microcopy.greeting.replace(
+                                        "{name}",
+                                        user?.username ?? ""
+                                    )}
+                                </Greeting>
+                            </HiddenOnTiny>
+                            <HiddenOnNarrow>
+                                <DownOutlined
+                                    aria-hidden
+                                    style={{
+                                        color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+                                        fontSize: 10
+                                    }}
+                                />
+                            </HiddenOnNarrow>
+                        </PillTrigger>
+                    </Dropdown>
+                </HiddenWhenDemoted>
             </RightCluster>
         </PageHeader>
     );
