@@ -66,7 +66,6 @@ const CtaGrid = styled.div`
 const CtaCard = styled(Card)`
     && {
         border-radius: ${radius.lg}px;
-        cursor: pointer;
         transition: border-color 160ms ease-out;
     }
 
@@ -74,8 +73,13 @@ const CtaCard = styled(Card)`
         padding: ${space.lg}px;
     }
 
-    &&:hover,
-    &&:focus-visible {
+    /*
+     * Hover highlights the card boundary as a visual cue that there's
+     * an interactive control inside; the inner Button is the actual
+     * click target. The cursor stays default (no pointer lie) since
+     * the bare card surface is no longer clickable.
+     */
+    &&:hover {
         border-color: ${accent.border};
     }
 
@@ -160,21 +164,25 @@ const CopilotLandingPage = () => {
             </PageHeading>
             <PageSubtitle>{microcopy.copilotLanding.subtitle}</PageSubtitle>
             <CtaGrid>
-                <CtaCard
-                    data-testid="copilot-landing-ask"
-                    hoverable
-                    onClick={goToAsk}
-                >
+                {/*
+                 * The CTA cards' inner `<Button>` is the canonical
+                 * click target so the action is keyboard-reachable
+                 * (Enter / Space) and announced by AT. The previous
+                 * implementation also wired `onClick` to the outer
+                 * Card, which only fired on mouse — keyboard users
+                 * could focus the Button but the outer mouse-only
+                 * target meant the visual "hoverable" affordance
+                 * lied about its accessibility. Drop the outer
+                 * onClick and rely on the Button alone.
+                 */}
+                <CtaCard data-testid="copilot-landing-ask" hoverable>
                     <CtaTitle>{microcopy.copilotLanding.askTitle}</CtaTitle>
                     <CtaDescription>
                         {microcopy.copilotLanding.askDescription}
                     </CtaDescription>
                     <Button
                         block
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            goToAsk();
-                        }}
+                        onClick={goToAsk}
                         size="large"
                         style={{ marginTop: space.md }}
                         type="primary"
@@ -182,21 +190,14 @@ const CopilotLandingPage = () => {
                         {microcopy.copilotLanding.askTitle}
                     </Button>
                 </CtaCard>
-                <CtaCard
-                    data-testid="copilot-landing-brief"
-                    hoverable
-                    onClick={goToBrief}
-                >
+                <CtaCard data-testid="copilot-landing-brief" hoverable>
                     <CtaTitle>{microcopy.copilotLanding.briefTitle}</CtaTitle>
                     <CtaDescription>
                         {microcopy.copilotLanding.briefDescription}
                     </CtaDescription>
                     <Button
                         block
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            goToBrief();
-                        }}
+                        onClick={goToBrief}
                         size="large"
                         style={{ marginTop: space.md }}
                     >

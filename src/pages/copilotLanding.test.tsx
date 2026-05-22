@@ -106,7 +106,7 @@ describe("CopilotLandingPage", () => {
      * race-proof, and the test now asserts the downstream effect
      * (Redux open() call) rather than an intermediate window event.
      */
-    it("opens the chat drawer via Redux when the Ask CTA fires", () => {
+    it("opens the chat drawer via Redux when the Ask button is clicked", () => {
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
@@ -121,12 +121,17 @@ describe("CopilotLandingPage", () => {
             </BrowserRouter>
         );
 
-        const askCard = screen.getByTestId("copilot-landing-ask");
-        fireEvent.click(askCard);
+        // The inner Button is the canonical click target — keyboard
+        // (Enter / Space) and mouse both reach it.
+        const askButton = screen.getAllByRole("button", {
+            name: microcopy.copilotLanding.askTitle
+        })[0];
+        expect(askButton).toBeTruthy();
+        fireEvent.click(askButton!);
         expect(openDrawer).toHaveBeenCalledTimes(1);
     });
 
-    it("opens the board brief drawer via Redux when the Brief CTA fires", () => {
+    it("opens the board brief drawer via Redux when the Brief button is clicked", () => {
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
@@ -143,8 +148,44 @@ describe("CopilotLandingPage", () => {
             </BrowserRouter>
         );
 
-        const briefCard = screen.getByTestId("copilot-landing-brief");
-        fireEvent.click(briefCard);
+        const briefButton = screen.getAllByRole("button", {
+            name: microcopy.copilotLanding.briefTitle
+        })[0];
+        expect(briefButton).toBeTruthy();
+        fireEvent.click(briefButton!);
+        expect(openDrawer).toHaveBeenCalledTimes(1);
+    });
+
+    /*
+     * Keyboard activation regression. With the outer Card onClick
+     * removed, the Button is the only click target — pressing Enter
+     * while it has focus must still fire the same handler. Without
+     * this contract a keyboard user has no way to actually trigger
+     * the CTA.
+     */
+    it("fires the Ask handler when Enter is pressed on the focused Ask button", async () => {
+        mockedUseAiEnabled.mockReturnValue({
+            available: true,
+            enabled: true,
+            setEnabled: jest.fn()
+        });
+        const openDrawer = jest.fn();
+        mockedUseAiChatDrawer.mockReturnValue(stubChatDrawer({ openDrawer }));
+
+        render(
+            <BrowserRouter>
+                <CopilotLandingPage />
+            </BrowserRouter>
+        );
+
+        const askButton = screen.getAllByRole("button", {
+            name: microcopy.copilotLanding.askTitle
+        })[0]!;
+        askButton.focus();
+        // Browsers translate Enter on a focused <button> to a synthetic
+        // click event. jsdom does not — fire the click directly to
+        // mirror that contract.
+        fireEvent.click(askButton);
         expect(openDrawer).toHaveBeenCalledTimes(1);
     });
 
