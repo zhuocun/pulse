@@ -133,6 +133,16 @@ export interface AiChatDrawerProps {
      */
     onRejectProposal?: (proposal: MutationProposal) => void;
     /**
+     * Called when the user clicks post-commit Undo on a
+     * `MutationProposalCard` (i.e. after the 10-second countdown has
+     * fired `onAccept`). Owners route this to whatever backend reversal
+     * endpoint the workspace supports. When omitted the card's
+     * post-commit Undo button is not rendered — same fallback as before,
+     * but now the chat surface no longer *strips* the escape hatch from
+     * proposals that advertise `undoable: true`.
+     */
+    onUndoProposal?: (proposal: MutationProposal) => void;
+    /**
      * Called when the user clicks the primary CTA on a NudgeCard. Owners
      * navigate or kick off a follow-up agent run.
      */
@@ -165,6 +175,7 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
     pendingNudges,
     onAcceptProposal,
     onRejectProposal,
+    onUndoProposal,
     onActionNudge,
     onDismissNudge
 }) => {
@@ -1877,6 +1888,11 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                                 }
                                 onReject={() =>
                                     handleRejectProposal(visibleProposal)
+                                }
+                                onUndo={
+                                    onUndoProposal
+                                        ? () => onUndoProposal(visibleProposal)
+                                        : undefined
                                 }
                                 proposal={visibleProposal}
                             />

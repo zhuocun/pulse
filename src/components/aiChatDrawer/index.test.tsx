@@ -103,6 +103,7 @@ const renderDrawer = (
         pendingNudges?: TriageNudge[];
         onAcceptProposal?: (proposal: MutationProposal) => void;
         onRejectProposal?: (proposal: MutationProposal) => void;
+        onUndoProposal?: (proposal: MutationProposal) => void;
         onActionNudge?: (nudge: TriageNudge) => void;
         onDismissNudge?: (nudge: TriageNudge) => void;
     } = {}
@@ -623,5 +624,63 @@ describe("AiChatDrawer", () => {
         });
         const hint = screen.getByTestId("chat-prompt-char-hint");
         expect(hint.className).toMatch(/warning/i);
+    });
+
+    it("wires onUndoProposal so the post-commit Undo button is reachable inside chat (regression for 04·F2)", () => {
+        // The chat drawer used to render the proposal card without an
+        // `onUndo` callback. As a result `MutationProposalCard`'s
+        // `showCommittedUndo` resolved to false even for proposals that
+        // advertise `undoable: true`, and the user lost the escape hatch.
+        // Wiring `onUndoProposal` re-surfaces the Undo button beside
+        // Cancel/Apply in the idle phase; clicking it fires the prop.
+        mockEnv.aiMutationProposalsEnabled = true;
+        const proposal: MutationProposal = {
+            proposal_id: "prop-undo",
+            description: "Reassign overdue tasks to Alice",
+            diff: {
+                task_updates: [
+                    {
+                        task_id: "t1",
+                        field: "coordinatorId",
+                        from: "m2",
+                        to: "m1"
+                    }
+                ]
+            },
+            risk: "low",
+            undoable: true
+        };
+        const onUndoProposal = jest.fn();
+        renderDrawer(true, {
+            pendingProposal: proposal,
+            onUndoProposal
+        });
+
+        const undoBtn = screen.getByRole("button", {
+            name: microcopy.mutation.undoAriaLabel as string
+        });
+        fireEvent.click(undoBtn);
+        expect(onUndoProposal).toHaveBeenCalledTimes(1);
+        expect(onUndoProposal).toHaveBeenCalledWith(proposal);
+    });
+
+    it("hides the post-commit Undo when no onUndoProposal is supplied (preserves the existing fallback)", () => {
+        // When the caller does not wire `onUndoProposal` the Undo button
+        // is not rendered — same behaviour as before — so the change is
+        // additive rather than a forced affordance.
+        mockEnv.aiMutationProposalsEnabled = true;
+        const proposal: MutationProposal = {
+            proposal_id: "prop-no-undo",
+            description: "Reassign overdue tasks to Alice",
+            diff: {},
+            risk: "low",
+            undoable: true
+        };
+        renderDrawer(true, { pendingProposal: proposal });
+        expect(
+            screen.queryByRole("button", {
+                name: microcopy.mutation.undoAriaLabel as string
+            })
+        ).not.toBeInTheDocument();
     });
 });
