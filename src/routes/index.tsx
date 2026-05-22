@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import {
     Navigate,
     Outlet,
@@ -9,7 +9,6 @@ import {
 } from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
-import { PageSpin } from "../components/status";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import AuthLayout from "../layouts/authLayout";
@@ -142,11 +141,10 @@ const NotFoundRoute = () => {
     );
 };
 
-const SuspenseShell = () => (
-    <Suspense fallback={<PageSpin />}>
-        <Outlet />
-    </Suspense>
-);
+// Thin root shell — the Suspense boundary has been moved into the
+// layout shells (mainLayout + authLayout) so the chrome stays mounted
+// while a lazy page chunk fetches (B-M6).
+const RootShell = () => <Outlet />;
 
 /**
  * Layout wrapper for `/projects/:projectId/board` and its sibling
@@ -215,7 +213,7 @@ const TaskDetailPanelRoute = () => {
 const routes = [
     {
         path: "/",
-        element: <SuspenseShell />,
+        element: <RootShell />,
         children: [
             { index: true, element: <RootRedirect /> },
             {
