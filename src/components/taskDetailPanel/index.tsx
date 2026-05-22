@@ -607,14 +607,25 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * columns" is a Phase 4 follow-up — for now the right drawer is
      * sufficient.
      */
+    /*
+     * AntD 6 deprecated the discrete `height`/`width` props on Drawer
+     * in favour of a single `size` prop (number | string | "default"
+     * | "large"). Both the bottom-sheet height and the right-drawer
+     * width flow through `size`; the `placement` prop disambiguates
+     * which axis it applies to. Phone: 92dvh leaves a visible sliver
+     * of the board behind the sheet so spatial orientation is
+     * preserved. Tablet+: 480 px is the figure A2 spec'd; we drop to
+     * 92vw on `sm`-width tablets in portrait so the panel doesn't
+     * exceed the screen.
+     */
     const drawerProps = isPhone
         ? {
               placement: "bottom" as const,
-              height: "92dvh"
+              size: "92dvh"
           }
         : {
               placement: "right" as const,
-              width: screens.md ? 480 : "92vw"
+              size: screens.md ? 480 : ("92vw" as string | number)
           };
 
     return (
