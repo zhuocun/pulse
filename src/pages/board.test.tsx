@@ -321,6 +321,26 @@ describe("BoardPage", () => {
         ).not.toBeChecked();
     });
 
+    it("mounts MemberPopover in the BoardActions row, surfacing team avatars when members are present (QW-12)", async () => {
+        renderBoard();
+        // Wait for the board to settle so members query resolves.
+        await screen.findByText("Roadmap board");
+
+        // The MemberPopover trigger advertises itself with the
+        // "View team members" aria-label and shows the count + initials of
+        // the first three members as a small avatar stack. With two
+        // members in fixture data we expect both Alice (A) and Bob (B)
+        // initials rendered inside the trigger button.
+        const trigger = await screen.findByRole("button", {
+            name: /view team members/i
+        });
+        await waitFor(() => {
+            expect(trigger.textContent).toContain("2");
+        });
+        expect(trigger.textContent).toContain("A");
+        expect(trigger.textContent).toContain("B");
+    });
+
     it("clears semanticIds from the URL when Project AI is off so the board is not stuck filtered", async () => {
         localStorage.setItem(
             "boardCopilot:disabledProjectIds",

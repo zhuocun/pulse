@@ -35,14 +35,6 @@ jest.mock("react-router", () => {
         useNavigate: jest.fn()
     };
 });
-jest.mock("../memberPopover", () => {
-    const React = require("react");
-
-    return {
-        __esModule: true,
-        default: () => React.createElement("span", null, "Members")
-    };
-});
 // Mock environment so tests control aiEnabled/aiUseLocalEngine independently
 // of whatever process.env happens to be set in CI/test.
 jest.mock("../../constants/env", () => ({
@@ -154,13 +146,18 @@ describe("Header", () => {
     const accountTrigger = () =>
         screen.getByRole("button", { name: /account menu for alice/i });
 
-    it("renders logo, member navigation, and the current user greeting", () => {
+    it("renders logo and the current user greeting", () => {
         renderHeader();
 
         expect(
             screen.getByRole("button", { name: /pulse home/i })
         ).toBeInTheDocument();
-        expect(screen.getByText("Members")).toBeInTheDocument();
+        // MemberPopover has moved off the global header (QW-12); it now
+        // lives on the board's BoardActions cluster where the project
+        // members are contextually relevant.
+        expect(
+            screen.queryByRole("button", { name: /view team members/i })
+        ).not.toBeInTheDocument();
         expect(accountTrigger()).toBeInTheDocument();
         expect(screen.getByText(/hi, alice/i)).toBeInTheDocument();
     });

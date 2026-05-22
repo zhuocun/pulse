@@ -20,7 +20,6 @@ import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import BrandMark from "../brandMark";
 import LanguageSwitcher from "../languageSwitcher";
-import MemberPopover from "../memberPopover";
 import { NoPaddingButton } from "../projectList";
 import UserAvatar from "../userAvatar";
 
@@ -447,7 +446,6 @@ const Header: React.FC = () => {
                 >
                     <BrandMark size="sm" />
                 </BrandLink>
-                <MemberPopover />
             </LeftCluster>
             <RightCluster>
                 {environment.aiEnabled && !environment.aiUseLocalEngine && (
