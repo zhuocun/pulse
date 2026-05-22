@@ -162,6 +162,20 @@ describe("Header", () => {
         expect(screen.getByText(/hi, alice/i)).toBeInTheDocument();
     });
 
+    it("hosts a single EngineModeTag in the app chrome when AI is enabled (Cross-cutting #8 dedup)", () => {
+        renderHeader();
+
+        // EngineModeTag renders an AntD Tag with the active engine label.
+        // The default test env has aiUseLocalEngine: true so the label is
+        // the local-engine microcopy. The dedup goal (Cross-cutting #8)
+        // is to mount this tag once in the app chrome and remove the
+        // copies in aiChatDrawer / boardBriefDrawer / aiSearchInput /
+        // aiTaskAssistPanel / aiTaskDraftModal headers — handoff to B2.
+        expect(
+            screen.getByText(microcopy.ai.processingModeLocalLabel)
+        ).toBeInTheDocument();
+    });
+
     /*
      * The logo is now a native-navigation trigger
      * (`window.location.assign("/projects")` — see `Header`). jsdom's

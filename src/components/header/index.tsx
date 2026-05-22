@@ -19,6 +19,7 @@ import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import BrandMark from "../brandMark";
+import EngineModeTag from "../engineModeTag";
 import LanguageSwitcher from "../languageSwitcher";
 import { NoPaddingButton } from "../projectList";
 import UserAvatar from "../userAvatar";
@@ -448,6 +449,11 @@ const Header: React.FC = () => {
                 </BrandLink>
             </LeftCluster>
             <RightCluster>
+                {environment.aiEnabled && (
+                    <HiddenOnNarrow>
+                        <EngineModeTag />
+                    </HiddenOnNarrow>
+                )}
                 {environment.aiEnabled && !environment.aiUseLocalEngine && (
                     <AgentHealthBadge />
                 )}
