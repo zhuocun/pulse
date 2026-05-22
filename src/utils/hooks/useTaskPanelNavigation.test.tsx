@@ -149,34 +149,46 @@ describe("useTaskPanelNavigation", () => {
         expect(getByTestId("path").textContent).toBe("/projects/p1/board");
     });
 
-    it("returns stable function identities across renders", () => {
-        const { ref, rerender } = renderHook();
-        const first = ref.current!;
+    it("returns stable function identities across re-renders of the SAME tree (B-T3)", () => {
+        // Capture every render's api ref so we can compare identities
+        // across re-renders within a single MemoryRouter mount. A bare
+        // wrapper `{ tick }` prop forces the Probe to re-render without
+        // remounting the tree, isolating the hook's `useCallback`
+        // identity claim.
+        const captured: ReturnType<typeof useTaskPanelNavigation>[] = [];
+        const Capture: React.FC<{ tick: number }> = ({ tick }) => {
+            const api = useTaskPanelNavigation();
+            captured.push(api);
+            void tick;
+            return null;
+        };
+        const { rerender } = render(
+            <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={<Capture tick={0} />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        );
         rerender(
             <MemoryRouter initialEntries={["/projects/p1/board"]}>
                 <Routes>
                     <Route
                         path="/projects/:projectId/board"
-                        element={
-                            <Probe
-                                onReady={(api) => {
-                                    ref.current = api;
-                                }}
-                            />
-                        }
+                        element={<Capture tick={1} />}
                     />
                 </Routes>
             </MemoryRouter>
         );
-        // useCallback dependencies are projectId + navigate; both stable
-        // across the same MemoryRouter, so the function identities are
-        // expected to be stable.
-        const second = ref.current!;
-        expect(typeof second.openTask).toBe("function");
-        expect(typeof second.closeTask).toBe("function");
-        // Identity equality is a stronger claim than functional
-        // equivalence — keep it loose since rerender re-mounts the
-        // tree.
-        expect(first.openTask).not.toBeUndefined();
+        expect(captured.length).toBeGreaterThanOrEqual(2);
+        const first = captured[0];
+        const last = captured[captured.length - 1];
+        // Referential identity holds across the rerender because both
+        // `useCallback` deps (currentProjectId + navigate) are stable
+        // within a single MemoryRouter instance.
+        expect(last.openTask).toBe(first.openTask);
+        expect(last.closeTask).toBe(first.closeTask);
     });
 });
