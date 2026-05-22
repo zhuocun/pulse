@@ -1,6 +1,6 @@
 import { Button } from "antd";
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
 import { PageSpin } from "../components/status";
@@ -60,8 +60,23 @@ const RootRedirect = () => {
  */
 const RequireAuth = () => {
     const { isAuthenticated } = useAuth();
+    const location = useLocation();
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        /*
+         * Forward the originally-requested location as router state so
+         * the login form can return the user to where they were
+         * heading (e.g. `/share?title=foo` from an external app's share
+         * sheet). Without this hint, every post-login navigate landed
+         * on `/projects` and dropped the share-target params on the
+         * floor.
+         */
+        return (
+            <Navigate
+                to="/login"
+                replace
+                state={{ from: location.pathname + location.search }}
+            />
+        );
     }
     return <MainLayout />;
 };

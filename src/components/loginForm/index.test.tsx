@@ -8,7 +8,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { message } from "antd";
-import { BrowserRouter } from "react-router-dom";
+import {
+    BrowserRouter,
+    MemoryRouter,
+    Route,
+    Routes,
+    useLocation
+} from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import useApi from "../../utils/hooks/useApi";
@@ -396,5 +402,89 @@ describe("LoginForm", () => {
         expect(
             screen.getByRole("link", { name: /^terms of service$/i })
         ).toHaveAttribute("href", "/auth/terms");
+    });
+
+    /*
+     * `RequireAuth` forwards the originally-requested path + search as
+     * router state when it redirects an unauthenticated visit to
+     * /login. The form must honor that hint so a user who hit /share
+     * (or any other protected route) returns there after auth instead
+     * of always landing on /projects. The probe route renders the
+     * resolved pathname + search so we can assert on a single text node.
+     */
+    it("returns the user to the forwarded `from` path after a successful login", async () => {
+        mutateAsync.mockResolvedValue(user());
+        api.mockResolvedValue(user());
+        mockedUseApi.mockReturnValue(
+            api as unknown as ReturnType<typeof useApi>
+        );
+        mockedUseReactMutation.mockReturnValue({
+            isLoading: false,
+            mutateAsync
+        } as unknown as ReturnType<typeof useReactMutation<IUser>>);
+
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                mutations: { retry: false },
+                queries: { retry: false }
+            }
+        });
+
+        // Read the router-resolved location (MemoryRouter does not sync
+        // `window.location`, so reading it from the hook is the only
+        // reliable signal).
+        const LocationProbe = () => {
+            const loc = useLocation();
+            return <div data-testid="probe">{loc.pathname + loc.search}</div>;
+        };
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter
+                    initialEntries={[
+                        {
+                            pathname: "/login",
+                            state: { from: "/share?title=foo" }
+                        }
+                    ]}
+                >
+                    <Routes>
+                        <Route
+                            path="/login"
+                            element={<LoginForm onError={jest.fn()} />}
+                        />
+                        <Route path="/share" element={<LocationProbe />} />
+                        <Route path="/projects" element={<LocationProbe />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(screen.getByTestId("probe").textContent).toBe(
+                "/share?title=foo"
+            );
+        });
+    });
+
+    it("falls back to /projects when no `from` hint is supplied", async () => {
+        // The default direct-login flow (user typed /login themselves)
+        // has no forwarded location state, so the navigate target stays
+        // at the legacy /projects landing surface.
+        mutateAsync.mockResolvedValue(user());
+        api.mockResolvedValue(user());
+        renderLoginForm();
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(window.location.pathname).toBe("/projects");
+        });
     });
 });
