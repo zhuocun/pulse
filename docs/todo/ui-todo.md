@@ -10,7 +10,7 @@
 - **Immediate — product UX (no GA code dependency):** **§20a** move autonomy into real Settings + drive allowed levels from `AgentMetadata.allowed_autonomy` once v3 contracts exist; ~~**§20b** extend `AiFeedbackPopover` parity to `AiTaskAssistPanel` / `BoardBriefDrawer`;~~ **[Complete on branch `(no branch)` (verify-feedback-parity verifier handoff recorded no git branch): `src/__tests__/aiCopilotSurfaceFeedback.strict.test.tsx`, `src/__tests__/aiAccessibility.strict.test.tsx`, `aiTaskAssistPanel`, `boardBriefDrawer`, `aiFeedbackPopover`, `microcopy.feedback.*` en/zh-CN — see §1.2 item 20b.]** Phase **1.4–1.5** typography + header brand token follow-through; Phase **3.3** contrast cleanup; **2.C** promote `eslint-plugin-jsx-a11y` to fail CI (`--max-warnings 0`) now that `frontend-ci.yml` runs ESLint.
 - **Later:** Phase **2** surface rebuilds (header IA, project list scale, board chrome consolidation), Storybook + `rollup-plugin-visualizer`, remaining Phase **3** motion/a11y debt, Phase **4** stretch items beyond the shipped command palette.
 
-This document is a critical review of the current `pulse` interface and a phased plan to bring it up to a polished, modern Jira-like product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
+This document is a critical review of the current `pulse` interface and a phased plan to bring it up to a polished, modern product. Each section starts with a concrete observation (what is in the code today) and ends with a recommendation. File references use `path:line` so each finding can be traced.
 
 The plan is intentionally pragmatic: Phase 1 ("Foundations") removes the worst structural debt that everything else inherits, Phase 2 ("Surfaces") rebuilds the high-traffic screens, Phase 3 ("Polish & Accessibility") hardens the experience, and Phase 4 ("Stretch") adds nice-to-have UX.
 
@@ -302,7 +302,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
    Click on the title to rename without opening the modal; press Esc to revert. Reuses the same mutation as the modal.
 
 6. **Sticky columns + horizontal mini-map.**
-   For boards with many columns, a thin overview strip at the top showing the user's current viewport — a known Jira-board affordance.
+   For boards with many columns, a thin overview strip at the top showing the user's current viewport — a known board affordance.
 
 7. **Reporting page (placeholder route).**
    Once the project detail tabs exist (Phase 2.5), reserve `/projects/:id/reports` for a future velocity / burndown chart.
@@ -464,7 +464,7 @@ To keep the design from drifting after these phases ship:
 
 - **Storybook** for every component in `src/components/**`. Each story documents `default`, `loading`, `empty`, `error`, `disabled`, and `with content overflow` states.
 - **Visual regression** via `@storybook/test-runner` + Playwright snapshots, run in CI on every PR.
-- **`jest-axe`** assertion in every page and modal test (`App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`, `aiTaskDraftModal/index.test.tsx`, etc.). The `jira-react-test-development` skill already targets 100 % coverage; the same gate enforces zero a11y violations. **[In place: 31 axe tests in `src/__tests__/aiAccessibility.strict.test.tsx` covering AiChatDrawer, AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput, NudgeCard, MutationProposalCard, CommandPalette, EngineModeTag, CitationChip, AiMatchStrengthBadge.]**
+- **`jest-axe`** assertion in every page and modal test (`App.test.tsx`, `board.test.tsx`, `project.test.tsx`, `taskModal/index.test.tsx`, `aiChatDrawer/index.test.tsx`, `aiTaskDraftModal/index.test.tsx`, etc.). The `react-test-development` skill already targets 100 % coverage; the same gate enforces zero a11y violations. **[In place: 31 axe tests in `src/__tests__/aiAccessibility.strict.test.tsx` covering AiChatDrawer, AiTaskAssistPanel, BoardBriefDrawer, AiTaskDraftModal, AiSearchInput, NudgeCard, MutationProposalCard, CommandPalette, EngineModeTag, CitationChip, AiMatchStrengthBadge.]**
 - **`eslint-plugin-jsx-a11y`** is installed and configured in `eslint.config.mjs`; promote warnings to **CI-blocking** failures (`--max-warnings 0` in `npm run eslint`) now that `.github/workflows/frontend-ci.yml` runs ESLint on FE changes (see [`release-todo.md`](release-todo.md) §7b).
 - **Design tokens documented** at `docs/design-tokens.md` (single source for spacing, color, type, motion). Storybook reads from the same module. **[Reference shipped 2026-05-10: `docs/design-tokens.md` → `src/theme/tokens.ts` / `src/theme/antdTheme.ts`. Storybook scaffolding remains open.]**
 - **Component contribution checklist** in `CONTRIBUTING.md`: passes a11y, ships story, supports keyboard, supports `prefers-reduced-motion`, has loading/empty/error states, ships tests.
@@ -493,7 +493,7 @@ The order below batches changes that share files so we do not churn the same are
 ## 4. Risks and dependencies
 
 - **AntD v6 token migration.** Removing the 62.5 % hack and inlining tokens will cause one round of pixel-level visual diffs. Tests that snapshot DOM are fine; tests that assert pixel sizes will need updating.
-- **Test coverage.** The repo carries a `jira-react-test-development` skill aiming for 100 % coverage. Each phase needs to keep the existing tests green and add tests for the new affordances (e.g. keyboard handlers on the new task card, `<Avatar>` rendering in the project list).
+- **Test coverage.** The repo carries a `react-test-development` skill aiming for 100 % coverage. Each phase needs to keep the existing tests green and add tests for the new affordances (e.g. keyboard handlers on the new task card, `<Avatar>` rendering in the project list).
 - **Board Copilot contract.** Phase 2.3's `Dropdown.Button` consolidation must not break the existing `aria-label` strings the AI tests rely on (`src/components/aiChatDrawer/index.tsx:96–106`, `src/components/aiTaskDraftModal/index.tsx:172–189`, `src/pages/board.tsx:111–151`). Keep the labels stable.
 - **Drag-and-drop keyboard support.** `@hello-pangea/dnd` already supports keyboard, but we have not wired any user-facing instructions; that is part of Phase 3.4 and should land alongside accessible task-card focus styles.
 - **Routing flash.** Phase 2.5 (project detail collapse) must preserve the existing `/projects/:projectId/board` URL — the navigation hook in `src/pages/projectDetail.tsx:45–49` redirects to `board`; the new tabbed shell needs to keep that redirect or the AI tests that mount the board route will fail.

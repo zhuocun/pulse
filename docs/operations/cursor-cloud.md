@@ -33,8 +33,8 @@ below was previously split between the root `AGENTS.md` and
 
 ## Backend (FastAPI)
 
-Product overview: FastAPI backend (Python 3.12) for the Jira-like
-project management app. Six LangGraph-based AI agents ship alongside
+Product overview: FastAPI backend (Python 3.12) for the project
+management app. Six LangGraph-based AI agents ship alongside
 standard CRUD routes. Default database is MongoDB; AI features use
 deterministic stubs when no LLM API key is set.
 

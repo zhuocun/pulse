@@ -2,7 +2,7 @@ import deleteProjectCallback from "./deleteProject";
 
 const project = (overrides: Partial<IProject> = {}): IProject => ({
     _id: "project-1",
-    projectName: "Jira clone",
+    projectName: "Pulse demo",
     managerId: "member-1",
     organization: "Product",
     createdAt: "2026-04-25T00:00:00.000Z",

@@ -230,7 +230,7 @@ def _build_draft_prompt(state: dict[str, Any]) -> str:
     return (
         COPILOT_IDENTITY
         + "\n\n"
-        + "You are drafting a Jira task card. Update only the eligible text "
+        + "You are drafting a task card. Update only the eligible text "
         "fields and return them in the structured schema. Keep taskName "
         "<=80 chars, note <=500 chars (plain text), rationale <=180 "
         "chars. Do not invent ids; do not change story points.\n\n"

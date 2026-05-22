@@ -287,7 +287,7 @@ explicit header that operators must rename `app` to their Fly.io
 application before deploy. `docs/operations/deployment.md` and
 `backend/README.md` call out the same rename requirement so the
 `cd backend && fly deploy` fallback path cannot silently inherit the
-pre-monorepo `jira-python-server` name.
+pre-monorepo Fly.io app name.
 
 ### ✅ 17. `BaseAgentState` carries static run-scoped data  *(BE — Resolved 2026-05-10)*
 

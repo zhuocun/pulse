@@ -25,7 +25,7 @@ Contributor reference for the app design system. **Implementation source of trut
 [`buildAntdTheme(mode, coarsePointer)`](../src/theme/antdTheme.ts) returns Ant Design v5+ `ThemeConfig`:
 
 - **`token` (global):** `colorPrimary` / link colors from `brand`; `colorSuccess` / `colorWarning` / `colorError` from `semantic`; `borderRadius*` from `radius`; `fontFamily` / `fontSize*` / `lineHeight*` from the typography exports; `motionDurationFast|Mid|Slow` from `motion.short|medium|long`; `controlHeight*` uses `touchTargetCoarse` when `coarsePointer` so small controls still meet touch targets.
-- **`components`:** Dense Jira-like tuning — e.g. `Button` padding uses `space`, `Modal` / `Card` / `Input` / `Select` / `Table` / `Tag` / `Tabs` / `Tooltip` / `Form` / `Alert` / `Popover` / `Dropdown` pull `space`, `radius`, `fontSize`, `fontWeight`, and mode-specific rgba strokes from the palette where needed.
+- **`components`:** Dense tuning — e.g. `Button` padding uses `space`, `Modal` / `Card` / `Input` / `Select` / `Table` / `Tag` / `Tabs` / `Tooltip` / `Form` / `Alert` / `Popover` / `Dropdown` pull `space`, `radius`, `fontSize`, `fontWeight`, and mode-specific rgba strokes from the palette where needed.
 
 `ConfigProvider` should receive the object from `buildAntdTheme`; see `src/utils/appProviders.tsx`.
 

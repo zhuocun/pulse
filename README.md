@@ -1,10 +1,10 @@
 # pulse
 
-`pulse` is a React-based front-end application for a Jira-like project management tool. This app provides a user-friendly interface for managing tasks, projects, and team collaborations.
+`pulse` is a React-based front-end application for a project management tool. This app provides a user-friendly interface for managing tasks, projects, and team collaborations.
 
 ## Monorepo layout
 
-This repository hosts both the React frontend and the Python (FastAPI) backend that previously lived in `zhuocun/jira-python-server`:
+This repository hosts both the React frontend and the Python (FastAPI) backend:
 
 - `/` — React + Vite frontend (this README, `package.json`, `src/`, `vite.config.ts`, root `vercel.json`).
 - `backend/` — FastAPI server (`backend/app`, `backend/api`, `backend/pyproject.toml`, `backend/Dockerfile`, `backend/fly.toml`, `backend/vercel.json`). See `backend/README.md` for backend-specific docs.

@@ -334,7 +334,7 @@ def _build_headline_prompt(state: dict[str, Any]) -> str:
         COPILOT_IDENTITY
         + "\n\n"
         + "Write a single-line, <=120-character standup headline for this "
-        "Jira-style board snapshot. Do not invent counts; only use the "
+        "board snapshot. Do not invent counts; only use the "
         "facts provided. Return JSON matching the schema. Facts (JSON):\n"
         + json.dumps(safe_facts)
     )

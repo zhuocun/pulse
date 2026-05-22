@@ -164,8 +164,8 @@ def _build_readiness_prompt(state: dict[str, Any]) -> str:
         COPILOT_IDENTITY
         + "\n\n"
         + "Rewrite the message and suggestion strings for each readiness "
-        "issue below so they are specific and actionable for this Jira-"
-        "style task draft. Keep each string <=160 chars and on a single "
+        "issue below so they are specific and actionable for this task "
+        "draft. Keep each string <=160 chars and on a single "
         "line. Preserve the field id verbatim; do not invent new fields. "
         "Return JSON matching the schema.\n\n"
         f"Draft: {json.dumps(safe_draft)}\n"

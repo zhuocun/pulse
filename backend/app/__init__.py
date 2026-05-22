@@ -1,1 +1,1 @@
-"""FastAPI implementation of the Jira-like server."""
+"""FastAPI backend for pulse."""

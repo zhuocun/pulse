@@ -253,7 +253,7 @@ def _build_search_prompt(state: dict[str, Any]) -> str:
     return (
         COPILOT_IDENTITY
         + "\n\n"
-        + "You are re-ranking search results for a Jira-style project tool. "
+        + "You are re-ranking search results for a project management tool. "
         "Pick up to 10 of the candidate ids that best match the query, "
         "ordered most to least relevant. Use only ids that appear in the "
         "candidate list; never invent new ids. Return JSON matching the "

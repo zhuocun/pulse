@@ -1,8 +1,8 @@
 # pulse — backend
 
-FastAPI port of `jira-express-server`. Six LangGraph-based AI agents
-ship alongside standard CRUD routes. Default database is MongoDB; AI
-features fall back to deterministic stubs when no LLM API key is set.
+FastAPI backend. Six LangGraph-based AI agents ship alongside standard
+CRUD routes. Default database is MongoDB; AI features fall back to
+deterministic stubs when no LLM API key is set.
 
 For the full HTTP reference (auth, projects, boards, tasks, AI v1
 shim, v2.1 agents SSE) see

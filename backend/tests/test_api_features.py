@@ -80,7 +80,7 @@ def create_project_board_and_task(
     response = client.post(
         "/api/v1/projects/",
         json={
-            "projectName": "Jira Python",
+            "projectName": "Pulse",
             "organization": "OpenAI",
             "managerId": user_id,
         },
@@ -190,10 +190,10 @@ def test_full_feature_flow(client: TestClient) -> None:
         headers=headers,
     )
     assert response.status_code == 200
-    assert response.json()["projectName"] == "Jira Python"
+    assert response.json()["projectName"] == "Pulse"
 
     response = client.get(
-        f"/api/v1/projects/?projectName=Jira Python&managerId={logged_in['_id']}",
+        f"/api/v1/projects/?projectName=Pulse&managerId={logged_in['_id']}",
         headers=headers,
     )
     assert response.status_code == 200
@@ -203,7 +203,7 @@ def test_full_feature_flow(client: TestClient) -> None:
         "/api/v1/projects/",
         json={
             "_id": ids["project_id"],
-            "projectName": "Jira Python API",
+            "projectName": "Pulse API",
             "organization": "OpenAI",
             "managerId": logged_in["_id"],
         },

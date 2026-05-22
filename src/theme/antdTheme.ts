@@ -21,7 +21,7 @@ import {
  * radii, and font-size match the rest of the app exactly.
  *
  * `algorithm` switches between light and dark; component overrides keep the
- * Jira-like compact density (small controls, dense tables) without losing the
+ * compact density (small controls, dense tables) without losing the
  * 24px minimum target size mandated by WCAG 2.5.8.
  */
 export const buildAntdTheme = (

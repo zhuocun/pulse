@@ -29,7 +29,7 @@ describe("filterRequest", () => {
 
     it("returns a new object without mutating the input", () => {
         const params = {
-            projectName: "Jira clone",
+            projectName: "Pulse demo",
             assigneeId: ""
         };
 
@@ -37,9 +37,9 @@ describe("filterRequest", () => {
 
         expect(result).not.toBe(params);
         expect(params).toEqual({
-            projectName: "Jira clone",
+            projectName: "Pulse demo",
             assigneeId: ""
         });
-        expect(result).toEqual({ projectName: "Jira clone" });
+        expect(result).toEqual({ projectName: "Pulse demo" });
     });
 });

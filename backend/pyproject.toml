@@ -1,7 +1,7 @@
 [project]
 name = "pulse-server"
 version = "0.1.0"
-description = "FastAPI port of jira-express-server"
+description = "Pulse FastAPI backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
