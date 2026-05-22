@@ -509,6 +509,107 @@ describe("TaskDetailPanel", () => {
         });
     });
 
+    it("keeps the panel open and surfaces the error when PUT fails (B-T1)", async () => {
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const method = (init as RequestInit | undefined)?.method;
+            if (method === "PUT") {
+                return {
+                    json: jest
+                        .fn()
+                        .mockResolvedValue({ error: "Save failed: boom" }),
+                    ok: false,
+                    status: 500
+                } as unknown as Response;
+            }
+            const body = url.includes("/tasks")
+                ? [task()]
+                : url.includes("/users/members")
+                  ? members
+                  : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+        const input = await screen.findByDisplayValue("Build task");
+        fireEvent.change(input, { target: { value: "Build task v2" } });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        // ErrorBox surfaces the rejection message; panel stays open.
+        expect(await screen.findByText(/save failed/i)).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("keeps the panel open and surfaces the error when DELETE fails (B-T1)", async () => {
+        const messageErrorSpy = jest
+            .spyOn(
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                require("antd").message,
+                "error"
+            )
+            .mockImplementation(() => undefined);
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                config.onOk?.();
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const method = (init as RequestInit | undefined)?.method;
+            if (method === "DELETE") {
+                return {
+                    json: jest
+                        .fn()
+                        .mockResolvedValue({ error: "Delete forbidden" }),
+                    ok: false,
+                    status: 403
+                } as unknown as Response;
+            }
+            const body = url.includes("/tasks")
+                ? [task()]
+                : url.includes("/users/members")
+                  ? members
+                  : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+        await screen.findByText(/edit task · build task/i);
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
+
+        // The DELETE failure path fires `message.error` — assert the
+        // spy was called and the panel stayed at the task route.
+        await waitFor(() => {
+            expect(messageErrorSpy).toHaveBeenCalled();
+        });
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+
+        confirmSpy.mockRestore();
+        messageErrorSpy.mockRestore();
+    });
+
     it("deep-links: rendering the panel route directly opens the panel on the board", async () => {
         // Equivalent to opening the URL in a fresh browser tab. The
         // initialEntries here is the panel route; the board layout
