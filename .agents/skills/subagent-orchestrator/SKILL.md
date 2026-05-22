@@ -1,0 +1,86 @@
+---
+name: subagent-orchestrator
+description: Orchestrates parallel subagents as the primary performers of research and implementation work.
+---
+
+# Subagent Orchestrator
+
+## Role
+
+Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, lookups, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb that work itself unless it is genuinely tiny or tightly coupled to the next local action.
+
+## Tier
+
+Pick a tier up front and keep it consistent across the task unless the user changes it. State the chosen tier in your first orchestration update.
+
+### standard (default)
+
+Subagents run on **mid-tier, non-best** models — faster and cheaper than the orchestrator. The orchestrator absorbs the quality premium; subagents handle bounded, well-scoped work where mid-tier quality is sufficient. Optimizes for parallel throughput and cost.
+
+### max
+
+Subagents run on **top-tier** models and may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
+
+### Selecting the tier
+
+- Default to **standard**.
+- Switch to **max** when the user explicitly asks for it ("max mode", "use the best models", "highest quality"), when the slash-command is invoked with a `max` argument, or when the task is large and integration-sensitive enough that mid-tier subagents would force costly rework.
+- A single subtask inside an otherwise-standard task may be individually promoted to max-tier configuration if it is integration-sensitive enough to warrant it; the rest of the task stays standard.
+
+## When to delegate
+
+Only delegate when the session or user authorizes subagents. If no subagent launcher exists, ignore this skill. If the platform exposes a faster-but-still-capable subagent option, prefer it when it does not hurt quality.
+
+When delegation is allowed, **subagents are the default executor**. Treat staying local as the exception. A task is worth delegating if any of these are true:
+
+- it spans more than one independent question or subsystem
+- it combines exploration with implementation, or implementation with verification
+- it is likely to take more than a few minutes
+- it has 2+ independent workstreams or 3+ distinct side subtasks
+
+Stay local only for genuinely tiny or tightly coupled work, and for the immediate blocking step whose result the next local action depends on.
+
+Prefer one subagent per distinct subtask. Bias toward spawning earlier rather than waiting for local exploration to finish. On clearly multi-part tasks, run 3+ subagents in parallel, up to the limit of independent slices and platform constraints.
+
+## Model selection
+
+Map the terminology to whatever the platform exposes — `model`, `subagent_type`, `reasoning_effort`, extended thinking / thinking budget, etc.
+
+**Always set these parameters explicitly on every subagent call.** Never accept the platform default: it can route to a forbidden tier, silently downgrade reasoning, or mirror the orchestrator's own config.
+
+Forbidden tier (both modes): never use the smallest/distilled variants (`*-mini`, `*-haiku`-class) unless a higher-priority instruction requires them.
+
+### Standard tier
+
+Subagent model: mid-tier — cheaper or faster than the orchestrator, never the forbidden tier. The subagent must differ from the orchestrator in either model or reasoning budget. Apply the rule that fits your platform:
+
+1. Anthropic / OpenAI: step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT).
+2. Cursor: choose the best Composer model.
+3. Fallback (no acceptable lower tier exists in your family): keep the orchestrator's model but drop the reasoning budget by at least one level (e.g. high → medium).
+
+Reasoning budget: moderate for sidecar/exploration/lookup work; high for implementation or integration-sensitive code paths. Pick the fastest setting that still meets the quality bar; escalate only when correctness is at risk.
+
+### Max tier
+
+Subagent model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. The subagent may run the same model and reasoning budget as the orchestrator; the standard-tier divergence rule does not apply here.
+
+Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of max tier.
+
+Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
+
+## Review
+
+The orchestrator is the final reviewer and quality gate. Subagent output is a draft.
+
+- Read every diff and research summary; do not accept work sight-unseen.
+- Verify against the original goal: scope, expected output, ownership, constraints.
+- Reconcile conflicts with surrounding code, conventions, and other concurrent subagent edits.
+- Run the relevant quality gates (typecheck, lint, targeted tests, full suite, manual smoke checks) before declaring a task done.
+- If output is incomplete, incorrect, or off-scope, send it back with a precise correction prompt or redo it locally — do not paper over.
+- Surface unresolved risks, skipped checks, or known gaps explicitly in the final summary.
+
+## Communication
+
+- Briefly tell the user what stays local on the critical path and what is being delegated. Include which tier (standard / max) you chose and why.
+- Keep progress updates short and integration-focused.
+- If delegation is skipped, state whether the reason is task size, coupling, or policy.
