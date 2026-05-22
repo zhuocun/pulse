@@ -684,8 +684,7 @@ describe("AiChatDrawer", () => {
 
         // The keyword "due" routes the contextual heuristic to the
         // "risk" chip. The chip's label is the user-visible prompt text.
-        const riskChipText = microcopy.ai.followUpChips
-            .riskFromDue as string;
+        const riskChipText = microcopy.ai.followUpChips.riskFromDue as string;
         const chip = screen.getByText(riskChipText);
         expect(chip).toBeInTheDocument();
 
