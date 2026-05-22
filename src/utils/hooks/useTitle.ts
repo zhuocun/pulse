@@ -36,19 +36,26 @@ export const composeBrandedTitle = (page: string): string =>
  *               previous title is restored on unmount.
  */
 const useTitle = (title: string, keepOnMount = true) => {
-    const oldTitle = useRef(document.title).current;
+    // Capture lazily inside the first effect. `useRef(document.title)`
+    // snapshotted at first render, which fired BEFORE the previous
+    // route's unmount on lazy()-loaded pages (the in-between PageSpin
+    // had already painted the wrong title). Reading inside the effect
+    // means we capture whatever the predecessor route left behind.
+    const oldTitle = useRef<string | null>(null);
 
     useEffect(() => {
+        if (oldTitle.current === null) oldTitle.current = document.title;
         document.title = title;
     }, [title]);
 
-    useEffect(() => {
-        return () => {
-            if (!keepOnMount) {
-                document.title = oldTitle;
+    useEffect(
+        () => () => {
+            if (!keepOnMount && oldTitle.current !== null) {
+                document.title = oldTitle.current;
             }
-        };
-    }, [keepOnMount, oldTitle]);
+        },
+        [keepOnMount]
+    );
 };
 
 export default useTitle;
