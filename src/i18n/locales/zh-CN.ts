@@ -164,7 +164,37 @@ const zhCN: Dictionary = {
         boardCopilot: "看板 Copilot",
         toggleBoardCopilot: "启用看板 Copilot 功能",
         language: "语言",
-        changeLanguage: "切换语言"
+        changeLanguage: "切换语言",
+        theme: "主题",
+        aiEnabled: "看板 Copilot",
+        logout: "退出登录",
+        pageTitle: "设置",
+        pageSubtitle: "选择您的主题、语言和 Copilot 偏好设置。"
+    },
+    nav: {
+        primaryLandmarkLabel: "主导航",
+        tabs: {
+            boards: "看板",
+            inbox: "收件箱",
+            copilot: "Copilot",
+            profile: "我的"
+        }
+    },
+    inbox: {
+        emptyTitle: "收件箱为空",
+        emptyDescription: "整理提议、提及和 AI 活动将显示在此处。",
+        heading: "收件箱"
+    },
+    copilotLanding: {
+        heading: "Copilot",
+        subtitle: "提出问题或为当前看板打开简报。",
+        askTitle: "询问 Copilot",
+        askDescription: "针对您的看板、任务或成员提出问题。",
+        briefTitle: "打开看板简报",
+        briefDescription: "查看当前看板的一目了然摘要。",
+        aiDisabledTitle: "AI 已关闭",
+        aiDisabledDescription:
+            "请在设置中启用看板 Copilot 以使用 Copilot 选项卡。"
     },
     fields: {
         column: "列",
@@ -350,6 +380,9 @@ const zhCN: Dictionary = {
         forgotPassword: "重置密码",
         terms: "服务条款",
         projects: "项目",
+        inbox: "收件箱",
+        copilot: "Copilot",
+        settings: "设置",
         share: "分享到 Pulse"
     },
     empty: {

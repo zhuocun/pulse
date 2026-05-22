@@ -151,7 +151,43 @@ export const enSource = {
         boardCopilot: "Board Copilot",
         toggleBoardCopilot: "Enable Board Copilot features",
         language: "Language",
-        changeLanguage: "Change language"
+        changeLanguage: "Change language",
+        theme: "Theme",
+        aiEnabled: "Board Copilot",
+        logout: "Log out",
+        pageTitle: "Settings",
+        pageSubtitle: "Choose your theme, language, and Copilot preferences."
+    },
+    /**
+     * Bottom tab bar (Phase 3 A3). Surfaces the four primary destinations
+     * on `pointer: coarse` viewports. Labels stay short so the 25vw tab
+     * width keeps the icon + label legible without truncation.
+     */
+    nav: {
+        primaryLandmarkLabel: "Primary",
+        tabs: {
+            boards: "Boards",
+            inbox: "Inbox",
+            copilot: "Copilot",
+            profile: "Profile"
+        }
+    },
+    inbox: {
+        emptyTitle: "Your inbox is empty",
+        emptyDescription:
+            "Triage proposals, mentions, and AI activity will appear here.",
+        heading: "Inbox"
+    },
+    copilotLanding: {
+        heading: "Copilot",
+        subtitle: "Ask a question or open a brief for the current board.",
+        askTitle: "Ask Copilot",
+        askDescription: "Pose a question about your boards, tasks, or members.",
+        briefTitle: "Open Board brief",
+        briefDescription: "See a one-glance summary of the active board.",
+        aiDisabledTitle: "AI is off",
+        aiDisabledDescription:
+            "Turn on Board Copilot in Settings to use the Copilot tab."
     },
     labels: {
         members: "Members",
@@ -372,6 +408,9 @@ export const enSource = {
         forgotPassword: "Reset your password",
         terms: "Terms of Service",
         projects: "Projects",
+        inbox: "Inbox",
+        copilot: "Copilot",
+        settings: "Settings",
         share: "Share to Pulse"
     },
     empty: {
