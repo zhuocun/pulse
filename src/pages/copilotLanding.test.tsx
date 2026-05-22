@@ -11,6 +11,9 @@ import CopilotLandingPage from "./copilotLanding";
 
 jest.mock("../utils/hooks/useAiEnabled");
 jest.mock("../utils/hooks/useAiChatDrawer");
+// `useBoardBriefDrawer` is mocked even though the landing page no longer
+// imports it: a future regression could re-introduce the dispatch and we
+// want the brief-CTA test below to assert openDrawer is NEVER called.
 jest.mock("../utils/hooks/useBoardBriefDrawer");
 
 const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
@@ -131,7 +134,15 @@ describe("CopilotLandingPage", () => {
         expect(openDrawer).toHaveBeenCalledTimes(1);
     });
 
-    it("opens the board brief drawer via Redux when the Brief button is clicked", () => {
+    /*
+     * The Brief CTA must NOT dispatch `openBriefDrawer`: the brief
+     * drawer is mounted on `board.tsx` only, never on `/projects`, so
+     * setting the Redux flag here leaked the open state across routes
+     * and ambushed the user with an uninvited drawer the next time
+     * they opened any board. The CTA only navigates; the brief opens
+     * from the board header.
+     */
+    it("navigates to /projects without dispatching openBriefDrawer when the Brief button is clicked", () => {
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
@@ -153,7 +164,8 @@ describe("CopilotLandingPage", () => {
         })[0];
         expect(briefButton).toBeTruthy();
         fireEvent.click(briefButton!);
-        expect(openDrawer).toHaveBeenCalledTimes(1);
+        expect(openDrawer).not.toHaveBeenCalled();
+        expect(window.location.pathname).toBe("/projects");
     });
 
     /*
