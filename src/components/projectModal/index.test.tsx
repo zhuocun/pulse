@@ -189,6 +189,58 @@ describe("ProjectModal", () => {
         setActiveLocale(DEFAULT_LOCALE);
     });
 
+    it("opens with the Create title and an empty form even when the project list cache is populated", async () => {
+        // Regression: ``useProjectModal`` reads ``["projects", { projectId }]``
+        // through ``useReactQuery`` which strips ``projectId: undefined`` via
+        // ``filterRequest`` — that collapses the key to ``["projects", {}]``
+        // and collides with the list page's project-array cache. Without
+        // gating ``data`` on ``editingProjectId``, the modal reads the list,
+        // ``Boolean(editingProject)`` flips true, and the Create CTA opens a
+        // dialog titled "Edit project". Pre-seed the cache here to pin the
+        // gate.
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                mutations: { retry: false },
+                queries: { retry: false }
+            }
+        });
+        queryClient.setQueryData(["projects", {}], [project()]);
+        store.dispatch(projectActions.openModal());
+
+        render(
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects"]}>
+                        <Routes>
+                            <Route
+                                path="/projects"
+                                element={
+                                    <>
+                                        <ProjectModal />
+                                        <LocationProbe />
+                                    </>
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
+        );
+
+        expect(
+            await screen.findByRole("dialog", { name: "Create project" })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Create project" })
+        ).toBeInTheDocument();
+        expect(
+            (screen.getByLabelText("Project name") as HTMLInputElement).value
+        ).toBe("");
+        expect(
+            (screen.getByLabelText("Organization") as HTMLInputElement).value
+        ).toBe("");
+    });
+
     it("renders a localized manager select placeholder when zh-CN is active", async () => {
         setActiveLocale("zh-CN");
         renderProjectModal({ type: "open" });

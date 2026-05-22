@@ -114,11 +114,7 @@ const TaskCreator: React.FC<{
             taskName: trimmed,
             projectId,
             columnId,
-            coordinatorId: user?._id,
-            type: "Task",
-            epic: "New Feature",
-            storyPoints: 1,
-            note: "No note yet"
+            coordinatorId: user?._id
         });
     };
     const toggle = () => {

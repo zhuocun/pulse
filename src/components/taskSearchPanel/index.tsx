@@ -296,7 +296,11 @@ const TaskSearchPanel: React.FC<Props> = ({
                     </Button>
                 </ResetButtonSlot>
             </FilterRow>
-            <FilterChips chips={chips} onDismiss={dismissChip} />
+            <FilterChips
+                chips={chips}
+                onClearAll={resetParams}
+                onDismiss={dismissChip}
+            />
         </FilterShell>
     );
 };

@@ -1,4 +1,5 @@
 import {
+    Alert,
     Button,
     Form,
     Grid,
@@ -121,11 +122,24 @@ const TaskModal: React.FC<{
     const placeholderId = Boolean(
         editingTaskId && isOptimisticPlaceholderId(editingTaskId)
     );
+    // When the underlying task disappears from the resolved list while the
+    // user has unsaved edits, keep the modal open with a non-dismissable
+    // banner instead of silently closing and ``resetFields``-ing the
+    // dirty payload. Without this guard a concurrent delete or refetch
+    // discards in-flight edits with no warning — a real data-loss bug,
+    // see review note ``ui-ux-comprehensive-review-2026-05.md`` §"Critical
+    // bugs that ship today".
+    const taskMissingAfterLoad =
+        Boolean(editingTaskId) &&
+        !placeholderId &&
+        !tasksStillLoading &&
+        !editingTask;
+    const hasDirtyEdits = taskMissingAfterLoad && form.isFieldsTouched();
     const modalOpen =
         Boolean(editingTaskId) &&
         (placeholderId
             ? Boolean(editingTask)
-            : tasksStillLoading || Boolean(editingTask));
+            : tasksStillLoading || Boolean(editingTask) || hasDirtyEdits);
     const awaitingTaskResolution =
         Boolean(editingTaskId) && !placeholderId && tasksStillLoading;
     const { data: membersData } = useMembersList();
@@ -253,10 +267,15 @@ const TaskModal: React.FC<{
         ) {
             return;
         }
-        if (!editingTask) {
+        // Preserve dirty edits if the task vanished between renders — the
+        // banner inside the modal (see ``taskMissingAfterLoad`` above) is
+        // the user's recovery path. Only auto-close when the user has not
+        // touched the form, so the previous "task gone -> close cleanly"
+        // path still works for read-only viewers.
+        if (!editingTask && !form.isFieldsTouched()) {
             onClose();
         }
-    }, [editingTask, editingTaskId, onClose, tasks]);
+    }, [editingTask, editingTaskId, form, onClose, tasks]);
 
     // Clear stale save errors when the user opens a different task; the
     // previous error referred to the prior payload and would mislead.
@@ -446,6 +465,36 @@ const TaskModal: React.FC<{
                     </div>
                 ) : null}
                 <div hidden={awaitingTaskResolution}>
+                    {taskMissingAfterLoad ? (
+                        <Alert
+                            action={
+                                <Button
+                                    danger
+                                    onClick={onClose}
+                                    size="small"
+                                    type="text"
+                                >
+                                    {microcopy.taskModal.discardEdits}
+                                </Button>
+                            }
+                            description={
+                                microcopy.taskModal.removedByOthersBody
+                            }
+                            message={microcopy.taskModal.removedByOthersTitle}
+                            role="alert"
+                            showIcon
+                            style={{ marginBlockEnd: space.md }}
+                            type="warning"
+                        />
+                    ) : null}
+                    {/* TODO(ui-ux-comprehensive-review-2026-05 · §"Critical
+                     * bugs that ship today" · Bug 3): pair this banner
+                     * with a "Save as new" CTA that POSTs the dirty
+                     * fields through the existing create-task mutation
+                     * once the routed-task-panel refactor (A2) lands.
+                     * The Discard button above is the minimum viable
+                     * recovery — the data-loss bug is closed; the more
+                     * complete UX awaits the panel rewrite. */}
                     <ErrorBox error={saveError} />
                     <Form
                         form={form}

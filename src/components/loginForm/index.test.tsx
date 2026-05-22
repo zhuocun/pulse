@@ -234,6 +234,24 @@ describe("LoginForm", () => {
         expect(tokenStorage.readAiProxyToken()).toBe("ai-token");
     });
 
+    it("normalizes email by trimming whitespace and lowercasing on submit", async () => {
+        // iOS Safari can paste trailing whitespace; mixed case from auto-fill
+        // suggestions would otherwise mismatch the stored lower-cased identity.
+        mutateAsync.mockResolvedValue(user());
+        renderLoginForm();
+
+        await changeField(/^email$/i, "  USER@EXAMPLE.com  ");
+        await changeField(/^password$/i, "secret");
+        await submitLogin();
+
+        await waitFor(() => {
+            expect(mutateAsync).toHaveBeenCalledWith({
+                email: "user@example.com",
+                password: "secret"
+            });
+        });
+    });
+
     it("does not crash when the login response omits the AI proxy token", async () => {
         // Login may legitimately come back without ``ai_jwt`` (AI
         // disabled, restricted account). The route guard's source of

@@ -76,12 +76,20 @@ const AuthErrorSummaryBody = ({
 }: SummaryBodyProps) => {
     const ref = useRef<HTMLDivElement>(null);
     const visible = Boolean(apiMessage || fieldErrors.length);
+    // Focus must move to the summary exactly once per appearance — when
+    // visibility transitions from hidden to visible. Depending on
+    // ``apiMessage`` or ``fieldErrors.length`` here yanked focus on every
+    // validation update, dismissing the iOS keyboard mid-type. Track the
+    // previous visibility in a ref so additional rerenders while visible
+    // do not steal focus.
+    const wasVisibleRef = useRef(false);
 
     useEffect(() => {
-        if (visible) {
+        if (visible && !wasVisibleRef.current) {
             ref.current?.focus();
         }
-    }, [visible, apiMessage, fieldErrors.length]);
+        wasVisibleRef.current = visible;
+    }, [visible]);
 
     if (!visible) {
         return null;

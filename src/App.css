@@ -70,10 +70,30 @@ html,
 body {
     margin: 0;
     padding: 0;
-    /* Prevent horizontal page scroll on small screens when an overflowing
-     * element briefly stretches the viewport (e.g. an AntD modal during
-     * its open transition or a long token in user content). The board's
-     * column container handles its own horizontal overflow. */
+}
+
+/*
+ * Suppress horizontal page scroll on small screens when an overflowing
+ * element briefly stretches the viewport (an AntD modal mid-open
+ * transition, a long token in user content). The board's column
+ * container handles its own ``overflow-x: auto`` and still scrolls
+ * normally — clipping the document does not interfere with descendant
+ * scrollers.
+ *
+ * ``overflow-x: clip`` on ``html`` (not ``hidden``) is load-bearing: the
+ * legacy ``overflow-x: hidden`` declaration here AND on ``body`` made
+ * ``body`` the document scroller, detaching ``window.scrollY``
+ * (permanently 0) and silently breaking IntersectionObserver
+ * (root: null), scroll-restoration, sticky observers, and Playwright
+ * fullPage captures. ``clip`` is the modern equivalent that does not
+ * promote a scroll container, so the document scroller stays on the
+ * viewport where every observer expects it.
+ */
+html {
+    overflow-x: clip;
+}
+
+body {
     overflow-x: hidden;
 }
 

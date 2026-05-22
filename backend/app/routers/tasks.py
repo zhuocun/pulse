@@ -36,14 +36,16 @@ def create_task(
     data: Dict[str, Any] = Body(default_factory=dict),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> str:
+    # Only the routing/identity fields are mandatory at the wire. ``type``,
+    # ``epic``, ``storyPoints`` and ``note`` are filled with sensible
+    # defaults by ``task_service.create`` so quick-add from a column can
+    # post just ``{taskName, projectId, columnId, coordinatorId}`` without
+    # the FE writing canned template strings the user must immediately
+    # undo.
     messages = {
         "projectId": "Project ID cannot be empty",
         "columnId": "Column ID cannot be empty",
-        "epic": "Epic cannot be empty",
-        "storyPoints": "Story points cannot be empty",
         "taskName": "Task name cannot be empty",
-        "type": "Task type cannot be empty",
-        "note": "Task note cannot be empty",
     }
     errors = required_body_errors(data, messages)
     if errors:

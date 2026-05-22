@@ -61,7 +61,10 @@ const LoginForm: React.FC<{
         setSubmitAttempted(false);
         let res: IUser;
         try {
-            res = await mutateAsync(input);
+            res = await mutateAsync({
+                ...input,
+                email: input.email.trim().toLowerCase()
+            });
         } catch {
             // Error state is set by useReactMutation's onError callback.
             return;

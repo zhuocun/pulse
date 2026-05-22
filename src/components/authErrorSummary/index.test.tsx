@@ -63,6 +63,70 @@ describe("AuthErrorSummary", () => {
         expect(document.activeElement).toBe(alert);
     });
 
+    it("does not re-steal focus when field errors update while the summary stays visible", () => {
+        // The previous implementation depended on ``fieldErrors.length``
+        // so every mid-type validation rerun ran ``ref.current.focus()``,
+        // dismissing the iOS keyboard between keystrokes. Focus must move
+        // exactly once per visibility transition (hidden -> visible).
+        let captured: FormInstance | null = null;
+        const { rerender } = render(
+            <Harness
+                formRef={(form) => {
+                    captured = form;
+                }}
+            />
+        );
+        act(() => {
+            captured!.setFields([
+                { name: "email", errors: ["Email is required"] }
+            ]);
+        });
+        const alert = screen.getByRole("alert");
+        const focusSpy = jest.spyOn(alert, "focus");
+
+        // Subsequent validation passes the user typing into the field
+        // would trigger should not re-focus the summary.
+        act(() => {
+            captured!.setFields([
+                {
+                    name: "email",
+                    errors: ["Email is required", "Email must be valid"]
+                }
+            ]);
+        });
+        rerender(
+            <Harness
+                formRef={(form) => {
+                    captured = form;
+                }}
+            />
+        );
+        act(() => {
+            captured!.setFields([
+                { name: "password", errors: ["Password too short"] }
+            ]);
+        });
+
+        expect(focusSpy).not.toHaveBeenCalled();
+        focusSpy.mockRestore();
+    });
+
+    it("re-focuses the summary when it transitions from hidden to visible again", () => {
+        // After dismissal, a fresh failure must still land focus on the
+        // summary — the ref-tracked previous-visibility flag flips back
+        // to false on the hidden render so the next 0 -> 1 transition
+        // re-focuses.
+        const { rerender } = render(<Harness />);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+        rerender(<Harness serverError={new Error("Boom")} />);
+        expect(document.activeElement).toBe(screen.getByRole("alert"));
+
+        rerender(<Harness />);
+        rerender(<Harness serverError={new Error("Boom again")} />);
+        expect(document.activeElement).toBe(screen.getByRole("alert"));
+    });
+
     it("lists field-level errors as anchor links when includeFieldErrors is true", () => {
         let captured: FormInstance | null = null;
         render(

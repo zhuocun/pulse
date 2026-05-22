@@ -342,6 +342,12 @@ export const enSource = {
             "Set a name, organization, and a manager to start tracking work.",
         editDescription: "Update project details and assignment."
     },
+    taskModal: {
+        removedByOthersTitle: "This task was removed by another change.",
+        removedByOthersBody:
+            "Your edits are still here. Discard them or save them as a new task to keep them.",
+        discardEdits: "Discard edits"
+    },
     projectsPage: {
         title: "Projects",
         subtitle:
