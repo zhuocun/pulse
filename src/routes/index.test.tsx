@@ -40,6 +40,24 @@ jest.mock("../pages/board", () => ({
     __esModule: true,
     default: () => null
 }));
+jest.mock("../pages/share", () => ({
+    __esModule: true,
+    default: () => null
+}));
+jest.mock("../pages/inbox", () => ({
+    __esModule: true,
+    default: () => <div data-testid="inbox-content">Inbox Route</div>
+}));
+jest.mock("../pages/copilotLanding", () => ({
+    __esModule: true,
+    default: () => (
+        <div data-testid="copilot-landing-content">Copilot Route</div>
+    )
+}));
+jest.mock("../pages/settings", () => ({
+    __esModule: true,
+    default: () => <div data-testid="settings-content">Settings Route</div>
+}));
 // Stub the auth layout to a thin shell that just renders the Outlet so
 // the routed terms page surfaces in the test DOM without dragging in
 // the brand chrome.
@@ -217,4 +235,66 @@ describe("auth/terms reachability (Bug 1)", () => {
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
         expect(window.location.pathname).toBe("/auth/terms");
     });
+});
+
+/**
+ * Phase 3 A3 — bottom-tab destinations. The three new routes mount
+ * under `<RequireAuth />` so they MUST require a session; an
+ * unauthenticated visit redirects to /login like every other protected
+ * page. With a session, each route surfaces its routed page through
+ * the main layout's Outlet.
+ */
+describe("bottom-tab routes (Phase 3 A3)", () => {
+    const renderAt = (path: string, authedUser?: IUser) => {
+        window.history.pushState({}, "App", path);
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } }
+        });
+        if (authedUser) {
+            queryClient.setQueryData(["users"], authedUser);
+        }
+        render(
+            <QueryClientProvider client={queryClient}>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
+            </QueryClientProvider>
+        );
+    };
+
+    const authedUser: IUser = {
+        _id: "u1",
+        email: "alice@example.com",
+        likedProjects: [],
+        username: "Alice"
+    };
+
+    beforeEach(() => {
+        window.localStorage.clear();
+    });
+
+    it.each([
+        ["/inbox", "inbox-content"],
+        ["/copilot", "copilot-landing-content"],
+        ["/settings", "settings-content"]
+    ])(
+        "renders %s through MainLayout for an authenticated visitor",
+        async (path, testid) => {
+            renderAt(path, authedUser);
+            expect(
+                await screen.findByTestId("main-layout")
+            ).toBeInTheDocument();
+            expect(await screen.findByTestId(testid)).toBeInTheDocument();
+        }
+    );
+
+    it.each(["/inbox", "/copilot", "/settings"])(
+        "redirects %s to /login for an unauthenticated visitor",
+        async (path) => {
+            renderAt(path);
+            await waitFor(() => {
+                expect(window.location.pathname).toBe("/login");
+            });
+        }
+    );
 });
