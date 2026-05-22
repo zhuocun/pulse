@@ -389,4 +389,68 @@ describe("SharePage", () => {
         // Only the text is preserved; the unsafe URL is dropped entirely.
         expect(call.note).toBe("A note");
     });
+
+    /*
+     * Android Chrome's case + trailing-slash mismatch — the substring
+     * dedup failed and the URL appeared twice. Normalise both sides
+     * before comparing so a single canonical form collapses them.
+     */
+    it("dedups the URL when text and url differ only by case", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?text=Look%3A%20https%3A%2F%2FExample.com%2Fx&url=https%3A%2F%2Fexample.com%2Fx"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
+        // The URL is recognised as already present in the text despite
+        // the case mismatch and is NOT appended a second time.
+        expect(call.note).toBe("Look: https://Example.com/x");
+    });
+
+    it("dedups the URL when only the trailing slash differs", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?text=See%20https%3A%2F%2Fexample.com%2Fx&url=https%3A%2F%2Fexample.com%2Fx%2F"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
+        expect(call.note).toBe("See https://example.com/x");
+    });
+
+    it("preserves the query string when normalising for dedup", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        // text references the URL with `?utm=1`; the shared url ALSO
+        // carries the query — the two should still dedup as the same
+        // canonical form.
+        renderShare(
+            "/share?text=Read%20https%3A%2F%2Fexample.com%2Fx%3Futm%3D1&url=https%3A%2F%2Fexample.com%2Fx%3Futm%3D1"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
+        expect(call.note).toBe("Read https://example.com/x?utm=1");
+    });
 });
