@@ -568,7 +568,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     return (
         <Drawer
             {...drawerProps}
-            destroyOnClose={false}
             mask
             maskClosable
             onClose={requestClose}
