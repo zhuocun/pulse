@@ -53,6 +53,11 @@ interface LoginLocationState {
 const isLoginLocationState = (value: unknown): value is LoginLocationState =>
     value !== null && typeof value === "object" && !Array.isArray(value);
 
+// Reject protocol-relative (`//evil.com`) and absolute (`https://…`) URLs so a
+// stale or attacker-controlled `state.from` cannot open-redirect off-origin.
+const isInternalPath = (raw: unknown): raw is string =>
+    typeof raw === "string" && /^\/(?!\/)/.test(raw);
+
 const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
     serverError?: Error | IError | null;
@@ -105,15 +110,17 @@ const LoginForm: React.FC<{
              * user who landed on /login via a protected redirect lands
              * back where they came from (typically `/share?title=…`).
              * Defaults to `/projects` so the normal direct-login flow
-             * still goes to the project list. Guard the cast: any
-             * non-object state (or an empty `from`) falls through to
-             * the default.
+             * still goes to the project list. Any non-object state, or
+             * a `from` that isn't a single-leading-slash internal path,
+             * falls through to the default — guards against open
+             * redirect via stale / synthesized router state.
              */
             const state = isLoginLocationState(location.state)
                 ? location.state
                 : undefined;
-            const target =
-                state?.from && state.from.length > 0 ? state.from : "/projects";
+            const target = isInternalPath(state?.from)
+                ? state.from
+                : "/projects";
             navigate(target, { viewTransition: true });
         } catch {
             queryClient?.setQueryData(userQueryKey, undefined);
