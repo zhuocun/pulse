@@ -71,6 +71,42 @@ export const RESPONSE_HOP_HEADERS = new Set([
     "content-length"
 ]);
 
+const BACKEND_TRAILING_SLASH_PATHS = new Set([
+    "/api/v1/boards",
+    "/api/v1/projects",
+    "/api/v1/tasks",
+    "/api/v1/users"
+]);
+
+const pathFromVercelRewrite = (pathParam: string): string =>
+    `/api/${pathParam
+        .split("/")
+        .filter((segment) => segment.length > 0)
+        .map((segment) => encodeURIComponent(segment))
+        .join("/")}`;
+
+const canonicalBackendPath = (pathname: string): string =>
+    BACKEND_TRAILING_SLASH_PATHS.has(pathname) ? `${pathname}/` : pathname;
+
+export const buildBackendTarget = (requestUrl: string): string => {
+    const url = new URL(requestUrl, "https://proxy.local");
+    const pathParam = url.searchParams.get("path");
+    const rewritePath =
+        url.pathname === "/api" && pathParam
+            ? pathFromVercelRewrite(pathParam)
+            : null;
+    const pathname = rewritePath ?? url.pathname;
+
+    const expectedPathParam = pathname.startsWith("/api/")
+        ? pathname.slice("/api/".length)
+        : null;
+    if (pathParam && pathParam === expectedPathParam) {
+        url.searchParams.delete("path");
+    }
+
+    return `${BACKEND_URL}${canonicalBackendPath(pathname)}${url.search}`;
+};
+
 export const readRequestBody = async (
     req: IncomingMessage
 ): Promise<Uint8Array | undefined> => {
@@ -195,7 +231,7 @@ export const handleProxyRequest = async (
 ): Promise<void> => {
     try {
         const path = req.url ?? "/";
-        const target = `${BACKEND_URL}${path}`;
+        const target = buildBackendTarget(path);
         const headers = buildOutgoingHeaders(req);
         const body = await readRequestBody(req);
 
@@ -242,7 +278,7 @@ export const handleProxyFetch = async (request: Request): Promise<Response> => {
         const url = request.url.startsWith("http")
             ? new URL(request.url)
             : new URL(request.url, "https://proxy.local");
-        const target = `${BACKEND_URL}${url.pathname}${url.search}`;
+        const target = buildBackendTarget(`${url.pathname}${url.search}`);
         const headers = buildOutgoingHeadersFromWeb(request.headers);
         const method = request.method.toUpperCase();
         const bodyBuffer =
