@@ -175,7 +175,7 @@ const TabIcon = styled.span`
     /* Lift the icon to a comfortable size for thumb scanning. */
     align-items: center;
     display: inline-flex;
-    font-size: 22px;
+    font-size: ${fontSize.xl}px;
     justify-content: center;
     line-height: 1;
 `;
