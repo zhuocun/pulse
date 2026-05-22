@@ -1,5 +1,4 @@
 import styled from "@emotion/styled";
-import { Grid } from "antd";
 import { Outlet } from "react-router";
 
 import BottomTabBar from "../components/bottomTabBar";
@@ -8,6 +7,7 @@ import ProjectModal from "../components/projectModal";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
 /*
  * Reads page-level theme tokens defined in App.css. AntD's own `--ant-*`
@@ -104,15 +104,15 @@ const MainLayout = () => {
      *   - `environment.bottomNavEnabled` is the rollback kill-switch
      *     (REACT_APP_BOTTOM_NAV_ENABLED=false brings back the
      *     header-only chrome without a code revert).
-     *   - `Grid.useBreakpoint().md === false` keeps the bar to phone
-     *     widths only; the header chrome already owns desktop. We use
-     *     AntD's Grid hook to stay consistent with the rest of the
-     *     codebase (commandPalette, projectModal, taskModal all read
-     *     screens.md the same way).
+     *   - `useIsPhoneChrome()` reads `(pointer: coarse)`, the single
+     *     source of truth shared with the Header's right-cluster
+     *     demote-gate. Aligning both surfaces on the same predicate
+     *     prevents the bar/header mismatch (touchscreen laptops were
+     *     hiding the header right-cluster while refusing to mount the
+     *     bar; small-window non-touch laptops were doing the inverse).
      */
-    const screens = Grid.useBreakpoint();
-    const isPhone = screens.md === false;
-    const showBottomNav = environment.bottomNavEnabled && isPhone;
+    const isPhoneChrome = useIsPhoneChrome();
+    const showBottomNav = environment.bottomNavEnabled && isPhoneChrome;
 
     return (
         <Container>

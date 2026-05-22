@@ -54,6 +54,12 @@ const envMod = jest.requireMock("../constants/env") as {
     default: { bottomNavEnabled: boolean };
 };
 
+/**
+ * Phone mode = the `(pointer: coarse)` query matches. Other queries
+ * (AntD's width-based Grid.useBreakpoint) report `false` so the
+ * `useIsPhoneChrome` hook resolves to `true` without dragging in
+ * unrelated AntD layout signals.
+ */
 const installMatchMediaPhone = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
@@ -61,9 +67,7 @@ const installMatchMediaPhone = () => {
             addEventListener: jest.fn(),
             addListener: jest.fn(),
             dispatchEvent: jest.fn(),
-            // `matches: false` for every query collapses AntD's
-            // Grid.useBreakpoint to phone mode (md=false).
-            matches: false,
+            matches: query === "(pointer: coarse)",
             media: query,
             onchange: null,
             removeEventListener: jest.fn(),
@@ -72,6 +76,13 @@ const installMatchMediaPhone = () => {
     });
 };
 
+/**
+ * Desktop mode = `(pointer: coarse)` does NOT match (fine pointer,
+ * mouse) so `useIsPhoneChrome` resolves to `false` and the bar does
+ * not mount regardless of viewport width. AntD's width queries return
+ * `true` here so any Grid-driven chrome elsewhere still reads as
+ * "desktop wide".
+ */
 const installMatchMediaDesktop = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
@@ -79,9 +90,7 @@ const installMatchMediaDesktop = () => {
             addEventListener: jest.fn(),
             addListener: jest.fn(),
             dispatchEvent: jest.fn(),
-            // `matches: true` for every query lifts AntD's
-            // Grid.useBreakpoint to desktop mode (md=true).
-            matches: true,
+            matches: query !== "(pointer: coarse)",
             media: query,
             onchange: null,
             removeEventListener: jest.fn(),
@@ -149,14 +158,15 @@ describe("MainLayout", () => {
         expect(skip).toHaveFocus();
     });
 
-    // Phase 3 A3 — BottomTabBar mount gating. The bar must appear on
-    // phone widths when the env flag is on, AND must NOT mount on
-    // desktop (Grid.useBreakpoint().md === true) or when the flag is
-    // off. The mock above replaces the real bar with a sentinel <nav>
-    // so we can assert mount/no-mount without dragging in NavLink
-    // routing concerns.
+    // Phase 3 A3 — BottomTabBar mount gating. The bar must appear when
+    // the user is on a coarse-pointer surface (phone, touchscreen
+    // laptop) AND the env flag is on; otherwise it must not mount. The
+    // mount-gate is the shared `useIsPhoneChrome` predicate, aligned
+    // with the Header's right-cluster demote-gate. The mock above
+    // replaces the real bar with a sentinel <nav> so we can assert
+    // mount/no-mount without dragging in NavLink routing concerns.
     describe("BottomTabBar mount gating", () => {
-        it("mounts the bar on phone widths when the flag is on", () => {
+        it("mounts the bar on coarse-pointer surfaces when the flag is on", () => {
             installMatchMediaPhone();
             envMod.default.bottomNavEnabled = true;
             render(
@@ -173,7 +183,7 @@ describe("MainLayout", () => {
             ).toBeInTheDocument();
         });
 
-        it("does NOT mount the bar on desktop widths (md=true)", () => {
+        it("does NOT mount the bar on fine-pointer surfaces (mouse / trackpad)", () => {
             installMatchMediaDesktop();
             envMod.default.bottomNavEnabled = true;
             render(
@@ -190,7 +200,7 @@ describe("MainLayout", () => {
             ).not.toBeInTheDocument();
         });
 
-        it("does NOT mount the bar when the env flag is off, even on phone", () => {
+        it("does NOT mount the bar when the env flag is off, even on coarse-pointer surfaces", () => {
             installMatchMediaPhone();
             envMod.default.bottomNavEnabled = false;
             render(

@@ -18,6 +18,7 @@ import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
 import LanguageSwitcher from "../languageSwitcher";
@@ -244,14 +245,20 @@ const HiddenOnTiny = styled.span`
  * the routed Settings page reachable from the bottom-tab Profile
  * entry. Desktop / mouse users keep the dropdown untouched.
  *
- * We prefer `display: none` over conditional rendering so the JSX
- * shape stays identical across viewports — any consumer that mocks
- * matchMedia in a test can still find the controls in the DOM tree
- * if they query a non-visible scope.
+ * The visibility branch is driven by the shared `useIsPhoneChrome`
+ * hook so the demote-gate and the BottomTabBar mount-gate consume the
+ * same predicate (`pointer: coarse`). The previous implementation
+ * emitted the hide via `@media (pointer: coarse)` CSS, which diverged
+ * from MainLayout's `Grid.useBreakpoint().md === false` mount-gate —
+ * touchscreen laptops were hiding controls while never mounting the
+ * bar, leaving the user with no way to reach logout / theme.
+ *
+ * We still wrap the controls in a `<span>` so the JSX shape stays
+ * stable for tests that traverse the DOM (the wrapper exists either
+ * way; we just toggle `display` from JS instead of CSS).
  */
-const HiddenWhenDemoted = styled.span<{ $demoted: boolean }>`
-    ${(props) =>
-        props.$demoted ? "@media (pointer: coarse) { display: none; }" : ""}
+const HiddenWhenDemoted = styled.span<{ $hidden: boolean }>`
+    ${(props) => (props.$hidden ? "display: none;" : "")}
 `;
 
 /**
@@ -348,6 +355,16 @@ const Header: React.FC = () => {
     } = useAiEnabled();
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
+    /*
+     * Phase 3 A3 — phone demotion. The flag-gated `bottomNavEnabled`
+     * env switch composes with the shared `useIsPhoneChrome` predicate
+     * so the right-cluster only hides when (a) the bottom-tab chassis
+     * is rolled out AND (b) the user is on a coarse-pointer surface
+     * where the bar actually mounts. See `useIsPhoneChrome` and the
+     * matching gate in `MainLayout` for the predicate alignment.
+     */
+    const isPhoneChrome = useIsPhoneChrome();
+    const rightClusterHidden = environment.bottomNavEnabled && isPhoneChrome;
     /*
      * Publish the rendered header height to a global CSS custom property
      * so secondary sticky chrome (e.g. the project detail page's
@@ -484,7 +501,7 @@ const Header: React.FC = () => {
                  * inline as before — the flag falls back to the legacy
                  * chrome with one env var.
                  */}
-                <HiddenWhenDemoted $demoted={environment.bottomNavEnabled}>
+                <HiddenWhenDemoted $hidden={rightClusterHidden}>
                     <IconButton
                         aria-label={
                             scheme === "dark"
@@ -503,7 +520,7 @@ const Header: React.FC = () => {
                         )}
                     </IconButton>
                 </HiddenWhenDemoted>
-                <HiddenWhenDemoted $demoted={environment.bottomNavEnabled}>
+                <HiddenWhenDemoted $hidden={rightClusterHidden}>
                     <Dropdown menu={{ items }} trigger={["click"]}>
                         <PillTrigger
                             aria-label={microcopy.a11y.accountMenuFor.replace(

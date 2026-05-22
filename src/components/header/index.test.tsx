@@ -419,12 +419,13 @@ describe("Header", () => {
 
     /*
      * Phase 3 A3 — phone demotion. The right-cluster account + theme
-     * cluster is wrapped in `<HiddenWhenDemoted $demoted={bottomNavEnabled}>`,
-     * which emits an `@media (pointer: coarse) { display: none; }`
-     * rule when the flag is on. We can't observe matchMedia in jsdom,
-     * but we can walk the stylesheet, find the styled-emotion class
-     * applied to the wrapper, and assert the rule is emitted (vs the
-     * fallback flag-off branch which emits no rule at all).
+     * cluster is wrapped in `<HiddenWhenDemoted>`. Its visibility is now
+     * driven by the shared `useIsPhoneChrome` hook (single source of
+     * truth with the BottomTabBar mount-gate in MainLayout) — when the
+     * flag is on AND the pointer is coarse, the wrapper emits
+     * `display: none` from JS. The previous CSS `@media (pointer: coarse)`
+     * implementation diverged from the bar's mount-gate; see
+     * `useIsPhoneChrome` for the alignment rationale.
      */
     describe("phone demotion (flag-gated)", () => {
         const envMod = jest.requireMock("../../constants/env") as {
@@ -437,8 +438,25 @@ describe("Header", () => {
             };
         };
 
+        const installCoarsePointer = () => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: (query: string) => ({
+                    addEventListener: jest.fn(),
+                    addListener: jest.fn(),
+                    dispatchEvent: jest.fn(),
+                    matches: query === "(pointer: coarse)",
+                    media: query,
+                    onchange: null,
+                    removeEventListener: jest.fn(),
+                    removeListener: jest.fn()
+                })
+            });
+        };
+
         afterEach(() => {
             envMod.default.bottomNavEnabled = true;
+            installAntdBrowserMocks();
         });
 
         const sheetText = () =>
@@ -456,20 +474,15 @@ describe("Header", () => {
                 })
                 .join("\n");
 
-        it("emits a coarse-pointer hide rule for the demoted right-cluster when the flag is on", () => {
+        it("emits a JS-driven display:none rule for the demoted right-cluster when the flag is on and the pointer is coarse", () => {
+            installCoarsePointer();
             envMod.default.bottomNavEnabled = true;
             renderHeader();
-            // The styled `HiddenWhenDemoted` $demoted=true branch
-            // inserts the `@media (pointer: coarse) { display: none; }`
-            // rule into the document's stylesheet. Anchor on the
-            // unmistakable selector text. Note: emotion shares the
-            // stylesheet across tests in the same module, so the
-            // negative case (no rule) can't be reliably asserted here
-            // — covered instead in the MainLayout test which observes
-            // the dependent BottomTabBar mount.
-            expect(sheetText()).toMatch(
-                /@media \(pointer: coarse\)[^}]*display:\s*none/i
-            );
+            // The styled `HiddenWhenDemoted` `$hidden=true` branch
+            // emits a plain `display: none;` rule (no media wrapper)
+            // because the predicate is computed from the shared
+            // `useIsPhoneChrome` hook rather than CSS.
+            expect(sheetText()).toMatch(/display:\s*none/i);
         });
 
         it("wraps both the theme button and the account dropdown in the demotion span", () => {
