@@ -453,4 +453,20 @@ describe("SharePage", () => {
         const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
         expect(call.note).toBe("Read https://example.com/x?utm=1");
     });
+
+    /*
+     * Submit gate — no columns means the user has no destination, so
+     * the Save button must stay disabled even when projects + task
+     * name are populated.
+     */
+    it("disables the Save button when the selected project has no columns", () => {
+        wireQueries({ columns: [] });
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare("/share?title=Ship%20it");
+
+        expect(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        ).toBeDisabled();
+    });
 });
