@@ -179,15 +179,14 @@ const CopilotLandingPage = () => {
                 {/*
                  * The CTA cards' inner `<Button>` is the canonical
                  * click target so the action is keyboard-reachable
-                 * (Enter / Space) and announced by AT. The previous
-                 * implementation also wired `onClick` to the outer
-                 * Card, which only fired on mouse — keyboard users
-                 * could focus the Button but the outer mouse-only
-                 * target meant the visual "hoverable" affordance
-                 * lied about its accessibility. Drop the outer
-                 * onClick and rely on the Button alone.
+                 * (Enter / Space) and announced by AT. The card no
+                 * longer carries `hoverable` (which paints a
+                 * `cursor: pointer` lie since the surface isn't
+                 * clickable) — the styled `&:hover` border-color
+                 * shift in CtaCard preserves the hover affordance
+                 * without misleading the pointer.
                  */}
-                <CtaCard data-testid="copilot-landing-ask" hoverable>
+                <CtaCard data-testid="copilot-landing-ask">
                     <CtaTitle>{microcopy.copilotLanding.askTitle}</CtaTitle>
                     <CtaDescription>
                         {microcopy.copilotLanding.askDescription}
@@ -202,7 +201,7 @@ const CopilotLandingPage = () => {
                         {microcopy.copilotLanding.askTitle}
                     </Button>
                 </CtaCard>
-                <CtaCard data-testid="copilot-landing-brief" hoverable>
+                <CtaCard data-testid="copilot-landing-brief">
                     <CtaTitle>{microcopy.copilotLanding.briefTitle}</CtaTitle>
                     <CtaDescription>
                         {microcopy.copilotLanding.briefDescription}
