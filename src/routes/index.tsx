@@ -15,6 +15,8 @@ import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import AuthLayout from "../layouts/authLayout";
 import MainLayout from "../layouts/mainLayout";
+import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useAuth from "../utils/hooks/useAuth";
 
 /**
@@ -179,6 +181,13 @@ const TaskDetailPanelRoute = () => {
         projectId: string;
         taskId: string;
     }>();
+    // Mirror BoardPage's `boardAiOn` derivation so the routed panel
+    // gates the AI assist surface on the same signal as the modal path
+    // (B-H4). The two predicates compose: global AI toggle + per-
+    // project AI opt-out.
+    const { enabled: aiEnabled } = useAiEnabled();
+    const { disabled: aiDisabledForProject } = useAiProjectDisabled(projectId);
+    const boardAiOn = aiEnabled && !aiDisabledForProject;
     if (!projectId || !taskId) {
         // Defensive — the route shape guarantees both params are
         // present, but render nothing if a future refactor breaks
@@ -186,7 +195,12 @@ const TaskDetailPanelRoute = () => {
         return null;
     }
     return (
-        <TaskDetailPanel key={taskId} projectId={projectId} taskId={taskId} />
+        <TaskDetailPanel
+            boardAiOn={boardAiOn}
+            key={taskId}
+            projectId={projectId}
+            taskId={taskId}
+        />
     );
 };
 
