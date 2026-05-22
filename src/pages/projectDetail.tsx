@@ -1,13 +1,6 @@
 import styled from "@emotion/styled";
-import { Alert, Breadcrumb, Button, Skeleton, Tabs } from "antd";
-import { useEffect } from "react";
-import {
-    Link,
-    Outlet,
-    useLocation,
-    useNavigate,
-    useParams
-} from "react-router-dom";
+import { Alert, Breadcrumb, Button, Skeleton } from "antd";
+import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
 import { microcopy } from "../constants/microcopy";
@@ -129,32 +122,6 @@ const BreadcrumbWrapper = styled.div`
     }
 `;
 
-const TabsRow = styled(Tabs)`
-    && {
-        flex: 0 0 auto;
-        min-width: 0;
-    }
-    /* AntD draws a 1 px rail under the tab list (.ant-tabs-nav::before)
-     * that the orange ink-bar slides on. With the surrounding TopBar
-     * now using the page gradient as a surface, that gray rail would
-     * print a hard line over the peach. Hide it — the orange ink-bar
-     * alone is enough to mark the active tab. AntD's nav also has a
-     * default margin-bottom we drop to keep the row centered. */
-    && .ant-tabs-nav {
-        margin: 0;
-    }
-    && .ant-tabs-nav::before {
-        border-bottom-color: transparent;
-    }
-    && .ant-tabs-tab {
-        font-weight: ${fontWeight.medium};
-        padding: ${space.xs}px ${space.sm}px;
-    }
-    && .ant-tabs-ink-bar {
-        height: 2px;
-    }
-`;
-
 const Body = styled.div`
     display: flex;
     flex: 1;
@@ -163,23 +130,9 @@ const Body = styled.div`
     overflow: auto;
 `;
 
-const tabItems = [
-    {
-        key: "board",
-        label: (
-            <Link to="board" viewTransition>
-                {microcopy.labels.board}
-            </Link>
-        )
-    }
-];
-
 const ProjectDetailPage = () => {
-    const { pathname } = useLocation();
     const { projectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
-    const segments = pathname.split("/").filter(Boolean);
-    const activeTab = segments[segments.length - 1] || "board";
 
     const {
         data: project,
@@ -202,13 +155,6 @@ const ProjectDetailPage = () => {
      * against a phantom project.
      */
     const isNotFound = pSuccess && !project;
-
-    useEffect(() => {
-        if (pError || isNotFound) return;
-        if (!pathname.endsWith("/board")) {
-            navigate("board", { viewTransition: true });
-        }
-    }, [navigate, pathname, pError, isNotFound]);
 
     return (
         <Container>
@@ -241,7 +187,6 @@ const ProjectDetailPage = () => {
                         ]}
                     />
                 </BreadcrumbWrapper>
-                <TabsRow activeKey={activeTab} items={tabItems} size="small" />
             </TopBar>
             <Body>
                 {pError ? (

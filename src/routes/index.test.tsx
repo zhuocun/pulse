@@ -74,13 +74,18 @@ describe("routes", () => {
         ]);
     });
 
-    it("nests the board route below project detail", () => {
+    it("nests an index redirect and the board route below project detail", () => {
         const projectDetailRoute = routes[0].children?.[1]?.children?.find(
             (route) => route.path === "projects/:projectId"
         );
 
-        expect(
-            projectDetailRoute?.children?.map((route) => route.path)
-        ).toEqual(["board"]);
+        // Bare `/projects/:projectId` is handled by a declarative `index`
+        // redirect (Navigate to "board"). The previous `useEffect`
+        // force-redirect inside `ProjectDetailPage` was removed in QW-11.
+        const children = projectDetailRoute?.children ?? [];
+        expect(children[0] && "index" in children[0] && children[0].index).toBe(
+            true
+        );
+        expect(children.slice(1).map((route) => route.path)).toEqual(["board"]);
     });
 });

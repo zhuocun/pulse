@@ -108,6 +108,18 @@ const routes = [
                         path: "projects/:projectId",
                         element: <ProjectDetailPage />,
                         children: [
+                            /*
+                             * Bare `/projects/:projectId` redirects to the
+                             * board child route declaratively. The previous
+                             * implementation force-redirected via a
+                             * `useEffect` inside `ProjectDetailPage` that
+                             * paired with a single-tab `Tabs` row (QW-11) —
+                             * both deleted in the Phase 2 IA cleanup.
+                             */
+                            {
+                                index: true,
+                                element: <Navigate to="board" replace />
+                            },
                             {
                                 path: "board",
                                 element: <BoardPage />
