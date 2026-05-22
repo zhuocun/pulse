@@ -10,7 +10,6 @@ import {
 
 import EmptyState from "../components/emptyState";
 import { PageSpin } from "../components/status";
-import TaskDetailPanel from "../components/taskDetailPanel";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import AuthLayout from "../layouts/authLayout";
@@ -42,6 +41,7 @@ const SharePage = lazy(() => import("../pages/share"));
 const InboxPage = lazy(() => import("../pages/inbox"));
 const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
 const SettingsPage = lazy(() => import("../pages/settings"));
+const TaskDetailPanel = lazy(() => import("../components/taskDetailPanel"));
 
 /**
  * Resolves the root URL by consulting authentication once, at the route
