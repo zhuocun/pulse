@@ -92,11 +92,11 @@ const Nav = styled.nav<{ $hidden: boolean }>`
     position: fixed;
     right: 0;
     /* Sit in the navBar tier — above page content but below AntD's
-     * Drawer (1000) and Modal (1100) surfaces. The previous value
-     * (1010) painted the bar on top of an open Drawer/Modal mask and
-     * trapped touch users behind it. Route-level drawers now stack
-     * cleanly on top via their own z-index without the bar peeking
-     * through the dimmer. */
+     * Drawer + Modal mask (both paint at z-index 1000) and Modal
+     * content (1010). The previous bar value (1010) painted on top
+     * of an open Drawer/Modal mask and trapped touch users behind
+     * it. Route-level drawers now stack cleanly on top via their
+     * own z-index without the bar peeking through the dimmer. */
     z-index: ${zIndex.navBar};
     /* Keyboard hide: translate out of the viewport when the soft keyboard
      * pushes the visual viewport up. The translate gives us a deterministic
