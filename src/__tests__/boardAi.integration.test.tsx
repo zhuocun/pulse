@@ -300,7 +300,10 @@ describe("Board AI integration (App + local engine)", () => {
         const user = await loginAndOpenBoard();
 
         await user.click(
-            screen.getByRole("button", { name: /ask board copilot/i })
+            screen.getByRole("button", { name: /board copilot menu/i })
+        );
+        await user.click(
+            await screen.findByRole("menuitem", { name: /ask copilot/i })
         );
 
         const messageInput = await screen.findByLabelText(
@@ -359,7 +362,10 @@ describe("Board AI integration (App + local engine)", () => {
         const user = await loginAndOpenBoard();
 
         await user.click(
-            screen.getByRole("button", { name: /open board copilot brief/i })
+            screen.getByRole("button", { name: /board copilot menu/i })
+        );
+        await user.click(
+            await screen.findByRole("menuitem", { name: /board brief/i })
         );
 
         await waitFor(() => {
@@ -385,7 +391,10 @@ describe("Board AI integration (App + local engine)", () => {
         const user = await loginAndOpenBoard();
 
         await user.click(
-            screen.getByRole("button", { name: /ask board copilot/i })
+            screen.getByRole("button", { name: /board copilot menu/i })
+        );
+        await user.click(
+            await screen.findByRole("menuitem", { name: /ask copilot/i })
         );
 
         await waitFor(() => {

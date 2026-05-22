@@ -37,7 +37,6 @@ import useAgent from "../../utils/hooks/useAgent";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import AiSparkleIcon from "../aiSparkleIcon";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 
 type TaskSearchProps = {
     kind: "tasks";
@@ -468,7 +467,6 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 >
                     {labels.helper}
                 </Typography.Paragraph>
-                <EngineModeTag />
             </div>
             <span
                 /*

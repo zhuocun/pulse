@@ -27,7 +27,7 @@ import { BRIEF_CACHE_TTL_MS } from "../../theme/aiTokens";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
-import { srOnlyLiveRegionStyle } from "../../utils/a11y/srOnlyLiveRegionStyle";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
@@ -683,14 +683,7 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
             size={drawerWidth}
         >
             <CopilotRemoteConsentNotice route="board-brief" />
-            <div
-                aria-atomic="true"
-                aria-live="polite"
-                role="status"
-                style={srOnlyLiveRegionStyle}
-            >
-                {briefStatusAnnouncement}
-            </div>
+            <SrOnlyLive>{briefStatusAnnouncement}</SrOnlyLive>
             {showBriefLoadingSkeleton && (
                 <div
                     aria-label={microcopy.a11y.generatingBrief}

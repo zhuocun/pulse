@@ -16,6 +16,7 @@ jest.mock("../../utils/hooks/useReactMutation");
 type DropdownMenuItem = {
     key?: string | number;
     label?: ReactNode;
+    onClick?: () => void;
 };
 
 type DropdownMockProps = {
@@ -41,8 +42,12 @@ jest.mock("antd", () => {
                     { "data-testid": "dropdown-menu" },
                     menu?.items?.map((item) =>
                         React.createElement(
-                            "div",
-                            { key: item.key },
+                            "button",
+                            {
+                                key: item.key,
+                                onClick: item.onClick,
+                                type: "button"
+                            },
                             item.label
                         )
                     )
@@ -327,11 +332,9 @@ describe("ProjectList", () => {
     });
 
     it("opens the edit flow from row actions", () => {
-        renderList();
+        renderList({ dataSource: [project()] });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^edit roadmap$/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
 
         expect(startEditing).toHaveBeenCalledWith("project-1");
     });
@@ -358,11 +361,9 @@ describe("ProjectList", () => {
                     update: jest.fn()
                 } as ReturnType<typeof Modal.confirm>;
             });
-        renderList();
+        renderList({ dataSource: [project()] });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete roadmap$/i })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
 
         expect(confirmSpy).toHaveBeenCalledWith(
             expect.objectContaining({
