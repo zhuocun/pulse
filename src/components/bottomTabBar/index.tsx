@@ -6,7 +6,7 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { useEffect, useRef, useState } from "react";
-import { NavLink, useLocation } from "react-router";
+import { NavLink } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import {
@@ -42,34 +42,32 @@ import {
 
 const KEYBOARD_HEIGHT_THRESHOLD_PX = 150;
 
+/* `end={false}` on /projects keeps the Boards tab active on nested
+ * routes ('/projects/:id/board'); the others require an exact match. */
 const TAB_DEFINITIONS = [
     {
         to: "/projects",
         labelKey: "boards" as const,
         icon: <AppstoreOutlined aria-hidden />,
-        /* `/projects` and any nested project route ('/projects/:id/board')
-         * keep the Boards tab active so a user deep in a board still sees
-         * the chassis nudge them home. */
-        matchPaths: (path: string) =>
-            path === "/projects" || path.startsWith("/projects/")
+        end: false
     },
     {
         to: "/inbox",
         labelKey: "inbox" as const,
         icon: <InboxOutlined aria-hidden />,
-        matchPaths: (path: string) => path === "/inbox"
+        end: true
     },
     {
         to: "/copilot",
         labelKey: "copilot" as const,
         icon: <RobotOutlined aria-hidden />,
-        matchPaths: (path: string) => path === "/copilot"
+        end: true
     },
     {
         to: "/settings",
         labelKey: "profile" as const,
         icon: <UserOutlined aria-hidden />,
-        matchPaths: (path: string) => path === "/settings"
+        end: true
     }
 ];
 
@@ -185,7 +183,6 @@ const TabLabel = styled.span`
 `;
 
 const BottomTabBar: React.FC = () => {
-    const location = useLocation();
     const tabsRef = useRef<HTMLAnchorElement[]>([]);
     const [keyboardOpen, setKeyboardOpen] = useState(false);
 
@@ -244,24 +241,20 @@ const BottomTabBar: React.FC = () => {
             data-testid="bottom-tab-bar"
             onKeyDown={onKeyDown}
         >
-            {TAB_DEFINITIONS.map((tab, idx) => {
-                const isActive = tab.matchPaths(location.pathname);
-                return (
-                    <TabLink
-                        key={tab.to}
-                        aria-current={isActive ? "page" : undefined}
-                        end={tab.to === "/projects" ? false : true}
-                        ref={(node: HTMLAnchorElement | null) => {
-                            tabsRef.current[idx] = node as HTMLAnchorElement;
-                        }}
-                        tabIndex={keyboardOpen ? -1 : 0}
-                        to={tab.to}
-                    >
-                        <TabIcon>{tab.icon}</TabIcon>
-                        <TabLabel>{microcopy.nav.tabs[tab.labelKey]}</TabLabel>
-                    </TabLink>
-                );
-            })}
+            {TAB_DEFINITIONS.map((tab, idx) => (
+                <TabLink
+                    key={tab.to}
+                    end={tab.end}
+                    ref={(node: HTMLAnchorElement | null) => {
+                        tabsRef.current[idx] = node as HTMLAnchorElement;
+                    }}
+                    tabIndex={keyboardOpen ? -1 : 0}
+                    to={tab.to}
+                >
+                    <TabIcon>{tab.icon}</TabIcon>
+                    <TabLabel>{microcopy.nav.tabs[tab.labelKey]}</TabLabel>
+                </TabLink>
+            ))}
         </Nav>
     );
 };
