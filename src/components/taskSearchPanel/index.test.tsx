@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
+import { microcopy } from "../../constants/microcopy";
 import useAuth from "../../utils/hooks/useAuth";
 
 import TaskSearchPanel, { TaskSearchParam } from ".";
@@ -266,6 +268,33 @@ describe("TaskSearchPanel", () => {
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toEqual(["Coordinators"]);
+        });
+    });
+
+    it("clears all active filters when the FilterChips clear-all CTA is pressed", async () => {
+        const rtlUser = userEvent.setup();
+        const setParam = jest.fn();
+        // Two active filters so the FilterChips CTA renders (it only
+        // appears at 2+ chips).
+        const param: TaskSearchParam = {
+            coordinatorId: "u1",
+            taskName: "checkout",
+            type: ""
+        };
+
+        renderPanel({ param, setParam });
+
+        await rtlUser.click(
+            screen.getByRole("button", {
+                name: new RegExp(`^${microcopy.actions.clear}$`, "i")
+            })
+        );
+
+        expect(setParam).toHaveBeenLastCalledWith({
+            coordinatorId: undefined,
+            semanticIds: undefined,
+            taskName: undefined,
+            type: undefined
         });
     });
 
