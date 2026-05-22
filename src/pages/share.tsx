@@ -173,18 +173,35 @@ const deriveTaskName = (params: {
 };
 
 /**
+ * Normalise a URL-ish string for case- and trailing-slash-insensitive
+ * comparison. Android Chrome routinely sends `text="Look: https://Example.com/x"`
+ * plus `url="https://example.com/x/"` — case + trailing slash mismatch.
+ * A raw substring check failed to dedup; this canonical form catches
+ * the embedded-in-text case across mixed casing and trailing slashes.
+ */
+const normalizeForDedup = (s: string): string => {
+    try {
+        const u = new URL(s);
+        return (
+            u.origin +
+            u.pathname.replace(/\/$/, "") +
+            u.search
+        ).toLowerCase();
+    } catch {
+        return s.toLowerCase();
+    }
+};
+
+/**
  * Compose the task note from the shared text + url. Each line is
  * preserved verbatim so the user can edit out whichever they don't
  * need. Returns `undefined` when both are empty so we don't ship a
  * blank-line note (the task-creation endpoint treats undefined as
  * "no note" — see `utils/optimisticUpdate/createTask.ts`).
  *
- * The URL is appended only when it's not already a substring of the
- * shared text. Android Chrome routinely packs the same URL into both
- * the `text` field (as the trailing portion of the shared snippet)
- * AND the `url` field; an exact-equality check failed to catch that
- * and the URL ended up rendered twice. Substring check covers both
- * the exact-match case and the embedded-in-text case.
+ * The URL is appended only when it's not already represented in the
+ * shared text. Comparison runs on the normalised forms so a case or
+ * trailing-slash mismatch (Android Chrome's quirk) still dedups.
  */
 const composeNote = (params: {
     text?: string;
@@ -194,7 +211,12 @@ const composeNote = (params: {
     const text = params.text?.trim();
     if (text) segments.push(text);
     const url = params.url?.trim();
-    if (url && !text?.includes(url)) segments.push(url);
+    if (url) {
+        const normalizedText = text ? normalizeForDedup(text) : "";
+        if (!normalizedText.includes(normalizeForDedup(url))) {
+            segments.push(url);
+        }
+    }
     return segments.length > 0 ? segments.join("\n\n") : undefined;
 };
 
