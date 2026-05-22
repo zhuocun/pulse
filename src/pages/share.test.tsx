@@ -170,6 +170,13 @@ describe("SharePage", () => {
         mockedUseReactQuery.mockReset();
     });
 
+    // Restore module-level mocks so subsequent test files start from a
+    // clean slate — without this, useReactQuery / useReactMutation stayed
+    // mocked across files and leaked into anything that imports them.
+    afterAll(() => {
+        jest.restoreAllMocks();
+    });
+
     it("renders the shared title as the default task name and shows the shared text + url", () => {
         wireQueries();
         const mutateAsync = jest.fn();
