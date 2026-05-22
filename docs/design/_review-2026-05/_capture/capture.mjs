@@ -256,8 +256,8 @@ const handle = (url, method) => {
     return { status: 200, body: {} };
 };
 
-const installMocks = async (page) => {
-    await page.route(/\/api\/v1\//, async (route, request) => {
+const installMocks = async (context) => {
+    await context.route("**/api/v1/**", async (route, request) => {
         const r = handle(request.url(), request.method());
         await route.fulfill({
             status: r.status,
@@ -265,10 +265,19 @@ const installMocks = async (page) => {
             body: JSON.stringify(r.body)
         });
     });
-    // Block analytics and any external host
-    await page.route(/^https?:\/\/(?!localhost)/, (route) =>
-        route.fulfill({ status: 200, contentType: "text/plain", body: "" })
-    );
+    // Block analytics and any external host (allow fonts.googleapis)
+    await context.route("**/*", async (route, request) => {
+        const url = request.url();
+        if (url.startsWith("http://localhost:3000") || url.startsWith("data:")) {
+            await route.continue();
+            return;
+        }
+        if (url.includes("fonts.googleapis") || url.includes("gstatic")) {
+            await route.continue();
+            return;
+        }
+        await route.fulfill({ status: 200, contentType: "text/plain", body: "" });
+    });
 };
 
 const setColorScheme = async (page, scheme) => {
@@ -396,8 +405,13 @@ const run = async () => {
         const context = await browser.newContext(contextOptions);
         await seedAuth(context);
         await seedColorScheme(context, scheme);
+        await installMocks(context);
         const page = await context.newPage();
-        await installMocks(page);
+        page.on("console", (m) => {
+            if (m.type() === "error" || m.type() === "warning") {
+                // console.log("    >", m.type(), m.text().slice(0, 160));
+            }
+        });
         await setColorScheme(page, scheme);
 
         const url = `${BASE_URL}${urlPath}`;
@@ -410,12 +424,20 @@ const run = async () => {
             // Wait for the AuthProvider spinner to clear (cached `users`).
             await page.waitForFunction(
                 () => {
-                    const spin = document.querySelector('[data-testid="page-spin"]');
-                    return !spin || spin.offsetParent === null;
+                    const status = document.querySelectorAll('[role="status"]');
+                    for (const el of status) {
+                        if (
+                            el.textContent &&
+                            el.textContent.toLowerCase().includes("loading")
+                        ) {
+                            return false;
+                        }
+                    }
+                    return true;
                 },
-                { timeout: 6000 }
+                { timeout: 8000 }
             ).catch(() => {});
-            await sleep(600);
+            await sleep(800);
 
             if (hook === "auth-then-create") {
                 // Click "Create project" CTA
