@@ -207,11 +207,12 @@ const BottomTabBar: React.FC = () => {
     }, []);
 
     /*
-     * Arrow-key navigation between tabs. The `<NavLink>` elements each
-     * remain in the page tab order so Tab into the bar lands on the
-     * first tab; ←/→ then walks across the bar without leaving the
-     * landmark. Home / End jump to the ends. Enter and Space activate
-     * the link via the browser default for anchors.
+     * Arrow-key navigation as a convenience. We use a <nav> landmark
+     * with NavLinks (not the ARIA tablist roving-tabindex pattern); each
+     * tab is independently Tab-reachable so screen-reader users walk
+     * them as plain links. ←/→ and Home/End move focus across the bar
+     * once the user has tabbed in. Enter and Space activate via the
+     * browser anchor default.
      */
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         const tabs = tabsRef.current.filter((node): node is HTMLAnchorElement =>
