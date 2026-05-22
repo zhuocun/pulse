@@ -402,16 +402,16 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             title: microcopy.confirm.deleteTask.title,
             content: microcopy.confirm.deleteTask.description,
             onOk() {
+                // Clear dirty state synchronously so the blocker won't
+                // intercept any close-during-delete fallback (B-C1).
+                isFormDirtyRef.current = false;
+                setIsFormDirty(false);
+                form.resetFields();
                 remove(
                     { taskId: id },
                     {
                         onSuccess: () => {
                             message.success(microcopy.feedback.taskDeleted);
-                            // Bypass the dirty-guard — the task no
-                            // longer exists, the form payload is
-                            // irrelevant. resetFields() first so the
-                            // blocker re-evaluates as `false`.
-                            form.resetFields();
                             closePanel();
                         },
                         onError: () =>
