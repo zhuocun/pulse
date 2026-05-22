@@ -25,6 +25,9 @@ def update_user(
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> Dict[str, Any]:
     user_id = current_user_id(payload)
+    if user_service.get(user_id) is None:
+        api_error(status.HTTP_404_NOT_FOUND, "User not found")
+
     errors = user_service.update_validation_errors(user_id, data)
     if errors:
         validation_errors(errors)

@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
-from langgraph.runtime import Runtime, get_runtime
+from langgraph.runtime import Runtime
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel
@@ -3932,8 +3932,9 @@ def test_aggregate_astream_tokens_covers_messages_loop(
         async def boom_astream(*args: Any, **kwargs: Any) -> Any:
             nonlocal boom_called
             boom_called = True
+            if False:
+                yield None
             raise RuntimeError("boom after state stored")
-            yield  # noqa: unreachable -- makes it an async generator
 
         agent.astream = boom_astream  # type: ignore[method-assign]
         try:
@@ -3990,8 +3991,9 @@ def test_aggregate_astream_tokens_no_propagate_swallows_aggregate_error(
     runtime._aggregate_astream_tokens = boom_agg  # type: ignore[method-assign]  # noqa: SLF001
 
     async def boom_astream(*args: Any, **kwargs: Any) -> Any:
+        if False:
+            yield None
         raise RuntimeError("no values before boom")
-        yield  # noqa: unreachable -- makes it an async generator
 
     agent.astream = boom_astream  # type: ignore[method-assign]
 

@@ -465,6 +465,34 @@ def test_logout_clears_the_session_cookie(client: TestClient) -> None:
     assert client.get("/api/v1/users/").status_code == 401
 
 
+def test_logout_clears_secure_session_cookie(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "securelogout",
+            "email": "securelogout@example.com",
+            "password": "secret",
+        },
+    )
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "securelogout@example.com", "password": "secret"},
+        headers={"X-Forwarded-Proto": "https"},
+    )
+    assert response.status_code == 200
+    assert "secure" in response.headers.get("set-cookie", "").lower()
+
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"X-Forwarded-Proto": "https"},
+    )
+
+    assert response.status_code == 204
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "max-age=0" in set_cookie
+    assert "secure" in set_cookie
+
+
 def test_login_session_cookie_is_secure_when_forwarded_proto_is_https(
     client: TestClient,
 ) -> None:
@@ -647,10 +675,9 @@ def test_project_board_task_error_paths(client: TestClient) -> None:
         == 404
     )
     assert client.delete("/api/v1/tasks/", headers=headers).status_code == 400
-    assert (
-        client.delete("/api/v1/tasks/?taskId=bad-id", headers=headers).status_code
-        == 400
-    )
+    response = client.delete("/api/v1/tasks/?taskId=bad-id", headers=headers)
+    assert response.status_code == 404
+    assert response.json() == {"error": "Task not found"}
     # The login earlier in this test put a session cookie in the
     # TestClient jar that httpx now sends automatically. Clear it so
     # this assertion exercises the unauthenticated path it was
@@ -673,6 +700,51 @@ def test_task_reorder_requires_valid_payload_with_auth(
         headers=auth_headers(logged_in["jwt"]),
     )
     assert response.status_code == 400
+
+
+def test_task_update_rejects_corrupt_editable_fields(client: TestClient) -> None:
+    logged_in = register_and_login(client)
+    headers = auth_headers(logged_in["jwt"])
+    ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
+
+    cases = [
+        ({"taskName": ""}, "Task name cannot be empty", "taskName"),
+        ({"storyPoints": "x"}, "Story points must be a positive number", "storyPoints"),
+        ({"storyPoints": -1}, "Story points must be a positive number", "storyPoints"),
+    ]
+    for patch, message, param in cases:
+        response = client.put(
+            "/api/v1/tasks/",
+            json={"_id": ids["task_id"], **patch},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert response.json()["error"][0]["msg"] == message
+        assert response.json()["error"][0]["param"] == param
+
+
+def test_task_create_rejects_corrupt_story_points(client: TestClient) -> None:
+    logged_in = register_and_login(client)
+    headers = auth_headers(logged_in["jwt"])
+    ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
+
+    for story_points in [True, "x", -1]:
+        response = client.post(
+            "/api/v1/tasks/",
+            json={
+                "projectId": ids["project_id"],
+                "columnId": ids["todo_id"],
+                "coordinatorId": logged_in["_id"],
+                "taskName": "Invalid estimate",
+                "storyPoints": story_points,
+            },
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert response.json()["error"][0]["msg"] == (
+            "Story points must be a positive number"
+        )
+        assert response.json()["error"][0]["param"] == "storyPoints"
 
 
 def test_board_create_before_default_columns_matches_express(
@@ -790,6 +862,40 @@ def test_user_error_paths(client: TestClient, store: FakeStore) -> None:
             {
                 "msg": "Username has been registered",
                 "value": "bob",
+                "param": "username",
+                "location": "body",
+            }
+        ]
+    }
+
+    response = client.put(
+        "/api/v1/users/",
+        json={"email": "not-an-email"},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": [
+            {
+                "msg": "The input is not an email address",
+                "value": "not-an-email",
+                "param": "email",
+                "location": "body",
+            }
+        ]
+    }
+
+    response = client.put(
+        "/api/v1/users/",
+        json={"username": "ab"},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": [
+            {
+                "msg": "Length of username cannot be less than 3",
+                "value": "ab",
                 "param": "username",
                 "location": "body",
             }

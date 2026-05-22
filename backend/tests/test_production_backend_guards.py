@@ -223,6 +223,24 @@ def test_validate_memory_agent_backends_no_op_when_both_postgres(
     main._validate_memory_agent_backends(cfg)
 
 
+def test_validate_settings_fails_on_hosted_env_without_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("UUID", raising=False)
+    monkeypatch.setattr(main, "assert_provider_available", lambda settings: None)
+    monkeypatch.setattr(
+        main, "assert_embeddings_provider_available", lambda settings: None
+    )
+    cfg = replace(
+        app_settings,
+        jwt_secret="ephemeral-but-long-enough-for-local-tests",
+    )
+
+    with pytest.raises(RuntimeError, match="UUID env var must be set"):
+        main._validate_settings(cfg)
+
+
 # ---------------------------------------------------------------------------
 # _configure_middleware_backends — multi-instance warnings for memory backends
 # ---------------------------------------------------------------------------

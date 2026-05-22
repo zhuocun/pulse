@@ -852,25 +852,39 @@ class AgentRuntime:
                 # On a successful stream, aggregate token usage from the last
                 # ``values`` payload captured during the loop — avoids an extra
                 # ``aget_state`` Postgres round-trip on every successful stream.
-                if self._checkpointer is not None:
-                    try:
-                        self._aggregate_tokens_from_payload(
+                tokens_in = 0
+                tokens_out = 0
+                try:
+                    if self._checkpointer is not None:
+                        tokens_in, tokens_out = self._aggregate_tokens_from_payload(
                             _last_values_payload, run_span
                         )
-                    except AgentError:
-                        raise
-                    except (LookupError, KeyError, ValueError, RuntimeError):
-                        logger.debug(
-                            "astream token aggregation failed; span will show 0 tokens.",
-                            exc_info=True,
+                    else:
+                        tokens_in, tokens_out = self._tokens_from_payload(
+                            _last_values_payload
                         )
+                except AgentError:
+                    raise
+                except (LookupError, KeyError, ValueError, RuntimeError):
+                    logger.debug(
+                        "astream token aggregation failed; span will show 0 tokens.",
+                        exc_info=True,
+                    )
+                if tokens_in or tokens_out:
+                    yield (
+                        "usage",
+                        {
+                            "kind": "usage",
+                            "tokensIn": tokens_in,
+                            "tokensOut": tokens_out,
+                        },
+                    )
 
-    def _aggregate_tokens_from_payload(
+    def _tokens_from_payload(
         self,
         payload: Any,
-        run_span: Any,
-    ) -> None:
-        """Aggregate token usage from a ``values`` payload and report on span.
+    ) -> tuple[int, int]:
+        """Aggregate token usage from a ``values`` payload.
 
         Called on the success path of :meth:`astream` using the last captured
         ``values`` payload, avoiding a separate ``aget_state`` Postgres
@@ -885,7 +899,16 @@ class AgentRuntime:
             ti, to = extract_token_usage(msg)
             tokens_in += ti
             tokens_out += to
+        return tokens_in, tokens_out
+
+    def _aggregate_tokens_from_payload(
+        self,
+        payload: Any,
+        run_span: Any,
+    ) -> tuple[int, int]:
+        tokens_in, tokens_out = self._tokens_from_payload(payload)
         run_span.set_token_usage(tokens_in, tokens_out)
+        return tokens_in, tokens_out
 
     async def _aggregate_astream_tokens(
         self,

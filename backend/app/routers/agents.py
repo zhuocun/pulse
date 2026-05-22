@@ -42,7 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.agents import AgentConfigurationError, AgentRuntime
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.errors import AgentError, agent_http_error_detail
-from app.agents.limits import enforce_request_limits
+from app.agents.limits import enforce_request_limits, iter_message_content_texts
 from app.agents.llm import estimate_text_tokens, result_token_usage_from_graph_result
 from app.agents.sse import (
     DONE_FRAME,
@@ -773,9 +773,8 @@ def _input_token_estimate(inputs: Mapping[str, Any]) -> int:
     if isinstance(messages, list):
         for message in messages:
             if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, str):
-                    total += estimate_text_tokens(content)
+                for text in iter_message_content_texts(message.get("content")):
+                    total += estimate_text_tokens(text)
     return max(1, total)
 
 
@@ -1197,6 +1196,13 @@ async def stream_agent(
                         **options,
                     )
                     async for mode, chunk in _with_disconnect(request, stream, timeout):
+                        if mode == "usage":
+                            usage = _maybe_capture_usage(
+                                {"data": chunk if isinstance(chunk, dict) else {}}
+                            )
+                            if usage is not None:
+                                tokens_in_total, tokens_out_total = usage
+                            continue
                         for envelope in translate_event(mode, chunk):
                             yield encode_sse(envelope)
                             if envelope.get("type") == "custom":

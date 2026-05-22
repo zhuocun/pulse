@@ -37,6 +37,14 @@ def register(data: Dict[str, Any]) -> str:
                 "Length of username cannot be less than 3",
             )
         )
+    elif repository.find_one(USERS, {"username": username}) is not None:
+        errors.append(
+            make_validation_error(
+                "Username has already been registered",
+                "username",
+                username,
+            )
+        )
 
     email = data.get("email")
     if not isinstance(email, str) or email == "":

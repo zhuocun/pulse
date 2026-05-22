@@ -54,11 +54,13 @@ def fake_redis() -> Iterable[fakeredis.FakeRedis]:
 
 
 @pytest.fixture(autouse=True)
-def _restore_module_singletons() -> Iterable[None]:
+def _restore_module_singletons(monkeypatch: pytest.MonkeyPatch) -> Iterable[None]:
     """Swap the module-level singletons back to a fresh in-memory
     backend after each test so a swap performed by one case never
     leaks into another."""
 
+    monkeypatch.delenv("WEB_CONCURRENCY", raising=False)
+    monkeypatch.delenv("UVICORN_WORKERS", raising=False)
     original_budget = _budget.budget_tracker
     original_rate_limit = _rate_limit.rate_limiter
     yield
@@ -425,6 +427,27 @@ def test_configure_middleware_backends_requires_redis_uri_for_redis_backend() ->
         redis_uri="",
     )
     with pytest.raises(RuntimeError, match="REDIS_URI is empty"):
+        main._configure_middleware_backends(cfg)
+
+
+def test_configure_middleware_backends_pings_redis_at_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BrokenRedis:
+        def ping(self) -> None:
+            raise OSError("refused")
+
+    monkeypatch.setattr(
+        redis_backends, "build_redis_client", lambda _uri: _BrokenRedis()
+    )
+    cfg = replace(
+        app_settings,
+        rate_limit_backend="redis",
+        budget_backend="memory",
+        redis_uri="redis://stub",
+    )
+
+    with pytest.raises(RuntimeError, match="REDIS_URI is not reachable"):
         main._configure_middleware_backends(cfg)
 
 

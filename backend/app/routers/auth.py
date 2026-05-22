@@ -63,7 +63,7 @@ def login(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response) -> Response:
+def logout(request: Request, response: Response) -> Response:
     # Clearing must match the cookie's Path so the browser actually
     # removes it. ``Secure`` / ``SameSite`` are irrelevant on a delete
     # but ``HttpOnly`` keeps any in-flight handler-side cookie reads
@@ -72,6 +72,7 @@ def logout(response: Response) -> Response:
         key=SESSION_COOKIE_NAME,
         path="/",
         httponly=True,
+        secure=_session_cookie_secure(request),
         samesite="lax",
     )
     response.status_code = status.HTTP_204_NO_CONTENT

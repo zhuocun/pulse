@@ -11,6 +11,7 @@ from pytest import FixtureRequest
 
 from app import main, security
 from app.agents.limits import enforce_request_limits
+from app.routers.agents import _input_token_estimate
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
 
@@ -68,6 +69,63 @@ def test_inputs_message_oversized_content_raises_413() -> None:
     with pytest.raises(Exception) as exc_info:
         enforce_request_limits({"inputs": {"messages": msgs}})
     assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
+def test_inputs_oversized_prompt_raises_413() -> None:
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"inputs": {"prompt": "x" * 9000}})
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
+def test_inputs_message_oversized_content_block_raises_413() -> None:
+    msgs = [
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "x" * 9000}],
+        }
+    ]
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"inputs": {"messages": msgs}})
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
+def test_inputs_message_oversized_tool_result_block_raises_413() -> None:
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "content": [{"type": "text", "text": "x" * 9000}],
+                }
+            ],
+        }
+    ]
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"inputs": {"messages": msgs}})
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
+def test_input_token_estimate_counts_content_blocks() -> None:
+    assert (
+        _input_token_estimate(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "hello world"},
+                            {
+                                "type": "tool_result",
+                                "content": [{"type": "text", "text": "tool output"}],
+                            },
+                        ],
+                    }
+                ]
+            }
+        )
+        > 1
+    )
 
 
 def test_exactly_50_messages_passes() -> None:
@@ -189,8 +247,8 @@ def test_v1_normal_payload_passes(
         "context": {"project": {"_id": "p-1"}},
     }
     resp = ai_client.post("/api/ai/task-draft", json=payload, headers=ai_headers)
-    # Any non-413 status means the limit check passed (could be 200 or other errors)
-    assert resp.status_code != HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+    assert resp.status_code == HTTPStatus.OK
+    assert "taskName" in resp.json()
 
 
 # ---------------------------------------------------------------------------

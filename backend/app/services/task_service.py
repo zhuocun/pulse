@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, List, Optional, Union
 
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
@@ -5,7 +6,7 @@ from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
 from app.services.board_service import DEFAULT_COLUMNS
 from app.services.project_service import is_project_manager
-from app.validation import sorted_by_index
+from app.validation import body_error, sorted_by_index
 
 # Fields a manager may write via PUT /tasks. Repository-managed fields
 # (``_id`` / ``createdAt`` / ``updatedAt``) and ordering-managed fields
@@ -30,6 +31,27 @@ def _same_project(*items: Dict[str, Any]) -> bool:
         str(item.get("projectId")) for item in items if item.get("projectId")
     }
     return len(project_ids) == 1
+
+
+def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    story_points = data.get("storyPoints")
+    if (
+        not isinstance(story_points, (int, float))
+        or isinstance(story_points, bool)
+        or not math.isfinite(story_points)
+        or story_points <= 0
+    ):
+        return body_error(
+            data, "storyPoints", "Story points must be a positive number"
+        )
+    return None
+
+
+def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if "storyPoints" not in data:
+        return []
+    error = _story_points_error(data)
+    return [error] if error is not None else []
 
 
 def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
@@ -118,6 +140,19 @@ def get(project_id: str, user_id: str) -> Union[List[Dict[str, Any]], str]:
         tasks = repository.find_many(TASKS, {"projectId": project_id})
 
     return repository.serialize_documents(sorted_by_index(tasks))
+
+
+def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    errors = []
+    if "taskName" in data:
+        task_name = data.get("taskName")
+        if not isinstance(task_name, str) or task_name == "":
+            errors.append(body_error(data, "taskName", "Task name cannot be empty"))
+    if "storyPoints" in data:
+        error = _story_points_error(data)
+        if error is not None:
+            errors.append(error)
+    return errors
 
 
 def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
