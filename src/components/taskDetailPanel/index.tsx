@@ -14,7 +14,7 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
@@ -252,45 +252,48 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const members = membersData ?? [];
 
     /**
-     * Returns true when the form has at least one user-supplied edit
-     * relative to the canonical task payload. We can't rely on
+     * Dirty flag driven by `onValuesChange`. We can't rely on
      * `form.isFieldsTouched()` alone — AntD treats `setFieldsValue`
      * (which we call on every `editingTask` change) as a "touch" so
-     * the flag would be permanently true. Instead, compare the live
-     * form values against `editingTask`. The dirty flag drives both
-     * the close-on-mask blocker (next commit) and the
-     * `taskMissingAfterLoad` recovery banner above.
+     * the flag would be permanently true. We also can't lazily diff
+     * via `form.getFieldsValue()` inside `useBlocker`'s callback —
+     * the blocker callback is captured at render time and would read
+     * stale state on the navigation tick.
+     *
+     * The state flips:
+     *   - false → true on any user-driven `onValuesChange` whose
+     *     merged result diverges from `editingTask`.
+     *   - true → false when the user discards (Modal.confirm OK,
+     *     `form.resetFields()`), saves successfully, or the task
+     *     deletes.
+     *
+     * A ref mirrors the same value so the blocker callback (which
+     * the router re-invokes on every navigation attempt) always reads
+     * the latest dirty state without re-subscribing.
      */
-    const isFormDirty = useMemo(() => {
-        if (!editingTask) return false;
-        const live = form.getFieldsValue();
-        const trimmedName =
-            typeof live.taskName === "string"
-                ? live.taskName.trim()
-                : live.taskName;
-        const merged = { ...editingTask, ...live, taskName: trimmedName };
-        // Touch the dependency so this memo re-runs on every field
-        // change — `formTick` increments inside `onValuesChange`.
-        void formTick;
-        return !shallowEqual(merged, editingTask);
-    }, [editingTask, form, formTick]);
+    const [isFormDirty, setIsFormDirty] = useState(false);
+    const isFormDirtyRef = useRef(false);
+    isFormDirtyRef.current = isFormDirty;
 
-    // Confirm-dialog state for the dirty-state guard. Wired to
-    // `useBlocker` in a follow-up commit; the renderer below already
-    // honors the `pendingClose` state so the back-button path works
-    // identically to the mask click.
+    // Confirm-dialog state for the mask-click / Esc / explicit close
+    // path. Wires the same dialog as the useBlocker programmatic-
+    // navigation path so the user sees one consistent confirmation
+    // surface regardless of how they tried to leave.
     const [pendingClose, setPendingClose] = useState(false);
 
     const closePanel = useCallback(() => {
         form.resetFields();
+        setIsFormDirty(false);
+        isFormDirtyRef.current = false;
         setSaveError(null);
         setAppliedFieldOrigin({});
         setPendingClose(false);
-        // useNavigate(-1) preserves browser history so a tab opened on
-        // a deep URL (with no prior board entry) doesn't navigate to a
-        // blank page — we resolve the board-level URL relative to the
-        // current route. Use the route-aware fallback so deep links
-        // still close gracefully.
+        // Navigate to the board URL. We can't use `navigate(-1)`
+        // because a deep-link visitor (or a fresh tab opened to
+        // `/projects/:projectId/board/task/:taskId`) has no history
+        // entry to pop back to — `navigate(-1)` would no-op or land
+        // outside the app. Going to the board URL works both for
+        // freshly-loaded sessions and within-app opens.
         navigate(`/projects/${projectId}/board`);
     }, [form, navigate, projectId]);
 
@@ -300,20 +303,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * while the form has uncommitted edits — covers programmatic
      * `navigate(...)`, browser back, iOS swipe-back, and Android
      * system back, because react-router 7's blocker hooks into the
-     * History API for all three. The mask-click path goes through
-     * the drawer's `onClose` which calls our `requestClose` below
-     * and falls through to the same confirm dialog.
+     * History API for all three. The mask-click path is handled
+     * separately by `requestClose` below; both surfaces converge on
+     * the same `Modal.confirm`.
      */
     const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-        // Don't block if we're not actually moving (StrictMode double
-        // render guard). currentLocation === nextLocation happens when
-        // the blocker re-evaluates after `reset()`.
+        // Don't block self-navigation (StrictMode re-renders, or the
+        // identity-equal re-entry that `blocker.reset()` triggers).
         if (currentLocation.pathname === nextLocation.pathname) return false;
-        // Don't block when there are no dirty edits, or when the
-        // user has explicitly approved the close via the dialog —
-        // the `closePanel`/`reset()` path runs `form.resetFields()`
-        // first so `isFormDirty` is already false by then.
-        return isFormDirty;
+        return isFormDirtyRef.current;
     });
 
     /**
@@ -321,12 +319,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * dirty, surface the confirm dialog; otherwise close immediately.
      */
     const requestClose = useCallback(() => {
-        if (isFormDirty) {
+        if (isFormDirtyRef.current) {
             setPendingClose(true);
             return;
         }
         closePanel();
-    }, [closePanel, isFormDirty]);
+    }, [closePanel]);
 
     const markFieldAsCopilotApplied = useCallback((field: TaskPanelField) => {
         setAppliedFieldOrigin((prev) => ({ ...prev, [field]: "copilot" }));
@@ -722,10 +720,36 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         form={form}
                         initialValues={editingTask}
                         layout="vertical"
-                        onValuesChange={(changedValues) => {
+                        onValuesChange={(changedValues, allValues) => {
                             setFormTick((tick) => tick + 1);
                             if (saveError) setSaveError(null);
                             clearOriginOnManualEdits(changedValues);
+                            /*
+                             * Flip the dirty flag iff the current
+                             * form contents diverge from the
+                             * persisted task. Trim the taskName
+                             * before comparing so trailing whitespace
+                             * doesn't read as a real edit. Mirroring
+                             * the same trim that `onSubmit` applies
+                             * keeps the dirty signal in lockstep
+                             * with the persistence boundary.
+                             */
+                            if (!editingTask) return;
+                            const trimmedName =
+                                typeof allValues.taskName === "string"
+                                    ? allValues.taskName.trim()
+                                    : allValues.taskName;
+                            const merged = {
+                                ...editingTask,
+                                ...allValues,
+                                taskName: trimmedName
+                            };
+                            const nextDirty = !shallowEqual(
+                                merged,
+                                editingTask
+                            );
+                            setIsFormDirty(nextDirty);
+                            isFormDirtyRef.current = nextDirty;
                         }}
                     >
                         <Form.Item
@@ -917,28 +941,28 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 okButtonProps={{ danger: true }}
                 onCancel={() => {
                     setPendingClose(false);
-                    if (blocker.state === "blocked") blocker.reset?.();
+                    // "Keep editing" — cancel the navigation if the
+                    // blocker fired, otherwise just dismiss the
+                    // dialog and leave the panel open.
+                    if (blocker.state === "blocked") {
+                        blocker.reset?.();
+                    }
                 }}
                 onOk={() => {
                     setPendingClose(false);
+                    // "Discard" — clear the form first so the
+                    // blocker re-reads `isFormDirty` as false and
+                    // doesn't intercept the proceed-or-close call.
+                    form.resetFields();
+                    setIsFormDirty(false);
+                    isFormDirtyRef.current = false;
                     if (blocker.state === "blocked") {
-                        // The user approved the navigation; `proceed`
-                        // continues to the URL the blocker
-                        // intercepted. Clear the form first so the
-                        // blocker re-evaluation reads `isFormDirty`
-                        // as `false`.
-                        form.resetFields();
                         blocker.proceed?.();
                     } else {
                         closePanel();
                     }
                 }}
-                open={
-                    pendingClose ||
-                    (blocker.state === "blocked" &&
-                        blocker.location?.pathname !==
-                            `/projects/${projectId}/board/task/${taskId}`)
-                }
+                open={pendingClose || blocker.state === "blocked"}
                 title={microcopy.taskDetailPanel.confirmDiscardTitle}
                 width={Math.min(420, breakpoints.sm)}
             >
