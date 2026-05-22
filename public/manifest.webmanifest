@@ -17,6 +17,13 @@
             "type": "image/svg+xml",
             "form_factor": "narrow",
             "label": "Pulse project board on mobile"
+        },
+        {
+            "src": "/icons/icon-512.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "form_factor": "wide",
+            "label": "Pulse project board on desktop"
         }
     ],
     "icons": [
@@ -67,6 +74,34 @@
             "sizes": "512x512",
             "type": "image/svg+xml",
             "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "New task",
+            "short_name": "New task",
+            "description": "Open the project list to pick a board and create a task.",
+            "url": "/projects?openTaskCreator=1",
+            "icons": [
+                {
+                    "src": "/icons/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
+        },
+        {
+            "name": "Open Copilot",
+            "short_name": "Copilot",
+            "description": "Open Pulse with Board Copilot ready to ask.",
+            "url": "/projects?openCopilot=1",
+            "icons": [
+                {
+                    "src": "/icons/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
         }
     ]
 }
