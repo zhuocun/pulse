@@ -234,7 +234,7 @@ const SAMPLE_USER: IUser = {
 
 const SAMPLE_PROJECT: IProject = {
     _id: "proj-1",
-    projectName: "Jira Clone",
+    projectName: "Pulse Demo",
     organization: "Acme Corp",
     managerId: "u1"
 };

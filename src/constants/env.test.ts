@@ -25,7 +25,7 @@ describe("environment", () => {
         // base is no longer derived from it -- that's what makes the
         // HttpOnly session cookie same-origin and immune to iOS 26.5's
         // ITP-driven cross-origin cookie drop.
-        process.env.REACT_APP_API_URL = "https://jira-api.example";
+        process.env.REACT_APP_API_URL = "https://api.example";
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
         process.env.REACT_APP_AI_USE_LOCAL = "true";
@@ -79,7 +79,7 @@ describe("environment", () => {
         // (which keeps Jest on the local engine by default) is bypassed.
         const previousNodeEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = "production";
-        process.env.REACT_APP_API_URL = "https://jira-api.example";
+        process.env.REACT_APP_API_URL = "https://api.example";
         delete process.env.REACT_APP_AI_BASE_URL;
         delete process.env.REACT_APP_AI_ENABLED;
         delete process.env.REACT_APP_AI_USE_LOCAL;
@@ -88,7 +88,7 @@ describe("environment", () => {
             jest.resetModules();
             const environment = require("./env").default;
 
-            expect(environment.aiBaseUrl).toBe("https://jira-api.example");
+            expect(environment.aiBaseUrl).toBe("https://api.example");
             expect(environment.aiUseLocalEngine).toBe(false);
         } finally {
             process.env.NODE_ENV = previousNodeEnv;

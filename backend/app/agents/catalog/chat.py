@@ -70,8 +70,8 @@ from app.observability.metrics import record_agent_mutation_event
 logger = logging.getLogger(__name__)
 
 _CHAT_AGENT_PROMPT = (
-    "You are Board Copilot, an assistant embedded in a Jira-style project "
-    "management tool. Answer concisely. To inspect board, project, task, "
+    "You are Board Copilot, an assistant embedded in a project management "
+    "tool. Answer concisely. To inspect board, project, task, "
     "or member data, call one of the listProjects / listMembers / "
     "getProject / listBoard / listTasks / getTask tools -- the FE will "
     "execute the call and return the result. Never invent ids or counts; "

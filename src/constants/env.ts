@@ -1,5 +1,5 @@
 /**
- * Environment configuration for the Jira React App.
+ * Environment configuration for the React app.
  *
  * Environment variables (all optional unless noted):
  *   REACT_APP_API_URL          — Origin of the REST API. Used only to

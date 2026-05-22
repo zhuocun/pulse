@@ -1,9 +1,9 @@
 ---
-name: jira-react-ux-sweep
-description: Discover and fix UI/UX regressions in this jira-react-app via headless-browser screenshots across routes, viewports, themes, and interaction states. Use when asked to audit the UI, review the design, find visual or accessibility regressions, screenshot the app, or "make the UI look right." Pairs each screenshot with a root-cause probe and a surgical fix; not for product/feature work or new pages.
+name: react-ux-sweep
+description: Discover and fix UI/UX regressions in this react-app via headless-browser screenshots across routes, viewports, themes, and interaction states. Use when asked to audit the UI, review the design, find visual or accessibility regressions, screenshot the app, or "make the UI look right." Pairs each screenshot with a root-cause probe and a surgical fix; not for product/feature work or new pages.
 ---
 
-# Jira React UX Sweep
+# React UX Sweep
 
 Find UI/UX issues by screenshot review and fix them in tight commits.
 The screenshot matrix is the discovery loop — don't skip it because

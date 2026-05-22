@@ -4,8 +4,8 @@ Provides a small, backend-agnostic contract for storing and recalling
 user / team preferences, facts, and shortcuts across sessions. Until
 this module landed, the agent only had short-term checkpoint state +
 task-similarity vectors; anything the user told the agent (``"always
-use the design template for new bug reports"``, ``"PR titles need a
-jira link"``) was forgotten between requests.
+use the design template for new bug reports"``, ``"PR titles need an
+issue link"``) was forgotten between requests.
 
 This module defines:
 

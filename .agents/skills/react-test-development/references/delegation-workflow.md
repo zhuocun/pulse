@@ -57,17 +57,17 @@ Adjust shards from current coverage output. At high coverage, split by uncovered
 Use a prompt like this, customized with exact paths:
 
 ```text
-Use the repo-local skill at .agents/skills/jira-react-test-development.
+Use the repo-local skill at .agents/skills/react-test-development.
 
 You are one worker in a parallel test-writing effort. You are not alone in the codebase. Do not revert or overwrite edits outside your assigned write set, and do not edit shared helpers unless explicitly assigned.
 
 Goal: add high-quality unit/integration tests for: <source area>.
 
 Read:
-- .agents/skills/jira-react-test-development/SKILL.md
-- .agents/skills/jira-react-test-development/references/project-map.md if you need app architecture
-- .agents/skills/jira-react-test-development/references/test-patterns.md for local testing patterns
-- .agents/skills/jira-react-test-development/references/test-inventory.md entries for your assigned files
+- .agents/skills/react-test-development/SKILL.md
+- .agents/skills/react-test-development/references/project-map.md if you need app architecture
+- .agents/skills/react-test-development/references/test-patterns.md for local testing patterns
+- .agents/skills/react-test-development/references/test-inventory.md entries for your assigned files
 - existing tests/helpers relevant to your assigned files
 
 Write ownership:

@@ -19,7 +19,7 @@ jest.mock("../../assets/logo-software.svg?react", () => {
         __esModule: true,
         default: (props: Record<string, unknown>) =>
             React.createElement("svg", {
-                "aria-label": "Jira Software",
+                "aria-label": "Pulse logo",
                 ...props
             })
     };

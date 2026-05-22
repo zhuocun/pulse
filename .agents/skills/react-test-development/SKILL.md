@@ -1,13 +1,13 @@
 ---
-name: jira-react-test-development
-description: Develop, extend, and maintain unit and integration tests for this jira-react-app repository until coverage reaches 100%. Use when Codex is asked to add tests, improve Jest/React Testing Library coverage, continue from any existing coverage percentage, create test helpers, test React pages/components/hooks/utils/state, or verify frontend behavior against mocked API contracts in this project.
+name: react-test-development
+description: Develop, extend, and maintain unit and integration tests for this react-app repository until coverage reaches 100%. Use when Codex is asked to add tests, improve Jest/React Testing Library coverage, continue from any existing coverage percentage, create test helpers, test React pages/components/hooks/utils/state, or verify frontend behavior against mocked API contracts in this project.
 ---
 
-# Jira React Test Development
+# React Test Development
 
 ## Overview
 
-Use this skill to continue test development for the React Jira-style app from any starting point. Treat every invocation as a resume from unknown progress: rebuild project context, audit existing tests, run coverage, then choose the next target.
+Use this skill to continue test development for the React app from any starting point. Treat every invocation as a resume from unknown progress: rebuild project context, audit existing tests, run coverage, then choose the next target.
 
 ## First Moves
 
