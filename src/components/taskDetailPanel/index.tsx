@@ -441,7 +441,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         setAppliedFieldOrigin({});
     }, [taskId]);
 
-    // After-load missing-task auto-close (only when no dirty edits)
+    // After-load missing-task auto-close (only when no dirty edits AND
+    // not mid-delete — otherwise optimistic cache eviction races the
+    // DELETE round-trip and the panel closes before failure rollback).
     useEffect(() => {
         if (
             !taskId ||
@@ -450,10 +452,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         ) {
             return;
         }
-        if (!editingTask && !form.isFieldsTouched()) {
+        if (!editingTask && !form.isFieldsTouched() && !dLoading) {
             closePanel();
         }
-    }, [closePanel, editingTask, form, taskId, tasks]);
+    }, [closePanel, dLoading, editingTask, form, taskId, tasks]);
 
     const liveValues = (() => {
         const fromForm = form.getFieldsValue();
