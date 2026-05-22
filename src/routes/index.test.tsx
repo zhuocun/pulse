@@ -42,7 +42,7 @@ jest.mock("../pages/board", () => ({
 }));
 jest.mock("../pages/share", () => ({
     __esModule: true,
-    default: () => null
+    default: () => <div data-testid="share-content">Share Route</div>
 }));
 jest.mock("../pages/inbox", () => ({
     __esModule: true,
@@ -276,7 +276,8 @@ describe("bottom-tab routes (Phase 3 A3)", () => {
     it.each([
         ["/inbox", "inbox-content"],
         ["/copilot", "copilot-landing-content"],
-        ["/settings", "settings-content"]
+        ["/settings", "settings-content"],
+        ["/share", "share-content"]
     ])(
         "renders %s through MainLayout for an authenticated visitor",
         async (path, testid) => {
@@ -288,7 +289,7 @@ describe("bottom-tab routes (Phase 3 A3)", () => {
         }
     );
 
-    it.each(["/inbox", "/copilot", "/settings"])(
+    it.each(["/inbox", "/copilot", "/settings", "/share"])(
         "redirects %s to /login for an unauthenticated visitor",
         async (path) => {
             renderAt(path);
