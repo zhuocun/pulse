@@ -29,6 +29,9 @@ const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
 const SharePage = lazy(() => import("../pages/share"));
+const InboxPage = lazy(() => import("../pages/inbox"));
+const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
+const SettingsPage = lazy(() => import("../pages/settings"));
 
 /**
  * Resolves the root URL by consulting authentication once, at the route
@@ -203,6 +206,28 @@ const routes = [
                     {
                         path: "share",
                         element: <SharePage />
+                    },
+                    /*
+                     * Bottom-tab destinations (Phase 3 A3). Inbox is the
+                     * future home of triage / mentions / AI activity (a
+                     * placeholder until A8 lands); Copilot is the no-board
+                     * landing surface that delegates to the existing chat
+                     * and brief drawers; Settings consolidates theme,
+                     * language, AI on/off, and logout in one routed page
+                     * so the phone header can drop its right-cluster
+                     * dropdown.
+                     */
+                    {
+                        path: "inbox",
+                        element: <InboxPage />
+                    },
+                    {
+                        path: "copilot",
+                        element: <CopilotLandingPage />
+                    },
+                    {
+                        path: "settings",
+                        element: <SettingsPage />
                     }
                 ]
             },
