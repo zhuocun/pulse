@@ -17,13 +17,6 @@
             "type": "image/svg+xml",
             "form_factor": "narrow",
             "label": "Pulse project board on mobile"
-        },
-        {
-            "src": "/icons/icon-512.svg",
-            "sizes": "512x512",
-            "type": "image/svg+xml",
-            "form_factor": "wide",
-            "label": "Pulse project board on desktop"
         }
     ],
     "icons": [
