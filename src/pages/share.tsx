@@ -302,13 +302,20 @@ const SharePage = () => {
 
     const onCreate = async () => {
         if (!canSubmit || !selectedProjectId || !selectedColumnId) return;
-        await mutateAsync({
-            taskName: taskName.trim(),
-            projectId: selectedProjectId,
-            columnId: selectedColumnId,
-            coordinatorId: user?._id,
-            note
-        });
+        try {
+            await mutateAsync({
+                taskName: taskName.trim(),
+                projectId: selectedProjectId,
+                columnId: selectedColumnId,
+                coordinatorId: user?._id,
+                note
+            });
+        } catch {
+            // Surface the failure: without this catch the success toast +
+            // navigate ran on rejection, silently dropping the user's data.
+            message.error(microcopy.feedback.saveFailed);
+            return;
+        }
         message.success(microcopy.feedback.taskSaved);
         navigate(`/projects/${selectedProjectId}/board`, {
             viewTransition: true
