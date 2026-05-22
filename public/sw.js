@@ -203,17 +203,28 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
+    /*
+     * Routing order is load-bearing: `isAppShellStatic` MUST run before
+     * `isImage`. Same-origin shell paths like `/icons/icon-*.png` and
+     * `/apple-touch-icon-*.png` would otherwise be captured by the
+     * generic image predicate and routed to IMAGE_CACHE's SWR strategy,
+     * defeating the cache-first contract those install assets need.
+     * Cross-origin images (CDN avatars, etc.) still flow through
+     * `isImage` because `isAppShellStatic` rejects non-same-origin URLs.
+     * See Bug 4 in `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+     */
+    if (isAppShellStatic(url)) {
+        // Same-origin static shell paths (icons, manifest, apple-touch-icon,
+        // /assets/ Vite bucket) cache-first.
+        event.respondWith(cacheFirst(event.request, STATIC_CACHE));
+        return;
+    }
+
     if (isImage(url)) {
         event.respondWith(staleWhileRevalidate(event.request, IMAGE_CACHE));
         return;
     }
 
-    if (isAppShellStatic(url)) {
-        // Same-origin static shell paths (icons, manifest, apple-touch-icon,
-        // /assets/ Vite bucket) cache-first. Everything else falls through
-        // to the browser's default network handling — no implicit SWR.
-        event.respondWith(cacheFirst(event.request, STATIC_CACHE));
-    }
     // NOTE: unclassified same-origin GETs intentionally fall through to
     // the browser's network handling. The previous catch-all SWR captured
     // any same-origin response into STATIC_CACHE — a footgun for future
