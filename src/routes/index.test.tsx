@@ -95,9 +95,9 @@ describe("routes", () => {
         // redirect (Navigate to "board"). The previous `useEffect`
         // force-redirect inside `ProjectDetailPage` was removed in QW-11.
         const children = projectDetailRoute?.children ?? [];
-        expect(
-            children[0] && "index" in children[0] && children[0].index
-        ).toBe(true);
+        expect(children[0] && "index" in children[0] && children[0].index).toBe(
+            true
+        );
         expect(children.slice(1).map((route) => route.path)).toEqual(["board"]);
     });
 });
