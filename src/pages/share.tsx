@@ -144,10 +144,20 @@ const ActionsRow = styled.div`
 `;
 
 /**
+ * Only http(s) URLs round-trip through the share UI — `javascript:`,
+ * `data:`, `file:` etc. don't XSS through React's text-escaping but
+ * the literal string would still be rendered to the user, who may
+ * casually copy/click it. Gate every URL-derived surface on this.
+ */
+const isSafeShareUrl = (s: string): boolean => /^https?:/i.test(s);
+
+/**
  * Build the task name from the share payload. Prefers the explicit
  * `title`, falls back to a trimmed prefix of the shared `text`, and
  * finally to the `url`'s host so we always have a non-empty label
  * for the resulting task. Mirrors what a user would type by hand.
+ * Non-http(s) URLs are ignored so a `javascript:` payload doesn't
+ * end up as the task name.
  */
 const deriveTaskName = (params: {
     title?: string;
@@ -162,7 +172,7 @@ const deriveTaskName = (params: {
         return text.length > 80 ? `${text.slice(0, 80).trimEnd()}…` : text;
     }
     const url = params.url?.trim();
-    if (url) {
+    if (url && isSafeShareUrl(url)) {
         try {
             return new URL(url).hostname;
         } catch {
@@ -211,7 +221,9 @@ const composeNote = (params: {
     const text = params.text?.trim();
     if (text) segments.push(text);
     const url = params.url?.trim();
-    if (url) {
+    // Drop non-http(s) URLs from the composed note so a javascript:
+    // / data: payload never lands in the saved task.
+    if (url && isSafeShareUrl(url)) {
         const normalizedText = text ? normalizeForDedup(text) : "";
         if (!normalizedText.includes(normalizeForDedup(url))) {
             segments.push(url);
@@ -389,8 +401,14 @@ const SharePage = () => {
         );
     }
 
+    // A non-http(s) URL is filtered out of every user-visible surface,
+    // so it doesn't count as a renderable payload — otherwise the
+    // summary card would render empty when the only param is e.g.
+    // url=javascript:alert(1).
     const hasPayload =
-        Boolean(params.title) || Boolean(params.text) || Boolean(params.url);
+        Boolean(params.title) ||
+        Boolean(params.text) ||
+        Boolean(params.url && isSafeShareUrl(params.url));
 
     return (
         <PageContainer>
@@ -421,7 +439,7 @@ const SharePage = () => {
                             <SummaryValue>{params.text}</SummaryValue>
                         </SummarySection>
                     ) : null}
-                    {params.url ? (
+                    {params.url && isSafeShareUrl(params.url) ? (
                         <SummarySection>
                             <SummaryLabel>
                                 {microcopy.share.summaryUrl}
