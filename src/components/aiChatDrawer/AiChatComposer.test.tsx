@@ -22,7 +22,7 @@ const renderComposer = (
         promptCharHintText: "0 / 2000",
         promptCharHintWarning: false,
         remoteHealthEnabled: false,
-        healthStatus: "unknown",
+        healthStatus: "ok",
         inputRef,
         ...overrides
     };
