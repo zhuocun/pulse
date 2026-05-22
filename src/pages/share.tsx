@@ -1,5 +1,14 @@
 import styled from "@emotion/styled";
-import { Alert, Button, Card, message, Select, Space, Typography } from "antd";
+import {
+    Alert,
+    Button,
+    Card,
+    Input,
+    message,
+    Select,
+    Space,
+    Typography
+} from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -396,18 +405,24 @@ const SharePage = () => {
                     <FieldLabel htmlFor="share-task-name">
                         {microcopy.fields.taskName}
                     </FieldLabel>
-                    <input
+                    {/*
+                     * Use the AntD `<Input>` so this field picks up
+                     * the same enterKeyHint / autoComplete / size
+                     * contract as the canonical task-name field in
+                     * `taskCreator`. The previous raw `<input>` lost
+                     * the iOS keyboard hint, the autoComplete=off
+                     * suppression, and the AntD focus styling, all
+                     * of which made the surface feel like a third-
+                     * party form drop-in instead of part of Pulse.
+                     */}
+                    <Input
                         aria-label={microcopy.fields.taskName}
-                        className="ant-input"
+                        autoComplete="off"
+                        enterKeyHint="done"
                         id="share-task-name"
+                        inputMode="text"
                         onChange={(e) => setTaskName(e.target.value)}
-                        type="text"
                         value={taskName}
-                        style={{
-                            borderRadius: radius.md,
-                            padding: `${space.xs}px ${space.sm}px`,
-                            width: "100%"
-                        }}
                     />
                 </FieldRow>
 
