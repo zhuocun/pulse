@@ -2,7 +2,7 @@ import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Form, Input, message } from "antd";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
@@ -26,6 +26,7 @@ const RegisterForm: React.FC<{
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [form] = Form.useForm<{
         email: string;
         username: string;
@@ -58,7 +59,14 @@ const RegisterForm: React.FC<{
             // request was received — without this the redirect can read
             // as a navigation glitch on a slow connection.
             message.success(microcopy.feedback.accountCreated);
-            navigate("/login", { viewTransition: true });
+            // Forward the original location state (e.g. the `from`
+            // hint set by `RequireAuth`) so a share → /login → "Sign
+            // up" → register → /login round-trip preserves the
+            // post-login redirect target.
+            navigate("/login", {
+                viewTransition: true,
+                state: location.state
+            });
         } catch {
             // Error state is set by useReactMutation's onError callback.
         }

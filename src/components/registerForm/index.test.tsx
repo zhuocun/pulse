@@ -6,7 +6,13 @@ import {
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BrowserRouter } from "react-router-dom";
+import {
+    BrowserRouter,
+    MemoryRouter,
+    Route,
+    Routes,
+    useLocation
+} from "react-router-dom";
 
 import useReactMutation from "../../utils/hooks/useReactMutation";
 
@@ -253,5 +259,62 @@ describe("RegisterForm", () => {
                 name: /^terms of service$/i
             })
         ).toHaveAttribute("href", "/auth/terms");
+    });
+
+    /*
+     * Share-target flow: external app → /share → /login (state.from=
+     * "/share?…") → user taps "Sign up" → register submits → form
+     * navigates to /login. The `from` hint must survive that hop so
+     * the subsequent login can return the user to /share. The probe
+     * route reads the forwarded router state directly so we don't
+     * have to round-trip through the real login form.
+     */
+    it("preserves the location state when redirecting to /login after register", async () => {
+        mockedUseReactMutation.mockReturnValue({
+            isLoading: false,
+            mutateAsync
+        } as unknown as ReturnType<typeof useReactMutation<unknown>>);
+        mutateAsync.mockResolvedValue({});
+
+        const LocationProbe = () => {
+            const loc = useLocation();
+            return (
+                <div data-testid="probe">
+                    {typeof loc.state === "object" && loc.state !== null
+                        ? JSON.stringify(loc.state)
+                        : ""}
+                </div>
+            );
+        };
+
+        render(
+            <MemoryRouter
+                initialEntries={[
+                    {
+                        pathname: "/register",
+                        state: { from: "/share?title=foo" }
+                    }
+                ]}
+            >
+                <Routes>
+                    <Route
+                        path="/register"
+                        element={<RegisterForm onError={jest.fn()} />}
+                    />
+                    <Route path="/login" element={<LocationProbe />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await changeField(/^email$/i, "alice@example.com");
+        await changeField(/^username$/i, "Alice");
+        await changeField(/^password$/i, "secret-password");
+        await submitRegister();
+
+        await waitFor(() => {
+            expect(screen.getByTestId("probe").textContent).toBe(
+                JSON.stringify({ from: "/share?title=foo" })
+            );
+        });
     });
 });
