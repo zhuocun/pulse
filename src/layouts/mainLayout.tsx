@@ -1,9 +1,11 @@
 import styled from "@emotion/styled";
+import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import BottomTabBar from "../components/bottomTabBar";
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
+import { PageSpin } from "../components/status";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
@@ -121,7 +123,11 @@ const MainLayout = () => {
             </SkipLink>
             <Header />
             <Main $hasBottomNav={showBottomNav} id="main-content" tabIndex={-1}>
-                <Outlet />
+                {/* Suspense lives inside the layout so the header + bottom
+                 * tab bar stay mounted while a lazy page chunk fetches. */}
+                <Suspense fallback={<PageSpin />}>
+                    <Outlet />
+                </Suspense>
             </Main>
             <ProjectModal />
             {showBottomNav ? <BottomTabBar /> : null}

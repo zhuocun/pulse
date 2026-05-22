@@ -5,9 +5,11 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Button, Card } from "antd";
+import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import BrandMark from "../components/brandMark";
+import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
 import {
     aurora,
@@ -363,7 +365,12 @@ const AuthLayout = () => {
                     <BrandMark size="md" />
                 </BrandHeader>
                 <FormCard>
-                    <Outlet />
+                    {/* Suspense lives inside the layout so the brand
+                     * chrome stays mounted while a lazy page chunk
+                     * fetches. */}
+                    <Suspense fallback={<PageSpin />}>
+                        <Outlet />
+                    </Suspense>
                 </FormCard>
             </Canvas>
         </Page>
