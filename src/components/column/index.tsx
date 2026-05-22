@@ -14,6 +14,7 @@ import { useParams } from "react-router-dom";
 
 import bugIcon from "../../assets/bug.svg";
 import taskIcon from "../../assets/task.svg";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import {
     brand,
@@ -31,6 +32,7 @@ import {
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
@@ -614,7 +616,24 @@ const Column = React.forwardRef<
         },
         ref
     ) => {
-        const { startEditing } = useTaskModal();
+        /*
+         * Demonstration callsite for the Phase 3 A2 routed task
+         * panel. When `environment.taskPanelRouted` is on, the card
+         * click navigates to `/projects/:projectId/board/task/:taskId`
+         * (URL state, deep-linkable, browser-back-friendly) via
+         * `useTaskPanelNavigation`. When the flag is off, the click
+         * dispatches the Redux overlay action through `useTaskModal`
+         * exactly as before — this PR only flips ONE callsite so
+         * users can toggle the flag and validate both paths end-to-
+         * end. The follow-up cleanup PR migrates remaining callsites
+         * (palette, triage nudge, AI assist's "open similar task"
+         * link) and removes `TaskModal` once validated.
+         */
+        const { startEditing: openViaModal } = useTaskModal();
+        const { openTask: openViaPanel } = useTaskPanelNavigation();
+        const startEditing = environment.taskPanelRouted
+            ? openViaPanel
+            : openViaModal;
         const columnDragHandleProps = useDetachedDragHandleProps();
         const filteredTasks = tasks.filter(
             (task) =>

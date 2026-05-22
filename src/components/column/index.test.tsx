@@ -3,15 +3,22 @@ import { Modal } from "antd";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { TaskSearchParam } from "../taskSearchPanel";
 
 import Column from ".";
 
 jest.mock("../../utils/hooks/useReactMutation");
 jest.mock("../../utils/hooks/useTaskModal");
+jest.mock("../../utils/hooks/useTaskPanelNavigation");
+jest.mock("../../constants/env", () => ({
+    __esModule: true,
+    default: { taskPanelRouted: false }
+}));
 
 type DragMockProps = {
     children: ReactNode;
@@ -125,6 +132,8 @@ jest.mock("antd", () => {
 
 const mockedUseReactMutation = useReactMutation as jest.Mock;
 const mockedUseTaskModal = useTaskModal as jest.Mock;
+const mockedUseTaskPanelNavigation = useTaskPanelNavigation as jest.Mock;
+const mockedEnvironment = environment as { taskPanelRouted: boolean };
 
 const column = (overrides: Partial<IColumn> = {}): IColumn => ({
     _id: "column-1",
@@ -156,6 +165,8 @@ const defaultParam: TaskSearchParam = {
 
 const removeColumn = jest.fn();
 const startEditing = jest.fn();
+const openTask = jest.fn();
+const closeTask = jest.fn();
 
 const renderColumn = ({
     boardColumn = column(),
@@ -186,6 +197,7 @@ const renderColumn = ({
 } = {}) => {
     mockedUseReactMutation.mockReturnValue({ mutate: removeColumn });
     mockedUseTaskModal.mockReturnValue({ startEditing });
+    mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
 
     return render(
         <MemoryRouter initialEntries={["/projects/project-1/board"]}>
@@ -211,6 +223,7 @@ const renderColumn = ({
 describe("Column", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockedEnvironment.taskPanelRouted = false;
     });
 
     it("renders the column title, matching task cards, and TaskCreator state", () => {
@@ -339,6 +352,23 @@ describe("Column", () => {
 
         expect(startEditing).toHaveBeenCalledTimes(1);
         expect(startEditing).toHaveBeenCalledWith("task-1");
+        // Routed-panel path is NOT taken when the flag is off.
+        expect(openTask).not.toHaveBeenCalled();
+    });
+
+    it("routes the click through useTaskPanelNavigation when the flag is on (Phase 3 A2)", () => {
+        // Flip the mocked environment flag. The column reads it lazily
+        // on render so this needs to happen before renderColumn().
+        mockedEnvironment.taskPanelRouted = true;
+        renderColumn();
+
+        fireEvent.click(screen.getByText("Build task"));
+
+        // openTask is wired; the legacy modal-opening startEditing is
+        // not called at all when the flag is on.
+        expect(openTask).toHaveBeenCalledTimes(1);
+        expect(openTask).toHaveBeenCalledWith("task-1");
+        expect(startEditing).not.toHaveBeenCalled();
     });
 
     it("disables drag and open behavior when a task id is empty", () => {
