@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import { Button, Card, Space, Typography } from "antd";
+import { Button, Card, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 
 import AiSparkleIcon from "../components/aiSparkleIcon";
@@ -38,8 +38,11 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 const PageHeading = styled(Typography.Title)`
     && {
+        align-items: center;
+        display: inline-flex;
         font-size: ${fontSize.xxl}px;
         font-weight: ${fontWeight.semibold};
+        gap: ${space.xs}px;
         line-height: ${lineHeight.tight};
         margin-bottom: ${space.xs}px;
     }
@@ -157,10 +160,15 @@ const CopilotLandingPage = () => {
     return (
         <PageContainer>
             <PageHeading level={1}>
-                <Space size={space.xs}>
-                    <AiSparkleIcon aria-hidden size="lg" />
-                    {microcopy.copilotLanding.heading}
-                </Space>
+                {/*
+                 * `<Space>` renders a `<div>`, which is flow content
+                 * and invalid inside the phrasing-only `<h1>`. The
+                 * styled PageHeading sets `display: inline-flex`
+                 * directly so the icon + label sit on the same line
+                 * without dropping a forbidden div inside the heading.
+                 */}
+                <AiSparkleIcon aria-hidden size="lg" />
+                <span>{microcopy.copilotLanding.heading}</span>
             </PageHeading>
             <PageSubtitle>{microcopy.copilotLanding.subtitle}</PageSubtitle>
             <CtaGrid>
