@@ -631,6 +631,31 @@ describe("TaskModal", () => {
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
     });
 
+    it("stacks the phone footer Delete → Cancel → Save so the primary lands in the thumb zone", async () => {
+        // Regression for QW-19 (docs/design/ui-ux-comprehensive-review-2026-05.md).
+        // The matchMedia mock returns `matches: false` for every query so
+        // AntD's `Grid.useBreakpoint` resolves to phone mode. The footer
+        // must render in DOM order Delete (top) → Cancel (middle) → Save
+        // (bottom) so the destructive control is far from the primary
+        // tap target. The DOM order is also the visual order in a flex
+        // column.
+        renderModal();
+        await screen.findByDisplayValue("Build task");
+
+        const footerButtons = Array.from(
+            document.querySelectorAll(".ant-modal-footer button")
+        ) as HTMLButtonElement[];
+        const labels = footerButtons.map(
+            (btn) => btn.textContent?.trim() ?? ""
+        );
+        const deleteIdx = labels.findIndex((label) => /^delete$/i.test(label));
+        const cancelIdx = labels.findIndex((label) => /^cancel$/i.test(label));
+        const saveIdx = labels.findIndex((label) => /^save$/i.test(label));
+        expect(deleteIdx).toBeGreaterThanOrEqual(0);
+        expect(cancelIdx).toBeGreaterThan(deleteIdx);
+        expect(saveIdx).toBeGreaterThan(cancelIdx);
+    });
+
     it("does not open the modal for optimistic placeholder ids while tasks are still loading", () => {
         renderModal({
             initialTasks: undefined,

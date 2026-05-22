@@ -122,8 +122,10 @@ const ProjectModal: React.FC = () => {
              * the OK button still gets the 8 px left margin and ends up
              * visibly offset from the Cancel button. Render a stacked
              * column without that inter-button margin so the two buttons
-             * line up edge-to-edge. Tablet / desktop keep the default
-             * right-aligned arrangement.
+             * line up edge-to-edge — with Save (primary) at the bottom in
+             * the thumb zone and Cancel above it per QW-19 in
+             * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+             * Tablet / desktop keep the default right-aligned arrangement.
              */
             footer={
                 !screens.sm
@@ -135,8 +137,8 @@ const ProjectModal: React.FC = () => {
                                   gap: space.xs
                               }}
                           >
-                              <OkBtn />
                               <CancelBtn />
+                              <OkBtn />
                           </div>
                       )
                     : undefined

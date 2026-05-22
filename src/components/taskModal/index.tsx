@@ -373,13 +373,16 @@ const TaskModal: React.FC<{
                     </Button>
                 );
                 /*
-                 * On phone widths the buttons stack full-width. The visual
-                 * order is Save (primary) → Cancel → Delete (destructive last)
-                 * so users do not accidentally tap the destructive control
-                 * with a thumb reaching for the primary action. On tablet+
-                 * we keep the conventional Delete-left, Cancel/Save-right
-                 * arrangement that matches the rest of the app's modal
-                 * footers.
+                 * On phone widths the buttons stack full-width with the
+                 * primary action in the thumb zone (bottom of the stack)
+                 * and the destructive Delete at the top of the stack,
+                 * de-emphasised as a danger-coloured text button. The
+                 * thumb-down reach is reserved for Save, Cancel sits
+                 * directly above it, and Delete is intentionally far from
+                 * the primary tap target. Desktop / tablet keeps the
+                 * conventional Delete-left, Cancel/Save-right
+                 * arrangement. See QW-19 in
+                 * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
                  */
                 if (!screens.sm) {
                     return (
@@ -390,9 +393,9 @@ const TaskModal: React.FC<{
                                 gap: space.xs
                             }}
                         >
-                            <OkBtn />
-                            <CancelBtn />
                             {deleteButton}
+                            <CancelBtn />
+                            <OkBtn />
                         </div>
                     );
                 }
