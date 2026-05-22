@@ -3,7 +3,7 @@ import { AuthSubtitle, AuthTitle } from "../../layouts/authLayout";
 import useTitle, { composeBrandedTitle } from "../../utils/hooks/useTitle";
 
 const TermsPage = () => {
-    useTitle(composeBrandedTitle(microcopy.pageTitle.terms));
+    useTitle(composeBrandedTitle(microcopy.pageTitle.terms), false);
 
     return (
         <>

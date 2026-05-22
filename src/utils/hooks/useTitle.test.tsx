@@ -70,4 +70,25 @@ describe("useTitle", () => {
 
         expect(document.title).toBe("Log in · Pulse");
     });
+
+    it("restores the previous document.title on unmount for the auth-pages call pattern (Bug 7)", () => {
+        // Bug 7 — the four auth pages (login, register, forgotPassword,
+        // terms) now pass `false` as the second argument so an
+        // intermediate route doesn't silently inherit the auth title.
+        // Today the project page immediately overrides on navigation,
+        // but the restore behaviour guarantees the previous title is
+        // preserved for any in-between routes (e.g. the Suspense fallback
+        // or a future post-auth interstitial).
+        document.title = "Previous title";
+
+        const { unmount } = renderHook(() =>
+            useTitle(composeBrandedTitle("Log in"), false)
+        );
+
+        expect(document.title).toBe("Log in · Pulse");
+
+        unmount();
+
+        expect(document.title).toBe("Previous title");
+    });
 });

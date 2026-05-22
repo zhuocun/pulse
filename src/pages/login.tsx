@@ -21,7 +21,7 @@ const SwitchAuthLink = styled(Link)`
 `;
 
 const LoginPage = () => {
-    useTitle(composeBrandedTitle(microcopy.pageTitle.login));
+    useTitle(composeBrandedTitle(microcopy.pageTitle.login), false);
     const { isAuthenticated } = useAuth();
     const [error, setError] = useState<Error | IError | null>(null);
 
