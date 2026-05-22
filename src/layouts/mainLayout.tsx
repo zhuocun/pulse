@@ -1,8 +1,11 @@
 import styled from "@emotion/styled";
+import { Grid } from "antd";
 import { Outlet } from "react-router";
 
+import BottomTabBar from "../components/bottomTabBar";
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
 
@@ -32,12 +35,24 @@ const Container = styled.div`
     min-height: 100dvh;
 `;
 
-const Main = styled.main`
+const Main = styled.main<{ $hasBottomNav: boolean }>`
     display: flex;
     flex-direction: column;
     min-height: 0;
     min-width: 0;
     scroll-padding-top: 64px;
+    /*
+     * When the bottom tab bar mounts (phone + flag on), reserve space so
+     * the fixed-position bar doesn't occlude the routed content. The
+     * 64 px figure matches the bar's 56 px touch target + 8 px top
+     * padding; safe-area-inset-bottom is added on top so iOS home
+     * indicator devices clear the gesture area. The bar itself owns the
+     * safe-area inset in its own padding-block-end so the icons stay
+     * within the visible band; this offset on the main region is the
+     * scroll-content clearance.
+     */
+    padding-bottom: ${(props) =>
+        props.$hasBottomNav ? "calc(64px + env(safe-area-inset-bottom))" : "0"};
 `;
 
 /**
@@ -84,16 +99,32 @@ const SkipLink = styled.a`
  * width down to 320px (WCAG 1.4.10).
  */
 const MainLayout = () => {
+    /*
+     * Bottom tab bar gating (Phase 3 A3). Two predicates compose:
+     *   - `environment.bottomNavEnabled` is the rollback kill-switch
+     *     (REACT_APP_BOTTOM_NAV_ENABLED=false brings back the
+     *     header-only chrome without a code revert).
+     *   - `Grid.useBreakpoint().md === false` keeps the bar to phone
+     *     widths only; the header chrome already owns desktop. We use
+     *     AntD's Grid hook to stay consistent with the rest of the
+     *     codebase (commandPalette, projectModal, taskModal all read
+     *     screens.md the same way).
+     */
+    const screens = Grid.useBreakpoint();
+    const isPhone = screens.md === false;
+    const showBottomNav = environment.bottomNavEnabled && isPhone;
+
     return (
         <Container>
             <SkipLink href="#main-content">
                 {microcopy.a11y.skipToMainContent}
             </SkipLink>
             <Header />
-            <Main id="main-content" tabIndex={-1}>
+            <Main $hasBottomNav={showBottomNav} id="main-content" tabIndex={-1}>
                 <Outlet />
             </Main>
             <ProjectModal />
+            {showBottomNav ? <BottomTabBar /> : null}
         </Container>
     );
 };
