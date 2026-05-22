@@ -435,11 +435,13 @@ describe("TaskDetailPanel", () => {
         fireEvent.change(input, { target: { value: "Edited" } });
 
         // Simulate a browser back / iOS swipe-back / Android system
-        // back by programmatically navigating. react-router 7's
-        // `useBlocker` intercepts the call — the URL doesn't move
-        // immediately, and the confirm dialog fires.
+        // back by programmatically navigating to a sibling task —
+        // the parent board URL is an explicit close target and bypasses
+        // the blocker. react-router 7's `useBlocker` intercepts the
+        // call — the URL doesn't move immediately, and the confirm
+        // dialog fires.
         act(() => {
-            router.navigate("/projects/project-1/board");
+            router.navigate("/projects/project-1/board/task/task-2");
         });
 
         expect(
@@ -462,7 +464,7 @@ describe("TaskDetailPanel", () => {
         fireEvent.change(input, { target: { value: "Edited" } });
 
         act(() => {
-            router.navigate("/projects/project-1/board");
+            router.navigate("/projects/project-1/board/task/task-2");
         });
 
         await screen.findByText(
@@ -476,10 +478,10 @@ describe("TaskDetailPanel", () => {
             await userEvent.click(discardButton);
         });
 
-        // Navigation completed — we're on the board URL.
+        // Navigation completed — we're on the sibling task URL.
         await waitFor(() => {
             expect(router.state.location.pathname).toBe(
-                "/projects/project-1/board"
+                "/projects/project-1/board/task/task-2"
             );
         });
     });
