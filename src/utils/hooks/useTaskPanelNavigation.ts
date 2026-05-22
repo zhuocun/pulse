@@ -41,10 +41,10 @@ const useTaskPanelNavigation = () => {
         (projectId?: string) => {
             const pid = projectId ?? currentProjectId;
             if (!pid) {
-                // Fall back to a normal "back one step" if we can't
-                // resolve the board URL — better than navigating to
-                // a non-existent route.
-                navigate(-1);
+                // Deep-link visitors have one history entry, so
+                // `navigate(-1)` is a no-op or exits the app. Land
+                // on the project list as a safe default (B-M3).
+                navigate("/projects", { viewTransition: true });
                 return;
             }
             navigate(`/projects/${pid}/board`);
