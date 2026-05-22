@@ -394,31 +394,6 @@ const Header: React.FC = () => {
     }, []);
 
     const items: MenuProps["items"] = [
-        {
-            key: "theme",
-            label: (
-                <SettingsRow>
-                    <Space size={space.xs}>
-                        {scheme === "dark" ? (
-                            <MoonOutlined aria-hidden />
-                        ) : (
-                            <SunOutlined aria-hidden />
-                        )}
-                        <Typography.Text>
-                            {microcopy.settings.darkMode}
-                        </Typography.Text>
-                    </Space>
-                    <Switch
-                        aria-label={microcopy.settings.toggleDarkMode}
-                        checked={scheme === "dark"}
-                        onChange={(checked) =>
-                            setPreference(checked ? "dark" : "light")
-                        }
-                        size="small"
-                    />
-                </SettingsRow>
-            )
-        },
         ...(aiAvailable
             ? [
                   {
