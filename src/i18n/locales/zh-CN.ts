@@ -623,6 +623,7 @@ const zhCN: Dictionary = {
         welcomeBannerBody:
             "起草任务、估算工作量、总结看板、回答问题 — 全部基于您的看板数据。",
         welcomeBannerCta: "试试:总结这个看板",
+        welcomeBannerCtaPrompt: "总结这个看板",
         welcomeBannerDismiss: "关闭",
         whyThisResult: "为什么是这个结果?",
         didYouMean: "您是想搜索:",

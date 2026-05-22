@@ -672,6 +672,13 @@ export const enSource = {
         welcomeBannerBody:
             "Draft tasks, estimate work, summarize the board, and answer questions — all from your board data.",
         welcomeBannerCta: "Try: Summarize this board",
+        /**
+         * The actual prompt sent to chat when the welcome banner CTA
+         * fires. Matches the user-facing wording of the suggestion in
+         * `chatSuggestions` so a user who picks the CTA gets the same
+         * experience as one who taps the chip in chat.
+         */
+        welcomeBannerCtaPrompt: "Summarize this board",
         welcomeBannerDismiss: "Dismiss",
         whyThisResult: "Why this result?",
         didYouMean: "Did you mean:",

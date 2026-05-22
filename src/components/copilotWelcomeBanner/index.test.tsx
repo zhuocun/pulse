@@ -42,7 +42,7 @@ describe("CopilotWelcomeBanner", () => {
         ).not.toBeInTheDocument();
     });
 
-    it("invokes onCta when the user clicks the primary CTA and dismisses the banner", () => {
+    it("invokes onCta when supplied and dismisses the banner", () => {
         const onCta = jest.fn();
         render(<CopilotWelcomeBanner storageKey={KEY} onCta={onCta} />);
         fireEvent.click(
@@ -54,5 +54,53 @@ describe("CopilotWelcomeBanner", () => {
         expect(
             screen.queryByText(microcopy.ai.welcomeBannerTitle)
         ).not.toBeInTheDocument();
+    });
+
+    it("dispatches `boardCopilot:openChat` with the canonical prompt when no onCta is supplied", () => {
+        // The default CTA opens chat pre-filled with "Summarize this
+        // board" — see PRD §8.1 + the 04·F11 review note. The host page
+        // already listens for `boardCopilot:openChat` (board.tsx /
+        // project.tsx); reusing that hook keeps the chat-open path
+        // single-sourced.
+        const handler = jest.fn();
+        window.addEventListener("boardCopilot:openChat", handler);
+        try {
+            render(<CopilotWelcomeBanner storageKey={KEY} />);
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.ai.welcomeBannerCta
+                })
+            );
+            expect(handler).toHaveBeenCalledTimes(1);
+            const event = handler.mock.calls[0][0] as CustomEvent<{
+                prompt: string;
+            }>;
+            expect(event.detail?.prompt).toBe(
+                microcopy.ai.welcomeBannerCtaPrompt
+            );
+            expect(
+                screen.queryByText(microcopy.ai.welcomeBannerTitle)
+            ).not.toBeInTheDocument();
+        } finally {
+            window.removeEventListener("boardCopilot:openChat", handler);
+        }
+    });
+
+    it("does not dispatch `boardCopilot:openChat` when onCta is supplied (host owns the open)", () => {
+        const handler = jest.fn();
+        window.addEventListener("boardCopilot:openChat", handler);
+        try {
+            const onCta = jest.fn();
+            render(<CopilotWelcomeBanner storageKey={KEY} onCta={onCta} />);
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.ai.welcomeBannerCta
+                })
+            );
+            expect(onCta).toHaveBeenCalledTimes(1);
+            expect(handler).not.toHaveBeenCalled();
+        } finally {
+            window.removeEventListener("boardCopilot:openChat", handler);
+        }
     });
 });
