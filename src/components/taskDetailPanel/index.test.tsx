@@ -222,15 +222,16 @@ describe("TaskDetailPanel", () => {
 
         await screen.findByText(/edit task · build task/i);
 
-        // AntD adds a placement class to the wrapper. Verify that
-        // the panel is NOT in the bottom-sheet shape (jsdom default
-        // mocks `pointer: coarse` to false, and `screens.md` is also
-        // false by default — but `useIsPhoneViewport` requires BOTH
-        // coarse AND not-md, so the right-drawer branch wins).
-        const drawerHost = document.querySelector(".ant-drawer-right");
-        const bottomHost = document.querySelector(".ant-drawer-bottom");
-        expect(drawerHost).not.toBeNull();
-        expect(bottomHost).toBeNull();
+        // Assert on the public `data-placement` attribute so we don't
+        // couple to AntD's internal `.ant-drawer-*` classnames (B-T2).
+        // jsdom default mocks `pointer: coarse` to false, so
+        // `useIsPhoneChrome()` returns false and the right-drawer
+        // branch wins.
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        );
+        expect(panel).not.toBeNull();
+        expect(panel?.getAttribute("data-placement")).toBe("right");
     });
 
     it("mounts as a bottom-sheet on coarse-pointer phone viewports", async () => {
@@ -238,10 +239,11 @@ describe("TaskDetailPanel", () => {
         renderPanelAt("/projects/project-1/board/task/task-1");
         await screen.findByText(/edit task · build task/i);
 
-        const bottomHost = document.querySelector(".ant-drawer-bottom");
-        const rightHost = document.querySelector(".ant-drawer-right");
-        expect(bottomHost).not.toBeNull();
-        expect(rightHost).toBeNull();
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        );
+        expect(panel).not.toBeNull();
+        expect(panel?.getAttribute("data-placement")).toBe("bottom");
         // Restore default mock for subsequent tests.
         installAntdBrowserMocks();
     });
