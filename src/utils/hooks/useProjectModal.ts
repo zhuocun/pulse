@@ -41,15 +41,27 @@ const useProjectModal = () => {
      * duplicate `/api/v1/projects?projectId=…` fetch every time the modal
      * opened, and mutations on `["projects"]` would have left the modal
      * staring at stale data.
+     *
+     * Without an ``editingProjectId`` the read collides with the list
+     * page's ``["projects", {}]`` cache entry (``filterRequest`` strips
+     * ``projectId: undefined``) and ``data`` arrives as the full project
+     * list — flipping ``isEditing`` true on the "Create project" CTA and
+     * shipping a modal titled "Edit project". Discard the colliding read
+     * here so callers only ever see a single ``IProject`` or
+     * ``undefined``.
      */
-    const { data: editingProject, isLoading } = useReactQuery<IProject>(
-        "projects",
-        { projectId: editingProjectId },
-        undefined,
-        undefined,
-        undefined,
-        Boolean(editingProjectId)
-    );
+    const isEditing = Boolean(editingProjectId);
+    const { data: queryData, isLoading: queryLoading } =
+        useReactQuery<IProject>(
+            "projects",
+            { projectId: editingProjectId },
+            undefined,
+            undefined,
+            undefined,
+            isEditing
+        );
+    const editingProject = isEditing ? queryData : undefined;
+    const isLoading = isEditing && queryLoading;
 
     const startEditing = useCallback(
         (id: string) => {
