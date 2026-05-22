@@ -263,7 +263,9 @@ describe("Header", () => {
         });
 
         fireEvent.click(accountTrigger());
-        await screen.findByRole("switch", { name: /toggle dark mode/i });
+        // Wait for the dropdown to render its language row before asserting
+        // the absence of the AI toggle.
+        await screen.findByRole("group", { name: /change language/i });
 
         expect(
             screen.queryByRole("switch", { name: /enable board copilot/i })
@@ -287,21 +289,10 @@ describe("Header", () => {
         expect(setEnabled.mock.calls[0][0]).toBe(false);
     });
 
-    it("toggles the color scheme via the dropdown switch", async () => {
-        const setPreference = jest.fn();
-        renderHeader("/projects/p1/board", undefined, {
-            preference: "light",
-            scheme: "light",
-            setPreference
-        });
-
-        fireEvent.click(accountTrigger());
-        fireEvent.click(
-            await screen.findByRole("switch", { name: /toggle dark mode/i })
-        );
-
-        expect(setPreference).toHaveBeenCalledWith("dark");
-    });
+    // The header dropdown no longer carries a theme toggle — that surface
+    // moved to the routed /settings page where the 3-state Segmented
+    // preserves the `system` preference. The inline IconButton remains the
+    // header's only theme control; see the IconButton test above.
 
     // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
     // least 24×24 CSS px, with AAA at 44×44. The header's account `PillTrigger`
