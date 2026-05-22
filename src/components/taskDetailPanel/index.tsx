@@ -14,7 +14,14 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    cloneElement,
+    isValidElement,
+    useCallback,
+    useEffect,
+    useRef,
+    useState
+} from "react";
 import { useBlocker, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
@@ -908,8 +915,28 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 open={pendingClose || blocker.state === "blocked"}
                 title={microcopy.taskDetailPanel.confirmDiscardTitle}
                 width={Math.min(420, breakpoints.sm)}
+                // Link the body to the dialog via aria-describedby so SR
+                // users hear the description right after the title (B-M4).
+                // rc-dialog renders the dialog div with hardcoded
+                // aria-labelledby only; modalRender wraps the inner
+                // container and lets us inject the aria attribute there.
+                modalRender={(node) =>
+                    isValidElement(node)
+                        ? cloneElement(
+                              node as React.ReactElement<{
+                                  "aria-describedby"?: string;
+                              }>,
+                              {
+                                  "aria-describedby":
+                                      "task-detail-panel-discard-body"
+                              }
+                          )
+                        : node
+                }
             >
-                {microcopy.taskDetailPanel.confirmDiscardBody}
+                <div id="task-detail-panel-discard-body">
+                    {microcopy.taskDetailPanel.confirmDiscardBody}
+                </div>
             </Modal>
         </Drawer>
     );
