@@ -17,7 +17,6 @@ import {
 } from "../theme/tokens";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
-import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
@@ -26,14 +25,20 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * is off (env or per-user toggle), the page renders an EmptyState
  * instead.
  *
- * Each CTA opens its drawer through the canonical Redux hook BEFORE
- * navigating. The drawer state lives in the global overlays slice, so
- * setting it here survives the route change; the project page mounts
- * an `<AiChatDrawer />` keyed off `useAiChatDrawer().open` and opens
- * automatically on first paint. The previous `dispatchEvent` +
- * `navigate` sequence raced the project page's mount and fired the
+ * The Ask CTA opens the chat drawer through the canonical Redux hook
+ * BEFORE navigating. The drawer state lives in the global overlays
+ * slice, so setting it here survives the route change; the project
+ * page mounts an `<AiChatDrawer />` keyed off `useAiChatDrawer().open`
+ * and opens automatically on first paint. The previous `dispatchEvent`
+ * + `navigate` sequence raced the project page's mount and fired the
  * event before any listener had subscribed (cold load) — the chat
  * never opened. Reading from Redux state on mount is race-proof.
+ *
+ * The Brief CTA only navigates: the brief drawer is mounted on the
+ * board page (not `/projects`), so setting the Redux flag here would
+ * leak across routes and pop the drawer the next time the user opened
+ * any board. The user picks a board from `/projects` and opens the
+ * brief from its header.
  */
 
 const PageHeading = styled(Typography.Title)`
@@ -115,7 +120,6 @@ const CopilotLandingPage = () => {
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
     const { openDrawer: openChatDrawer } = useAiChatDrawer();
-    const { openDrawer: openBriefDrawer } = useBoardBriefDrawer();
 
     if (!aiEnabled) {
         return (
@@ -147,13 +151,13 @@ const CopilotLandingPage = () => {
 
     const goToBrief = () => {
         /*
-         * The brief drawer is project-scoped (mounted on the board
-         * page). We set the Redux open flag here so that when the user
-         * picks a project + board, the board page opens the drawer on
-         * mount. Without the Redux bridge, a cold dispatchEvent fired
-         * before the board even rendered and the click was a no-op.
+         * The brief drawer is mounted only on the board page, never on
+         * `/projects`. Dispatching `openBriefDrawer()` here leaked the
+         * Redux flag across routes and ambushed the user with an
+         * uninvited drawer the next time they opened ANY board. The
+         * brief is a per-board concept, so the landing CTA just routes
+         * to the project list where the user picks a board.
          */
-        openBriefDrawer();
         navigate("/projects", { viewTransition: true });
     };
 
