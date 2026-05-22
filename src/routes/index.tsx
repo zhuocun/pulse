@@ -185,7 +185,9 @@ const TaskDetailPanelRoute = () => {
         // that contract.
         return null;
     }
-    return <TaskDetailPanel projectId={projectId} taskId={taskId} />;
+    return (
+        <TaskDetailPanel key={taskId} projectId={projectId} taskId={taskId} />
+    );
 };
 
 /**
