@@ -231,7 +231,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      */
     const taskMissingAfterLoad =
         Boolean(taskId) && !placeholderId && !tasksStillLoading && !editingTask;
-    const hasDirtyEdits = taskMissingAfterLoad && form.isFieldsTouched();
     const awaitingTaskResolution =
         Boolean(taskId) && !placeholderId && tasksStillLoading;
 
