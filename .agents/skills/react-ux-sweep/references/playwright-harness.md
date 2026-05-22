@@ -104,7 +104,7 @@ import pw from "/opt/node22/lib/node_modules/playwright/index.js";
 import fs from "node:fs";
 const { chromium } = pw;
 
-const OUT = "/tmp/jira-screens";
+const OUT = "/tmp/screens";
 fs.mkdirSync(OUT, { recursive: true });
 
 const json = (data, status = 200) => ({

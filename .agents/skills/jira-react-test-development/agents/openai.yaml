@@ -1,4 +1,0 @@
-interface:
-    display_name: "Jira React Test Development"
-    short_description: "Plan robust tests for this app"
-    default_prompt: "Use $jira-react-test-development to continue building unit and integration tests for this Jira React app."

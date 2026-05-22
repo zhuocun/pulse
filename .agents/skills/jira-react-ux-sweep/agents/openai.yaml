@@ -1,4 +1,0 @@
-interface:
-    display_name: "Jira React UX Sweep"
-    short_description: "Find and fix UI/UX issues by screenshot review"
-    default_prompt: "Use $jira-react-ux-sweep to audit the UI of this Jira React app, capture the screenshot matrix, and fix every issue found in surgical commits on the dev branch."
