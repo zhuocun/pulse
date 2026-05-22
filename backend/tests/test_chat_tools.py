@@ -27,15 +27,32 @@ _INVOCATIONS: tuple[tuple[str, dict[str, object]], ...] = (
     ("listBoard", {"projectId": "p-1"}),
     ("listTasks", {"projectId": "p-1"}),
     ("getTask", {"taskId": "t-1"}),
+    (
+        "requestMutationApproval",
+        {
+            "description": "Rename a task",
+            "risk": "low",
+            "diff": {
+                "task_updates": [
+                    {
+                        "task_id": "t-1",
+                        "field": "taskName",
+                        "from": "Old",
+                        "to": "New",
+                    }
+                ]
+            },
+        },
+    ),
 )
 
 
 def test_chat_tools_are_complete_and_named_for_the_fe_wire() -> None:
-    """All six tools are registered and the names match ``chatTools.ts``.
+    """All chat tools are registered and the names match the agent contract.
 
-    The FE dispatcher in ``src/utils/ai/chatTools.ts``
-    routes by the wire name; a typo here breaks the round-trip without
-    a clear error. The assertions below catch a rename / missing tool.
+    Read-tool names are the LangChain-facing names that the chat graph maps to
+    ``fe.*`` interrupts. ``requestMutationApproval`` is a model-facing proposal
+    tool that the graph converts into the typed HITL mutation lane.
     """
 
     by_name = {tool.name: tool for tool in CHAT_TOOLS}
@@ -44,16 +61,7 @@ def test_chat_tools_are_complete_and_named_for_the_fe_wire() -> None:
 
 
 def test_chat_tool_arg_shapes_match_fe_dispatcher() -> None:
-    """Each tool's top-level arg keys match what the FE dispatcher reads.
-
-    The FE dispatcher in ``src/utils/ai/chatTools.ts``
-    pulls fields from ``call.arguments`` by name (e.g. ``args.filter``,
-    ``args.projectId``). If the BE schema declares a flat
-    ``{taskName, type, ...}`` while the FE reads ``args.filter.taskName``,
-    every model-emitted filter is silently dropped at the dispatcher --
-    user-visible failure mode is "the AI ignores my filter request".
-    Pinning the contract here catches the regression at unit-test time.
-    """
+    """Each tool's top-level arg keys match the model-facing contract."""
 
     by_name = {tool.name: tool for tool in CHAT_TOOLS}
     expected: dict[str, set[str]] = {
@@ -63,6 +71,12 @@ def test_chat_tool_arg_shapes_match_fe_dispatcher() -> None:
         "listBoard": {"projectId"},
         "listTasks": {"projectId", "filter"},
         "getTask": {"taskId"},
+        "requestMutationApproval": {
+            "proposal_id",
+            "description",
+            "risk",
+            "diff",
+        },
     }
     for name, expected_keys in expected.items():
         actual_keys = set(by_name[name].args.keys())
@@ -73,14 +87,7 @@ def test_chat_tool_arg_shapes_match_fe_dispatcher() -> None:
 
 
 def test_list_tasks_filter_subschema_matches_fe_known_fields() -> None:
-    """The ``listTasks.filter`` sub-schema mirrors the FE dispatcher's
-    pass-through fields exactly.
-
-    ``chatTools.ts`` only forwards ``taskName``, ``type``,
-    ``coordinatorId``, and ``columnId``; any other field on
-    ``args.filter`` is dropped on the client. Steering the LLM toward
-    these exact names keeps the round-trip actionable.
-    """
+    """The ``listTasks.filter`` sub-schema advertises supported task fields."""
 
     by_name = {tool.name: tool for tool in CHAT_TOOLS}
     list_tasks = by_name["listTasks"]

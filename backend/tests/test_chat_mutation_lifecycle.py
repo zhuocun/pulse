@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
@@ -252,3 +252,161 @@ def test_chat_blank_proposal_id_drops_loudly() -> None:
     out = _mutation_hitl({"mutation_pending": {"proposal_id": "  "}})
     assert out["mutation_pending"] is None
     assert "missing id" in out["messages"][0].content
+
+
+def test_chat_real_model_read_tool_call_interrupts_and_resumes(
+    chat_graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real-provider tool calls must flow through v2.1 FE interrupts."""
+
+    class _FakeBound:
+        calls = 0
+
+        async def ainvoke(self, messages, config=None):  # type: ignore[no-untyped-def]
+            self.calls += 1
+            if self.calls == 1:
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "id": "call-tasks",
+                            "name": "listTasks",
+                            "args": {"projectId": "p-test"},
+                            "type": "tool_call",
+                        }
+                    ],
+                )
+            return AIMessage(content="Found one matching task.")
+
+    fake = _FakeBound()
+    import app.agents.catalog.chat as chat_module
+
+    monkeypatch.setattr(chat_module, "_get_bound", lambda _model: fake)
+    monkeypatch.setattr(chat_module, "is_stub_model", lambda _model: False)
+
+    async def run() -> None:
+        cfg = {"configurable": {"thread_id": "real-tool-1"}}
+        ctx = _ctx() | {"chat_model": object()}
+        first = await chat_graph.ainvoke(
+            {"messages": [HumanMessage(content="list the tasks")]},
+            config=cfg,
+            context=ctx,
+        )
+        interrupts = first.get("__interrupt__") or []
+        assert interrupts
+        assert interrupts[0].value == {
+            "tool": "fe.listTasks",
+            "args": {"projectId": "p-test", "project_id": "p-test"},
+        }
+
+        final = await chat_graph.ainvoke(
+            Command(resume={"tasks": [{"_id": "t1", "taskName": "Fix auth"}]}),
+            config=cfg,
+            context=ctx,
+        )
+        assert final["messages"][-1].content == "Found one matching task."
+
+    asyncio.run(run())
+
+
+def test_chat_real_model_get_task_tool_call_uses_fe_argument_casing(
+    chat_graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _FakeBound:
+        async def ainvoke(self, messages, config=None):  # type: ignore[no-untyped-def]
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "id": "call-task",
+                        "name": "getTask",
+                        "args": {"taskId": "t1", "projectId": "p-test"},
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+    import app.agents.catalog.chat as chat_module
+
+    monkeypatch.setattr(chat_module, "_get_bound", lambda _model: _FakeBound())
+    monkeypatch.setattr(chat_module, "is_stub_model", lambda _model: False)
+
+    async def run() -> None:
+        first = await chat_graph.ainvoke(
+            {"messages": [HumanMessage(content="open task t1")]},
+            config={"configurable": {"thread_id": "real-tool-casing-1"}},
+            context=_ctx() | {"chat_model": object()},
+        )
+        interrupts = first.get("__interrupt__") or []
+        assert interrupts
+        assert interrupts[0].value == {
+            "tool": "fe.getTask",
+            "args": {
+                "projectId": "p-test",
+                "project_id": "p-test",
+                "taskId": "t1",
+                "task_id": "t1",
+            },
+        }
+
+    asyncio.run(run())
+
+
+def test_chat_real_model_mutation_tool_call_enters_hitl(
+    chat_graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Organic provider proposals should use the same HITL lane as stub proposals."""
+
+    class _FakeBound:
+        async def ainvoke(self, messages, config=None):  # type: ignore[no-untyped-def]
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "id": "call-proposal",
+                        "name": "requestMutationApproval",
+                        "args": {
+                            "proposal_id": "organic-1",
+                            "description": "Rename the task",
+                            "risk": "low",
+                            "diff": {
+                                "task_updates": [
+                                    {
+                                        "task_id": "t1",
+                                        "field": "taskName",
+                                        "from": "Old title",
+                                        "to": "New title",
+                                    }
+                                ]
+                            },
+                        },
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+    import app.agents.catalog.chat as chat_module
+
+    monkeypatch.setattr(chat_module, "_get_bound", lambda _model: _FakeBound())
+    monkeypatch.setattr(chat_module, "is_stub_model", lambda _model: False)
+
+    async def run() -> None:
+        cfg = {"configurable": {"thread_id": "organic-proposal-1"}}
+        first = await chat_graph.ainvoke(
+            {"messages": [HumanMessage(content="rename this task")]},
+            config=cfg,
+            context=_ctx() | {"chat_model": object()},
+        )
+        events = first.get("events") or []
+        proposal_events = [
+            event
+            for event in events
+            if isinstance(event, dict) and event.get("kind") == "mutation_proposal"
+        ]
+        assert proposal_events
+        assert proposal_events[0]["proposal"]["proposal_id"] == "organic-1"
+        interrupts = first.get("__interrupt__") or []
+        assert interrupts
+        assert interrupts[0].value["tool"] == "fe.requestMutationApproval"
+
+    asyncio.run(run())

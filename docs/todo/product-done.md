@@ -7,8 +7,8 @@ open. Per-PR history lives in git log.
 
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes; architecture-theme backlog closed on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; **GA §1 partial** — stub LangGraph HITL + FE interrupts verified; **sign-off** tracks organic proposals + Mongo/Jest/replay proof ([`release-todo.md`](release-todo.md) §1; see git log for verifier transcripts). |
-| Last updated | 2026-05-21                                                                                                                                                                       |
+| Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes; architecture-theme backlog closed on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; **GA §1 closed** — organic chat proposals, v2.1 FE interrupts, mutation journal HTTP, and FE apply/undo path are covered by targeted tests ([`release-todo.md`](release-todo.md) §1). |
+| Last updated | 2026-05-22                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
 For the live GA / blocker / soft-blocker / polish status see
@@ -38,7 +38,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Security — `REACT_APP_AI_BASE_URL` validation, per-project AI opt-out, snake_case | — | ✅ |
 | `aiBaseUrl` 3-way resolution (defaults to `apiOrigin` for deployed builds) | — | ✅ |
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
-| Backend release gates | — | ⏳ **GA §1 partial:** stub LangGraph mutation lifecycle + journal APIs on integrate branch; **sign-off** for organic chat + Mongo-backed undo/record + apply/replay Jest proof — [`release-todo.md`](release-todo.md) §1; see git log for verifier transcripts |
+| Backend release gates | — | ✅ **GA §1 closed in code:** real-provider chat tool calls dispatch through v2.1 FE interrupts; organic `requestMutationApproval` emits `mutation_proposal`; mutation journal HTTP + FE apply/undo path covered — [`release-todo.md`](release-todo.md) §1 |
 | Cross-provider chat failover (`with_fallbacks`, `AGENT_CHAT_MODEL_FAILOVER`) | [`release-todo.md`](release-todo.md) §2 | ✅ Anthropic/OpenAI retryable-error failover with OTel hooks; `tests/test_llm_failover.py` |
 | Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; operator embeddings backfill remains |
 | Polish-step JSON schema (`PolishStep`, `method="json_schema"` when supported) | [`release-todo.md`](release-todo.md) §5 | ✅ Provider-level polish validation ahead of FE validators |
@@ -54,7 +54,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | `mapErrorResponse` honors typed `{code, message}` envelope | — | ✅ |
 | `useAgentChat.dismissNudge` propagates to `useAgent` inbox | — | ✅ |
 | Security — JWT-in-localStorage XSS exfiltration | [`release-todo.md`](release-todo.md) §3 | ✅ `ai_jwt` (`scp=ai_proxy`) in `sessionStorage`; AI calls prefer `AiProxyJwt` in `aiAuthHeader.ts`; REST rejects narrow proxy scope |
-| `AGENT_PROPOSAL_UNDONE` + mutation journal HTTP | — | ⏳ **Partial** — FE toast calls `agents/mutations/undo` after apply (`applyMutation.ts`); end-to-end **Mongo HTTP** + `applyMutationTool.run` Jest coverage not in verifier logs — [`release-todo.md`](release-todo.md) §1 |
+| `AGENT_PROPOSAL_UNDONE` + mutation journal HTTP | — | ✅ FE toast calls `agents/mutations/undo` after apply (`applyApprovedMutation.ts`); mutation journal HTTP + apply/undo path covered — [`release-todo.md`](release-todo.md) §1 |
 | Triage-agent on `/projects` list page | — | ⏳ Skipped (no `project_id`; rate-limit risk) |
 | `taskCreator` / `columnCreator` keyboard + a11y rebuild | UX (ui-todo §13) | ✅ `CreateLink` and `AddColumnButton` ship as real `<button type="button">` with focus-visible styling; the always-on faux empty column is gone (collapsed-button → input on click) |
 | `column` task card + dropdown actions a11y | UX (ui-todo §21) | ✅ `TaskCard` is a real `<button type="button">` with `aria-label`; dropdown menu uses AntD `<Dropdown>` + `NoPaddingButton` |
@@ -167,8 +167,8 @@ For the live GA / blocker / soft-blocker / polish status see
   `useAgent("chat-agent")` SSE; local builds use `useAiChat` and
   the deterministic engine. Accepts optional `pendingProposal` /
   `pendingNudges` props that render `MutationProposalCard` and
-  `NudgeCard` inline. Proposal card is gated off in production by
-  default (see GA Blocker §1 in `release-todo.md`).
+  `NudgeCard` inline. Proposal cards default on; operators can set
+  `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false` as a rollback.
 - `src/utils/hooks/useAiChat.ts` and
   `src/utils/hooks/useAgentChat.ts` — local and remote orchestrators.
 - `src/utils/ai/chatEngine.ts` — local assistant step
@@ -248,9 +248,10 @@ field value.
 
 - `agentClient.ts` parses Server-Sent `StreamPart` events and maps
   non-OK responses to typed errors.
-- `FE_TOOL_REGISTRY` exposes 12 read-only FE tools; six are
-  wire-bound to `chat-agent` via `chatTools.ts`. Snake_case args
-  match BE schemas.
+- `FE_TOOL_REGISTRY` exposes FE-executed tools for read access plus the
+  two-step mutation approval/apply lane. The remote `chat-agent` maps
+  model-facing chat-tool calls to canonical `fe.*` interrupts; snake_case
+  args match the FE registry.
 - `useAgent` drives a turn end-to-end, reduces stream parts into UI
   state, persists `thread_id` per `(name, project)`, auto-resumes
   on FE-tool interrupts, and enforces per-project AI opt-out.
@@ -318,7 +319,7 @@ first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
 | AC-C3 | All `taskId` and `memberId` references in the brief exist in the cache | ✅ (`validateBoardBrief`) |
 | AC-C4 | Brief is read-only except deep-linking into the existing task modal | ✅ |
 | AC-C5 | Drawer's request is aborted when the drawer closes | ✅ |
-| AC-D1 | Only registered read-only tools can run client-side | ✅ (`chatTools.ts` whitelist) |
+| AC-D1 | Only registered FE tools can run client-side | ✅ (`FE_TOOL_REGISTRY` whitelist) |
 | AC-D2 | Tool definitions not supplied from user thread (remote must own tools) | ✅ |
 | AC-D3 | Closing the chat drawer aborts in-flight work | ✅ |
 | AC-D4 | Conversation cleared on hard reload | ✅ (in-memory state only) |
@@ -397,10 +398,8 @@ REACT_APP_AI_USE_LOCAL=true npm run build
 
 ## What is open
 
-For the live numbered backlog see [`release-todo.md`](release-todo.md): **only
-🛑 GA §1** (`MutationProposal` accept + undo / `fe.applyMutation` path)
-remains an open **code** gate in that file. Beta §2/§3/§6 and soft §4/§5/§7
-are ✅ there (with operator caveats: Redis bundle for multi-worker,
-`MCP_ENABLED`, pgvector backfill, pinned Actions URLs, etc.). Proposal cards
-stay gated off by default until §1 closes (see §1 mitigation in
-[`release-todo.md`](release-todo.md)).
+For the live numbered backlog see [`release-todo.md`](release-todo.md): there is
+no remaining AI-code gate in that file. Beta §2/§3/§6 and soft §4/§5/§7 are ✅
+there (with operator caveats: Redis bundle for multi-worker, pgvector backfill,
+pinned Actions URLs, etc.). Proposal cards default on and can be rolled back with
+`REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false`.

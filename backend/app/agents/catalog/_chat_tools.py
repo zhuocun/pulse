@@ -2,10 +2,10 @@
 
 PRD v2.1 §5A.6 / Phase 3 of the Board Copilot rollout: when the chat
 agent has a real chat model it picks tools from this catalogue and the
-FE dispatcher in ``src/utils/ai/chatTools.ts`` executes
-them client-side. The FE owns the auth context + React Query cache the
-calls need, so executing them server-side would require duplicating
-that machinery.
+chat graph translates those model-facing calls into v2.1 ``fe.*``
+interrupts. The FE owns the auth context + React Query cache the calls
+need, so executing them server-side would require duplicating that
+machinery.
 
 **Single source of truth**: tool names, descriptions, and arg shapes are
 defined in :data:`app.tools.fe_tool_schemas.CHAT_TOOL_SCHEMAS`. This
@@ -13,9 +13,9 @@ module generates the LangChain :class:`~langchain_core.tools.BaseTool`
 stubs from that schema via :func:`build_chat_tools` so the contract
 lives in one place. The function bodies never run -- the LangChain
 ``StructuredTool`` only carries them as schemas for
-``BaseChatModel.bind_tools``. Names match the FE wire identifiers
-exactly (camelCase, no ``fe.`` prefix) so no translation is needed at
-either end.
+``BaseChatModel.bind_tools``. Names are intentionally model-facing
+camelCase identifiers; ``chat.py`` maps them to canonical ``fe.*`` tool
+names and argument casing before interrupting the FE.
 
 The module name starts with ``_`` so
 :func:`app.agents.catalog.discover` skips it -- this module declares
@@ -48,12 +48,11 @@ _TYPE_MAP: dict[str, Any] = {
 def _fe_executed(name: str) -> str:
     """Body for declare-only chat tools.
 
-    Should never run -- the FE executes the tool and POSTs the result
-    back to ``/api/ai/chat`` as a ``role: "tool"`` message. If this
-    function is ever invoked server-side something has wired the chat
-    agent into a server-side tool executor by mistake; raise loudly so
-    the misuse surfaces in tests rather than silently swallowing the
-    call.
+    Should never run. The chat graph converts model tool calls into
+    v2.1 interrupts and appends the resumed FE result as a ``ToolMessage``.
+    If this function is ever invoked server-side something has wired the
+    chat agent into a server-side tool executor by mistake; raise loudly
+    so the misuse surfaces in tests rather than silently swallowing the call.
     """
 
     raise RuntimeError(f"FE-executed chat tool {name!r} was invoked server-side.")

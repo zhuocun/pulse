@@ -455,7 +455,7 @@ This table maps the principles above to the current implementation state for tra
 | Undo correctness            | Readiness Undo fixed (Phase 1); bulk undo partial     | P1-4, P1-5 in optimization plan   |
 | Capability framing          | AI search renamed (Phase 1)                           | P1-2 resolved; §7.3 above         |
 | Error copy neutrality       | Fixed (Phase 1)                                       | P2-3 resolved; §5.2 above         |
-| Agentic write safety        | MutationProposalCard gated off by default             | P1-7, §9.4 above                  |
+| Agentic write safety        | MutationProposalCard default-on with rollback flag     | P1-7, §9.4 above                  |
 | Accessibility               | jest-axe suite added (2026-05-04)                     | §8 above; test plan in opt plan   |
 | Observability               | Sinks + call sites wired (Phase 3)                    | §12 above; P2-5 resolved          |
 | Entry point consolidation   | Fragmented — Phase 4 target                           | P1-6, §10.1 above                 |

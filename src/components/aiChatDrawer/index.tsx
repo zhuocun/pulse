@@ -200,13 +200,9 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
             if (o.value !== "auto") {
                 return { ...o, disabled: false as boolean | undefined };
             }
-            const mutationsOk = environment.aiMutationProposalsEnabled;
-            const serverAllowsAuto =
-                chatMeta.status !== "ready" ||
-                chatMeta.data.allowed_autonomy.includes("auto");
             return {
                 ...o,
-                disabled: !mutationsOk || !serverAllowsAuto
+                disabled: true
             };
         });
     }, [chatMeta]);
@@ -1871,10 +1867,8 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     / `onDismissNudge` to drive `agent.resume(...)`; when
                     omitted the drawer hides cards locally so the user can
                     always dismiss.
-                    MutationProposalCard is gated behind
-                    `environment.aiMutationProposalsEnabled` (defaults false)
-                    until the backend lifecycle is ready. See
-                    REACT_APP_AI_MUTATION_PROPOSALS_ENABLED. */}
+                    MutationProposalCard is still operator-gated for rollback
+                    via REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false. */}
                     {environment.aiMutationProposalsEnabled &&
                         visibleProposal && (
                             <MutationProposalCard

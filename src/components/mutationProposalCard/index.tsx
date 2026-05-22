@@ -62,18 +62,9 @@ interface MutationProposalCardProps {
     onReject: () => void;
     /**
      * Optional Undo CTA. Rendered only when `proposal.undoable === true`
-     * AND a callback is supplied — existing callers that don't yet pass
-     * `onUndo` (the BE doesn't emit a `MutationProposal` today, so all
-     * production callers fall into this branch) keep the previous
-     * read-only "Undoable" tag with no behavior change.
-     *
-     * Wiring `onUndo` to a backend reversal is intentionally out of
-     * scope for this branch — there is no FE undo endpoint yet (the BE
-     * undo lifecycle is a separate GA blocker tracked in
-     * `docs/todo/release-todo.md` §1). Surfaces that want to support
-     * optimistic local undo can pass a handler today; the analytics
-     * event fires either way so usage of the affordance is measurable
-     * before the BE half lands.
+     * AND a callback is supplied. Chat's apply tool uses the backend
+     * journal/undo endpoints through its toast flow; this prop remains
+     * for surfaces that need a card-local post-commit undo affordance.
      */
     onUndo?: () => void;
     /** Disables the buttons while a previous click is in flight. */

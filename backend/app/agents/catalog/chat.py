@@ -5,23 +5,25 @@ behaves predictably for tests; with a real provider configured via
 ``AGENT_CHAT_MODEL_PROVIDER`` (or env auto-detect) the agent binds the
 six FE-executed read tools (``listProjects`` / ``listMembers`` /
 ``getProject`` / ``listBoard`` / ``listTasks`` / ``getTask`` -- see
-:mod:`app.agents.catalog._chat_tools`) to the model so it can ground
-factual claims in real board data. The FE dispatches each tool call,
-posts the result back as a ``role: "tool"`` message, and the loop
-repeats until the model returns plain text (max 5 rounds, enforced FE-
-side in ``useAiChat.ts``).
+:mod:`app.agents.catalog._chat_tools`) plus ``requestMutationApproval``
+to the model so it can ground factual claims in real board data and
+stage board mutations for review. The graph translates model tool calls
+into canonical v2.1 ``fe.*`` interrupts, appends the resumed result as a
+``ToolMessage``, and repeats until the model returns plain text.
 
-GA §1: stub turns that include ``__PROPOSE_MUTATION__`` emit a typed
-``mutation_proposal`` custom event, pause on
-``fe.requestMutationApproval`` for the HITL review card, resume with
-``Command(resume={"accepted": <bool>})``, then -- when accepted --
-emit a second interrupt for ``fe.applyApprovedMutation`` which the FE
-redeems against the approval id the agent issued.
+GA §1: stub turns that include ``__PROPOSE_MUTATION__`` and real-provider
+``requestMutationApproval`` tool calls both emit a typed
+``mutation_proposal`` custom event, pause on ``fe.requestMutationApproval``
+for the HITL review card, resume with
+``Command(resume={"accepted": <bool>})``, then -- when accepted -- emit a
+second interrupt for ``fe.applyApprovedMutation`` which the FE redeems
+against the approval id the agent issued.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import secrets
@@ -54,6 +56,12 @@ from app.agents.tool_envelope import wrap_tool_result
 from app.tools import be_tools
 from app.tools.fe_tool_names import (
     FE_APPLY_APPROVED_MUTATION,
+    FE_GET_PROJECT,
+    FE_GET_TASK,
+    FE_LIST_BOARD,
+    FE_LIST_MEMBERS,
+    FE_LIST_PROJECTS,
+    FE_LIST_TASKS,
     FE_REQUEST_MUTATION_APPROVAL,
 )
 from app.tools.fe_tool_schemas import interrupt_payload
@@ -117,6 +125,16 @@ def _get_bound(model: BaseChatModel) -> BaseChatModel:
 
 _STUB_MUTATION_TRIGGER = "__PROPOSE_MUTATION__"
 _TASK_ID_RE = re.compile(r"__TASK_ID__:([a-fA-F0-9]{24})__")
+_REQUEST_MUTATION_APPROVAL_TOOL = "requestMutationApproval"
+_CHAT_TOOL_TO_FE_TOOL: dict[str, str] = {
+    "listProjects": FE_LIST_PROJECTS,
+    "listMembers": FE_LIST_MEMBERS,
+    "getProject": FE_GET_PROJECT,
+    "listBoard": FE_LIST_BOARD,
+    "listTasks": FE_LIST_TASKS,
+    "getTask": FE_GET_TASK,
+}
+_RISK_VALUES = {"low", "med", "high"}
 # Visible marker on the AIMessage when the live provider failed and we are
 # serving the deterministic stub reply instead.  Audience/operator sees it
 # without any FE change so a silently-degraded demo is impossible.
@@ -169,10 +187,187 @@ def _stub_mutation_proposal(user_text: str, _project_id: str) -> MutationProposa
     )
 
 
-def _after_respond(state: ChatState) -> Literal["mutation_hitl", "end"]:
+def _after_respond(
+    state: ChatState,
+) -> Literal["dispatch_tools", "mutation_hitl", "end"]:
     if state.get("mutation_pending"):
         return "mutation_hitl"
+    if _last_ai_tool_calls(state):
+        return "dispatch_tools"
     return "end"
+
+
+def _after_tool_dispatch(state: ChatState) -> Literal["mutation_hitl", "respond"]:
+    if state.get("mutation_pending"):
+        return "mutation_hitl"
+    return "respond"
+
+
+def _last_ai_tool_calls(state: ChatState) -> list[dict[str, Any]]:
+    for message in reversed(state.get("messages") or []):
+        if not isinstance(message, AIMessage):
+            continue
+        calls = getattr(message, "tool_calls", None) or []
+        return [call for call in calls if isinstance(call, dict)]
+    return []
+
+
+def _tool_call_name(call: dict[str, Any]) -> str:
+    raw = call.get("name")
+    return raw if isinstance(raw, str) else ""
+
+
+def _tool_call_id(call: dict[str, Any]) -> str:
+    raw = call.get("id")
+    return raw if isinstance(raw, str) and raw else f"call-{secrets.token_hex(4)}"
+
+
+def _tool_call_args(call: dict[str, Any]) -> dict[str, Any]:
+    raw = call.get("args")
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _has_supported_diff(diff: MutationDiffWire) -> bool:
+    return bool(diff.task_updates or diff.column_updates or diff.bulk_apply)
+
+
+def _organic_mutation_proposal(args: dict[str, Any]) -> MutationProposalWire | None:
+    raw = args.get("proposal") or args.get("mutation") or args
+    if not isinstance(raw, dict):
+        return None
+
+    diff_raw = raw.get("diff")
+    if not isinstance(diff_raw, dict):
+        diff_raw = {
+            key: raw[key]
+            for key in ("task_updates", "column_updates", "bulk_apply")
+            if key in raw
+        }
+    try:
+        diff = MutationDiffWire(**diff_raw)
+    except (TypeError, ValueError):
+        return None
+    if not _has_supported_diff(diff):
+        return None
+
+    proposal_id = raw.get("proposal_id") or args.get("proposal_id")
+    if not isinstance(proposal_id, str) or not proposal_id.strip():
+        proposal_id = f"proposal-{secrets.token_hex(8)}"
+
+    description = raw.get("description") or raw.get("explanation")
+    if not isinstance(description, str) or not description.strip():
+        description = "Proposed board change"
+
+    risk = raw.get("risk")
+    if not isinstance(risk, str) or risk not in _RISK_VALUES:
+        risk = "med"
+
+    try:
+        return MutationProposalWire(
+            proposal_id=proposal_id.strip(),
+            description=description.strip(),
+            diff=diff,
+            risk=risk,
+            undoable=True,
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _json_tool_content(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
+def _fe_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
+    if name in {"getProject", "listBoard", "listTasks"}:
+        project_id = args.get("projectId") or args.get("project_id")
+        return {
+            **args,
+            **({"project_id": project_id} if isinstance(project_id, str) else {}),
+        }
+    if name == "getTask":
+        task_id = args.get("taskId") or args.get("task_id")
+        project_id = args.get("projectId") or args.get("project_id")
+        return {
+            **args,
+            **({"task_id": task_id} if isinstance(task_id, str) else {}),
+            **({"project_id": project_id} if isinstance(project_id, str) else {}),
+        }
+    return args
+
+
+def _dispatch_tool_calls(state: ChatState) -> dict[str, Any]:
+    calls = _last_ai_tool_calls(state)
+    if not calls:
+        return {}
+
+    tool_messages: list[ToolMessage] = []
+    for call in calls:
+        name = _tool_call_name(call)
+        args = _tool_call_args(call)
+        call_id = _tool_call_id(call)
+
+        if name == _REQUEST_MUTATION_APPROVAL_TOOL:
+            proposal_model = _organic_mutation_proposal(args)
+            if proposal_model is None:
+                logger.warning(
+                    "chat-agent: refusing malformed organic mutation proposal."
+                )
+                return {
+                    "messages": [
+                        AIMessage(
+                            content=(
+                                "I could not turn that into a safe board-change "
+                                "proposal. Please name the exact task or field to "
+                                "change."
+                            )
+                        )
+                    ],
+                    "mutation_pending": None,
+                    "mutation_decision": None,
+                }
+            proposal_dict = proposal_model.model_dump(mode="json", by_alias=True)
+            event = MutationProposalEvent(proposal=proposal_model).model_dump(
+                mode="json", by_alias=True
+            )
+            record_agent_mutation_event("proposal_emitted")
+            return {
+                "events": [event],
+                "mutation_pending": proposal_dict,
+                "mutation_decision": None,
+            }
+
+        fe_name = _CHAT_TOOL_TO_FE_TOOL.get(name)
+        if fe_name is None:
+            tool_messages.append(
+                ToolMessage(
+                    content=_json_tool_content(
+                        {"error": f"Unsupported tool: {name or '<missing>'}"}
+                    ),
+                    tool_call_id=call_id,
+                    name=name or "unknown",
+                )
+            )
+            continue
+
+        result = interrupt(interrupt_payload(fe_name, _fe_tool_args(name, args)))
+        tool_messages.append(
+            ToolMessage(
+                content=_json_tool_content(result),
+                tool_call_id=call_id,
+                name=name,
+            )
+        )
+
+    return {"messages": tool_messages}
 
 
 def _new_approval_id(proposal_id: str) -> str:
@@ -634,13 +829,23 @@ class ChatAgent(BaseAgent):
 
         graph: StateGraph = StateGraph(ChatState, context_schema=ChatContext)
         graph.add_node("respond", respond)
+        graph.add_node("dispatch_tools", _dispatch_tool_calls)
         graph.add_node("mutation_hitl", _mutation_hitl)
         graph.add_node("mutation_finalize", _mutation_finalize)
         graph.add_edge(START, "respond")
         graph.add_conditional_edges(
             "respond",
             _after_respond,
-            {"mutation_hitl": "mutation_hitl", "end": END},
+            {
+                "dispatch_tools": "dispatch_tools",
+                "mutation_hitl": "mutation_hitl",
+                "end": END,
+            },
+        )
+        graph.add_conditional_edges(
+            "dispatch_tools",
+            _after_tool_dispatch,
+            {"mutation_hitl": "mutation_hitl", "respond": "respond"},
         )
         graph.add_edge("mutation_hitl", "mutation_finalize")
         graph.add_edge("mutation_finalize", END)
