@@ -339,7 +339,10 @@ const zhCN: Dictionary = {
             "浏览您的团队正在推进的看板。筛选、搜索,或创建一个新项目来开始跟踪工作。",
         totalProjects: "项目总数",
         organizations: "组织数",
-        teamMembers: "团队成员"
+        teamMembers: "团队成员",
+        loadingStats: "正在加载项目统计",
+        statsAnnouncement:
+            "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。"
     },
     empty: {
         projects: {
@@ -814,6 +817,13 @@ const zhCN: Dictionary = {
             proposed: "建议值"
         },
         columnFieldLabel: "列{field}"
+    },
+    swUpdate: {
+        title: "新版本可用",
+        description: "Pulse 已发布新版本。刷新页面即可获得最新的修复。",
+        reload: "刷新",
+        dismiss: "稍后",
+        ariaLabel: "新版本可用通知"
     }
 };
 

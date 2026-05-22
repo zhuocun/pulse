@@ -354,7 +354,10 @@ export const enSource = {
             "Browse the boards your team is shipping. Filter, search, or create a new project to start tracking work.",
         totalProjects: "Total projects",
         organizations: "Organizations",
-        teamMembers: "Team members"
+        teamMembers: "Team members",
+        loadingStats: "Loading project stats",
+        statsAnnouncement:
+            "{total} projects across {organizations} organizations, {members} team members."
     },
     empty: {
         projects: {
@@ -864,6 +867,14 @@ export const enSource = {
             proposed: "Proposed"
         },
         columnFieldLabel: "Column {field}"
+    },
+    swUpdate: {
+        title: "New version available",
+        description:
+            "A new build of Pulse is ready. Reload to pick up the latest fixes.",
+        reload: "Reload",
+        dismiss: "Later",
+        ariaLabel: "New version available notification"
     }
 } as const;
 
