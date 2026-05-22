@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { useState } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 
 import RegisterForm from "../components/registerForm";
 import { microcopy } from "../constants/microcopy";
@@ -23,6 +23,7 @@ const SwitchAuthLink = styled(Link)`
 const RegisterPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.register), false);
     const { isAuthenticated } = useAuth();
+    const location = useLocation();
     const [error, setError] = useState<Error | null | IError>(null);
 
     if (isAuthenticated) {
@@ -35,7 +36,7 @@ const RegisterPage = () => {
             <RegisterForm onError={setError} serverError={error} />
             <SwitchRow>
                 {microcopy.auth.switchToLogin}{" "}
-                <SwitchAuthLink to="/login">
+                <SwitchAuthLink to="/login" state={location.state}>
                     {microcopy.actions.loginCta}
                 </SwitchAuthLink>
             </SwitchRow>
