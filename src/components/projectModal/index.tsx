@@ -192,6 +192,7 @@ const ProjectModal: React.FC = () => {
                                     microcopy.validation.projectNameRequired
                             }
                         ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
                     >
                         <Input
                             autoComplete="off"
@@ -211,6 +212,7 @@ const ProjectModal: React.FC = () => {
                                     microcopy.validation.organizationRequired
                             }
                         ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
                     >
                         <Input
                             autoComplete="organization"
@@ -228,6 +230,7 @@ const ProjectModal: React.FC = () => {
                                 message: microcopy.validation.managerRequired
                             }
                         ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
                     >
                         <Select
                             options={(members ?? []).map((member) => ({

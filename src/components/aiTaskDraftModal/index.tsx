@@ -677,6 +677,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                                 message: microcopy.validation.taskNameRequired
                             }
                         ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
                     >
                         <Input
                             autoComplete="off"

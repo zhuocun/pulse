@@ -524,6 +524,7 @@ const TaskModal: React.FC<{
                                         microcopy.validation.taskNameRequired
                                 }
                             ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
                         >
                             <Input
                                 autoComplete="off"
@@ -542,6 +543,7 @@ const TaskModal: React.FC<{
                                         microcopy.validation.coordinatorRequired
                                 }
                             ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
                         >
                             <Select
                                 options={members.map((member) => ({
@@ -564,6 +566,7 @@ const TaskModal: React.FC<{
                                         microcopy.validation.taskTypeRequired
                                 }
                             ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
                         >
                             <Select
                                 options={TASK_TYPE_OPTIONS}
