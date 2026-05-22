@@ -292,10 +292,18 @@ const SharePage = () => {
         }
     }, [columns, columnsLoading]);
 
+    // Re-derive the invalidation key from the live `selectedProjectId`
+    // so that switching projects mid-session invalidates the correct
+    // ["tasks", { projectId }] cache slot on success rather than the
+    // first-render snapshot.
+    const tasksQueryKey = useMemo(
+        () => ["tasks", { projectId: selectedProjectId }] as const,
+        [selectedProjectId]
+    );
     const { mutateAsync, isLoading: submitting } = useReactMutation(
         "tasks",
         "POST",
-        ["tasks", { projectId: selectedProjectId }],
+        tasksQueryKey,
         newTaskCallback
     );
 
