@@ -40,4 +40,32 @@ describe("AiSuggestedBadge", () => {
             screen.getByText(microcopy.ai.suggestionPopover)
         ).toBeInTheDocument();
     });
+
+    it("does not open the popover when the badge merely gains focus", () => {
+        // Regression guard: the popover used to fire on `focus`, which
+        // narrated the rationale into screen-reader output mid-form-fill
+        // as users tabbed through adjacent badges. With `"focus"` dropped
+        // from the trigger list, focus alone is a no-op; the user must
+        // click (or press Enter/Space) to open the popover.
+        render(<AiSuggestedBadge />);
+        const badge = screen.getByRole("button", {
+            name: microcopy.ai.appliedSuggestion
+        });
+        badge.focus();
+        fireEvent.focus(badge);
+        expect(
+            screen.queryByText(microcopy.ai.suggestionPopover)
+        ).not.toBeInTheDocument();
+    });
+
+    it("still opens the popover on click", () => {
+        render(<AiSuggestedBadge />);
+        const badge = screen.getByRole("button", {
+            name: microcopy.ai.appliedSuggestion
+        });
+        fireEvent.click(badge);
+        expect(
+            screen.getByText(microcopy.ai.suggestionPopover)
+        ).toBeInTheDocument();
+    });
 });
