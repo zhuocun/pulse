@@ -318,15 +318,21 @@ describe("Header", () => {
             );
         expect(styledCls).toBeTruthy();
 
-        // Walk every stylesheet's rules (including nested rules inside
-        // `@media` blocks — `PillTrigger`'s 44 px rule lives behind
-        // `@media (pointer: coarse)`) and collect every `height: <N>px`
-        // declaration on a rule that mentions the styled class.
+        // Scope the height search to rules nested inside an
+        // `@media (pointer: coarse)` block — that is where the 44 px
+        // declaration is supposed to live. A rule containing a literal
+        // `44` outside that media query (incidental layout math, for
+        // example) must NOT satisfy this assertion.
         const heights: number[] = [];
         const visit = (rule: CSSRule) => {
             if (rule instanceof CSSStyleRule) {
                 if (!styledCls || !rule.selectorText.includes(styledCls))
                     return;
+                const parent = rule.parentRule;
+                const inCoarse =
+                    parent instanceof CSSMediaRule &&
+                    parent.conditionText.includes("coarse");
+                if (!inCoarse) return;
                 const re = /(?<!-)height:\s*(\d+(?:\.\d+)?)px/gi;
                 let m: RegExpExecArray | null = re.exec(rule.cssText);
                 while (m !== null) {
