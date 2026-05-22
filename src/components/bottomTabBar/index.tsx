@@ -15,7 +15,8 @@ import {
     fontSize,
     fontWeight,
     motion,
-    space
+    space,
+    zIndex
 } from "../../theme/tokens";
 
 /**
@@ -90,9 +91,13 @@ const Nav = styled.nav<{ $hidden: boolean }>`
     padding-inline-end: env(safe-area-inset-right);
     position: fixed;
     right: 0;
-    /* Above the AntD drawer surfaces and the sticky header chrome. The
-     * route-level drawers stack on top via their own z-index. */
-    z-index: 1010;
+    /* Sit in the navBar tier — above page content but below AntD's
+     * Drawer (1000) and Modal (1100) surfaces. The previous value
+     * (1010) painted the bar on top of an open Drawer/Modal mask and
+     * trapped touch users behind it. Route-level drawers now stack
+     * cleanly on top via their own z-index without the bar peeking
+     * through the dimmer. */
+    z-index: ${zIndex.navBar};
     /* Keyboard hide: translate out of the viewport when the soft keyboard
      * pushes the visual viewport up. The translate gives us a deterministic
      * hide-vs-show contract instead of clipping the bar mid-input. */

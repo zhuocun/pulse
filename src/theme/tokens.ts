@@ -221,6 +221,14 @@ export const easing = {
 
 export const zIndex = {
     sticky: 10,
+    /*
+     * Bottom-tab bar (phone chassis). Sits above page content (sticky
+     * tier) but BELOW AntD's drawer (1000) and modal (1100) so an open
+     * overlay can fully obscure the chrome without the bar painting on
+     * top of its dimmer. The previous value (1010) painted over both
+     * surfaces and trapped touch users behind the bar.
+     */
+    navBar: 10,
     dropdown: 1050,
     drawer: 1000,
     modal: 1100,
