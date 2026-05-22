@@ -63,10 +63,16 @@ const RequireAuth = () => {
 };
 
 /**
- * Wraps guest-only routes (login / register / forgot-password / terms):
+ * Wraps guest-only routes (login / register / forgot-password):
  * renders `<AuthLayout />` (with its `<Outlet />`) for visitors without a
  * session, and bounces authenticated users straight to `/projects`. Mirrors
  * `RequireAuth` so the auth predicate is owned in exactly one place.
+ *
+ * Note: `auth/terms` is intentionally NOT guarded — see `PublicAuthShell`
+ * below. The Terms link is reachable both from the login/register forms
+ * (guest context) and from any authenticated surface that exposes a
+ * "Terms" footer link, so it lives on a public branch that still renders
+ * the branded AuthLayout chrome.
  */
 const RequireGuest = () => {
     const { isAuthenticated } = useAuth();
@@ -75,6 +81,16 @@ const RequireGuest = () => {
     }
     return <AuthLayout />;
 };
+
+/**
+ * Public-but-branded shell: renders `<AuthLayout />` for everyone —
+ * guests AND authenticated users — so the Terms page is reachable from
+ * either context. The legacy guarded version sent authenticated visitors
+ * to `/projects`, which made the in-form `Terms` link a dead route once
+ * the user had a session. See Bug 1 in
+ * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+ */
+const PublicAuthShell = () => <AuthLayout />;
 
 const NotFoundRoute = () => {
     const navigate = useNavigate();
@@ -131,7 +147,12 @@ const routes = [
                     {
                         path: "auth/forgot-password",
                         element: <ForgotPasswordPage />
-                    },
+                    }
+                ]
+            },
+            {
+                element: <PublicAuthShell />,
+                children: [
                     {
                         path: "auth/terms",
                         element: <TermsPage />
@@ -177,5 +198,5 @@ const routes = [
     }
 ];
 
-export { RequireAuth, RequireGuest, RootRedirect };
+export { PublicAuthShell, RequireAuth, RequireGuest, RootRedirect };
 export default routes;
