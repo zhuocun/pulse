@@ -199,7 +199,11 @@ const composeNote = (params: {
 };
 
 const SharePage = () => {
-    useTitle(composeBrandedTitle(microcopy.pageTitle.share));
+    // `keepOnMount=false` restores the previous `document.title` on
+    // unmount so the share-target page doesn't leak its title into the
+    // next route. Mirrors the Phase 2 Bug 7 fix on every other branded
+    // page (inbox / settings / copilotLanding / project / login).
+    useTitle(composeBrandedTitle(microcopy.pageTitle.share), false);
     const navigate = useNavigate();
     const { user } = useAuth();
     const params = useShareTargetParams();
