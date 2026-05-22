@@ -371,7 +371,8 @@ export const enSource = {
         register: "Sign up",
         forgotPassword: "Reset your password",
         terms: "Terms of Service",
-        projects: "Projects"
+        projects: "Projects",
+        share: "Share to Pulse"
     },
     empty: {
         projects: {
@@ -905,6 +906,31 @@ export const enSource = {
             proposed: "Proposed"
         },
         columnFieldLabel: "Column {field}"
+    },
+    /**
+     * Web Share Target landing-page microcopy (Phase 3 A4). The page
+     * receives the share intent payload via URL params from the manifest's
+     * `share_target.action = "/share"` entry and surfaces a project +
+     * column picker so the user can drop the shared content straight onto
+     * a board. Microcopy lives here so both English and zh-CN translators
+     * can review it as a single block.
+     */
+    share: {
+        headline: "Share to Pulse",
+        summary: "Create a task from the content you shared.",
+        summaryTitle: "Title",
+        summaryText: "Text",
+        summaryUrl: "URL",
+        projectLabel: "Project",
+        columnLabel: "Column",
+        create: "Create task",
+        cancel: "Cancel",
+        emptyTitle: "Create your first project to start sharing",
+        emptyDescription:
+            "Pulse needs at least one project before you can share content into it.",
+        nothingTitle: "Nothing to share yet",
+        nothingDescription:
+            "Open Pulse from another app's share sheet to pre-fill a task here."
     },
     swUpdate: {
         title: "New version available",

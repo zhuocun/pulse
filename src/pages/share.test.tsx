@@ -1,0 +1,268 @@
+import "@testing-library/jest-dom";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+
+import { microcopy } from "../constants/microcopy";
+import { store } from "../store";
+import useReactMutation from "../utils/hooks/useReactMutation";
+import useReactQuery from "../utils/hooks/useReactQuery";
+
+import SharePage from "./share";
+
+jest.mock("../utils/hooks/useReactMutation");
+jest.mock("../utils/hooks/useReactQuery");
+
+const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
+    typeof useReactMutation
+>;
+const mockedUseReactQuery = useReactQuery as jest.MockedFunction<
+    typeof useReactQuery
+>;
+
+const stubMutation = (mutateAsync: jest.Mock) =>
+    ({
+        error: null,
+        isLoading: false,
+        mutate: jest.fn(),
+        mutateAsync
+    }) as unknown as ReturnType<typeof useReactMutation<unknown>>;
+
+const stubQuery = <T,>(data: T | undefined, isLoading = false) =>
+    ({
+        data,
+        error: null,
+        isLoading,
+        isSuccess: !isLoading,
+        refetch: jest.fn()
+    }) as unknown as ReturnType<typeof useReactQuery<T>>;
+
+const projectsFixture: IProject[] = [
+    {
+        _id: "project-1",
+        managerId: "member-1",
+        organization: "Atlas",
+        projectName: "Atlas roadmap"
+    },
+    {
+        _id: "project-2",
+        managerId: "member-2",
+        organization: "Bravo",
+        projectName: "Bravo launch"
+    }
+];
+
+const columnsFixture: IColumn[] = [
+    {
+        _id: "column-1",
+        columnName: "Backlog",
+        index: 0,
+        projectId: "project-1"
+    },
+    {
+        _id: "column-2",
+        columnName: "In progress",
+        index: 1,
+        projectId: "project-1"
+    }
+];
+
+const userFixture: IUser = {
+    _id: "user-1",
+    email: "alice@example.com",
+    likedProjects: [],
+    username: "Alice"
+};
+
+beforeAll(() => {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => ({
+            addEventListener: jest.fn(),
+            addListener: jest.fn(),
+            dispatchEvent: jest.fn(),
+            matches: false,
+            media: query,
+            onchange: null,
+            removeEventListener: jest.fn(),
+            removeListener: jest.fn()
+        })
+    });
+    class ResizeObserverMock {
+        observe = jest.fn();
+
+        unobserve = jest.fn();
+
+        disconnect = jest.fn();
+    }
+    Object.defineProperty(window, "ResizeObserver", {
+        writable: true,
+        value: ResizeObserverMock
+    });
+});
+
+const LocationProbe = () => {
+    const location = useLocation();
+    return (
+        <div data-testid="location">{location.pathname + location.search}</div>
+    );
+};
+
+const renderShare = (initialEntry: string) => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            mutations: { retry: false },
+            queries: { retry: false }
+        }
+    });
+    queryClient.setQueryData(["users"], userFixture);
+
+    return render(
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[initialEntry]}>
+                    <Routes>
+                        <Route path="/share" element={<SharePage />} />
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<LocationProbe />}
+                        />
+                        <Route path="/projects" element={<LocationProbe />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
+    );
+};
+
+describe("SharePage", () => {
+    /**
+     * `useReactQuery` is called twice in the page: first for the project
+     * list (no params), then for the board columns (with a projectId).
+     * We map by call args so the order of mock returns stays stable even
+     * if React re-runs them in a different sequence under Strict mode.
+     */
+    const wireQueries = (overrides?: {
+        projects?: IProject[];
+        columns?: IColumn[];
+        projectsLoading?: boolean;
+    }) => {
+        const projects = overrides?.projects ?? projectsFixture;
+        const columns = overrides?.columns ?? columnsFixture;
+        mockedUseReactQuery.mockImplementation(((
+            endpoint: string,
+            params?: { [key: string]: unknown }
+        ) => {
+            if (endpoint === "projects" && !params) {
+                return stubQuery(projects, overrides?.projectsLoading) as never;
+            }
+            if (endpoint === "boards") {
+                return stubQuery(columns) as never;
+            }
+            return stubQuery(undefined) as never;
+        }) as unknown as typeof mockedUseReactQuery);
+    };
+
+    beforeEach(() => {
+        mockedUseReactMutation.mockReset();
+        mockedUseReactQuery.mockReset();
+    });
+
+    it("renders the shared title as the default task name and shows the shared text + url", () => {
+        wireQueries();
+        const mutateAsync = jest.fn();
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?title=Pulse%20release%20notes&text=The%20latest%20build%20ships%20Web%20Share%20Target&url=https%3A%2F%2Fexample.com%2Frelease"
+        );
+
+        expect(
+            screen.getByRole("heading", { name: microcopy.share.headline })
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText(microcopy.fields.taskName)).toHaveValue(
+            "Pulse release notes"
+        );
+        const summary = screen.getByTestId("share-summary");
+        expect(summary).toHaveTextContent(
+            "The latest build ships Web Share Target"
+        );
+        expect(summary).toHaveTextContent("https://example.com/release");
+    });
+
+    it("submits a task with the shared title + composed note when Create task is pressed", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?title=Ship%20it&text=A%20draft%20note&url=https%3A%2F%2Fexample.com%2Fa"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.share.create })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        expect(mutateAsync).toHaveBeenCalledWith({
+            taskName: "Ship it",
+            projectId: "project-1",
+            columnId: "column-1",
+            coordinatorId: "user-1",
+            note: "A draft note\n\nhttps://example.com/a"
+        });
+        // After a successful submit we route to the picked project's board.
+        await waitFor(() =>
+            expect(screen.getByTestId("location")).toHaveTextContent(
+                "/projects/project-1/board"
+            )
+        );
+    });
+
+    it("falls back to a slice of the shared text when no title is supplied", () => {
+        wireQueries();
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare("/share?text=A%20short%20snippet%20without%20a%20title");
+
+        expect(screen.getByLabelText(microcopy.fields.taskName)).toHaveValue(
+            "A short snippet without a title"
+        );
+    });
+
+    it("renders an empty-state CTA when the user has no projects", () => {
+        wireQueries({ projects: [] });
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare("/share?title=Anything");
+
+        expect(
+            screen.getByRole("heading", { name: microcopy.share.emptyTitle })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(microcopy.share.emptyDescription)
+        ).toBeInTheDocument();
+        // No form / submit affordance when there's nowhere to share into.
+        expect(
+            screen.queryByRole("button", { name: microcopy.share.create })
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders the 'nothing to share' alert when no params are present, but still allows manual entry", () => {
+        wireQueries();
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare("/share");
+
+        expect(screen.getByTestId("share-nothing")).toBeInTheDocument();
+        // Task name input is rendered, but empty — so the submit is disabled.
+        expect(screen.getByLabelText(microcopy.fields.taskName)).toHaveValue(
+            ""
+        );
+        expect(
+            screen.getByRole("button", { name: microcopy.share.create })
+        ).toBeDisabled();
+    });
+});

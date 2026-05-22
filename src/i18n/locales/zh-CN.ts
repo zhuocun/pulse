@@ -349,7 +349,8 @@ const zhCN: Dictionary = {
         register: "注册",
         forgotPassword: "重置密码",
         terms: "服务条款",
-        projects: "项目"
+        projects: "项目",
+        share: "分享到 Pulse"
     },
     empty: {
         projects: {
@@ -830,6 +831,22 @@ const zhCN: Dictionary = {
             proposed: "建议值"
         },
         columnFieldLabel: "列{field}"
+    },
+    share: {
+        headline: "分享到 Pulse",
+        summary: "根据您分享的内容创建任务。",
+        summaryTitle: "标题",
+        summaryText: "文本",
+        summaryUrl: "链接",
+        projectLabel: "项目",
+        columnLabel: "列",
+        create: "创建任务",
+        cancel: "取消",
+        emptyTitle: "请先创建您的第一个项目,以便开始分享内容",
+        emptyDescription: "Pulse 需要至少一个项目才能将分享内容收入其中。",
+        nothingTitle: "暂无分享内容",
+        nothingDescription:
+            "请通过其他应用的分享面板打开 Pulse,以便在此处预填任务。"
     },
     swUpdate: {
         title: "新版本可用",
