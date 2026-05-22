@@ -253,7 +253,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // entry to pop back to — `navigate(-1)` would no-op or land
         // outside the app. Going to the board URL works both for
         // freshly-loaded sessions and within-app opens.
-        navigate(`/projects/${projectId}/board`);
+        navigate(`/projects/${projectId}/board`, { viewTransition: true });
     }, [form, navigate, projectId]);
 
     /*
@@ -857,7 +857,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                                     // task. The dirty-guard intercepts
                                     // if needed.
                                     navigate(
-                                        `/projects/${projectId}/board/task/${otherTaskId}`
+                                        `/projects/${projectId}/board/task/${otherTaskId}`,
+                                        { viewTransition: true }
                                     );
                                 }}
                                 values={liveValues}
