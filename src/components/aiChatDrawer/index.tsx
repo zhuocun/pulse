@@ -72,10 +72,10 @@ import {
     AssistantDisclaimer,
     MessageBubble,
     MessageRow,
-    SamplePrompt,
     StreamingCursor,
     ToolPayloadPanel
 } from "./aiChatDrawerStyles";
+import SamplePrompt from "./samplePrompt";
 import {
     BUDGET_CRITICAL_THRESHOLD,
     BUDGET_WARN_THRESHOLD,
