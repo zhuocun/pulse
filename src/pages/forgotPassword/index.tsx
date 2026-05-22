@@ -1,9 +1,9 @@
 import { microcopy } from "../../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../../layouts/authLayout";
-import useTitle from "../../utils/hooks/useTitle";
+import useTitle, { composeBrandedTitle } from "../../utils/hooks/useTitle";
 
 const ForgotPasswordPage = () => {
-    useTitle(microcopy.auth.forgotPasswordPlaceholderTitle);
+    useTitle(composeBrandedTitle(microcopy.pageTitle.forgotPassword));
 
     return (
         <>

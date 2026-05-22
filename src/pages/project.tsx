@@ -32,7 +32,7 @@ import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
 import useReactQuery from "../utils/hooks/useReactQuery";
-import useTitle from "../utils/hooks/useTitle";
+import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
 
 const PageHeader = styled.header`
@@ -238,7 +238,7 @@ const StatValue = styled.span`
 `;
 
 const ProjectPage = () => {
-    useTitle(microcopy.projectsPage.title, false);
+    useTitle(composeBrandedTitle(microcopy.pageTitle.projects), false);
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
     const {

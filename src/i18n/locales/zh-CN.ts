@@ -344,6 +344,13 @@ const zhCN: Dictionary = {
         statsAnnouncement:
             "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。"
     },
+    pageTitle: {
+        login: "登录",
+        register: "注册",
+        forgotPassword: "重置密码",
+        terms: "服务条款",
+        projects: "项目"
+    },
     empty: {
         projects: {
             title: "暂无项目",

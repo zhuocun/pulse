@@ -7,7 +7,7 @@ import { microcopy } from "../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../layouts/authLayout";
 import { fontSize, space } from "../theme/tokens";
 import useAuth from "../utils/hooks/useAuth";
-import useTitle from "../utils/hooks/useTitle";
+import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 const SwitchRow = styled.p`
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
@@ -21,7 +21,7 @@ const SwitchAuthLink = styled(Link)`
 `;
 
 const RegisterPage = () => {
-    useTitle(microcopy.actions.signUp);
+    useTitle(composeBrandedTitle(microcopy.pageTitle.register));
     const { isAuthenticated } = useAuth();
     const [error, setError] = useState<Error | null | IError>(null);
 

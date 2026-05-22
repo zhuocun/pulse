@@ -359,6 +359,20 @@ export const enSource = {
         statsAnnouncement:
             "{total} projects across {organizations} organizations, {members} team members."
     },
+    /**
+     * Page-name microcopy fed to `useTitle`. The hook composes
+     * `${page} · Pulse` so every routable surface advertises the brand
+     * in the browser tab. Auth and project-list surfaces consume these
+     * keys; board / project-detail pages keep their dynamic project
+     * name since they're already context-specific.
+     */
+    pageTitle: {
+        login: "Log in",
+        register: "Sign up",
+        forgotPassword: "Reset your password",
+        terms: "Terms of Service",
+        projects: "Projects"
+    },
     empty: {
         projects: {
             title: "No projects yet",

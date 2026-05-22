@@ -1,6 +1,21 @@
 import { renderHook } from "@testing-library/react";
 
-import useTitle from "./useTitle";
+import useTitle, { composeBrandedTitle } from "./useTitle";
+
+describe("composeBrandedTitle", () => {
+    it("appends the ' · Pulse' suffix to the page name", () => {
+        // QW-20 — single composition helper so every owned auth +
+        // project-list surface formats `document.title` the same way.
+        expect(composeBrandedTitle("Log in")).toBe("Log in · Pulse");
+        expect(composeBrandedTitle("Projects")).toBe("Projects · Pulse");
+    });
+
+    it("collapses to just 'Pulse' when the page name is empty", () => {
+        // Defensive: an empty page name shouldn't print the ugly
+        // leading separator ("· Pulse"). Degrade to the brand alone.
+        expect(composeBrandedTitle("")).toBe("Pulse");
+    });
+});
 
 describe("useTitle", () => {
     const originalTitle = document.title;
@@ -42,5 +57,17 @@ describe("useTitle", () => {
         unmount();
 
         expect(document.title).toBe("Project board");
+    });
+
+    it("writes a brand-suffixed title when callers pass composeBrandedTitle output", () => {
+        // The canonical pattern owned auth pages use: pass the result of
+        // composeBrandedTitle(page) through to useTitle. The hook itself
+        // is brand-agnostic so unrelated callers (board, projectDetail)
+        // continue printing their bare titles.
+        document.title = "Old title";
+
+        renderHook(() => useTitle(composeBrandedTitle("Log in"), false));
+
+        expect(document.title).toBe("Log in · Pulse");
     });
 });
