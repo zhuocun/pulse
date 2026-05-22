@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { message } from "antd";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
@@ -297,5 +298,95 @@ describe("SharePage", () => {
         expect(
             screen.getByRole("button", { name: microcopy.actions.createTask })
         ).toBeDisabled();
+    });
+
+    /*
+     * Failure surfacing — without the onCreate try/catch the success
+     * toast + navigate ran on rejection, silently dropping the user's
+     * shared content. The contract is now: on rejection, show
+     * feedback.saveFailed and leave the form intact (no navigate).
+     */
+    it("shows the saveFailed message and does not navigate when the mutation rejects", async () => {
+        wireQueries();
+        const error = new Error("network down");
+        const mutateAsync = jest.fn().mockRejectedValue(error);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+        const errorSpy = jest
+            .spyOn(message, "error")
+            .mockImplementation(() => "" as never);
+        const successSpy = jest
+            .spyOn(message, "success")
+            .mockImplementation(() => "" as never);
+
+        renderShare("/share?title=Ship%20it");
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        await waitFor(() =>
+            expect(errorSpy).toHaveBeenCalledWith(microcopy.feedback.saveFailed)
+        );
+        expect(successSpy).not.toHaveBeenCalled();
+        // Stays on /share — no nav fired.
+        expect(screen.queryByTestId("location")).not.toBeInTheDocument();
+
+        errorSpy.mockRestore();
+        successSpy.mockRestore();
+    });
+
+    /*
+     * Security — a `javascript:` URL doesn't XSS through React's text-
+     * escaping but the literal would still be rendered to the user.
+     * `isSafeShareUrl` filters non-http(s) schemes everywhere: the
+     * summary card, the composed note, and the derived task name.
+     */
+    it("does not render a javascript: URL in the summary card", () => {
+        wireQueries();
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare(
+            "/share?title=Pretend&url=javascript%3Aalert(1)&text=harmless"
+        );
+
+        const summary = screen.getByTestId("share-summary");
+        // The URL row is suppressed entirely (no anchor or text).
+        expect(summary).not.toHaveTextContent("javascript:alert(1)");
+        expect(summary).not.toHaveTextContent(microcopy.share.summaryUrl);
+        expect(summary).toHaveTextContent("harmless");
+    });
+
+    it("does not render a data: URL in the summary card", () => {
+        wireQueries();
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare(
+            "/share?title=Pretend&url=data%3Atext%2Fhtml%2C%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+        );
+
+        const summary = screen.getByTestId("share-summary");
+        expect(summary).not.toHaveTextContent("data:text/html");
+        expect(summary).not.toHaveTextContent("script");
+        expect(summary).not.toHaveTextContent(microcopy.share.summaryUrl);
+    });
+
+    it("excludes a javascript: URL from the composed note when submitting", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?title=Title&text=A%20note&url=javascript%3Aalert(1)"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.createTask })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
+        // Only the text is preserved; the unsafe URL is dropped entirely.
+        expect(call.note).toBe("A note");
     });
 });
