@@ -3,15 +3,46 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 
 import { microcopy } from "../constants/microcopy";
+import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 
 import CopilotLandingPage from "./copilotLanding";
 
 jest.mock("../utils/hooks/useAiEnabled");
+jest.mock("../utils/hooks/useAiChatDrawer");
+jest.mock("../utils/hooks/useBoardBriefDrawer");
 
 const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
     typeof useAiEnabled
 >;
+const mockedUseAiChatDrawer = useAiChatDrawer as jest.MockedFunction<
+    typeof useAiChatDrawer
+>;
+const mockedUseBoardBriefDrawer = useBoardBriefDrawer as jest.MockedFunction<
+    typeof useBoardBriefDrawer
+>;
+
+const stubChatDrawer = (
+    overrides: Partial<ReturnType<typeof useAiChatDrawer>> = {}
+) =>
+    ({
+        open: false,
+        pendingPrompt: undefined,
+        openDrawer: jest.fn(),
+        closeDrawer: jest.fn(),
+        ...overrides
+    }) as ReturnType<typeof useAiChatDrawer>;
+
+const stubBriefDrawer = (
+    overrides: Partial<ReturnType<typeof useBoardBriefDrawer>> = {}
+) =>
+    ({
+        open: false,
+        openDrawer: jest.fn(),
+        closeDrawer: jest.fn(),
+        ...overrides
+    }) as ReturnType<typeof useBoardBriefDrawer>;
 
 describe("CopilotLandingPage", () => {
     beforeEach(() => {
@@ -30,6 +61,8 @@ describe("CopilotLandingPage", () => {
                 removeListener: jest.fn()
             })
         });
+        mockedUseAiChatDrawer.mockReturnValue(stubChatDrawer());
+        mockedUseBoardBriefDrawer.mockReturnValue(stubBriefDrawer());
     });
 
     afterEach(() => {
@@ -65,14 +98,22 @@ describe("CopilotLandingPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("dispatches boardCopilot:openChat when the Ask CTA fires", () => {
+    /*
+     * The CTAs open their drawers via the canonical Redux hooks
+     * (`useAiChatDrawer().openDrawer()`, `useBoardBriefDrawer().openDrawer()`)
+     * BEFORE navigating. The previous custom-event bridge raced the
+     * project-page mount on cold loads; reading from Redux on mount is
+     * race-proof, and the test now asserts the downstream effect
+     * (Redux open() call) rather than an intermediate window event.
+     */
+    it("opens the chat drawer via Redux when the Ask CTA fires", () => {
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
             setEnabled: jest.fn()
         });
-        const handler = jest.fn();
-        window.addEventListener("boardCopilot:openChat", handler);
+        const openDrawer = jest.fn();
+        mockedUseAiChatDrawer.mockReturnValue(stubChatDrawer({ openDrawer }));
 
         render(
             <BrowserRouter>
@@ -82,19 +123,19 @@ describe("CopilotLandingPage", () => {
 
         const askCard = screen.getByTestId("copilot-landing-ask");
         fireEvent.click(askCard);
-        expect(handler).toHaveBeenCalledTimes(1);
-
-        window.removeEventListener("boardCopilot:openChat", handler);
+        expect(openDrawer).toHaveBeenCalledTimes(1);
     });
 
-    it("dispatches boardCopilot:openBrief when the Brief CTA fires", () => {
+    it("opens the board brief drawer via Redux when the Brief CTA fires", () => {
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
             setEnabled: jest.fn()
         });
-        const handler = jest.fn();
-        window.addEventListener("boardCopilot:openBrief", handler);
+        const openDrawer = jest.fn();
+        mockedUseBoardBriefDrawer.mockReturnValue(
+            stubBriefDrawer({ openDrawer })
+        );
 
         render(
             <BrowserRouter>
@@ -104,9 +145,7 @@ describe("CopilotLandingPage", () => {
 
         const briefCard = screen.getByTestId("copilot-landing-brief");
         fireEvent.click(briefCard);
-        expect(handler).toHaveBeenCalledTimes(1);
-
-        window.removeEventListener("boardCopilot:openBrief", handler);
+        expect(openDrawer).toHaveBeenCalledTimes(1);
     });
 
     it("renders the 'AI is off' empty state when AI is disabled", () => {

@@ -15,7 +15,9 @@ import {
     radius,
     space
 } from "../theme/tokens";
+import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
@@ -24,12 +26,14 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * is off (env or per-user toggle), the page renders an EmptyState
  * instead.
  *
- * Each CTA dispatches a `window` CustomEvent that the board / project
- * pages already listen for (`boardCopilot:openChat`) or will be
- * extended to listen for (`boardCopilot:openBrief`). To make the CTAs
- * useful from /copilot (no board in scope), we also navigate to
- * /projects on click — the existing project page mounts an
- * AiChatDrawer that picks up the event.
+ * Each CTA opens its drawer through the canonical Redux hook BEFORE
+ * navigating. The drawer state lives in the global overlays slice, so
+ * setting it here survives the route change; the project page mounts
+ * an `<AiChatDrawer />` keyed off `useAiChatDrawer().open` and opens
+ * automatically on first paint. The previous `dispatchEvent` +
+ * `navigate` sequence raced the project page's mount and fired the
+ * event before any listener had subscribed (cold load) — the chat
+ * never opened. Reading from Redux state on mount is race-proof.
  */
 
 const PageHeading = styled(Typography.Title)`
@@ -99,34 +103,12 @@ const CtaDescription = styled(Typography.Text)`
     }
 `;
 
-const dispatchOpenChat = () => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-        new CustomEvent<{ prompt: string }>("boardCopilot:openChat", {
-            detail: { prompt: "" }
-        })
-    );
-};
-
-const dispatchOpenBrief = () => {
-    if (typeof window === "undefined") return;
-    /*
-     * The brief drawer is project-scoped and is opened directly via
-     * useBoardBriefDrawer inside the board page. We dispatch a forward-
-     * looking event the board page will pick up once it's listening; the
-     * navigate-then-event sequence below means the user lands on the
-     * project list where they can pick a board to actually generate the
-     * brief from.
-     */
-    window.dispatchEvent(
-        new CustomEvent("boardCopilot:openBrief", { detail: {} })
-    );
-};
-
 const CopilotLandingPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.copilot), false);
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
+    const { openDrawer: openChatDrawer } = useAiChatDrawer();
+    const { openDrawer: openBriefDrawer } = useBoardBriefDrawer();
 
     if (!aiEnabled) {
         return (
@@ -146,13 +128,26 @@ const CopilotLandingPage = () => {
     }
 
     const goToAsk = () => {
+        /*
+         * Open the chat drawer via Redux BEFORE navigating so the
+         * project page's `useAiChatDrawer()` reads the open=true
+         * snapshot on mount. The custom-event bridge raced the
+         * navigation on cold loads (event fired, no subscriber yet).
+         */
+        openChatDrawer();
         navigate("/projects", { viewTransition: true });
-        dispatchOpenChat();
     };
 
     const goToBrief = () => {
+        /*
+         * The brief drawer is project-scoped (mounted on the board
+         * page). We set the Redux open flag here so that when the user
+         * picks a project + board, the board page opens the drawer on
+         * mount. Without the Redux bridge, a cold dispatchEvent fired
+         * before the board even rendered and the click was a no-op.
+         */
+        openBriefDrawer();
         navigate("/projects", { viewTransition: true });
-        dispatchOpenBrief();
     };
 
     return (
