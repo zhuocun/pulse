@@ -5,13 +5,40 @@ import { MemoryRouter } from "react-router-dom";
 
 import ProjectCard from "./projectCard";
 
+type DropdownMenuItem = {
+    key?: string | number;
+    label?: ReactNode;
+    onClick?: () => void;
+    danger?: boolean;
+};
+
 type DropdownMockProps = {
     children: ReactNode;
     menu?: {
-        items?: Array<{ key?: string | number; label?: ReactNode }>;
+        items?: DropdownMenuItem[];
     };
 };
 
+/**
+ * Lightweight Dropdown mock. The real AntD Dropdown attaches menu
+ * items as `role="menuitem"` elements that invoke their `onClick` on
+ * both pointer and keyboard activation; this mock mirrors the
+ * minimum surface area the tests need:
+ *
+ *  - Render the trigger (children) untouched.
+ *  - Render each `items[]` entry as a `role="menuitem"` button so the
+ *    tests can assert keyboard activation (Enter / Space on a
+ *    menuitem fires the wired `onClick`, exactly what the production
+ *    Dropdown does at the rc-menu layer).
+ *  - Wire the per-item `onClick` to the menuitem's `click` handler
+ *    rather than calling the production AntD `MenuInfo` callback —
+ *    the production handler only needs to fire on activation.
+ *
+ * Lets the suite assert the QW-rewire contract: each menuitem is a
+ * single AT-readable element (no nested `<button>` wrapper anymore)
+ * with its own activation handler, and Enter on the menuitem invokes
+ * the wired callback.
+ */
 jest.mock("antd", () => {
     const actual = jest.requireActual("antd");
     const React = jest.requireActual("react");
@@ -28,8 +55,13 @@ jest.mock("antd", () => {
                     { "data-testid": "dropdown-menu" },
                     menu?.items?.map((item) =>
                         React.createElement(
-                            "div",
-                            { key: item.key },
+                            "button",
+                            {
+                                key: item.key,
+                                onClick: item.onClick,
+                                role: "menuitem",
+                                type: "button"
+                            },
                             item.label
                         )
                     )
@@ -85,7 +117,12 @@ describe("ProjectCard", () => {
         expect(onLike).toHaveBeenCalledTimes(1);
     });
 
-    it("invokes onEdit from the row actions menu without navigating first", async () => {
+    // Each menu entry now renders as a single AT-readable element
+    // (`role="menuitem"`) with no nested `<button>` wrapper. Clicking
+    // the menuitem fires the wired `onClick` directly — no more
+    // double-announce ("Edit · Edit roadmap") or stopPropagation
+    // gymnastics inside the label.
+    it("invokes onEdit from the row actions menu on click", async () => {
         const user = userEvent.setup();
         const { onEdit } = renderCard();
 
@@ -97,13 +134,13 @@ describe("ProjectCard", () => {
         );
 
         await user.click(
-            screen.getByRole("button", { name: /^edit roadmap$/i })
+            within(dropdown).getByRole("menuitem", { name: /^edit$/i })
         );
 
         expect(onEdit).toHaveBeenCalledTimes(1);
     });
 
-    it("invokes onDelete from the row actions menu", async () => {
+    it("invokes onDelete from the row actions menu on click", async () => {
         const user = userEvent.setup();
         const { onDelete } = renderCard();
 
@@ -115,10 +152,29 @@ describe("ProjectCard", () => {
         );
 
         await user.click(
-            screen.getByRole("button", { name: /^delete roadmap$/i })
+            within(dropdown).getByRole("menuitem", { name: /^delete$/i })
         );
 
         expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
+    // Keyboard activation: tabbing to a menuitem and pressing Enter
+    // must fire the wired handler. The new structure routes activation
+    // through the menuitem directly (no inner button to swallow the
+    // event), so Enter triggers `onEdit` without the previously needed
+    // `e.stopPropagation()` workaround.
+    it("invokes onEdit when Enter is pressed on the menuitem", async () => {
+        const user = userEvent.setup();
+        const { onEdit } = renderCard();
+
+        const editItem = within(
+            screen.getByTestId("project-card-actions-dropdown")
+        ).getByRole("menuitem", { name: /^edit$/i });
+
+        editItem.focus();
+        await user.keyboard("{Enter}");
+
+        expect(onEdit).toHaveBeenCalledTimes(1);
     });
 
     // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
