@@ -169,6 +169,13 @@ const deriveTaskName = (params: {
  * need. Returns `undefined` when both are empty so we don't ship a
  * blank-line note (the task-creation endpoint treats undefined as
  * "no note" — see `utils/optimisticUpdate/createTask.ts`).
+ *
+ * The URL is appended only when it's not already a substring of the
+ * shared text. Android Chrome routinely packs the same URL into both
+ * the `text` field (as the trailing portion of the shared snippet)
+ * AND the `url` field; an exact-equality check failed to catch that
+ * and the URL ended up rendered twice. Substring check covers both
+ * the exact-match case and the embedded-in-text case.
  */
 const composeNote = (params: {
     text?: string;
@@ -178,7 +185,7 @@ const composeNote = (params: {
     const text = params.text?.trim();
     if (text) segments.push(text);
     const url = params.url?.trim();
-    if (url && url !== text) segments.push(url);
+    if (url && !text?.includes(url)) segments.push(url);
     return segments.length > 0 ? segments.join("\n\n") : undefined;
 };
 

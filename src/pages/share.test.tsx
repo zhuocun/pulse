@@ -232,6 +232,32 @@ describe("SharePage", () => {
         );
     });
 
+    /*
+     * Android Chrome routinely packs the same URL into both `text`
+     * (as the trailing portion of the shared snippet) AND `url`. The
+     * dedup check is now a substring test, so the URL appears in the
+     * note exactly once instead of being duplicated.
+     */
+    it("composes a single URL line even when the shared text already contains the URL (Android Chrome dedup)", async () => {
+        wireQueries();
+        const mutateAsync = jest.fn().mockResolvedValue(undefined);
+        mockedUseReactMutation.mockReturnValue(stubMutation(mutateAsync));
+
+        renderShare(
+            "/share?text=Check%20this%20https%3A%2F%2Fexample.com%2Fx&url=https%3A%2F%2Fexample.com%2Fx"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.share.create })
+        );
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+        const call = mutateAsync.mock.calls[0]?.[0] as { note?: string };
+        // The note must reproduce the text once; the URL must appear
+        // exactly once (not appended as a second segment).
+        expect(call.note).toBe("Check this https://example.com/x");
+    });
+
     it("renders an empty-state CTA when the user has no projects", () => {
         wireQueries({ projects: [] });
         mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
