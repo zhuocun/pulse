@@ -5,6 +5,7 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
@@ -631,37 +632,72 @@ describe("AiChatDrawer", () => {
         // `onUndo` callback. As a result `MutationProposalCard`'s
         // `showCommittedUndo` resolved to false even for proposals that
         // advertise `undoable: true`, and the user lost the escape hatch.
-        // Wiring `onUndoProposal` re-surfaces the Undo button beside
-        // Cancel/Apply in the idle phase; clicking it fires the prop.
-        mockEnv.aiMutationProposalsEnabled = true;
-        const proposal: MutationProposal = {
-            proposal_id: "prop-undo",
-            description: "Reassign overdue tasks to Alice",
-            diff: {
-                task_updates: [
-                    {
-                        task_id: "t1",
-                        field: "coordinatorId",
-                        from: "m2",
-                        to: "m1"
-                    }
-                ]
-            },
-            risk: "low",
-            undoable: true
-        };
-        const onUndoProposal = jest.fn();
-        renderDrawer(true, {
-            pendingProposal: proposal,
-            onUndoProposal
-        });
+        // Wiring `onUndoProposal` re-surfaces the Undo button — now in the
+        // committed phase (Bug 2 reshuffle) so the footer hint
+        // "Undo available after accepting" finally pays off.
+        jest.useFakeTimers();
+        try {
+            mockEnv.aiMutationProposalsEnabled = true;
+            const proposal: MutationProposal = {
+                proposal_id: "prop-undo",
+                description: "Reassign overdue tasks to Alice",
+                diff: {
+                    task_updates: [
+                        {
+                            task_id: "t1",
+                            field: "coordinatorId",
+                            from: "m2",
+                            to: "m1"
+                        }
+                    ]
+                },
+                risk: "low",
+                undoable: true
+            };
+            const onUndoProposal = jest.fn();
+            // Provide an onAcceptProposal that the drawer delegates to —
+            // omitting it would trigger the drawer's local fallback path
+            // (`setLocalProposalHandled(true)`), unmounting the card on
+            // accept and hiding the committed-phase Undo CTA. The real
+            // chat surface always wires the parent-supplied callbacks
+            // when proposals are operator-enabled.
+            const onAcceptProposal = jest.fn();
+            renderDrawer(true, {
+                pendingProposal: proposal,
+                onAcceptProposal,
+                onUndoProposal
+            });
 
-        const undoBtn = screen.getByRole("button", {
-            name: microcopy.mutation.undoAriaLabel as string
-        });
-        fireEvent.click(undoBtn);
-        expect(onUndoProposal).toHaveBeenCalledTimes(1);
-        expect(onUndoProposal).toHaveBeenCalledWith(proposal);
+            // Idle phase: no post-commit Undo button yet.
+            expect(
+                screen.queryByRole("button", {
+                    name: microcopy.mutation.undoAriaLabel as string
+                })
+            ).not.toBeInTheDocument();
+
+            // Accept the proposal and drive the 10-second countdown to
+            // zero — that's when the card transitions to the committed
+            // phase and surfaces the Undo CTA.
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            );
+            for (let i = 0; i < 11; i += 1) {
+                act(() => {
+                    jest.advanceTimersByTime(1000);
+                });
+            }
+
+            const undoBtn = screen.getByRole("button", {
+                name: microcopy.mutation.undoAriaLabel as string
+            });
+            fireEvent.click(undoBtn);
+            expect(onUndoProposal).toHaveBeenCalledTimes(1);
+            expect(onUndoProposal).toHaveBeenCalledWith(proposal);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("renders the contextual 'at risk' follow-up chip after a question about due dates and clicking populates the composer", async () => {
@@ -757,5 +793,55 @@ describe("AiChatDrawer", () => {
                 name: microcopy.mutation.undoAriaLabel as string
             })
         ).not.toBeInTheDocument();
+    });
+
+    it("makes the follow-up chip row keyboard-reachable (Tab focuses a chip, Enter populates composer) — Bug 3 a11y", async () => {
+        // Bug 3: AntD's `Tag.CheckableTag` renders as a bare <span> with
+        // no tabIndex / role / keyboard handler. The SamplePrompt wrapper
+        // adds tabIndex={0}, role="button", and an Enter/Space handler so
+        // chip rows behave like the buttons users expect them to be.
+        const history = [
+            { role: "user", content: "Which tasks are due this week?" },
+            { role: "assistant", content: "Two tasks are due Friday." }
+        ];
+        window.localStorage.setItem(
+            "copilot_history_p1",
+            JSON.stringify(history)
+        );
+        const user = userEvent.setup();
+        renderDrawer(true);
+        await waitFor(() => {
+            expect(
+                screen.getByText("Two tasks are due Friday.")
+            ).toBeInTheDocument();
+        });
+
+        const riskChipText = microcopy.ai.followUpChips.riskFromDue as string;
+        // AntD's CheckableTag renders `<span ...restProps><span>{text}</span></span>`,
+        // so the matching text is the inner content span — walk up to
+        // the outer button-shaped wrapper that carries the a11y props.
+        const chipText = screen.getByText(riskChipText);
+        const chip = chipText.closest('[data-testid="chat-follow-up-chip"]');
+        expect(chip).not.toBeNull();
+        // Each chip exposes a button role + a non-negative tabIndex so it
+        // joins the natural Tab order.
+        expect(chip).toHaveAttribute("role", "button");
+        expect((chip as HTMLElement).getAttribute("tabIndex")).toBe("0");
+
+        // Focus the chip directly (Tab from an arbitrary upstream node is
+        // brittle in jsdom because focus order depends on layout). Then
+        // assert keyboard activation populates the composer.
+        const input = screen.getByLabelText(
+            microcopy.a11y.messageBoardCopilot as string
+        ) as HTMLTextAreaElement;
+        expect(input.value).toBe("");
+
+        (chip as HTMLElement).focus();
+        expect(document.activeElement).toBe(chip);
+
+        await user.keyboard("{Enter}");
+        await waitFor(() => {
+            expect(input.value).toBe(riskChipText);
+        });
     });
 });
