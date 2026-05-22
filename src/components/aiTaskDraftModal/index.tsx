@@ -40,7 +40,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 
 interface AiTaskDraftModalProps {
     open: boolean;
@@ -478,7 +477,9 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         {microcopy.actions.draftWithAi}
                     </span>
                     <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    <EngineModeTag />
+                    {/*
+                     * EngineModeTag now mounts once in the global header.
+                     */}
                 </Space>
             }
             width={modalWidthCss(640)}

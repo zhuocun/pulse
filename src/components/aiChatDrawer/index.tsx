@@ -64,7 +64,6 @@ import CitationChip from "../citationChip";
 import CopilotAboutPopover from "../copilotAboutPopover";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
 import { AiChatComposer } from "./AiChatComposer";
@@ -1119,7 +1118,12 @@ const AiChatDrawerInner: React.FC<AiChatDrawerProps> = ({
                     {screens.md && (
                         <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
                     )}
-                    {screens.md && <EngineModeTag />}
+                    {/*
+                     * EngineModeTag now mounts once in the global header
+                     * (see refactor in `src/components/header/index.tsx`).
+                     * Drawer/panel headers no longer duplicate the same
+                     * flag — see comprehensive review §11.8.
+                     */}
                 </Space>
             }
         >

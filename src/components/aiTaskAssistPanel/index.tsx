@@ -31,7 +31,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 import {
@@ -527,7 +526,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                         {microcopy.ai.copilotLabel}
                     </span>
                     <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    <EngineModeTag />
+                    {/*
+                     * EngineModeTag now mounts once in the global header.
+                     */}
                     <CopilotPrivacyPopover route="estimate" />
                 </Space>
             }

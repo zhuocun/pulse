@@ -36,7 +36,6 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
-import EngineModeTag from "../engineModeTag";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 /**
@@ -675,7 +674,10 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                     <Tag color="purple" style={{ marginInlineStart: space.xs }}>
                         {microcopy.a11y.aiBadge}
                     </Tag>
-                    <EngineModeTag />
+                    {/*
+                     * EngineModeTag now mounts once in the global header
+                     * (see refactor in `src/components/header/index.tsx`).
+                     */}
                 </Space>
             }
             size={drawerWidth}
