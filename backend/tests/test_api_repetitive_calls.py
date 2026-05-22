@@ -1091,11 +1091,13 @@ def test_task_put_same_payload_n_times_is_idempotent(client: TestClient) -> None
 def test_task_create_validation_matrix_returns_400_for_every_partial_body(
     client: TestClient,
 ) -> None:
-    """Every missing-required-field permutation must yield 400.
+    """Every missing required-field permutation must yield 400.
 
-    Power-set check (small) over the seven required keys. A regression
-    that softened validation on any one field would let a malformed
-    task through; we want every gap surfaced explicitly.
+    Only the routing/identity keys (``projectId``, ``columnId``,
+    ``taskName``) are mandatory at the wire. ``type``, ``epic``,
+    ``storyPoints`` and ``note`` are optional and filled with sensible
+    defaults server-side so quick-add from a column can post a minimal
+    body without the FE shipping canned placeholder strings.
     """
 
     logged_in = register_and_login(client)
@@ -1103,11 +1105,7 @@ def test_task_create_validation_matrix_returns_400_for_every_partial_body(
     full_body = {
         "projectId": "p",
         "columnId": "c",
-        "epic": "e",
-        "storyPoints": 1,
         "taskName": "t",
-        "type": "Task",
-        "note": "n",
     }
     keys = list(full_body)
     for key in keys:
@@ -1116,6 +1114,44 @@ def test_task_create_validation_matrix_returns_400_for_every_partial_body(
         assert response.status_code == HTTPStatus.BAD_REQUEST
         body = response.json()
         assert any(entry.get("param") == key for entry in body["error"])
+
+
+def test_task_create_minimal_body_defaults_optional_fields_server_side(
+    client: TestClient,
+) -> None:
+    """POST /tasks with only routing keys fills optional fields server-side.
+
+    The FE quick-add affordance sends ``{taskName, projectId, columnId,
+    coordinatorId}`` — no canned ``epic`` / ``type`` / ``storyPoints`` /
+    ``note`` template the user must clear after the fact. The service
+    layer is the single source of truth for those defaults.
+    """
+
+    logged_in = register_and_login(client)
+    headers = auth_headers(logged_in["jwt"])
+    ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
+
+    response = client.post(
+        "/api/v1/tasks/",
+        json={
+            "projectId": ids["project_id"],
+            "columnId": ids["todo_id"],
+            "coordinatorId": logged_in["_id"],
+            "taskName": "Ship the thing",
+        },
+        headers=headers,
+    )
+    assert response.status_code == HTTPStatus.CREATED
+    assert response.json() == "Task created"
+
+    tasks = client.get(
+        f"/api/v1/tasks/?projectId={ids['project_id']}", headers=headers
+    ).json()
+    created = next(task for task in tasks if task["taskName"] == "Ship the thing")
+    assert created["type"] == "Task"
+    assert created["epic"] == ""
+    assert created["note"] == ""
+    assert created["storyPoints"] == 1
 
 
 def test_repeated_delete_of_same_task_returns_400_after_first(

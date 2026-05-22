@@ -50,17 +50,27 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
         return "Forbidden"
 
     tasks = repository.find_many(TASKS, {"columnId": column_id})
+    # ``epic`` / ``type`` / ``note`` / ``storyPoints`` are optional at the
+    # wire: quick-add from a column only ships routing + name fields, and
+    # the task modal can fill the rest later. Defaults below match the
+    # legacy FE template (Task / 1 story point / empty epic + note) so
+    # existing readers (column card, brief) don't have to handle missing
+    # values.
     repository.insert_one(
         TASKS,
         {
             "columnId": column_id,
             "coordinatorId": coordinator_id,
-            "epic": data["epic"],
+            "epic": data.get("epic") or "",
             "taskName": data["taskName"],
-            "type": data["type"],
-            "note": data["note"],
+            "type": data.get("type") or "Task",
+            "note": data.get("note") or "",
             "projectId": project_id,
-            "storyPoints": data["storyPoints"],
+            "storyPoints": (
+                data["storyPoints"]
+                if isinstance(data.get("storyPoints"), (int, float))
+                else 1
+            ),
             "index": len(tasks),
         },
     )

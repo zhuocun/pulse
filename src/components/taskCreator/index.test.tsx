@@ -119,14 +119,19 @@ describe("TaskCreator", () => {
         ).toHaveValue("");
     });
 
-    it("creates a task with route, column, current user, and default fields", async () => {
+    it("creates a task with only the name and column context — no canned defaults", async () => {
+        // Quick-create posts the four fields the user actually supplied
+        // (name + project/column/coordinator context). Type, epic, story
+        // points and note are left for the server-side default or the
+        // task modal to fill in — sending canned strings here means every
+        // follow-up edit is undoing a placeholder ("No note yet" et al.).
         renderCreator();
 
         fireEvent.click(createButton());
         fireEvent.change(
             screen.getByPlaceholderText("What needs to be done?"),
             {
-                target: { value: "Investigate outage" }
+                target: { value: "Ship the thing" }
             }
         );
         fireEvent.keyDown(
@@ -140,16 +145,17 @@ describe("TaskCreator", () => {
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/tasks");
-        expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+        const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+        expect(body).toEqual({
             columnId: "column-1",
             coordinatorId: "member-1",
-            epic: "New Feature",
-            note: "No note yet",
             projectId: "project-1",
-            storyPoints: 1,
-            taskName: "Investigate outage",
-            type: "Task"
+            taskName: "Ship the thing"
         });
+        expect(body).not.toHaveProperty("type");
+        expect(body).not.toHaveProperty("epic");
+        expect(body).not.toHaveProperty("storyPoints");
+        expect(body).not.toHaveProperty("note");
         expect(fetchMock.mock.calls[0][1]).toEqual(
             expect.objectContaining({ method: "POST" })
         );

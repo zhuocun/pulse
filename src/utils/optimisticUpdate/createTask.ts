@@ -5,10 +5,10 @@ interface INewTaskParams {
     projectId: string;
     columnId: string;
     coordinatorId: string;
-    type: "Task";
-    epic: "New Feature";
-    storyPoints: 1;
-    note: "No note yet";
+    type?: string;
+    epic?: string;
+    storyPoints?: number;
+    note?: string;
 }
 
 const newTaskCallback = (target: INewTaskParams, old: ITask[] | undefined) => {
