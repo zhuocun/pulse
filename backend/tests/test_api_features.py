@@ -723,6 +723,30 @@ def test_task_update_rejects_corrupt_editable_fields(client: TestClient) -> None
         assert response.json()["error"][0]["param"] == param
 
 
+def test_task_create_rejects_corrupt_story_points(client: TestClient) -> None:
+    logged_in = register_and_login(client)
+    headers = auth_headers(logged_in["jwt"])
+    ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
+
+    for story_points in [True, "x", -1]:
+        response = client.post(
+            "/api/v1/tasks/",
+            json={
+                "projectId": ids["project_id"],
+                "columnId": ids["todo_id"],
+                "coordinatorId": logged_in["_id"],
+                "taskName": "Invalid estimate",
+                "storyPoints": story_points,
+            },
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert response.json()["error"][0]["msg"] == (
+            "Story points must be a positive number"
+        )
+        assert response.json()["error"][0]["param"] == "storyPoints"
+
+
 def test_board_create_before_default_columns_matches_express(
     client: TestClient,
 ) -> None:

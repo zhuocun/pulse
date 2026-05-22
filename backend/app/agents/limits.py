@@ -84,15 +84,18 @@ def enforce_request_limits(
             detail="Request payload too large",
         )
 
-    prompt = payload.get("prompt")
-    if isinstance(prompt, str) and len(prompt.encode()) > _MAX_PROMPT_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Request payload too large",
-        )
-
     # Check top-level ``messages`` (v1 chat) and ``inputs.messages`` (v2.1 agents).
     inputs = payload.get("inputs")
+    prompt_candidates = [payload.get("prompt")]
+    if isinstance(inputs, dict):
+        prompt_candidates.append(inputs.get("prompt"))
+    for prompt in prompt_candidates:
+        if isinstance(prompt, str) and len(prompt.encode()) > _MAX_PROMPT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Request payload too large",
+            )
+
     candidates = [payload.get("messages")]
     if isinstance(inputs, dict):
         candidates.append(inputs.get("messages"))

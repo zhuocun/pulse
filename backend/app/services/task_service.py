@@ -33,6 +33,27 @@ def _same_project(*items: Dict[str, Any]) -> bool:
     return len(project_ids) == 1
 
 
+def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    story_points = data.get("storyPoints")
+    if (
+        not isinstance(story_points, (int, float))
+        or isinstance(story_points, bool)
+        or not math.isfinite(story_points)
+        or story_points <= 0
+    ):
+        return body_error(
+            data, "storyPoints", "Story points must be a positive number"
+        )
+    return None
+
+
+def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if "storyPoints" not in data:
+        return []
+    error = _story_points_error(data)
+    return [error] if error is not None else []
+
+
 def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     column_id = data.get("columnId")
     coordinator_id = data.get("coordinatorId")
@@ -128,16 +149,9 @@ def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         if not isinstance(task_name, str) or task_name == "":
             errors.append(body_error(data, "taskName", "Task name cannot be empty"))
     if "storyPoints" in data:
-        story_points = data.get("storyPoints")
-        if (
-            not isinstance(story_points, (int, float))
-            or isinstance(story_points, bool)
-            or not math.isfinite(story_points)
-            or story_points <= 0
-        ):
-            errors.append(
-                body_error(data, "storyPoints", "Story points must be a positive number")
-            )
+        error = _story_points_error(data)
+        if error is not None:
+            errors.append(error)
     return errors
 
 

@@ -71,6 +71,12 @@ def test_inputs_message_oversized_content_raises_413() -> None:
     assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
 
 
+def test_inputs_oversized_prompt_raises_413() -> None:
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"inputs": {"prompt": "x" * 9000}})
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
+
+
 def test_inputs_message_oversized_content_block_raises_413() -> None:
     msgs = [
         {

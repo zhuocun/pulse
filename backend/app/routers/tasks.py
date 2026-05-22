@@ -48,6 +48,7 @@ def create_task(
         "taskName": "Task name cannot be empty",
     }
     errors = required_body_errors(data, messages)
+    errors.extend(task_service.create_validation_errors(data))
     if errors:
         validation_errors(errors)
 
