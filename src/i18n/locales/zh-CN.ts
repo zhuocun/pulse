@@ -387,7 +387,11 @@ const zhCN: Dictionary = {
         confirmDiscardTitle: "放弃未保存的更改?",
         confirmDiscardBody: "对此任务的编辑将会丢失。",
         confirmDiscardOk: "放弃",
-        confirmDiscardCancel: "继续编辑"
+        confirmDiscardCancel: "继续编辑",
+        siblingNextLabel: "下一个任务",
+        siblingPrevLabel: "上一个任务",
+        siblingPositionLabel: "第 {position} 个,共 {total} 个",
+        ariaLabel: "任务详情"
     },
     copilotDock: {
         title: "Copilot",
