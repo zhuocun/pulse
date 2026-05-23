@@ -49,7 +49,6 @@ import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
 import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
-import useCopilotDock from "../../utils/hooks/useCopilotDock";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import type {
     AutonomyLevel,
@@ -144,6 +143,17 @@ export interface ChatTabBodyProps {
     members: IMember[];
     knownProjectIds: string[];
     initialPrompt?: string;
+    /**
+     * R-A M1 Issue #8: fired immediately after the body consumes the
+     * `initialPrompt` (one-shot per change of the prop value). The
+     * dock host wires this to `clearInitialPrompt` so a subsequent
+     * `ProjectScopedDock` remount on project switch does not see a
+     * leftover prompt and auto-dispatch it into the new project's
+     * chat. Legacy `<AiChatDrawer>` callers can leave it unset — the
+     * body's internal `initialPromptHandled` ref already dedupes for
+     * the single-mount case those surfaces use.
+     */
+    onInitialPromptConsumed?: () => void;
     pendingProposal?: MutationProposal;
     pendingNudges?: TriageNudge[];
     onAcceptProposal?: (proposal: MutationProposal) => void;
@@ -164,6 +174,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     members,
     knownProjectIds,
     initialPrompt,
+    onInitialPromptConsumed,
     pendingProposal,
     pendingNudges,
     onAcceptProposal,
@@ -284,16 +295,6 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const screens = Grid.useBreakpoint();
     const initialPromptHandled = useRef<string | null>(null);
     const { message } = App.useApp();
-    /*
-     * R-A M1 Issue #8: after we dispatch the prompt below, clear the
-     * Redux-staged `initialPrompt` so a subsequent ProjectScopedDock
-     * remount (e.g. after a project switch under the key={projectId}
-     * fix for Issues #1/#3/#7) does NOT see a leftover prompt and
-     * auto-dispatch it into the new project's chat. The body's local
-     * `initialPromptHandled` ref dedupes within a single mount; the
-     * Redux clear dedupes across remounts.
-     */
-    const { clearInitialPrompt } = useCopilotDock();
 
     useEffect(() => {
         if (!surfaceVisible) {
@@ -554,12 +555,16 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         if (initialPromptHandled.current === initialPrompt) return;
         initialPromptHandled.current = initialPrompt;
         dispatch(initialPrompt);
-        // R-A M1 Issue #8: clear the staged prompt in Redux so a
-        // remount (e.g. project switch under the key-remount fix for
-        // Issues #1/#3/#7) does not see a leftover prompt and
-        // auto-dispatch it into the new project's chat.
-        clearInitialPrompt();
-    }, [clearInitialPrompt, dispatch, initialPrompt, surfaceVisible]);
+        // R-A M1 Issue #8: notify the host that the prompt is consumed
+        // so the host can clear the staged prompt in Redux. A
+        // subsequent ProjectScopedDock remount (e.g. after a project
+        // switch under the key={projectId} fix for Issues #1/#3/#7)
+        // must NOT see a leftover prompt and auto-dispatch it into the
+        // new project's chat. Legacy <AiChatDrawer> callers leave the
+        // handler unset because the body's `initialPromptHandled` ref
+        // already dedupes for the single-mount drawer model.
+        onInitialPromptConsumed?.();
+    }, [dispatch, initialPrompt, onInitialPromptConsumed, surfaceVisible]);
 
     useEffect(() => {
         if (!dockOpen) initialPromptHandled.current = null;

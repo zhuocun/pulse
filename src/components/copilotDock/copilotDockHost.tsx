@@ -63,8 +63,14 @@ interface ProjectScopedDockProps {
 }
 
 const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
-    const { activeTab, open, pendingPrompt, setActiveTab, closeDock } =
-        useCopilotDock();
+    const {
+        activeTab,
+        open,
+        pendingPrompt,
+        setActiveTab,
+        closeDock,
+        clearInitialPrompt
+    } = useCopilotDock();
     const { closeDrawer: closeChatDrawer } = useAiChatDrawer();
     const { closeDrawer: closeBriefDrawer } = useBoardBriefDrawer();
 
@@ -205,6 +211,7 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
                     ? handleTriageNudgeDismiss
                     : undefined
             }
+            onInitialPromptConsumed={clearInitialPrompt}
             onTabChange={handleTabChange}
             open={open}
             pendingNudges={

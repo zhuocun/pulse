@@ -23,6 +23,13 @@ export interface CopilotDockProps {
     knownProjectIds: string[];
     /** Chat-only: pre-populated prompt dispatched from the command palette. */
     initialPrompt?: string;
+    /**
+     * Chat-only: fired after the chat tab body consumes the initial
+     * prompt so the host can clear it from Redux state. See
+     * ChatTabBody's `onInitialPromptConsumed` doc for the full
+     * rationale (R-A M1 Issue #8).
+     */
+    onInitialPromptConsumed?: () => void;
     /** Chat-only: active MutationProposal emitted by the agent stream. */
     pendingProposal?: MutationProposal;
     pendingNudges?: TriageNudge[];
@@ -44,6 +51,7 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
     members,
     knownProjectIds,
     initialPrompt,
+    onInitialPromptConsumed,
     pendingProposal,
     pendingNudges,
     onAcceptProposal,
@@ -82,6 +90,7 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
                     onAcceptProposal={onAcceptProposal}
                     onActionNudge={onActionNudge}
                     onDismissNudge={onDismissNudge}
+                    onInitialPromptConsumed={onInitialPromptConsumed}
                     onRejectProposal={onRejectProposal}
                     onUndoProposal={onUndoProposal}
                     pendingNudges={pendingNudges}
