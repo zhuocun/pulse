@@ -26,6 +26,13 @@ import useTaskModal from "../utils/hooks/useTaskModal";
 jest.mock("../utils/hooks/useReactMutation");
 jest.mock("../utils/hooks/useReactQuery");
 jest.mock("../utils/hooks/useTaskModal");
+// Mirror the useTaskModal mock so the routed-panel sibling hook never
+// reaches its real implementation when the modal route refactor adds an
+// indirect dependency on it (R-C M3).
+jest.mock("../utils/hooks/useTaskPanelNavigation", () => ({
+    __esModule: true,
+    default: () => ({ openTask: jest.fn(), closeTask: jest.fn() })
+}));
 
 const mockedUseReactMutation = useReactMutation as jest.MockedFunction<
     typeof useReactMutation
