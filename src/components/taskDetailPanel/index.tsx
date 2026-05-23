@@ -39,7 +39,7 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
-import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import useTaskPanelSiblings from "../../utils/hooks/useTaskPanelSiblings";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
@@ -270,7 +270,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * every navigation away.
      */
     const { goToNext, goToPrev, nextTaskId, prevTaskId } =
-        useTaskPanelNavigation();
+        useTaskPanelSiblings();
 
     /**
      * Dirty flag driven by `onValuesChange`. We can't rely on
