@@ -12,11 +12,14 @@ import NudgeCard from "../nudgeCard";
 /**
  * Phase 4 A8 — Inbox tab body for the Copilot dock.
  *
- * Renders the most-recent triage-agent nudges (capped at
- * {@link MAX_VISIBLE_NUDGES}) plus a footer link to the full `/inbox`
- * page when there are more entries to triage. The visible cap mirrors
- * the PRD AC-V14 limit on the inbox itself (5) so the dock and the page
- * agree on what counts as "actionable now".
+ * Renders the most-recent triage-agent nudges plus a footer link to
+ * the full `/inbox` page. The source array is the triage agent's
+ * `nudges` buffer, which `useNudgeInbox` already caps at
+ * {@link NUDGE_INBOX_MAX} (PRD AC-V14 = 5) — so the dock and the
+ * page agree on what counts as "actionable now" and the body
+ * doesn't need a separate visible cap. The "See all" link is a
+ * pure navigation handle to the full inbox surface, which renders
+ * the same array.
  *
  * The nudges array is fed in from `CopilotDockHost` so the source of
  * truth is the same as the in-chat NudgeCard list (`useAgent`'s
@@ -29,8 +32,6 @@ import NudgeCard from "../nudgeCard";
  * from the fresh `useAgent` instance — see the Lane A caveat fix and
  * the dock's `key={projectId}` history in `copilotDockHost.tsx`.
  */
-
-const MAX_VISIBLE_NUDGES = 5;
 
 export interface InboxTabBodyProps {
     /**
@@ -86,14 +87,11 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
         });
     }, [surfaceVisible]);
 
-    const visibleNudges = nudges.slice(0, MAX_VISIBLE_NUDGES);
-    const overflowCount = Math.max(0, nudges.length - MAX_VISIBLE_NUDGES);
-
     const handleSeeAll = useCallback(() => {
         navigate("/inbox");
     }, [navigate]);
 
-    if (visibleNudges.length === 0) {
+    if (nudges.length === 0) {
         return (
             <div
                 data-testid="copilot-dock-inbox-empty"
@@ -141,7 +139,7 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
                 size={space.xxs}
                 style={{ width: "100%" }}
             >
-                {visibleNudges.map((nudge) => (
+                {nudges.map((nudge) => (
                     <NudgeCard
                         actionLabel={microcopyString(
                             microcopy.copilotDock.inboxTab.actionLabel
@@ -164,11 +162,7 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
                     size="small"
                     type="link"
                 >
-                    {overflowCount > 0
-                        ? `${microcopyString(microcopy.copilotDock.inboxTab.seeAll)} (+${overflowCount})`
-                        : microcopyString(
-                              microcopy.copilotDock.inboxTab.seeAll
-                          )}
+                    {microcopyString(microcopy.copilotDock.inboxTab.seeAll)}
                 </Button>
             </div>
         </div>
