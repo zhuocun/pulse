@@ -1316,7 +1316,9 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2 / R-B L)", () => {
      * R-B L mirror: pointerdown within the 20 px band on the RIGHT
      * side of the viewport (iOS forward-swipe territory) is also
      * skipped. Window is pinned to innerWidth = 1024 in `beforeAll`,
-     * so the right guard activates at clientX ≥ 1004.
+     * and the source uses strict `clientX > viewportWidth - GUARD`, so
+     * the right guard activates at clientX > 1004 (i.e. 1005 and
+     * above is guarded; 1004 is the last safe-side coordinate).
      */
     it("ignores pointerdown within the 20 px right-edge guard band (R-B L)", async () => {
         const { router } = renderPanelAt(
@@ -1356,6 +1358,178 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2 / R-B L)", () => {
         expect(router.state.location.pathname).toBe(
             "/projects/project-1/board/task/task-1"
         );
+    });
+
+    /*
+     * R-B L boundary tests: the edge-guard check uses STRICT inequality
+     * (`event.clientX < SWIPE_EDGE_GUARD_PX` and
+     * `event.clientX > viewportWidth - SWIPE_EDGE_GUARD_PX`). The four
+     * tests below pin the exact boundaries so a sloppy refactor that
+     * flips `<` to `<=` or `>` to `>=` would change the outcome at the
+     * edge coordinate and fail. Without the boundary cases, the broad
+     * 5px / 1020px tests would still pass against either operator and
+     * the regression would slip through.
+     */
+    it("guards a pointerdown at clientX=19 (last guarded pixel on the left edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 19 < 20 → strict `<` guards the gesture. A 100 px right-swipe
+        // from inside the band would otherwise navigate to task-1.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 19,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 119,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-2"
+        );
+    });
+
+    it("allows a pointerdown at clientX=20 (first safe pixel past the left edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 20 is NOT strict-less-than 20 → the guard does NOT fire, and
+        // the 100 px right-swipe routes to the previous task (task-1).
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 20,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 120,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-1"
+            );
+        });
+    });
+
+    it("guards a pointerdown at clientX=1005 (first guarded pixel on the right edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 1005 > 1004 (innerWidth 1024 - guard 20) → strict `>` guards
+        // the gesture. A 100 px left-swipe from inside the band would
+        // otherwise navigate to task-2.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 1005,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 905,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("allows a pointerdown at clientX=1004 (last safe pixel before the right edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 1004 is NOT strict-greater-than 1004 → the guard does NOT
+        // fire, and the 100 px left-swipe routes to the next task
+        // (task-2).
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 1004,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 904,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-2"
+            );
+        });
     });
 
     /*
