@@ -196,23 +196,46 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
     );
 
     /*
-     * Phase 4 A8 — projection sync for the launcher badge. Whenever
-     * the triage agent's nudge buffer length changes, dispatch the
-     * fresh count to Redux so launchers (the CopilotMenu Button in
-     * board.tsx, the Ask Copilot button on the projects page, future
-     * bottom-nav badge) can render a badge without subscribing to
-     * the agent. The Inbox-open path zeros the count separately via
-     * `markCopilotDockInboxRead` — we deliberately skip the dispatch
-     * here when the user is currently looking at the Inbox so we
-     * don't fight that effect with a stale non-zero count on the
-     * next render.
+     * Phase 4 A8 — projection sync for the launcher badge. The Inbox-
+     * read path zeros the count via `markInboxRead`; this effect bumps
+     * it back up ONLY when the agent's nudge buffer actually grows
+     * past the last-seen high-water mark, so the user's "I read it"
+     * gesture isn't immediately undone by a re-fire on the next
+     * render. Without the high-water gate, leaving the Inbox tab
+     * (`inboxSurfaceVisible` flips false) re-runs this effect, sees
+     * `nudgeCount = N` (unchanged), and dispatches `setInboxUnread(N)`
+     * — restoring the badge the user just dismissed.
+     *
+     * `prevCountRef` tracks the latest count the projection accepted
+     * (initialized to 0 to match the slice's initial state):
+     *   - If the surface is visible, we keep the ref in sync with the
+     *     current count but do not dispatch — the read transition
+     *     owns the count while the user is looking at the Inbox.
+     *   - If the surface is hidden and the count went UP, we dispatch
+     *     the new count (a fresh nudge arrived while the user wasn't
+     *     looking) and advance the ref.
+     *   - If the count went DOWN or stayed flat while hidden, we just
+     *     advance the ref (e.g. a nudge expired or was dismissed) —
+     *     the Redux value is whatever the read transition left
+     *     (typically 0), so the badge stays quiet.
+     *
+     * The local-engine guard short-circuits before any ref movement
+     * so the local-engine-only test harness behaves identically to
+     * production (the original effect had the same guard).
      */
     const inboxSurfaceVisible = open && activeTab === "inbox";
     const nudgeCount = triageAgent.nudges.length;
+    const prevNudgeCountRef = useRef(0);
     useEffect(() => {
-        if (inboxSurfaceVisible) return;
         if (environment.aiUseLocalEngine) return;
-        setInboxUnread(nudgeCount);
+        if (inboxSurfaceVisible) {
+            prevNudgeCountRef.current = nudgeCount;
+            return;
+        }
+        if (nudgeCount > prevNudgeCountRef.current) {
+            setInboxUnread(nudgeCount);
+        }
+        prevNudgeCountRef.current = nudgeCount;
     }, [inboxSurfaceVisible, nudgeCount, setInboxUnread]);
 
     /*

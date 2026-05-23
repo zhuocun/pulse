@@ -985,4 +985,129 @@ describe("CopilotDockHost", () => {
             );
         });
     });
+
+    /*
+     * R-A M1 review regression (MAJOR): the launcher-badge projection
+     * effect re-runs whenever `inboxSurfaceVisible` flips false. After
+     * the user opens Inbox → `markInboxRead` zeros the count → user
+     * switches BACK to a non-inbox tab, the effect saw `nudgeCount = N`
+     * (unchanged because the agent buffer didn't move), did NOT
+     * short-circuit, and dispatched `setInboxUnread(N)` — restoring
+     * the badge to its pre-read value. The "I read my inbox" state
+     * only lasted as long as the user stayed on the Inbox tab.
+     *
+     * The fix gates the projection on a high-water-mark ref
+     * (`prevNudgeCountRef`): the effect only dispatches when the
+     * current nudge count is strictly GREATER than the ref. When the
+     * user opens Inbox, the ref is synced to the current count; the
+     * follow-up switch-away sees `N > N` is false and stays quiet.
+     *
+     * This test exercises the FULL `aiUseLocalEngine: false` path the
+     * production bug lives on — the original tests all mocked
+     * `aiUseLocalEngine: true` so the projection early-returned and
+     * the bug was invisible. We pin the env mock to remote-engine for
+     * the duration of this test only; the `afterEach` restores it so
+     * sibling tests stay on the local engine.
+     */
+    describe("with aiUseLocalEngine: false (remote engine)", () => {
+        const envMod = jest.requireMock("../../constants/env") as {
+            default: {
+                apiBaseUrl: string;
+                aiBaseUrl: string;
+                aiEnabled: boolean;
+                aiUseLocalEngine: boolean;
+                aiMutationProposalsEnabled: boolean;
+                aiKnowledgeCutoff: string;
+                bottomNavEnabled: boolean;
+                taskPanelRouted: boolean;
+                copilotDockEnabled: boolean;
+            };
+        };
+
+        beforeEach(() => {
+            envMod.default.aiUseLocalEngine = false;
+        });
+
+        afterEach(() => {
+            envMod.default.aiUseLocalEngine = true;
+        });
+
+        it("does NOT bounce the launcher-badge back to N after opening Inbox and switching to another tab", async () => {
+            // Stage the triage agent to surface N nudges so the
+            // projection effect has something to push to Redux.
+            const stagedNudges = [
+                {
+                    nudge_id: "nudge-bounce-1",
+                    kind: "wip_overflow" as const,
+                    target_ids: ["task-p1-a"],
+                    summary: "first nudge",
+                    severity: "warn" as const,
+                    project_id: "p1"
+                },
+                {
+                    nudge_id: "nudge-bounce-2",
+                    kind: "stale_task" as const,
+                    target_ids: ["task-p1-a"],
+                    summary: "second nudge",
+                    severity: "info" as const,
+                    project_id: "p1"
+                }
+            ];
+            mockedUseAgent.mockImplementation((agentName) =>
+                agentName === "triage-agent"
+                    ? baseAgent({ nudges: stagedNudges })
+                    : baseAgent()
+            );
+
+            renderHarness();
+
+            // Open the dock on the Brief tab so the projection effect
+            // runs (inboxSurfaceVisible = false) and bumps the count to
+            // the staged nudge length. We use Brief instead of Chat to
+            // avoid the un-mocked `useAgentChat` engine that would
+            // otherwise hang under aiUseLocalEngine: false.
+            act(() => {
+                store.dispatch(
+                    overlaysActions.openCopilotDock({ tab: "brief" })
+                );
+            });
+            await waitFor(() => {
+                expect(
+                    store.getState().overlays.copilotDock.inboxUnreadCount
+                ).toBe(stagedNudges.length);
+            });
+
+            // User opens the Inbox tab. The host's mark-read effect
+            // fires on the open transition and zeros the count.
+            act(() => {
+                store.dispatch(overlaysActions.setCopilotDockTab("inbox"));
+            });
+            await waitFor(() => {
+                expect(
+                    store.getState().overlays.copilotDock.inboxUnreadCount
+                ).toBe(0);
+            });
+
+            // User switches BACK to the Brief tab. Pre-fix, the
+            // projection effect re-ran (inboxSurfaceVisible flipped
+            // false), saw nudgeCount = N (unchanged), and re-dispatched
+            // setInboxUnread(N) — restoring the badge. With the
+            // prevNudgeCountRef high-water gate, the effect only
+            // dispatches on STRICT increase, so N > N is false and
+            // the count stays 0.
+            act(() => {
+                store.dispatch(overlaysActions.setCopilotDockTab("brief"));
+            });
+            // Wait a microtask for the projection effect to run; if
+            // the bug is present the count will already be N here.
+            await waitFor(() => {
+                expect(store.getState().overlays.copilotDock.activeTab).toBe(
+                    "brief"
+                );
+            });
+            expect(store.getState().overlays.copilotDock.inboxUnreadCount).toBe(
+                0
+            );
+        });
+    });
 });
