@@ -705,6 +705,23 @@ const TaskModal: React.FC<{
                                         )
                                     );
                                 }}
+                                /*
+                                 * Wave 4 follow-up: pass `route` so the
+                                 * disclosure reads the task-note scope
+                                 * from `getAiDataScope` and surfaces
+                                 * the ghost-text-specific data list
+                                 * (column / task name / type / in-
+                                 * progress note text) instead of the
+                                 * generic global summary. The explicit
+                                 * `storageKey` is kept for the existing
+                                 * acknowledgement state — the default
+                                 * resolved from `route` would match
+                                 * (`boardCopilot:privacyShown:task-note`)
+                                 * but pinning the key here documents
+                                 * the contract for the test fixtures
+                                 * that pre-set it.
+                                 */
+                                route="task-note"
                                 storageKey="boardCopilot:privacyShown:task-note"
                             />
                         ) : null}
