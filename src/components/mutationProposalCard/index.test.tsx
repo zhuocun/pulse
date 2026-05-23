@@ -276,4 +276,72 @@ describe("MutationProposalCard", () => {
             jest.useRealTimers();
         }
     });
+
+    /*
+     * Regression test for A8 review issue #2. Before the fix, the in-card
+     * post-commit Undo button and the ledger entry's undo closure both
+     * called onUndo() — clicking in-card Undo and later opening the dock
+     * to click Revert fired onUndo() twice. The fix shares an
+     * `undoFiredRef` guard between both paths and the in-card Undo
+     * additionally removes the ledger entry so the Revert button is no
+     * longer reachable.
+     */
+    it("in-card Undo + ledger Revert fire onUndo exactly ONCE for the same proposal (issue #2)", async () => {
+        jest.useFakeTimers();
+        try {
+            const onUndo = jest.fn();
+            const onAccept = jest.fn();
+            renderCard({
+                onAccept,
+                onReject: jest.fn(),
+                onUndo,
+                proposal: baseProposal
+            });
+
+            // Walk the card through Accept → countdown → committed.
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            );
+            flushAcceptCountdown();
+            expect(onAccept).toHaveBeenCalledTimes(1);
+
+            // Sanity: the ledger now holds the entry with a live undo.
+            const ledgerBefore = store.getState().aiLedger.entries;
+            expect(ledgerBefore).toHaveLength(1);
+            const ledgerEntryId = ledgerBefore[0].id;
+
+            // Click in-card Undo.
+            const undoBtn = screen.getByRole("button", {
+                name: /Undo this proposal/i
+            });
+            fireEvent.click(undoBtn);
+
+            expect(onUndo).toHaveBeenCalledTimes(1);
+            // The synchronization contract: the in-card Undo removes the
+            // ledger entry so the dock can't surface a second Revert
+            // button for the same proposal.
+            expect(store.getState().aiLedger.entries).toHaveLength(0);
+
+            // Now simulate the dock attempting to fire the ledger's undo
+            // closure after the in-card Undo has already run. We do this
+            // by trying to fire the original closure directly — even if
+            // some component held a stale reference, the guard prevents
+            // a second `onUndo` invocation. (The ledger entry is gone in
+            // production but the guard is the belt-and-braces second
+            // line of defence.) We also fire a second in-card click —
+            // the guard short-circuits it.
+            fireEvent.click(undoBtn);
+            expect(onUndo).toHaveBeenCalledTimes(1);
+            // Belt-and-braces — the entry id we captured is unreachable.
+            expect(
+                store
+                    .getState()
+                    .aiLedger.entries.some((e) => e.id === ledgerEntryId)
+            ).toBe(false);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
 });

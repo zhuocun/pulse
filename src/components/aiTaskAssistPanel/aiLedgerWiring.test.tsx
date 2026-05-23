@@ -23,6 +23,24 @@ jest.mock("../../constants/env", () => ({
         taskPanelRouted: false
     }
 }));
+/*
+ * Intercept the toast helper so the test can drive the in-toast Undo
+ * callback synchronously — the real implementation goes through AntD's
+ * `message.open` which is fiddly to script in jsdom. The mock captures
+ * the latest `undo` callback to a ref the test can invoke.
+ */
+const capturedToastUndo: { undo: (() => void | Promise<void>) | null } = {
+    undo: null
+};
+jest.mock("../../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({
+        show: (options: { undo: () => void | Promise<void> }) => {
+            capturedToastUndo.undo = options.undo;
+            return { dismiss: jest.fn() };
+        }
+    })
+}));
 
 // eslint-disable-next-line simple-import-sort/imports
 import useAi from "../../utils/hooks/useAi";
@@ -116,11 +134,13 @@ describe("AiTaskAssistPanel — activity ledger wiring (A8)", () => {
     beforeEach(() => {
         store.dispatch(aiLedgerActions.clearAiLedger());
         __resetAiLedgerUndoCallbacksForTests();
+        capturedToastUndo.undo = null;
     });
 
     afterEach(() => {
         store.dispatch(aiLedgerActions.clearAiLedger());
         __resetAiLedgerUndoCallbacksForTests();
+        capturedToastUndo.undo = null;
     });
 
     it("logs an activity-ledger entry tagged 'task-assist' when story points are applied", async () => {
@@ -138,5 +158,46 @@ describe("AiTaskAssistPanel — activity ledger wiring (A8)", () => {
         expect(entries[0].description).toContain("5");
         expect(entries[0].description).toContain("Login refactor");
         expect(entries[0].undoable).toBe(true);
+    });
+
+    /*
+     * Regression test for A8 review issue #3. Before the fix, clicking
+     * the 10 s undoToast Undo button reverted the field but left the
+     * ledger entry with a still-live closure. The fix shares a
+     * `performUndo` between toast + ledger and the toast additionally
+     * calls `removeLedger(id)` so the row drops in the same tick.
+     */
+    it("toast Undo removes the ledger entry and ledger Revert becomes a no-op (issue #3)", async () => {
+        const onApplyStoryPoints = jest.fn();
+        renderPanel({ onApplyStoryPoints });
+        const applyButton = await screen.findByRole("button", {
+            name: /Apply suggested story points/i
+        });
+        act(() => {
+            fireEvent.click(applyButton);
+        });
+        // After Apply: one ledger entry is present and onApplyStoryPoints
+        // has been called once with the suggested value.
+        const entriesBefore = getLedgerEntries();
+        expect(entriesBefore).toHaveLength(1);
+        expect(onApplyStoryPoints).toHaveBeenCalledTimes(1);
+        expect(onApplyStoryPoints).toHaveBeenLastCalledWith(5);
+
+        // Fire the captured toast Undo callback. This should invoke
+        // the inverse (restore previous value, 2) AND drop the ledger
+        // entry so it no longer shows in the dock.
+        expect(capturedToastUndo.undo).not.toBeNull();
+        await act(async () => {
+            await capturedToastUndo.undo!();
+        });
+
+        // onApplyStoryPoints was called a second time with the previous
+        // value (2) — the inverse landed.
+        expect(onApplyStoryPoints).toHaveBeenCalledTimes(2);
+        expect(onApplyStoryPoints).toHaveBeenLastCalledWith(2);
+
+        // And the ledger row dropped — clicking ledger Revert in the
+        // dock would now find no entry.
+        expect(getLedgerEntries()).toHaveLength(0);
     });
 });
