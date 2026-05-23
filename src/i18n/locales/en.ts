@@ -870,6 +870,19 @@ export const enSource = {
             popoverTitleGrooming: "Needs grooming · {ready}/{total}",
             popoverEmptyReady: "Every task in this column passed the check.",
             popoverBlockerListLabel: "Tasks still needing work"
+        },
+        /**
+         * Inline ghost-text suggestions in the task description field
+         * (Phase 4 W3 — docs/design/_review-2026-05/04-ai-copilot.md
+         * §Ambition 2). The wrapper renders the local-engine completion
+         * as faded text after the caret; Tab accepts, Esc dismisses.
+         */
+        ghostText: {
+            acceptHint: "Press Tab to accept · Esc to dismiss",
+            dismissAriaLabel: "Dismiss ghost-text suggestion",
+            srOnlySuggestionPrefix: "Copilot suggests:",
+            srOnlySuggestionAccepted: "Suggestion accepted.",
+            srOnlySuggestionDismissed: "Suggestion dismissed."
         }
     },
     auth: {

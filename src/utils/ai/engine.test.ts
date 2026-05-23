@@ -7,6 +7,7 @@ import {
     detectType,
     draftTask,
     estimate,
+    noteCompletion,
     readiness,
     semanticSearch
 } from "./engine";
@@ -533,5 +534,81 @@ describe("engine.draftTask column picking", () => {
         });
         expect(suggestion.type).toBe("Bug");
         expect(suggestion.columnId).toBe("col-dev");
+    });
+});
+
+describe("engine.noteCompletion", () => {
+    it("returns an empty string when the partial value is empty and no taskName seed exists", () => {
+        expect(noteCompletion({ currentValue: "" })).toBe("");
+    });
+
+    it("seeds a scaffold when the partial value is empty but a task name is known", () => {
+        const out = noteCompletion({
+            taskName: "Fix login redirect",
+            currentValue: ""
+        });
+        expect(out).toContain("## Summary");
+        expect(out).toContain("Fix login redirect");
+        expect(out).toContain("## Acceptance criteria");
+    });
+
+    it("completes the tail of a 'when' conjunction with a verb-phrase", () => {
+        const out = noteCompletion({
+            taskName: "Add login",
+            currentValue: "When"
+        });
+        expect(out.length).toBeGreaterThan(0);
+        expect(out.toLowerCase()).toContain("user");
+    });
+
+    it("seeds bullet-list completion right after a fresh '## Acceptance criteria' heading", () => {
+        const out = noteCompletion({
+            taskName: "Fix the broken login flow",
+            currentValue:
+                "## Summary\nLogin breaks for new users.\n\n## Acceptance criteria"
+        });
+        expect(out).toMatch(/-\s/);
+        // Bug-typed acceptance copy
+        expect(out.toLowerCase()).toContain("regression");
+    });
+
+    it("offers a generic continuation when the user is mid-sentence", () => {
+        const out = noteCompletion({
+            taskName: "Add a new project header",
+            columnName: "Backlog",
+            currentValue: "We want users to be able to rename projects"
+        });
+        expect(out.length).toBeGreaterThan(0);
+        // Must not strip / duplicate the prefix
+        expect(out).not.toContain(
+            "We want users to be able to rename projects"
+        );
+    });
+
+    it("ignores absurdly long inputs to keep latency tight", () => {
+        const long = "x".repeat(5000);
+        expect(noteCompletion({ currentValue: long })).toBe("");
+    });
+
+    it("uses the column name to tune sentence-boundary follow-ups", () => {
+        const out = noteCompletion({
+            taskName: "Add coverage for login",
+            columnName: "In Progress",
+            currentValue: "We shipped the login change yesterday."
+        });
+        expect(out.toLowerCase()).toContain("regression test");
+    });
+
+    it("returns a leading space when the prefix ends mid-word", () => {
+        // taskName presence makes the suggestion deterministic for the
+        // sentence-boundary branch; the "and" branch ends mid-word.
+        const out = noteCompletion({
+            taskName: "Investigate slow signups",
+            currentValue:
+                "We changed the signup form so the email field validates"
+        });
+        // First char is whitespace so the accept-write does not paste
+        // a word boundary into the user's text.
+        expect(out.startsWith(" ")).toBe(true);
     });
 });

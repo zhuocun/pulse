@@ -776,6 +776,13 @@ const zhCN: Dictionary = {
             popoverTitleGrooming: "需整理 · {ready}/{total}",
             popoverEmptyReady: "本列中的所有任务都已通过检查。",
             popoverBlockerListLabel: "仍需完善的任务"
+        },
+        ghostText: {
+            acceptHint: "按 Tab 接受 · Esc 关闭",
+            dismissAriaLabel: "关闭 Copilot 自动补全建议",
+            srOnlySuggestionPrefix: "Copilot 建议:",
+            srOnlySuggestionAccepted: "已接受建议。",
+            srOnlySuggestionDismissed: "已关闭建议。"
         }
     },
     auth: {
