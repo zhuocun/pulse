@@ -78,6 +78,20 @@ interface AiGhostTextProps {
 }
 
 const STORAGE_KEY_PREFIX = "boardCopilot:privacyShown:";
+/**
+ * Same-tab consent updates ride this custom window event because the HTML
+ * spec restricts `storage` to *other* tabs — the writer's tab never sees
+ * its own write. When the user clicks "Got it" on `<CopilotPrivacyDisclosure>`
+ * inside the open task modal, the disclosure dispatches this event so any
+ * already-mounted `<AiGhostText>` upgrades its consent state without a
+ * remount. Detail carries `route` so subscribers can ignore unrelated
+ * surfaces (chat, draft modal, etc.) when more come online.
+ */
+export const AI_PRIVACY_CONSENT_EVENT = "ai-privacy-consent-changed";
+
+export interface AiPrivacyConsentEventDetail {
+    route: AiGhostTextRoute;
+}
 
 const readConsent = (route: AiGhostTextRoute): boolean => {
     if (typeof window === "undefined") return false;
@@ -94,18 +108,33 @@ const usePrivacyConsent = (route: AiGhostTextRoute): boolean => {
     const [consent, setConsent] = useState<boolean>(() => readConsent(route));
     useEffect(() => {
         // Re-read on mount in case the user acknowledged the disclosure on
-        // another tab. We also subscribe to the cross-tab `storage` event
-        // so revoking consent elsewhere downgrades this surface mid-session
-        // without a reload.
+        // another tab. We subscribe to two signals:
+        //   1. `storage` — cross-tab consent revoke/grant (the writer tab
+        //      never receives its own `storage` event per HTML spec).
+        //   2. Custom `ai-privacy-consent-changed` — same-tab consent
+        //      acknowledge from `<CopilotPrivacyDisclosure>` so the ghost
+        //      text activates without a modal close/reopen.
         setConsent(readConsent(route));
         if (typeof window === "undefined") return;
         const key = `${STORAGE_KEY_PREFIX}${route}`;
-        const handler = (event: StorageEvent) => {
+        const storageHandler = (event: StorageEvent) => {
             if (event.key && event.key !== key) return;
             setConsent(readConsent(route));
         };
-        window.addEventListener("storage", handler);
-        return () => window.removeEventListener("storage", handler);
+        const customHandler = (event: Event) => {
+            const detail = (event as CustomEvent<AiPrivacyConsentEventDetail>)
+                .detail;
+            // Filter on `detail.route` so a disclosure ack on a different
+            // surface (e.g. chat) cannot prematurely activate this one.
+            if (detail && detail.route !== route) return;
+            setConsent(readConsent(route));
+        };
+        window.addEventListener("storage", storageHandler);
+        window.addEventListener(AI_PRIVACY_CONSENT_EVENT, customHandler);
+        return () => {
+            window.removeEventListener("storage", storageHandler);
+            window.removeEventListener(AI_PRIVACY_CONSENT_EVENT, customHandler);
+        };
     }, [route]);
     return consent;
 };

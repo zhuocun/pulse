@@ -202,4 +202,77 @@ describe("TaskModal ghost-text integration", () => {
             ).toBeInTheDocument();
         });
     });
+
+    it("activates the ghost-text surface after the user acknowledges the disclosure in the same tab", async () => {
+        // Reviewer-flagged regression: `usePrivacyConsent` subscribed to
+        // `storage` only, but the HTML spec withholds that event from the
+        // tab that wrote the key. Without the same-tab consent signal a
+        // first-time user opts in, types into the note, and ghost-text
+        // never activates until the modal is closed and reopened. The
+        // fix dispatches a custom `ai-privacy-consent-changed` event from
+        // the disclosure's `onAcknowledge`, which the hook listens for
+        // alongside the cross-tab `storage` event.
+        setFlag(true);
+        // No consent in localStorage at start.
+        renderModal();
+        await screen.findByText(/edit task · build task/i);
+
+        const noteFields = screen
+            .getAllByRole("textbox")
+            .filter((el) => el.tagName.toLowerCase() === "textarea");
+        expect(noteFields.length).toBeGreaterThan(0);
+        const note = noteFields[0] as HTMLTextAreaElement;
+
+        // 1) Pre-consent: typing must not surface a suggestion because
+        //    the surface is gated off (engine never called).
+        await act(async () => {
+            fireEvent.change(note, {
+                target: { value: "Repro: open the app on iOS Safari" }
+            });
+        });
+        await act(async () => {
+            jest.advanceTimersByTime(600);
+        });
+        expect(screen.queryByTestId("ai-ghost-text")).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId("ai-ghost-text-overlay")
+        ).not.toBeInTheDocument();
+
+        // 2) Acknowledge — both buttons read "Got it"/"Don't show again";
+        //    grab the primary one (first by document order).
+        const ackButton = screen
+            .getAllByRole("button")
+            .find((btn) => /got it/i.test(btn.textContent ?? ""));
+        expect(ackButton).toBeDefined();
+        await act(async () => {
+            fireEvent.click(ackButton as HTMLElement);
+        });
+
+        // 3) The ghost-text shell must now be live without closing the modal.
+        await waitFor(() => {
+            expect(screen.getByTestId("ai-ghost-text")).toBeInTheDocument();
+        });
+
+        // 4) Typing more must now trigger the engine and surface a
+        //    suggestion within the debounce window.
+        const liveNoteFields = screen
+            .getAllByRole("textbox")
+            .filter((el) => el.tagName.toLowerCase() === "textarea");
+        const liveNote = liveNoteFields[0] as HTMLTextAreaElement;
+        await act(async () => {
+            fireEvent.change(liveNote, {
+                target: {
+                    value: "Repro: open the app on iOS Safari and tap login"
+                }
+            });
+        });
+        await act(async () => {
+            jest.advanceTimersByTime(600);
+        });
+        await waitFor(() => {
+            expect(
+                screen.getByTestId("ai-ghost-text-overlay")
+            ).toBeInTheDocument();
+        });
+    });
 });
