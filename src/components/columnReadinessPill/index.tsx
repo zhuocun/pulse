@@ -23,6 +23,7 @@
  * (Tag + sparkle + label) so a swap is a one-import refactor.
  */
 
+import styled from "@emotion/styled";
 import { Popover, Tag } from "antd";
 import React, { useState } from "react";
 
@@ -31,6 +32,39 @@ import { aiTokens } from "../../theme/aiTokens";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import type { ColumnReadinessReport } from "../../utils/hooks/useColumnReadiness";
 import AiSparkleIcon from "../aiSparkleIcon";
+
+/**
+ * Touch hit-area expander (PR #308 review — Followup B). On `pointer:
+ * coarse` viewports we bump the pill's hit area to the WCAG 2.1 SC 2.5.5
+ * recommended 44×44 minimum *without* changing the visible chip size —
+ * a `::before` pseudo-element pads out the click target using a
+ * negative inset margin so the parent layout stays unchanged. The
+ * visible pill still measures whatever the inline styles spec (so the
+ * column header doesn't bloat for fine-pointer users), but a tap
+ * anywhere inside the 44-square activates the popover. The rule is
+ * gated on `(pointer: coarse)` so desktop precision pointing isn't
+ * affected.
+ */
+const PillRoot = styled.span`
+    position: relative;
+    @media (pointer: coarse) {
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 50% auto auto 50%;
+            min-block-size: 44px;
+            min-inline-size: 44px;
+            transform: translate(-50%, -50%);
+            /*
+             * Negative z-index keeps the expander behind the visible
+             * pill so it doesn't sit on top of the sparkle / label.
+             * Pointer events still reach it because the parent is the
+             * Popover trigger.
+             */
+            z-index: -1;
+        }
+    }
+`;
 
 const formatTemplate = (
     template: string,
@@ -64,7 +98,7 @@ const PillBody: React.FC<{
             ? asMicrocopyString(copy.readyLabel)
             : asMicrocopyString(copy.groomingLabel);
     return (
-        <span
+        <PillRoot
             aria-label={ariaLabel}
             data-status={status}
             data-testid="column-readiness-pill"
@@ -91,7 +125,7 @@ const PillBody: React.FC<{
         >
             <AiSparkleIcon aria-hidden size="sm" />
             <span>{label}</span>
-        </span>
+        </PillRoot>
     );
 };
 

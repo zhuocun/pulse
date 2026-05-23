@@ -144,7 +144,15 @@ export const enSource = {
         renameTask: "Rename task",
         columnReadinessReady: "{ready} of {total} tasks ready",
         columnReadinessGrooming:
-            "{ready} of {total} tasks ready — needs grooming"
+            "{ready} of {total} tasks ready — needs grooming",
+        /*
+         * QW#13 (2026-05 review §Quick Wins): the AiConfidenceIndicator
+         * aria-label template. The numeric percentage *and* the plain-
+         * language band (Low / Moderate / High) both ride in the label
+         * so screen-reader users get the same paired signal sighted
+         * users see in the visible chip.
+         */
+        confidenceAriaLabel: "Confidence {band}, {percent}"
     },
     dragHints: {
         taskCardKeyboard:
@@ -396,7 +404,36 @@ export const enSource = {
         copilotMenuAsk: "Ask Copilot",
         copilotMenuBrief: "Board brief",
         copilotProjectDisabledDescription:
-            "Hides Board Copilot on this board and blocks AI requests for this project."
+            "Hides Board Copilot on this board and blocks AI requests for this project.",
+        /*
+         * Phase 4.6 board minimap (sticky overview strip). Visible
+         * label hidden — the minimap is purely visual chrome, the
+         * navigation landmark and per-segment buttons carry the
+         * accessible names. `inViewStatus` / `offScreenStatus` are
+         * suffixed into each segment's aria-label so a screen reader
+         * announces "Todo column, 4 tasks, currently in view" /
+         * "currently off-screen".
+         *
+         * `aria` is the landmark name for `<nav>` so screen-reader
+         * users can quickly jump to / past the minimap with `D` (NVDA
+         * landmark navigation) or `VO+U` rotor (macOS VoiceOver).
+         *
+         * `segmentAriaOne` / `segmentAriaOther` follow the plural-pair
+         * pattern used elsewhere in this file (no ICU formatter is
+         * loaded; call sites pick the right key off the count and
+         * `.replace()` to interpolate). The codebase deliberately does
+         * NOT embed ICU plural syntax in the value because a single-
+         * string `{count, plural, one {…} other {…}}` would render
+         * literally to screen-reader users.
+         */
+        minimap: {
+            aria: "Board minimap",
+            segmentAriaOne: "{name} column, 1 task, currently {status}",
+            segmentAriaOther:
+                "{name} column, {count} tasks, currently {status}",
+            inViewStatus: "in view",
+            offScreenStatus: "off-screen"
+        }
     },
     projectModal: {
         createDescription:
@@ -870,6 +907,19 @@ export const enSource = {
             popoverTitleGrooming: "Needs grooming · {ready}/{total}",
             popoverEmptyReady: "Every task in this column passed the check.",
             popoverBlockerListLabel: "Tasks still needing work"
+        },
+        /**
+         * Inline ghost-text suggestions in the task description field
+         * (Phase 4 W3 — docs/design/_review-2026-05/04-ai-copilot.md
+         * §Ambition 2). The wrapper renders the local-engine completion
+         * as faded text after the caret; Tab accepts, Esc dismisses.
+         */
+        ghostText: {
+            acceptHint: "Press Tab to accept · Esc to dismiss",
+            dismissAriaLabel: "Dismiss ghost-text suggestion",
+            srOnlySuggestionPrefix: "Copilot suggests:",
+            srOnlySuggestionAccepted: "Suggestion accepted.",
+            srOnlySuggestionDismissed: "Suggestion dismissed."
         }
     },
     auth: {
@@ -1063,7 +1113,23 @@ export const enSource = {
             current: "Current",
             proposed: "Proposed"
         },
-        columnFieldLabel: "Column {field}"
+        columnFieldLabel: "Column {field}",
+        /*
+         * QW#10 (2026-05 review §Quick Wins): the Apply button now
+         * shows the action verb matching the kind of mutation the
+         * agent proposed, derived from the diff shape (the wire schema
+         * doesn't carry an explicit `kind` — see `interfaces/agent.d.ts`).
+         * Surfaces that want to bypass the inferred verb can still pass
+         * a `title` override on `MutationProposalCard`.
+         */
+        applyVerbs: {
+            create: "Create",
+            update: "Save changes",
+            delete: "Delete",
+            move: "Move",
+            reassign: "Reassign",
+            renameColumn: "Rename"
+        }
     },
     /**
      * Web Share Target landing-page microcopy (Phase 3 A4). The page

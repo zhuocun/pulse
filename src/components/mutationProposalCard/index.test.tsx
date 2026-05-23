@@ -77,6 +77,29 @@ describe("MutationProposalCard", () => {
         __resetAiLedgerUndoCallbacksForTests();
     });
 
+    /*
+     * QW#6 (2026-05 review §Quick Wins): the inline diff card uses
+     * `role="region"` paired with an `aria-label` heading — the previous
+     * `role="alertdialog"` hijacked screen-reader focus as if the diff
+     * were a modal. The card is always rendered inline (chat drawer +
+     * review-each list); the surface that hosts a real modal supplies
+     * its own `dialog` role outside the card.
+     */
+    it("uses role=region with the heading as aria-label so the inline diff is a navigable landmark, not an alertdialog", () => {
+        renderCard({
+            onAccept: jest.fn(),
+            onReject: jest.fn(),
+            proposal: baseProposal
+        });
+        // The card itself surfaces a region landmark.
+        const region = screen.getByRole("region", {
+            name: /Reassign two unowned bugs/
+        });
+        expect(region).toBeInTheDocument();
+        // And the legacy alertdialog role is gone.
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
     it("renders the diff plus accept/reject without an Undo CTA when no onUndo is provided", () => {
         renderCard({
             onAccept: jest.fn(),
@@ -275,6 +298,144 @@ describe("MutationProposalCard", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    /*
+     * QW#10 (2026-05 review §Quick Wins): the visible Apply verb is
+     * derived from the diff shape — a coordinatorId-only task diff
+     * surfaces "Reassign", a columnId-only diff surfaces "Move",
+     * column-name-only diffs surface "Rename", and bulk_apply
+     * operations carry an explicit `operation` we can read.
+     * Heterogeneous diffs fall through to the generic "Apply" verb.
+     */
+    describe("QW#10 — Apply button verb derivation", () => {
+        it("surfaces `Reassign` for a coordinatorId-only task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: baseProposal
+            });
+            // baseProposal is a single coordinatorId task update → reassign.
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Reassign/i);
+        });
+
+        it("surfaces `Move` for a columnId-only task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "columnId",
+                                from: "c-todo",
+                                to: "c-doing"
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Move/i);
+        });
+
+        it("surfaces `Save changes` for a mixed-field task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "epic",
+                                from: "Old",
+                                to: "New"
+                            },
+                            {
+                                task_id: "t-1",
+                                field: "storyPoints",
+                                from: 3,
+                                to: 5
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Save changes/i);
+        });
+
+        it("surfaces `Rename` for a column-name-only diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        column_updates: [
+                            {
+                                column_id: "c-1",
+                                field: "name",
+                                from: "Doing",
+                                to: "In Progress"
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Rename/i);
+        });
+
+        it("falls back to the generic `Apply` verb for a heterogeneous diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "columnId",
+                                from: "c-todo",
+                                to: "c-doing"
+                            }
+                        ],
+                        column_updates: [
+                            {
+                                column_id: "c-doing",
+                                field: "order",
+                                from: 1,
+                                to: 2
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/^Apply$/i);
+        });
     });
 
     /*

@@ -19,6 +19,7 @@ import taskIcon from "../../assets/task.svg";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import {
+    blur,
     brand,
     breakpoints,
     columnMinWidthRem,
@@ -29,7 +30,8 @@ import {
     shadow,
     space,
     touchTargetCoarse,
-    touchTargetMin
+    touchTargetMin,
+    zIndex
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
@@ -111,6 +113,21 @@ export const ColumnContainer = styled.div`
     }
 `;
 
+/**
+ * The column's vertical scroll context. The ColumnHeader lives *inside*
+ * this container as its first child so `position: sticky` on the header
+ * pins it against this exact scroll port; if the header were a sibling
+ * outside, sticky would degenerate to plain relative because the
+ * nearest scroll ancestor would be the page itself (or the BoardShell
+ * flex item, which doesn't scroll).
+ *
+ * `display: flex; flex-direction: column; gap: ${space.xs}` preserves
+ * the original 8-px rhythm between every task card. The header used to
+ * carry its own `margin-bottom: ${space.sm}` (12 px) as a sibling
+ * above; that's dropped now that the flex gap supplies the 8-px
+ * separator between the header and the first card. Net visual delta
+ * is 4 px tighter — well within the "calm board" rhythm.
+ */
 const TaskContainer = styled.div`
     display: flex;
     flex: 1;
@@ -323,10 +340,85 @@ const EpicTag = styled(Tag)`
     }
 `;
 
+/**
+ * Column header — sticky-pinned against the parent TaskContainer so a
+ * user scrolling a tall task list always sees the column name + count
+ * + readiness pill + more-actions menu. Phase 4.6 of `ui-todo.md`.
+ *
+ * `position: sticky` requires a positioned ancestor that scrolls; the
+ * direct parent (`TaskContainer`) is `overflow-y: auto` so the header
+ * snaps to its top edge.
+ *
+ * `z-index: ${zIndex.sticky}` (10) sits above every task card (which
+ * paint at the default `0`) so card text never bleeds through the
+ * header during the cross-fade as a card scrolls beneath it. The pill's
+ * AntD Popover (`zIndex.dropdown` = 1050) and the more-actions Dropdown
+ * (same) both ride well above the sticky tier, so neither clips behind
+ * the header — verified by the contract test in `index.test.tsx`.
+ *
+ * The dnd drag clone is painted at z-index 5000 on `document.body` via
+ * React's createPortal (see `tokens.ts` § dndDragClone), so a card in
+ * flight always paints over this header on every browser including iOS.
+ *
+ * `backdrop-filter: blur(${blur.sm}px)` adds a soft frost so task text
+ * scrolling underneath gets a subtle smear instead of a hard crop;
+ * paired with a translucent background tint so the header reads as a
+ * pane, not a hole. Both fall back gracefully on `forced-colors` /
+ * `prefers-reduced-transparency` (the browser drops backdrop-filter
+ * and we paint the page background underneath).
+ */
 const ColumnHeader = styled(Row)`
     align-items: center;
-    margin-bottom: ${space.sm}px;
+    /*
+     * Solid-ish pane that lets a touch of the column's fill-quaternary
+     * tint show through. Falls back to the column's own background
+     * (set at the ColumnContainer level) on browsers that don't
+     * support backdrop-filter (no blur, no shimmer — still readable).
+     */
+    background: var(--ant-color-bg-container, rgba(255, 255, 255, 0.86));
+    /* Pull the sticky bg inside the column's own rounded corner so the
+     * header doesn't paint past the column's radius when pinned. */
+    border-radius: ${radius.sm}px;
+    backdrop-filter: saturate(180%) blur(${blur.sm}px);
+    -webkit-backdrop-filter: saturate(180%) blur(${blur.sm}px);
     padding: ${space.xxs}px ${space.xs}px;
+    position: sticky;
+    top: 0;
+    /*
+     * zIndex.sticky (= 10) — above task cards (which paint at the
+     * default z-index 0), below all AntD overlays (Dropdown / Popover
+     * ride at 1050+) so the readiness-pill popover and column-actions
+     * dropdown render above this header without a stacking-context
+     * trap. The dnd drag clone (z-index 5000 via body portal) also
+     * paints above this, so a dragged card stays visible while
+     * crossing the pinned header.
+     */
+    z-index: ${zIndex.sticky};
+
+    /*
+     * Honour the user's reduced-transparency preference: collapse the
+     * frosted backdrop to a solid surface so the column doesn't look
+     * smeared in environments that disable transparency (Windows
+     * high-contrast, macOS "Reduce Transparency"). Mirrors the recipe
+     * the main page header uses.
+     */
+    @media (prefers-reduced-transparency: reduce) {
+        background: var(--ant-color-bg-container, #ffffff);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    /*
+     * Forced-colors mode (Windows high-contrast) replaces every author
+     * colour with system tokens. Drop the translucent background so the
+     * system colour wins; keep the sticky positioning intact because
+     * pinning the header is still useful in high-contrast.
+     */
+    @media (forced-colors: active) {
+        background: Canvas;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
 
     /*
      * Lift the column-level "more actions" trigger to a 32 × 32 hit target
@@ -801,24 +893,30 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
 
 TaskCard.displayName = "TaskCard";
 
-const Column = React.forwardRef<
-    HTMLDivElement,
-    {
-        tasks: ITask[];
-        column: IColumn;
-        param: TaskSearchParam;
-        /** Disables inline task creation while a reorder mutation is in flight. */
-        isDragDisabled: boolean;
-        /**
-         * When set, controls row drag only (e.g. filters active). Defaults to
-         * `isDragDisabled` so a single flag still disables both behaviors.
-         */
-        taskDragDisabled?: boolean;
-        boardAiOn?: boolean;
-        members?: IMember[];
-        onResetFilters?: () => void;
-    }
->(
+/**
+ * Column props extend the native `<div>` HTML attributes so the
+ * Drag wrapper (which spreads its `draggableProps` / `dragHandleProps`
+ * onto the cloned child) and the BoardMinimap (which threads a
+ * `data-minimap-column-id` identifier through for its in-view lookup)
+ * can both attach data-attrs without per-attr forwarding plumbing.
+ */
+type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
+    tasks: ITask[];
+    column: IColumn;
+    param: TaskSearchParam;
+    /** Disables inline task creation while a reorder mutation is in flight. */
+    isDragDisabled: boolean;
+    /**
+     * When set, controls row drag only (e.g. filters active). Defaults to
+     * `isDragDisabled` so a single flag still disables both behaviors.
+     */
+    taskDragDisabled?: boolean;
+    boardAiOn?: boolean;
+    members?: IMember[];
+    onResetFilters?: () => void;
+};
+
+const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
     (
         {
             column,
@@ -882,51 +980,60 @@ const Column = React.forwardRef<
         });
         return (
             <ColumnContainer {...props} ref={ref}>
-                <ColumnHeader between>
-                    <span
-                        style={{
-                            alignItems: "center",
-                            display: "inline-flex",
-                            gap: space.xs,
-                            minWidth: 0
-                        }}
-                    >
-                        {columnDragHandleProps ? (
-                            <ColumnDragHandleButton
-                                type="button"
-                                {...columnDragHandleProps}
-                                aria-label={
-                                    microcopy.dragHints.columnDragHandle
-                                }
-                            >
-                                <HolderOutlined aria-hidden />
-                            </ColumnDragHandleButton>
-                        ) : null}
-                        <ColumnDot
-                            aria-hidden
-                            statusColor={dotForColumn(column._id)}
-                        />
-                        <ColumnTitle level={4}>{column.columnName}</ColumnTitle>
-                        <Badge
-                            aria-label={`${filteredTasks.length} tasks in ${column.columnName}`}
-                            color="default"
-                            count={filteredTasks.length}
-                            showZero
+                {/*
+                 * Phase 4.6 — the ColumnHeader is now rendered *inside*
+                 * TaskContainer so its `position: sticky` pins against
+                 * that scroll port. As a sibling it would have
+                 * degenerated to plain relative (no nearest scrollable
+                 * ancestor) and not stuck at all.
+                 */}
+                <TaskContainer data-testid="column-task-container">
+                    <ColumnHeader between data-testid="column-header">
+                        <span
                             style={{
-                                backgroundColor:
-                                    "var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06))",
-                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                                fontWeight: 600
+                                alignItems: "center",
+                                display: "inline-flex",
+                                gap: space.xs,
+                                minWidth: 0
                             }}
+                        >
+                            {columnDragHandleProps ? (
+                                <ColumnDragHandleButton
+                                    type="button"
+                                    {...columnDragHandleProps}
+                                    aria-label={
+                                        microcopy.dragHints.columnDragHandle
+                                    }
+                                >
+                                    <HolderOutlined aria-hidden />
+                                </ColumnDragHandleButton>
+                            ) : null}
+                            <ColumnDot
+                                aria-hidden
+                                statusColor={dotForColumn(column._id)}
+                            />
+                            <ColumnTitle level={4}>
+                                {column.columnName}
+                            </ColumnTitle>
+                            <Badge
+                                aria-label={`${filteredTasks.length} tasks in ${column.columnName}`}
+                                color="default"
+                                count={filteredTasks.length}
+                                showZero
+                                style={{
+                                    backgroundColor:
+                                        "var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06))",
+                                    color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
+                                    fontWeight: 600
+                                }}
+                            />
+                            <ColumnReadinessPill report={readinessReport} />
+                        </span>
+                        <DeleteDropDown
+                            columnId={column._id}
+                            columnName={column.columnName}
                         />
-                        <ColumnReadinessPill report={readinessReport} />
-                    </span>
-                    <DeleteDropDown
-                        columnId={column._id}
-                        columnName={column.columnName}
-                    />
-                </ColumnHeader>
-                <TaskContainer>
+                    </ColumnHeader>
                     <Drop
                         type="ROW"
                         direction="vertical"

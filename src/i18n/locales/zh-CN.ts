@@ -146,7 +146,8 @@ const zhCN: Dictionary = {
         lensComingSoon: "敬请期待",
         renameTask: "重命名任务",
         columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
-        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理"
+        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理",
+        confidenceAriaLabel: "置信度 {band}，{percent}"
     },
     dragHints: {
         taskCardKeyboard:
@@ -375,7 +376,14 @@ const zhCN: Dictionary = {
         copilotMenuAsk: "询问 Copilot",
         copilotMenuBrief: "看板简报",
         copilotProjectDisabledDescription:
-            "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
+            "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。",
+        minimap: {
+            aria: "看板缩略图",
+            segmentAriaOne: "{name} 列,1 个任务,当前{status}",
+            segmentAriaOther: "{name} 列,{count} 个任务,当前{status}",
+            inViewStatus: "在视图中",
+            offScreenStatus: "在视图外"
+        }
     },
     projectModal: {
         createDescription: "设置名称、组织和负责人,开始跟踪工作。",
@@ -776,6 +784,13 @@ const zhCN: Dictionary = {
             popoverTitleGrooming: "需整理 · {ready}/{total}",
             popoverEmptyReady: "本列中的所有任务都已通过检查。",
             popoverBlockerListLabel: "仍需完善的任务"
+        },
+        ghostText: {
+            acceptHint: "按 Tab 接受 · Esc 关闭",
+            dismissAriaLabel: "关闭 Copilot 自动补全建议",
+            srOnlySuggestionPrefix: "Copilot 建议:",
+            srOnlySuggestionAccepted: "已接受建议。",
+            srOnlySuggestionDismissed: "已关闭建议。"
         }
     },
     auth: {
@@ -961,7 +976,15 @@ const zhCN: Dictionary = {
             current: "当前值",
             proposed: "建议值"
         },
-        columnFieldLabel: "列{field}"
+        columnFieldLabel: "列{field}",
+        applyVerbs: {
+            create: "创建",
+            update: "保存更改",
+            delete: "删除",
+            move: "移动",
+            reassign: "重新分配",
+            renameColumn: "重命名"
+        }
     },
     share: {
         headline: "分享到 Pulse",

@@ -25,7 +25,13 @@ import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
+import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
+import AiGhostText, {
+    AI_PRIVACY_CONSENT_EVENT,
+    type AiPrivacyConsentEventDetail
+} from "../aiGhostText";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
+import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import ErrorBox from "../errorBox";
 
 // Replaces lodash/isEqual for the modal's diff check. ITask is a flat
@@ -88,6 +94,51 @@ const TASK_MODAL_FIELDS: readonly TaskModalField[] = [
 
 const isTaskModalField = (field: string): field is TaskModalField =>
     TASK_MODAL_FIELDS.includes(field as TaskModalField);
+
+/**
+ * Form-binding adapter for the ghost-text-wrapped notes textarea. AntD
+ * `Form.Item` injects `value` / `onChange` into its direct child, so the
+ * adapter intercepts that pair and feeds the live partial back into the
+ * `<AiGhostText>` context so the local engine sees the user's most recent
+ * keystroke. The wrapped textarea keeps every prop the bare
+ * `Input.TextArea` had (placeholder, rows, inputMode, etc.) — they just
+ * move through the adapter unchanged.
+ */
+const AiGhostTextNoteField: React.FC<{
+    value?: string;
+    onChange?: (event: { target: { value: string } }) => void;
+    columnId?: string;
+    projectId?: string;
+    taskName?: string;
+    type?: "Task" | "Bug";
+}> = ({ value, onChange, columnId, projectId, taskName, type }) => {
+    const project = useCachedQueryData<IProject>(["projects", { projectId }]);
+    const columns =
+        useCachedQueryData<IColumn[]>(["boards", { projectId }]) ?? [];
+    const currentColumn = columns.find((column) => column._id === columnId);
+    return (
+        <AiGhostText
+            route="task-note"
+            context={{
+                projectName: project?.projectName,
+                columnName: currentColumn?.columnName,
+                taskName,
+                type,
+                currentValue: value ?? ""
+            }}
+        >
+            <Input.TextArea
+                autoComplete="off"
+                enterKeyHint="done"
+                inputMode="text"
+                onChange={onChange}
+                placeholder={microcopy.placeholders.notesAcceptanceCriteria}
+                rows={4}
+                value={value}
+            />
+        </AiGhostText>
+    );
+};
 
 const TaskModal: React.FC<{
     tasks: ITask[] | undefined;
@@ -631,17 +682,58 @@ const TaskModal: React.FC<{
                                 }
                             />
                         </Form.Item>
-                        <Form.Item label={microcopy.fields.notes} name="note">
-                            <Input.TextArea
-                                autoComplete="off"
-                                enterKeyHint="done"
-                                inputMode="text"
-                                placeholder={
-                                    microcopy.placeholders
-                                        .notesAcceptanceCriteria
-                                }
-                                rows={4}
+                        {environment.aiGhostTextEnabled &&
+                        aiEnabled &&
+                        boardAiOn ? (
+                            <CopilotPrivacyDisclosure
+                                onAcknowledge={() => {
+                                    // The HTML spec restricts the
+                                    // `storage` event to *other* tabs, so
+                                    // the writer never sees its own
+                                    // write. Without this dispatch the
+                                    // already-mounted `<AiGhostText>`
+                                    // would only pick up consent on the
+                                    // next modal close/reopen — which is
+                                    // exactly the regression the reviewer
+                                    // flagged.
+                                    const detail: AiPrivacyConsentEventDetail =
+                                        { route: "task-note" };
+                                    window.dispatchEvent(
+                                        new CustomEvent(
+                                            AI_PRIVACY_CONSENT_EVENT,
+                                            { detail }
+                                        )
+                                    );
+                                }}
+                                storageKey="boardCopilot:privacyShown:task-note"
                             />
+                        ) : null}
+                        <Form.Item label={microcopy.fields.notes} name="note">
+                            {environment.aiGhostTextEnabled &&
+                            aiEnabled &&
+                            boardAiOn ? (
+                                <AiGhostTextNoteField
+                                    columnId={editingTask?.columnId}
+                                    projectId={projectId}
+                                    taskName={liveValues.taskName}
+                                    type={
+                                        liveValues.type === "Bug"
+                                            ? "Bug"
+                                            : "Task"
+                                    }
+                                />
+                            ) : (
+                                <Input.TextArea
+                                    autoComplete="off"
+                                    enterKeyHint="done"
+                                    inputMode="text"
+                                    placeholder={
+                                        microcopy.placeholders
+                                            .notesAcceptanceCriteria
+                                    }
+                                    rows={4}
+                                />
+                            )}
                         </Form.Item>
                     </Form>
                     {aiEnabled &&

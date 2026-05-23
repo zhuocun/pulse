@@ -1,7 +1,7 @@
 import { Tooltip } from "antd";
 import React from "react";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
     confidenceBand,
     confidenceColor,
@@ -65,7 +65,20 @@ const AiConfidenceIndicator: React.FC<AiConfidenceIndicatorProps> = ({
     const text = compact
         ? BAND_LABEL[band]
         : `${BAND_LABEL[band]} (${percent})`;
-    const ariaLabel = `Confidence ${BAND_LABEL[band].toLowerCase()}, ${percent}`;
+    /*
+     * QW#13 (2026-05 review §Quick Wins): the aria-label flows through
+     * the locale-aware microcopy template instead of a hard-coded
+     * English string. The visible chip pairs the band with the
+     * percentage; the SR label mirrors that pairing so users on
+     * assistive tech don't get a strictly weaker signal. The band copy
+     * itself comes from `ai.confidenceBands.*` (already locale-aware)
+     * and is lowercased to keep the "High, 83%" → "high, 83%" reading
+     * cadence that NN/g flagged as the most natural for confidence
+     * announcements.
+     */
+    const ariaLabel = microcopyString(microcopy.a11y.confidenceAriaLabel)
+        .replace("{band}", BAND_LABEL[band].toLowerCase())
+        .replace("{percent}", percent);
     const node = (
         <CopilotChip aria-label={ariaLabel} tone={tone} variant="confidence">
             {text}
