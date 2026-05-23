@@ -531,6 +531,36 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const [draft, setDraft] = React.useState(task.taskName);
         const cardRef = React.useRef<HTMLButtonElement | null>(null);
         const inputRef = React.useRef<InputRef | null>(null);
+        /*
+         * Browsers fire `click → click → dblclick` for a real
+         * double-click. Stopping propagation on `dblclick` alone is
+         * not enough — both preceding `click` events would still
+         * bubble to TaskCardOuter and trigger `onOpen()`, opening
+         * the modal underneath the inline-edit Input. We defer the
+         * outer-card open by ~250 ms; if a `dblclick` lands inside
+         * that window, `enterEditing` cancels the pending timer and
+         * the modal never fires. The timeout id is kept in a ref so
+         * the cancellation path can find it across renders.
+         *
+         * 250 ms matches the OS-level dblclick threshold on macOS /
+         * Windows (Linear / Notion use the same envelope). Lower
+         * values race against slow-finger users; higher values add
+         * perceptible lag to a plain single click.
+         */
+        const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+            null
+        );
+        // Cancel any pending open timer on unmount so we don't open
+        // a modal for a card that has scrolled out of the column.
+        React.useEffect(
+            () => () => {
+                if (openTimerRef.current !== null) {
+                    clearTimeout(openTimerRef.current);
+                    openTimerRef.current = null;
+                }
+            },
+            []
+        );
         // Bridge the outer forwardRef to our local cardRef so we can
         // restore focus on commit/revert without losing parent-supplied
         // refs (react-router, dnd, etc.).
@@ -588,8 +618,15 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             (event: React.MouseEvent<HTMLDivElement>) => {
                 // Double-click on the title — stop propagation so the
                 // outer `onClick={onOpen}` doesn't also fire and open
-                // the modal underneath our Input.
+                // the modal underneath our Input. Stopping propagation
+                // suppresses the `dblclick` bubble; the click-timer
+                // cancellation below handles the two preceding `click`
+                // events that already fired before this handler runs.
                 event.stopPropagation();
+                if (openTimerRef.current !== null) {
+                    clearTimeout(openTimerRef.current);
+                    openTimerRef.current = null;
+                }
                 if (isMock) return;
                 setDraft(task.taskName);
                 setEditing(true);
@@ -601,6 +638,27 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             },
             [isMock, task.taskName]
         );
+        /*
+         * Outer card click → deferred `onOpen`. The first `click` of
+         * a real double-click sequence lands here ~10–30 ms before
+         * the matching `dblclick` reaches `enterEditing` on the
+         * title; the 250 ms timer gives `enterEditing` a window to
+         * cancel before the modal opens. A plain single click
+         * resolves the timer normally — there's a ~250 ms perceived
+         * lag, but it sits below the 300 ms threshold most users
+         * register as "delayed" and matches Linear's behaviour for
+         * card rows that support inline edit.
+         */
+        const handleCardClick = React.useCallback(() => {
+            if (!onOpen) return;
+            if (openTimerRef.current !== null) {
+                clearTimeout(openTimerRef.current);
+            }
+            openTimerRef.current = setTimeout(() => {
+                openTimerRef.current = null;
+                onOpen();
+            }, 250);
+        }, [onOpen]);
         return (
             <TaskCardOuter
                 aria-label={
@@ -611,7 +669,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 }
                 aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 disabled={isMock}
-                onClick={onOpen}
+                onClick={handleCardClick}
                 ref={setCardRef}
                 title={microcopy.dragHints.taskCardKeyboard}
                 type="button"

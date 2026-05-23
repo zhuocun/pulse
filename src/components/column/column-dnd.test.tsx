@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DragDropContext } from "@hello-pangea/dnd";
 import type { ReactNode } from "react";
@@ -184,7 +184,14 @@ describe("Column DnD affordances (live @hello-pangea/dnd)", () => {
             })
         );
 
-        expect(startEditing).toHaveBeenCalledTimes(1);
+        // TaskCardOuter now defers `onOpen()` by 250 ms so a real
+        // browser's `click → click → dblclick` sequence has a chance
+        // to cancel the modal before it opens (see the dblclick
+        // regression coverage in `index.test.tsx`). Wait for the
+        // timer to drain rather than asserting synchronously.
+        await waitFor(() => {
+            expect(startEditing).toHaveBeenCalledTimes(1);
+        });
         expect(startEditing).toHaveBeenCalledWith("task-1");
     });
 
