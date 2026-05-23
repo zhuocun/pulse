@@ -309,7 +309,7 @@ export const enSource = {
         todayTooltip: "Tasks due today",
         thisWeekTooltip: "Tasks due in this ISO week (Mon–Sun)",
         mineTooltip: "Tasks where you're the coordinator",
-        atRiskTooltip: "AI-flagged tasks that may slip",
+        atRiskTooltip: "Tasks AI-flagged as high or medium risk",
         comingSoonBadge: "Soon"
     },
     confirm: {
