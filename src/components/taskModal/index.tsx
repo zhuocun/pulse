@@ -26,7 +26,10 @@ import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
-import AiGhostText from "../aiGhostText";
+import AiGhostText, {
+    AI_PRIVACY_CONSENT_EVENT,
+    type AiPrivacyConsentEventDetail
+} from "../aiGhostText";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import ErrorBox from "../errorBox";
@@ -682,7 +685,28 @@ const TaskModal: React.FC<{
                         {environment.aiGhostTextEnabled &&
                         aiEnabled &&
                         boardAiOn ? (
-                            <CopilotPrivacyDisclosure storageKey="boardCopilot:privacyShown:task-note" />
+                            <CopilotPrivacyDisclosure
+                                onAcknowledge={() => {
+                                    // The HTML spec restricts the
+                                    // `storage` event to *other* tabs, so
+                                    // the writer never sees its own
+                                    // write. Without this dispatch the
+                                    // already-mounted `<AiGhostText>`
+                                    // would only pick up consent on the
+                                    // next modal close/reopen — which is
+                                    // exactly the regression the reviewer
+                                    // flagged.
+                                    const detail: AiPrivacyConsentEventDetail =
+                                        { route: "task-note" };
+                                    window.dispatchEvent(
+                                        new CustomEvent(
+                                            AI_PRIVACY_CONSENT_EVENT,
+                                            { detail }
+                                        )
+                                    );
+                                }}
+                                storageKey="boardCopilot:privacyShown:task-note"
+                            />
                         ) : null}
                         <Form.Item label={microcopy.fields.notes} name="note">
                             {environment.aiGhostTextEnabled &&
