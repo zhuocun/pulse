@@ -492,8 +492,13 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         const fingerprintChanged =
             prevFingerprint !== "" && prevFingerprint !== fingerprint;
         const isFirstOpen = prevFingerprint === "";
-        if (isFirstOpen || fingerprintChanged) {
+        // COPILOT_BRIEF_OPEN models a true open transition only. A
+        // mid-session board mutation that triggers a refetch is a
+        // separate signal (R-A H2) so the open-rate metric stays clean.
+        if (isFirstOpen) {
             track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
+        } else if (fingerprintChanged) {
+            track(ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE);
         }
         if (prevFingerprint !== fingerprint) {
             lastFingerprintRef.current = fingerprint;
