@@ -10,6 +10,7 @@
  */
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useMemo, useState } from "react";
+import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -44,6 +45,7 @@ jest.mock("../../constants/env", () => ({
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
 import useAgent from "../../utils/hooks/useAgent";
+import { store } from "../../store";
 
 import AiTaskAssistPanel from ".";
 
@@ -136,23 +138,25 @@ const renderPanel = (
     const onApplySuggestion = jest.fn();
     const onOpenSimilarTask = jest.fn();
     const utils = render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <AiTaskAssistPanel
-                                onApplyStoryPoints={onApplyStoryPoints}
-                                onApplySuggestion={onApplySuggestion}
-                                onOpenSimilarTask={onOpenSimilarTask}
-                                values={values}
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskAssistPanel
+                                    onApplyStoryPoints={onApplyStoryPoints}
+                                    onApplySuggestion={onApplySuggestion}
+                                    onOpenSimilarTask={onOpenSimilarTask}
+                                    values={values}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
     return {
         ...utils,
@@ -383,16 +387,18 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         mockedUseAgent.mockReturnValue(baseAgent({ start }));
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={<TasksCacheBumper />}
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={<TasksCacheBumper />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
@@ -433,16 +439,18 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         };
 
         render(
-            <QueryClientProvider client={new QueryClient()}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={<DraftChanger />}
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={new QueryClient()}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={<DraftChanger />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
@@ -500,16 +508,18 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         };
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={<Harness />}
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={<Harness />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         await waitFor(() => expect(start).toHaveBeenCalledTimes(1));

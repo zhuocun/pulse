@@ -22,6 +22,7 @@ import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
+import useAiLedger from "../../utils/hooks/useAiLedger";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useDebounce from "../../utils/hooks/useDebounce";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
@@ -237,6 +238,12 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const previousPointsRef = useRef<number | undefined>(values.storyPoints);
     const [showAlternative, setShowAlternative] = useState(false);
     const undoToast = useUndoToast();
+    /*
+     * Activity ledger (A8): each accepted suggestion logs an entry so the
+     * dock's session-level activity log can surface a one-click revert
+     * even after the 10-second toast window closes.
+     */
+    const aiLedger = useAiLedger();
     const errorView = aiErrorView(estimateError);
     const readinessErrorView = aiErrorView(readinessError);
 
@@ -401,7 +408,35 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 previousPointsRef.current = previous;
             }
         });
-    }, [estimateData, onApplyStoryPoints, undoToast]);
+        /*
+         * A8: also log the apply to the session ledger so the user can
+         * revert it from the dock's activity log later. The undo
+         * closure mirrors the undoToast undo so the two paths stay in
+         * sync — a previous undefined value means there is no inverse
+         * to apply, so we skip the closure entirely.
+         */
+        aiLedger.record({
+            description: asMicrocopyString(
+                microcopy.aiActivityLog.descriptions.taskAssistPointsApplied
+            )
+                .replace("{points}", String(next))
+                .replace("{taskName}", values.taskName ?? ""),
+            surface: "task-assist",
+            undo:
+                previous === undefined
+                    ? undefined
+                    : () => {
+                          onApplyStoryPoints(previous as StoryPoints);
+                          previousPointsRef.current = previous;
+                      }
+        });
+    }, [
+        aiLedger,
+        estimateData,
+        onApplyStoryPoints,
+        undoToast,
+        values.taskName
+    ]);
 
     const handleApplyReadiness = useCallback(
         (issue: IReadinessIssue) => {
@@ -424,8 +459,33 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                     });
                 }
             });
+            /*
+             * A8: log the field update so it shows up in the activity log
+             * with the same revert affordance the undoToast provided
+             * for its short 10-second window.
+             */
+            aiLedger.record({
+                description: asMicrocopyString(
+                    microcopy.aiActivityLog.descriptions.taskAssistFieldApplied
+                )
+                    .replace("{taskName}", values.taskName ?? "")
+                    .replace("{field}", String(issue.field)),
+                surface: "task-assist",
+                undo: () => {
+                    onApplySuggestion(issue.field, previous, {
+                        replace: true
+                    });
+                }
+            });
         },
-        [excludeTaskId, onApplySuggestion, projectId, undoToast, values]
+        [
+            aiLedger,
+            excludeTaskId,
+            onApplySuggestion,
+            projectId,
+            undoToast,
+            values
+        ]
     );
 
     const handleRegenerate = useCallback(() => {

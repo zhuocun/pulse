@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 jest.mock("../../utils/hooks/useAi", () => ({
@@ -10,6 +11,7 @@ jest.mock("../../utils/hooks/useAi", () => ({
 // eslint-disable-next-line simple-import-sort/imports
 import useAi from "../../utils/hooks/useAi";
 
+import { store } from "../../store";
 import AiTaskAssistPanel from ".";
 
 const mockedUseAi = useAi as jest.MockedFunction<typeof useAi>;
@@ -67,23 +69,27 @@ describe("AiTaskAssistPanel effect error handling", () => {
         queryClient.setQueryData(["tasks", { projectId: "p1" }], []);
 
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskAssistPanel
-                                    onApplyStoryPoints={jest.fn()}
-                                    onApplySuggestion={jest.fn()}
-                                    onOpenSimilarTask={jest.fn()}
-                                    values={{ taskName: "Hello world task" }}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskAssistPanel
+                                        onApplyStoryPoints={jest.fn()}
+                                        onApplySuggestion={jest.fn()}
+                                        onOpenSimilarTask={jest.fn()}
+                                        values={{
+                                            taskName: "Hello world task"
+                                        }}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         act(() => {
