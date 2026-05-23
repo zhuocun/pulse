@@ -1,9 +1,11 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 
 import App from "../App";
+import { store } from "../store";
 
 jest.mock("../constants/env", () => ({
     __esModule: true,
@@ -57,11 +59,13 @@ const renderApp = () => {
         defaultOptions: { queries: { retry: false } }
     });
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/"]}>
-                <App />
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/"]}>
+                    <App />
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
