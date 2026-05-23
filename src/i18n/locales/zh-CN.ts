@@ -400,7 +400,17 @@ const zhCN: Dictionary = {
         closeLabel: "关闭 Copilot",
         tabChat: "聊天",
         tabBrief: "简报",
-        tabListLabel: "Copilot 视图"
+        tabListLabel: "Copilot 视图",
+        inboxTab: {
+            title: "收件箱",
+            emptyTitle: "已全部处理完毕",
+            emptyDescription: "Copilot 发现看板问题时,会在这里推送提醒。",
+            seeAll: "在收件箱查看全部",
+            unreadBadgeAriaLabel: "{count} 条未读 Copilot 提醒",
+            sectionLabel: "整理提醒",
+            actionLabel: "打开任务",
+            dismissLabel: "忽略"
+        }
     },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",

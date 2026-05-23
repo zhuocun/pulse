@@ -7,6 +7,7 @@ import {
 import styled from "@emotion/styled";
 import {
     Alert,
+    Badge,
     Button,
     Dropdown,
     Popover,
@@ -54,6 +55,7 @@ import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
+import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -448,6 +450,20 @@ const BoardPage = () => {
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
     /*
+     * Phase 4 A8 — launcher badge subscription. `inboxUnreadCount` is
+     * a pure projection of the triage agent's nudge buffer (owned by
+     * `CopilotDockHost`), so this Button doesn't mount the agent —
+     * it just reads the cached count. When the count is 0 the Badge
+     * collapses to nothing (AntD treats `count={0}` as no-badge).
+     */
+    const { inboxUnreadCount: copilotInboxUnread } = useCopilotDock();
+    const copilotUnreadAriaLabel = copilotInboxUnread
+        ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabel.replace(
+              "{count}",
+              String(copilotInboxUnread)
+          )
+        : undefined;
+    /*
      * R-A M1: the CopilotDock is now mounted in `MainLayout` by
      * `CopilotDockHost`, which bridges these legacy `chatDrawer` /
      * `boardBriefOpen` flags onto the persistent dock state so the
@@ -711,23 +727,47 @@ const BoardPage = () => {
                                                 placement="bottomRight"
                                                 trigger={["click"]}
                                             >
-                                                <Button
+                                                {/*
+                                                 * Phase 4 A8 — launcher badge
+                                                 * advertises unread Inbox
+                                                 * nudges produced by the
+                                                 * triage agent. The count
+                                                 * comes from Redux (owned by
+                                                 * `CopilotDockHost`) so the
+                                                 * Button doesn't need to
+                                                 * subscribe to the agent.
+                                                 * `count={0}` hides the dot
+                                                 * automatically — AntD's
+                                                 * Badge collapses to nothing
+                                                 * when count is falsy.
+                                                 */}
+                                                <Badge
                                                     aria-label={
-                                                        microcopy.a11y
-                                                            .boardCopilotMenu
+                                                        copilotUnreadAriaLabel
                                                     }
-                                                    icon={
-                                                        <AiSparkleIcon
-                                                            aria-hidden
-                                                        />
-                                                    }
-                                                    type="default"
+                                                    count={copilotInboxUnread}
+                                                    data-testid="copilot-launcher-badge"
+                                                    offset={[-4, 4]}
+                                                    size="small"
                                                 >
-                                                    {
-                                                        microcopy.labels
-                                                            .copilotShort
-                                                    }
-                                                </Button>
+                                                    <Button
+                                                        aria-label={
+                                                            microcopy.a11y
+                                                                .boardCopilotMenu
+                                                        }
+                                                        icon={
+                                                            <AiSparkleIcon
+                                                                aria-hidden
+                                                            />
+                                                        }
+                                                        type="default"
+                                                    >
+                                                        {
+                                                            microcopy.labels
+                                                                .copilotShort
+                                                        }
+                                                    </Button>
+                                                </Badge>
                                             </Dropdown>
                                         </>
                                     )}

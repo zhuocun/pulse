@@ -5,7 +5,7 @@ import {
     TeamOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Alert, Button, Typography } from "antd";
+import { Alert, Badge, Button, Typography } from "antd";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -30,6 +30,7 @@ import {
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
@@ -249,6 +250,22 @@ const ProjectPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
+    /*
+     * Phase 4 A8 — launcher badge subscription mirrors the Board
+     * Copilot menu's badge on `pages/board.tsx`. We surface the same
+     * unread count on the project-list "Ask" Copilot launcher so the
+     * user sees the badge even when they're between boards (the dock
+     * itself is still hidden because there's no projectId yet; the
+     * badge tells them "something landed on a board you triaged
+     * earlier this session").
+     */
+    const { inboxUnreadCount: copilotInboxUnread } = useCopilotDock();
+    const copilotUnreadAriaLabel = copilotInboxUnread
+        ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabel.replace(
+              "{count}",
+              String(copilotInboxUnread)
+          )
+        : undefined;
     /**
      * Listen for `boardCopilot:openChat` from the command palette so the
      * project list (no board context) still surfaces AI mode submissions
@@ -385,14 +402,22 @@ const ProjectPage = () => {
                 </PageHeadingGroup>
                 <Toolbar>
                     {aiEnabled && (
-                        <Button
-                            aria-label={microcopy.ai.askCopilot}
-                            icon={<AiSparkleIcon aria-hidden />}
-                            onClick={() => openChatDrawer()}
-                            type="default"
+                        <Badge
+                            aria-label={copilotUnreadAriaLabel}
+                            count={copilotInboxUnread}
+                            data-testid="copilot-launcher-badge"
+                            offset={[-4, 4]}
+                            size="small"
                         >
-                            {microcopy.labels.askShort}
-                        </Button>
+                            <Button
+                                aria-label={microcopy.ai.askCopilot}
+                                icon={<AiSparkleIcon aria-hidden />}
+                                onClick={() => openChatDrawer()}
+                                type="default"
+                            >
+                                {microcopy.labels.askShort}
+                            </Button>
+                        </Badge>
                     )}
                     <Button
                         aria-label={microcopy.actions.createProject}

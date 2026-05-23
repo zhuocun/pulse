@@ -8,8 +8,9 @@ import AiSparkleIcon from "../aiSparkleIcon";
 
 import BriefTabBody from "./BriefTabBody";
 import ChatTabBody from "./ChatTabBody";
+import InboxTabBody, { type InboxTabBodyProps } from "./InboxTabBody";
 
-export type CopilotDockTab = "chat" | "brief";
+export type CopilotDockTab = "chat" | "brief" | "inbox";
 
 /**
  * Phase 4 A8 — body slot for the dock surface (tabs + active tab body).
@@ -17,9 +18,9 @@ export type CopilotDockTab = "chat" | "brief";
  * Lifted out of the Drawer shell so the host can keep the Drawer mount
  * stable across `projectId` changes (Lane A caveat fix): the dock body
  * carries `key={projectId}` to reset per-project state (chat hook, brief
- * cache, triage-agent thread), while the Drawer container stays mounted
- * continuously so AntD does NOT animate a close/open transition on
- * project switch.
+ * cache, triage-agent thread, nudge inbox), while the Drawer container
+ * stays mounted continuously so AntD does NOT animate a close/open
+ * transition on project switch.
  *
  * Used by:
  *   - `CopilotDockHost` (production) — wraps this in a host-owned Drawer
@@ -63,6 +64,14 @@ export interface CopilotDockBodyProps {
      * still renders flush against its footer.
      */
     footerSlot?: React.ReactNode;
+    /**
+     * Phase 4 A8 — inbox surface props. Optional so legacy callers
+     * (tests that compose `<CopilotDock>` directly without an inbox
+     * wiring) keep working without forcing them to supply a stub.
+     */
+    inboxNudges?: InboxTabBodyProps["nudges"];
+    onActionInboxNudge?: InboxTabBodyProps["onActionNudge"];
+    onDismissInboxNudge?: InboxTabBodyProps["onDismissNudge"];
 }
 
 export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
@@ -83,7 +92,10 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
     onUndoProposal,
     onActionNudge,
     onDismissNudge,
-    footerSlot
+    footerSlot,
+    inboxNudges,
+    onActionInboxNudge,
+    onDismissInboxNudge
 }) => {
     // Both bodies stay mounted across tab switches (`destroyOnHidden={false}`
     // below). `dockOpen` drives close-side teardown ONLY; `tabActive`
@@ -127,6 +139,19 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
                     project={project ?? undefined}
                     tabActive={activeTab === "brief"}
                     tasks={tasks}
+                />
+            )
+        },
+        {
+            key: "inbox",
+            label: microcopy.copilotDock.inboxTab.title,
+            children: (
+                <InboxTabBody
+                    dockOpen={open}
+                    nudges={inboxNudges ?? []}
+                    onActionNudge={onActionInboxNudge}
+                    onDismissNudge={onDismissInboxNudge}
+                    tabActive={activeTab === "inbox"}
                 />
             )
         }

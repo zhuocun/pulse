@@ -30,12 +30,34 @@ interface ChatDrawerState {
  * `copilotDock.open = true` + `activeTab = "chat"`, mirroring the old
  * board-local `useEffect` collapse.
  */
-type CopilotDockTab = "chat" | "brief";
+type CopilotDockTab = "chat" | "brief" | "inbox";
 
 interface CopilotDockState {
     open: boolean;
     activeTab: CopilotDockTab;
     initialPrompt: string | null;
+    /**
+     * Phase 4 A8 — wall-clock ms when the user last read the Inbox tab
+     * (defined as: dock was open AND Inbox tab was the active surface).
+     * The dock host derives `unreadCount = nudges.filter(n => n.receivedAt
+     * > inboxLastReadAt).length` so the launcher badge is a pure function
+     * of (incoming-nudge timestamps, last-read timestamp). Session-only
+     * by design — the badge resets when the page reloads, matching the
+     * triage-agent's session lifetime; a nudge that hasn't been triaged
+     * since the last refresh is no longer a candidate for "unread".
+     */
+    inboxLastReadAt: number | null;
+    /**
+     * Phase 4 A8 — count of unread triage nudges the launcher badge
+     * should advertise. Owned by `CopilotDockHost` (the only component
+     * with access to the triage agent's nudges); recomputed and
+     * dispatched whenever the agent's nudge buffer changes OR the
+     * Inbox tab becomes the active surface (which drops the count to
+     * 0 via `markCopilotDockInboxRead`). Launcher buttons subscribe
+     * to this number directly — they don't touch the agent — so
+     * adding a badge to a new launcher stays cheap.
+     */
+    inboxUnreadCount: number;
 }
 
 interface OverlaysState {
@@ -51,7 +73,13 @@ const initialState: OverlaysState = {
     chatDrawer: { open: false, pendingPrompt: null },
     boardBriefOpen: false,
     aiDraftActiveColumnId: null,
-    copilotDock: { open: false, activeTab: "chat", initialPrompt: null }
+    copilotDock: {
+        open: false,
+        activeTab: "chat",
+        initialPrompt: null,
+        inboxLastReadAt: null,
+        inboxUnreadCount: 0
+    }
 };
 
 export const overlaysSlice = createSlice({
@@ -131,6 +159,34 @@ export const overlaysSlice = createSlice({
         },
         clearCopilotDockInitialPrompt(state) {
             state.copilotDock.initialPrompt = null;
+        },
+        /**
+         * Phase 4 A8 — stamps `inboxLastReadAt` with the current wall-
+         * clock ms so the launcher badge's unread count drops to zero.
+         * Fired by the dock host every time the Inbox tab becomes the
+         * active surface (open dock + Inbox tab selected) — see
+         * `CopilotDockHost`'s `useEffect` on (open, activeTab). Payload
+         * is an explicit timestamp so tests can pin the value without
+         * mocking `Date.now`.
+         */
+        markCopilotDockInboxRead(state, action: PayloadAction<number>) {
+            state.copilotDock.inboxLastReadAt = action.payload;
+            // Reading the inbox always zeros the unread count too —
+            // there's no scenario where the user just opened the
+            // inbox AND the badge should keep advertising unread.
+            state.copilotDock.inboxUnreadCount = 0;
+        },
+        /**
+         * Phase 4 A8 — projection updater for the launcher badge.
+         * Dispatched by `CopilotDockHost` when the triage agent's
+         * nudge buffer changes (and the user is NOT currently on the
+         * Inbox tab — otherwise `markCopilotDockInboxRead` zeros it
+         * out in the same render). The host is the only legitimate
+         * caller; other components should subscribe READ-ONLY via
+         * `useCopilotDock().inboxUnreadCount`.
+         */
+        setCopilotDockInboxUnread(state, action: PayloadAction<number>) {
+            state.copilotDock.inboxUnreadCount = Math.max(0, action.payload);
         }
     }
 });

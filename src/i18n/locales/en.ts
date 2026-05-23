@@ -422,7 +422,19 @@ export const enSource = {
         closeLabel: "Close Copilot",
         tabChat: "Chat",
         tabBrief: "Brief",
-        tabListLabel: "Copilot surfaces"
+        tabListLabel: "Copilot surfaces",
+        inboxTab: {
+            title: "Inbox",
+            emptyTitle: "You're all caught up",
+            emptyDescription:
+                "Copilot will surface triage nudges here as it spots issues on your board.",
+            seeAll: "See all in Inbox",
+            unreadBadgeAriaLabel:
+                "{count} unread Copilot {count, plural, one {nudge} other {nudges}}",
+            sectionLabel: "Triage nudges",
+            actionLabel: "Open task",
+            dismissLabel: "Dismiss"
+        }
     },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",

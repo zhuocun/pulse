@@ -45,9 +45,9 @@ import { CopilotDockBody, CopilotDockShell } from "./index";
  *   - The project-scoped body (`<ProjectScopedDockBody key={projectId}>`)
  *     is rendered AS A CHILD of the shell. The keyed remount tears down
  *     per-project state (chat hook's `messages` buffer, the triage
- *     agent's threadId + nudges, the brief cache) so cross-project
- *     leaks (#1, #3, #7) stay fixed — see the original `key={projectId}`
- *     placement history below.
+ *     agent's threadId + nudges, the brief cache, the inbox-nudge list)
+ *     so cross-project leaks (#1, #3, #7) stay fixed — see the original
+ *     `key={projectId}` placement history below.
  *
  * Inputs flow:
  *   - `projectId` from `useMatch("/projects/:projectId/board/*")` so the
@@ -78,8 +78,14 @@ interface ProjectScopedDockBodyProps {
 const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
     projectId
 }) => {
-    const { activeTab, open, pendingPrompt, setActiveTab, clearInitialPrompt } =
-        useCopilotDock();
+    const {
+        activeTab,
+        open,
+        pendingPrompt,
+        setActiveTab,
+        clearInitialPrompt,
+        setInboxUnread
+    } = useCopilotDock();
 
     const { data: currentProject } = useReactQuery<IProject>(
         "projects",
@@ -116,6 +122,8 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
      * effect below decides whether to start it. Behaviour parity with
      * the original board-page wiring:
      *   - chat must be the active surface (dock open on chat tab)
+     *     OR the inbox tab must be active (so the inbox surface gets
+     *     the same triage run even when the user opens it directly)
      *   - AI must be on for this project
      *   - remote backend must be available (`!aiUseLocalEngine`)
      *   - the project hasn't been triaged this app session yet
@@ -128,9 +136,10 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
     const dismissTriageNudge = triageAgent.dismissNudge;
     const triagedProjectsRef = useRef<Set<string>>(new Set());
 
-    const chatTabActive = open && activeTab === "chat";
+    const triageTabActive =
+        open && (activeTab === "chat" || activeTab === "inbox");
     useEffect(() => {
-        if (!chatTabActive) return;
+        if (!triageTabActive) return;
         if (!projectId) return;
         if (environment.aiUseLocalEngine) return;
         if (triagedProjectsRef.current.has(projectId)) return;
@@ -149,7 +158,7 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // surfaced via triageAgent.error if needed.
         }
-    }, [chatTabActive, projectId, startTriageAgent]);
+    }, [triageTabActive, projectId, startTriageAgent]);
 
     const visibleTasks = useMemo(() => tasks ?? [], [tasks]);
 
@@ -180,25 +189,60 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
     );
 
     const handleTabChange = useCallback(
-        (tab: "chat" | "brief") => {
+        (tab: "chat" | "brief" | "inbox") => {
             setActiveTab(tab);
         },
         [setActiveTab]
     );
 
+    /*
+     * Phase 4 A8 — projection sync for the launcher badge. Whenever
+     * the triage agent's nudge buffer length changes, dispatch the
+     * fresh count to Redux so launchers (the CopilotMenu Button in
+     * board.tsx, the Ask Copilot button on the projects page, future
+     * bottom-nav badge) can render a badge without subscribing to
+     * the agent. The Inbox-open path zeros the count separately via
+     * `markCopilotDockInboxRead` — we deliberately skip the dispatch
+     * here when the user is currently looking at the Inbox so we
+     * don't fight that effect with a stale non-zero count on the
+     * next render.
+     */
+    const inboxSurfaceVisible = open && activeTab === "inbox";
+    const nudgeCount = triageAgent.nudges.length;
+    useEffect(() => {
+        if (inboxSurfaceVisible) return;
+        if (environment.aiUseLocalEngine) return;
+        setInboxUnread(nudgeCount);
+    }, [inboxSurfaceVisible, nudgeCount, setInboxUnread]);
+
+    /*
+     * Phase 4 A8 — inbox tab data source. The triage agent's `nudges`
+     * array (which wraps `useNudgeInbox` internally) is the canonical
+     * source — passed in unconditionally so the inbox surface shows
+     * whatever the agent has produced. The `pendingNudges` chat-tab
+     * path stays gated on `!aiUseLocalEngine` (legacy contract with
+     * the in-chat NudgeCard list) so we don't change the chat-rail
+     * rendering, but the inbox surface deliberately treats the empty
+     * array as "nothing to triage" instead of hiding the tab — local
+     * engine users see the same inbox shape, just always empty until
+     * the remote backend wires in.
+     */
     return (
         <CopilotDockBody
             activeTab={activeTab}
             columns={board ?? []}
             footerSlot={<AiActivityLog />}
+            inboxNudges={triageAgent.nudges}
             initialPrompt={pendingPrompt ?? undefined}
             knownProjectIds={[projectId]}
             members={members ?? []}
+            onActionInboxNudge={handleTriageNudgeAction}
             onActionNudge={
                 !environment.aiUseLocalEngine
                     ? handleTriageNudgeAction
                     : undefined
             }
+            onDismissInboxNudge={handleTriageNudgeDismiss}
             onDismissNudge={
                 !environment.aiUseLocalEngine
                     ? handleTriageNudgeDismiss
@@ -313,13 +357,14 @@ const BridgeLegacyOverlayFlags: React.FC = () => {
  * that render `<MainLayout/>` without a Redux Provider (and the flag
  * off) used to crash on the host's bridge hooks when those were lifted
  * to the outer component, so we keep the gate-first / hooks-second
- * shape and move the unified close-handler into this inner shell.
+ * shape and move the unified close-handler / inbox-read effect into
+ * this inner shell.
  */
 const CopilotDockHostInner: React.FC<{
     projectId: string | null;
     boardAiOn: boolean;
 }> = ({ projectId, boardAiOn }) => {
-    const { open, closeDock } = useCopilotDock();
+    const { activeTab, open, closeDock, markInboxRead } = useCopilotDock();
     const { closeDrawer: closeChatDrawer } = useAiChatDrawer();
     const { closeDrawer: closeBriefDrawer } = useBoardBriefDrawer();
 
@@ -342,6 +387,24 @@ const CopilotDockHostInner: React.FC<{
         closeChatDrawer();
         closeBriefDrawer();
     }, [closeBriefDrawer, closeChatDrawer, closeDock]);
+
+    /*
+     * Phase 4 A8 — mark the Inbox as "read" when the user opens it.
+     * A single transition (false → true on `inboxSurfaceVisible`)
+     * stamps the timestamp once per open; subsequent re-renders while
+     * the surface stays open are no-ops. Without the ref gate, every
+     * useAgent stream-update re-render would re-stamp the timestamp,
+     * which would correctly leave unreadCount = 0 but would burn
+     * dispatches unnecessarily.
+     */
+    const inboxSurfaceVisible = open && activeTab === "inbox";
+    const prevInboxVisibleRef = useRef(false);
+    useEffect(() => {
+        const wasVisible = prevInboxVisibleRef.current;
+        prevInboxVisibleRef.current = inboxSurfaceVisible;
+        if (!inboxSurfaceVisible || wasVisible) return;
+        markInboxRead();
+    }, [inboxSurfaceVisible, markInboxRead]);
 
     /*
      * Drawer-lift (Phase 4 A8 — Lane A caveat fix): the

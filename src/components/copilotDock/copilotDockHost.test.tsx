@@ -755,10 +755,10 @@ describe("CopilotDockHost", () => {
      * which fired the Drawer's close/open animation. The Lane A fix
      * lifts `<CopilotDockShell>` (the Drawer) outside the keyed body,
      * so the Drawer's `open` prop never flips false and AntD does NOT
-     * animate during the project switch. We assert the dock element
-     * stays mounted AND keeps the same DOM identity (no remount) — a
-     * remount would produce a fresh element reference, the lifted-
-     * shell pattern keeps the reference stable.
+     * animate during the project switch. We assert it stays mounted
+     * AND the same DOM node (not a fresh one) — a remount would
+     * produce a new element reference, the lifted-shell pattern keeps
+     * the reference stable.
      */
     it("keeps the Drawer mounted continuously across a project switch (Drawer-lift)", async () => {
         renderHarness();
@@ -771,7 +771,9 @@ describe("CopilotDockHost", () => {
             ).not.toBeNull();
         });
 
-        // Capture the Drawer element reference before navigation.
+        // Capture the Drawer element reference before navigation. AntD
+        // renders the dialog inside `data-testid='copilot-dock'`; the
+        // dialog node identity is what we track.
         const dockBefore = document.querySelector(
             "[data-testid='copilot-dock']"
         );
@@ -794,5 +796,194 @@ describe("CopilotDockHost", () => {
         expect(dockAfter).toBe(dockBefore);
         // And the Redux open flag is still true throughout.
         expect(store.getState().overlays.copilotDock.open).toBe(true);
+    });
+
+    /*
+     * Phase 4 A8 — Inbox tab body is rendered when the user switches
+     * to it via `setCopilotDockTab("inbox")`. The body sources its
+     * nudges from the triage agent (passed in through the dock host),
+     * so a mocked `useAgent` with non-empty `nudges` should populate
+     * the inbox list. Empty state surfaces when no nudges are present.
+     *
+     * The mock implementation matches on agent name because the dock
+     * also instantiates `useAgent("board-brief-agent", …)` inside
+     * `BriefTabBody`; returning the inbox nudges from EVERY useAgent
+     * call would let the brief's agent shape leak the wrong fields.
+     */
+    it("renders the Inbox tab body when the inbox tab is active and shows nudges from the triage agent", async () => {
+        const inboxNudges = [
+            {
+                nudge_id: "nudge-1",
+                kind: "wip_overflow" as const,
+                target_ids: ["task-p1-a"],
+                summary: "WIP overflow in Doing column",
+                severity: "warn" as const,
+                project_id: "p1"
+            }
+        ];
+        mockedUseAgent.mockImplementation((agentName) =>
+            agentName === "triage-agent"
+                ? baseAgent({ nudges: inboxNudges })
+                : baseAgent()
+        );
+
+        renderHarness();
+        act(() => {
+            store.dispatch(overlaysActions.openCopilotDock({ tab: "inbox" }));
+        });
+
+        // The dock is open on the Inbox tab and the nudges are
+        // rendered through the inbox list (NudgeCard summaries).
+        await waitFor(() => {
+            expect(
+                document.querySelector(
+                    "[data-testid='copilot-dock-inbox-list']"
+                )
+            ).not.toBeNull();
+        });
+        expect(
+            screen.getByText("WIP overflow in Doing column")
+        ).toBeInTheDocument();
+    });
+
+    /*
+     * Phase 4 A8 — opening the Inbox tab stamps `inboxLastReadAt`
+     * (the launcher-badge unread-count baseline). The dock host's
+     * effect fires on the open transition only; closing and re-
+     * opening the Inbox produces a fresh stamp.
+     *
+     * We pin a known baseline by stamping the slice ourselves before
+     * the harness mount, so the assertion can compare relative to a
+     * stable starting point regardless of other tests' state.
+     */
+    it("stamps inboxLastReadAt when the Inbox tab becomes the active surface", async () => {
+        // Pin a known baseline so the assertion is order-independent.
+        const baseline = 1_000;
+        store.dispatch(overlaysActions.markCopilotDockInboxRead(baseline));
+
+        renderHarness();
+        // `renderHarness` resets open/chat/brief flags but leaves
+        // inboxLastReadAt at our baseline above. We re-stamp the
+        // baseline AFTER renderHarness in case the host's mount-time
+        // effect fired (it shouldn't — open is false here — but the
+        // assertion below proves the open transition is what stamps).
+        store.dispatch(overlaysActions.markCopilotDockInboxRead(baseline));
+        expect(store.getState().overlays.copilotDock.inboxLastReadAt).toBe(
+            baseline
+        );
+
+        act(() => {
+            store.dispatch(overlaysActions.openCopilotDock({ tab: "inbox" }));
+        });
+
+        // After the open transition, the stamp jumps to a real
+        // wall-clock value strictly greater than our baseline.
+        await waitFor(() => {
+            const stamped =
+                store.getState().overlays.copilotDock.inboxLastReadAt ?? 0;
+            expect(stamped).toBeGreaterThan(baseline);
+        });
+    });
+
+    /*
+     * Phase 4 A8 — per-project nudge isolation regression. When the
+     * dock body remounts on project switch (key={projectId}), the new
+     * project's `useAgent("triage-agent", { projectId: p2 })` instance
+     * supplies a fresh nudges array — p1's nudges must NOT bleed into
+     * p2's Inbox. We assert at the React level: after navigation, the
+     * inbox renders the p2 mock's nudges (and the p1 nudges are gone),
+     * because the body remounted and re-invoked useAgent with the new
+     * projectId.
+     */
+    it("Inbox refreshes to the new project's nudges after a project switch", async () => {
+        const p1Nudges = [
+            {
+                nudge_id: "nudge-p1",
+                kind: "wip_overflow" as const,
+                target_ids: ["task-p1-a"],
+                summary: "p1 inbox nudge",
+                severity: "warn" as const,
+                project_id: "p1"
+            }
+        ];
+        const p2Nudges = [
+            {
+                nudge_id: "nudge-p2",
+                kind: "stale_task" as const,
+                target_ids: ["task-p2-a"],
+                summary: "p2 inbox nudge",
+                severity: "info" as const,
+                project_id: "p2"
+            }
+        ];
+        // Match on (agentName, projectId): only the triage agent for
+        // the matching project returns the project-specific nudges so
+        // we can verify that the body's remount (key={projectId})
+        // brings up a fresh useAgent instance with the new options
+        // — that's the per-project isolation the spec calls for.
+        mockedUseAgent.mockImplementation((agentName, options) => {
+            if (agentName !== "triage-agent") return baseAgent();
+            const optProjectId = (options as { projectId?: string } | undefined)
+                ?.projectId;
+            if (optProjectId === "p1") return baseAgent({ nudges: p1Nudges });
+            if (optProjectId === "p2") return baseAgent({ nudges: p2Nudges });
+            return baseAgent();
+        });
+
+        renderHarness();
+        act(() => {
+            store.dispatch(overlaysActions.openCopilotDock({ tab: "inbox" }));
+        });
+        await waitFor(() => {
+            expect(screen.getByText("p1 inbox nudge")).toBeInTheDocument();
+        });
+
+        // Navigate to p2 — the body remounts under key={projectId},
+        // useAgent is re-invoked with projectId=p2, returns p2Nudges.
+        fireEvent.click(screen.getByText("Go to p2"));
+        await waitFor(() => {
+            expect(screen.getByText("Board page")).toBeInTheDocument();
+        });
+        await waitFor(() => {
+            expect(screen.getByText("p2 inbox nudge")).toBeInTheDocument();
+        });
+        // p1's nudge is gone (not bleeding across).
+        expect(screen.queryByText("p1 inbox nudge")).not.toBeInTheDocument();
+    });
+
+    /*
+     * Phase 4 A8 — launcher-badge unread is zeroed when the user
+     * opens the Inbox tab. This is the surface contract: opening the
+     * Inbox = "I've seen everything" → badge collapses. The agent →
+     * Redux projection path (nudges arrive, unreadCount bumps up
+     * while NOT on Inbox) lives behind the `!aiUseLocalEngine` gate;
+     * exercising it inside this test harness would force the chat
+     * tab body onto the un-mocked `useAgentChat` engine and hang, so
+     * we cover the projection itself in the overlaysSlice unit tests
+     * (`setCopilotDockInboxUnread` + `markCopilotDockInboxRead` zero
+     * coupling) and stay surface-level here.
+     */
+    it("zeros the launcher-badge unread count when the user opens the Inbox tab", async () => {
+        // Seed an unread count as if the host's projection effect had
+        // already fired (the agent path is gated on remote engine, so
+        // we set Redux directly here to keep the assertion focused on
+        // the read transition).
+        act(() => {
+            store.dispatch(overlaysActions.setCopilotDockInboxUnread(3));
+        });
+        renderHarness();
+        // renderHarness resets the dock open flag but `setCopilotDockInboxUnread`
+        // survives the reset — verify the seed is intact.
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(3));
+        expect(store.getState().overlays.copilotDock.inboxUnreadCount).toBe(3);
+
+        act(() => {
+            store.dispatch(overlaysActions.openCopilotDock({ tab: "inbox" }));
+        });
+        await waitFor(() => {
+            expect(store.getState().overlays.copilotDock.inboxUnreadCount).toBe(
+                0
+            );
+        });
     });
 });

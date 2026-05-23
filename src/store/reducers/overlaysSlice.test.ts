@@ -12,7 +12,13 @@ describe("overlaysSlice", () => {
             chatDrawer: { open: false, pendingPrompt: null },
             boardBriefOpen: false,
             aiDraftActiveColumnId: null,
-            copilotDock: { open: false, activeTab: "chat", initialPrompt: null }
+            copilotDock: {
+                open: false,
+                activeTab: "chat",
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
+            }
         });
     });
 
@@ -102,7 +108,9 @@ describe("overlaysSlice", () => {
             copilotDock: {
                 open: true,
                 activeTab: "chat" as const,
-                initialPrompt: null
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             }
         };
         const next = overlaysSlice.reducer(
@@ -115,7 +123,9 @@ describe("overlaysSlice", () => {
         expect(next.copilotDock).toEqual({
             open: true,
             activeTab: "chat",
-            initialPrompt: null
+            initialPrompt: null,
+            inboxLastReadAt: null,
+            inboxUnreadCount: 0
         });
         expect(next.chatDrawer).toEqual({ open: false, pendingPrompt: null });
     });
@@ -129,7 +139,9 @@ describe("overlaysSlice", () => {
             expect(next.copilotDock).toEqual({
                 open: true,
                 activeTab: "chat",
-                initialPrompt: null
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -141,7 +153,9 @@ describe("overlaysSlice", () => {
             expect(next.copilotDock).toEqual({
                 open: true,
                 activeTab: "brief",
-                initialPrompt: null
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -156,7 +170,9 @@ describe("overlaysSlice", () => {
             expect(next.copilotDock).toEqual({
                 open: true,
                 activeTab: "chat",
-                initialPrompt: "Summarize the board"
+                initialPrompt: "Summarize the board",
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -175,7 +191,9 @@ describe("overlaysSlice", () => {
             expect(closed.copilotDock).toEqual({
                 open: false,
                 activeTab: "chat",
-                initialPrompt: null
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -194,7 +212,9 @@ describe("overlaysSlice", () => {
             expect(switched.copilotDock).toEqual({
                 open: true,
                 activeTab: "brief",
-                initialPrompt: "x"
+                initialPrompt: "x",
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -213,7 +233,9 @@ describe("overlaysSlice", () => {
             expect(cleared.copilotDock).toEqual({
                 open: true,
                 activeTab: "brief",
-                initialPrompt: null
+                initialPrompt: null,
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -244,7 +266,9 @@ describe("overlaysSlice", () => {
             expect(reopened.copilotDock).toEqual({
                 open: true,
                 activeTab: "chat",
-                initialPrompt: "Summarize"
+                initialPrompt: "Summarize",
+                inboxLastReadAt: null,
+                inboxUnreadCount: 0
             });
         });
 
@@ -261,6 +285,54 @@ describe("overlaysSlice", () => {
                 overlaysActions.openCopilotDock({ pendingPrompt: null })
             );
             expect(cleared.copilotDock.initialPrompt).toBeNull();
+        });
+
+        it("setCopilotDockTab accepts the inbox tab key (Phase 4 A8)", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockTab("inbox")
+            );
+            expect(next.copilotDock.activeTab).toBe("inbox");
+        });
+
+        /*
+         * Phase 4 A8 — `markCopilotDockInboxRead` stamps the wall-clock
+         * ms when the user last opened the Inbox tab so the launcher
+         * badge can derive `unreadCount = nudges.filter(receivedAt
+         * > inboxLastReadAt).length`. The dock host dispatches this on
+         * every open transition (false → true on `inboxSurfaceVisible`).
+         */
+        it("markCopilotDockInboxRead stamps inboxLastReadAt with the supplied timestamp AND zeros the unread count", () => {
+            // Seed an unread badge first so we can verify the read
+            // action collapses it back to 0 in the same dispatch.
+            const seeded = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockInboxUnread(3)
+            );
+            expect(seeded.copilotDock.inboxUnreadCount).toBe(3);
+            const next = overlaysSlice.reducer(
+                seeded,
+                overlaysActions.markCopilotDockInboxRead(1_700_000_000_000)
+            );
+            expect(next.copilotDock.inboxLastReadAt).toBe(1_700_000_000_000);
+            expect(next.copilotDock.inboxUnreadCount).toBe(0);
+            // Doesn't touch the other dock keys — pure stamp.
+            expect(next.copilotDock.open).toBe(false);
+            expect(next.copilotDock.activeTab).toBe("chat");
+            expect(next.copilotDock.initialPrompt).toBeNull();
+        });
+
+        it("setCopilotDockInboxUnread clamps negative payloads at 0", () => {
+            const seeded = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockInboxUnread(5)
+            );
+            expect(seeded.copilotDock.inboxUnreadCount).toBe(5);
+            const clamped = overlaysSlice.reducer(
+                seeded,
+                overlaysActions.setCopilotDockInboxUnread(-2)
+            );
+            expect(clamped.copilotDock.inboxUnreadCount).toBe(0);
         });
     });
 });
