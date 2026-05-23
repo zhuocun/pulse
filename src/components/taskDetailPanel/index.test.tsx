@@ -102,7 +102,44 @@ const installCoarsePointerMock = () => {
     });
 };
 
-const seedQueryClient = (initialTasks: ITask[] | undefined) => {
+/*
+ * Desktop-lg viewport mock for the Phase 3 A2 docked rail. The panel's
+ * `isDesktopRail` predicate is `!isPhone && screens.lg`, so we need:
+ *   - `pointer: coarse` to match false (NOT phone)
+ *   - the AntD breakpoint hook to resolve `screens.lg === true`
+ *
+ * AntD's `Grid.useBreakpoint` reads `window.matchMedia` for each
+ * breakpoint band. `lg` is `(min-width: 1024px)`; we return true for
+ * that AND for the lower bands (sm, md) since AntD treats breakpoints
+ * cumulatively. Anything narrower (xl, xxl) returns false.
+ */
+const installDesktopLgMock = () => {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => {
+            const isLgOrBelow =
+                query.includes("min-width: 576px") ||
+                query.includes("min-width: 768px") ||
+                query.includes("min-width: 992px") ||
+                query.includes("min-width: 1024px");
+            return {
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches: isLgOrBelow,
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            };
+        }
+    });
+};
+
+const seedQueryClient = (
+    initialTasks: ITask[] | undefined,
+    initialColumns?: IColumn[]
+) => {
     const queryClient = new QueryClient({
         defaultOptions: {
             mutations: { retry: false },
@@ -116,11 +153,22 @@ const seedQueryClient = (initialTasks: ITask[] | undefined) => {
             initialTasks
         );
     }
+    // Sibling navigation reads the `boards` cache for the column-task
+    // order. Seed it whenever the caller provides columns; default to
+    // a single column so the multi-sibling tests in this suite have
+    // explicit data without polluting the legacy single-task tests.
+    if (initialColumns !== undefined) {
+        queryClient.setQueryData(
+            ["boards", { projectId: "project-1" }],
+            initialColumns
+        );
+    }
     return queryClient;
 };
 
 interface RenderOptions {
     initialTasks?: ITask[] | undefined;
+    initialColumns?: IColumn[];
     taskId?: string;
     projectId?: string;
     boardAiOn?: boolean;
@@ -133,7 +181,7 @@ const renderPanelAt = (path: string, options: RenderOptions = {}) => {
     )
         ? options.initialTasks
         : [task()];
-    const queryClient = seedQueryClient(initialTasks);
+    const queryClient = seedQueryClient(initialTasks, options.initialColumns);
     const router = createMemoryRouter(
         [
             {
@@ -683,5 +731,407 @@ describe("feature flag", () => {
      */
     it("is importable as a standalone component (callers gate by flag)", () => {
         expect(typeof TaskDetailPanel).toBe("function");
+    });
+});
+
+/*
+ * Phase 3 A2 — desktop docked rail (>= lg). When `screens.lg` resolves
+ * true AND the pointer is fine (not phone), the panel renders as a
+ * docked `<aside>` rather than an AntD Drawer. The board's columns
+ * reflow because the route shell wraps both surfaces in a flex row.
+ */
+describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
+    const fetchMock = jest.spyOn(global, "fetch");
+
+    beforeAll(() => {
+        installAntdBrowserMocks();
+    });
+
+    beforeEach(() => {
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(async (input) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const body = url.includes("/boards")
+                ? []
+                : url.includes("/tasks")
+                  ? [task()]
+                  : url.includes("/users/members")
+                    ? members
+                    : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+    });
+
+    afterAll(() => {
+        fetchMock.mockRestore();
+        installAntdBrowserMocks();
+    });
+
+    it("renders as a docked rail (NO AntD Drawer wrapper) at lg+ viewports", async () => {
+        installDesktopLgMock();
+        renderPanelAt("/projects/project-1/board/task/task-1");
+
+        await screen.findByText(/edit task · build task/i);
+
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        );
+        expect(panel).not.toBeNull();
+        expect(panel?.getAttribute("data-placement")).toBe("rail");
+        // CRITICAL: the rail mode must NOT mount an AntD Drawer
+        // surface — the rail is part of the board layout, not an
+        // overlay. The discard-confirm Modal still renders inside
+        // (as it does in every chassis), but no `.ant-drawer` element
+        // should exist when the rail is the active chassis.
+        expect(document.querySelector(".ant-drawer")).toBeNull();
+        // The surface itself is a <aside> element so AT users hear it
+        // as a complementary landmark.
+        expect(panel?.tagName.toLowerCase()).toBe("aside");
+        installAntdBrowserMocks();
+    });
+
+    it("the rail aside has the expected 480px width contract", async () => {
+        installDesktopLgMock();
+        renderPanelAt("/projects/project-1/board/task/task-1");
+
+        await screen.findByText(/edit task · build task/i);
+
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        ) as HTMLElement | null;
+        expect(panel).not.toBeNull();
+        // The rail width is set inline via `flex: 0 0 480px`. We
+        // assert the inline style carries the load-bearing value so a
+        // future refactor that breaks the contract surfaces here.
+        const style = panel?.getAttribute("style") ?? "";
+        expect(style).toContain("480px");
+        installAntdBrowserMocks();
+    });
+
+    it("renders the form body inside the rail (same fields as the Drawer)", async () => {
+        installDesktopLgMock();
+        renderPanelAt("/projects/project-1/board/task/task-1");
+
+        // The body content is identical across chassis modes; the
+        // form input for taskName must render even when the rail
+        // wraps it instead of the Drawer.
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        installAntdBrowserMocks();
+    });
+
+    it("keeps the dirty-state guard wired in rail mode", async () => {
+        installDesktopLgMock();
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+
+        const input = await screen.findByDisplayValue("Build task");
+        fireEvent.change(input, { target: { value: "Edited" } });
+
+        // Programmatic navigate to a sibling task — the blocker fires
+        // because the form is dirty AND we're not navigating to the
+        // parent board URL.
+        act(() => {
+            router.navigate("/projects/project-1/board/task/task-2");
+        });
+
+        expect(
+            await screen.findByText(
+                microcopy.taskDetailPanel.confirmDiscardTitle as string
+            )
+        ).toBeInTheDocument();
+        installAntdBrowserMocks();
+    });
+
+    it("falls back to AntD Drawer on coarse-pointer phone even at >= lg width", async () => {
+        // Touchscreen-laptop case: pointer:coarse=true AND screens.lg=true.
+        // useIsPhoneChrome wins — the bottom-sheet Drawer is the right
+        // call because the user is still tapping with a thumb.
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) => ({
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches:
+                    query === "(pointer: coarse)" ||
+                    query.includes("min-width: 576px") ||
+                    query.includes("min-width: 768px") ||
+                    query.includes("min-width: 992px") ||
+                    query.includes("min-width: 1024px"),
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            })
+        });
+        renderPanelAt("/projects/project-1/board/task/task-1");
+        await screen.findByText(/edit task · build task/i);
+
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        );
+        expect(panel).not.toBeNull();
+        // Phone branch wins even though screens.lg is true.
+        expect(panel?.getAttribute("data-placement")).toBe("bottom");
+        installAntdBrowserMocks();
+    });
+});
+
+/*
+ * Phase 3 A2 — swipe-between-tasks. The TaskDetailPanel attaches
+ * touch handlers to the body surface; a left-swipe routes through
+ * `goToNext` (which uses the same `navigate(...)` as every other
+ * close path), and a right-swipe routes through `goToPrev`. The
+ * dirty-state guard intercepts via `useBlocker`. Tests dispatch
+ * native touch events at the panel surface so the handlers fire as
+ * they would on a real device.
+ */
+describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
+    const fetchMock = jest.spyOn(global, "fetch");
+
+    const columns = [
+        {
+            _id: "column-1",
+            columnName: "Todo",
+            index: 0,
+            projectId: "project-1"
+        },
+        {
+            _id: "column-2",
+            columnName: "Done",
+            index: 1,
+            projectId: "project-1"
+        }
+    ] satisfies IColumn[];
+
+    const buildSiblingTasks = (): ITask[] => [
+        task({ _id: "task-1", index: 0, columnId: "column-1" }),
+        task({ _id: "task-2", index: 1, columnId: "column-1" }),
+        task({ _id: "task-3", index: 0, columnId: "column-2" })
+    ];
+
+    beforeAll(() => {
+        installAntdBrowserMocks();
+    });
+
+    beforeEach(() => {
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(async (input) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const body = url.includes("/boards")
+                ? columns
+                : url.includes("/tasks")
+                  ? buildSiblingTasks()
+                  : url.includes("/users/members")
+                    ? members
+                    : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+    });
+
+    afterAll(() => {
+        fetchMock.mockRestore();
+    });
+
+    /*
+     * Helper: dispatch a synthetic left/right swipe on the panel
+     * surface. `touches` on touchstart and `changedTouches` on
+     * touchend must carry the SAME identifier so the panel matches
+     * them up correctly.
+     */
+    const swipe = (
+        element: HTMLElement,
+        direction: "left" | "right",
+        distance = 80
+    ) => {
+        const startX = direction === "left" ? 200 : 100;
+        const endX =
+            direction === "left" ? startX - distance : startX + distance;
+        fireEvent.touchStart(element, {
+            touches: [{ clientX: startX, clientY: 100, identifier: 0 }]
+        });
+        fireEvent.touchEnd(element, {
+            changedTouches: [{ clientX: endX, clientY: 100, identifier: 0 }]
+        });
+    };
+
+    it("left-swipe advances to the next sibling task URL", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        // The Drawer surface portals its body to document.body, so
+        // the swipe target is a dedicated test-id inside the body.
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            swipe(swipeTarget, "left", 80);
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-2"
+            );
+        });
+    });
+
+    it("right-swipe goes to the previous sibling task URL", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        // Wait for the panel to mount; the form values for task-2
+        // start blank because the seeded "Build task" name belongs to
+        // task-1 — we only need the panel surface to mount.
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            swipe(swipeTarget, "right", 80);
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-1"
+            );
+        });
+    });
+
+    it("does NOT navigate when the swipe is below the threshold", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 30px is below the 50px threshold; no navigation should
+        // happen. Wait a tick before asserting so any race resolves.
+        act(() => {
+            swipe(swipeTarget, "left", 30);
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("does NOT navigate when the gesture is vertical-dominant (scroll)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 80px horizontal + 200px vertical → the gesture is
+        // scroll-dominant and the swipe handler bails.
+        act(() => {
+            fireEvent.touchStart(swipeTarget, {
+                touches: [{ clientX: 200, clientY: 100, identifier: 0 }]
+            });
+            fireEvent.touchEnd(swipeTarget, {
+                changedTouches: [{ clientX: 120, clientY: 300, identifier: 0 }]
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("intercepts swipe-between-tasks when the form is dirty (Phase 3 A2 dirty-guard)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        const input = await screen.findByDisplayValue("Build task");
+        fireEvent.change(input, { target: { value: "Edited" } });
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            swipe(swipeTarget, "left", 80);
+        });
+
+        // Confirm dialog fires; URL stays on task-1.
+        expect(
+            await screen.findByText(
+                microcopy.taskDetailPanel.confirmDiscardTitle as string
+            )
+        ).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("left-swipe on the last task is a no-op (no sibling to advance to)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-3",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-3"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            swipe(swipeTarget, "left", 80);
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        // No next sibling exists for task-3 — URL is unchanged.
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-3"
+        );
     });
 });
