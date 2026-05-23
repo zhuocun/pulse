@@ -592,6 +592,64 @@ describe("Column", () => {
     });
 
     /*
+     * Phase 4.6 — sticky column header. The header is rendered as the
+     * first child of the column's scroll container so `position: sticky`
+     * pins it against that scroll port; without the move, the header
+     * would degenerate to plain relative and never stick when the user
+     * scrolls a tall task list.
+     *
+     * jsdom does not paint, so we assert the *contract* (computed
+     * position, top, z-index) rather than visual pinning. The
+     * z-index contract is the load-bearing assertion: it must sit
+     * above task cards (which paint at the default z-index 0) and
+     * below AntD's overlay tier (Dropdown / Popover ride at 1050) so
+     * the readiness-pill popover and column-actions dropdown render
+     * above the pinned header without a stacking-context trap.
+     */
+    describe("sticky column header (Phase 4.6)", () => {
+        it("pins the column header inside the task scroll container with sticky positioning", () => {
+            renderColumn();
+            const taskContainer = screen.getByTestId("column-task-container");
+            const header = screen.getByTestId("column-header");
+
+            // Contract 1: header is the FIRST child of the scroll
+            // container, so sticky `top: 0` snaps it to the top edge
+            // when the user scrolls the task list. If a wrapper sneaks
+            // between them later, sticky still works but the visual
+            // padding behaviour may shift — fail loud so it's a
+            // conscious choice.
+            expect(taskContainer.firstElementChild).toBe(header);
+
+            // Contract 2: the styled CSS declares `position: sticky;
+            // top: 0`. Read via getComputedStyle so the assertion is
+            // robust to Emotion's class-name churn.
+            const style = window.getComputedStyle(header);
+            expect(style.position).toBe("sticky");
+            expect(style.top).toBe("0px");
+        });
+
+        it("keeps the header z-index strictly below the AntD overlay tier", () => {
+            // Load-bearing: the readiness-pill Popover (1050) and the
+            // column-actions Dropdown (1050) MUST render above the
+            // sticky header so a click on either surface doesn't open
+            // a panel that's then clipped behind a pinned header. The
+            // sticky tier (10) is far enough below that even a future
+            // bump to 100 stays safe.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const tokens = require("../../theme/tokens");
+            expect(tokens.zIndex.sticky).toBeLessThan(tokens.zIndex.dropdown);
+            expect(tokens.zIndex.sticky).toBeLessThan(tokens.zIndex.modal);
+
+            // And the header's computed z-index matches the sticky
+            // token (i.e. nobody silently inlined a different value).
+            renderColumn();
+            const header = screen.getByTestId("column-header");
+            const headerZ = Number(window.getComputedStyle(header).zIndex);
+            expect(headerZ).toBe(tokens.zIndex.sticky);
+        });
+    });
+
+    /*
      * Part B — inline-edit task card title (Phase 4.5 of `ui-todo.md`).
      */
     describe("inline-edit task title", () => {
