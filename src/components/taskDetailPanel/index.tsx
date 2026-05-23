@@ -23,7 +23,7 @@ import {
     useRef,
     useState
 } from "react";
-import type { TouchEvent as ReactTouchEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useBlocker, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
@@ -84,6 +84,16 @@ const SWIPE_THRESHOLD_PX = 50;
 // swipe. If the user's finger moves more than half as much vertically
 // as horizontally, the gesture is scroll-not-swipe.
 const SWIPE_VERTICAL_TOLERANCE = 0.5;
+// Edge-from-screen guard for the swipe-between-tasks gesture (R-B L).
+// iOS Safari fires its native swipe-back on touches that originate
+// within the leftmost ~20 px of the viewport; the equivalent forward
+// gesture lives on the right edge. PointerEvents reach the page
+// alongside (or just before) the system gesture's commit, so without
+// this guard a forward iOS swipe-back also reads as a left-swipe →
+// next-task on our side and the user navigates twice. Skipping the
+// gesture when the pointerdown origin is within the edge band lets the
+// browser's chrome own that interaction entirely.
+const SWIPE_EDGE_GUARD_PX = 20;
 
 // Replaces lodash/isEqual for the panel's diff check. Matches the same
 // shallow comparison logic as `TaskModal` (same ITask shape).
@@ -518,11 +528,32 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
     /*
      * Swipe-between-tasks handlers (Phase 3 A2 — Line 171 of the
-     * design doc). The touchstart records origin; touchend computes
-     * delta and routes through `goToNext` / `goToPrev` when the
-     * horizontal delta exceeds the threshold AND the gesture is more
-     * horizontal than vertical. Vertical-dominant moves are scrolls
-     * (long notes inside the form) and must NOT trigger navigation.
+     * design doc; migrated to PointerEvents in R-B L). pointerdown
+     * records origin; pointerup computes delta and routes through
+     * `goToNext` / `goToPrev` when the horizontal delta exceeds the
+     * threshold AND the gesture is more horizontal than vertical.
+     * Vertical-dominant moves are scrolls (long notes inside the form)
+     * and must NOT trigger navigation.
+     *
+     * PointerEvents over TouchEvents:
+     *   - One handler covers touch + pen + (active-pen) trackpad; we
+     *     keep the desktop click/drag-select path clean by filtering
+     *     `pointerType === "mouse"` out of the gesture entirely.
+     *   - `setPointerCapture` keeps the gesture bound to the panel
+     *     surface even if the finger slides off the element mid-drag
+     *     (e.g. onto the body backdrop). TouchEvents bubbled through
+     *     `changedTouches` which is fragile when the touch leaves the
+     *     element.
+     *   - `pointercancel` fires when the OS reclaims the gesture
+     *     (multi-finger pinch promoted to zoom, iOS swipe-back commit
+     *     reaching threshold, scroll inertia kick-in). We clear the
+     *     origin and DO NOT navigate.
+     *
+     * Edge-from-screen guard (R-B L): pointerdown origins within
+     * `SWIPE_EDGE_GUARD_PX` of either viewport edge are skipped so
+     * iOS Safari's native swipe-back stays interaction-exclusive on
+     * the leftmost band, and the mirror-image forward gesture stays
+     * exclusive on the rightmost band.
      *
      * The handlers attach to the panel surface — Drawer body for
      * phone/tablet, the docked `<aside>` for desktop. The dirty-state
@@ -532,28 +563,67 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const swipeOriginRef = useRef<{
         x: number;
         y: number;
-        identifier: number;
+        pointerId: number;
     } | null>(null);
-    const onTouchStart = useCallback((event: ReactTouchEvent) => {
-        const touch = event.touches[0];
-        if (!touch) return;
+    const onPointerDown = useCallback((event: ReactPointerEvent) => {
+        // Mouse drag-select inside the form (text selection, link
+        // clicks, scrollbar drags) shares the pointer surface. The
+        // swipe gesture is finger / pen only — mice keep their native
+        // behavior and never navigate.
+        if (event.pointerType === "mouse") return;
+        // Skip when the pointerdown lands in either viewport-edge band
+        // so the browser's native back/forward gesture (iOS Safari)
+        // is interaction-exclusive there.
+        const viewportWidth =
+            typeof window !== "undefined" ? window.innerWidth : 0;
+        if (
+            event.clientX < SWIPE_EDGE_GUARD_PX ||
+            (viewportWidth > 0 &&
+                event.clientX > viewportWidth - SWIPE_EDGE_GUARD_PX)
+        ) {
+            return;
+        }
         swipeOriginRef.current = {
-            x: touch.clientX,
-            y: touch.clientY,
-            identifier: touch.identifier
+            x: event.clientX,
+            y: event.clientY,
+            pointerId: event.pointerId
         };
+        // Capture so the gesture survives the pointer leaving this
+        // element (sliding onto the drawer mask, the AntD Select
+        // dropdown layer, etc.). jsdom doesn't implement
+        // `setPointerCapture` so we guard with a feature check; real
+        // browsers (including iOS Safari 13+) ship it.
+        const target = event.currentTarget;
+        if (typeof target.setPointerCapture === "function") {
+            try {
+                target.setPointerCapture(event.pointerId);
+            } catch {
+                // Some browsers throw if the pointer id is no longer
+                // active (race with pointercancel). The gesture still
+                // works without capture; swallow and move on.
+            }
+        }
     }, []);
-    const onTouchEnd = useCallback(
-        (event: ReactTouchEvent) => {
+    const onPointerUp = useCallback(
+        (event: ReactPointerEvent) => {
             const origin = swipeOriginRef.current;
             swipeOriginRef.current = null;
+            const target = event.currentTarget;
+            if (typeof target.releasePointerCapture === "function") {
+                try {
+                    target.releasePointerCapture(event.pointerId);
+                } catch {
+                    // Releasing a capture that was never held throws
+                    // in some engines; swallow.
+                }
+            }
             if (!origin) return;
-            const touch = Array.from(event.changedTouches).find(
-                (t) => t.identifier === origin.identifier
-            );
-            if (!touch) return;
-            const deltaX = touch.clientX - origin.x;
-            const deltaY = touch.clientY - origin.y;
+            // Only honour the same pointer that started the gesture.
+            // Stray pointerup from a second finger arriving mid-drag
+            // would otherwise short-circuit the primary swipe.
+            if (event.pointerId !== origin.pointerId) return;
+            const deltaX = event.clientX - origin.x;
+            const deltaY = event.clientY - origin.y;
             // Reject swipes that don't clear the threshold (likely a
             // tap with finger drift) or that are scroll-dominant.
             if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) return;
@@ -574,6 +644,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         },
         [goToNext, goToPrev]
     );
+    const onPointerCancel = useCallback((event: ReactPointerEvent) => {
+        // OS reclaimed the gesture (system back-swipe commit, zoom
+        // promotion, etc.). Drop the origin so the next pointerup
+        // doesn't accidentally navigate, and release any active
+        // capture so the pointer id is clean for the next gesture.
+        swipeOriginRef.current = null;
+        const target = event.currentTarget;
+        if (typeof target.releasePointerCapture === "function") {
+            try {
+                target.releasePointerCapture(event.pointerId);
+            } catch {
+                // Same race as in onPointerUp; swallow.
+            }
+        }
+    }, []);
 
     const liveValues = (() => {
         const fromForm = form.getFieldsValue();
@@ -1106,11 +1191,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     aria-label={microcopy.taskDetailPanel.ariaLabel}
                     data-testid="task-detail-panel"
                     data-placement="rail"
-                    // Touch handlers ride the aside surface directly
+                    // Pointer handlers ride the aside surface directly
                     // so swipe gestures captured anywhere within the
                     // rail (header, body, footer) advance the URL.
-                    onTouchEnd={onTouchEnd}
-                    onTouchStart={onTouchStart}
+                    // PointerEvents (R-B L) supersede the legacy touch
+                    // pair so pen + trackpad gestures also work and the
+                    // capture survives pointer drift off the element.
+                    onPointerCancel={onPointerCancel}
+                    onPointerDown={onPointerDown}
+                    onPointerUp={onPointerUp}
                     ref={asideRef}
                     // tabIndex=-1 so the rail mount effect can focus the
                     // landmark for screen-reader announcement (R-B H1).
@@ -1237,16 +1326,18 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             }}
             data-testid="task-detail-panel"
             data-placement={drawerProps.placement}
-            // Touch handlers ride the body div via styles — but on the
-            // Drawer surface they need to attach to the inner content
-            // container; AntD doesn't expose that directly. Wrap the
-            // body in our own div with the handlers so the gesture
-            // is captured anywhere inside the drawer.
+            // Pointer handlers ride the body div via styles — but on
+            // the Drawer surface they need to attach to the inner
+            // content container; AntD doesn't expose that directly.
+            // Wrap the body in our own div with the handlers so the
+            // gesture is captured anywhere inside the drawer
+            // (PointerEvents, R-B L).
         >
             <div
                 data-testid="task-detail-panel-swipe-target"
-                onTouchEnd={onTouchEnd}
-                onTouchStart={onTouchStart}
+                onPointerCancel={onPointerCancel}
+                onPointerDown={onPointerDown}
+                onPointerUp={onPointerUp}
                 style={{ minHeight: "100%" }}
             >
                 {bodyContent}
