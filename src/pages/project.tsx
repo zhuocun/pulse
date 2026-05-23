@@ -271,6 +271,11 @@ const ProjectPage = () => {
      * re-fire. The ref guard makes the once-per-mount contract explicit
      * — without it, the URL-strip below would re-enter this effect via
      * the searchParams subscription on the very next render.
+     *
+     * The `openTaskCreator` param is a historical name kept for backwards
+     * compatibility with installed manifests; the user-facing PWA
+     * shortcut is "New project" because the project list page has no
+     * task creator — `openModal()` opens the project-create modal.
      */
     const [shortcutSearchParams, setShortcutSearchParams] = useSearchParams();
     const shortcutsFiredRef = useRef(false);
@@ -281,10 +286,10 @@ const ProjectPage = () => {
         const wantsCopilot = shortcutSearchParams.get("openCopilot") === "1";
         if (!wantsTaskCreator && !wantsCopilot) return;
         shortcutsFiredRef.current = true;
-        // `openTaskCreator` opens the page's primary creation modal — the
-        // project list is the gateway to boards/tasks. `openCopilot` opens
-        // the legacy AI chat drawer mounted below (the CopilotDock lives
-        // only on board.tsx).
+        // `openTaskCreator` (legacy param name) opens the project-create
+        // modal — the PWA shortcut is labeled "New project" to match
+        // actual behavior. `openCopilot` opens the legacy AI chat drawer
+        // mounted below (the CopilotDock lives only on board.tsx).
         if (wantsTaskCreator) openModal();
         if (wantsCopilot) openChatDrawer();
         const next = new URLSearchParams(shortcutSearchParams);

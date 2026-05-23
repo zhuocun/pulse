@@ -80,9 +80,9 @@
     ],
     "shortcuts": [
         {
-            "name": "New task",
-            "short_name": "New task",
-            "description": "Open the project list to pick a board and create a task.",
+            "name": "New project",
+            "short_name": "New project",
+            "description": "Open the project list and start a new project.",
             "url": "/projects?openTaskCreator=1",
             "icons": [
                 {
