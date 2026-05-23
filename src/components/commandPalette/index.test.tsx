@@ -2,13 +2,31 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { axe, toHaveNoViolations } from "jest-axe";
-import { MemoryRouter } from "react-router-dom";
+import { Provider } from "react-redux";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
+import { store } from "../../store";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
 import CommandPalette from ".";
 
 expect.extend(toHaveNoViolations);
+
+// Mock the env so individual tests can toggle the routed-panel flag
+// without restarting the module. Defaults to OFF (legacy modal path).
+// Preserve the real env (aiBaseUrl etc.) so unrelated components still
+// see the production-shape config.
+jest.mock("../../constants/env", () => {
+    const actual = jest.requireActual("../../constants/env");
+    return {
+        __esModule: true,
+        default: { ...actual.default, taskPanelRouted: false }
+    };
+});
+
+const mockedEnvironment = environment as { taskPanelRouted: boolean };
 
 const installAntdMocks = () => {
     Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
@@ -68,11 +86,13 @@ const renderPalette = (open: boolean = true) => {
     const onClose = jest.fn();
     const queryClient = seedClient();
     const utils = render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter>
-                <CommandPalette onClose={onClose} open={open} />
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter>
+                    <CommandPalette onClose={onClose} open={open} />
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
     return { ...utils, onClose };
 };
@@ -131,11 +151,13 @@ describe("CommandPalette", () => {
         const onClose = jest.fn();
         const queryClient = seedClient();
         render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter>
-                    <CommandPalette onClose={onClose} open />
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter>
+                        <CommandPalette onClose={onClose} open />
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
         const user = userEvent.setup();
         await screen.findByRole("combobox");
@@ -186,11 +208,13 @@ describe("CommandPalette", () => {
         });
         try {
             render(
-                <QueryClientProvider client={qc}>
-                    <MemoryRouter>
-                        <CommandPalette onClose={onClose} open />
-                    </MemoryRouter>
-                </QueryClientProvider>
+                <Provider store={store}>
+                    <QueryClientProvider client={qc}>
+                        <MemoryRouter>
+                            <CommandPalette onClose={onClose} open />
+                        </MemoryRouter>
+                    </QueryClientProvider>
+                </Provider>
             );
             await screen.findByRole("combobox");
             await waitFor(() => {
@@ -209,11 +233,13 @@ describe("CommandPalette", () => {
             defaultOptions: { queries: { retry: false } }
         });
         render(
-            <QueryClientProvider client={qc}>
-                <MemoryRouter>
-                    <CommandPalette onClose={onClose} open />
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={qc}>
+                    <MemoryRouter>
+                        <CommandPalette onClose={onClose} open />
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
         const input = (await screen.findByRole("combobox")).querySelector(
             "input"
@@ -255,14 +281,128 @@ describe("CommandPalette", () => {
             [{ _id: "c1", columnName: "Backlog", index: 0, projectId: "p1" }]
         );
         render(
-            <QueryClientProvider client={qc}>
-                <MemoryRouter>
-                    <CommandPalette onClose={onClose} open />
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={qc}>
+                    <MemoryRouter>
+                        <CommandPalette onClose={onClose} open />
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
         await screen.findByRole("combobox");
         expect(screen.getByText("Refactor login")).toBeInTheDocument();
         expect(screen.getByText("Backlog")).toBeInTheDocument();
+    });
+
+    describe("task entry navigation (Phase 3 A2)", () => {
+        const LocationProbe = () => {
+            const location = useLocation();
+            return (
+                <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+            );
+        };
+
+        const seedTaskClient = () => {
+            const qc = new QueryClient();
+            qc.setQueryData<IProject[]>(
+                ["projects", { managerId: "m1" }],
+                [
+                    {
+                        _id: "p1",
+                        createdAt: "0",
+                        managerId: "m1",
+                        organization: "Acme",
+                        projectName: "Roadmap"
+                    }
+                ]
+            );
+            qc.setQueryData<ITask[]>(
+                ["tasks", { projectId: "p1" }],
+                [
+                    {
+                        _id: "t1",
+                        columnId: "c1",
+                        coordinatorId: "m1",
+                        epic: "Auth",
+                        index: 0,
+                        note: "",
+                        projectId: "p1",
+                        storyPoints: 2,
+                        taskName: "Refactor login",
+                        type: "Task"
+                    }
+                ]
+            );
+            return qc;
+        };
+
+        const renderPaletteWithProbe = (onClose: () => void = jest.fn()) => {
+            const qc = seedTaskClient();
+            return render(
+                <Provider store={store}>
+                    <QueryClientProvider client={qc}>
+                        <MemoryRouter initialEntries={["/start"]}>
+                            <Routes>
+                                <Route
+                                    path="*"
+                                    element={
+                                        <>
+                                            <CommandPalette
+                                                onClose={onClose}
+                                                open
+                                            />
+                                            <LocationProbe />
+                                        </>
+                                    }
+                                />
+                            </Routes>
+                        </MemoryRouter>
+                    </QueryClientProvider>
+                </Provider>
+            );
+        };
+
+        beforeEach(() => {
+            // Reset Redux overlay state between tests so each assertion
+            // sees the expected starting value.
+            store.dispatch(overlaysActions.closeTaskModal());
+            mockedEnvironment.taskPanelRouted = false;
+        });
+
+        it("flag OFF: picking a task entry opens the legacy modal AND navigates to /projects/{projectId}", async () => {
+            const onClose = jest.fn();
+            renderPaletteWithProbe(onClose);
+
+            await screen.findByRole("combobox");
+            fireEvent.click(screen.getByText("Refactor login"));
+
+            // Legacy modal is opened via Redux dispatch.
+            await waitFor(() => {
+                expect(store.getState().overlays.editingTaskId).toBe("t1");
+            });
+            // URL navigates to the project page (legacy palette behavior).
+            expect(screen.getByTestId("location").textContent).toBe(
+                "/projects/p1"
+            );
+            expect(onClose).toHaveBeenCalled();
+        });
+
+        it("flag ON: picking a task entry navigates to the routed task panel, NOT the modal", async () => {
+            mockedEnvironment.taskPanelRouted = true;
+            const onClose = jest.fn();
+            renderPaletteWithProbe(onClose);
+
+            await screen.findByRole("combobox");
+            fireEvent.click(screen.getByText("Refactor login"));
+
+            await waitFor(() => {
+                expect(screen.getByTestId("location").textContent).toBe(
+                    "/projects/p1/board/task/t1"
+                );
+            });
+            // Legacy modal is NOT opened when the flag is on.
+            expect(store.getState().overlays.editingTaskId).toBeFalsy();
+            expect(onClose).toHaveBeenCalled();
+        });
     });
 });
