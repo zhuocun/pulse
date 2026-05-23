@@ -1,17 +1,19 @@
 ---
-name: subagent-orchestrator
+name: burst
 description: Orchestrates parallel subagents as the primary performers of research and implementation work.
 ---
 
-# Subagent Orchestrator
+# Burst
 
 ## Role
 
 Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, lookups, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb that work itself unless it is genuinely tiny or tightly coupled to the next local action.
 
-## Tier
+Worker output is never integrated directly. Every worker deliverable passes through a dedicated **reviewer subagent** (top-tier model, high reasoning) before the orchestrator runs its own final gate. The full chain: **orchestrator → worker → reviewer → orchestrator**.
 
-Pick a tier up front and keep it consistent across the task unless the user changes it. State the chosen tier in your first orchestration update.
+## Mode
+
+Pick a mode up front and keep it consistent across the task unless the user changes it. State the chosen mode in your first orchestration update.
 
 ### standard (default)
 
@@ -21,11 +23,11 @@ Subagents run on **mid-tier, non-best** models — faster and cheaper than the o
 
 Subagents run on **top-tier** models and may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
 
-### Selecting the tier
+### Selecting the mode
 
 - Default to **standard**.
 - Switch to **max** when the user explicitly asks for it ("max mode", "use the best models", "highest quality"), when the slash-command is invoked with a `max` argument, or when the task is large and integration-sensitive enough that mid-tier subagents would force costly rework.
-- A single subtask inside an otherwise-standard task may be individually promoted to max-tier configuration if it is integration-sensitive enough to warrant it; the rest of the task stays standard.
+- A single subtask inside an otherwise-standard task may be individually promoted to max-mode configuration if it is integration-sensitive enough to warrant it; the rest of the task stays standard.
 
 ## When to delegate
 
@@ -42,6 +44,37 @@ Stay local only for genuinely tiny or tightly coupled work, and for the immediat
 
 Prefer one subagent per distinct subtask. Bias toward spawning earlier rather than waiting for local exploration to finish. On clearly multi-part tasks, run 3+ subagents in parallel, up to the limit of independent slices and platform constraints.
 
+## Reviewer
+
+After each worker returns, dispatch its output to a fresh reviewer subagent before integrating. Reviewers run in parallel across multiple worker outputs.
+
+**Reviewer input** — no more, no less:
+
+- the exact brief the worker received
+- the worker's final artifact (diff for code; write-up for research)
+- the surrounding files needed for context
+
+The reviewer does not see the worker's intermediate reasoning, scratch work, or chat — it judges the artifact, not the process.
+
+**Reviewer output** — structured:
+
+- **verdict**: `pass` / `revise` / `redo`
+- **issues**: concrete problems with `file:line` references
+- **suggested fixes**: precise corrections, not paraphrased rewordings
+- **confidence**: low / medium / high, called out explicitly on judgment calls
+
+The reviewer reads only. It does not edit code.
+
+**Skip the reviewer hop only when** the output is a pure fact lookup or a mechanical summary the orchestrator can verify in seconds. If the output could be wrong-but-plausible, route through the reviewer.
+
+**Verdict handling**:
+
+- `pass` → orchestrator runs its final gate (see **Orchestrator final gate**)
+- `revise` → send the worker back with the reviewer's issues verbatim; do not paraphrase
+- `redo` → re-brief from scratch or reassign to a fresh worker
+
+Stop after two failed reviews on the same subtask (initial review + one retry). Pull the work local or escalate to the user — do not start a third review.
+
 ## Model selection
 
 Map the terminology to whatever the platform exposes — `model`, `subagent_type`, `reasoning_effort`, extended thinking / thinking budget, etc.
@@ -50,7 +83,7 @@ Map the terminology to whatever the platform exposes — `model`, `subagent_type
 
 Forbidden tier (both modes): never use the smallest/distilled variants (`*-mini`, `*-haiku`-class) unless a higher-priority instruction requires them.
 
-### Standard tier
+### Standard mode
 
 Subagent model: mid-tier — cheaper or faster than the orchestrator, never the forbidden tier. The subagent must differ from the orchestrator in either model or reasoning budget. Apply the rule that fits your platform:
 
@@ -60,27 +93,29 @@ Subagent model: mid-tier — cheaper or faster than the orchestrator, never the 
 
 Reasoning budget: moderate for sidecar/exploration/lookup work; high for implementation or integration-sensitive code paths. Pick the fastest setting that still meets the quality bar; escalate only when correctness is at risk.
 
-### Max tier
+**Reviewers are the explicit exception to the divergence rule above.** They always run top-tier with high reasoning — the cost premium buys an independent quality gate above the cheaper worker.
 
-Subagent model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. The subagent may run the same model and reasoning budget as the orchestrator; the standard-tier divergence rule does not apply here.
+### Max mode
 
-Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of max tier.
+Subagent model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. The subagent may run the same model and reasoning budget as the orchestrator; the standard-mode divergence rule does not apply here.
+
+Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of max mode.
 
 Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
 
-## Review
+## Orchestrator final gate
 
-The orchestrator is the final reviewer and quality gate. Subagent output is a draft.
+A reviewer `pass` does not bypass the orchestrator. The reviewer catches subtask-local quality issues; the orchestrator catches cross-subtask integration issues. Both are required.
 
-- Read every diff and research summary; do not accept work sight-unseen.
-- Verify against the original goal: scope, expected output, ownership, constraints.
+- Verify each subtask against its original goal: scope, expected output, ownership, constraints.
 - Reconcile conflicts with surrounding code, conventions, and other concurrent subagent edits.
 - Run the relevant quality gates (typecheck, lint, targeted tests, full suite, manual smoke checks) before declaring a task done.
-- If output is incomplete, incorrect, or off-scope, send it back with a precise correction prompt or redo it locally — do not paper over.
+- If integration issues surface, send the worker back with a precise correction prompt, redo locally, or rebrief through a fresh reviewer cycle — do not paper over.
 - Surface unresolved risks, skipped checks, or known gaps explicitly in the final summary.
 
 ## Communication
 
-- Briefly tell the user what stays local on the critical path and what is being delegated. Include which tier (standard / max) you chose and why.
+- Briefly tell the user what stays local on the critical path and what is being delegated. Include which mode (standard / max) you chose and why.
+- Note when a reviewer flags issues that trigger worker rework. Escalate to the user before a third review cycle on the same subtask.
 - Keep progress updates short and integration-focused.
 - If delegation is skipped, state whether the reason is task size, coupling, or policy.
