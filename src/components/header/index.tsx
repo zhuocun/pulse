@@ -7,18 +7,20 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { blur, breakpoints, radius, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import ActivityFeedDrawer, { ActivityFeedBell } from "../activityFeedDrawer";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
 import LanguageSwitcher from "../languageSwitcher";
@@ -356,6 +358,15 @@ const Header: React.FC = () => {
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
     /*
+     * Phase 4.3 — activity feed. The bell icon is always visible
+     * (including phone chrome) so notifications stay reachable without
+     * touching the demoted dropdown. The flag is a hard kill-switch so
+     * deployed builds can roll back the entire surface with one env
+     * var; see `environment.activityFeedEnabled` for the rationale.
+     */
+    const { unreadCount } = useActivityFeed();
+    const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
+    /*
      * Phase 3 A3 — phone demotion. The flag-gated `bottomNavEnabled`
      * env switch composes with the shared `useIsPhoneChrome` predicate
      * so the right-cluster only hides when (a) the bottom-tab chassis
@@ -467,6 +478,20 @@ const Header: React.FC = () => {
                     <AgentHealthBadge />
                 )}
                 {/*
+                 * Phase 4.3 — activity feed bell. The bell renders on
+                 * every viewport (including phone chrome) so the user
+                 * can reach the drawer from anywhere. The drawer itself
+                 * lives below the header chrome so its bottom-sheet
+                 * placement on phones works without colliding with the
+                 * bottom-tab bar.
+                 */}
+                {environment.activityFeedEnabled && (
+                    <ActivityFeedBell
+                        unreadCount={unreadCount}
+                        onClick={() => setActivityDrawerOpen((prev) => !prev)}
+                    />
+                )}
+                {/*
                  * Phone-demotion wrapper. With the bottom-tab chassis
                  * active (Phase 3 A3, flag default ON), theme + account
                  * controls move to the routed Settings page reachable
@@ -531,6 +556,12 @@ const Header: React.FC = () => {
                     </Dropdown>
                 </HiddenWhenDemoted>
             </RightCluster>
+            {environment.activityFeedEnabled && (
+                <ActivityFeedDrawer
+                    open={activityDrawerOpen}
+                    onClose={() => setActivityDrawerOpen(false)}
+                />
+            )}
         </PageHeader>
     );
 };
