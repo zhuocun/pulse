@@ -11,7 +11,8 @@ describe("overlaysSlice", () => {
             editingTaskId: null,
             chatDrawer: { open: false, pendingPrompt: null },
             boardBriefOpen: false,
-            aiDraftActiveColumnId: null
+            aiDraftActiveColumnId: null,
+            copilotDock: { open: false, activeTab: "chat", initialPrompt: null }
         });
     });
 
@@ -97,7 +98,12 @@ describe("overlaysSlice", () => {
             editingTaskId: "t-1",
             chatDrawer: { open: true, pendingPrompt: "hi" },
             boardBriefOpen: true,
-            aiDraftActiveColumnId: "c-1"
+            aiDraftActiveColumnId: "c-1",
+            copilotDock: {
+                open: true,
+                activeTab: "chat" as const,
+                initialPrompt: null
+            }
         };
         const next = overlaysSlice.reducer(
             populated,
@@ -106,6 +112,109 @@ describe("overlaysSlice", () => {
         expect(next.editingTaskId).toBe("t-1");
         expect(next.boardBriefOpen).toBe(true);
         expect(next.aiDraftActiveColumnId).toBe("c-1");
+        expect(next.copilotDock).toEqual({
+            open: true,
+            activeTab: "chat",
+            initialPrompt: null
+        });
         expect(next.chatDrawer).toEqual({ open: false, pendingPrompt: null });
+    });
+
+    describe("copilotDock actions", () => {
+        it("openCopilotDock with no payload opens on the previously-active tab without a prompt", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock()
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: null
+            });
+        });
+
+        it("openCopilotDock with a tab payload switches the active tab on open", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({ tab: "brief" })
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: null
+            });
+        });
+
+        it("openCopilotDock with a pendingPrompt stores the prompt for ChatTabBody to consume", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "Summarize the board"
+                })
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: "Summarize the board"
+            });
+        });
+
+        it("closeCopilotDock flips open=false and clears the initialPrompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "hello"
+                })
+            );
+            const closed = overlaysSlice.reducer(
+                opened,
+                overlaysActions.closeCopilotDock()
+            );
+            expect(closed.copilotDock).toEqual({
+                open: false,
+                activeTab: "chat",
+                initialPrompt: null
+            });
+        });
+
+        it("setCopilotDockTab switches the active tab without touching open/prompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "x"
+                })
+            );
+            const switched = overlaysSlice.reducer(
+                opened,
+                overlaysActions.setCopilotDockTab("brief")
+            );
+            expect(switched.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: "x"
+            });
+        });
+
+        it("clearCopilotDockInitialPrompt drops the prompt while leaving open/tab alone", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "brief",
+                    pendingPrompt: "x"
+                })
+            );
+            const cleared = overlaysSlice.reducer(
+                opened,
+                overlaysActions.clearCopilotDockInitialPrompt()
+            );
+            expect(cleared.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: null
+            });
+        });
     });
 });
