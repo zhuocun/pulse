@@ -389,6 +389,14 @@ const zhCN: Dictionary = {
         confirmDiscardOk: "放弃",
         confirmDiscardCancel: "继续编辑"
     },
+    copilotDock: {
+        title: "Copilot",
+        ariaLabel: "Copilot 工作台",
+        closeLabel: "关闭 Copilot",
+        tabChat: "聊天",
+        tabBrief: "简报",
+        tabListLabel: "Copilot 视图"
+    },
     projectsPage: {
         title: "项目",
         subtitle:
