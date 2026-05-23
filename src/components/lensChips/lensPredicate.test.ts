@@ -35,15 +35,17 @@ describe("buildLensPredicate", () => {
             expect(predicate(task({ coordinatorId: "u-other" }))).toBe(false);
         });
 
-        it("matches no tasks when no current user is provided", () => {
+        it("is a no-op when the current user is unresolved (R2-M2)", () => {
             const predicate = buildLensPredicate({
                 lens: "mine",
                 currentUserId: undefined
             });
-            // We surface "nothing" rather than "everything" when a signed-out
-            // user somehow toggles the Mine lens — avoids the surprise of
-            // every task matching for a session that has no identity.
-            expect(predicate(task())).toBe(false);
+            // Auth-refresh / login propagation can leave `currentUserId`
+            // briefly undefined. The lens behaves as a no-op there
+            // rather than emptying the board — the user identity is
+            // authoritative when present, not when missing.
+            expect(predicate(task())).toBe(true);
+            expect(predicate(task({ coordinatorId: "u-other" }))).toBe(true);
         });
     });
 
@@ -84,6 +86,45 @@ describe("buildLensPredicate", () => {
             expect(
                 predicate(task({ dueDate: tomorrow.toISOString() } as never))
             ).toBe(false);
+        });
+
+        /*
+         * R2-M1 regression: comparing UTC timestamps to a local-midnight
+         * window excluded tasks whose ISO `dueDate` crossed UTC midnight
+         * but were still "today" on the user's wall clock. The predicate
+         * now compares the local-calendar `YYYY-MM-DD` strings on both
+         * sides, so a task that the calendar shows as "today" in any
+         * timezone is matched regardless of the dueDate's hour.
+         */
+        it("matches tasks whose dueDate is the SAME local calendar date even when the ISO timestamp straddles UTC midnight", () => {
+            // Pick a local time that's safely "today" for any TZ jsdom
+            // happens to use. The two dueDates below describe the same
+            // local calendar date (split across UTC midnight in some
+            // timezones), so both must match.
+            const now = new Date("2026-05-23T18:00:00");
+            const predicate = buildLensPredicate({
+                lens: "today",
+                currentUserId: "u-self",
+                now
+            });
+
+            // A dueDate stamped late in the day: same local calendar
+            // date as `now`. Must match.
+            const sameDayLate = new Date(now);
+            sameDayLate.setHours(23, 30, 0, 0);
+            expect(
+                predicate(task({ dueDate: sameDayLate.toISOString() } as never))
+            ).toBe(true);
+
+            // A dueDate stamped right after local midnight: same local
+            // calendar date as `now`. Must match.
+            const sameDayEarly = new Date(now);
+            sameDayEarly.setHours(0, 1, 0, 0);
+            expect(
+                predicate(
+                    task({ dueDate: sameDayEarly.toISOString() } as never)
+                )
+            ).toBe(true);
         });
     });
 
@@ -146,6 +187,23 @@ describe("buildLensPredicate", () => {
                 predicate({
                     ...task(),
                     aiRisk: "high"
+                } as never)
+            ).toBe(true);
+        });
+
+        it("matches a task flagged aiRisk=medium (R2-L2)", () => {
+            // "At risk" reads to most teams as "any AI flag worth a
+            // second look," not just the most-critical bucket. Medium-
+            // risk tasks surface alongside high so the triage view is
+            // useful, not a one-bucket sliver.
+            const predicate = buildLensPredicate({
+                lens: "at-risk",
+                currentUserId: "u-self"
+            });
+            expect(
+                predicate({
+                    ...task(),
+                    aiRisk: "medium"
                 } as never)
             ).toBe(true);
         });
