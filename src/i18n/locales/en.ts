@@ -638,6 +638,7 @@ export const enSource = {
             "Could not finish the answer (too many steps). Try a narrower question.",
         suggestedStoryPoints: "Suggested story points",
         estimateTaskNameHint: "Type a task name above to get an estimate.",
+        estimateConfidenceTooltip: "Based on similar tasks on this board.",
         estimatingPoints: "Estimating story points",
         suggestedPointsAria: "Suggested story points: {points}",
         applyPointsAria: "Apply suggested story points",

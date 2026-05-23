@@ -573,6 +573,7 @@ const zhCN: Dictionary = {
         toolRoundExhausted: "无法完成回答(步骤过多),请换一个更具体的问题。",
         suggestedStoryPoints: "建议故事点",
         estimateTaskNameHint: "请先在上方输入任务名称以获取估算。",
+        estimateConfidenceTooltip: "依据本看板中的相似任务。",
         estimatingPoints: "正在估算故事点",
         suggestedPointsAria: "建议故事点:{points}",
         applyPointsAria: "应用建议的故事点",
