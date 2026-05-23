@@ -13,6 +13,21 @@ import {
 } from "../../theme/tokens";
 import EmptyIllustration from "../emptyIllustration";
 
+/**
+ * Tone selects the ARIA semantics of the surface:
+ *  - `empty` (default) and `loading` mount with `role="status"` so AT
+ *    politely announces "no items yet" / "loading" when the surface
+ *    appears mid-flow (search results, just-emptied list).
+ *  - `error` mounts with `role="alert"` for assertive announcement —
+ *    use when something failed and the user needs to know now.
+ *  - `notice` and `notFound` mount with no live-region role; the
+ *    heading itself carries the message and the page change (or
+ *    initial mount) is sufficient context. Avoids the gratuitous
+ *    polite-live-region announcement on every 404 / AI-disabled
+ *    landing.
+ */
+type EmptyStateTone = "empty" | "loading" | "notice" | "notFound" | "error";
+
 interface EmptyStateProps {
     title: string;
     description?: React.ReactNode;
@@ -27,8 +42,19 @@ interface EmptyStateProps {
      * inside a column).
      */
     headingLevel?: 1 | 2 | 3 | 4 | 5;
+    /**
+     * ARIA-tone of the surface. Defaults to `"empty"` (role=status, same
+     * as the prior unconditional behavior) so existing callsites keep
+     * announcing. Pass `"notFound"` / `"notice"` for surfaces that
+     * shouldn't trigger a live-region announcement on every mount, or
+     * `"error"` for assertive announcement.
+     */
+    tone?: EmptyStateTone;
     "data-testid"?: string;
 }
+
+/* Tones that should fire a polite live-region announcement on mount. */
+const POLITE_TONES = new Set<EmptyStateTone>(["empty", "loading"]);
 
 const Container = styled.div`
     align-items: center;
@@ -93,18 +119,31 @@ const EmptyState: React.FC<EmptyStateProps> = ({
     illustration,
     variant = "tasks",
     headingLevel = 5,
+    tone = "empty",
     "data-testid": testId
-}) => (
-    <Container data-testid={testId} role="status">
-        {illustration ?? (
-            <IllustrationFrame>
-                <EmptyIllustration size={44} variant={variant} />
-            </IllustrationFrame>
-        )}
-        <Title level={headingLevel}>{title}</Title>
-        {description ? <Description>{description}</Description> : null}
-        {cta ? <div style={{ marginTop: space.xs }}>{cta}</div> : null}
-    </Container>
-);
+}) => {
+    // Map tone → ARIA role. `empty`/`loading` keep the prior
+    // `role="status"` so existing callsites continue to announce
+    // politely; `error` escalates to assertive; `notice`/`notFound`
+    // drop the live-region role entirely.
+    const role =
+        tone === "error"
+            ? "alert"
+            : POLITE_TONES.has(tone)
+              ? "status"
+              : undefined;
+    return (
+        <Container data-testid={testId} role={role}>
+            {illustration ?? (
+                <IllustrationFrame>
+                    <EmptyIllustration size={44} variant={variant} />
+                </IllustrationFrame>
+            )}
+            <Title level={headingLevel}>{title}</Title>
+            {description ? <Description>{description}</Description> : null}
+            {cta ? <div style={{ marginTop: space.xs }}>{cta}</div> : null}
+        </Container>
+    );
+};
 
 export default EmptyState;

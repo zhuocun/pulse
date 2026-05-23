@@ -40,4 +40,56 @@ describe("EmptyState", () => {
         const results = await axe(container);
         expect(results).toHaveNoViolations();
     });
+
+    describe("tone → role mapping", () => {
+        it("defaults to role=status (backwards-compatible with the prior unconditional announce)", () => {
+            render(<EmptyState data-testid="es" title="No tasks" />);
+            expect(screen.getByTestId("es")).toHaveAttribute("role", "status");
+        });
+
+        it("tone='empty' renders role=status", () => {
+            render(<EmptyState data-testid="es" title="Empty" tone="empty" />);
+            expect(screen.getByTestId("es")).toHaveAttribute("role", "status");
+        });
+
+        it("tone='loading' renders role=status (polite announce)", () => {
+            render(
+                <EmptyState data-testid="es" title="Loading" tone="loading" />
+            );
+            expect(screen.getByTestId("es")).toHaveAttribute("role", "status");
+        });
+
+        it("tone='error' renders role=alert (assertive announce)", () => {
+            render(
+                <EmptyState
+                    data-testid="es"
+                    title="Something went wrong"
+                    tone="error"
+                />
+            );
+            expect(screen.getByTestId("es")).toHaveAttribute("role", "alert");
+        });
+
+        it("tone='notice' renders without a live-region role", () => {
+            render(
+                <EmptyState
+                    data-testid="es"
+                    title="AI is disabled"
+                    tone="notice"
+                />
+            );
+            expect(screen.getByTestId("es")).not.toHaveAttribute("role");
+        });
+
+        it("tone='notFound' renders without a live-region role", () => {
+            render(
+                <EmptyState
+                    data-testid="es"
+                    title="Page not found"
+                    tone="notFound"
+                />
+            );
+            expect(screen.getByTestId("es")).not.toHaveAttribute("role");
+        });
+    });
 });
