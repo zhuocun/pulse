@@ -424,6 +424,45 @@ export const enSource = {
         tabBrief: "Brief",
         tabListLabel: "Copilot surfaces"
     },
+    aiActivityLog: {
+        pillLabel: "{count} AI change this session",
+        pillLabelPlural: "{count} AI changes this session",
+        pillAriaExpanded: "Hide AI activity log",
+        pillAriaCollapsed: "Show AI activity log",
+        listTitle: "AI activity this session",
+        revert: "Revert",
+        revertAriaLabel: "Revert: {description}",
+        revertUnavailable:
+            "Revert isn't available for this entry after reload.",
+        clearAll: "Clear all",
+        clearConfirmTitle: "Clear AI activity log?",
+        clearConfirmBody:
+            "Removes every entry in this session. Already-applied changes stay applied.",
+        clearConfirmOk: "Clear",
+        clearConfirmCancel: "Keep",
+        emptyState: "Nothing yet — accept an AI suggestion to see it here.",
+        undoFailedToast: "Couldn't undo: {error}",
+        relativeJustNow: "just now",
+        relativeOneMinute: "1 min ago",
+        relativeMinutes: "{count} min ago",
+        relativeOneHour: "1 hour ago",
+        relativeHours: "{count} hours ago",
+        relativeOneDay: "1 day ago",
+        relativeDays: "{count} days ago",
+        surfaceLabels: {
+            "task-assist": "Task assist",
+            "task-draft": "Task draft",
+            "mutation-proposal": "Mutation proposal"
+        },
+        descriptions: {
+            taskAssistPointsApplied:
+                "Applied {points} story points to “{taskName}”",
+            taskAssistFieldApplied:
+                "Applied AI suggestion to “{taskName}” {field}",
+            taskDraftCreated: "Created task “{taskName}” from AI draft",
+            mutationProposalApplied: "Applied mutation: {description}"
+        }
+    },
     projectsPage: {
         title: "Projects",
         subtitle:

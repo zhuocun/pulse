@@ -402,6 +402,41 @@ const zhCN: Dictionary = {
         tabBrief: "简报",
         tabListLabel: "Copilot 视图"
     },
+    aiActivityLog: {
+        pillLabel: "本次会话中有 {count} 项 AI 变更",
+        pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
+        pillAriaExpanded: "隐藏 AI 活动日志",
+        pillAriaCollapsed: "显示 AI 活动日志",
+        listTitle: "本次会话的 AI 活动",
+        revert: "撤销",
+        revertAriaLabel: "撤销:{description}",
+        revertUnavailable: "刷新后此条目不可撤销。",
+        clearAll: "全部清除",
+        clearConfirmTitle: "清除 AI 活动日志?",
+        clearConfirmBody: "将移除本次会话的所有条目。已应用的更改仍会保留。",
+        clearConfirmOk: "清除",
+        clearConfirmCancel: "保留",
+        emptyState: "暂无记录 —— 采用 AI 建议后会显示在这里。",
+        undoFailedToast: "无法撤销:{error}",
+        relativeJustNow: "刚刚",
+        relativeOneMinute: "1 分钟前",
+        relativeMinutes: "{count} 分钟前",
+        relativeOneHour: "1 小时前",
+        relativeHours: "{count} 小时前",
+        relativeOneDay: "1 天前",
+        relativeDays: "{count} 天前",
+        surfaceLabels: {
+            "task-assist": "任务助手",
+            "task-draft": "任务草稿",
+            "mutation-proposal": "变更提案"
+        },
+        descriptions: {
+            taskAssistPointsApplied: "将 “{taskName}” 的故事点应用为 {points}",
+            taskAssistFieldApplied: "为 “{taskName}” 的 {field} 应用了 AI 建议",
+            taskDraftCreated: "已根据 AI 草稿创建任务 “{taskName}”",
+            mutationProposalApplied: "已应用变更:{description}"
+        }
+    },
     projectsPage: {
         title: "项目",
         subtitle:
