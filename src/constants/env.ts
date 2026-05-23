@@ -182,6 +182,20 @@ const aiColumnReadinessEnabledFlag = readEnv(
     "REACT_APP_AI_COLUMN_READINESS_ENABLED"
 );
 
+/**
+ * Phase 4 W3 — Inline ghost-text suggestions inside the task description
+ * field (docs/design/_review-2026-05/04-ai-copilot.md §Ambition 2). The
+ * `<AiGhostText>` wrapper renders faded completion text after the caret
+ * in the task modal's note field; Tab accepts, Esc dismisses, IME
+ * composition suspends the debounce. Default off so the surface stays
+ * opt-in until the local-engine completion quality is validated on real
+ * boards. The wrapper additionally requires the user to have acknowledged
+ * the route-scoped `CopilotPrivacyDisclosure` so note bodies never feed
+ * the completion engine without consent. Set
+ * `REACT_APP_AI_GHOST_TEXT_ENABLED=true` to enable.
+ */
+const aiGhostTextEnabledFlag = readEnv("REACT_APP_AI_GHOST_TEXT_ENABLED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -219,7 +233,15 @@ const environment = {
      * synchronously against the deterministic local engine so flipping
      * the flag has no remote cost.
      */
-    aiColumnReadinessEnabled: aiColumnReadinessEnabledFlag === "true"
+    aiColumnReadinessEnabled: aiColumnReadinessEnabledFlag === "true",
+    /**
+     * Phase 4 W3 ghost-text flag. Default false (opt-in) — see the
+     * `aiGhostTextEnabledFlag` block above. The completion runs entirely
+     * synchronously against the deterministic local engine so flipping
+     * the flag has no remote cost, and the wrapper additionally gates on
+     * the route-scoped privacy disclosure being acknowledged.
+     */
+    aiGhostTextEnabled: aiGhostTextEnabledFlag === "true"
 };
 
 export default environment;

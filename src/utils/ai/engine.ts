@@ -615,3 +615,177 @@ export const semanticSearch = (
         expandedTerms
     };
 };
+
+/**
+ * Inline ghost-text completion for the task description field
+ * (docs/design/_review-2026-05/04-ai-copilot.md §Ambition 2).
+ *
+ * Local-only deterministic completion — no remote round-trip. The caller
+ * (`<AiGhostText>`) debounces and gates on consent + the
+ * `REACT_APP_AI_GHOST_TEXT_ENABLED` flag, then asks this function for the
+ * next 1–2 sentences to render as faded overlay text after the caret.
+ *
+ * The returned string is *just* the completion — it never overlaps with
+ * `partialNote` and is safe to concatenate as-is when the user accepts.
+ * An empty string means "no useful completion right now" (the overlay
+ * stays invisible). This keeps the surface deterministic with sub-300 ms
+ * latency budget: every branch returns synchronously from string-only
+ * heuristics, so the wrapper can call it inside the debounced effect
+ * without ever awaiting a network round-trip.
+ */
+export interface NoteCompletionContext {
+    /** Project name the task lives in. May be empty if unknown. */
+    projectName?: string;
+    /** Column the task currently sits in. May be empty. */
+    columnName?: string;
+    /** Task name (title) — strongest signal for the completion tone. */
+    taskName?: string;
+    /** Detected task type if known; defaults to inferring from taskName. */
+    type?: "Task" | "Bug";
+    /** The current partial note the user has typed so far. */
+    currentValue: string;
+}
+
+const BUG_ACCEPTANCE_TAIL =
+    "Bug is no longer reproducible on the affected surface and a regression test guards the failure mode.";
+const TASK_ACCEPTANCE_TAIL =
+    "Behaviour above is implemented end to end with tests covering the new path.";
+
+const VERB_TAILS: Array<{ regex: RegExp; tail: string }> = [
+    { regex: /\bwhen\s*$/i, tail: " the user performs the action above." },
+    {
+        regex: /\bthen\s*$/i,
+        tail: " the system responds with the expected outcome."
+    },
+    { regex: /\bso that\s*$/i, tail: " the user can complete their goal." },
+    {
+        regex: /\bbecause\s*$/i,
+        tail: " the current behaviour blocks this path."
+    },
+    { regex: /\bensure\s*$/i, tail: " the change is covered by tests." }
+];
+
+const isMidWord = (value: string): boolean =>
+    value.length > 0 && /[A-Za-z0-9]$/.test(value);
+
+const trimTrailingSpaces = (value: string): string =>
+    value.replace(/[ \t]+$/u, "");
+
+const sentenceCase = (value: string): string =>
+    value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
+
+/**
+ * Compute the next 1–2 sentences of completion for a partially-typed
+ * task note. The function tries, in order:
+ *   1. Resolve a tiny set of "leading conjunction" patterns (`when`,
+ *      `then`, `so that` …) that almost always want a specific tail.
+ *   2. If the user has just typed an "Acceptance criteria" heading,
+ *      seed it with the type-appropriate stock acceptance line.
+ *   3. If the user is at the start of a bullet (`- ` or `* `) inside an
+ *      acceptance section, seed the next acceptance line.
+ *   4. Otherwise, when the partial ends mid-sentence (no terminal
+ *      punctuation), suggest a generic "and …" continuation grounded in
+ *      the task name; when it ends at a sentence boundary, suggest a
+ *      follow-up next sentence keyed off the column.
+ *
+ * Every branch normalises leading whitespace: if the partial ends with a
+ * non-space character the completion starts with a space, otherwise it
+ * starts flush.
+ */
+export const noteCompletion = (context: NoteCompletionContext): string => {
+    const { currentValue } = context;
+    if (typeof currentValue !== "string") return "";
+    // Reject extreme inputs — completion is meant for "drafting a note",
+    // not for nudging a 10 KB document.
+    if (currentValue.length > 4000) return "";
+    const stripped = trimTrailingSpaces(currentValue);
+    if (stripped.length === 0) {
+        // Cold-start completion: seed with a Summary scaffold so the user
+        // sees the structure ghost-text will keep filling in. The leading
+        // double newline only applies if currentValue had whitespace.
+        if (!context.taskName) return "";
+        return `## Summary\n${context.taskName}\n\n## Acceptance criteria\n- `;
+    }
+    const tail = isMidWord(stripped) ? " " : "";
+    const lower = stripped.toLowerCase();
+    const type =
+        context.type ??
+        (context.taskName ? detectType(context.taskName) : "Task");
+
+    // 1) Leading conjunctions / common verbs
+    for (const { regex, tail: phrase } of VERB_TAILS) {
+        if (regex.test(stripped)) {
+            return phrase;
+        }
+    }
+
+    // 2) Acceptance heading just typed (e.g. "## Acceptance criteria\n")
+    if (/##\s*acceptance(\s+criteria)?\s*$/i.test(stripped)) {
+        return type === "Bug"
+            ? "\n- Bug is no longer reproducible on the affected surface\n- Regression test guards the failure mode"
+            : "\n- Behaviour above is implemented end to end\n- Tests cover the new path";
+    }
+
+    // 3) Bullet-prefix continuation inside an acceptance section
+    const lastLineMatch = stripped.match(/(?:^|\n)([-*]\s*)$/u);
+    if (lastLineMatch) {
+        const seenAcceptance = /acceptance|criteria|done when/i.test(lower);
+        if (seenAcceptance) {
+            return type === "Bug"
+                ? "Root cause documented in the task notes"
+                : "User-visible copy reviewed";
+        }
+        return type === "Bug"
+            ? "Reproduction steps captured for QA"
+            : "Add a clear acceptance line for this step";
+    }
+
+    // 4) Sentence-boundary continuation
+    const endsTerminated = /[.!?]\s*$/u.test(stripped);
+    if (endsTerminated) {
+        // Suggest a follow-up sentence that grounds in the column/task.
+        const column = (context.columnName ?? "").trim();
+        const taskName = (context.taskName ?? "").trim();
+        if (
+            column.length > 0 &&
+            /(progress|doing|review|qa|testing)/i.test(column)
+        ) {
+            return (
+                tail +
+                sentenceCase(
+                    `${type === "Bug" ? "Add" : "Cover"} a regression test before marking this complete.`
+                )
+            );
+        }
+        if (taskName.length > 0) {
+            return (
+                tail +
+                sentenceCase(
+                    type === "Bug" ? BUG_ACCEPTANCE_TAIL : TASK_ACCEPTANCE_TAIL
+                )
+            );
+        }
+        return (
+            tail +
+            sentenceCase(
+                type === "Bug"
+                    ? "Capture the reproduction steps so QA can verify the fix."
+                    : "Add an acceptance criteria section so the work is unambiguous."
+            )
+        );
+    }
+
+    // Mid-sentence continuation: short, grounded, non-presumptuous.
+    const words = tokenize(stripped);
+    if (words.length === 0) return "";
+    // Too short to ground a useful completion; defer until the user has
+    // typed enough to imply a direction.
+    if (words.length < 3) return "";
+    if (/\band\b/.test(lower.split(/\s+/).slice(-2).join(" "))) {
+        return tail + "the related fields stay in sync.";
+    }
+    if (type === "Bug") {
+        return tail + "and a regression test guards the failure mode.";
+    }
+    return tail + "and the behaviour is covered by tests.";
+};
