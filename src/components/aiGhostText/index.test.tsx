@@ -332,6 +332,43 @@ describe("AiGhostText", () => {
         expect(transition).toBe("none");
     });
 
+    it("keeps the overlay scrollTop synced when the textarea scrolls", async () => {
+        // Reviewer-flagged regression: previously the scroll sync only
+        // ran on the layout-effect pass (no `scroll` listener), so
+        // scrolling the textarea directly (wheel / drag / keyboard nav)
+        // would leave the mirror at scrollTop=0 and the overlay's
+        // `overflow: hidden` would silently truncate the suggestion.
+        // The fix attaches a native `scroll` listener; this test asserts
+        // the listener fires and the mirror tracks `ta.scrollTop`.
+        setFlag(true);
+        grantConsent();
+        render(<Host taskName="Login redirect bug" />);
+        const textarea = screen.getByLabelText(
+            "task-note"
+        ) as HTMLTextAreaElement;
+        await act(async () => {
+            fireEvent.change(textarea, {
+                target: { value: "Repro: open the app on iOS Safari" }
+            });
+        });
+        await act(async () => {
+            jest.advanceTimersByTime(600);
+        });
+        const overlay = (await screen.findByTestId(
+            "ai-ghost-text-overlay"
+        )) as HTMLDivElement;
+        // Programmatically scroll the textarea — jsdom does not lay out
+        // text so we set `scrollTop` directly and fire the event the
+        // browser would dispatch from a wheel/drag.
+        textarea.scrollTop = 42;
+        textarea.scrollLeft = 7;
+        await act(async () => {
+            fireEvent.scroll(textarea);
+        });
+        expect(overlay.scrollTop).toBe(42);
+        expect(overlay.scrollLeft).toBe(7);
+    });
+
     it("suppresses Tab-accept while IME composition is active", async () => {
         setFlag(true);
         grantConsent();
