@@ -413,7 +413,8 @@ export const enSource = {
         siblingNextLabel: "Next task",
         siblingPrevLabel: "Previous task",
         siblingPositionLabel: "Task {position} of {total}",
-        ariaLabel: "Task details"
+        ariaLabel: "Task details",
+        siblingNavAriaLabel: "Sibling task navigation"
     },
     copilotDock: {
         title: "Copilot",
