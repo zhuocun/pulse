@@ -11,9 +11,33 @@ import ChatTabBody from "./ChatTabBody";
 
 export type CopilotDockTab = "chat" | "brief";
 
-export interface CopilotDockProps {
+/**
+ * Phase 4 A8 — body slot for the dock surface (tabs + active tab body).
+ *
+ * Lifted out of the Drawer shell so the host can keep the Drawer mount
+ * stable across `projectId` changes (Lane A caveat fix): the dock body
+ * carries `key={projectId}` to reset per-project state (chat hook, brief
+ * cache, triage-agent thread), while the Drawer container stays mounted
+ * continuously so AntD does NOT animate a close/open transition on
+ * project switch.
+ *
+ * Used by:
+ *   - `CopilotDockHost` (production) — wraps this in a host-owned Drawer
+ *     and keys it on projectId so the body remounts cleanly per project.
+ *   - `<CopilotDock>` below (legacy single-mount tests) — wraps it in
+ *     its own Drawer so the public component contract stays unchanged
+ *     for tests that compose the dock outside of `CopilotDockHost`.
+ */
+export interface CopilotDockBodyProps {
+    /**
+     * Whether the host Drawer is currently open. Mirrors the legacy
+     * `dockOpen` semantics in `ChatTabBody`/`BriefTabBody`:
+     *   - `open` flips false → bodies abort in-flight streams + clear
+     *     transient state (R1-H1 / R1-H2).
+     *   - `open` flips true → bodies re-establish focus / dispatch
+     *     pending prompt / request the first brief.
+     */
     open: boolean;
-    onClose: () => void;
     activeTab: CopilotDockTab;
     onTabChange: (tab: CopilotDockTab) => void;
     project: IProject | null;
@@ -21,16 +45,8 @@ export interface CopilotDockProps {
     tasks: ITask[];
     members: IMember[];
     knownProjectIds: string[];
-    /** Chat-only: pre-populated prompt dispatched from the command palette. */
     initialPrompt?: string;
-    /**
-     * Chat-only: fired after the chat tab body consumes the initial
-     * prompt so the host can clear it from Redux state. See
-     * ChatTabBody's `onInitialPromptConsumed` doc for the full
-     * rationale (R-A M1 Issue #8).
-     */
     onInitialPromptConsumed?: () => void;
-    /** Chat-only: active MutationProposal emitted by the agent stream. */
     pendingProposal?: MutationProposal;
     pendingNudges?: TriageNudge[];
     onAcceptProposal?: (proposal: MutationProposal) => void;
@@ -49,9 +65,8 @@ export interface CopilotDockProps {
     footerSlot?: React.ReactNode;
 }
 
-const CopilotDock: React.FC<CopilotDockProps> = ({
+export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
     open,
-    onClose,
     activeTab,
     onTabChange,
     project,
@@ -70,16 +85,6 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
     onDismissNudge,
     footerSlot
 }) => {
-    const isPhone = useIsPhoneChrome();
-
-    // Phase 3 A1 — phone gets a full-height bottom sheet, desktop/tablet
-    // gets the 420 px right shelf the doc specifies (§A1 lines 153-166).
-    // `size` accepts a number/percentage for finer control than the
-    // "default" | "large" literals.
-    const drawerProps = isPhone
-        ? { placement: "bottom" as const, size: "100%" as const }
-        : { placement: "right" as const, size: 420 };
-
     // Both bodies stay mounted across tab switches (`destroyOnHidden={false}`
     // below). `dockOpen` drives close-side teardown ONLY; `tabActive`
     // drives focus/dispatch/initial requests/etc. This split is the
@@ -128,6 +133,74 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
     ];
 
     return (
+        <>
+            <Tabs
+                activeKey={activeTab}
+                aria-label={microcopy.copilotDock.tabListLabel}
+                data-testid="copilot-dock-tabs"
+                /*
+                 * `destroyOnHidden={false}` keeps inactive tabs mounted
+                 * so chat history + the brief cache survive a tab switch
+                 * — both bodies own their own state and teardown via
+                 * their `dockOpen` prop. Replaces the deprecated
+                 * `destroyInactiveTabPane` (AntD 5.18+).
+                 */
+                destroyOnHidden={false}
+                items={tabItems}
+                onChange={(key) => onTabChange(key as CopilotDockTab)}
+                size="small"
+                style={{
+                    display: "flex",
+                    flex: "1 1 auto",
+                    flexDirection: "column",
+                    minHeight: 0
+                }}
+            />
+            {footerSlot ? (
+                <div
+                    data-testid="copilot-dock-footer-slot"
+                    style={{
+                        display: "flex",
+                        flexShrink: 0,
+                        marginTop: space.xs
+                    }}
+                >
+                    {footerSlot}
+                </div>
+            ) : null}
+        </>
+    );
+};
+
+/**
+ * Phase 4 A8 — Drawer shell separated from the body so the host can
+ * keep it mounted across `projectId` changes. Owns the placement,
+ * title chrome, accessible name, and close handling. Renders its
+ * children inside the Drawer body — those children are the project-
+ * scoped tab content keyed on `projectId` in the host.
+ */
+export interface CopilotDockShellProps {
+    open: boolean;
+    onClose: () => void;
+    children: React.ReactNode;
+}
+
+export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
+    open,
+    onClose,
+    children
+}) => {
+    const isPhone = useIsPhoneChrome();
+
+    // Phase 3 A1 — phone gets a full-height bottom sheet, desktop/tablet
+    // gets the 420 px right shelf the doc specifies (§A1 lines 153-166).
+    // `size` accepts a number/percentage for finer control than the
+    // "default" | "large" literals.
+    const drawerProps = isPhone
+        ? { placement: "bottom" as const, size: "100%" as const }
+        : { placement: "right" as const, size: 420 };
+
+    return (
         <Drawer
             {...drawerProps}
             // The dialog's accessible name is the visible "Copilot" title.
@@ -169,51 +242,27 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
                 </Space>
             }
         >
-            <Tabs
-                activeKey={activeTab}
-                aria-label={microcopy.copilotDock.tabListLabel}
-                data-testid="copilot-dock-tabs"
-                /*
-                 * `destroyOnHidden={false}` keeps inactive tabs mounted
-                 * so chat history + the brief cache survive a tab switch
-                 * — both bodies own their own state and teardown via
-                 * their `dockOpen` prop. Replaces the deprecated
-                 * `destroyInactiveTabPane` (AntD 5.18+).
-                 */
-                destroyOnHidden={false}
-                items={tabItems}
-                onChange={(key) => onTabChange(key as CopilotDockTab)}
-                size="small"
-                style={{
-                    display: "flex",
-                    flex: "1 1 auto",
-                    flexDirection: "column",
-                    minHeight: 0
-                }}
-            />
-            {/*
-             * A8: optional footer slot for the AI activity ledger pill
-             * (or any future cross-tab footer affordance). Rendered
-             * outside the Tabs container so it stays visible across both
-             * chat + brief tabs. `flex-shrink: 0` keeps it from being
-             * squeezed out by a tall tab body, and the empty wrapper
-             * means an absent slot leaves zero markup behind (no stray
-             * padding under the tabs).
-             */}
-            {footerSlot ? (
-                <div
-                    data-testid="copilot-dock-footer-slot"
-                    style={{
-                        display: "flex",
-                        flexShrink: 0,
-                        marginTop: space.xs
-                    }}
-                >
-                    {footerSlot}
-                </div>
-            ) : null}
+            {children}
         </Drawer>
     );
 };
+
+/**
+ * Self-contained dock composition: `<CopilotDockShell>` + an inline
+ * `<CopilotDockBody>`. Kept for compositional tests (`index.test.tsx`,
+ * `index.agent.test.tsx`) that don't go through `CopilotDockHost`'s
+ * lifted Drawer architecture. Production callers use `CopilotDockHost`,
+ * which assembles the shell + body itself so the Drawer mount can stay
+ * stable across projectId switches (Lane A caveat fix).
+ */
+export interface CopilotDockProps extends CopilotDockBodyProps {
+    onClose: () => void;
+}
+
+const CopilotDock: React.FC<CopilotDockProps> = ({ onClose, ...bodyProps }) => (
+    <CopilotDockShell onClose={onClose} open={bodyProps.open}>
+        <CopilotDockBody {...bodyProps} />
+    </CopilotDockShell>
+);
 
 export default CopilotDock;

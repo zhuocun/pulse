@@ -746,4 +746,53 @@ describe("CopilotDockHost", () => {
         // initialPrompt is also cleared by the closeCopilotDock reducer.
         expect(store.getState().overlays.copilotDock.initialPrompt).toBeNull();
     });
+
+    /*
+     * Phase 4 A8 — Drawer-lift regression. With the previous
+     * architecture (`<ProjectScopedDock key={projectId}>` wrapping the
+     * whole CopilotDock including its AntD `<Drawer>`), a project
+     * switch with the dock open tore down the Drawer and remounted it,
+     * which fired the Drawer's close/open animation. The Lane A fix
+     * lifts `<CopilotDockShell>` (the Drawer) outside the keyed body,
+     * so the Drawer's `open` prop never flips false and AntD does NOT
+     * animate during the project switch. We assert the dock element
+     * stays mounted AND keeps the same DOM identity (no remount) — a
+     * remount would produce a fresh element reference, the lifted-
+     * shell pattern keeps the reference stable.
+     */
+    it("keeps the Drawer mounted continuously across a project switch (Drawer-lift)", async () => {
+        renderHarness();
+        act(() => {
+            store.dispatch(overlaysActions.openChatDrawer());
+        });
+        await waitFor(() => {
+            expect(
+                document.querySelector("[data-testid='copilot-dock']")
+            ).not.toBeNull();
+        });
+
+        // Capture the Drawer element reference before navigation.
+        const dockBefore = document.querySelector(
+            "[data-testid='copilot-dock']"
+        );
+        expect(dockBefore).not.toBeNull();
+
+        // Navigate to a different project. The dock body remounts
+        // (keyed), but the shell + its Drawer must stay continuously
+        // mounted with the same DOM reference.
+        fireEvent.click(screen.getByText("Go to p2"));
+        await waitFor(() => {
+            expect(screen.getByText("Board page")).toBeInTheDocument();
+        });
+
+        const dockAfter = document.querySelector(
+            "[data-testid='copilot-dock']"
+        );
+        expect(dockAfter).not.toBeNull();
+        // Same DOM node — no remount. A remount would produce a new
+        // reference even if the testid matched.
+        expect(dockAfter).toBe(dockBefore);
+        // And the Redux open flag is still true throughout.
+        expect(store.getState().overlays.copilotDock.open).toBe(true);
+    });
 });

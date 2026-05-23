@@ -16,7 +16,7 @@ import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import AiActivityLog from "../aiActivityLog";
 
-import CopilotDock from "./index";
+import { CopilotDockBody, CopilotDockShell } from "./index";
 
 /**
  * Persistent host for the CopilotDock (Phase 4 R-A M1).
@@ -36,6 +36,18 @@ import CopilotDock from "./index";
  *   - The current URL does not match a board route (no `projectId` to
  *     scope chat / brief context to).
  *   - The current project has AI opted out per-project.
+ *
+ * Phase 4 A8 — Drawer-lift architecture:
+ *   - The `<CopilotDockShell>` (the AntD Drawer + chrome) is owned by
+ *     this host and stays mounted across projectId changes — AntD does
+ *     NOT animate a close/open transition because the Drawer's `open`
+ *     prop never flips false during the navigation.
+ *   - The project-scoped body (`<ProjectScopedDockBody key={projectId}>`)
+ *     is rendered AS A CHILD of the shell. The keyed remount tears down
+ *     per-project state (chat hook's `messages` buffer, the triage
+ *     agent's threadId + nudges, the brief cache) so cross-project
+ *     leaks (#1, #3, #7) stay fixed — see the original `key={projectId}`
+ *     placement history below.
  *
  * Inputs flow:
  *   - `projectId` from `useMatch("/projects/:projectId/board/*")` so the
@@ -59,21 +71,15 @@ import CopilotDock from "./index";
  *     `boardCopilot:openChat` event keep working unchanged.
  */
 
-interface ProjectScopedDockProps {
+interface ProjectScopedDockBodyProps {
     projectId: string;
 }
 
-const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
-    const {
-        activeTab,
-        open,
-        pendingPrompt,
-        setActiveTab,
-        closeDock,
-        clearInitialPrompt
-    } = useCopilotDock();
-    const { closeDrawer: closeChatDrawer } = useAiChatDrawer();
-    const { closeDrawer: closeBriefDrawer } = useBoardBriefDrawer();
+const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
+    projectId
+}) => {
+    const { activeTab, open, pendingPrompt, setActiveTab, clearInitialPrompt } =
+        useCopilotDock();
 
     const { data: currentProject } = useReactQuery<IProject>(
         "projects",
@@ -173,20 +179,6 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
         [dismissTriageNudge]
     );
 
-    /*
-     * Single close handler: keep the legacy chat/brief Redux flags in
-     * sync so the existing trigger callsites (CopilotMenu, welcome
-     * banner CTA, copilot-landing page) flip back to "closed" too.
-     * Without this, `useAiChatDrawer().open` would remain stuck `true`
-     * after the user dismisses the dock, and a stale flag would
-     * silently reopen the dock through the bridge on the next reroute.
-     */
-    const handleClose = useCallback(() => {
-        closeDock();
-        closeChatDrawer();
-        closeBriefDrawer();
-    }, [closeBriefDrawer, closeChatDrawer, closeDock]);
-
     const handleTabChange = useCallback(
         (tab: "chat" | "brief") => {
             setActiveTab(tab);
@@ -195,7 +187,7 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
     );
 
     return (
-        <CopilotDock
+        <CopilotDockBody
             activeTab={activeTab}
             columns={board ?? []}
             footerSlot={<AiActivityLog />}
@@ -207,7 +199,6 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
                     ? handleTriageNudgeAction
                     : undefined
             }
-            onClose={handleClose}
             onDismissNudge={
                 !environment.aiUseLocalEngine
                     ? handleTriageNudgeDismiss
@@ -229,11 +220,11 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
  * Bridge: keep the legacy `chatDrawer.open` / `boardBriefOpen` Redux
  * flags wired to the dock state so existing callsites continue to work
  * unchanged. The hooks themselves are not flag-gated and dispatching
- * `closeChatDrawer` / `closeBoardBrief` from `ProjectScopedDock` will
+ * `closeChatDrawer` / `closeBoardBrief` from `ProjectScopedDockBody` will
  * fan back through here without an infinite loop because each
  * `useEffect` only fires when its watched value transitions.
  *
- * Lifted out of `ProjectScopedDock` so the bridge keeps running even
+ * Lifted out of `ProjectScopedDockBody` so the bridge keeps running even
  * when there is no `projectId` in the URL — a `copilotLanding.tsx`
  * → `/projects` flow dispatches `openChatDrawer()` while the user is
  * still on the project list; the dock is hidden but the dock state
@@ -316,51 +307,93 @@ const BridgeLegacyOverlayFlags: React.FC = () => {
     return null;
 };
 
-const CopilotDockHost: React.FC = () => {
+/**
+ * Phase 4 A8 — inner host wrapper. Lives below the env-flag gate so the
+ * Redux + agent hooks here NEVER run while the dock flag is off. Tests
+ * that render `<MainLayout/>` without a Redux Provider (and the flag
+ * off) used to crash on the host's bridge hooks when those were lifted
+ * to the outer component, so we keep the gate-first / hooks-second
+ * shape and move the unified close-handler into this inner shell.
+ */
+const CopilotDockHostInner: React.FC<{
+    projectId: string | null;
+    boardAiOn: boolean;
+}> = ({ projectId, boardAiOn }) => {
+    const { open, closeDock } = useCopilotDock();
+    const { closeDrawer: closeChatDrawer } = useAiChatDrawer();
+    const { closeDrawer: closeBriefDrawer } = useBoardBriefDrawer();
+
+    /*
+     * Single close handler: keep the legacy chat/brief Redux flags in
+     * sync so the existing trigger callsites (CopilotMenu, welcome
+     * banner CTA, copilot-landing page) flip back to "closed" too.
+     * Without this, `useAiChatDrawer().open` would remain stuck `true`
+     * after the user dismisses the dock, and a stale flag would
+     * silently reopen the dock through the bridge on the next reroute.
+     *
+     * Lifted to the host (was on `ProjectScopedDock`) under the Drawer-
+     * lift refactor — the shell needs the close handler and the shell
+     * lives outside the keyed body. The shell mounts unconditionally
+     * once the flag is on, so the handlers are stable across project
+     * switches.
+     */
+    const handleClose = useCallback(() => {
+        closeDock();
+        closeChatDrawer();
+        closeBriefDrawer();
+    }, [closeBriefDrawer, closeChatDrawer, closeDock]);
+
+    /*
+     * Drawer-lift (Phase 4 A8 — Lane A caveat fix): the
+     * `<CopilotDockShell>` owns the AntD Drawer mount and stays
+     * mounted continuously while the dock flag is on, so a project
+     * switch with the dock open does NOT animate a Drawer close/open
+     * transition. `<ProjectScopedDockBody key={projectId}>` is the
+     * body slot inside the shell — the `key={projectId}` remount tears
+     * down per-project state (chat hook messages, triage agent thread,
+     * brief cache) exactly like the previous `key={projectId}` on the
+     * outer subtree did, resolving cross-project leaks (#1, #3, #7).
+     */
+    return (
+        <>
+            <BridgeLegacyOverlayFlags />
+            {projectId && boardAiOn ? (
+                <CopilotDockShell onClose={handleClose} open={open}>
+                    <ProjectScopedDockBody
+                        key={projectId}
+                        projectId={projectId}
+                    />
+                </CopilotDockShell>
+            ) : null}
+        </>
+    );
+};
+
+/**
+ * Flag-gated middle layer that owns the router + AI-enabled gates so
+ * the inner host (`CopilotDockHostInner`) only sees the resolved
+ * `projectId` / `boardAiOn` pair. Keeps `useMatch` / `useAiEnabled`
+ * out of the inner component so its hook surface stays focused on the
+ * dock-state contract.
+ */
+const CopilotDockHostFlagged: React.FC = () => {
     const { enabled: aiEnabled } = useAiEnabled();
     const match = useMatch("/projects/:projectId/board/*");
     const projectId = match?.params.projectId ?? null;
     const { disabled: aiDisabledForProject } = useAiProjectDisabled(projectId);
     const boardAiOn = aiEnabled && !aiDisabledForProject;
 
+    return <CopilotDockHostInner boardAiOn={boardAiOn} projectId={projectId} />;
+};
+
+const CopilotDockHost: React.FC = () => {
     // Flag gate is the hard rollback: when off, the BoardPage still
     // owns the legacy drawer mounts and we do nothing here at all.
+    // Hooks below depend on Redux + react-router context — running them
+    // when the flag is off would break tests that render `MainLayout`
+    // without those providers (the host is supposed to be a no-op).
     if (!environment.copilotDockEnabled) return null;
-
-    /*
-     * Bridge runs whenever the dock flag is on so a chat-drawer open
-     * dispatched before the user reaches a board still wires through —
-     * `copilotLanding.tsx` opens the chat drawer BEFORE navigating to
-     * `/projects`, and the dock state snapshot needs to reflect that
-     * by the time the user clicks into a board.
-     *
-     * Always render the bridge wrapped in a fragment so the tree shape
-     * stays stable across projectId transitions (null → value). React
-     * uses the wrapping element type to decide unmount/remount; folding
-     * the bridge into the conditional changed the type between a bare
-     * Element and a Fragment, which tore down `prevChatOpenRef` /
-     * `prevBriefOpenRef` and re-dispatched the bridge effects on the
-     * next render (Issue #6).
-     *
-     * `ProjectScopedDock` carries `key={projectId}` so it REMOUNTS on
-     * project switch. This is the cleanest fix for the cross-project
-     * leaks in #3 (triage agent nudges/threadId/messages) and #7
-     * (board-brief agent suggestion). It also resolves #1 (chat history
-     * stale across switch) because ChatTabBody — which lives inside
-     * ProjectScopedDock — is destroyed and reconstructed alongside it,
-     * so the chat hook's internal `messages` state is fresh for the
-     * new project's restore effect to seed from localStorage. The Redux
-     * dock state (open/activeTab/initialPrompt) lives in the store, not
-     * inside the dock subtree, so it survives the remount unchanged.
-     */
-    return (
-        <>
-            <BridgeLegacyOverlayFlags />
-            {projectId && boardAiOn ? (
-                <ProjectScopedDock key={projectId} projectId={projectId} />
-            ) : null}
-        </>
-    );
+    return <CopilotDockHostFlagged />;
 };
 
 export default CopilotDockHost;
