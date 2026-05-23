@@ -22,13 +22,14 @@ import { useParams } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
 import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { validateBreakdown, validateDraft } from "../../utils/ai/validate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
+import useAiLedger from "../../utils/hooks/useAiLedger";
 import useApi from "../../utils/hooks/useApi";
 import useAuth from "../../utils/hooks/useAuth";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
@@ -108,6 +109,12 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     );
     const [form] = useForm();
     const undoToast = useUndoToast();
+    /*
+     * A8 activity ledger: each drafted task that lands creates an entry
+     * so the dock's session log can show + revert AI-created work even
+     * after the bulk-progress toast disappears.
+     */
+    const aiLedger = useAiLedger();
 
     // Mount ALL hooks unconditionally (React hook ordering rule).
     // Only one engine path drives the UI based on environment.aiUseLocalEngine.
@@ -310,7 +317,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const onSubmitSingle = async () => {
         const values = form.getFieldsValue();
-        await createTask({
+        const result = await createTask({
             taskName: values.taskName,
             type: values.type,
             epic: values.epic,
@@ -319,6 +326,35 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             columnId: values.columnId,
             coordinatorId: values.coordinatorId,
             projectId
+        });
+        /*
+         * A8: log the AI-drafted task creation. Undo deletes the task
+         * through the existing tasks endpoint and invalidates the
+         * cached list so the board removes the row immediately. If the
+         * create did not return an `_id` (optimistic-only path), we
+         * still log the entry but skip the undo callback — the user
+         * sees the activity entry without a broken Revert button.
+         */
+        const createdId =
+            result &&
+            typeof result === "object" &&
+            "_id" in result &&
+            typeof (result as { _id: string })._id === "string"
+                ? (result as { _id: string })._id
+                : null;
+        aiLedger.record({
+            description: microcopyString(
+                microcopy.aiActivityLog.descriptions.taskDraftCreated
+            ).replace("{taskName}", values.taskName ?? ""),
+            surface: "task-draft",
+            undo: createdId
+                ? async () => {
+                      await apiCall(`tasks/${createdId}`, { method: "DELETE" });
+                      void queryClient.invalidateQueries({
+                          queryKey: ["tasks", { projectId }]
+                      });
+                  }
+                : undefined
         });
         onClose();
     };
@@ -344,14 +380,36 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                     coordinatorId: item.coordinatorId,
                     projectId
                 });
-                if (
+                const createdId =
                     result &&
                     typeof result === "object" &&
                     "_id" in result &&
                     typeof (result as { _id: string })._id === "string"
-                ) {
-                    created.push((result as { _id: string })._id);
-                }
+                        ? (result as { _id: string })._id
+                        : null;
+                if (createdId) created.push(createdId);
+                /*
+                 * A8: each subtask gets its own activity-ledger entry so
+                 * the user can revert individual rows from the dock log
+                 * (the bulk undo toast still covers the whole batch in
+                 * the first 10 s).
+                 */
+                aiLedger.record({
+                    description: microcopyString(
+                        microcopy.aiActivityLog.descriptions.taskDraftCreated
+                    ).replace("{taskName}", item.taskName ?? ""),
+                    surface: "task-draft",
+                    undo: createdId
+                        ? async () => {
+                              await apiCall(`tasks/${createdId}`, {
+                                  method: "DELETE"
+                              });
+                              void queryClient.invalidateQueries({
+                                  queryKey: ["tasks", { projectId }]
+                              });
+                          }
+                        : undefined
+                });
                 setBulkProgress({ current: index + 1, total: selected.length });
             }
             undoToast.show({
