@@ -11,6 +11,7 @@
  */
 
 import { palette } from "./palettes";
+import { fontSize, fontWeight, radius, space } from "./tokens";
 
 export const aiTokens = {
     gradStart: `var(--color-copilot-grad-start, ${palette.aurora.deep})`,
@@ -21,6 +22,31 @@ export const aiTokens = {
     badge: `var(--color-copilot-badge, ${palette.brand.primary})`,
     badgeBg: `var(--color-copilot-badge-bg, rgba(${palette.accent.rgb}, 0.12))`,
     pulse: `var(--color-copilot-pulse, rgba(${palette.accent.rgb}, 0.45))`
+} as const;
+
+/**
+ * Shape primitives for the shared `<CopilotChip>` (Ambition 6). Every AI
+ * pill — provenance badge, citation, confidence, engine mode, match
+ * strength, mutation risk — composes from this table so a font-weight or
+ * radius tweak ripples to all six surfaces in one edit. Bespoke values
+ * (the old `BadgeTag` / `Chip` styled-components in
+ * `aiSuggestedBadge` / `citationChip`) used to drift by 1–2 px and a font
+ * weight notch; pinning the geometry here is the audit fix.
+ *
+ * The `purple` ring is the brand-accent flavour (uses the copilot CSS
+ * vars so dark mode flips and palette swaps re-tint). Other tones pass
+ * through to AntD's named Tag colors (`green` / `orange` / `red` /
+ * `default`) so the existing accessible contrast pairings are preserved.
+ */
+export const chipShape = {
+    radius: radius.pill,
+    paddingBlock: 1,
+    paddingInline: space.xs,
+    paddingInlineCompact: space.xxs + 2,
+    fontSize: fontSize.xs - 1,
+    fontWeight: fontWeight.semibold,
+    lineHeight: 1,
+    gap: space.xxs
 } as const;
 
 /** Streaming TTFT target in ms. Surfaces measure against this for AGENT_TTFT. */
