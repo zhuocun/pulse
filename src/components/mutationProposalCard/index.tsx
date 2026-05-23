@@ -165,6 +165,86 @@ const buildRows = (proposal: MutationProposal): DiffRow[] => {
     return rows;
 };
 
+/**
+ * Inferred proposal "kind" used to pick a verb for the Apply button.
+ *
+ * The wire schema doesn't carry an explicit `kind` field
+ * (`interfaces/agent.d.ts`); we read the diff shape and pick the most
+ * specific verb that still describes every row in the proposal. The
+ * fallback is the generic `actions.apply` literal so consumers that
+ * wire a heterogeneous diff (column rename + task move in the same
+ * proposal) get the safe "Apply" verb instead of a misleading
+ * specialization.
+ *
+ * Returns `null` when the diff shape doesn't fit any specialization;
+ * the caller substitutes `microcopy.actions.apply` in that case.
+ */
+const APPLY_VERB_KIND_KEYS = [
+    "create",
+    "update",
+    "delete",
+    "move",
+    "reassign",
+    "renameColumn"
+] as const;
+
+type ProposalApplyKind = (typeof APPLY_VERB_KIND_KEYS)[number];
+
+const inferApplyKind = (
+    proposal: MutationProposal
+): ProposalApplyKind | null => {
+    const taskUpdates = proposal.diff.task_updates ?? [];
+    const columnUpdates = proposal.diff.column_updates ?? [];
+    const bulkApply = proposal.diff.bulk_apply ?? [];
+    const hasTaskUpdates = taskUpdates.length > 0;
+    const hasColumnUpdates = columnUpdates.length > 0;
+    const hasBulkApply = bulkApply.length > 0;
+
+    /*
+     * Heterogeneous diffs deliberately fall through to the generic
+     * Apply verb — picking a specialization for a mixed diff would
+     * mislabel half the changes. A pure bulk_apply diff carries its
+     * own operation name we can map to a verb; mixed bulk + tasks +
+     * columns falls through.
+     */
+    if (hasBulkApply && !hasTaskUpdates && !hasColumnUpdates) {
+        const op = bulkApply[0]?.operation;
+        if (op === "create") return "create";
+        if (op === "delete") return "delete";
+        if (op === "assign" || op === "reassign") return "reassign";
+        if (op === "set_column" || op === "move") return "move";
+        return "update";
+    }
+    if (!hasTaskUpdates && hasColumnUpdates && !hasBulkApply) {
+        // Column-only diffs that touch `name` are renames; anything
+        // else (e.g. `order`) falls back to the generic Apply verb.
+        const onlyName = columnUpdates.every((u) => u.field === "name");
+        if (onlyName) return "renameColumn";
+        return null;
+    }
+    if (hasTaskUpdates && !hasColumnUpdates && !hasBulkApply) {
+        // Single-field task diffs map to specific verbs; mixed-field
+        // task diffs are generic updates.
+        const fields = new Set(taskUpdates.map((u) => u.field));
+        if (fields.size === 1) {
+            const [field] = [...fields];
+            if (field === "columnId") return "move";
+            if (field === "coordinatorId") return "reassign";
+        }
+        return "update";
+    }
+    return null;
+};
+
+const applyVerbLabel = (proposal: MutationProposal): string => {
+    const kind = inferApplyKind(proposal);
+    if (!kind) return microcopy.actions.apply;
+    const verb = microcopy.mutation.applyVerbs[kind];
+    return typeof verb === "string" && verb.length > 0
+        ? verb
+        : microcopy.actions.apply;
+};
+
 /** Derive a human-readable list of field names that will change. */
 const buildChangingFields = (proposal: MutationProposal): string => {
     const fields: string[] = [];
@@ -469,7 +549,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                             onClick={handleAccept}
                             type="primary"
                         >
-                            {microcopy.actions.apply}
+                            {applyVerbLabel(proposal)}
                         </Button>
                     </Space>
                     <FooterHint>

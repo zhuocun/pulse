@@ -1063,7 +1063,23 @@ export const enSource = {
             current: "Current",
             proposed: "Proposed"
         },
-        columnFieldLabel: "Column {field}"
+        columnFieldLabel: "Column {field}",
+        /*
+         * QW#10 (2026-05 review §Quick Wins): the Apply button now
+         * shows the action verb matching the kind of mutation the
+         * agent proposed, derived from the diff shape (the wire schema
+         * doesn't carry an explicit `kind` — see `interfaces/agent.d.ts`).
+         * Surfaces that want to bypass the inferred verb can still pass
+         * a `title` override on `MutationProposalCard`.
+         */
+        applyVerbs: {
+            create: "Create",
+            update: "Save changes",
+            delete: "Delete",
+            move: "Move",
+            reassign: "Reassign",
+            renameColumn: "Rename"
+        }
     },
     /**
      * Web Share Target landing-page microcopy (Phase 3 A4). The page
