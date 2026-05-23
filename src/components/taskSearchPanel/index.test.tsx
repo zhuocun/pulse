@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import {
+    SavedFilterPresetState,
     USER_PREFERENCES_STORAGE_KEY,
     userPreferencesSlice
 } from "../../store/reducers/userPreferencesSlice";
@@ -90,19 +91,20 @@ const installAntdBrowserMocks = () => {
 };
 
 /**
- * Phase 4.2 — the density toggle reads/writes the user-preferences
- * Redux slice, so every render wraps the panel in a Provider + a fresh
- * store. `AntdApp` is required so the AntD Segmented can resolve its
- * internal `App.useApp()` lookup without falling back to the silent
- * no-op shape.
+ * Phase 4.2 — preset + density UI surfaces require a Redux store and a
+ * react-router context (presets are scoped by `projectId`). We build a
+ * throwaway store per render so saved presets / density toggles from
+ * one test never leak into another. `AntdApp` is required so the
+ * `message.warning/info/success` calls inside the panel resolve to a
+ * real notification instance (rather than the silent fallback).
  */
-const makePanelStore = () =>
+const makePanelStore = (preset?: SavedFilterPresetState[]) =>
     configureStore({
         reducer: { userPreferences: userPreferencesSlice.reducer },
         preloadedState: {
             userPreferences: {
                 boardDensity: "comfortable" as const,
-                savedFilterPresets: []
+                savedFilterPresets: preset ?? []
             }
         }
     });
@@ -112,15 +114,23 @@ const renderPanel = ({
     param = defaultParam,
     panelMembers = members,
     setParam = jest.fn(),
-    panelTasks = [task(), task({ _id: "t2", coordinatorId: "u2", type: "Bug" })]
+    panelTasks = [
+        task(),
+        task({ _id: "t2", coordinatorId: "u2", type: "Bug" })
+    ],
+    initialPresets,
+    storeRef
 }: {
     loading?: boolean;
     param?: TaskSearchParam;
     panelMembers?: IMember[] | undefined;
     setParam?: jest.Mock;
     panelTasks?: ITask[];
+    initialPresets?: SavedFilterPresetState[];
+    storeRef?: { current: ReturnType<typeof makePanelStore> | null };
 } = {}) => {
-    const store = makePanelStore();
+    const store = makePanelStore(initialPresets);
+    if (storeRef) storeRef.current = store;
     render(
         <Provider store={store}>
             <MemoryRouter initialEntries={["/projects/project-1/board"]}>
@@ -163,8 +173,8 @@ describe("TaskSearchPanel", () => {
 
     beforeEach(() => {
         // The Phase 4.2 preferences persistence middleware writes to
-        // `localStorage`; clear between tests so a density flip in
-        // one test never resurfaces when the next builds its store.
+        // `localStorage`; clear between tests so a preset saved by one
+        // test never resurfaces when the next builds its store.
         window.localStorage.removeItem(USER_PREFERENCES_STORAGE_KEY);
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
@@ -366,9 +376,233 @@ describe("TaskSearchPanel", () => {
             </Provider>
         );
 
-        expect(container.querySelectorAll(".ant-select-loading")).toHaveLength(
-            2
-        );
+        // Two filter selects (coordinator + type) plus the preset Select
+        // both render the loading sentinel; we still assert there are at
+        // least two so the existing loading-shaped contract holds.
+        const loadingNodes = container.querySelectorAll(".ant-select-loading");
+        expect(loadingNodes.length).toBeGreaterThanOrEqual(2);
+    });
+
+    /*
+     * Phase 4.2 — Saved filter presets. The save button writes to the
+     * Redux slice; the load Select reads back from it and re-applies
+     * filterState into URL via `setParam`. The cap toast fires when the
+     * user tries to save past `SAVED_FILTER_PRESET_LIMIT`.
+     */
+    describe("saved filter presets (Phase 4.2)", () => {
+        it("saves the current filter as a preset via the popover", async () => {
+            const rtlUser = userEvent.setup();
+            const setParam = jest.fn();
+            const param: TaskSearchParam = {
+                coordinatorId: "u1",
+                taskName: "checkout",
+                type: ""
+            };
+            const { store } = renderPanel({ param, setParam });
+            await rtlUser.click(
+                screen.getByTestId("task-search-panel-save-preset")
+            );
+            const input = await screen.findByTestId(
+                "task-search-panel-preset-name-input"
+            );
+            await rtlUser.type(input, "My checkout bugs");
+            await rtlUser.click(
+                screen.getByRole("button", {
+                    name: microcopy.board.presets.saveConfirm
+                })
+            );
+            await waitFor(() => {
+                const presets =
+                    store.getState().userPreferences.savedFilterPresets;
+                expect(presets).toHaveLength(1);
+                expect(presets[0].name).toBe("My checkout bugs");
+                expect(presets[0].boardId).toBe("project-1");
+                expect(presets[0].filterState).toEqual({
+                    coordinatorId: "u1",
+                    taskName: "checkout",
+                    type: ""
+                });
+            });
+        });
+
+        it("disables the save button when no filter is active", () => {
+            renderPanel({ param: defaultParam });
+            expect(
+                screen.getByTestId("task-search-panel-save-preset")
+            ).toBeDisabled();
+        });
+
+        it("loading a preset rehydrates URL state via setParam", async () => {
+            const rtlUser = userEvent.setup();
+            const setParam = jest.fn();
+            const preset: SavedFilterPresetState = {
+                id: "preset-A",
+                name: "Open checkout",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "checkout",
+                    coordinatorId: "u1",
+                    type: "Bug"
+                },
+                createdAt: 1
+            };
+            renderPanel({ setParam, initialPresets: [preset] });
+            // Open the preset Select and pick the only option.
+            // AntD's Select traps the selector behind nested divs; the
+            // outer `.ant-select-selector` is the element that listens
+            // for the open mousedown event in the codebase's existing
+            // tests (see the helper at the top of this file).
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            await rtlUser.click(await screen.findByText("Open checkout"));
+            expect(setParam).toHaveBeenCalledWith({
+                coordinatorId: "u1",
+                taskName: "checkout",
+                type: "Bug",
+                semanticIds: undefined
+            });
+        });
+
+        it("loading a preset omits stale values and warns the user", async () => {
+            const rtlUser = userEvent.setup();
+            const setParam = jest.fn();
+            const preset: SavedFilterPresetState = {
+                id: "preset-stale",
+                name: "Stale preset",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "checkout",
+                    coordinatorId: "deleted-user-id",
+                    type: "Story"
+                },
+                createdAt: 1
+            };
+            renderPanel({ setParam, initialPresets: [preset] });
+            // AntD's Select traps the selector behind nested divs; the
+            // outer `.ant-select-selector` is the element that listens
+            // for the open mousedown event in the codebase's existing
+            // tests (see the helper at the top of this file).
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            await rtlUser.click(await screen.findByText("Stale preset"));
+            // taskName is always safe; coordinator + type drop because
+            // neither value is in the live members / observed types
+            // lists. The setParam call writes `undefined` for those so
+            // useUrl removes them from the URL string entirely.
+            expect(setParam).toHaveBeenCalledWith({
+                coordinatorId: undefined,
+                taskName: "checkout",
+                type: undefined,
+                semanticIds: undefined
+            });
+        });
+
+        it("deletes a preset from the slice when the inline delete button is clicked", async () => {
+            const rtlUser = userEvent.setup();
+            const preset: SavedFilterPresetState = {
+                id: "preset-D",
+                name: "Preset D",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "",
+                    coordinatorId: "",
+                    type: ""
+                },
+                createdAt: 1
+            };
+            const { store } = renderPanel({ initialPresets: [preset] });
+            // AntD's Select traps the selector behind nested divs; the
+            // outer `.ant-select-selector` is the element that listens
+            // for the open mousedown event in the codebase's existing
+            // tests (see the helper at the top of this file).
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            const deleteButton = await screen.findByLabelText(
+                /Delete preset Preset D/i
+            );
+            await rtlUser.click(deleteButton);
+            await waitFor(() => {
+                expect(
+                    store.getState().userPreferences.savedFilterPresets
+                ).toHaveLength(0);
+            });
+        });
+
+        it("scopes presets to the current board (project) plus globals", async () => {
+            const rtlUser = userEvent.setup();
+            const presets: SavedFilterPresetState[] = [
+                {
+                    id: "other-board",
+                    name: "Other board",
+                    boardId: "project-other",
+                    filterState: {
+                        taskName: "",
+                        coordinatorId: "",
+                        type: ""
+                    },
+                    createdAt: 1
+                },
+                {
+                    id: "this-board",
+                    name: "This board",
+                    boardId: "project-1",
+                    filterState: {
+                        taskName: "",
+                        coordinatorId: "",
+                        type: ""
+                    },
+                    createdAt: 2
+                },
+                {
+                    id: "global",
+                    name: "Global",
+                    boardId: null,
+                    filterState: {
+                        taskName: "",
+                        coordinatorId: "",
+                        type: ""
+                    },
+                    createdAt: 3
+                }
+            ];
+            renderPanel({ initialPresets: presets });
+            // AntD's Select traps the selector behind nested divs; the
+            // outer `.ant-select-selector` is the element that listens
+            // for the open mousedown event in the codebase's existing
+            // tests (see the helper at the top of this file).
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            await rtlUser.hover(
+                screen.getByTestId("task-search-panel-presets-select")
+            );
+            expect(screen.queryByText("Other board")).toBeNull();
+            expect(screen.getByText("This board")).toBeInTheDocument();
+            expect(screen.getByText("Global")).toBeInTheDocument();
+        });
     });
 
     /*

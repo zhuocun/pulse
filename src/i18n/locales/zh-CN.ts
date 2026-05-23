@@ -380,6 +380,22 @@ const zhCN: Dictionary = {
         densityLabel: "看板密度",
         densityComfortable: "宽松",
         densityCompact: "紧凑",
+        presets: {
+            saveAction: "保存当前筛选为预设…",
+            saveAriaLabel: "保存当前筛选为预设",
+            namePlaceholder: "预设名称",
+            saveConfirm: "保存",
+            saveCancel: "取消",
+            loadAriaLabel: "加载已保存的筛选预设",
+            loadPlaceholder: "已保存的预设",
+            deleteAriaLabel: "删除预设 {name}",
+            limitReachedTitle: "已达到预设上限",
+            limitReachedBody:
+                "最多可保存 {limit} 个预设。请先删除一个再保存新预设。",
+            saved: "预设已保存",
+            applied: "已应用预设 {name}",
+            staleValueWarning: "此预设中部分值已不存在,已跳过。"
+        },
         minimap: {
             aria: "看板缩略图",
             segmentAriaOne: "{name} 列,1 个任务,当前{status}",
@@ -507,6 +523,9 @@ const zhCN: Dictionary = {
         filteredColumn: {
             title: "没有任务匹配当前筛选条件",
             cta: "重置筛选"
+        },
+        savedPresets: {
+            empty: "暂无已保存的预设。"
         },
         commandPalette: {
             loading: "加载中…",

@@ -417,6 +417,27 @@ export const enSource = {
         densityComfortable: "Comfortable",
         densityCompact: "Compact",
         /*
+         * Phase 4.2 — saved filter presets on the board. Sit in the
+         * task-search panel as a small dropdown + save action.
+         */
+        presets: {
+            saveAction: "Save filter as preset…",
+            saveAriaLabel: "Save current filter as preset",
+            namePlaceholder: "Preset name",
+            saveConfirm: "Save",
+            saveCancel: "Cancel",
+            loadAriaLabel: "Load saved filter preset",
+            loadPlaceholder: "Saved presets",
+            deleteAriaLabel: "Delete preset {name}",
+            limitReachedTitle: "Preset limit reached",
+            limitReachedBody:
+                "You can save up to {limit} presets. Delete one before saving another.",
+            saved: "Preset saved",
+            applied: "Applied preset {name}",
+            staleValueWarning:
+                "Some values in this preset no longer exist and were skipped."
+        },
+        /*
          * Phase 4.6 board minimap (sticky overview strip). Visible
          * label hidden — the minimap is purely visual chrome, the
          * navigation landmark and per-segment buttons carry the
@@ -587,6 +608,9 @@ export const enSource = {
         filteredColumn: {
             title: "No tasks match the current filters",
             cta: "Reset filters"
+        },
+        savedPresets: {
+            empty: "No saved presets yet."
         },
         commandPalette: {
             loading: "Loading…",
