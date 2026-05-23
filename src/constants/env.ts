@@ -210,6 +210,19 @@ const aiGhostTextEnabledFlag = readEnv("REACT_APP_AI_GHOST_TEXT_ENABLED");
  */
 const boardMinimapEnabledFlag = readEnv("REACT_APP_BOARD_MINIMAP_ENABLED");
 
+/**
+ * Phase 4.3 — Activity / notifications drawer. Surfaces a bell icon in
+ * the header that opens a drawer listing every optimistic-update event
+ * recorded this session (task / column / project create-update-delete,
+ * plus AI mutations forwarded in from `aiLedgerSlice` via a one-way
+ * bridge). Default ON because the drawer is opt-out (a kill-switch): the
+ * bell badge is benign when the feed is empty, and the feed is fed
+ * incrementally by the existing optimistic-update callsites — there is
+ * no remote dependency to gate. Set
+ * `REACT_APP_ACTIVITY_FEED_ENABLED=false` for a one-flag rollback.
+ */
+const activityFeedEnabledFlag = readEnv("REACT_APP_ACTIVITY_FEED_ENABLED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -262,7 +275,13 @@ const environment = {
      * already hides the strip on small boards. See the
      * `boardMinimapEnabledFlag` block above.
      */
-    boardMinimapEnabled: boardMinimapEnabledFlag === "false" ? false : true
+    boardMinimapEnabled: boardMinimapEnabledFlag === "false" ? false : true,
+    /**
+     * Phase 4.3 activity-feed flag. Default true (kill-switch) — the
+     * header renders the bell + drawer unless this flag is explicitly
+     * "false". See the `activityFeedEnabledFlag` block above.
+     */
+    activityFeedEnabled: activityFeedEnabledFlag === "false" ? false : true
 };
 
 export default environment;

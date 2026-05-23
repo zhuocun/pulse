@@ -536,6 +536,58 @@ export const enSource = {
             dismissLabel: "Dismiss"
         }
     },
+    activityFeed: {
+        // Bell-icon aria-label. One/other plural pair — the consumer
+        // picks the right key off the unread count and interpolates
+        // `{count}`. We intentionally do NOT embed ICU plural syntax
+        // because this codebase has no ICU formatter; a literal
+        // `{count, plural, one {…} other {…}}` would read out to
+        // screen-reader users verbatim.
+        bellAriaLabelZero: "Activity feed, no new notifications",
+        bellAriaLabelOne: "Activity feed, {count} unread notification",
+        bellAriaLabelOther: "Activity feed, {count} unread notifications",
+        drawerTitle: "Activity",
+        drawerCloseLabel: "Close activity drawer",
+        markAllRead: "Mark all as read",
+        markAllReadAriaLabel: "Mark all activity as read",
+        empty: "All quiet. New activity will show up here.",
+        groupToday: "Today",
+        groupYesterday: "Yesterday",
+        groupEarlier: "Earlier",
+        // Date-relative ticker reused from the AI-activity log shape so
+        // the two surfaces speak the same temporal language; this lives
+        // under `activityFeed.relative*` so future tuning is local.
+        relativeJustNow: "just now",
+        relativeOneMinute: "1 min ago",
+        relativeMinutes: "{count} min ago",
+        relativeOneHour: "1 hour ago",
+        relativeHours: "{count} hours ago",
+        relativeOneDay: "1 day ago",
+        relativeDays: "{count} days ago",
+        undo: "Undo",
+        undoAriaLabel: "Undo: {summary}",
+        undoFailedToast: "Couldn't undo: {error}",
+        kindLabels: {
+            task: "Task",
+            column: "Column",
+            project: "Project",
+            ai: "AI"
+        },
+        descriptions: {
+            taskCreated: "Created task “{name}”",
+            taskUpdated: "Updated task “{name}”",
+            taskDeleted: "Deleted task “{name}”",
+            taskRenamed: "Renamed task to “{name}”",
+            taskMoved: "Moved task “{name}”",
+            columnCreated: "Created column “{name}”",
+            columnUpdated: "Updated column “{name}”",
+            columnDeleted: "Deleted column “{name}”",
+            columnRenamed: "Renamed column to “{name}”",
+            projectCreated: "Created project “{name}”",
+            projectUpdated: "Updated project “{name}”",
+            projectDeleted: "Deleted project “{name}”"
+        }
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",

@@ -460,6 +460,49 @@ const zhCN: Dictionary = {
             dismissLabel: "忽略"
         }
     },
+    activityFeed: {
+        bellAriaLabelZero: "活动通知,暂无新通知",
+        bellAriaLabelOne: "活动通知,{count} 条未读",
+        bellAriaLabelOther: "活动通知,{count} 条未读",
+        drawerTitle: "活动",
+        drawerCloseLabel: "关闭活动抽屉",
+        markAllRead: "全部标记为已读",
+        markAllReadAriaLabel: "将所有活动标记为已读",
+        empty: "目前没有新的动态。这里会显示新发生的活动。",
+        groupToday: "今天",
+        groupYesterday: "昨天",
+        groupEarlier: "更早",
+        relativeJustNow: "刚刚",
+        relativeOneMinute: "1 分钟前",
+        relativeMinutes: "{count} 分钟前",
+        relativeOneHour: "1 小时前",
+        relativeHours: "{count} 小时前",
+        relativeOneDay: "1 天前",
+        relativeDays: "{count} 天前",
+        undo: "撤销",
+        undoAriaLabel: "撤销:{summary}",
+        undoFailedToast: "无法撤销:{error}",
+        kindLabels: {
+            task: "任务",
+            column: "列",
+            project: "项目",
+            ai: "AI"
+        },
+        descriptions: {
+            taskCreated: "已创建任务 “{name}”",
+            taskUpdated: "已更新任务 “{name}”",
+            taskDeleted: "已删除任务 “{name}”",
+            taskRenamed: "任务已重命名为 “{name}”",
+            taskMoved: "已移动任务 “{name}”",
+            columnCreated: "已创建列 “{name}”",
+            columnUpdated: "已更新列 “{name}”",
+            columnDeleted: "已删除列 “{name}”",
+            columnRenamed: "列已重命名为 “{name}”",
+            projectCreated: "已创建项目 “{name}”",
+            projectUpdated: "已更新项目 “{name}”",
+            projectDeleted: "已删除项目 “{name}”"
+        }
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",

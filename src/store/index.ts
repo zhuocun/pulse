@@ -1,5 +1,6 @@
 import { configureStore, type Middleware } from "@reduxjs/toolkit";
 
+import { activityFeedSlice } from "./reducers/activityFeedSlice";
 import { aiLedgerSlice } from "./reducers/aiLedgerSlice";
 import { overlaysSlice } from "./reducers/overlaysSlice";
 import { projectModalSlice } from "./reducers/projectModalSlice";
@@ -14,7 +15,8 @@ export const rootReducer = {
     projectModal: projectModalSlice.reducer,
     overlays: overlaysSlice.reducer,
     aiLedger: aiLedgerSlice.reducer,
-    userPreferences: userPreferencesSlice.reducer
+    userPreferences: userPreferencesSlice.reducer,
+    activityFeed: activityFeedSlice.reducer
 };
 
 /**
