@@ -77,6 +77,29 @@ describe("MutationProposalCard", () => {
         __resetAiLedgerUndoCallbacksForTests();
     });
 
+    /*
+     * QW#6 (2026-05 review §Quick Wins): the inline diff card uses
+     * `role="region"` paired with an `aria-label` heading — the previous
+     * `role="alertdialog"` hijacked screen-reader focus as if the diff
+     * were a modal. The card is always rendered inline (chat drawer +
+     * review-each list); the surface that hosts a real modal supplies
+     * its own `dialog` role outside the card.
+     */
+    it("uses role=region with the heading as aria-label so the inline diff is a navigable landmark, not an alertdialog", () => {
+        renderCard({
+            onAccept: jest.fn(),
+            onReject: jest.fn(),
+            proposal: baseProposal
+        });
+        // The card itself surfaces a region landmark.
+        const region = screen.getByRole("region", {
+            name: /Reassign two unowned bugs/
+        });
+        expect(region).toBeInTheDocument();
+        // And the legacy alertdialog role is gone.
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
     it("renders the diff plus accept/reject without an Undo CTA when no onUndo is provided", () => {
         renderCard({
             onAccept: jest.fn(),

@@ -340,8 +340,20 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
             proposal.description
         );
 
+    /*
+     * QW#6 (2026-05 review §Quick Wins): the card is always rendered
+     * inline (chat drawer, review-each list) — it is not a modal dialog.
+     * `role="alertdialog"` forced screen readers into an alert + dialog
+     * announcement that hijacks focus and reads the diff as a
+     * notification; for an inline diff card that's the wrong contract.
+     * `role="region"` (paired with `aria-label={heading}`) gives the
+     * surface a navigable landmark while letting normal reading order
+     * resume after the card. If a future surface ever wraps the card in
+     * an actual modal, the parent Dialog supplies the `dialog` role and
+     * the card stays a `region` inside it.
+     */
     return (
-        <Wrap role="alertdialog" aria-label={heading}>
+        <Wrap role="region" aria-label={heading}>
             <Heading>
                 <Typography.Text strong style={{ fontSize: fontSize.base }}>
                     {heading}
