@@ -15,12 +15,14 @@ import { useForm } from "antd/lib/form/Form";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
@@ -94,6 +96,7 @@ const TaskModal: React.FC<{
     const [form] = useForm();
     const { projectId } = useParams<{ projectId: string }>();
     const { editingTaskId, startEditing, closeModal } = useTaskModal();
+    const { openTask } = useTaskPanelNavigation();
     const { enabled: aiEnabled } = useAiEnabled();
     const screens = Grid.useBreakpoint();
     const [formTick, setFormTick] = useState(0);
@@ -683,9 +686,17 @@ const TaskModal: React.FC<{
                                     }
                                     setFormTick((tick) => tick + 1);
                                 }}
-                                onOpenSimilarTask={(taskId) =>
-                                    startEditing(taskId)
-                                }
+                                onOpenSimilarTask={(taskId) => {
+                                    // Flag-aware hand-off — TaskModal is
+                                    // only mounted when the flag is off,
+                                    // so this branch is for symmetry with
+                                    // TaskDetailPanel's twin handler.
+                                    if (environment.taskPanelRouted) {
+                                        openTask(taskId, projectId);
+                                    } else {
+                                        startEditing(taskId);
+                                    }
+                                }}
                                 values={liveValues}
                             />
                         )}
