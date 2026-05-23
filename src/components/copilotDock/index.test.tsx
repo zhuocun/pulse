@@ -710,8 +710,8 @@ describe("CopilotDock", () => {
          * flush microtasks so React commits the resulting effect/setState
          * pairs before assertions land. Without the trailing `await
          * Promise.resolve()`, the local engine's `run()` (which begins
-         * with `await Promise.resolve(localResolve(...))`) leaks an
-         * "update not wrapped in act" warning into the test output.
+         * with `await Promise.resolve(...)`) leaks an "update not
+         * wrapped in act" warning into the test output.
          */
         const mutateTasks = async (
             controls: {
