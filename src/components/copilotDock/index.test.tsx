@@ -980,5 +980,212 @@ describe("CopilotDock", () => {
                 setAnalyticsSink(previous);
             }
         });
+
+        /*
+         * Cleanup path: an armed trailing timer must be cancelled the
+         * moment a manual refresh fires. Without that, the trailing
+         * would land seconds after the user's explicit click, burning
+         * a redundant provider call on identical state.
+         *
+         * Setup: the FIRST fingerprint change fires immediately because
+         * lastAutoRefreshAt is still 0. That call consumes the
+         * "instant feedback" credit and arms the gate. We then schedule
+         * the trailing with a second change at T=5s, click refresh at
+         * T=10s, and verify no auto refetch lands when the trailing
+         * would otherwise fire.
+         */
+        it("trailing timer is cleared when the user clicks manual refresh while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change inside the gate schedules a
+                // trailing timer for T=30s.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — user clicks the regenerate button. Manual
+                // refresh resets lastAutoRefreshAt AND clears the
+                // pending trailing timer.
+                await advanceBy(5_000);
+                await act(async () => {
+                    fireEvent.click(
+                        screen.getByRole("button", {
+                            name: microcopy.ai.regenerateLabel as string
+                        })
+                    );
+                    await Promise.resolve();
+                });
+
+                // Advance well past where the trailing would have fired
+                // (T=30s mark relative to the first auto fire, plus
+                // headroom). No fingerprint-driven refetch should land —
+                // the manual click owned the surface.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * Cleanup path: switching to Chat while a trailing timer is
+         * armed must cancel it. We never want a delayed refetch firing
+         * while the user is reading chat — the existing surface-flip
+         * effect handles this; the test pins the contract so a refactor
+         * can't drop the clearTimeout silently.
+         */
+        it("trailing timer is cleared when the user switches tabs while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change schedules the trailing timer.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — switch to Chat. surfaceVisible flips false on
+                // the brief body, which must drop the trailing timer.
+                await advanceBy(5_000);
+                await act(async () => {
+                    fireEvent.click(
+                        screen.getByRole("tab", {
+                            name: microcopy.copilotDock.tabChat as string
+                        })
+                    );
+                    await Promise.resolve();
+                });
+
+                // Advance past the trailing-fire boundary. No refetch
+                // should land while the user is on Chat.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * Cleanup path: unmounting the dock while a trailing timer is
+         * armed must not leave a phantom setTimeout that fires into a
+         * torn-down agent hook. The component's teardown effect handles
+         * this; the test pins the contract by spying clearTimeout and
+         * asserting the armed handle was cleared.
+         */
+        it("trailing timer is cleared on unmount while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            const clearTimeoutSpy = jest.spyOn(window, "clearTimeout");
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                const { unmount } = renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change schedules the trailing timer.
+                // Capture the IDs in flight at the time of the schedule
+                // so we can confirm the unmount path cleared one of
+                // them (jsdom assigns monotonic numeric handles).
+                await advanceBy(5_000);
+                const clearCallsBeforeUnmount = clearTimeoutSpy.mock.calls.length;
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — unmount the dock. The teardown effect must
+                // call clearTimeout on the armed handle.
+                await advanceBy(5_000);
+                await act(async () => {
+                    unmount();
+                    await Promise.resolve();
+                });
+
+                // The teardown ran at least one clearTimeout that
+                // wasn't there before the schedule.
+                expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(
+                    clearCallsBeforeUnmount
+                );
+
+                // Belt-and-braces: even if some other clearTimeout had
+                // been queued, advancing past the trailing-fire
+                // boundary must NOT track another refresh — the brief
+                // body is unmounted, so no fingerprint-driven refetch
+                // can land.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                clearTimeoutSpy.mockRestore();
+                setAnalyticsSink(previous);
+            }
+        });
     });
 });
