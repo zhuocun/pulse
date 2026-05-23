@@ -25,7 +25,6 @@ import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import Column from "../components/column";
-import CopilotDock, { type CopilotDockTab } from "../components/copilotDock";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
@@ -448,35 +447,19 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
-    // Phase 3 A1 — when `copilotDockEnabled` is on, both legacy overlay
-    // flags collapse into a single dock with `dockActiveTab` deciding
-    // which body is visible. The most recently opened surface wins so
-    // existing trigger callsites (CopilotMenu, palette hand-off, welcome
-    // banner CTA) open the dock on the right tab without bespoke wiring.
-    const [dockActiveTab, setDockActiveTab] = useState<CopilotDockTab>("chat");
-    useEffect(() => {
-        if (!environment.copilotDockEnabled) return;
-        if (chatOpen) setDockActiveTab("chat");
-        else if (briefOpen) setDockActiveTab("brief");
-    }, [chatOpen, briefOpen]);
-    const dockOpen = chatOpen || briefOpen;
-    const closeDock = useCallback(() => {
-        closeChatDrawer();
-        closeBriefDrawer();
-    }, [closeBriefDrawer, closeChatDrawer]);
-    const handleDockTabChange = useCallback(
-        (tab: CopilotDockTab) => {
-            setDockActiveTab(tab);
-            if (tab === "chat") {
-                openChatDrawer();
-                closeBriefDrawer();
-            } else {
-                openBriefDrawer();
-                closeChatDrawer();
-            }
-        },
-        [closeBriefDrawer, closeChatDrawer, openBriefDrawer, openChatDrawer]
-    );
+    /*
+     * R-A M1: the CopilotDock is now mounted in `MainLayout` by
+     * `CopilotDockHost`, which bridges these legacy `chatDrawer` /
+     * `boardBriefOpen` flags onto the persistent dock state so the
+     * existing trigger callsites below (CopilotMenu, welcome banner
+     * CTA, palette hand-off) keep working unchanged. The board page no
+     * longer owns the dock's open/active-tab state — those moved to
+     * Redux to survive project-route navigations.
+     *
+     * The flags ARE still read here (`chatOpen` / `briefOpen` below)
+     * because the rollback path (`!copilotDockEnabled`) keeps
+     * mounting the legacy drawers from this file.
+     */
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -974,10 +957,25 @@ const BoardPage = () => {
                 {!environment.taskPanelRouted && (
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
-                {boardAiOn &&
-                    (environment.copilotDockEnabled ? (
-                        <CopilotDock
-                            activeTab={dockActiveTab}
+                {/*
+                 * When the CopilotDock flag is on, the dock is mounted
+                 * by `CopilotDockHost` inside `MainLayout` so it
+                 * survives project-route navigations (R-A M1). The
+                 * legacy drawers below only render under the rollback
+                 * branch; the two surfaces never co-exist for a given
+                 * user.
+                 */}
+                {boardAiOn && !environment.copilotDockEnabled && (
+                    <>
+                        <BoardBriefDrawer
+                            columns={board ?? []}
+                            members={members ?? []}
+                            onClose={closeBriefDrawer}
+                            open={briefOpen}
+                            project={currentProject}
+                            tasks={visibleTasks}
+                        />
+                        <AiChatDrawer
                             columns={board ?? []}
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
@@ -987,14 +985,13 @@ const BoardPage = () => {
                                     ? handleTriageNudgeAction
                                     : undefined
                             }
-                            onClose={closeDock}
+                            onClose={closeChatDrawer}
                             onDismissNudge={
                                 !environment.aiUseLocalEngine
                                     ? handleTriageNudgeDismiss
                                     : undefined
                             }
-                            onTabChange={handleDockTabChange}
-                            open={dockOpen}
+                            open={chatOpen}
                             pendingNudges={
                                 !environment.aiUseLocalEngine
                                     ? triageAgent.nudges
@@ -1003,43 +1000,8 @@ const BoardPage = () => {
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />
-                    ) : (
-                        <>
-                            <BoardBriefDrawer
-                                columns={board ?? []}
-                                members={members ?? []}
-                                onClose={closeBriefDrawer}
-                                open={briefOpen}
-                                project={currentProject}
-                                tasks={visibleTasks}
-                            />
-                            <AiChatDrawer
-                                columns={board ?? []}
-                                initialPrompt={chatInitialPrompt}
-                                knownProjectIds={projectId ? [projectId] : []}
-                                members={members ?? []}
-                                onActionNudge={
-                                    !environment.aiUseLocalEngine
-                                        ? handleTriageNudgeAction
-                                        : undefined
-                                }
-                                onClose={closeChatDrawer}
-                                onDismissNudge={
-                                    !environment.aiUseLocalEngine
-                                        ? handleTriageNudgeDismiss
-                                        : undefined
-                                }
-                                open={chatOpen}
-                                pendingNudges={
-                                    !environment.aiUseLocalEngine
-                                        ? triageAgent.nudges
-                                        : undefined
-                                }
-                                project={currentProject ?? null}
-                                tasks={visibleTasks}
-                            />
-                        </>
-                    ))}
+                    </>
+                )}
             </BoardShell>
         </DragDropContext>
     );

@@ -8,10 +8,20 @@ import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
 
 /*
- * Phase 3 A1 — flag-on / flag-off mount coverage for the CopilotDock
- * inside the board page. The flag is checked at module load through
+ * Phase 3 A1 — flag-on / flag-off mount coverage for the CopilotDock.
+ *
+ * R-A M1 update: the dock no longer mounts inside `BoardPage` — it
+ * lives in `MainLayout` via `CopilotDockHost` so it survives project-
+ * route navigations. These tests now render the host alongside the
+ * page so the mount/no-mount assertions still exercise the dock from
+ * the shape it has in production. The legacy `<AiChatDrawer>` +
+ * `<BoardBriefDrawer>` mounts remain inside the board page on the
+ * rollback branch, so the flag-off assertion stays meaningful.
+ *
+ * The flag is checked at module load through
  * `environment.copilotDockEnabled`, so we mock `constants/env` per
- * scenario and re-require `pages/board` after mutating the mock.
+ * scenario and re-require `pages/board` / the host after mutating the
+ * mock.
  */
 
 type DragDropContextMockProps = {
@@ -191,6 +201,9 @@ const installAntdBrowserMocks = () => {
 // `environment.copilotDockEnabled` read picks up the mutable mock.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
 const BoardPage = require("./board").default as React.ComponentType;
+// eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+const CopilotDockHost = require("../components/copilotDock/copilotDockHost")
+    .default as React.ComponentType;
 
 const renderBoard = () => {
     const queryClient = new QueryClient({
@@ -204,10 +217,18 @@ const renderBoard = () => {
     store.dispatch(overlaysActions.closeChatDrawer());
     store.dispatch(overlaysActions.closeBoardBrief());
     store.dispatch(overlaysActions.closeAiDraft());
+    store.dispatch(overlaysActions.closeCopilotDock());
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
                 <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                    {/*
+                     * Mirror production layering: the host mounts
+                     * ABOVE the routed page in `MainLayout`. Render
+                     * it here so the dock surface comes from the
+                     * same callsite as in prod (R-A M1).
+                     */}
+                    <CopilotDockHost />
                     <Routes>
                         <Route
                             path="/projects/:projectId/board"
