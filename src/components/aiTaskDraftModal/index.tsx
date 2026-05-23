@@ -113,8 +113,14 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
      * A8 activity ledger: each drafted task that lands creates an entry
      * so the dock's session log can show + revert AI-created work even
      * after the bulk-progress toast disappears.
+     *
+     * We destructure `record` + `remove` so the bulk-undo path can drop
+     * the per-subtask ledger rows synchronously after the toast Undo
+     * runs — without this, the bulk toast would delete the BE rows but
+     * leave the per-subtask ledger entries pointing at now-404'd ids
+     * (issues #3 / #7 in the A8 review).
      */
-    const aiLedger = useAiLedger();
+    const { record: recordLedger, remove: removeLedger } = useAiLedger();
 
     // Mount ALL hooks unconditionally (React hook ordering rule).
     // Only one engine path drives the UI based on environment.aiUseLocalEngine.
@@ -342,7 +348,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
             typeof (result as { _id: string })._id === "string"
                 ? (result as { _id: string })._id
                 : null;
-        aiLedger.record({
+        recordLedger({
             description: microcopyString(
                 microcopy.aiActivityLog.descriptions.taskDraftCreated
             ).replace("{taskName}", values.taskName ?? ""),
@@ -365,7 +371,26 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         );
         if (selected.length === 0) return;
         setBulkProgress({ current: 0, total: selected.length });
+        /*
+         * A8 contract (issues #3 / #7): we track per-subtask `createdId`
+         * AND per-subtask `ledgerId` so the bulk Undo toast can clean up
+         * BOTH the BE rows and the corresponding activity-log entries
+         * in a single pass. Without ledger-id capture, the toast Undo
+         * would delete the BE rows but leave the ledger pointing at
+         * now-404'd ids — and clicking a per-row Revert from the
+         * activity log later would re-hit DELETE on the same id (404
+         * for issues already removed, idempotent at best, surprising
+         * at worst). The per-row revert path is also defensive: if the
+         * user clicked a per-row Revert first, the bulk toast's loop
+         * still does the DELETE — the BE call is idempotent (404 ≈
+         * "already done") and the partial-failure counter surfaces the
+         * net result. Issue #7 deferred: a perfect fix would require
+         * the per-row revert to mark its createdId as already-undone
+         * so the bulk loop could skip it; the existing
+         * removed/failed/partial messaging is correct telemetry.
+         */
         const created: string[] = [];
+        const ledgerIds: string[] = [];
         try {
             for (const [index, item] of selected.entries()) {
                 // sequential to keep optimistic cache consistent
@@ -394,7 +419,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                  * (the bulk undo toast still covers the whole batch in
                  * the first 10 s).
                  */
-                aiLedger.record({
+                const ledgerId = recordLedger({
                     description: microcopyString(
                         microcopy.aiActivityLog.descriptions.taskDraftCreated
                     ).replace("{taskName}", item.taskName ?? ""),
@@ -410,6 +435,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                           }
                         : undefined
                 });
+                ledgerIds.push(ledgerId);
                 setBulkProgress({ current: index + 1, total: selected.length });
             }
             undoToast.show({
@@ -443,6 +469,18 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                     void queryClient.invalidateQueries({
                         queryKey: ["tasks", { projectId }]
                     });
+                    /*
+                     * Sync ledger with the actual deletes. We drop every
+                     * captured ledger row regardless of per-id outcome —
+                     * the visible failure tally tells the user which
+                     * tasks survived, and keeping ledger rows whose
+                     * closures would 404 is worse than the brief loss
+                     * of in-dock visibility for tasks the user can see
+                     * back on the board. The `remove(id)` is a no-op if
+                     * the user had already clicked the per-row Revert
+                     * (the Map slot is already gone).
+                     */
+                    ledgerIds.forEach((id) => removeLedger(id));
                     if (failed === 0) {
                         message.success(
                             (removed === 1
