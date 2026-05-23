@@ -179,16 +179,13 @@ const buildRows = (proposal: MutationProposal): DiffRow[] => {
  * Returns `null` when the diff shape doesn't fit any specialization;
  * the caller substitutes `microcopy.actions.apply` in that case.
  */
-const APPLY_VERB_KIND_KEYS = [
-    "create",
-    "update",
-    "delete",
-    "move",
-    "reassign",
-    "renameColumn"
-] as const;
-
-type ProposalApplyKind = (typeof APPLY_VERB_KIND_KEYS)[number];
+type ProposalApplyKind =
+    | "create"
+    | "update"
+    | "delete"
+    | "move"
+    | "reassign"
+    | "renameColumn";
 
 const inferApplyKind = (
     proposal: MutationProposal
