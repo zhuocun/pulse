@@ -131,6 +131,30 @@ const aiKnowledgeCutoff =
     readEnv("REACT_APP_AI_KNOWLEDGE_CUTOFF")?.trim() ||
     DEFAULT_AI_KNOWLEDGE_CUTOFF;
 
+/**
+ * Phase 3 A3 — Bottom tab bar + demoted header. Default ON so the new
+ * chassis is the live experience without a release toggle; set
+ * `REACT_APP_BOTTOM_NAV_ENABLED=false` for a one-flag rollback to the
+ * previous header-only chrome (the dropdown right-cluster comes back,
+ * the bottom tab bar does not mount). When the env var is missing
+ * entirely (production parity), the flag still defaults to true so
+ * deployed builds get the new chassis.
+ */
+const bottomNavEnabledFlag = readEnv("REACT_APP_BOTTOM_NAV_ENABLED");
+
+/**
+ * Phase 3 A2 — Routed inline task panel. Opt-in until validated: the
+ * new `<TaskDetailPanel>` route at `/projects/:projectId/board/task/:taskId`
+ * only registers when this flag is "true". When the flag is unset or
+ * "false" (default), the existing `<TaskModal>` overlay continues to
+ * handle every task-open flow exactly as today, including all callsites
+ * that go through `useTaskModal`. The migration plan is to flip the flag
+ * once the panel is validated, then a second-pass PR migrates callsites
+ * and removes the modal surface. Set `REACT_APP_TASK_PANEL_ROUTED=true`
+ * in a local `.env.development` or at deploy time to enable.
+ */
+const taskPanelRoutedFlag = readEnv("REACT_APP_TASK_PANEL_ROUTED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -145,7 +169,18 @@ const environment = {
     aiMutationProposalsEnabled:
         aiMutationProposalsEnabledFlag === "false" ? false : true,
     /** Override via `REACT_APP_AI_KNOWLEDGE_CUTOFF` (see file header). */
-    aiKnowledgeCutoff
+    aiKnowledgeCutoff,
+    /**
+     * Phase 3 A3 mobile-chassis flag. Default true so the new bottom
+     * tab bar mounts on phones and the header demotes its right
+     * cluster; set `REACT_APP_BOTTOM_NAV_ENABLED=false` to roll back.
+     */
+    bottomNavEnabled: bottomNavEnabledFlag === "false" ? false : true,
+    /**
+     * Phase 3 A2 routed-task-panel flag. Default false (opt-in) — see
+     * the `taskPanelRoutedFlag` block above for the rollout plan.
+     */
+    taskPanelRouted: taskPanelRoutedFlag === "true"
 };
 
 export default environment;

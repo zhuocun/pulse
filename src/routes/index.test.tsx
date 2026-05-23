@@ -40,6 +40,24 @@ jest.mock("../pages/board", () => ({
     __esModule: true,
     default: () => null
 }));
+jest.mock("../pages/share", () => ({
+    __esModule: true,
+    default: () => <div data-testid="share-content">Share Route</div>
+}));
+jest.mock("../pages/inbox", () => ({
+    __esModule: true,
+    default: () => <div data-testid="inbox-content">Inbox Route</div>
+}));
+jest.mock("../pages/copilotLanding", () => ({
+    __esModule: true,
+    default: () => (
+        <div data-testid="copilot-landing-content">Copilot Route</div>
+    )
+}));
+jest.mock("../pages/settings", () => ({
+    __esModule: true,
+    default: () => <div data-testid="settings-content">Settings Route</div>
+}));
 // Stub the auth layout to a thin shell that just renders the Outlet so
 // the routed terms page surfaces in the test DOM without dragging in
 // the brand chrome.
@@ -123,9 +141,19 @@ describe("routes", () => {
         expect(element(protectedBranch as { element?: unknown }).type).toBe(
             RequireAuth
         );
+        // The trailing entries are:
+        //   - "share" (Phase 3 A4) — Web Share Target landing page
+        //   - "inbox", "copilot", "settings" (Phase 3 A3) — bottom tab
+        //     destinations carved off the header dropdown
+        // All appended at the tail of the protected branch so the
+        // existing /projects routes are unaffected.
         expect(protectedBranch?.children?.map((route) => route.path)).toEqual([
             "projects",
-            "projects/:projectId"
+            "projects/:projectId",
+            "share",
+            "inbox",
+            "copilot",
+            "settings"
         ]);
 
         const catchAll = routes[0].children?.[4];
@@ -206,5 +234,129 @@ describe("auth/terms reachability (Bug 1)", () => {
         // surface a guest does, just without the redirect.
         expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
         expect(window.location.pathname).toBe("/auth/terms");
+    });
+});
+
+/**
+ * Phase 3 A3 — bottom-tab destinations. The three new routes mount
+ * under `<RequireAuth />` so they MUST require a session; an
+ * unauthenticated visit redirects to /login like every other protected
+ * page. With a session, each route surfaces its routed page through
+ * the main layout's Outlet.
+ */
+describe("bottom-tab routes (Phase 3 A3)", () => {
+    const renderAt = (path: string, authedUser?: IUser) => {
+        window.history.pushState({}, "App", path);
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } }
+        });
+        if (authedUser) {
+            queryClient.setQueryData(["users"], authedUser);
+        }
+        render(
+            <QueryClientProvider client={queryClient}>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
+            </QueryClientProvider>
+        );
+    };
+
+    const authedUser: IUser = {
+        _id: "u1",
+        email: "alice@example.com",
+        likedProjects: [],
+        username: "Alice"
+    };
+
+    beforeEach(() => {
+        window.localStorage.clear();
+    });
+
+    it.each([
+        ["/inbox", "inbox-content"],
+        ["/copilot", "copilot-landing-content"],
+        ["/settings", "settings-content"],
+        ["/share", "share-content"]
+    ])(
+        "renders %s through MainLayout for an authenticated visitor",
+        async (path, testid) => {
+            renderAt(path, authedUser);
+            expect(
+                await screen.findByTestId("main-layout")
+            ).toBeInTheDocument();
+            expect(await screen.findByTestId(testid)).toBeInTheDocument();
+        }
+    );
+
+    it.each(["/inbox", "/copilot", "/settings", "/share"])(
+        "redirects %s to /login for an unauthenticated visitor",
+        async (path) => {
+            renderAt(path);
+            await waitFor(() => {
+                expect(window.location.pathname).toBe("/login");
+            });
+        }
+    );
+});
+
+/**
+ * Phase 3 A2 — routed inline task panel. The new overlay route at
+ * `/projects/:projectId/board/task/:taskId` only mounts when the
+ * `REACT_APP_TASK_PANEL_ROUTED` feature flag is "true". With the flag
+ * off (the default), the board route keeps its leaf shape and the
+ * existing TaskModal handles every open. With the flag on, board
+ * becomes a layout route and the panel mounts as a child.
+ */
+describe("routed task panel registration (Phase 3 A2)", () => {
+    const originalFlag = process.env.REACT_APP_TASK_PANEL_ROUTED;
+
+    afterEach(() => {
+        if (originalFlag === undefined) {
+            delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+        } else {
+            process.env.REACT_APP_TASK_PANEL_ROUTED = originalFlag;
+        }
+        jest.resetModules();
+    });
+
+    it("keeps the board route as a leaf when the flag is off", () => {
+        delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+        jest.resetModules();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const flagOffRoutes = require(".").default;
+        const protectedBranch = flagOffRoutes[0].children?.[3];
+        const projectDetailRoute = protectedBranch?.children?.find(
+            (route: { path?: string }) => route.path === "projects/:projectId"
+        );
+        const boardRoute = projectDetailRoute?.children?.find(
+            (route: { path?: string }) => route.path === "board"
+        );
+        // No children under board — TaskModal handles task open.
+        expect(boardRoute?.children).toBeUndefined();
+    });
+
+    it("registers the task/:taskId child route when the flag is on", () => {
+        process.env.REACT_APP_TASK_PANEL_ROUTED = "true";
+        jest.resetModules();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const flagOnRoutes = require(".").default;
+        const protectedBranch = flagOnRoutes[0].children?.[3];
+        const projectDetailRoute = protectedBranch?.children?.find(
+            (route: { path?: string }) => route.path === "projects/:projectId"
+        );
+        const boardRoute = projectDetailRoute?.children?.find(
+            (route: { path?: string }) => route.path === "board"
+        );
+        // Board is now a layout — children include an index slot and
+        // the task panel route.
+        const boardChildren = boardRoute?.children ?? [];
+        expect(boardChildren).toHaveLength(2);
+        expect(
+            "index" in boardChildren[0] ? boardChildren[0].index : undefined
+        ).toBe(true);
+        expect(
+            "path" in boardChildren[1] ? boardChildren[1].path : undefined
+        ).toBe("task/:taskId");
     });
 });

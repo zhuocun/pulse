@@ -151,7 +151,45 @@ export const enSource = {
         boardCopilot: "Board Copilot",
         toggleBoardCopilot: "Enable Board Copilot features",
         language: "Language",
-        changeLanguage: "Change language"
+        changeLanguage: "Change language",
+        theme: "Theme",
+        themeLight: "Light",
+        themeDark: "Dark",
+        themeSystem: "System",
+        aiEnabled: "Board Copilot",
+        pageTitle: "Settings",
+        pageSubtitle: "Choose your theme, language, and Copilot preferences."
+    },
+    /**
+     * Bottom tab bar (Phase 3 A3). Surfaces the four primary destinations
+     * on `pointer: coarse` viewports. Labels stay short so the 25vw tab
+     * width keeps the icon + label legible without truncation.
+     */
+    nav: {
+        primaryLandmarkLabel: "Primary",
+        tabs: {
+            boards: "Boards",
+            inbox: "Inbox",
+            copilot: "Copilot",
+            profile: "Profile"
+        }
+    },
+    inbox: {
+        emptyTitle: "Your inbox is empty",
+        emptyDescription:
+            "Triage proposals, mentions, and AI activity will appear here.",
+        heading: "Inbox"
+    },
+    copilotLanding: {
+        heading: "Copilot",
+        subtitle: "Ask a question or open a brief for the current board.",
+        askTitle: "Ask Copilot",
+        askDescription: "Pose a question about your boards, tasks, or members.",
+        briefTitle: "Open Board brief",
+        briefDescription: "See a one-glance summary of the active board.",
+        aiDisabledTitle: "AI is off",
+        aiDisabledDescription:
+            "Turn on Board Copilot in Settings to use the Copilot tab."
     },
     labels: {
         members: "Members",
@@ -348,6 +386,12 @@ export const enSource = {
             "Your edits are still here. Discard them or save them as a new task to keep them.",
         discardEdits: "Discard edits"
     },
+    taskDetailPanel: {
+        confirmDiscardTitle: "Discard unsaved changes?",
+        confirmDiscardBody: "Your edits to this task will be lost.",
+        confirmDiscardOk: "Discard",
+        confirmDiscardCancel: "Keep editing"
+    },
     projectsPage: {
         title: "Projects",
         subtitle:
@@ -371,7 +415,11 @@ export const enSource = {
         register: "Sign up",
         forgotPassword: "Reset your password",
         terms: "Terms of Service",
-        projects: "Projects"
+        projects: "Projects",
+        inbox: "Inbox",
+        copilot: "Copilot",
+        settings: "Settings",
+        share: "Share to Pulse"
     },
     empty: {
         projects: {
@@ -905,6 +953,29 @@ export const enSource = {
             proposed: "Proposed"
         },
         columnFieldLabel: "Column {field}"
+    },
+    /**
+     * Web Share Target landing-page microcopy (Phase 3 A4). The page
+     * receives the share intent payload via URL params from the manifest's
+     * `share_target.action = "/share"` entry and surfaces a project +
+     * column picker so the user can drop the shared content straight onto
+     * a board. Microcopy lives here so both English and zh-CN translators
+     * can review it as a single block.
+     */
+    share: {
+        headline: "Share to Pulse",
+        summary: "Create a task from the content you shared.",
+        summaryTitle: "Title",
+        summaryText: "Text",
+        summaryUrl: "URL",
+        projectLabel: "Project",
+        columnLabel: "Column",
+        emptyTitle: "Create your first project to start sharing",
+        emptyDescription:
+            "Pulse needs at least one project before you can share content into it.",
+        nothingTitle: "Nothing to share yet",
+        nothingDescription:
+            "Open Pulse from another app's share sheet to pre-fill a task here."
     },
     swUpdate: {
         title: "New version available",

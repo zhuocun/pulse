@@ -164,7 +164,39 @@ const zhCN: Dictionary = {
         boardCopilot: "看板 Copilot",
         toggleBoardCopilot: "启用看板 Copilot 功能",
         language: "语言",
-        changeLanguage: "切换语言"
+        changeLanguage: "切换语言",
+        theme: "主题",
+        themeLight: "浅色",
+        themeDark: "深色",
+        themeSystem: "跟随系统",
+        aiEnabled: "看板 Copilot",
+        pageTitle: "设置",
+        pageSubtitle: "选择您的主题、语言和 Copilot 偏好设置。"
+    },
+    nav: {
+        primaryLandmarkLabel: "主导航",
+        tabs: {
+            boards: "看板",
+            inbox: "收件箱",
+            copilot: "Copilot",
+            profile: "我的"
+        }
+    },
+    inbox: {
+        emptyTitle: "收件箱为空",
+        emptyDescription: "整理提议、提及和 AI 活动将显示在此处。",
+        heading: "收件箱"
+    },
+    copilotLanding: {
+        heading: "Copilot",
+        subtitle: "提出问题或为当前看板打开简报。",
+        askTitle: "询问 Copilot",
+        askDescription: "针对您的看板、任务或成员提出问题。",
+        briefTitle: "打开看板简报",
+        briefDescription: "查看当前看板的一目了然摘要。",
+        aiDisabledTitle: "AI 已关闭",
+        aiDisabledDescription:
+            "请在设置中启用看板 Copilot 以使用 Copilot 选项卡。"
     },
     fields: {
         column: "列",
@@ -333,6 +365,12 @@ const zhCN: Dictionary = {
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
         discardEdits: "丢弃更改"
     },
+    taskDetailPanel: {
+        confirmDiscardTitle: "放弃未保存的更改?",
+        confirmDiscardBody: "对此任务的编辑将会丢失。",
+        confirmDiscardOk: "放弃",
+        confirmDiscardCancel: "继续编辑"
+    },
     projectsPage: {
         title: "项目",
         subtitle:
@@ -349,7 +387,11 @@ const zhCN: Dictionary = {
         register: "注册",
         forgotPassword: "重置密码",
         terms: "服务条款",
-        projects: "项目"
+        projects: "项目",
+        inbox: "收件箱",
+        copilot: "Copilot",
+        settings: "设置",
+        share: "分享到 Pulse"
     },
     empty: {
         projects: {
@@ -830,6 +872,20 @@ const zhCN: Dictionary = {
             proposed: "建议值"
         },
         columnFieldLabel: "列{field}"
+    },
+    share: {
+        headline: "分享到 Pulse",
+        summary: "根据您分享的内容创建任务。",
+        summaryTitle: "标题",
+        summaryText: "文本",
+        summaryUrl: "链接",
+        projectLabel: "项目",
+        columnLabel: "列",
+        emptyTitle: "请先创建您的第一个项目,以便开始分享内容",
+        emptyDescription: "Pulse 需要至少一个项目才能将分享内容收入其中。",
+        nothingTitle: "暂无分享内容",
+        nothingDescription:
+            "请通过其他应用的分享面板打开 Pulse,以便在此处预填任务。"
     },
     swUpdate: {
         title: "新版本可用",

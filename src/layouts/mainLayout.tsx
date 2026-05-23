@@ -1,10 +1,15 @@
 import styled from "@emotion/styled";
+import { Suspense } from "react";
 import { Outlet } from "react-router";
 
+import BottomTabBar from "../components/bottomTabBar";
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
+import { PageSpin } from "../components/status";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
 /*
  * Reads page-level theme tokens defined in App.css. AntD's own `--ant-*`
@@ -32,12 +37,24 @@ const Container = styled.div`
     min-height: 100dvh;
 `;
 
-const Main = styled.main`
+const Main = styled.main<{ $hasBottomNav: boolean }>`
     display: flex;
     flex-direction: column;
     min-height: 0;
     min-width: 0;
-    scroll-padding-top: 64px;
+    scroll-padding-top: var(--header-height, 64px);
+    /*
+     * When the bottom tab bar mounts (phone + flag on), reserve space so
+     * the fixed-position bar doesn't occlude the routed content. The
+     * 64 px figure matches the bar's 56 px touch target + 8 px top
+     * padding; safe-area-inset-bottom is added on top so iOS home
+     * indicator devices clear the gesture area. The bar itself owns the
+     * safe-area inset in its own padding-block-end so the icons stay
+     * within the visible band; this offset on the main region is the
+     * scroll-content clearance.
+     */
+    padding-bottom: ${(props) =>
+        props.$hasBottomNav ? "calc(64px + env(safe-area-inset-bottom))" : "0"};
 `;
 
 /**
@@ -84,16 +101,36 @@ const SkipLink = styled.a`
  * width down to 320px (WCAG 1.4.10).
  */
 const MainLayout = () => {
+    /*
+     * Bottom tab bar gating (Phase 3 A3). Two predicates compose:
+     *   - `environment.bottomNavEnabled` is the rollback kill-switch
+     *     (REACT_APP_BOTTOM_NAV_ENABLED=false brings back the
+     *     header-only chrome without a code revert).
+     *   - `useIsPhoneChrome()` reads `(pointer: coarse)`, the single
+     *     source of truth shared with the Header's right-cluster
+     *     demote-gate. Aligning both surfaces on the same predicate
+     *     prevents the bar/header mismatch (touchscreen laptops were
+     *     hiding the header right-cluster while refusing to mount the
+     *     bar; small-window non-touch laptops were doing the inverse).
+     */
+    const isPhoneChrome = useIsPhoneChrome();
+    const showBottomNav = environment.bottomNavEnabled && isPhoneChrome;
+
     return (
         <Container>
             <SkipLink href="#main-content">
                 {microcopy.a11y.skipToMainContent}
             </SkipLink>
             <Header />
-            <Main id="main-content" tabIndex={-1}>
-                <Outlet />
+            <Main $hasBottomNav={showBottomNav} id="main-content" tabIndex={-1}>
+                {/* Suspense lives inside the layout so the header + bottom
+                 * tab bar stay mounted while a lazy page chunk fetches. */}
+                <Suspense fallback={<PageSpin />}>
+                    <Outlet />
+                </Suspense>
             </Main>
             <ProjectModal />
+            {showBottomNav ? <BottomTabBar /> : null}
         </Container>
     );
 };

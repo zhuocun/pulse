@@ -1,12 +1,20 @@
 import { Button } from "antd";
-import { lazy, Suspense } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { lazy } from "react";
+import {
+    Navigate,
+    Outlet,
+    useLocation,
+    useNavigate,
+    useParams
+} from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
-import { PageSpin } from "../components/status";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import AuthLayout from "../layouts/authLayout";
 import MainLayout from "../layouts/mainLayout";
+import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useAuth from "../utils/hooks/useAuth";
 
 /**
@@ -28,6 +36,11 @@ const TermsPage = lazy(() => import("../pages/terms"));
 const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
+const SharePage = lazy(() => import("../pages/share"));
+const InboxPage = lazy(() => import("../pages/inbox"));
+const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
+const SettingsPage = lazy(() => import("../pages/settings"));
+const TaskDetailPanel = lazy(() => import("../components/taskDetailPanel"));
 
 /**
  * Resolves the root URL by consulting authentication once, at the route
@@ -56,8 +69,23 @@ const RootRedirect = () => {
  */
 const RequireAuth = () => {
     const { isAuthenticated } = useAuth();
+    const location = useLocation();
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        /*
+         * Forward the originally-requested location as router state so
+         * the login form can return the user to where they were
+         * heading (e.g. `/share?title=foo` from an external app's share
+         * sheet). Without this hint, every post-login navigate landed
+         * on `/projects` and dropped the share-target params on the
+         * floor.
+         */
+        return (
+            <Navigate
+                to="/login"
+                replace
+                state={{ from: location.pathname + location.search }}
+            />
+        );
     }
     return <MainLayout />;
 };
@@ -113,11 +141,66 @@ const NotFoundRoute = () => {
     );
 };
 
-const SuspenseShell = () => (
-    <Suspense fallback={<PageSpin />}>
+// Thin root shell — the Suspense boundary has been moved into the
+// layout shells (mainLayout + authLayout) so the chrome stays mounted
+// while a lazy page chunk fetches (B-M6).
+const RootShell = () => <Outlet />;
+
+/**
+ * Layout wrapper for `/projects/:projectId/board` and its sibling
+ * overlay route `/projects/:projectId/board/task/:taskId`. Renders
+ * `<BoardPage />` ALWAYS so the kanban stays mounted underneath, and
+ * the `<Outlet />` slot underneath mounts the panel when the task
+ * route matches. This is the canonical React Router 7 pattern for a
+ * "modal route" — the parent layout keeps state across children, and
+ * the child route lays the overlay on top.
+ *
+ * Only registered as a layout when `environment.taskPanelRouted` is
+ * true. When the flag is off, `board` keeps its leaf-route shape and
+ * the existing `TaskModal` overlay handles every task-open flow as
+ * today — see `routes` below.
+ */
+const BoardRouteShell = () => (
+    <>
+        <BoardPage />
         <Outlet />
-    </Suspense>
+    </>
 );
+
+/**
+ * Route-level adapter that reads `projectId` and `taskId` from the
+ * URL params and hands them to `<TaskDetailPanel />`. Kept separate
+ * from the panel component itself so the panel stays testable with
+ * direct prop wiring (the tests render it inside a `MemoryRouter`
+ * without needing to set up the params via the route shape).
+ */
+const TaskDetailPanelRoute = () => {
+    const { projectId, taskId } = useParams<{
+        projectId: string;
+        taskId: string;
+    }>();
+    // Mirror BoardPage's `boardAiOn` derivation so the routed panel
+    // gates the AI assist surface on the same signal as the modal path
+    // (B-H4). The two predicates compose: global AI toggle + per-
+    // project AI opt-out.
+    const { enabled: aiEnabled } = useAiEnabled();
+    const { disabled: aiDisabledForProject } = useAiProjectDisabled(projectId);
+    const boardAiOn = aiEnabled && !aiDisabledForProject;
+    if (!projectId || !taskId) {
+        // Defensive — the route shape guarantees both params are
+        // present, but render nothing if a future refactor breaks
+        // that contract.
+        return null;
+    }
+    return (
+        <TaskDetailPanel
+            boardAiOn={boardAiOn}
+            key={taskId}
+            projectId={projectId}
+            taskId={taskId}
+        />
+    );
+};
 
 /**
  * Single "/" match: index redirects via `RootRedirect`. Sibling branches
@@ -130,7 +213,7 @@ const SuspenseShell = () => (
 const routes = [
     {
         path: "/",
-        element: <SuspenseShell />,
+        element: <RootShell />,
         children: [
             { index: true, element: <RootRedirect /> },
             {
@@ -182,11 +265,79 @@ const routes = [
                                 index: true,
                                 element: <Navigate to="board" replace />
                             },
-                            {
-                                path: "board",
-                                element: <BoardPage />
-                            }
+                            /*
+                             * Phase 3 A2 — routed task panel. When the
+                             * flag is ON, `board` becomes a layout
+                             * route: `BoardRouteShell` always renders
+                             * `<BoardPage />` plus an `<Outlet />` slot,
+                             * the index renders nothing, and the
+                             * `task/:taskId` child mounts the
+                             * `<TaskDetailPanel />` overlay. React
+                             * Router 7 keeps the layout instance (and
+                             * thus the BoardPage mount) alive across
+                             * children, so swiping between tasks or
+                             * closing the drawer doesn't unmount the
+                             * kanban. When the flag is OFF, `board`
+                             * stays a plain leaf route — the existing
+                             * `TaskModal` overlay handles every task
+                             * open. See A2 in
+                             * `docs/design/ui-ux-comprehensive-review-
+                             * 2026-05.md`.
+                             */
+                            environment.taskPanelRouted
+                                ? {
+                                      path: "board",
+                                      element: <BoardRouteShell />,
+                                      children: [
+                                          { index: true, element: null },
+                                          {
+                                              path: "task/:taskId",
+                                              element: <TaskDetailPanelRoute />
+                                          }
+                                      ]
+                                  }
+                                : {
+                                      path: "board",
+                                      element: <BoardPage />
+                                  }
                         ]
+                    },
+                    /*
+                     * Web Share Target landing page (Phase 3 A4). Wired to
+                     * the manifest's `share_target.action = "/share"`
+                     * entry — the browser navigates here with title / text
+                     * / url URL params when an external app shares into
+                     * Pulse. Guarded by `<RequireAuth>` because the page
+                     * needs an authenticated session to fetch projects +
+                     * post the resulting task; unauthenticated visitors
+                     * follow the same `/login` redirect path as every
+                     * other protected route.
+                     */
+                    {
+                        path: "share",
+                        element: <SharePage />
+                    },
+                    /*
+                     * Bottom-tab destinations (Phase 3 A3). Inbox is the
+                     * future home of triage / mentions / AI activity (a
+                     * placeholder until A8 lands); Copilot is the no-board
+                     * landing surface that delegates to the existing chat
+                     * and brief drawers; Settings consolidates theme,
+                     * language, AI on/off, and logout in one routed page
+                     * so the phone header can drop its right-cluster
+                     * dropdown.
+                     */
+                    {
+                        path: "inbox",
+                        element: <InboxPage />
+                    },
+                    {
+                        path: "copilot",
+                        element: <CopilotLandingPage />
+                    },
+                    {
+                        path: "settings",
+                        element: <SettingsPage />
                     }
                 ]
             },
