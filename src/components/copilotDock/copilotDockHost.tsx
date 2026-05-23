@@ -14,6 +14,7 @@ import useMembersList from "../../utils/hooks/useMembersList";
 import useReactQuery from "../../utils/hooks/useReactQuery";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import AiActivityLog from "../aiActivityLog";
 
 import CopilotDock from "./index";
 
@@ -197,6 +198,7 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
         <CopilotDock
             activeTab={activeTab}
             columns={board ?? []}
+            footerSlot={<AiActivityLog />}
             initialPrompt={pendingPrompt ?? undefined}
             knownProjectIds={[projectId]}
             members={members ?? []}

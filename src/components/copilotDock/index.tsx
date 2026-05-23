@@ -38,6 +38,15 @@ export interface CopilotDockProps {
     onUndoProposal?: (proposal: MutationProposal) => void;
     onActionNudge?: (nudge: TriageNudge) => void;
     onDismissNudge?: (nudge: TriageNudge) => void;
+    /**
+     * Optional slot rendered at the bottom of the dock body, below the
+     * active tab pane. Phase 4 A8 uses this to mount the AI activity
+     * ledger pill so it stays visible across both chat + brief tabs
+     * without intruding on the input composer (which lives inside the
+     * chat tab's body). Pass `null`/omit to skip the slot — the dock
+     * still renders flush against its footer.
+     */
+    footerSlot?: React.ReactNode;
 }
 
 const CopilotDock: React.FC<CopilotDockProps> = ({
@@ -58,7 +67,8 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
     onRejectProposal,
     onUndoProposal,
     onActionNudge,
-    onDismissNudge
+    onDismissNudge,
+    footerSlot
 }) => {
     const isPhone = useIsPhoneChrome();
 
@@ -181,6 +191,27 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
                     minHeight: 0
                 }}
             />
+            {/*
+             * A8: optional footer slot for the AI activity ledger pill
+             * (or any future cross-tab footer affordance). Rendered
+             * outside the Tabs container so it stays visible across both
+             * chat + brief tabs. `flex-shrink: 0` keeps it from being
+             * squeezed out by a tall tab body, and the empty wrapper
+             * means an absent slot leaves zero markup behind (no stray
+             * padding under the tabs).
+             */}
+            {footerSlot ? (
+                <div
+                    data-testid="copilot-dock-footer-slot"
+                    style={{
+                        display: "flex",
+                        flexShrink: 0,
+                        marginTop: space.xs
+                    }}
+                >
+                    {footerSlot}
+                </div>
+            ) : null}
         </Drawer>
     );
 };
