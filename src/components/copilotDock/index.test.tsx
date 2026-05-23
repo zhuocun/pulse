@@ -1157,7 +1157,8 @@ describe("CopilotDock", () => {
                 // so we can confirm the unmount path cleared one of
                 // them (jsdom assigns monotonic numeric handles).
                 await advanceBy(5_000);
-                const clearCallsBeforeUnmount = clearTimeoutSpy.mock.calls.length;
+                const clearCallsBeforeUnmount =
+                    clearTimeoutSpy.mock.calls.length;
                 await mutateTasks(controls!, [newTask("1"), newTask("2")]);
                 expect(countRefreshes(sink)).toBe(1);
 
