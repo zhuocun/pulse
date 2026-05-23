@@ -17,6 +17,7 @@ from app.routers import health as health_router
 from app.services import (
     auth_service,
     board_service,
+    column_seed,
     project_service,
     task_service,
     user_service,
@@ -86,6 +87,7 @@ def structured_model(
 SERVICE_MODULES = [
     auth_service,
     board_service,
+    column_seed,
     project_service,
     task_service,
     user_service,

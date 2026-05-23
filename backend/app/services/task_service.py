@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
 from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
-from app.services.board_service import DEFAULT_COLUMNS
+from app.services.column_seed import DEFAULT_COLUMNS
 from app.services.project_service import is_project_manager
 from app.validation import body_error, sorted_by_index
 

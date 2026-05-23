@@ -28,4 +28,5 @@ def test_requirements_txt_covers_runtime_and_ai_dependencies() -> None:
         )
     }
 
-    assert expected <= requirements
+    assert requirements == expected
+    assert not (ROOT / "uv.lock").exists()

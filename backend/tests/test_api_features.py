@@ -146,6 +146,37 @@ def create_project_board_and_task(
     }
 
 
+def test_create_board_column_on_fresh_project_sees_default_columns(
+    client: TestClient,
+) -> None:
+    logged_in = register_and_login(client)
+    headers = auth_headers(logged_in["jwt"])
+
+    response = client.post(
+        "/api/v1/projects/",
+        json={"projectName": "Fresh", "organization": "OpenAI"},
+        headers=headers,
+    )
+    assert response.status_code == 201
+
+    project_id = client.get("/api/v1/projects/", headers=headers).json()[0]["_id"]
+    response = client.post(
+        "/api/v1/boards/",
+        json={"columnName": "Review", "projectId": project_id},
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    assert response.json() == "Column created"
+    columns = client.get(f"/api/v1/boards/?projectId={project_id}", headers=headers).json()
+    assert [column["columnName"] for column in columns] == [
+        "To Do",
+        "In Progress",
+        "Done",
+        "Review",
+    ]
+
+
 def test_full_feature_flow(client: TestClient) -> None:
     response = client.get("/health", follow_redirects=False)
     assert response.status_code == 200
@@ -747,22 +778,22 @@ def test_task_create_rejects_corrupt_story_points(client: TestClient) -> None:
         assert response.json()["error"][0]["param"] == "storyPoints"
 
 
-def test_board_create_before_default_columns_matches_express(
+def test_board_create_on_legacy_project_without_columns_seeds_defaults(
     client: TestClient,
+    store: FakeStore,
 ) -> None:
     logged_in = register_and_login(client)
     headers = auth_headers(logged_in["jwt"])
-    response = client.post(
-        "/api/v1/projects/",
-        json={
+    project_id = "legacy-no-columns"
+    store.insert_one(
+        PROJECTS,
+        {
+            "_id": project_id,
             "projectName": "No board yet",
             "organization": "OpenAI",
             "managerId": logged_in["_id"],
         },
-        headers=headers,
     )
-    assert response.status_code == 201
-    project_id = client.get("/api/v1/projects/", headers=headers).json()[0]["_id"]
 
     response = client.post(
         "/api/v1/boards/",
@@ -770,8 +801,15 @@ def test_board_create_before_default_columns_matches_express(
         headers=headers,
     )
 
-    assert response.status_code == 404
-    assert response.json() == {"error": "Project not found"}
+    assert response.status_code == 201
+    assert response.json() == "Column created"
+    columns = client.get(f"/api/v1/boards/?projectId={project_id}", headers=headers).json()
+    assert [column["columnName"] for column in columns] == [
+        "To Do",
+        "In Progress",
+        "Done",
+        "Custom",
+    ]
 
 
 def test_tasks_router_handles_non_column_service_error(

@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 
 from app.database import PROJECTS, USERS
+from app.domain.password_policy import MIN_PASSWORD_LENGTH
 from app.repositories import repository
 from app.security import encrypt_password
 from app.validation import body_error, email_error, make_validation_error
@@ -14,7 +15,6 @@ USER_UPDATE_FIELDS = frozenset({"username", "email", "password"})
 # directory cannot accidentally leak liked-project membership graphs or
 # anything new added to the schema in the future.
 _PUBLIC_MEMBER_FIELDS = ("_id", "username", "email")
-_MIN_PASSWORD_LENGTH = 5
 
 
 def get(user_id: str) -> Optional[Dict[str, Any]]:
@@ -83,12 +83,12 @@ def update_validation_errors(
             errors.append(
                 body_error(update_data, "password", "Password cannot be empty")
             )
-        elif len(password) < _MIN_PASSWORD_LENGTH:
+        elif len(password) < MIN_PASSWORD_LENGTH:
             errors.append(
                 body_error(
                     update_data,
                     "password",
-                    f"Length of password cannot be less than {_MIN_PASSWORD_LENGTH}",
+                    f"Length of password cannot be less than {MIN_PASSWORD_LENGTH}",
                 )
             )
 

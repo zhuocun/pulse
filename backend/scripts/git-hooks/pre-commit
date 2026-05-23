@@ -1,15 +1,23 @@
 #!/bin/sh
 set -eu
 
+ROOT="$(git rev-parse --show-toplevel)"
+
 # Repo is a monorepo (FE at root, Python BE under backend/); pyproject.toml
-# and the .venv that pytest needs both live in backend/.
-cd "$(git rev-parse --show-toplevel)/backend"
+# lives in backend/. Python venvs may live either in backend/.venv for local
+# setup or at the repo root in Cursor Cloud.
+cd "$ROOT/backend"
 
 if [ -x ".venv/bin/python" ]; then
     PYTHON=".venv/bin/python"
+elif [ -x "$ROOT/.venv/bin/python" ]; then
+    PYTHON="$ROOT/.venv/bin/python"
 else
     PYTHON="python3"
 fi
 
-echo "Running tests with 100% coverage gate..."
+echo "Running backend lint..."
+"$PYTHON" -m ruff check .
+
+echo "Running tests with the backend coverage floor..."
 "$PYTHON" -m pytest

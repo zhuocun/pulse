@@ -842,13 +842,16 @@ def test_default_columns_seed_exactly_once_under_repeated_get(
 
     logged_in = register_and_login(client)
     headers = auth_headers(logged_in["jwt"])
-    response = client.post(
-        "/api/v1/projects/",
-        json={"projectName": "Seed me", "organization": "OpenAI"},
-        headers=headers,
+    project_id = "legacy-seed-me"
+    store.insert_one(
+        PROJECTS,
+        {
+            "_id": project_id,
+            "projectName": "Seed me",
+            "organization": "OpenAI",
+            "managerId": logged_in["_id"],
+        },
     )
-    assert response.status_code == HTTPStatus.CREATED
-    project_id = _list_projects(client, headers)[0]["_id"]
 
     seen_lengths = []
     for _ in range(8):

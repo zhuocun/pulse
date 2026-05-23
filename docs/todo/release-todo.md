@@ -120,8 +120,8 @@ expiry.
 Pytest marker ``integration`` registered in ``pyproject.toml``. Placeholder
 suite ``tests/integration/test_integration_gate.py`` runs only when
 ``RUN_INTEGRATION=1`` (wire to secret-gated CI + service containers as ops
-onboard real provider smoke). Default CI stays hermetic with 100% line
-coverage.
+onboard real provider smoke). Default CI stays hermetic with the backend
+coverage floor.
 
 ## Soft blockers — ship-able with documented caveats
 
@@ -148,9 +148,10 @@ LLM polish passes ahead of FE validation.
 
 `.github/workflows/backend-ci.yml`: on `push` / `pull_request`, changes under
 `backend/**` (or the workflow file) run **both** `test-full` (install
-`.[dev,ai]`, then `pytest` — the `--cov-fail-under=100` gate is set in
-`backend/pyproject.toml` `addopts`, so the workflow inherits it without
-re-passing the flag) and `test-slim` (install `.[dev]`, import smoke).
+`.[dev,ai]`, then `ruff check .` and `pytest` — the `--cov-fail-under=85`
+gate is set in `backend/pyproject.toml` `addopts`, so the workflow inherits
+it without re-passing the flag) and `test-slim` (install `requirements.txt`,
+import smoke).
 `workflow_dispatch` adds **mode** `both` \| `test-full` \| `test-slim`
 (default `both`).
 

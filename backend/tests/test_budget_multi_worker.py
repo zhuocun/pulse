@@ -575,9 +575,9 @@ def test_factory_dispatch_via_settings_round_trips() -> None:
     """A simulated env-var-driven flow: pass :class:`Settings` fields to
     :func:`build_budget_backend` -- the chosen class matches.
 
-    The :class:`Settings` class reads env vars eagerly at module import,
-    so we override via ``dataclasses.replace`` instead of
-    :func:`monkeypatch.setenv` (which wouldn't re-read after import).
+    The module-level ``settings`` singleton is created at import, so we
+    override via ``dataclasses.replace`` instead of mutating process env
+    for this already-constructed instance.
     """
 
     from dataclasses import replace

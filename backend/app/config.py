@@ -1,4 +1,7 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import Field, dataclass, field
 import os
 import secrets
 
@@ -17,9 +20,6 @@ def _resolve_jwt_secret() -> str:
     """
     raw = (os.getenv("UUID") or "").strip()
     return raw if raw else secrets.token_hex(32)
-
-
-_DEFAULT_JWT_SECRET: str = _resolve_jwt_secret()
 
 
 def _env_value(name: str, default: str) -> str:
@@ -68,6 +68,41 @@ def env_csv(name: str, default: str = "") -> tuple[str, ...]:
     return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
+def _env_str_field(name: str, default: str) -> Field[str]:
+    return field(default_factory=lambda: _env_value(name, default))
+
+
+def _env_lower_str_field(name: str, default: str) -> Field[str]:
+    return field(default_factory=lambda: _env_value(name, default).strip().lower())
+
+
+def _env_bool_field(name: str, default: str = "false") -> Field[bool]:
+    return field(default_factory=lambda: env_bool(name, default))
+
+
+def _env_int_field(name: str, default: str) -> Field[int]:
+    return field(default_factory=lambda: env_int(name, default))
+
+
+def _env_positive_int_field(name: str, default: str) -> Field[int]:
+    return field(default_factory=lambda: env_positive_int(name, default))
+
+
+def _env_float_field(name: str, default: str) -> Field[float]:
+    return field(default_factory=lambda: env_float(name, default))
+
+
+def _env_csv_field(name: str, default: str = "") -> Field[tuple[str, ...]]:
+    return field(default_factory=lambda: env_csv(name, default))
+
+
+def _env_dict_field(
+    name: str,
+    parser: Callable[[str], dict[str, str]],
+) -> Field[dict[str, str]]:
+    return field(default_factory=lambda: parser(_env_value(name, "")))
+
+
 def parse_project_chat_model_map(raw: str) -> dict[str, str]:
     """Parse ``AGENT_PROJECT_CHAT_MODEL_MAP`` — comma-separated ``project_id:model_id`` segments."""
 
@@ -85,47 +120,54 @@ def parse_project_chat_model_map(raw: str) -> dict[str, str]:
 
 @dataclass(frozen=True)
 class Settings:
-    database: str = os.getenv("DATABASE", "mongoDB")
-    mongo_uri: str = os.getenv("MONGO_URI", "mongodb://localhost:27017/jira")
-    mongo_db: str = os.getenv("MONGO_DB", "jira")
+    database: str = _env_str_field("DATABASE", "mongoDB")
+    mongo_uri: str = _env_str_field("MONGO_URI", "mongodb://localhost:27017/jira")
+    mongo_db: str = _env_str_field("MONGO_DB", "jira")
     # Postgres settings retained for the *agent* checkpoint/store backends
     # (langgraph), which are independent of the application data store
     # (now Mongo-only).  ``DATABASE`` only accepts ``mongoDB`` after the
     # DDB/PG application repositories were removed; the postgres_* fields
     # below are read by ``app.agents.checkpointing``.
-    postgres_uri: str = os.getenv("POSTGRES_URI", "")
-    postgres_user: str = os.getenv("POSTGRES_USER", "")
-    postgres_host: str = os.getenv("POSTGRES_HOST", "localhost")
-    postgres_database: str = os.getenv("POSTGRES_DATABASE", "jira")
-    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "")
-    postgres_port: int = env_int("POSTGRES_PORT", "5432")
-    postgres_ssl: bool = env_bool("POSTGRES_SSL")
-    agent_postgres_uri: str = os.getenv("AGENT_POSTGRES_URI", "")
-    agent_pg_pool_size: int = env_positive_int("AGENT_PG_POOL_SIZE", "10")
-    jwt_secret: str = _DEFAULT_JWT_SECRET
-    jwt_expires_seconds: int = env_int("JWT_EXPIRES_SECONDS", "86400")
-    jwt_ai_proxy_expires_seconds: int = env_int("JWT_AI_PROXY_EXPIRES_SECONDS", "3600")
-    cors_origins: tuple[str, ...] = env_csv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,https://pulse-react-app.vercel.app",
+    postgres_uri: str = _env_str_field("POSTGRES_URI", "")
+    postgres_user: str = _env_str_field("POSTGRES_USER", "")
+    postgres_host: str = _env_str_field("POSTGRES_HOST", "localhost")
+    postgres_database: str = _env_str_field("POSTGRES_DATABASE", "jira")
+    postgres_password: str = _env_str_field("POSTGRES_PASSWORD", "")
+    postgres_port: int = _env_int_field("POSTGRES_PORT", "5432")
+    postgres_ssl: bool = _env_bool_field("POSTGRES_SSL")
+    agent_postgres_uri: str = _env_str_field("AGENT_POSTGRES_URI", "")
+    agent_pg_pool_size: int = _env_positive_int_field("AGENT_PG_POOL_SIZE", "10")
+    jwt_secret: str = field(default_factory=_resolve_jwt_secret)
+    jwt_expires_seconds: int = _env_int_field("JWT_EXPIRES_SECONDS", "86400")
+    jwt_ai_proxy_expires_seconds: int = _env_int_field(
+        "JWT_AI_PROXY_EXPIRES_SECONDS", "3600"
     )
-    cors_origin_regex: str = os.getenv(
+    cors_origins: tuple[str, ...] = _env_csv_field(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "https://pulse-react-app.vercel.app",
+    )
+    cors_origin_regex: str = _env_str_field(
         "CORS_ORIGIN_REGEX",
         r"^https://pulse-react-app(-[a-z0-9-]+)?\.vercel\.app$",
     )
-    port: int = env_int("PORT", "8000")
-    agent_checkpoint_backend: str = os.getenv("AGENT_CHECKPOINT_BACKEND", "memory")
-    agent_store_backend: str = os.getenv("AGENT_STORE_BACKEND", "memory")
-    agent_default_thread_id: str = os.getenv("AGENT_DEFAULT_THREAD_ID", "default")
-    agent_recursion_limit: int = env_positive_int("AGENT_RECURSION_LIMIT", "25")
-    agent_request_timeout_seconds: int = env_positive_int(
+    port: int = _env_int_field("PORT", "8000")
+    agent_checkpoint_backend: str = _env_str_field(
+        "AGENT_CHECKPOINT_BACKEND", "memory"
+    )
+    agent_store_backend: str = _env_str_field("AGENT_STORE_BACKEND", "memory")
+    agent_default_thread_id: str = _env_str_field("AGENT_DEFAULT_THREAD_ID", "default")
+    agent_recursion_limit: int = _env_positive_int_field(
+        "AGENT_RECURSION_LIMIT", "25"
+    )
+    agent_request_timeout_seconds: int = _env_positive_int_field(
         "AGENT_REQUEST_TIMEOUT_SECONDS", "120"
     )
-    agent_default_autonomy: str = os.getenv("AGENT_DEFAULT_AUTONOMY", "plan")
-    agent_disabled_project_ids: tuple[str, ...] = env_csv(
+    agent_default_autonomy: str = _env_str_field("AGENT_DEFAULT_AUTONOMY", "plan")
+    agent_disabled_project_ids: tuple[str, ...] = _env_csv_field(
         "AGENT_DISABLED_PROJECT_IDS"
     )
-    agent_budget_monthly_token_cap: int = env_positive_int(
+    agent_budget_monthly_token_cap: int = _env_positive_int_field(
         "AGENT_BUDGET_MONTHLY_TOKEN_CAP", "1000000"
     )
     # Selects the rate-limit / budget / idempotency backend. ``memory``
@@ -134,20 +176,22 @@ class Settings:
     # in ``app/middleware/redis_backends.py`` so multi-worker /
     # serverless deploys enforce a single org-wide cap and dedup state
     # rather than ``workers x``.
-    rate_limit_backend: str = os.getenv("RATE_LIMIT_BACKEND", "memory")
-    budget_backend: str = os.getenv("BUDGET_BACKEND", "memory")
-    idempotency_backend: str = os.getenv("IDEMPOTENCY_BACKEND", "memory")
-    idempotency_ttl_seconds: int = env_positive_int(
+    rate_limit_backend: str = _env_str_field("RATE_LIMIT_BACKEND", "memory")
+    budget_backend: str = _env_str_field("BUDGET_BACKEND", "memory")
+    idempotency_backend: str = _env_str_field("IDEMPOTENCY_BACKEND", "memory")
+    idempotency_ttl_seconds: int = _env_positive_int_field(
         "IDEMPOTENCY_TTL_SECONDS", "86400"
     )
-    redis_uri: str = os.getenv("REDIS_URI", "")
-    agent_chat_model_provider: str = os.getenv("AGENT_CHAT_MODEL_PROVIDER", "auto")
+    redis_uri: str = _env_str_field("REDIS_URI", "")
+    agent_chat_model_provider: str = _env_str_field(
+        "AGENT_CHAT_MODEL_PROVIDER", "auto"
+    )
     # none | auto — auto enables a second provider when credentials exist.
-    agent_chat_model_failover: str = os.getenv(
+    agent_chat_model_failover: str = _env_lower_str_field(
         "AGENT_CHAT_MODEL_FAILOVER", "auto"
-    ).strip().lower()
-    agent_chat_model_id: str = os.getenv("AGENT_CHAT_MODEL_ID", "")
-    agent_chat_model_temperature: float = env_float(
+    )
+    agent_chat_model_id: str = _env_str_field("AGENT_CHAT_MODEL_ID", "")
+    agent_chat_model_temperature: float = _env_float_field(
         "AGENT_CHAT_MODEL_TEMPERATURE", "0.2"
     )
     agent_chat_model_max_retries: int = field(
@@ -162,42 +206,41 @@ class Settings:
     # When non-empty, only ids in this list are accepted; any other value
     # surfaces as a 400 ``unsupported_chat_model`` error.  This is the
     # whitelist that makes per-request model routing safe in production.
-    agent_chat_model_allowlist: tuple[str, ...] = env_csv(
+    agent_chat_model_allowlist: tuple[str, ...] = _env_csv_field(
         "AGENT_CHAT_MODEL_ALLOWLIST", ""
     )
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    anthropic_api_key: str = _env_str_field("ANTHROPIC_API_KEY", "")
+    openai_api_key: str = _env_str_field("OPENAI_API_KEY", "")
     # Embeddings provider. Selection mirrors AGENT_CHAT_MODEL_PROVIDER.
     # ``auto`` picks OpenAI if OPENAI_API_KEY is set (Anthropic has no
     # embeddings API), and the deterministic SHA-256 stub otherwise.
     # Explicit values (``openai`` / ``stub``) skip the auto-detect.
-    embeddings_provider: str = os.getenv("EMBEDDINGS_PROVIDER", "auto")
-    embeddings_model_id: str = os.getenv("EMBEDDINGS_MODEL_ID", "")
+    embeddings_provider: str = _env_str_field("EMBEDDINGS_PROVIDER", "auto")
+    embeddings_model_id: str = _env_str_field("EMBEDDINGS_MODEL_ID", "")
     # Production should set 512+ for real semantic quality; stub ignores this.
-    embeddings_dimensions: int = env_int("EMBEDDINGS_DIMENSIONS", "16")
-    langsmith_tracing: bool = env_bool("LANGSMITH_TRACING")
-    langsmith_project: str = os.getenv("LANGSMITH_PROJECT", "")
+    embeddings_dimensions: int = _env_int_field("EMBEDDINGS_DIMENSIONS", "16")
+    langsmith_tracing: bool = _env_bool_field("LANGSMITH_TRACING")
+    langsmith_project: str = _env_str_field("LANGSMITH_PROJECT", "")
     # Vendor-neutral observability (OpenTelemetry + Prometheus). Both
     # are opt-in so the dev / test paths and slim installs without the
     # ``[observability]`` extra stay free of the dependency cost.
     # ``OTEL_EXPORTER_OTLP_ENDPOINT`` empty falls back to
     # ``ConsoleSpanExporter`` -- useful for local dev without a
     # collector running.
-    otel_tracing: bool = env_bool("OTEL_TRACING")
-    otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "pulse-server")
-    otel_exporter_otlp_endpoint: str = os.getenv(
+    otel_tracing: bool = _env_bool_field("OTEL_TRACING")
+    otel_service_name: str = _env_str_field("OTEL_SERVICE_NAME", "pulse-server")
+    otel_exporter_otlp_endpoint: str = _env_str_field(
         "OTEL_EXPORTER_OTLP_ENDPOINT", ""
     )
-    prometheus_metrics: bool = env_bool("PROMETHEUS_METRICS")
+    prometheus_metrics: bool = _env_bool_field("PROMETHEUS_METRICS")
     # When true with Postgres + pgvector, neighbours augment estimation/search.
-    agent_vector_search_enabled: bool = env_bool("AGENT_VECTOR_SEARCH_ENABLED")
-    agent_vector_dimensions: int = env_int("AGENT_VECTOR_DIMENSIONS", "16")
+    agent_vector_search_enabled: bool = _env_bool_field("AGENT_VECTOR_SEARCH_ENABLED")
+    agent_vector_dimensions: int = _env_int_field("AGENT_VECTOR_DIMENSIONS", "16")
     # ``project_id:model_id`` pairs; model ids must also appear in
     # ``AGENT_CHAT_MODEL_ALLOWLIST`` when that allowlist is non-empty.
-    agent_project_chat_model_map: dict[str, str] = field(
-        default_factory=lambda: parse_project_chat_model_map(
-            _env_value("AGENT_PROJECT_CHAT_MODEL_MAP", "")
-        )
+    agent_project_chat_model_map: dict[str, str] = _env_dict_field(
+        "AGENT_PROJECT_CHAT_MODEL_MAP",
+        parse_project_chat_model_map,
     )
 
 

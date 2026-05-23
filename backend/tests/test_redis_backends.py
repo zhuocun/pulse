@@ -3,7 +3,7 @@ the lifespan factory that selects them.
 
 Uses :mod:`fakeredis` as a drop-in replacement for the real ``redis``
 client (Lua scripts, sorted sets, scan, expire all work) so the test
-suite stays hermetic and the 100% coverage gate keeps passing without
+suite stays hermetic and the coverage floor keeps passing without
 a live Redis. The same Lua scripts run against both fakeredis and a
 real Redis Server, so a green test here is meaningful evidence that
 production will behave identically.

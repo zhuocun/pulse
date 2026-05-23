@@ -323,6 +323,7 @@ def _dispatch_tool_calls(state: ChatState) -> dict[str, Any]:
                 )
                 return {
                     "messages": [
+                        *tool_messages,
                         AIMessage(
                             content=(
                                 "I could not turn that into a safe board-change "
@@ -340,6 +341,7 @@ def _dispatch_tool_calls(state: ChatState) -> dict[str, Any]:
             )
             record_agent_mutation_event("proposal_emitted")
             return {
+                "messages": tool_messages,
                 "events": [event],
                 "mutation_pending": proposal_dict,
                 "mutation_decision": None,

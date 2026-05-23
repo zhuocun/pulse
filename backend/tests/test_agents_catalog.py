@@ -81,6 +81,24 @@ def _drive(
     return asyncio.run(run())
 
 
+def _first_interrupt(
+    graph: Any,
+    inputs: dict[str, Any],
+    *,
+    context: dict[str, Any],
+    thread_id: str,
+) -> dict[str, Any]:
+    cfg = {"configurable": {"thread_id": thread_id}}
+
+    async def run() -> dict[str, Any]:
+        return await graph.ainvoke(inputs, config=cfg, context=context)
+
+    result = asyncio.run(run())
+    interrupts = result.get("__interrupt__") or []
+    assert interrupts
+    return interrupts[0].value
+
+
 # ---------------------------------------------------------------------------
 # discovery / registration
 # ---------------------------------------------------------------------------
@@ -138,6 +156,22 @@ def test_board_brief_runs_end_to_end() -> None:
     assert isinstance(brief["workload"], list)
     assert brief["recommendation"]
     assert any(message.content for message in final["messages"])
+
+
+def test_board_brief_interrupt_uses_context_project_id() -> None:
+    agent = global_registry.get("board-brief-agent")
+    checkpointer, store = _persistence()
+    graph = agent.compile(checkpointer=checkpointer, store=store)
+
+    assert _first_interrupt(
+        graph,
+        {},
+        context={"project_id": "p-from-context"},
+        thread_id="brief-context-project",
+    ) == {
+        "tool": "fe.boardSnapshot",
+        "args": {"project_id": "p-from-context"},
+    }
 
 
 def test_board_brief_message_includes_recommendation_detail() -> None:
@@ -317,6 +351,25 @@ def test_task_estimation_runs_with_neighbours() -> None:
     assert any(i["field"] == "coordinatorId" for i in final["readiness"]["issues"])
     payload = json.loads(final["messages"][-1].content)
     assert "estimate" in payload and "readiness" in payload
+
+
+def test_task_estimation_similar_interrupt_uses_context_project_id() -> None:
+    agent = global_registry.get("task-estimation-agent")
+    checkpointer, store = _persistence()
+    graph = agent.compile(checkpointer=checkpointer, store=store)
+
+    assert _first_interrupt(
+        graph,
+        {"task_draft": {"taskName": "implement signup", "note": "needs tests"}},
+        context={"project_id": "p-from-context"},
+        thread_id="est-context-project",
+    ) == {
+        "tool": "fe.similarTasks",
+        "args": {
+            "project_id": "p-from-context",
+            "query": "implement signup",
+        },
+    }
 
 
 def test_task_estimation_unwraps_similar_envelope() -> None:

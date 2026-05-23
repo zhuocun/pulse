@@ -69,8 +69,7 @@ WORKDIR /app
 # Copy the prebuilt venv from the builder stage.
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy application source. Tests/docs/CI artifacts are excluded via
-# .dockerignore (see repo root) so they don't bloat the image.
+# Copy only application source so tests/docs/CI artifacts stay out of the image.
 COPY app ./app
 
 RUN chown -R app:app /app

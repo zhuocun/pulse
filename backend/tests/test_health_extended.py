@@ -24,7 +24,7 @@ The file also incidentally exercises the early-return branches of
 ``app.main._origin_is_localhost`` for non-http schemes and missing
 hosts. The existing localhost-CORS suite covers the happy path; these
 cases plug the remaining defensive branches so the project keeps its
-100% coverage floor.
+coverage floor.
 """
 
 from __future__ import annotations

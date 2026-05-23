@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
 from app.repositories import repository
+from app.services.column_seed import ensure_default_columns
 from app.validation import clean_filter
 
 # Fields a manager may update via PUT /projects. ``_id`` is keyed
@@ -21,7 +22,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     # the caller for the request to succeed, so the field was attack
     # surface with no upside. We now derive the manager from the JWT
     # subject, eliminating an entire class of confused-deputy bugs.
-    repository.insert_one(
+    project_id = repository.insert_one(
         PROJECTS,
         {
             "projectName": data["projectName"],
@@ -29,6 +30,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             "managerId": user_id,
         },
     )
+    ensure_default_columns(str(project_id))
     return "Project created"
 
 

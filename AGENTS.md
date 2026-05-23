@@ -65,9 +65,9 @@ concrete rule plus the canonical anchor that demonstrates it.
   candidate dep has one call site, inline (lodash `isEqual` → inlined
   `shallowEqual` in `taskModal/index.tsx` is the model).
 - **Configuration coherence** — One source per concern. Node version in
-  `.nvmrc` only (not `.node-version` + `engines.node` + `.nvmrc`). Pick
-  `pyproject.toml` *or* `requirements.txt` *or* `uv.lock` — three sources
-  of truth means three places to drift.
+  `.nvmrc` only (not `.node-version` + `engines.node` + `.nvmrc`). Backend
+  keeps `pyproject.toml` canonical and mirrors production runtime deps in
+  `requirements.txt`; do not add `uv.lock` as a third source.
 - **Doc–code coherence** — When you delete code, update every doc that
   names it **in the same PR**. A `✅ Resolved` entry linking to files
   that no longer exist is worse than the deletion. Tracking files
