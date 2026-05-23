@@ -3,9 +3,10 @@ import { Button, Space, Table, Tag, Typography } from "antd";
 import React, { useEffect, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import type { MutationProposal, TaskUpdate } from "../../interfaces/agent";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import useAiLedger from "../../utils/hooks/useAiLedger";
 
 /**
  * Mutation preview card (PRD v3 §10.1, §7.4, C-R9). Renders the proposed
@@ -192,6 +193,17 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     title
 }) => {
     const rows = buildRows(proposal);
+    /*
+     * A8 activity ledger: each accepted proposal lands in the session
+     * log. When the proposal is `undoable` AND the surface wired a
+     * `onUndo` callback we forward that as the ledger's undo so the
+     * Revert button delegates to the same backend reversal path. When
+     * `onUndo` isn't wired (current production state — the BE reversal
+     * endpoint is still a GA blocker) we log the entry without an undo
+     * — the Revert button is hidden but the entry remains visible for
+     * traceability.
+     */
+    const aiLedger = useAiLedger();
 
     /**
      * Three-phase lifecycle for the 10-second undo window:
@@ -213,11 +225,23 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 risk: proposal.risk
             });
             onAccept();
+            aiLedger.record({
+                description: microcopyString(
+                    microcopy.aiActivityLog.descriptions.mutationProposalApplied
+                ).replace("{description}", proposal.description),
+                surface: "mutation-proposal",
+                undo:
+                    proposal.undoable === true && typeof onUndo === "function"
+                        ? () => {
+                              onUndo();
+                          }
+                        : undefined
+            });
             return;
         }
         const id = window.setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => window.clearTimeout(id);
-    }, [phase, countdown, onAccept, proposal]);
+    }, [phase, countdown, onAccept, proposal, onUndo, aiLedger]);
 
     const handleAccept = () => {
         setPhase("countdown");

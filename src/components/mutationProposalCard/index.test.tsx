@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
+import { Provider } from "react-redux";
 
 import {
     ANALYTICS_EVENTS,
@@ -8,6 +9,9 @@ import {
 } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { MutationProposal } from "../../interfaces/agent";
+import { store } from "../../store";
+import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
+import { __resetAiLedgerUndoCallbacksForTests } from "../../utils/hooks/useAiLedger";
 
 import MutationProposalCard from ".";
 
@@ -44,6 +48,18 @@ const baseProposal: MutationProposal = {
     }
 };
 
+/*
+ * Wrap MutationProposalCard renders in a Redux Provider so the embedded
+ * `useAiLedger` hook (A8) has a store to read from. Tests that need to
+ * inspect ledger entries call `getLedgerEntries()`.
+ */
+const renderCard = (props: React.ComponentProps<typeof MutationProposalCard>) =>
+    render(
+        <Provider store={store}>
+            <MutationProposalCard {...props} />
+        </Provider>
+    );
+
 describe("MutationProposalCard", () => {
     let sink: jest.MockedFunction<AnalyticsSink>;
     let restoreSink: AnalyticsSink;
@@ -51,20 +67,22 @@ describe("MutationProposalCard", () => {
     beforeEach(() => {
         sink = jest.fn();
         restoreSink = setAnalyticsSink(sink);
+        store.dispatch(aiLedgerActions.clearAiLedger());
+        __resetAiLedgerUndoCallbacksForTests();
     });
 
     afterEach(() => {
         setAnalyticsSink(restoreSink);
+        store.dispatch(aiLedgerActions.clearAiLedger());
+        __resetAiLedgerUndoCallbacksForTests();
     });
 
     it("renders the diff plus accept/reject without an Undo CTA when no onUndo is provided", () => {
-        render(
-            <MutationProposalCard
-                onAccept={jest.fn()}
-                onReject={jest.fn()}
-                proposal={baseProposal}
-            />
-        );
+        renderCard({
+            onAccept: jest.fn(),
+            onReject: jest.fn(),
+            proposal: baseProposal
+        });
         expect(
             screen.getByText(/Reassign two unowned bugs/)
         ).toBeInTheDocument();
@@ -77,14 +95,12 @@ describe("MutationProposalCard", () => {
     });
 
     it("does NOT render the post-commit Undo button in the idle phase (the footer hint promises it AFTER accept — Bug 2)", () => {
-        render(
-            <MutationProposalCard
-                onAccept={jest.fn()}
-                onReject={jest.fn()}
-                onUndo={jest.fn()}
-                proposal={baseProposal}
-            />
-        );
+        renderCard({
+            onAccept: jest.fn(),
+            onReject: jest.fn(),
+            onUndo: jest.fn(),
+            proposal: baseProposal
+        });
 
         // In the idle phase the only buttons are Cancel + Apply. The
         // post-commit Undo CTA waits for the user to actually accept.
@@ -103,14 +119,12 @@ describe("MutationProposalCard", () => {
         try {
             const onUndo = jest.fn();
             const onAccept = jest.fn();
-            render(
-                <MutationProposalCard
-                    onAccept={onAccept}
-                    onReject={jest.fn()}
-                    onUndo={onUndo}
-                    proposal={baseProposal}
-                />
-            );
+            renderCard({
+                onAccept,
+                onReject: jest.fn(),
+                onUndo,
+                proposal: baseProposal
+            });
 
             // The Undo button is NOT visible while the card is idle.
             expect(
@@ -167,14 +181,12 @@ describe("MutationProposalCard", () => {
                 // contract without fighting the literal `true` type.
                 undoable: false as unknown as true
             };
-            render(
-                <MutationProposalCard
-                    onAccept={jest.fn()}
-                    onReject={jest.fn()}
-                    onUndo={jest.fn()}
-                    proposal={proposal}
-                />
-            );
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                onUndo: jest.fn(),
+                proposal
+            });
             // Idle phase: no Undo affordance.
             expect(
                 screen.queryByRole("button", { name: /Undo this proposal/i })
@@ -197,15 +209,71 @@ describe("MutationProposalCard", () => {
     });
 
     it("has no axe-detectable a11y violations in the idle phase (Cancel/Apply + footer hint)", async () => {
-        const { container } = render(
-            <MutationProposalCard
-                onAccept={jest.fn()}
-                onReject={jest.fn()}
-                onUndo={jest.fn()}
-                proposal={baseProposal}
-            />
-        );
+        const { container } = renderCard({
+            onAccept: jest.fn(),
+            onReject: jest.fn(),
+            onUndo: jest.fn(),
+            proposal: baseProposal
+        });
         const results = await axe(container);
         expect(results).toHaveNoViolations();
+    });
+
+    it("records an activity-ledger entry tagged 'mutation-proposal' after the countdown completes (A8)", () => {
+        jest.useFakeTimers();
+        try {
+            const onAccept = jest.fn();
+            const onUndo = jest.fn();
+            renderCard({
+                onAccept,
+                onReject: jest.fn(),
+                onUndo,
+                proposal: baseProposal
+            });
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            );
+            flushAcceptCountdown();
+            const entries = store.getState().aiLedger.entries;
+            expect(entries).toHaveLength(1);
+            expect(entries[0].surface).toBe("mutation-proposal");
+            expect(entries[0].description).toContain(
+                "Reassign two unowned bugs"
+            );
+            // onUndo is wired and the proposal is undoable, so the entry
+            // is recorded with a live undo closure.
+            expect(entries[0].undoable).toBe(true);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it("logs the ledger entry without an undo when the proposal isn't undoable (Revert button hidden)", () => {
+        jest.useFakeTimers();
+        try {
+            const proposal = {
+                ...baseProposal,
+                undoable: false as unknown as true
+            };
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                onUndo: jest.fn(),
+                proposal
+            });
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            );
+            flushAcceptCountdown();
+            const entries = store.getState().aiLedger.entries;
+            expect(entries).toHaveLength(1);
+            expect(entries[0].undoable).toBe(false);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
