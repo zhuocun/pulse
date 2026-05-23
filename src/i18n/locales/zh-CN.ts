@@ -303,7 +303,7 @@ const zhCN: Dictionary = {
         todayTooltip: "今天到期的任务",
         thisWeekTooltip: "本周内（周一至周日）到期的任务",
         mineTooltip: "你作为协调人的任务",
-        atRiskTooltip: "AI 标记为可能延误的任务",
+        atRiskTooltip: "AI 标记为高或中风险的任务",
         comingSoonBadge: "敬请期待"
     },
     confirm: {
