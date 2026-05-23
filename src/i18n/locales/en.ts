@@ -392,6 +392,14 @@ export const enSource = {
         confirmDiscardOk: "Discard",
         confirmDiscardCancel: "Keep editing"
     },
+    copilotDock: {
+        title: "Copilot",
+        ariaLabel: "Copilot dock",
+        closeLabel: "Close Copilot",
+        tabChat: "Chat",
+        tabBrief: "Brief",
+        tabListLabel: "Copilot surfaces"
+    },
     projectsPage: {
         title: "Projects",
         subtitle:
