@@ -100,6 +100,29 @@ const buildScrollHost = ({
         configurable: true,
         get: () => 0
     });
+    /*
+     * Reviewer follow-up (PR #309): the production measurement path
+     * now uses `getBoundingClientRect()` rather than `offsetLeft /
+     * offsetWidth` so a dnd-positioned column clone reports the same
+     * geometry as a statically-laid-out one. Synthesize the host's
+     * rect to match the offset/scroll/client triple — the container
+     * itself sits at the document origin in jsdom, so the rect's left
+     * is always 0 and its width matches the visible client width.
+     */
+    host.getBoundingClientRect = () =>
+        ({
+            x: 0,
+            y: 0,
+            left: 0,
+            top: 0,
+            right: clientWidth,
+            bottom: 0,
+            width: clientWidth,
+            height: 0,
+            toJSON() {
+                return this;
+            }
+        }) as DOMRect;
 
     columns.forEach((col, i) => {
         const colEl = document.createElement("div");
@@ -112,6 +135,34 @@ const buildScrollHost = ({
             configurable: true,
             get: () => columnWidth
         });
+        // The production measurement reads `getBoundingClientRect`
+        // and subtracts the container's rect + adds `scrollLeft`. The
+        // host's rect.left is 0, so the column's rect.left must be
+        // `(i * columnWidth) - host.scrollLeft` for the math to land
+        // on the same scroll-content-coordinate the offsetLeft path
+        // produced. We make the rect reflect the column's position
+        // RELATIVE TO THE VIEWPORT, not the scroll content, since
+        // that's what a real browser returns — the production code
+        // adds `container.scrollLeft` back to recover the content
+        // coordinate.
+        colEl.getBoundingClientRect = () => {
+            const scrollLeftValue = (host as unknown as { scrollLeft: number })
+                .scrollLeft;
+            const leftRelativeToViewport = i * columnWidth - scrollLeftValue;
+            return {
+                x: leftRelativeToViewport,
+                y: 0,
+                left: leftRelativeToViewport,
+                top: 0,
+                right: leftRelativeToViewport + columnWidth,
+                bottom: 0,
+                width: columnWidth,
+                height: 0,
+                toJSON() {
+                    return this;
+                }
+            } as DOMRect;
+        };
         host.appendChild(colEl);
     });
 
@@ -358,11 +409,30 @@ describe("BoardMinimap", () => {
             screen.getByTestId("board-minimap-segment-col-3")
         ).toHaveAttribute("data-in-view", "false");
 
-        // Scroll to 600 → viewport [600, 1000) → cols 4 + 5 in view.
-        act(() => {
-            host.scrollLeft = 600;
-            host.dispatchEvent(new Event("scroll"));
-        });
+        /*
+         * Reviewer follow-up (PR #309): the scroll handler now defers
+         * its state write to the next `requestAnimationFrame` so a
+         * fling scroll only re-renders the minimap once per frame
+         * instead of on every native scroll tick. We stub rAF to call
+         * the callback synchronously for the assertion window so the
+         * test still observes the post-scroll state without polling
+         * a real timer. The stub is restored at the end of the act
+         * block so subsequent tests see the default jsdom rAF.
+         */
+        const rafSpy = jest
+            .spyOn(window, "requestAnimationFrame")
+            .mockImplementation((cb: FrameRequestCallback): number => {
+                cb(0);
+                return 0;
+            });
+        try {
+            act(() => {
+                host.scrollLeft = 600;
+                host.dispatchEvent(new Event("scroll"));
+            });
+        } finally {
+            rafSpy.mockRestore();
+        }
 
         expect(
             screen.getByTestId("board-minimap-segment-col-1")
@@ -424,5 +494,71 @@ describe("BoardMinimap", () => {
         expect(
             screen.getByTestId("board-minimap-segment-col-3")
         ).not.toHaveAttribute("aria-current");
+    });
+
+    /*
+     * Reviewer follow-up (PR #309): the scroll handler routes its
+     * `setViewport` write through `requestAnimationFrame` so a fling
+     * scroll firing 120 native events/second collapses to one render
+     * per frame instead of one render per tick. The contract here is
+     * "the scroll listener schedules a rAF" — we count the rAF
+     * invocations across a burst of scroll events. Any future
+     * refactor that drops the batching would call the listener
+     * synchronously and the spy count would stay at 0.
+     */
+    it("batches native scroll events through requestAnimationFrame (PR #309 follow-up)", () => {
+        const columns = buildColumns(5);
+        const { ref, host } = buildScrollHost({
+            columns,
+            scrollLeft: 0,
+            clientWidth: 400,
+            columnWidth: 200,
+            scrollWidth: 1000
+        });
+        ref.current = host;
+
+        const rafSpy = jest
+            .spyOn(window, "requestAnimationFrame")
+            .mockImplementation((cb: FrameRequestCallback): number => {
+                cb(0);
+                return 1;
+            });
+        const cancelSpy = jest
+            .spyOn(window, "cancelAnimationFrame")
+            .mockImplementation(() => {});
+
+        try {
+            render(
+                <BoardMinimap
+                    columns={columns}
+                    scrollContainerRef={
+                        ref as unknown as React.RefObject<HTMLElement>
+                    }
+                />
+            );
+
+            // Mount-time write happens synchronously (via applyUpdate),
+            // so the rAF counter starts at zero. Now fire a burst of
+            // scroll events and assert each one routes through rAF.
+            rafSpy.mockClear();
+            cancelSpy.mockClear();
+            act(() => {
+                for (let i = 0; i < 5; i += 1) {
+                    host.scrollLeft = i * 100;
+                    host.dispatchEvent(new Event("scroll"));
+                }
+            });
+
+            // Each scroll event scheduled a rAF; the cancel spy
+            // dropped the prior frame's pending callback so only the
+            // newest tick lands. That's the batching contract — five
+            // events, five rAF schedules, four cancels of the prior
+            // pending frame.
+            expect(rafSpy).toHaveBeenCalledTimes(5);
+            expect(cancelSpy).toHaveBeenCalledTimes(4);
+        } finally {
+            rafSpy.mockRestore();
+            cancelSpy.mockRestore();
+        }
     });
 });

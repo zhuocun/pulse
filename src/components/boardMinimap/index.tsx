@@ -40,7 +40,13 @@
  */
 
 import styled from "@emotion/styled";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState
+} from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
@@ -118,6 +124,24 @@ const MinimapNav = styled.nav`
     @media (max-width: ${breakpoints.sm - 1}px) {
         display: none;
     }
+
+    /* Coarse-pointer escape hatch (PR #309 follow-up): each segment
+     * carries a 44 px floor so dense boards (8+ columns) overflow the
+     * strip width. Replace the desktop overflow: hidden with
+     * horizontal scrolling so the user can pan to reach off-strip
+     * segments rather than losing them entirely. We mask the
+     * scrollbar (no visible thumb) because the minimap is decorative
+     * chrome — a visible scrollbar inside a 32 px band would itself
+     * eat the touch target. */
+    @media (pointer: coarse) {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
 `;
 
 /**
@@ -166,10 +190,27 @@ const MinimapSegment = styled.button<{ $inView: boolean }>`
     }
 
     /* Coarse-pointer touch lift (WCAG 2.5.5). The visual segment stays
-     * 28 px tall (the strip's 32 px minus 2×2 px inner padding); the
+     * 28 px tall (the strip 32 px minus 2x2 px inner padding); the
      * 44 px touch target is achieved with absolute-positioned
-     * extension above and below the visual strip. */
+     * extension above and below the visual strip.
+     *
+     * Reviewer follow-up (PR #309): the ::after extender only lifted
+     * the vertical hit area. On dense boards (8+ columns x narrow
+     * viewport) each proportional segment can fall well below the WCAG
+     * 44 px horizontal minimum — a 320 px strip / 8 columns = 40 px per
+     * segment before gaps, and a 12-column board collapses to ~27 px
+     * each. Add min-width: 44px so every segment hits the WCAG
+     * floor regardless of column count. The visual trade-off is real:
+     * once 8 x 44 = 352 px exceeds the available width, the
+     * proportional flex strip overflows and the strip becomes
+     * horizontally scrollable mini-segments. We accept that trade —
+     * mis-tapped segments would scroll the user to the wrong column,
+     * which is a far worse outcome than a scrollable minimap on dense
+     * boards. The fine-pointer path is unaffected (no min-width on
+     * desktop), so the visual rhythm stays intact for mouse users. */
     @media (pointer: coarse) {
+        min-width: 44px;
+
         &::after {
             content: "";
             position: absolute;
@@ -221,32 +262,71 @@ const useScrollViewport = (
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        const update = () => {
+        /*
+         * Reviewer follow-up (PR #309): the previous handler called
+         * `setViewport` synchronously from the native scroll event,
+         * which fires on every compositor tick during a fling scroll
+         * (~120 Hz on modern displays) and re-rendered the entire
+         * minimap each time. Wrap the state write in
+         * `requestAnimationFrame` so coalescing collapses the burst
+         * to one render per frame. We also drop any in-flight rAF
+         * before scheduling a new one so the ref's last queued read
+         * always wins — running an older `update` after the latest
+         * tick would paint a stale `scrollLeft` for one frame.
+         *
+         * The non-scroll callers (`update()` on mount, resize, and
+         * ResizeObserver) still call the synchronous `applyUpdate`
+         * because those don't fire often enough to need batching and
+         * keeping them synchronous lets the first paint reflect the
+         * real viewport on mount.
+         */
+        let rafHandle: number | null = null;
+        const applyUpdate = () => {
             setViewport({
                 scrollLeft: el.scrollLeft,
                 clientWidth: el.clientWidth
             });
         };
-        update();
-        el.addEventListener("scroll", update, { passive: true });
+        const scheduleUpdate = () => {
+            if (typeof window === "undefined") {
+                applyUpdate();
+                return;
+            }
+            if (typeof window.requestAnimationFrame !== "function") {
+                applyUpdate();
+                return;
+            }
+            if (rafHandle !== null) {
+                window.cancelAnimationFrame(rafHandle);
+            }
+            rafHandle = window.requestAnimationFrame(() => {
+                rafHandle = null;
+                applyUpdate();
+            });
+        };
+        applyUpdate();
+        el.addEventListener("scroll", scheduleUpdate, { passive: true });
         // ResizeObserver fires when the viewport width changes (e.g.
         // rotation, drawer open) so the in-view set re-computes
         // without a manual resize handler.
         const ro =
             typeof window !== "undefined" &&
             typeof window.ResizeObserver === "function"
-                ? new window.ResizeObserver(update)
+                ? new window.ResizeObserver(applyUpdate)
                 : null;
         if (ro) ro.observe(el);
         // Also reflect window resizes for environments where the
         // container's own ResizeObserver doesn't fire (some legacy
         // browsers when the container's dimensions are derived
         // entirely from window-scaled flex parents).
-        window.addEventListener("resize", update);
+        window.addEventListener("resize", applyUpdate);
         return () => {
-            el.removeEventListener("scroll", update);
-            window.removeEventListener("resize", update);
+            el.removeEventListener("scroll", scheduleUpdate);
+            window.removeEventListener("resize", applyUpdate);
             if (ro) ro.disconnect();
+            if (rafHandle !== null && typeof window !== "undefined") {
+                window.cancelAnimationFrame(rafHandle);
+            }
         };
     }, [ref]);
 
@@ -293,14 +373,36 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
      *     paint an empty <nav> on a board with zero columns (the
      *     EmptyState surface owns that experience).
      */
-    if (columns.length === 0 || columns.length < minColumnsToShow) return null;
+    const shouldRender =
+        columns.length > 0 && columns.length >= minColumnsToShow;
 
-    // Re-measure every column's offset against the scroll container
-    // on each render. The reads are O(N) and synchronous; with N ≤ 30
-    // columns (well above realistic boards) the work is unmeasurable
-    // on every machine the app supports.
-    const container = scrollContainerRef.current;
-    if (container) {
+    /*
+     * Reviewer follow-up (PR #309): the previous render path mutated
+     * `measurementsRef.current` synchronously during render, which is
+     * a Strict-Mode hazard and produced one extra render every time
+     * the cached map was rebuilt. Re-measure inside a layout effect
+     * keyed on `[columns, viewport]` so the read runs after commit
+     * (giving the DOM a chance to settle from any sibling layout)
+     * but before paint (so the in-view highlight reflects the new
+     * measurements in the same frame as the scroll/viewport change).
+     *
+     * We also use `getBoundingClientRect` instead of `offsetLeft /
+     * offsetWidth`. The previous offset-parent math broke when a dnd
+     * library wrapped the column in an absolutely-positioned clone
+     * mid-drag: the clone's offsetParent was no longer the container,
+     * so `el.offsetLeft - container.offsetLeft` returned a negative
+     * delta and the minimap painted every column as "out of view".
+     * `getBoundingClientRect` is layout-engine-canonical and works
+     * regardless of the column's containing block. We add
+     * `container.scrollLeft` back so the resulting `left` is in the
+     * container's scroll-content coordinate space — the same space
+     * the viewport's `scrollLeft` lives in.
+     */
+    useLayoutEffect(() => {
+        if (!shouldRender) return;
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const containerRect = container.getBoundingClientRect();
         const next = new Map<
             string,
             { left: number; right: number; width: number }
@@ -308,12 +410,15 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
         for (const column of columns) {
             const el = findColumnElement(container, column.id);
             if (!el) continue;
-            const left = el.offsetLeft - container.offsetLeft;
-            const width = el.offsetWidth;
+            const rect = el.getBoundingClientRect();
+            const left = rect.left - containerRect.left + container.scrollLeft;
+            const width = rect.width;
             next.set(column.id, { left, right: left + width, width });
         }
         measurementsRef.current = next;
-    }
+    }, [columns, viewport, scrollContainerRef, shouldRender]);
+
+    if (!shouldRender) return null;
 
     /*
      * Total measured width across all columns we found. Used to set
@@ -353,8 +458,25 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
             // the column I meant" by the surrounding context. Falls
             // back to a left-edge align if centring would overflow
             // the start.
-            const colLeft = el.offsetLeft - c.offsetLeft;
-            const colWidth = el.offsetWidth;
+            //
+            // Reviewer follow-up (PR #309): prefer `getBoundingClientRect`
+            // over `offsetLeft - offsetLeft` so a column wrapped by a
+            // positioned dnd clone still resolves to the correct scroll
+            // target. The Map already holds the canonical measurement;
+            // read from it first and only fall back to a live rect when
+            // the layout effect hasn't measured this column yet.
+            const cached = measurementsRef.current.get(id);
+            let colLeft: number;
+            let colWidth: number;
+            if (cached) {
+                colLeft = cached.left;
+                colWidth = cached.width;
+            } else {
+                const elRect = el.getBoundingClientRect();
+                const cRect = c.getBoundingClientRect();
+                colLeft = elRect.left - cRect.left + c.scrollLeft;
+                colWidth = elRect.width;
+            }
             const viewWidth = c.clientWidth;
             const target = Math.max(0, colLeft - (viewWidth - colWidth) / 2);
             try {
