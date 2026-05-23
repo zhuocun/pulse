@@ -30,6 +30,7 @@ import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useTaskModal from "../../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
@@ -354,6 +355,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     //   - `surfaceVisible`  gates analytics + intervals + initial request.
     const surfaceVisible = dockOpen && (tabActive ?? true);
     const { startEditing } = useTaskModal();
+    const { openTask } = useTaskPanelNavigation();
     const projectId = project?._id ?? "";
 
     // Mount BOTH hooks unconditionally (React hook ordering rule).
@@ -573,7 +575,10 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     }, [briefData, tasks.length]);
 
     const openTaskFromBrief = (taskId: string) => {
-        startEditing(taskId);
+        // Route through the panel when `taskPanelRouted` is on; otherwise
+        // fall back to the legacy modal via `useTaskModal` (Phase 3 A2).
+        if (environment.taskPanelRouted) openTask(taskId, projectId);
+        else startEditing(taskId);
     };
 
     const handleCopyMarkdown = async () => {
