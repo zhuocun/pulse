@@ -340,9 +340,11 @@ describe("AiChatDrawer", () => {
 
         renderDrawer(true, { pendingProposal: mockProposal });
 
-        // Card must NOT appear when flag is off
+        // Card must NOT appear when flag is off. QW#6 demoted the
+        // card from alertdialog → region, so the flag-off assertion
+        // checks the new role contract.
         expect(
-            screen.queryByRole("alertdialog", {
+            screen.queryByRole("region", {
                 name: /Reassign overdue tasks to Alice/i
             })
         ).not.toBeInTheDocument();
@@ -382,9 +384,11 @@ describe("AiChatDrawer", () => {
             pendingNudges: mockNudges
         });
 
-        // MutationProposalCard renders with role="alertdialog"
+        // MutationProposalCard renders with role="region" (QW#6 —
+        // the inline diff card was demoted from alertdialog to region
+        // so screen readers stop treating it as a modal notification).
         expect(
-            screen.getByRole("alertdialog", {
+            screen.getByRole("region", {
                 name: /Reassign overdue tasks to Alice/i
             })
         ).toBeInTheDocument();
@@ -457,7 +461,7 @@ describe("AiChatDrawer", () => {
             renderDrawer(true, { pendingProposal: proposal });
 
             expect(
-                screen.getByRole("alertdialog", {
+                screen.getByRole("region", {
                     name: /Reassign overdue tasks to Alice/i
                 })
             ).toBeInTheDocument();
@@ -475,7 +479,7 @@ describe("AiChatDrawer", () => {
 
             await waitFor(() => {
                 expect(
-                    screen.queryByRole("alertdialog", {
+                    screen.queryByRole("region", {
                         name: /Reassign overdue tasks to Alice/i
                     })
                 ).not.toBeInTheDocument();
