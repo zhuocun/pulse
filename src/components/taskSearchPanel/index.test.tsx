@@ -1,7 +1,15 @@
+import { configureStore } from "@reduxjs/toolkit";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { App as AntdApp } from "antd";
+import { Provider } from "react-redux";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
+import {
+    USER_PREFERENCES_STORAGE_KEY,
+    userPreferencesSlice
+} from "../../store/reducers/userPreferencesSlice";
 import useAuth from "../../utils/hooks/useAuth";
 
 import TaskSearchPanel, { TaskSearchParam } from ".";
@@ -81,6 +89,24 @@ const installAntdBrowserMocks = () => {
     });
 };
 
+/**
+ * Phase 4.2 — the density toggle reads/writes the user-preferences
+ * Redux slice, so every render wraps the panel in a Provider + a fresh
+ * store. `AntdApp` is required so the AntD Segmented can resolve its
+ * internal `App.useApp()` lookup without falling back to the silent
+ * no-op shape.
+ */
+const makePanelStore = () =>
+    configureStore({
+        reducer: { userPreferences: userPreferencesSlice.reducer },
+        preloadedState: {
+            userPreferences: {
+                boardDensity: "comfortable" as const,
+                savedFilterPresets: []
+            }
+        }
+    });
+
 const renderPanel = ({
     loading = false,
     param = defaultParam,
@@ -94,17 +120,31 @@ const renderPanel = ({
     setParam?: jest.Mock;
     panelTasks?: ITask[];
 } = {}) => {
+    const store = makePanelStore();
     render(
-        <TaskSearchPanel
-            loading={loading}
-            members={panelMembers}
-            param={param}
-            setParam={setParam}
-            tasks={panelTasks}
-        />
+        <Provider store={store}>
+            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                <AntdApp>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <TaskSearchPanel
+                                    loading={loading}
+                                    members={panelMembers}
+                                    param={param}
+                                    setParam={setParam}
+                                    tasks={panelTasks}
+                                />
+                            }
+                        />
+                    </Routes>
+                </AntdApp>
+            </MemoryRouter>
+        </Provider>
     );
 
-    return { setParam };
+    return { setParam, store };
 };
 
 const openSelect = (index: number) => {
@@ -122,6 +162,10 @@ describe("TaskSearchPanel", () => {
     });
 
     beforeEach(() => {
+        // The Phase 4.2 preferences persistence middleware writes to
+        // `localStorage`; clear between tests so a density flip in
+        // one test never resurfaces when the next builds its store.
+        window.localStorage.removeItem(USER_PREFERENCES_STORAGE_KEY);
         mockedUseAuth.mockReturnValue({
             logout: jest.fn(),
             isAuthenticated: true,
@@ -300,17 +344,61 @@ describe("TaskSearchPanel", () => {
 
     it("shows loading state for both selects", () => {
         const { container } = render(
-            <TaskSearchPanel
-                loading
-                members={members}
-                param={defaultParam}
-                setParam={jest.fn()}
-                tasks={[task()]}
-            />
+            <Provider store={makePanelStore()}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <AntdApp>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <TaskSearchPanel
+                                        loading
+                                        members={members}
+                                        param={defaultParam}
+                                        setParam={jest.fn()}
+                                        tasks={[task()]}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </AntdApp>
+                </MemoryRouter>
+            </Provider>
         );
 
         expect(container.querySelectorAll(".ant-select-loading")).toHaveLength(
             2
         );
+    });
+
+    /*
+     * Phase 4.2 — Density toggle inside the panel. Toggling writes to
+     * the slice; an external store mutation re-renders the AntD
+     * Segmented at the new value.
+     */
+    describe("density toggle (Phase 4.2)", () => {
+        it("flips the slice's boardDensity when the user picks Compact", async () => {
+            const { store } = renderPanel();
+            // AntD's Segmented hides the radios behind a label that
+            // owns the click; click the visible label rather than the
+            // hidden input (which carries `pointer-events: none`).
+            const compactLabel = screen.getByText(
+                microcopy.board.densityCompact
+            );
+            fireEvent.click(compactLabel);
+            await waitFor(() => {
+                expect(store.getState().userPreferences.boardDensity).toBe(
+                    "compact"
+                );
+            });
+        });
+
+        it("reflects the slice's current value on mount", () => {
+            renderPanel();
+            const comfortableRadio = screen.getByRole("radio", {
+                name: microcopy.board.densityComfortable
+            });
+            expect(comfortableRadio).toBeChecked();
+        });
     });
 });

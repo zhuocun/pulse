@@ -406,6 +406,17 @@ export const enSource = {
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project.",
         /*
+         * Phase 4.2 — board density toggle. Comfortable is the legacy
+         * spacing rhythm; Compact tightens the card padding ~25–30% so
+         * power users can fit more cards in a column without
+         * scrolling. The aria-label rides on the AntD Segmented so
+         * screen-reader users hear "Board density" before the
+         * selected option name.
+         */
+        densityLabel: "Board density",
+        densityComfortable: "Comfortable",
+        densityCompact: "Compact",
+        /*
          * Phase 4.6 board minimap (sticky overview strip). Visible
          * label hidden — the minimap is purely visual chrome, the
          * navigation landmark and per-segment buttons carry the

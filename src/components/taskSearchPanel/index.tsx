@@ -1,11 +1,12 @@
 import { SearchOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Select } from "antd";
+import { Button, Input, Segmented, Select, Space } from "antd";
 import React, { useMemo } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { breakpoints, radius, space } from "../../theme/tokens";
 import useAuth from "../../utils/hooks/useAuth";
+import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import FilterChips, { FilterChip } from "../filterChips";
 
 export interface TaskSearchParam {
@@ -104,6 +105,29 @@ const ResetButtonSlot = styled.div`
     }
 `;
 
+/*
+ * Phase 4.2 — trailing preference row that holds the density toggle.
+ * Sits below the primary filter row so it doesn't push the filter
+ * inputs around. On phone widths it stacks vertically.
+ */
+const PrefRow = styled.div`
+    align-items: stretch;
+    border-top: 1px solid
+        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
+    display: flex;
+    flex-direction: column;
+    gap: ${space.xs}px;
+    margin-top: ${space.sm}px;
+    padding-top: ${space.sm}px;
+
+    @media (min-width: ${breakpoints.md}px) {
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: ${space.sm}px;
+    }
+`;
+
 const TaskSearchPanel: React.FC<Props> = ({
     tasks,
     param,
@@ -113,6 +137,7 @@ const TaskSearchPanel: React.FC<Props> = ({
     aiSearchSlot
 }) => {
     const { user } = useAuth();
+    const { density, setDensity } = useBoardDensity();
     const coordinators = useMemo(() => {
         const result: IMember[] = [];
         const seen = new Set<string>();
@@ -301,6 +326,38 @@ const TaskSearchPanel: React.FC<Props> = ({
                 onClearAll={resetParams}
                 onDismiss={dismissChip}
             />
+            <PrefRow>
+                <Space size="small" align="center" wrap>
+                    <span
+                        id="board-density-label"
+                        style={{
+                            color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
+                            fontSize: "12px"
+                        }}
+                    >
+                        {microcopy.board.densityLabel}
+                    </span>
+                    <Segmented
+                        aria-labelledby="board-density-label"
+                        aria-label={microcopy.board.densityLabel}
+                        onChange={(value) =>
+                            setDensity(value as "comfortable" | "compact")
+                        }
+                        options={[
+                            {
+                                label: microcopy.board.densityComfortable,
+                                value: "comfortable"
+                            },
+                            {
+                                label: microcopy.board.densityCompact,
+                                value: "compact"
+                            }
+                        ]}
+                        size="small"
+                        value={density}
+                    />
+                </Space>
+            </PrefRow>
         </FilterShell>
     );
 };
