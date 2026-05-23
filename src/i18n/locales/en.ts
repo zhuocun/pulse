@@ -409,7 +409,11 @@ export const enSource = {
         confirmDiscardTitle: "Discard unsaved changes?",
         confirmDiscardBody: "Your edits to this task will be lost.",
         confirmDiscardOk: "Discard",
-        confirmDiscardCancel: "Keep editing"
+        confirmDiscardCancel: "Keep editing",
+        siblingNextLabel: "Next task",
+        siblingPrevLabel: "Previous task",
+        siblingPositionLabel: "Task {position} of {total}",
+        ariaLabel: "Task details"
     },
     copilotDock: {
         title: "Copilot",
