@@ -219,6 +219,29 @@ export const easing = {
     decelerate: "cubic-bezier(0, 0, 0, 1)"
 } as const;
 
+/*
+ * Stacking ladder. Sticky page chrome (header, projectDetail TopBar) sits at
+ * `sticky: 10`. AntD overlays (Drawer / Modal) and our toasts ride well
+ * above. The @hello-pangea/dnd drag clone is mounted on `document.body`
+ * via React's createPortal and gets an inline `z-index: 5000` (verified
+ * in `node_modules/@hello-pangea/dnd/dist/dnd.esm.js` `zIndexOptions`),
+ * which paints above every authored tier in this ladder including
+ * `toast` (1200). That ordering is intentional: a card in flight should
+ * always be visible to the user, even if a transient toast fires
+ * mid-drag.
+ *
+ * Stacking-context audit (2026-05-23): traced every ancestor of the
+ * sticky `<header>` and `<TopBar>` in the mainLayout → routes chain.
+ * Neither `<html>`, `<body>`, `#root`, the layout `<Container>` nor any
+ * intermediate wrapper applies `transform`, `will-change: transform`,
+ * `filter`, `perspective`, `contain: layout|paint|strict`, or
+ * `backdrop-filter`. The sticky header's own `backdrop-filter` /
+ * `view-transition-name` creates a stacking context on the header
+ * element itself but cannot trap a sibling-of-`<body>` portal. Result:
+ * the DnD clone is free to paint over the sticky chrome on every
+ * platform, including iOS Safari. Revisit this comment if a future
+ * change wraps the layout in a transformed/filtered ancestor.
+ */
 export const zIndex = {
     sticky: 10,
     /*
@@ -233,7 +256,15 @@ export const zIndex = {
     dropdown: 1050,
     drawer: 1000,
     modal: 1100,
-    toast: 1200
+    toast: 1200,
+    /**
+     * Reference value (NOT applied as a CSS prop) — the inline z-index
+     * `@hello-pangea/dnd` puts on the drag clone via its body portal.
+     * Documented here so the ladder assertions in `tokens.test.ts` can
+     * verify our chrome stays well below the drag layer. If the library
+     * bumps this value, the test will fail and force a conscious review.
+     */
+    dndDragClone: 5000
 } as const;
 
 /**
