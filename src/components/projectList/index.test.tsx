@@ -1,10 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import { message, Modal } from "antd";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import useAuth from "../../utils/hooks/useAuth";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -175,6 +182,17 @@ describe("ProjectList", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         likeProject.mockResolvedValue({});
+        // Clear the activity feed so the Phase 4.3 integration
+        // assertion below reads a deterministic event list.
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
+    });
+
+    afterEach(() => {
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
     });
 
     it("renders project cards with manager, fallback, date, and project links", async () => {
@@ -353,6 +371,54 @@ describe("ProjectList", () => {
             expect.any(Function),
             expect.any(Function)
         );
+    });
+
+    /*
+     * Phase 4.3 — integration assertion. The project-delete flow
+     * must surface a corresponding row in the activity feed (the
+     * bell-icon source of truth). The test exercises the mocked
+     * delete mutation's `onSuccess` callback to mirror what
+     * `useReactMutation`'s real `mutate(...)` would do on a
+     * 2xx response, then reads Redux directly so the assertion is
+     * independent of any particular drawer-UI affordance.
+     */
+    it("records an activity-feed event when a project is deleted (Phase 4.3 integration)", () => {
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                config.onOk?.();
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        try {
+            renderList({ dataSource: [project()] });
+
+            fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+
+            // The real `useReactMutation` would fire `onSuccess` after
+            // the server returns 2xx. Our test mocks the mutation, so
+            // the callback never runs unless we trigger it directly —
+            // walk the mock's last call to grab the options object the
+            // component passed in and invoke `onSuccess` ourselves.
+            expect(removeProject).toHaveBeenCalled();
+            const lastCall = removeProject.mock.calls.at(-1);
+            const options = lastCall?.[1] as
+                | { onSuccess?: () => void }
+                | undefined;
+            act(() => {
+                options?.onSuccess?.();
+            });
+
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("project");
+            expect(events[0].action).toBe("delete");
+            expect(events[0].summary).toContain("Roadmap");
+        } finally {
+            confirmSpy.mockRestore();
+        }
     });
 
     it("confirms project deletion before calling the delete mutation", () => {
