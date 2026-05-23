@@ -893,24 +893,30 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
 
 TaskCard.displayName = "TaskCard";
 
-const Column = React.forwardRef<
-    HTMLDivElement,
-    {
-        tasks: ITask[];
-        column: IColumn;
-        param: TaskSearchParam;
-        /** Disables inline task creation while a reorder mutation is in flight. */
-        isDragDisabled: boolean;
-        /**
-         * When set, controls row drag only (e.g. filters active). Defaults to
-         * `isDragDisabled` so a single flag still disables both behaviors.
-         */
-        taskDragDisabled?: boolean;
-        boardAiOn?: boolean;
-        members?: IMember[];
-        onResetFilters?: () => void;
-    }
->(
+/**
+ * Column props extend the native `<div>` HTML attributes so the
+ * Drag wrapper (which spreads its `draggableProps` / `dragHandleProps`
+ * onto the cloned child) and the BoardMinimap (which threads a
+ * `data-minimap-column-id` identifier through for its in-view lookup)
+ * can both attach data-attrs without per-attr forwarding plumbing.
+ */
+type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
+    tasks: ITask[];
+    column: IColumn;
+    param: TaskSearchParam;
+    /** Disables inline task creation while a reorder mutation is in flight. */
+    isDragDisabled: boolean;
+    /**
+     * When set, controls row drag only (e.g. filters active). Defaults to
+     * `isDragDisabled` so a single flag still disables both behaviors.
+     */
+    taskDragDisabled?: boolean;
+    boardAiOn?: boolean;
+    members?: IMember[];
+    onResetFilters?: () => void;
+};
+
+const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
     (
         {
             column,

@@ -375,7 +375,14 @@ const zhCN: Dictionary = {
         copilotMenuAsk: "询问 Copilot",
         copilotMenuBrief: "看板简报",
         copilotProjectDisabledDescription:
-            "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。"
+            "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。",
+        minimap: {
+            aria: "看板缩略图",
+            segmentAriaOne: "{name} 列,1 个任务,当前{status}",
+            segmentAriaOther: "{name} 列,{count} 个任务,当前{status}",
+            inViewStatus: "在视图中",
+            offScreenStatus: "在视图外"
+        }
     },
     projectModal: {
         createDescription: "设置名称、组织和负责人,开始跟踪工作。",

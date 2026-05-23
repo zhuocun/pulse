@@ -396,7 +396,36 @@ export const enSource = {
         copilotMenuAsk: "Ask Copilot",
         copilotMenuBrief: "Board brief",
         copilotProjectDisabledDescription:
-            "Hides Board Copilot on this board and blocks AI requests for this project."
+            "Hides Board Copilot on this board and blocks AI requests for this project.",
+        /*
+         * Phase 4.6 board minimap (sticky overview strip). Visible
+         * label hidden — the minimap is purely visual chrome, the
+         * navigation landmark and per-segment buttons carry the
+         * accessible names. `inViewStatus` / `offScreenStatus` are
+         * suffixed into each segment's aria-label so a screen reader
+         * announces "Todo column, 4 tasks, currently in view" /
+         * "currently off-screen".
+         *
+         * `aria` is the landmark name for `<nav>` so screen-reader
+         * users can quickly jump to / past the minimap with `D` (NVDA
+         * landmark navigation) or `VO+U` rotor (macOS VoiceOver).
+         *
+         * `segmentAriaOne` / `segmentAriaOther` follow the plural-pair
+         * pattern used elsewhere in this file (no ICU formatter is
+         * loaded; call sites pick the right key off the count and
+         * `.replace()` to interpolate). The codebase deliberately does
+         * NOT embed ICU plural syntax in the value because a single-
+         * string `{count, plural, one {…} other {…}}` would render
+         * literally to screen-reader users.
+         */
+        minimap: {
+            aria: "Board minimap",
+            segmentAriaOne: "{name} column, 1 task, currently {status}",
+            segmentAriaOther:
+                "{name} column, {count} tasks, currently {status}",
+            inViewStatus: "in view",
+            offScreenStatus: "off-screen"
+        }
     },
     projectModal: {
         createDescription:
