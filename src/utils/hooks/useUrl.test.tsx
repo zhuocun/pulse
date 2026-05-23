@@ -1,7 +1,41 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import type { NavigateOptions } from "react-router-dom";
 
 import useUrl from "./useUrl";
+
+/*
+ * `react-router-dom` exports `useSearchParams` as a non-configurable
+ * binding on its CJS module object, so `jest.spyOn(routerDom, ...)`
+ * can't intercept it at runtime. We capture the most recent setter
+ * argument via a manual mock at the top of the module — the variable
+ * is mutable so individual tests can subscribe / read.
+ */
+let capturedSetterOptions: NavigateOptions | undefined;
+const realRouterDom = jest.requireActual("react-router-dom") as Record<
+    string,
+    unknown
+>;
+jest.mock("react-router-dom", () => {
+    const actual = jest.requireActual(
+        "react-router-dom"
+    ) as typeof import("react-router-dom");
+    return {
+        ...actual,
+        useSearchParams: (
+            ...args: Parameters<typeof actual.useSearchParams>
+        ) => {
+            const [params, setParams] = actual.useSearchParams(...args);
+            const wrappedSet: typeof setParams = (next, options) => {
+                capturedSetterOptions = options;
+                return setParams(next, options);
+            };
+            return [params, wrappedSet];
+        }
+    };
+});
+// Suppress unused-warning — referenced from the module mock factory.
+void realRouterDom;
 
 const UrlProbe = () => {
     const [{ managerId, projectName }, setParams] = useUrl([
@@ -216,5 +250,48 @@ describe("useUrl", () => {
         await waitFor(() =>
             expect(screen.getByTestId("observer")).toHaveTextContent("on")
         );
+    });
+
+    /*
+     * R2-L1: `setUrlParams` accepts a second `NavigateOptions` arg and
+     * forwards it verbatim to `setSearchParams`. Callers rely on this
+     * to opt into `viewTransition: true` and `replace: true` — both
+     * options need to land at the router's setter, not get dropped.
+     * The module-level mock above captures whatever options the hook
+     * passes through, so this test reads the captured value back.
+     */
+    it("forwards NavigateOptions to setSearchParams (R2-L1)", () => {
+        capturedSetterOptions = undefined;
+        const Probe = () => {
+            const [, setParams] = useUrl(["modal"]);
+            return (
+                <button
+                    type="button"
+                    onClick={() =>
+                        setParams(
+                            { modal: "on" },
+                            { replace: true, viewTransition: true }
+                        )
+                    }
+                >
+                    write with options
+                </button>
+            );
+        };
+
+        render(
+            <MemoryRouter initialEntries={["/projects"]}>
+                <Probe />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "write with options" })
+        );
+
+        expect(capturedSetterOptions).toEqual({
+            replace: true,
+            viewTransition: true
+        });
     });
 });
