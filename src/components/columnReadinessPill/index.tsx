@@ -199,13 +199,20 @@ const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
             trigger="click"
         >
             {/*
-             * The Tag wrapper here is a styling no-op — kept to widen the
-             * click target with Tag's default 4 px padding so the pill
-             * lands a touch tap reliably. The accessible name + role live
-             * on the inner `<span>` so a screen reader announces
-             * "<n> of <m> tasks ready, button" rather than the wrapper.
+             * AntD's Popover clones its child and attaches the click /
+             * keyboard handlers to the child's ROOT — the <Tag>, not
+             * the inner <span>. The aria-label has to live on the Tag
+             * so a screen-reader user navigating to the popover
+             * trigger by role hears the readiness ratio instead of an
+             * unlabelled "button". The inner PillBody keeps a copy of
+             * the label so screen readers reading the focused element
+             * (role=button, tabIndex=0) also announce the count — both
+             * paths surface the same accessible name, no double-
+             * announce because the inner span sits inside the Tag's
+             * accessibility subtree.
              */}
             <Tag
+                aria-label={ariaLabel}
                 style={{
                     background: "transparent",
                     border: "none",

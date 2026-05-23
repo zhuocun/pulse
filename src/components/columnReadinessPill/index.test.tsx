@@ -169,4 +169,33 @@ describe("ColumnReadinessPill", () => {
         const pill = screen.getByTestId("column-readiness-pill");
         expect(pill).toHaveAttribute("tabindex", "0");
     });
+
+    /*
+     * The Popover clones its child and attaches the click/keyboard
+     * handlers to the child's ROOT — the <Tag>. A screen-reader user
+     * navigating to the trigger by role/landmark lands on the Tag, so
+     * the aria-label has to be on the Tag (not only on the inner
+     * span) or the AT announces an unlabelled "button" / "tag".
+     */
+    it("places the readiness aria-label on the outer Popover trigger root, not only the inner pill", () => {
+        render(
+            <ColumnReadinessPill
+                report={buildReport({
+                    readyCount: 8,
+                    totalCount: 10,
+                    status: "ready"
+                })}
+            />
+        );
+        const innerPill = screen.getByTestId("column-readiness-pill");
+        // The outer trigger is the parent .ant-tag element; AntD's
+        // Popover wires its click/keyboard handlers to that node, so
+        // its aria-label must surface the readiness count.
+        const outerTrigger = innerPill.closest(".ant-tag");
+        expect(outerTrigger).not.toBeNull();
+        expect(outerTrigger).toHaveAttribute(
+            "aria-label",
+            expect.stringMatching(/8 of 10 tasks ready/i)
+        );
+    });
 });
