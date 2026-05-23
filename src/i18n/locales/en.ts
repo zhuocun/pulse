@@ -138,7 +138,9 @@ export const enSource = {
         moreActionsForProject: "More actions for {name}",
         likeProject: "Like {name}",
         unlikeProject: "Unlike {name}",
-        applyReadinessSuggestion: "Apply readiness suggestion for {field}"
+        applyReadinessSuggestion: "Apply readiness suggestion for {field}",
+        lensChips: "Board lenses",
+        lensComingSoon: "Coming soon"
     },
     dragHints: {
         taskCardKeyboard:
@@ -292,6 +294,23 @@ export const enSource = {
         type: "Type",
         ai: "AI",
         smartMatch: "Smart match"
+    },
+    /**
+     * Phase 3 A7 — Lens chip row above the board filter rail. The
+     * "coming soon" badge is shown on lenses whose data field is not
+     * yet on `ITask` (dueDate, aiRisk — Phase 4) so users see the
+     * shape of the feature without the predicate silently no-op'ing.
+     */
+    lenses: {
+        today: "Today",
+        thisWeek: "This week",
+        mine: "Mine",
+        atRisk: "At risk",
+        todayTooltip: "Tasks due today",
+        thisWeekTooltip: "Tasks due in this ISO week (Mon–Sun)",
+        mineTooltip: "Tasks where you're the coordinator",
+        atRiskTooltip: "AI-flagged tasks that may slip",
+        comingSoonBadge: "Soon"
     },
     confirm: {
         deleteProject: {

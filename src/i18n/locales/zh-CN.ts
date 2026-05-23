@@ -141,7 +141,9 @@ const zhCN: Dictionary = {
         moreActionsForProject: "{name} 的更多操作",
         likeProject: "收藏 {name}",
         unlikeProject: "取消收藏 {name}",
-        applyReadinessSuggestion: "应用 {field} 的就绪建议"
+        applyReadinessSuggestion: "应用 {field} 的就绪建议",
+        lensChips: "看板视图",
+        lensComingSoon: "敬请期待"
     },
     dragHints: {
         taskCardKeyboard:
@@ -287,6 +289,22 @@ const zhCN: Dictionary = {
         type: "类型",
         ai: "AI",
         smartMatch: "智能匹配"
+    },
+    /**
+     * Phase 3 A7 — 看板筛选视图。`comingSoonBadge` 出现在依赖 ITask 的
+     * 新字段（dueDate、aiRisk —— Phase 4）的视图上，提示用户该视图当前
+     * 不会进行筛选，但已经在规划中。
+     */
+    lenses: {
+        today: "今天",
+        thisWeek: "本周",
+        mine: "我的",
+        atRisk: "存在风险",
+        todayTooltip: "今天到期的任务",
+        thisWeekTooltip: "本周内（周一至周日）到期的任务",
+        mineTooltip: "你作为协调人的任务",
+        atRiskTooltip: "AI 标记为可能延误的任务",
+        comingSoonBadge: "敬请期待"
     },
     confirm: {
         deleteProject: {
