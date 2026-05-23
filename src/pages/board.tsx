@@ -542,10 +542,13 @@ const BoardPage = () => {
             if (!taskId) return;
             // Route through the panel when the routed-task-panel flag
             // is on; otherwise fall back to the legacy modal (B-H5).
-            if (environment.taskPanelRouted) openTaskPanel(taskId);
+            // Pass projectId explicitly so the open survives a URL transit
+            // mid-handler instead of relying on useParams inside the hook.
+            if (environment.taskPanelRouted)
+                openTaskPanel(taskId, currentProject?._id);
             else openTaskModal(taskId);
         },
-        [openTaskModal, openTaskPanel, visibleTasks]
+        [currentProject?._id, openTaskModal, openTaskPanel, visibleTasks]
     );
     const handleTriageNudgeDismiss = useCallback(
         (nudge: TriageNudge) => {
