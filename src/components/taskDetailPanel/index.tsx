@@ -63,10 +63,11 @@ import ErrorBox from "../errorBox";
  *   - Phone (coarse pointer): bottom-sheet via AntD `Drawer`.
  *   - Tablet (md/lg-but-fine-pointer): right-overlay via AntD `Drawer`.
  *   - Desktop (>= lg + fine pointer): docked 480px right rail with no
- *     mask, no overlay, no Drawer chrome — the board's columns reflow
- *     into the remaining width. Coordinated with `BoardPage`, which
- *     reads the URL via `useMatch("/projects/:projectId/board/task/
- *     :taskId")` and trims the kanban grid's max-width.
+ *     mask, no overlay, no Drawer chrome. The kanban columns reflow
+ *     because `BoardRouteShell` (`src/routes/index.tsx`) renders this
+ *     panel as a flex sibling to `BoardPage`; the rail consumes its
+ *     480px and the board takes the remaining viewport. No URL matching
+ *     or grid-width trimming happens — the flex shell does the work.
  *
  * See `docs/design/ui-ux-comprehensive-review-2026-05.md` §A2.
  */
@@ -1092,9 +1093,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * viewport is >= lg AND the user is not on a coarse pointer, the
      * panel renders as a fixed-width 480 px aside docked to the right
      * edge of the board's content region. No Drawer, no mask, no
-     * scrim — the rail is part of the layout, and BoardPage reads
-     * the same URL match to trim the kanban grid's width by the rail
-     * width so columns reflow into the remaining viewport.
+     * scrim — the rail is part of the layout. Column reflow is owned
+     * by the `BoardRouteShell` flex row in `src/routes/index.tsx`,
+     * which renders this panel as the second flex child and lets the
+     * 480 px aside take a fixed slice while the kanban surface
+     * (`BoardPage`) takes the remaining viewport via `flex: 1 1 auto`.
      */
     if (isDesktopRail) {
         return (
@@ -1124,8 +1127,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         height: "100%",
                         minHeight: 0,
                         overflow: "hidden",
-                        // The board layout reserves the rail width via
-                        // BoardPage; here we just paint the surface.
+                        // BoardRouteShell's flex row reserves the rail
+                        // slot via this `flex` basis; we just paint it.
                         position: "sticky",
                         right: 0,
                         top: 0,
