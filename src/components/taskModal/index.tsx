@@ -16,14 +16,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import environment from "../../constants/env";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
+import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import AiGhostText, {
@@ -171,6 +173,27 @@ const TaskModal: React.FC<{
         // mutate(..., { onError }) below shows a task-specific message.
         () => {}
     );
+    // Re-create + re-update mutations used only as undo closures from the
+    // activity feed (Phase 4.3). They share the same react-query cache key
+    // so the optimistic update lands in the same list the UI is reading.
+    const { mutateAsync: recreate } = useReactMutation(
+        "tasks",
+        "POST",
+        ["tasks", { projectId }],
+        newTaskCallback,
+        // The undo path is fire-and-forget per brief — if it fails the
+        // user has already moved on; the empty handler keeps
+        // useReactMutation's auto-toast suppressed.
+        () => {}
+    );
+    const { mutateAsync: undoUpdate } = useReactMutation(
+        "tasks",
+        "PUT",
+        ["tasks", { projectId }],
+        undefined,
+        () => {}
+    );
+    const { record: recordActivity } = useActivityFeed();
     const editingTask = tasks?.find((task) => task._id === editingTaskId);
     const tasksStillLoading = tasks === undefined;
     const placeholderId = Boolean(
@@ -260,10 +283,34 @@ const TaskModal: React.FC<{
             closeModal();
             return;
         }
+        // Capture the before-state for the activity-feed undo closure
+        // BEFORE the server PUT lands — once the cache flips to the
+        // updated payload the original values would be lost.
+        const beforeState: ITask = { ...editingTask };
         try {
             await update(merged);
             setSaveError(null);
             message.success(microcopy.feedback.taskSaved);
+            // Phase 4.3 — record the update into the activity feed only
+            // after the server confirms. Undo PUTs the captured
+            // before-state through the same react-query mutation so the
+            // cache and the server move back in lockstep.
+            recordActivity({
+                kind: "task",
+                action: "update",
+                summary: microcopyString(
+                    microcopy.activityFeed.descriptions.taskUpdated
+                ).replace("{name}", merged.taskName),
+                undo: () => {
+                    // `MutationParam` is an open string-indexed record;
+                    // `ITask` is structurally identical at runtime but
+                    // its declared shape doesn't carry the index
+                    // signature, hence the assertion.
+                    void undoUpdate(
+                        beforeState as unknown as Record<string, unknown>
+                    );
+                }
+            });
             onClose();
         } catch {
             // ErrorBox surfaces the message via the onError callback above;
@@ -278,6 +325,9 @@ const TaskModal: React.FC<{
         }
         const taskName = editingTask.taskName;
         const taskId = editingTaskId;
+        // Capture the full task payload before the DELETE so the
+        // activity-feed undo can re-POST it via the create mutation.
+        const beforeState: ITask = { ...editingTask };
         Modal.confirm({
             centered: true,
             okText: microcopy.confirm.deleteTask.confirmLabel,
@@ -291,6 +341,27 @@ const TaskModal: React.FC<{
                     {
                         onSuccess: () => {
                             message.success(microcopy.feedback.taskDeleted);
+                            // Phase 4.3 — record the delete into the
+                            // activity feed only after the server
+                            // confirms. The undo closure re-POSTs the
+                            // captured task so the user can recover from
+                            // an accidental destructive action.
+                            recordActivity({
+                                kind: "task",
+                                action: "delete",
+                                summary: microcopyString(
+                                    microcopy.activityFeed.descriptions
+                                        .taskDeleted
+                                ).replace("{name}", taskName),
+                                undo: () => {
+                                    void recreate(
+                                        beforeState as unknown as Record<
+                                            string,
+                                            unknown
+                                        >
+                                    );
+                                }
+                            });
                             onClose();
                         },
                         onError: () =>

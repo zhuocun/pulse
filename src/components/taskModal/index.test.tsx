@@ -14,6 +14,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
 import zhCN from "../../i18n/locales/zh-CN";
 import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
+import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
 import TaskModal from ".";
@@ -175,6 +177,16 @@ describe("TaskModal", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(response({ _id: "task-1" }));
+        // Clear both slices so the Phase 4.3 integration assertions
+        // below read a deterministic event list. The AI-ledger bridge
+        // re-forwards every surviving aiLedger entry on each test
+        // render, so failing to clear it leaks AI rows across tests
+        // — assistive features like the task-assist panel push
+        // entries into aiLedger during the existing suite.
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+            store.dispatch(aiLedgerActions.clearAiLedger());
+        });
     });
 
     afterAll(() => {
@@ -183,6 +195,10 @@ describe("TaskModal", () => {
 
     afterEach(() => {
         setActiveLocale(DEFAULT_LOCALE);
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+            store.dispatch(aiLedgerActions.clearAiLedger());
+        });
     });
 
     it("renders localized select placeholders when zh-CN is active and story points are unset", async () => {
@@ -810,6 +826,65 @@ describe("TaskModal", () => {
             await waitFor(() => expect(noteInput.value).toBe("Keep this note"));
         } finally {
             jest.useRealTimers();
+        }
+    });
+
+    /*
+     * Phase 4.3 — integration assertion (Critical issue 1). The
+     * brief required "task create/update/delete" all to land in the
+     * activity feed; the update + delete paths live here in
+     * taskModal. Read Redux directly so the assertion is independent
+     * of any particular drawer-UI affordance.
+     */
+    it("records an activity-feed event when a task is updated (Phase 4.3 integration)", async () => {
+        renderModal();
+        const taskNameInput = await screen.findByDisplayValue("Build task");
+
+        fireEvent.change(taskNameInput, {
+            target: { value: "Build task details" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("task");
+            expect(events[0].action).toBe("update");
+            expect(events[0].summary).toContain("Build task details");
+        });
+    });
+
+    it("records an activity-feed event when a task is deleted (Phase 4.3 integration)", async () => {
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                config.onOk?.();
+                return {
+                    destroy: jest.fn(),
+                    update: jest.fn()
+                } as ReturnType<typeof Modal.confirm>;
+            });
+        try {
+            renderModal();
+
+            expect(
+                await screen.findByDisplayValue("Build task")
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole("button", { name: /^delete build task$/i })
+            );
+
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+            await waitFor(() => {
+                const events = store.getState().activityFeed.events;
+                expect(events).toHaveLength(1);
+                expect(events[0].kind).toBe("task");
+                expect(events[0].action).toBe("delete");
+                expect(events[0].summary).toContain("Build task");
+            });
+        } finally {
+            confirmSpy.mockRestore();
         }
     });
 });
