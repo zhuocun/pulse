@@ -1,7 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
+import { useEffect, useRef, useState } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 
@@ -13,7 +19,72 @@ import {
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 
+// Mock the hooks the dock bodies pull in so tab-switch tests can spy on
+// `abort` / `start` directly. Default `mockReturnValue` shapes are
+// applied in `beforeEach` so the dock-level tests above (which don't
+// drive hook behavior) keep working with the safe defaults.
+jest.mock("../../utils/hooks/useAiChat", () => ({
+    __esModule: true,
+    default: jest.fn()
+}));
+jest.mock("../../utils/hooks/useAgent", () => ({
+    __esModule: true,
+    default: jest.fn()
+}));
+
+// eslint-disable-next-line simple-import-sort/imports
+import useAiChat from "../../utils/hooks/useAiChat";
+import useAgent from "../../utils/hooks/useAgent";
+import type { UseAgentResult } from "../../utils/hooks/useAgent";
+import type { AiChatMessage } from "../../utils/ai/chatEngine";
+
 import CopilotDock, { type CopilotDockTab } from ".";
+
+const mockedUseAiChat = useAiChat as jest.MockedFunction<typeof useAiChat>;
+const mockedUseAgent = useAgent as jest.MockedFunction<typeof useAgent>;
+
+type UseAiChatResult = ReturnType<typeof useAiChat>;
+
+const baseAiChat = (
+    overrides: Partial<UseAiChatResult> = {}
+): UseAiChatResult => ({
+    abort: jest.fn(),
+    dismissError: jest.fn(),
+    error: null,
+    isLoading: false,
+    messages: [] as AiChatMessage[],
+    reset: jest.fn(),
+    seedMessages: jest.fn(),
+    send: jest.fn().mockResolvedValue(undefined),
+    streamingText: "",
+    ...overrides
+});
+
+const baseAgent = (
+    overrides: Partial<UseAgentResult> = {}
+): UseAgentResult => ({
+    start: jest.fn().mockResolvedValue(undefined),
+    resume: jest.fn().mockResolvedValue(undefined),
+    abort: jest.fn(),
+    seedMessages: jest.fn(),
+    isStreaming: false,
+    status: "idle",
+    state: { messages: [] },
+    pendingInterrupt: null,
+    pendingProposal: null,
+    citations: [],
+    nudges: [],
+    lastSuggestion: null,
+    error: null,
+    reset: jest.fn(),
+    threadId: "t_test",
+    ttftMs: null,
+    isSlowTtft: false,
+    clearPendingProposal: jest.fn(),
+    clearSuggestion: jest.fn(),
+    dismissNudge: jest.fn(),
+    ...overrides
+});
 
 /*
  * CopilotDock — Phase 3 A1.
@@ -124,19 +195,41 @@ const renderDock = (options: RenderOptions = {}) => {
  * `renderDock` (above) passes a `jest.fn()`, which catches the call but
  * never updates state — that's fine for the lower-level assertions but
  * useless for "type in Chat → switch to Brief → switch back". This
- * controlled wrapper threads the tab through real React state.
+ * controlled wrapper threads the tab through real React state. The
+ * `tasks` prop is also controlled so a test can mutate it mid-session
+ * (e.g. simulate a board mutation while the user is on the Chat tab).
  */
 interface ControlledDockProps {
     initialTab?: CopilotDockTab;
     initialOpen?: boolean;
+    initialTasks?: ITask[];
+    /**
+     * Exposes the internal `setTasks` setter so a test can simulate a
+     * board mutation (fingerprint change) from outside React's tree.
+     */
+    onMount?: (controls: {
+        setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+    }) => void;
 }
 
 const ControlledDock: React.FC<ControlledDockProps> = ({
     initialTab = "chat",
-    initialOpen = true
+    initialOpen = true,
+    initialTasks = [],
+    onMount
 }) => {
     const [activeTab, setActiveTab] = useState<CopilotDockTab>(initialTab);
     const [open, setOpen] = useState(initialOpen);
+    const [tasks, setTasks] = useState<ITask[]>(initialTasks);
+    // Surface setTasks once so the test can mutate the fingerprint.
+    const onMountRef = useRef(onMount);
+    onMountRef.current = onMount;
+    const surfaced = useRef(false);
+    useEffect(() => {
+        if (surfaced.current) return;
+        surfaced.current = true;
+        onMountRef.current?.({ setTasks });
+    }, []);
     return (
         <CopilotDock
             activeTab={activeTab}
@@ -147,7 +240,7 @@ const ControlledDock: React.FC<ControlledDockProps> = ({
             onTabChange={setActiveTab}
             open={open}
             project={project()}
-            tasks={[]}
+            tasks={tasks}
         />
     );
 };
@@ -177,6 +270,11 @@ const renderControlled = (
 describe("CopilotDock", () => {
     beforeEach(() => {
         installAntdBrowserMocks(false);
+        // Safe default mock returns so existing dock-level assertions
+        // (which don't care about hook internals) keep passing. Tests
+        // that DO drive hook behavior override these via mockReturnValue.
+        mockedUseAiChat.mockReturnValue(baseAiChat());
+        mockedUseAgent.mockReturnValue(baseAgent());
     });
 
     it("renders the dock with both Chat and Brief tabs visible", () => {
@@ -300,13 +398,25 @@ describe("CopilotDock", () => {
 
     /*
      * R1-H1 regression: switching from Chat → Brief used to clear the
-     * composer text and abort any in-flight stream because the body's
+     * composer text AND abort any in-flight stream because the body's
      * teardown effect watched a single `open` prop that was passed as
      * `dockOpen && activeTab === "chat"`. After the prop split, the body
-     * stays mounted across tab switches and the composer text must
-     * survive a round-trip to the Brief tab.
+     * stays mounted across tab switches; composer text + in-flight
+     * stream must survive a round-trip to the Brief tab.
+     *
+     * Extended (R-A L1): also asserts `abort` is NOT called when a
+     * stream is in flight at the time of the tab switch — covers the
+     * "I asked Copilot something, opened Brief to check workload, came
+     * back, my answer is still streaming" flow the contract requires.
      */
-    it("preserves chat composer text across a Chat → Brief → Chat tab switch (R1-H1)", async () => {
+    it("preserves chat composer text + in-flight stream across a Chat → Brief → Chat tab switch (R1-H1)", async () => {
+        const abort = jest.fn();
+        // Simulate a stream in flight so the close-side teardown wired
+        // to `dockOpen` (NOT `tabActive`) would be the only thing that
+        // could abort it. A tab switch must leave it alone.
+        mockedUseAiChat.mockReturnValue(
+            baseAiChat({ abort, isLoading: true, streamingText: "Working…" })
+        );
         renderControlled({ initialTab: "chat" });
 
         const composer = (await screen.findByRole("textbox", {
@@ -314,6 +424,8 @@ describe("CopilotDock", () => {
         })) as HTMLTextAreaElement;
         fireEvent.change(composer, { target: { value: "hello copilot" } });
         expect(composer.value).toBe("hello copilot");
+        // Sanity: abort hasn't fired during render / typing.
+        expect(abort).not.toHaveBeenCalled();
 
         fireEvent.click(
             screen.getByRole("tab", {
@@ -340,6 +452,9 @@ describe("CopilotDock", () => {
         ) as HTMLTextAreaElement | null;
         expect(composerAfter).not.toBeNull();
         expect(composerAfter!.value).toBe("hello copilot");
+        // The actual R1-H1 invariant: tab switch must NOT tear down the
+        // in-flight stream. Body stays mounted, abort stays untouched.
+        expect(abort).not.toHaveBeenCalled();
 
         // Switching back to Chat re-shows the same composer with the
         // text intact.
@@ -354,6 +469,9 @@ describe("CopilotDock", () => {
             }) as HTMLTextAreaElement;
             expect(composerVisible.value).toBe("hello copilot");
         });
+        // Round-trip complete; the stream is still flagged in-flight
+        // and abort was never fired.
+        expect(abort).not.toHaveBeenCalled();
     });
 
     /*
@@ -423,6 +541,117 @@ describe("CopilotDock", () => {
                 ([event]) => event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
             ).length;
             expect(finalBriefOpenCount).toBe(1);
+        } finally {
+            setAnalyticsSink(previous);
+        }
+    });
+
+    /*
+     * R-A H2 fix: mid-session board mutations that change the brief's
+     * fingerprint while the user is on the Chat tab must surface a
+     * distinct `BRIEF_REFRESHED_BY_BOARD_CHANGE` signal (not a second
+     * COPILOT_BRIEF_OPEN). Open-rate metrics must not be inflated by
+     * refetches caused by board state drift.
+     */
+    it("fires BRIEF_REFRESHED_BY_BOARD_CHANGE (not BRIEF_OPEN) when the fingerprint changes mid-tab-away", async () => {
+        const sink = jest.fn<
+            ReturnType<AnalyticsSink>,
+            Parameters<AnalyticsSink>
+        >();
+        const previous = setAnalyticsSink(sink);
+        let controls: {
+            setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+        } | null = null;
+        try {
+            renderControlled({
+                initialTab: "brief",
+                onMount: (c) => {
+                    controls = c;
+                }
+            });
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabBrief as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+            // First-open BRIEF_OPEN should have fired exactly once.
+            expect(
+                sink.mock.calls.filter(
+                    ([event]) => event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                )
+            ).toHaveLength(1);
+
+            // Switch to Chat so `surfaceVisible` flips false on the brief
+            // body — the user is no longer looking at the brief.
+            fireEvent.click(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.tabChat as string
+                })
+            );
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabChat as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+
+            // Simulate a board mutation: add a task while the user is on
+            // Chat. This bumps the fingerprint without touching the dock.
+            act(() => {
+                controls!.setTasks([
+                    {
+                        _id: "task-new",
+                        columnId: "column-1",
+                        coordinatorId: "member-1",
+                        epic: "x",
+                        index: 0,
+                        note: "",
+                        projectId: "project-1",
+                        storyPoints: 2,
+                        taskName: "Mid-session add",
+                        type: "Task"
+                    }
+                ]);
+            });
+
+            // Switch back to Brief — the body sees a new fingerprint and
+            // must refetch under the distinct refresh event.
+            fireEvent.click(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.tabBrief as string
+                })
+            );
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabBrief as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+
+            await waitFor(() => {
+                expect(
+                    sink.mock.calls.filter(
+                        ([event]) =>
+                            event ===
+                            ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE
+                    )
+                ).toHaveLength(1);
+            });
+
+            // BRIEF_OPEN must still be at 1 — the surface was never closed
+            // and re-opened, only the underlying data drifted.
+            expect(
+                sink.mock.calls.filter(
+                    ([event]) => event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                )
+            ).toHaveLength(1);
         } finally {
             setAnalyticsSink(previous);
         }
