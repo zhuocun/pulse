@@ -386,6 +386,12 @@ export const enSource = {
             "Your edits are still here. Discard them or save them as a new task to keep them.",
         discardEdits: "Discard edits"
     },
+    taskDetailPanel: {
+        confirmDiscardTitle: "Discard unsaved changes?",
+        confirmDiscardBody: "Your edits to this task will be lost.",
+        confirmDiscardOk: "Discard",
+        confirmDiscardCancel: "Keep editing"
+    },
     projectsPage: {
         title: "Projects",
         subtitle:

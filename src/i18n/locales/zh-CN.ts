@@ -365,6 +365,12 @@ const zhCN: Dictionary = {
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
         discardEdits: "丢弃更改"
     },
+    taskDetailPanel: {
+        confirmDiscardTitle: "放弃未保存的更改?",
+        confirmDiscardBody: "对此任务的编辑将会丢失。",
+        confirmDiscardOk: "放弃",
+        confirmDiscardCancel: "继续编辑"
+    },
     projectsPage: {
         title: "项目",
         subtitle:

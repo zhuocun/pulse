@@ -55,6 +55,7 @@ import useDragEnd from "../utils/hooks/useDragEnd";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTaskModal from "../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../utils/hooks/useTaskPanelNavigation";
 import useTitle from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
 import { isOptimisticPlaceholderId } from "../utils/optimisticClientId";
@@ -478,6 +479,7 @@ const BoardPage = () => {
     }, [boardAiOn, chatOpen, currentProject?._id, startTriageAgent]);
 
     const { startEditing: openTaskModal } = useTaskModal();
+    const { openTask: openTaskPanel } = useTaskPanelNavigation();
     /**
      * Triage-nudge primary CTA. The nudge wire shape (`agent.d.ts`)
      * exposes `target_ids` but does not type-distinguish between task,
@@ -492,9 +494,13 @@ const BoardPage = () => {
             const taskId = nudge.target_ids.find((id) =>
                 visibleTasks.some((t) => t._id === id)
             );
-            if (taskId) openTaskModal(taskId);
+            if (!taskId) return;
+            // Route through the panel when the routed-task-panel flag
+            // is on; otherwise fall back to the legacy modal (B-H5).
+            if (environment.taskPanelRouted) openTaskPanel(taskId);
+            else openTaskModal(taskId);
         },
-        [openTaskModal, visibleTasks]
+        [openTaskModal, openTaskPanel, visibleTasks]
     );
     const handleTriageNudgeDismiss = useCallback(
         (nudge: TriageNudge) => {
@@ -904,7 +910,9 @@ const BoardPage = () => {
                 ) : (
                     <BoardLoadingSkeleton />
                 )}
-                <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
+                {!environment.taskPanelRouted && (
+                    <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
+                )}
                 {boardAiOn && (
                     <>
                         <BoardBriefDrawer

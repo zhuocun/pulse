@@ -119,6 +119,42 @@ describe("environment", () => {
         expect(disabledEnv.aiMutationProposalsEnabled).toBe(false);
     });
 
+    it("defaults the routed task-panel flag to false (opt-in) and only flips on for `true`", () => {
+        // Phase 3 A2: the new routed inline task panel ships behind a
+        // feature flag. Default false until validated; one-flag opt-in.
+        const originalFlag = process.env.REACT_APP_TASK_PANEL_ROUTED;
+        try {
+            delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+            process.env.REACT_APP_AI_USE_LOCAL = "true";
+
+            jest.resetModules();
+            const defaultEnv = require("./env").default;
+            expect(defaultEnv.taskPanelRouted).toBe(false);
+
+            process.env.REACT_APP_TASK_PANEL_ROUTED = "false";
+            jest.resetModules();
+            const offEnv = require("./env").default;
+            expect(offEnv.taskPanelRouted).toBe(false);
+
+            process.env.REACT_APP_TASK_PANEL_ROUTED = "true";
+            jest.resetModules();
+            const onEnv = require("./env").default;
+            expect(onEnv.taskPanelRouted).toBe(true);
+
+            // Any value other than the literal "true" leaves the flag off.
+            process.env.REACT_APP_TASK_PANEL_ROUTED = "TRUE";
+            jest.resetModules();
+            const otherEnv = require("./env").default;
+            expect(otherEnv.taskPanelRouted).toBe(false);
+        } finally {
+            if (originalFlag === undefined) {
+                delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+            } else {
+                process.env.REACT_APP_TASK_PANEL_ROUTED = originalFlag;
+            }
+        }
+    });
+
     it("uses the remote proxy when an AI base URL is provided", () => {
         process.env.REACT_APP_AI_BASE_URL = "https://copilot.example";
 

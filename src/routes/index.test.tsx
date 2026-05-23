@@ -299,3 +299,64 @@ describe("bottom-tab routes (Phase 3 A3)", () => {
         }
     );
 });
+
+/**
+ * Phase 3 A2 — routed inline task panel. The new overlay route at
+ * `/projects/:projectId/board/task/:taskId` only mounts when the
+ * `REACT_APP_TASK_PANEL_ROUTED` feature flag is "true". With the flag
+ * off (the default), the board route keeps its leaf shape and the
+ * existing TaskModal handles every open. With the flag on, board
+ * becomes a layout route and the panel mounts as a child.
+ */
+describe("routed task panel registration (Phase 3 A2)", () => {
+    const originalFlag = process.env.REACT_APP_TASK_PANEL_ROUTED;
+
+    afterEach(() => {
+        if (originalFlag === undefined) {
+            delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+        } else {
+            process.env.REACT_APP_TASK_PANEL_ROUTED = originalFlag;
+        }
+        jest.resetModules();
+    });
+
+    it("keeps the board route as a leaf when the flag is off", () => {
+        delete process.env.REACT_APP_TASK_PANEL_ROUTED;
+        jest.resetModules();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const flagOffRoutes = require(".").default;
+        const protectedBranch = flagOffRoutes[0].children?.[3];
+        const projectDetailRoute = protectedBranch?.children?.find(
+            (route: { path?: string }) => route.path === "projects/:projectId"
+        );
+        const boardRoute = projectDetailRoute?.children?.find(
+            (route: { path?: string }) => route.path === "board"
+        );
+        // No children under board — TaskModal handles task open.
+        expect(boardRoute?.children).toBeUndefined();
+    });
+
+    it("registers the task/:taskId child route when the flag is on", () => {
+        process.env.REACT_APP_TASK_PANEL_ROUTED = "true";
+        jest.resetModules();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const flagOnRoutes = require(".").default;
+        const protectedBranch = flagOnRoutes[0].children?.[3];
+        const projectDetailRoute = protectedBranch?.children?.find(
+            (route: { path?: string }) => route.path === "projects/:projectId"
+        );
+        const boardRoute = projectDetailRoute?.children?.find(
+            (route: { path?: string }) => route.path === "board"
+        );
+        // Board is now a layout — children include an index slot and
+        // the task panel route.
+        const boardChildren = boardRoute?.children ?? [];
+        expect(boardChildren).toHaveLength(2);
+        expect(
+            "index" in boardChildren[0] ? boardChildren[0].index : undefined
+        ).toBe(true);
+        expect(
+            "path" in boardChildren[1] ? boardChildren[1].path : undefined
+        ).toBe("task/:taskId");
+    });
+});
