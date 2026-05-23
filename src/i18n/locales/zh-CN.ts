@@ -391,7 +391,8 @@ const zhCN: Dictionary = {
         siblingNextLabel: "下一个任务",
         siblingPrevLabel: "上一个任务",
         siblingPositionLabel: "第 {position} 个,共 {total} 个",
-        ariaLabel: "任务详情"
+        ariaLabel: "任务详情",
+        siblingNavAriaLabel: "同级任务导航"
     },
     copilotDock: {
         title: "Copilot",
