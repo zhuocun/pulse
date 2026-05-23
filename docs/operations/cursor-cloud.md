@@ -88,8 +88,9 @@ python -m pytest
 ```
 
 Tests use an in-memory `FakeStore` and `fakeredis`; **no external
-services needed**. Coverage must be 100% (configured in
-`pyproject.toml`). The full `[ai]` extra must be installed for the
+services needed**. Coverage must stay above the 85% floor configured in
+`pyproject.toml` (real coverage is ~98%). The full `[ai]` extra must be
+installed for the
 entire suite to pass (observability tests need `opentelemetry-*` and
 `prometheus-client`):
 

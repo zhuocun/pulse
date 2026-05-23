@@ -3,8 +3,8 @@
 The test is marked ``@pytest.mark.eval`` *and* skipped at collection
 time unless ``RUN_EVAL=1`` is set in the environment — mirroring the
 ``RUN_INTEGRATION`` pattern used elsewhere in the codebase.  This is
-the right tradeoff: the default ``pytest`` run gates on 100% coverage
-of ``app`` and the eval module is explicitly out of scope (it is a
+the right tradeoff: the default ``pytest`` run gates on the backend
+coverage floor and the eval module is explicitly out of scope (it is a
 test / dev harness, not production code).
 
 Run with::

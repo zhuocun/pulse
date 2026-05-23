@@ -4,7 +4,8 @@ Two test surfaces:
 
 1. Pure-Python fakes for the psycopg pool/cursor so we can validate
    SQL shape, parameter binding, and result decoding without a live
-   database. This keeps the hermetic test suite green at 100% coverage.
+   database. This keeps the hermetic test suite green above the
+   coverage floor.
 
 2. An optional live-Postgres smoke test, gated by
    ``PYTEST_AGENT_POSTGRES_URI``. When set we run the full

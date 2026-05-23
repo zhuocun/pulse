@@ -120,8 +120,8 @@ expiry.
 Pytest marker ``integration`` registered in ``pyproject.toml``. Placeholder
 suite ``tests/integration/test_integration_gate.py`` runs only when
 ``RUN_INTEGRATION=1`` (wire to secret-gated CI + service containers as ops
-onboard real provider smoke). Default CI stays hermetic with 100% line
-coverage.
+onboard real provider smoke). Default CI stays hermetic with the backend
+coverage floor.
 
 ## Soft blockers — ship-able with documented caveats
 

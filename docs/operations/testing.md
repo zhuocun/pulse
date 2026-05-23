@@ -115,7 +115,7 @@ tests / 142 suites) so the suite has grown.
 ## Backend pytest
 
 Suite shape: **1042 passed, 1 skipped (environment-gated), 40
-warnings** at 100% coverage.
+warnings** with coverage above the 85% floor.
 
 Run command (from `backend/`):
 

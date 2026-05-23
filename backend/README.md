@@ -63,7 +63,9 @@ cp scripts/git-hooks/commit-msg .git/hooks/commit-msg
 chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
 ```
 
-- `pre-commit` runs `python -m pytest`, which is configured to fail below `85%` coverage (real coverage is ~98%; the gate is a floor, not a target).
+- `pre-commit` runs `python -m ruff check .` and `python -m pytest`, which is
+  configured to fail below `85%` coverage (real coverage is ~98%; the gate is a
+  floor, not a target).
 - `commit-msg` enforces Conventional Commits with these types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 Examples:
