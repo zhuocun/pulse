@@ -99,6 +99,10 @@ const Nav = styled.nav<{ $hidden: boolean }>`
      * it. Route-level drawers now stack cleanly on top via their
      * own z-index without the bar peeking through the dimmer. */
     z-index: ${zIndex.navBar};
+    /* Opt the bar out of the route cross-fade (matches the header's
+       pulse-header treatment); keeps it pinned across navigations
+       instead of flickering with the body swap. */
+    view-transition-name: pulse-tabbar;
     /* Keyboard hide: translate out of the viewport when the soft keyboard
      * pushes the visual viewport up. The translate gives us a deterministic
      * hide-vs-show contract instead of clipping the bar mid-input. */
