@@ -693,6 +693,7 @@ const zhCN: Dictionary = {
         toolDetailsToggle: "显示详情",
         toolDetailsHide: "隐藏详情",
         characterCountTemplate: "{count}/{max}",
+        characterCountAtLimit: "{count}/{max} — 已达字符上限。",
         toolEmptyResult: "空结果",
         toolVerbs: {
             checkedProjects: "已检查项目",

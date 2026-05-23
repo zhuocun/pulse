@@ -726,9 +726,15 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     );
 
     const promptCharMax = microcopy.ai.characterCounterMax;
-    const promptCharHintText = microcopyString(
-        microcopy.ai.characterCountTemplate
-    )
+    // At the hard cap the textarea's `maxLength` blocks further input;
+    // surface a stronger "limit reached" hint so the user knows to trim
+    // their prompt instead of wondering why typing stopped registering
+    // (Quick win 20). Below the cap the counter stays a quiet "N/max".
+    const atCharLimit = input.length >= promptCharMax;
+    const promptCharHintTemplate = atCharLimit
+        ? microcopy.ai.characterCountAtLimit
+        : microcopy.ai.characterCountTemplate;
+    const promptCharHintText = microcopyString(promptCharHintTemplate)
         .replace("{count}", String(input.length))
         .replace("{max}", String(promptCharMax));
     const promptCharHintWarning = input.length > promptCharMax * 0.9;

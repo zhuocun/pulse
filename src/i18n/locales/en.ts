@@ -771,6 +771,7 @@ export const enSource = {
         toolDetailsToggle: "Show details",
         toolDetailsHide: "Hide details",
         characterCountTemplate: "{count}/{max}",
+        characterCountAtLimit: "{count}/{max} — character limit reached.",
         toolEmptyResult: "empty result",
         toolVerbs: {
             checkedProjects: "Checked projects",
