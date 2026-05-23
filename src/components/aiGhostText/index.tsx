@@ -4,7 +4,6 @@ import type { TextAreaProps } from "antd/lib/input/TextArea";
 import type { ChangeEvent, CompositionEvent, KeyboardEvent } from "react";
 import React, {
     cloneElement,
-    isValidElement,
     useCallback,
     useEffect,
     useLayoutEffect,
@@ -219,13 +218,17 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
 
     const enabled = flagOn && consent;
 
-    if (!isValidElement(children)) {
-        // Caller passed an invalid child — fall back to rendering null
-        // rather than crashing the modal. This branch is unreachable in
-        // type-checked callsites.
-        return null;
-    }
-
+    // Note: previously this site had an `isValidElement(children) ? ...`
+    // runtime guard that returned `null` between two batches of hooks.
+    // Even though `AiGhostTextProps['children']` is typed as
+    // `React.ReactElement` (so the path was statically unreachable),
+    // any future change — a test bypass, a type weakening, a child
+    // becoming explicitly `null` — would trip React's "rendered fewer
+    // hooks than expected" invariant and crash the modal. The type
+    // already excludes invalid values, and `cloneElement` below will
+    // throw with a clearer message if the contract is ever violated.
+    // Dropping the guard keeps every hook unconditional, which is the
+    // safe shape per the React rules-of-hooks.
     const childProps = (children as React.ReactElement<TextAreaProps>).props;
 
     // ---- Debounce ---------------------------------------------------
