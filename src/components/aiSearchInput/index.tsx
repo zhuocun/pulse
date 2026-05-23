@@ -27,6 +27,7 @@ import {
     AiSearchProjectsContext,
     semanticSearch
 } from "../../utils/ai/engine";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { isProjectAiDisabled } from "../../utils/ai/projectAiStorage";
 import { validateSearch } from "../../utils/ai/validate";
@@ -477,27 +478,13 @@ const AiSearchInput: React.FC<Props> = (props) => {
                     {labels.helper}
                 </Typography.Paragraph>
             </div>
-            <span
-                /*
-                 * Polite, not assertive — search status is non-urgent
-                 * background information and `assertive` interrupts whatever
-                 * the screen reader is currently saying (e.g. the row of
-                 * recently rendered results), which is hostile UX.
-                 */
-                aria-live="polite"
-                id={announcerId}
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
+            {/*
+             * Polite, not assertive — search status is non-urgent
+             * background information and `assertive` interrupts whatever
+             * the screen reader is currently saying (e.g. the row of
+             * recently rendered results), which is hostile UX.
+             */}
+            <SrOnlyLive id={announcerId}>
                 {busy
                     ? microcopy.feedback.searching
                     : semanticActive && matchRationale
@@ -506,7 +493,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                             matchRationale
                         )
                       : (noMatchHint ?? "")}
-            </span>
+            </SrOnlyLive>
             {matchSummary && matchSummary.total > 0 && (
                 <div
                     style={{

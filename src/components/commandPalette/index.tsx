@@ -15,6 +15,7 @@ import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
@@ -559,21 +560,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                     value={query}
                 />
             </div>
-            <span
-                aria-live="polite"
-                id={announcerId}
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
+            <SrOnlyLive id={announcerId}>
                 {aiMode
                     ? microcopy.a11y.boardCopilotModeAnnouncement
                     : query.trim().length > 0
@@ -582,7 +569,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                             : microcopy.counts.results.other
                         ).replace("{count}", String(resultCount))
                       : ""}
-            </span>
+            </SrOnlyLive>
             {aiMode ? (
                 <ModeBanner role="status">
                     <AiSparkleIcon aria-hidden />

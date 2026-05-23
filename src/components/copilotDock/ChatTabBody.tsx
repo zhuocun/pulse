@@ -38,6 +38,7 @@ import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
 import {
@@ -924,41 +925,8 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                         type={healthStatus === "offline" ? "error" : "warning"}
                     />
                 )}
-            <div
-                aria-atomic="true"
-                aria-live="polite"
-                role="status"
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
-                {completionAnnouncement}
-            </div>
-            <div
-                aria-live="polite"
-                role="status"
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
-                {streamingAnnouncement}
-            </div>
+            <SrOnlyLive>{completionAnnouncement}</SrOnlyLive>
+            <SrOnlyLive aria-atomic={false}>{streamingAnnouncement}</SrOnlyLive>
             <div
                 style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}
             >
