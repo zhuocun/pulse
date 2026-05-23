@@ -143,7 +143,10 @@ const zhCN: Dictionary = {
         unlikeProject: "取消收藏 {name}",
         applyReadinessSuggestion: "应用 {field} 的就绪建议",
         lensChips: "看板视图",
-        lensComingSoon: "敬请期待"
+        lensComingSoon: "敬请期待",
+        renameTask: "重命名任务",
+        columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
+        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理"
     },
     dragHints: {
         taskCardKeyboard:
@@ -763,7 +766,15 @@ const zhCN: Dictionary = {
         autonomyLevelAuto: "自动",
         autonomySelectorAriaLabel: "选择 Copilot 自主模式",
         autonomyAutoDisabledTooltip:
-            "自动模式需要支持预批准工具的智能体,将在 v3 提供。"
+            "自动模式需要支持预批准工具的智能体,将在 v3 提供。",
+        columnReadiness: {
+            readyLabel: "已就绪",
+            groomingLabel: "需整理",
+            popoverTitleReady: "已就绪 · {ready}/{total}",
+            popoverTitleGrooming: "需整理 · {ready}/{total}",
+            popoverEmptyReady: "本列中的所有任务都已通过检查。",
+            popoverBlockerListLabel: "仍需完善的任务"
+        }
     },
     auth: {
         loginTitle: "登录账号",
