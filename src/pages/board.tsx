@@ -656,13 +656,7 @@ const BoardPage = () => {
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <BoardShell>
-                {boardAiOn && (
-                    <CopilotWelcomeBanner
-                        onCta={() => {
-                            openBriefDrawer();
-                        }}
-                    />
-                )}
+                {boardAiOn && <CopilotWelcomeBanner />}
                 <BoardHeader>
                     <Row
                         between
