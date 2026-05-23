@@ -122,7 +122,21 @@ const computeFollowUpChips = (
 };
 
 export interface ChatTabBodyProps {
-    open: boolean;
+    /**
+     * Whether the host surface (legacy drawer or copilot dock) is open.
+     * Drives close-side teardown (abort in-flight stream, clear composer)
+     * but NOT mount/unmount — the body stays mounted across dock-internal
+     * tab switches so chat history + composer state survive.
+     */
+    dockOpen: boolean;
+    /**
+     * Whether this body is the *active surface* the user is looking at.
+     * Drives focus + prompt dispatch + history restore — anything that
+     * should only run when the user is actually viewing the chat tab.
+     * Defaults to `dockOpen` so legacy single-surface drawers (and tests
+     * that haven't been migrated) keep behaving identically.
+     */
+    tabActive?: boolean;
     project: IProject | null;
     columns: IColumn[];
     tasks: ITask[];
@@ -141,7 +155,8 @@ export interface ChatTabBodyProps {
 const fallbackQueryClient = new QueryClient();
 
 const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
-    open,
+    dockOpen,
+    tabActive,
     project,
     columns,
     tasks,
@@ -156,6 +171,14 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     onActionNudge,
     onDismissNudge
 }) => {
+    // `tabActive` defaults to `dockOpen` so call sites that don't split
+    // the two (legacy drawer wrappers) keep the original single-surface
+    // semantics. Inside this body:
+    //   - `dockOpen`     drives close-side cleanup only.
+    //   - `surfaceVisible` (dockOpen && tabActive) drives focus, prompt
+    //     dispatch, and history restore — anything that should only run
+    //     while the user is looking at the chat surface.
+    const surfaceVisible = dockOpen && (tabActive ?? true);
     const chatMeta = useChatAgentMetadata();
     const allowedAutonomy = useMemo(
         () =>
@@ -262,14 +285,14 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const { message } = App.useApp();
 
     useEffect(() => {
-        if (!open) {
+        if (!surfaceVisible) {
             return;
         }
         const handle = window.setTimeout(() => {
             inputRef.current?.focus({ cursor: "end" });
         }, 0);
         return () => window.clearTimeout(handle);
-    }, [open]);
+    }, [surfaceVisible]);
 
     const chatCtx = useMemo(() => {
         const knownProjectSet = new Set(knownProjectIds);
@@ -298,11 +321,15 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
 
     // Mount BOTH hooks; only one drives the UI based on aiUseLocalEngine.
     // The inactive hook receives null ctx so it doesn't fire any requests.
+    // Gated on `dockOpen` (not `surfaceVisible`): a request started while
+    // chat was the active tab must continue streaming after the user
+    // switches to Brief — the body stays mounted, the stream is in flight,
+    // tearing it down on tab switch was the original R1-H1 regression.
     const localChat = useAiChat(
-        environment.aiUseLocalEngine && open ? chatCtx : null
+        environment.aiUseLocalEngine && dockOpen ? chatCtx : null
     );
     const agentChat = useAgentChat(
-        !environment.aiUseLocalEngine && open ? chatCtx : null,
+        !environment.aiUseLocalEngine && dockOpen ? chatCtx : null,
         { allowedAutonomy }
     );
 
@@ -319,7 +346,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     } = environment.aiUseLocalEngine ? localChat : agentChat;
 
     useEffect(() => {
-        if (!open || !project?._id) return;
+        if (!dockOpen || !project?._id) return;
         if (historyRestoredForRef.current === project._id) return;
         historyRestoredForRef.current = project._id;
         const saved = loadChatHistory(project._id).filter(
@@ -332,7 +359,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         if (saved.length > 0) {
             seedMessages(saved);
         }
-    }, [open, project?._id, seedMessages]);
+    }, [dockOpen, project?._id, seedMessages]);
 
     useEffect(() => {
         setMessageTimes((prev) => {
@@ -362,21 +389,22 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     }, [pendingProposal?.proposal_id, agentChat.pendingProposal?.proposal_id]);
 
     useEffect(() => {
-        if (!open) {
+        if (!dockOpen) {
             setLocalProposalHandled(false);
             setLocallyDismissedNudges(new Set());
         }
-    }, [open]);
+    }, [dockOpen]);
 
     // Body owns the close-side cleanup that the legacy drawer previously
     // routed through its own `handleClose` (abort + input reset). Watching
-    // `open` here makes both the drawer wrapper and the dock host benefit
-    // from the same teardown without needing an imperative handle.
+    // `dockOpen` (NOT `surfaceVisible`) so a tab switch from Chat → Brief
+    // does NOT abort the in-flight stream or wipe the composer — the body
+    // stays mounted and its state must survive (R1-H1).
     useEffect(() => {
-        if (open) return;
+        if (dockOpen) return;
         abort();
         setInput("");
-    }, [abort, open]);
+    }, [abort, dockOpen]);
 
     const isRemote = !environment.aiUseLocalEngine;
     const effectivePendingProposal =
@@ -508,15 +536,18 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     );
 
     useEffect(() => {
-        if (!open || !initialPrompt) return;
+        // Dispatch only when the chat tab is actually visible — opening
+        // the dock on the Brief tab via a palette prompt must NOT auto-
+        // send into the chat surface.
+        if (!surfaceVisible || !initialPrompt) return;
         if (initialPromptHandled.current === initialPrompt) return;
         initialPromptHandled.current = initialPrompt;
         dispatch(initialPrompt);
-    }, [dispatch, initialPrompt, open]);
+    }, [dispatch, initialPrompt, surfaceVisible]);
 
     useEffect(() => {
-        if (!open) initialPromptHandled.current = null;
-    }, [open]);
+        if (!dockOpen) initialPromptHandled.current = null;
+    }, [dockOpen]);
 
     const handleSend = () => {
         dispatch(input);

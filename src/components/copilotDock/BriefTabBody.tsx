@@ -91,7 +91,21 @@ const WorkloadBar = styled.div<{ overloaded: boolean }>`
 `;
 
 export interface BriefTabBodyProps {
-    open: boolean;
+    /**
+     * Whether the host surface (legacy drawer or copilot dock) is open.
+     * Drives the actual close-side teardown (abort in-flight brief, reset
+     * local AI state). NOT mount/unmount — the body remains mounted across
+     * dock-internal tab switches so the rendered brief survives (R1-H2).
+     */
+    dockOpen: boolean;
+    /**
+     * Whether this body is the *active surface* the user is looking at.
+     * Drives the analytics "brief open" event, the relative-timestamp
+     * interval, and the initial brief request kickoff. Defaults to
+     * `dockOpen` so the legacy drawer wrapper (single surface) keeps the
+     * original behavior.
+     */
+    tabActive?: boolean;
     project?: IProject;
     columns: IColumn[];
     tasks: ITask[];
@@ -327,12 +341,18 @@ const briefToMarkdown = (brief: IBoardBrief): string => {
 };
 
 const BriefTabBody: React.FC<BriefTabBodyProps> = ({
-    open,
+    dockOpen,
+    tabActive,
     project,
     columns,
     tasks,
     members
 }) => {
+    // `tabActive` defaults to `dockOpen` so a legacy single-surface caller
+    // (drawer wrapper) inherits the original semantics. Inside this body:
+    //   - `dockOpen`        gates close-side teardown only.
+    //   - `surfaceVisible`  gates analytics + intervals + initial request.
+    const surfaceVisible = dockOpen && (tabActive ?? true);
     const { startEditing } = useTaskModal();
     const projectId = project?._id ?? "";
 
@@ -425,14 +445,19 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
 
     useEffect(() => {
         if (!isRemote) return;
-        if (open && projectId) {
+        // Kick the remote brief request only when the user is actually
+        // looking at the Brief surface. Tearing it down is wired to
+        // `dockOpen` below so a Chat ↔ Brief tab switch doesn't abort the
+        // in-flight stream (R1-H2).
+        if (surfaceVisible && projectId) {
             void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
-        } else if (!open) {
+        } else if (!dockOpen) {
             abortRemoteBrief();
             clearRemoteBriefSuggestion();
         }
     }, [
-        open,
+        surfaceVisible,
+        dockOpen,
         isRemote,
         projectId,
         startRemoteBrief,
@@ -441,14 +466,25 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     ]);
 
     useEffect(() => {
-        if (!open) {
-            lastFingerprintRef.current = "";
+        // Surface-visible gates the analytics event + fingerprint-driven
+        // refresh: the user has to be looking at the Brief tab for either
+        // to count. On tab switch to Chat (surfaceVisible flips false,
+        // dockOpen stays true), keep the fingerprint ref so we don't
+        // double-fire the "open" event when the user comes back to Brief
+        // with no underlying change.
+        if (!surfaceVisible) {
+            if (!dockOpen) {
+                lastFingerprintRef.current = "";
+            }
             return;
         }
-        track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
         const prevFingerprint = lastFingerprintRef.current;
         const fingerprintChanged =
             prevFingerprint !== "" && prevFingerprint !== fingerprint;
+        const isFirstOpen = prevFingerprint === "";
+        if (isFirstOpen || fingerprintChanged) {
+            track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
+        }
         if (prevFingerprint !== fingerprint) {
             lastFingerprintRef.current = fingerprint;
         }
@@ -460,7 +496,8 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
             void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         }
     }, [
-        open,
+        surfaceVisible,
+        dockOpen,
         fingerprint,
         runBrief,
         isRemote,
@@ -470,16 +507,21 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     ]);
 
     useEffect(() => {
-        if (!open) {
+        // Reset the local AI state only when the dock actually closes —
+        // a tab switch must leave the rendered brief intact (R1-H2).
+        if (!dockOpen) {
             localReset();
         }
-    }, [open, localReset]);
+    }, [dockOpen, localReset]);
 
     useEffect(() => {
-        if (!open) return;
+        // The "generated X ago" interval only ticks while the user is
+        // looking at the Brief tab; no point burning a setInterval when
+        // they're typing in Chat. Switching back re-establishes it.
+        if (!surfaceVisible) return;
         const handle = window.setInterval(() => setNow(Date.now()), 30_000);
         return () => window.clearInterval(handle);
-    }, [open]);
+    }, [surfaceVisible]);
 
     const cached = cacheKey ? BRIEF_CACHE.get(cacheKey) : undefined;
     const briefData: IBoardBrief | undefined = data ?? cached?.data;
@@ -493,12 +535,15 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         microcopy.feedback.couldntGenerateBrief
     );
     const briefStatusAnnouncement = useMemo(() => {
-        if (!open) return "";
+        // Announcements only fire while the user is actually looking at
+        // the brief surface; on tab switch we don't want a queued status
+        // message firing to screen readers about a tab they can't see.
+        if (!surfaceVisible) return "";
         if (error && !briefData) return microcopy.ai.briefStatusError;
         if (briefData) return microcopy.ai.briefStatusReady;
         if (activeIsLoading) return microcopy.ai.briefStatusLoading;
         return "";
-    }, [open, error, briefData, activeIsLoading]);
+    }, [surfaceVisible, error, briefData, activeIsLoading]);
 
     const headline = useMemo(() => {
         if (!briefData) return "";
