@@ -103,6 +103,48 @@ describe("CopilotPrivacyDisclosure", () => {
         expect(screen.getByText(microcopy.ai.privacyTitle)).toBeInTheDocument();
     });
 
+    /*
+     * Followup C (PR #308 review): users who dismissed the legacy
+     * global `boardCopilot:privacyShown` key before the F10 fix shipped
+     * must not be re-prompted on every route the next time they open a
+     * Copilot surface. The migration treats the legacy "dismissed"
+     * signal as global dismissal — when the new route-scoped key is
+     * unset *and* the legacy key is "1", the disclosure stays
+     * acknowledged.
+     */
+    describe("Followup C — legacy storage-key migration", () => {
+        it("honors a legacy global dismissal on a fresh route (no re-prompt)", () => {
+            // Pre-existing user: dismissed under the legacy global key
+            // before the route-scoped split.
+            window.localStorage.setItem("boardCopilot:privacyShown", "1");
+            const { container } = render(
+                <CopilotPrivacyDisclosure route="estimate" />
+            );
+            // Even though `boardCopilot:privacyShown:estimate` was
+            // never set, the legacy "1" suppresses the disclosure.
+            expect(container.firstChild).toBeNull();
+        });
+
+        it("still renders the disclosure when no keys are set at all", () => {
+            // Net-new user, neither key seeded.
+            render(<CopilotPrivacyDisclosure route="estimate" />);
+            expect(
+                screen.getByText(microcopy.ai.privacyTitle)
+            ).toBeInTheDocument();
+        });
+
+        it("does not honor the legacy key when the caller passes an explicit storageKey override", () => {
+            // Legacy global key is set, but the caller supplied its own
+            // storageKey — the migration must respect that override and
+            // surface the disclosure normally.
+            window.localStorage.setItem("boardCopilot:privacyShown", "1");
+            render(<CopilotPrivacyDisclosure storageKey="test:explicit" />);
+            expect(
+                screen.getByText(microcopy.ai.privacyTitle)
+            ).toBeInTheDocument();
+        });
+    });
+
     it("writes the route-scoped key when the user acknowledges", () => {
         render(<CopilotPrivacyDisclosure route="board-brief" />);
         fireEvent.click(

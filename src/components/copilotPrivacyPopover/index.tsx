@@ -181,8 +181,44 @@ interface CopilotPrivacyDisclosureProps {
     route?: AiRoute | "chat";
 }
 
+const LEGACY_GLOBAL_KEY = "boardCopilot:privacyShown";
+
 const buildDefaultStorageKey = (route?: AiRoute | "chat"): string =>
-    route ? `boardCopilot:privacyShown:${route}` : "boardCopilot:privacyShown";
+    route ? `boardCopilot:privacyShown:${route}` : LEGACY_GLOBAL_KEY;
+
+/**
+ * Followup C (PR #308 review): legacy-key migration for the route-scoped
+ * privacy disclosure (Review F10).
+ *
+ * Wave 2 introduced `boardCopilot:privacyShown:{route}` so each AI
+ * surface can carry its own acknowledgement state, but had no fallback
+ * for users who already dismissed the previous global
+ * `boardCopilot:privacyShown` key — they'd be re-prompted on every
+ * route the next time they opened a Copilot surface.
+ *
+ * Migration semantics (chosen for simplicity + safety): the legacy
+ * "dismissed" signal is treated as *global* dismissal. If the new
+ * route-scoped key is unset AND the legacy global key is truthy ("1"),
+ * we report the disclosure as already acknowledged for that route.
+ *
+ * We deliberately do NOT mutate localStorage during the read — back-
+ * filling the new key for every route the user might visit would
+ * silently extend the consent for routes the user has never opened. The
+ * legacy key stays in place until either the user re-enables the
+ * disclosure (out of scope; no UI for this today) or the user
+ * acknowledges the new route-scoped key in which case both keys agree.
+ * This is the least surprising path because it preserves a clean
+ * "explicit acknowledgement per surface" mental model for any new
+ * surface added after the legacy users have moved on.
+ */
+const hasLegacyGlobalAck = (): boolean => {
+    if (typeof window === "undefined") return false;
+    try {
+        return window.localStorage.getItem(LEGACY_GLOBAL_KEY) === "1";
+    } catch {
+        return false;
+    }
+};
 
 export const CopilotPrivacyDisclosure: React.FC<
     CopilotPrivacyDisclosureProps
@@ -191,7 +227,27 @@ export const CopilotPrivacyDisclosure: React.FC<
     const [shown, setShown] = React.useState<boolean>(() => {
         if (typeof window === "undefined") return false;
         try {
-            return window.localStorage.getItem(resolvedStorageKey) === "1";
+            if (window.localStorage.getItem(resolvedStorageKey) === "1") {
+                return true;
+            }
+            /*
+             * If the new route-scoped key is unset but the user
+             * dismissed the legacy global key before the F10 fix
+             * shipped, honor that prior dismissal — re-prompting them
+             * on every route would be a regression in calm-by-default.
+             * Only fires when the caller used the default key (route
+             * scope) so explicit callers / tests that pass their own
+             * `storageKey` are unaffected.
+             */
+            if (
+                !storageKey &&
+                route &&
+                resolvedStorageKey !== LEGACY_GLOBAL_KEY &&
+                hasLegacyGlobalAck()
+            ) {
+                return true;
+            }
+            return false;
         } catch {
             return false;
         }
