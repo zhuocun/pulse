@@ -723,8 +723,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const siblingHint = useMemo(() => {
         if (!nextTaskId && !prevTaskId) return null;
         return (
-            <div
-                aria-label={microcopy.taskDetailPanel.ariaLabel}
+            // <nav> + dedicated aria-label so ATs surface this as a
+            // sibling-task navigation landmark (R-B H2). A bare <div>
+            // dropped the aria-label, and reusing the panel's generic
+            // "Task details" string didn't describe the widget itself.
+            <nav
+                aria-label={microcopy.taskDetailPanel.siblingNavAriaLabel}
                 style={{
                     alignItems: "center",
                     color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55))",
@@ -754,7 +758,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 >
                     {`${microcopy.taskDetailPanel.siblingNextLabel} →`}
                 </Button>
-            </div>
+            </nav>
         );
     }, [goToNext, goToPrev, nextTaskId, prevTaskId]);
 
