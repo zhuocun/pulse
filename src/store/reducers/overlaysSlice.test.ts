@@ -16,7 +16,6 @@ describe("overlaysSlice", () => {
                 open: false,
                 activeTab: "chat",
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             }
         });
@@ -109,7 +108,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "chat" as const,
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             }
         };
@@ -124,7 +122,6 @@ describe("overlaysSlice", () => {
             open: true,
             activeTab: "chat",
             initialPrompt: null,
-            inboxLastReadAt: null,
             inboxUnreadCount: 0
         });
         expect(next.chatDrawer).toEqual({ open: false, pendingPrompt: null });
@@ -140,7 +137,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "chat",
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -154,7 +150,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "brief",
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -171,7 +166,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "chat",
                 initialPrompt: "Summarize the board",
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -192,7 +186,6 @@ describe("overlaysSlice", () => {
                 open: false,
                 activeTab: "chat",
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -213,7 +206,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "brief",
                 initialPrompt: "x",
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -234,7 +226,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "brief",
                 initialPrompt: null,
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -267,7 +258,6 @@ describe("overlaysSlice", () => {
                 open: true,
                 activeTab: "chat",
                 initialPrompt: "Summarize",
-                inboxLastReadAt: null,
                 inboxUnreadCount: 0
             });
         });
@@ -296,15 +286,15 @@ describe("overlaysSlice", () => {
         });
 
         /*
-         * Phase 4 A8 — `markCopilotDockInboxRead` stamps the wall-clock
-         * ms when the user last opened the Inbox tab so the launcher
-         * badge can derive `unreadCount = nudges.filter(receivedAt
-         * > inboxLastReadAt).length`. The dock host dispatches this on
-         * every open transition (false → true on `inboxSurfaceVisible`).
+         * Phase 4 A8 — `markCopilotDockInboxRead` zeros the launcher-
+         * badge unread count so the badge collapses to nothing when the
+         * user opens the Inbox surface. The dock host dispatches this
+         * on every open transition (false → true on `inboxSurfaceVisible`).
+         * The projection-effect's `prevNudgeCountRef` is what stops the
+         * count from bouncing back up on the next tab-switch; this
+         * reducer just owns the surface-side "read" signal.
          */
-        it("markCopilotDockInboxRead stamps inboxLastReadAt with the supplied timestamp AND zeros the unread count", () => {
-            // Seed an unread badge first so we can verify the read
-            // action collapses it back to 0 in the same dispatch.
+        it("markCopilotDockInboxRead zeros the unread count without touching other dock keys", () => {
             const seeded = overlaysSlice.reducer(
                 initialState,
                 overlaysActions.setCopilotDockInboxUnread(3)
@@ -312,11 +302,10 @@ describe("overlaysSlice", () => {
             expect(seeded.copilotDock.inboxUnreadCount).toBe(3);
             const next = overlaysSlice.reducer(
                 seeded,
-                overlaysActions.markCopilotDockInboxRead(1_700_000_000_000)
+                overlaysActions.markCopilotDockInboxRead()
             );
-            expect(next.copilotDock.inboxLastReadAt).toBe(1_700_000_000_000);
             expect(next.copilotDock.inboxUnreadCount).toBe(0);
-            // Doesn't touch the other dock keys — pure stamp.
+            // Doesn't touch the other dock keys — pure read signal.
             expect(next.copilotDock.open).toBe(false);
             expect(next.copilotDock.activeTab).toBe("chat");
             expect(next.copilotDock.initialPrompt).toBeNull();

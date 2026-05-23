@@ -846,45 +846,6 @@ describe("CopilotDockHost", () => {
     });
 
     /*
-     * Phase 4 A8 — opening the Inbox tab stamps `inboxLastReadAt`
-     * (the launcher-badge unread-count baseline). The dock host's
-     * effect fires on the open transition only; closing and re-
-     * opening the Inbox produces a fresh stamp.
-     *
-     * We pin a known baseline by stamping the slice ourselves before
-     * the harness mount, so the assertion can compare relative to a
-     * stable starting point regardless of other tests' state.
-     */
-    it("stamps inboxLastReadAt when the Inbox tab becomes the active surface", async () => {
-        // Pin a known baseline so the assertion is order-independent.
-        const baseline = 1_000;
-        store.dispatch(overlaysActions.markCopilotDockInboxRead(baseline));
-
-        renderHarness();
-        // `renderHarness` resets open/chat/brief flags but leaves
-        // inboxLastReadAt at our baseline above. We re-stamp the
-        // baseline AFTER renderHarness in case the host's mount-time
-        // effect fired (it shouldn't — open is false here — but the
-        // assertion below proves the open transition is what stamps).
-        store.dispatch(overlaysActions.markCopilotDockInboxRead(baseline));
-        expect(store.getState().overlays.copilotDock.inboxLastReadAt).toBe(
-            baseline
-        );
-
-        act(() => {
-            store.dispatch(overlaysActions.openCopilotDock({ tab: "inbox" }));
-        });
-
-        // After the open transition, the stamp jumps to a real
-        // wall-clock value strictly greater than our baseline.
-        await waitFor(() => {
-            const stamped =
-                store.getState().overlays.copilotDock.inboxLastReadAt ?? 0;
-            expect(stamped).toBeGreaterThan(baseline);
-        });
-    });
-
-    /*
      * Phase 4 A8 — per-project nudge isolation regression. When the
      * dock body remounts on project switch (key={projectId}), the new
      * project's `useAgent("triage-agent", { projectId: p2 })` instance
