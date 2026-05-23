@@ -1,9 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 
+import {
+    ANALYTICS_EVENTS,
+    setAnalyticsSink,
+    type AnalyticsSink
+} from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 
@@ -112,6 +118,62 @@ const renderDock = (options: RenderOptions = {}) => {
     return { ...utils, onClose, onTabChange };
 };
 
+/**
+ * Tests that exercise tab-switch behavior need the parent to actually
+ * apply `onTabChange` so the dock re-renders with the new `activeTab`.
+ * `renderDock` (above) passes a `jest.fn()`, which catches the call but
+ * never updates state — that's fine for the lower-level assertions but
+ * useless for "type in Chat → switch to Brief → switch back". This
+ * controlled wrapper threads the tab through real React state.
+ */
+interface ControlledDockProps {
+    initialTab?: CopilotDockTab;
+    initialOpen?: boolean;
+}
+
+const ControlledDock: React.FC<ControlledDockProps> = ({
+    initialTab = "chat",
+    initialOpen = true
+}) => {
+    const [activeTab, setActiveTab] = useState<CopilotDockTab>(initialTab);
+    const [open, setOpen] = useState(initialOpen);
+    return (
+        <CopilotDock
+            activeTab={activeTab}
+            columns={[column()]}
+            knownProjectIds={["project-1"]}
+            members={[member()]}
+            onClose={() => setOpen(false)}
+            onTabChange={setActiveTab}
+            open={open}
+            project={project()}
+            tasks={[]}
+        />
+    );
+};
+
+const renderControlled = (
+    props: ControlledDockProps = {}
+): ReturnType<typeof render> => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            mutations: { retry: false },
+            queries: { retry: false }
+        }
+    });
+    return render(
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter>
+                    <AntdApp>
+                        <ControlledDock {...props} />
+                    </AntdApp>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
+    );
+};
+
 describe("CopilotDock", () => {
     beforeEach(() => {
         installAntdBrowserMocks(false);
@@ -179,20 +241,29 @@ describe("CopilotDock", () => {
         });
     });
 
-    it("renders a single consolidated header (one AI badge, no duplicate engine tags)", () => {
+    it("renders a single consolidated header (exactly one AI badge in the dock header)", () => {
         renderDock();
 
         // The dock title row owns exactly one ai-badge tag. Both legacy
         // drawers used to render their own; the dock's role is to
         // collapse them onto a single header.
-        const aiBadges = screen.getAllByText(microcopy.a11y.aiBadge as string, {
-            exact: false
-        });
-        // ChatTabBody's per-message disclaimer also renders aiBadge,
-        // so we expect the dock title to surface it AT LEAST once, but
-        // we explicitly check there is only one in the dock's header
-        // region by counting Tags inside the data-testid wrapper title.
-        expect(aiBadges.length).toBeGreaterThanOrEqual(1);
+        //
+        // ChatTabBody's per-message disclaimer ALSO renders the
+        // `microcopy.a11y.aiBadge` string, so a global text count can
+        // exceed one without telling us anything about the header.
+        // Scope the assertion to the AntD drawer header region so we
+        // count badges that actually live in the dock title row only.
+        const header = document.querySelector(
+            "[data-testid='copilot-dock'] .ant-drawer-header"
+        );
+        expect(header).not.toBeNull();
+        const headerBadgeMatches = (header as HTMLElement).querySelectorAll(
+            ".ant-tag"
+        );
+        const headerAiBadges = Array.from(headerBadgeMatches).filter((node) =>
+            (node.textContent ?? "").includes(microcopy.a11y.aiBadge as string)
+        );
+        expect(headerAiBadges).toHaveLength(1);
     });
 
     it("invokes onClose when the mask is clicked (dirty-state-safe close)", () => {
@@ -225,5 +296,135 @@ describe("CopilotDock", () => {
         // DOM (it animates back to a hidden state). The test root will
         // not show the tablist or the composer.
         expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    });
+
+    /*
+     * R1-H1 regression: switching from Chat → Brief used to clear the
+     * composer text and abort any in-flight stream because the body's
+     * teardown effect watched a single `open` prop that was passed as
+     * `dockOpen && activeTab === "chat"`. After the prop split, the body
+     * stays mounted across tab switches and the composer text must
+     * survive a round-trip to the Brief tab.
+     */
+    it("preserves chat composer text across a Chat → Brief → Chat tab switch (R1-H1)", async () => {
+        renderControlled({ initialTab: "chat" });
+
+        const composer = (await screen.findByRole("textbox", {
+            name: /message board copilot/i
+        })) as HTMLTextAreaElement;
+        fireEvent.change(composer, { target: { value: "hello copilot" } });
+        expect(composer.value).toBe("hello copilot");
+
+        fireEvent.click(
+            screen.getByRole("tab", {
+                name: microcopy.copilotDock.tabBrief as string
+            })
+        );
+
+        // After the switch, AntD keeps the Chat panel mounted (it just
+        // hides its visibility). The textarea node is still in the DOM
+        // and its value MUST be preserved.
+        await waitFor(() => {
+            expect(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.tabBrief as string,
+                    selected: true
+                })
+            ).toBeInTheDocument();
+        });
+        // Same composer node, queried by ID since visibility may have
+        // changed how queries resolve. Use a direct DOM query because
+        // the hidden panel is excluded from name-based queries.
+        const composerAfter = document.querySelector(
+            "textarea[aria-label='Message Board Copilot']"
+        ) as HTMLTextAreaElement | null;
+        expect(composerAfter).not.toBeNull();
+        expect(composerAfter!.value).toBe("hello copilot");
+
+        // Switching back to Chat re-shows the same composer with the
+        // text intact.
+        fireEvent.click(
+            screen.getByRole("tab", {
+                name: microcopy.copilotDock.tabChat as string
+            })
+        );
+        await waitFor(() => {
+            const composerVisible = screen.getByRole("textbox", {
+                name: /message board copilot/i
+            }) as HTMLTextAreaElement;
+            expect(composerVisible.value).toBe("hello copilot");
+        });
+    });
+
+    /*
+     * R1-H2 regression: the Brief body's `useEffect([open])` used to fire
+     * `track(COPILOT_BRIEF_OPEN)` every time `open` flipped, including on
+     * tab switches that re-show the tab without any underlying state
+     * change. After the prop split, the analytics event must fire ONCE
+     * for an "open → tab Chat → tab Brief" round-trip — the user has not
+     * re-opened the brief surface from scratch.
+     */
+    it("only fires COPILOT_BRIEF_OPEN once across a Brief → Chat → Brief round-trip (R1-H2)", async () => {
+        const sink = jest.fn<
+            ReturnType<AnalyticsSink>,
+            Parameters<AnalyticsSink>
+        >();
+        const previous = setAnalyticsSink(sink);
+        try {
+            renderControlled({ initialTab: "brief" });
+
+            // Wait for the brief tab to render so its mount-effect has
+            // run at least once.
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabBrief as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+            const initialBriefOpenCount = sink.mock.calls.filter(
+                ([event]) => event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+            ).length;
+            expect(initialBriefOpenCount).toBe(1);
+
+            // Switch to Chat, then back to Brief. Same fingerprint, same
+            // surface state — the event must NOT fire a second time just
+            // because the user toggled tabs.
+            fireEvent.click(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.tabChat as string
+                })
+            );
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabChat as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+
+            fireEvent.click(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.tabBrief as string
+                })
+            );
+            await waitFor(() => {
+                expect(
+                    screen.getByRole("tab", {
+                        name: microcopy.copilotDock.tabBrief as string,
+                        selected: true
+                    })
+                ).toBeInTheDocument();
+            });
+
+            const finalBriefOpenCount = sink.mock.calls.filter(
+                ([event]) => event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+            ).length;
+            expect(finalBriefOpenCount).toBe(1);
+        } finally {
+            setAnalyticsSink(previous);
+        }
     });
 });
