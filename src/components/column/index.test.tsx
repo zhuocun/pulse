@@ -167,6 +167,7 @@ const defaultParam: TaskSearchParam = {
 };
 
 const removeColumn = jest.fn();
+const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
 const closeTask = jest.fn();
@@ -198,7 +199,15 @@ const renderColumn = ({
     tasks?: ITask[];
     boardAiOn?: boolean;
 } = {}) => {
-    mockedUseReactMutation.mockReturnValue({ mutate: removeColumn });
+    // The component calls `useReactMutation` twice: once for the column
+    // delete (endpoint="boards") and once for the task rename
+    // (endpoint="tasks"). Route by the first arg so the two mutations
+    // don't collide in test assertions.
+    mockedUseReactMutation.mockImplementation((endPoint: string) =>
+        endPoint === "tasks"
+            ? { mutate: updateTask, isLoading: false }
+            : { mutate: removeColumn, isLoading: false }
+    );
     mockedUseTaskModal.mockReturnValue({ startEditing });
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
 
@@ -461,7 +470,11 @@ describe("Column", () => {
 
     it("invokes onResetFilters when the reset button is clicked", () => {
         const onResetFilters = jest.fn();
-        mockedUseReactMutation.mockReturnValue({ mutate: removeColumn });
+        mockedUseReactMutation.mockImplementation((endPoint: string) =>
+            endPoint === "tasks"
+                ? { mutate: updateTask, isLoading: false }
+                : { mutate: removeColumn, isLoading: false }
+        );
         mockedUseTaskModal.mockReturnValue({ startEditing });
 
         render(
@@ -555,5 +568,112 @@ describe("Column", () => {
         });
         const pill = screen.getByTestId("column-readiness-pill");
         expect(pill).toHaveAttribute("data-status", "needs-grooming");
+    });
+
+    /*
+     * Part B — inline-edit task card title (Phase 4.5 of `ui-todo.md`).
+     */
+    describe("inline-edit task title", () => {
+        it("enters edit mode on double-click of the title and shows an autofocused Input", () => {
+            renderColumn();
+            const title = screen.getAllByTestId("task-card-title")[0];
+            fireEvent.doubleClick(title);
+            const input = screen.getByTestId(
+                "task-card-title-input"
+            ) as HTMLInputElement;
+            expect(input).toBeInTheDocument();
+            // AntD's Input wraps a native <input>; the value mirrors the
+            // task name when edit mode opens.
+            expect(input.value).toBe("Build task");
+            expect(input).toHaveAccessibleName("Rename task");
+        });
+
+        it("commits the rename through the task PUT mutation on Enter", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Renamed task" } });
+            fireEvent.keyDown(input, { key: "Enter" });
+            expect(updateTask).toHaveBeenCalledTimes(1);
+            expect(updateTask).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    _id: "task-1",
+                    taskName: "Renamed task"
+                })
+            );
+        });
+
+        it("reverts and skips the mutation on Esc", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Renamed task" } });
+            fireEvent.keyDown(input, { key: "Escape" });
+            expect(updateTask).not.toHaveBeenCalled();
+            // The card title text reverts to the original.
+            expect(screen.getByText("Build task")).toBeInTheDocument();
+            // The Input is unmounted.
+            expect(
+                screen.queryByTestId("task-card-title-input")
+            ).not.toBeInTheDocument();
+        });
+
+        it("commits on blur (Linear convention) when the value actually changed", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Blurred name" } });
+            fireEvent.blur(input);
+            expect(updateTask).toHaveBeenCalledTimes(1);
+            expect(updateTask).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    _id: "task-1",
+                    taskName: "Blurred name"
+                })
+            );
+        });
+
+        it("does not call the mutation when blur fires with an unchanged value", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.blur(input);
+            expect(updateTask).not.toHaveBeenCalled();
+        });
+
+        it("does not call the mutation when the trimmed value is empty (whitespace-only)", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "   " } });
+            fireEvent.keyDown(input, { key: "Enter" });
+            expect(updateTask).not.toHaveBeenCalled();
+        });
+
+        it("stops click propagation from the Input so the modal doesn't open underneath", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.click(input);
+            // The card-level open handler is `startEditing` (modal flow,
+            // since `taskPanelRouted` is false in this suite). It must
+            // NOT have fired despite the click landing inside the card.
+            expect(startEditing).not.toHaveBeenCalled();
+        });
+
+        it("does not enter edit mode for mock (optimistic-placeholder) tasks", () => {
+            renderColumn();
+            // The third task in the fixture is the optimistic placeholder
+            // ("Optimistic task" with _id="mock"); its title must remain
+            // a plain non-editable label.
+            const optimisticTitle = screen
+                .getAllByTestId("task-card-title")
+                .find((node) => node.textContent === "Optimistic task");
+            expect(optimisticTitle).toBeTruthy();
+            fireEvent.doubleClick(optimisticTitle!);
+            expect(
+                screen.queryByTestId("task-card-title-input")
+            ).not.toBeInTheDocument();
+        });
     });
 });
