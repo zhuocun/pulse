@@ -377,6 +377,9 @@ const zhCN: Dictionary = {
         copilotMenuBrief: "看板简报",
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。",
+        densityLabel: "看板密度",
+        densityComfortable: "宽松",
+        densityCompact: "紧凑",
         minimap: {
             aria: "看板缩略图",
             segmentAriaOne: "{name} 列,1 个任务,当前{status}",

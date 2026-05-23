@@ -1,16 +1,30 @@
+import { configureStore } from "@reduxjs/toolkit";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DragDropContext } from "@hello-pangea/dnd";
 import type { ReactNode } from "react";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
+import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import { Drag, Drop, DropChild } from "../dragAndDrop";
 import { TaskSearchParam } from "../taskSearchPanel";
 
 import Column from ".";
+
+const makeTestStore = () =>
+    configureStore({
+        reducer: { userPreferences: userPreferencesSlice.reducer },
+        preloadedState: {
+            userPreferences: {
+                boardDensity: "comfortable" as const,
+                savedFilterPresets: []
+            }
+        }
+    });
 
 jest.mock("../../utils/hooks/useReactMutation");
 jest.mock("../../utils/hooks/useTaskModal");
@@ -133,39 +147,41 @@ const renderColumnWithColumnDnD = (options?: { startEditing?: jest.Mock }) => {
     });
 
     return render(
-        <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-            <Routes>
-                <Route
-                    path="/projects/:projectId/board"
-                    element={
-                        <DragDropContext onDragEnd={() => undefined}>
-                            <Drop
-                                direction="horizontal"
-                                droppableId="column"
-                                type="COLUMN"
-                            >
-                                <DropChild style={{ display: "flex" }}>
-                                    <Drag
-                                        detachDragHandle
-                                        disableInteractiveElementBlocking
-                                        draggableId="columncolumn-1"
-                                        index={0}
-                                        isDragDisabled={false}
-                                    >
-                                        <Column
-                                            column={column()}
+        <Provider store={makeTestStore()}>
+            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={
+                            <DragDropContext onDragEnd={() => undefined}>
+                                <Drop
+                                    direction="horizontal"
+                                    droppableId="column"
+                                    type="COLUMN"
+                                >
+                                    <DropChild style={{ display: "flex" }}>
+                                        <Drag
+                                            detachDragHandle
+                                            disableInteractiveElementBlocking
+                                            draggableId="columncolumn-1"
+                                            index={0}
                                             isDragDisabled={false}
-                                            param={defaultParam}
-                                            tasks={[task()]}
-                                        />
-                                    </Drag>
-                                </DropChild>
-                            </Drop>
-                        </DragDropContext>
-                    }
-                />
-            </Routes>
-        </MemoryRouter>
+                                        >
+                                            <Column
+                                                column={column()}
+                                                isDragDisabled={false}
+                                                param={defaultParam}
+                                                tasks={[task()]}
+                                            />
+                                        </Drag>
+                                    </DropChild>
+                                </Drop>
+                            </DragDropContext>
+                        }
+                    />
+                </Routes>
+            </MemoryRouter>
+        </Provider>
     );
 };
 
@@ -239,39 +255,41 @@ describe("Column DnD affordances (live @hello-pangea/dnd)", () => {
         mockedUseTaskModal.mockReturnValue({ startEditing: jest.fn() });
 
         render(
-            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <DragDropContext onDragEnd={() => undefined}>
-                                <Drop
-                                    direction="horizontal"
-                                    droppableId="column"
-                                    type="COLUMN"
-                                >
-                                    <DropChild style={{ display: "flex" }}>
-                                        <Drag
-                                            detachDragHandle
-                                            disableInteractiveElementBlocking
-                                            draggableId="columncolumn-1"
-                                            index={0}
-                                            isDragDisabled
-                                        >
-                                            <Column
-                                                column={column()}
-                                                isDragDisabled={false}
-                                                param={defaultParam}
-                                                tasks={[task()]}
-                                            />
-                                        </Drag>
-                                    </DropChild>
-                                </Drop>
-                            </DragDropContext>
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
+            <Provider store={makeTestStore()}>
+                <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <DragDropContext onDragEnd={() => undefined}>
+                                    <Drop
+                                        direction="horizontal"
+                                        droppableId="column"
+                                        type="COLUMN"
+                                    >
+                                        <DropChild style={{ display: "flex" }}>
+                                            <Drag
+                                                detachDragHandle
+                                                disableInteractiveElementBlocking
+                                                draggableId="columncolumn-1"
+                                                index={0}
+                                                isDragDisabled
+                                            >
+                                                <Column
+                                                    column={column()}
+                                                    isDragDisabled={false}
+                                                    param={defaultParam}
+                                                    tasks={[task()]}
+                                                />
+                                            </Drag>
+                                        </DropChild>
+                                    </Drop>
+                                </DragDropContext>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </Provider>
         );
 
         expect(
