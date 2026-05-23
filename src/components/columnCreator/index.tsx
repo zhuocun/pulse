@@ -5,7 +5,7 @@ import type { InputRef } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
     breakpoints,
     fontWeight,
@@ -13,6 +13,7 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 
@@ -86,6 +87,7 @@ const ColumnCreator: React.FC = () => {
         ["boards", { projectId }],
         newColumnCallback
     );
+    const { record: recordActivity } = useActivityFeed();
 
     const collapse = useCallback(() => {
         setEditing(false);
@@ -101,6 +103,14 @@ const ColumnCreator: React.FC = () => {
         setColumnName("");
         await mutateAsync({ columnName: trimmed, projectId });
         setEditing(false);
+        // Phase 4.3 — record column create into the activity feed.
+        recordActivity({
+            kind: "column",
+            action: "create",
+            summary: microcopyString(
+                microcopy.activityFeed.descriptions.columnCreated
+            ).replace("{name}", trimmed)
+        });
     };
 
     useEffect(() => {

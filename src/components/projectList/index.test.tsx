@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { message, Modal } from "antd";
 import type { ReactNode } from "react";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { store } from "../../store";
 import useAuth from "../../utils/hooks/useAuth";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -146,20 +148,22 @@ const renderList = ({
     );
 
     return render(
-        <MemoryRouter initialEntries={["/projects"]}>
-            <Routes>
-                <Route
-                    path="/projects"
-                    element={
-                        <ProjectList
-                            dataSource={dataSource}
-                            loading={loading}
-                            members={members}
-                        />
-                    }
-                />
-            </Routes>
-        </MemoryRouter>
+        <Provider store={store}>
+            <MemoryRouter initialEntries={["/projects"]}>
+                <Routes>
+                    <Route
+                        path="/projects"
+                        element={
+                            <ProjectList
+                                dataSource={dataSource}
+                                loading={loading}
+                                members={members}
+                            />
+                        }
+                    />
+                </Routes>
+            </MemoryRouter>
+        </Provider>
     );
 };
 
