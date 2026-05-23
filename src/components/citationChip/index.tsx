@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import { App, Button, Tooltip, Typography } from "antd";
+import { App, Button, Popover, Typography } from "antd";
 import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
@@ -13,14 +13,22 @@ import CopilotChip from "../copilotChip";
  * — clicking or pressing Enter navigates to the cited entity (or fires
  * `onNavigate` so the surface can scroll the row into view and pulse it
  * per C-R7). Verbatim `quote` is mandatory and always shown in the
- * tooltip / popover so users can verify what the agent saw.
+ * popover so users can verify what the agent saw.
+ *
+ * QW#7 (2026-05 review §Quick Wins): the source preview + "report wrong
+ * source" affordance now live inside a *Popover* with a `click` trigger
+ * instead of a hover Tooltip. Tooltips dismiss on mouse-out and only
+ * surface on hover, so the flag action was unreachable for keyboard +
+ * touch users — the Popover keeps the same body but opens on click /
+ * Enter, stays open until the user dismisses it (Esc or outside-click),
+ * and lets the flag Button receive focus.
  *
  * The pill geometry is owned by the shared `<CopilotChip variant="citation">`
  * (Ambition 6 / 2026-05 review §6). The superscript positioning and 2 px
  * outer margin remain citation-specific so the chip slots inline with body
  * text without floating off the baseline.
  */
-const TooltipBody = styled.div`
+const PopoverBody = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${space.xxs}px;
@@ -88,34 +96,50 @@ const CitationChip: React.FC<CitationChipProps> = ({
         message.success(microcopy.ai.citationFlagConfirm);
     };
     const navigable = typeof onNavigate === "function";
+    /*
+     * The popover body lives inline so the source preview, verbatim
+     * quote, and report-this-citation action share a single overlay.
+     * The button stops propagation so flagging never also navigates to
+     * the cited entity even though both affordances live in the same
+     * overlay.
+     */
+    const popoverContent = (
+        <PopoverBody>
+            <Typography.Text strong>
+                {getSourceLabel(citation.source)} · {citation.id}
+            </Typography.Text>
+            <Typography.Text>“{citation.quote}”</Typography.Text>
+            <Button
+                aria-label={microcopy.ai.citationFlagAction}
+                disabled={flagged}
+                onClick={handleFlag}
+                size="small"
+                style={{
+                    marginTop: 4,
+                    paddingInline: 0
+                }}
+                type="link"
+            >
+                {flagged
+                    ? microcopy.ai.citationFlagConfirm
+                    : microcopy.ai.citationFlagAction}
+            </Button>
+        </PopoverBody>
+    );
     return (
-        <Tooltip
-            title={
-                <TooltipBody>
-                    <Typography.Text strong style={{ color: "inherit" }}>
-                        {getSourceLabel(citation.source)} · {citation.id}
-                    </Typography.Text>
-                    <Typography.Text style={{ color: "inherit" }}>
-                        “{citation.quote}”
-                    </Typography.Text>
-                    <Button
-                        aria-label={microcopy.ai.citationFlagAction}
-                        disabled={flagged}
-                        onClick={handleFlag}
-                        size="small"
-                        style={{
-                            color: "inherit",
-                            marginTop: 4,
-                            paddingInline: 0
-                        }}
-                        type="link"
-                    >
-                        {flagged
-                            ? microcopy.ai.citationFlagConfirm
-                            : microcopy.ai.citationFlagAction}
-                    </Button>
-                </TooltipBody>
-            }
+        <Popover
+            content={popoverContent}
+            placement="top"
+            /*
+             * Click-only trigger (QW#7): hover would re-introduce the
+             * keyboard / touch reachability bug, focus would auto-open
+             * the popover on tab-through and read the quote into the
+             * screen reader stream mid-document (the same issue we just
+             * silenced on AiSuggestedBadge in QW#12). The chip already
+             * forwards Enter / Space via `interactive` → `role=button`,
+             * so keyboard activation still toggles the popover.
+             */
+            trigger="click"
         >
             <CopilotChip
                 aria-label={microcopy.ai.citationAriaLabel
@@ -136,7 +160,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
             >
                 [{index}]
             </CopilotChip>
-        </Tooltip>
+        </Popover>
     );
 };
 
