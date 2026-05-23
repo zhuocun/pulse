@@ -15,6 +15,7 @@ import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
 import ProjectList from "../components/projectList";
 import ProjectSearchPanel from "../components/projectSearchPanel";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import {
     accent,
@@ -252,8 +253,16 @@ const ProjectPage = () => {
      * Listen for `boardCopilot:openChat` from the command palette so the
      * project list (no board context) still surfaces AI mode submissions
      * (PRD CP-R6).
+     *
+     * R-A M1 Issue #2: under the dock flag, the host owns the listener
+     * so palette → dock works from any route. Keeping this listener
+     * live under the flag would dispatch `openChatDrawer` twice and
+     * cause Issue #4 (the project-page-mounted `<AiChatDrawer>` also
+     * consumes the prompt, then the dock body consumes it AGAIN after
+     * navigation to the board).
      */
     useEffect(() => {
+        if (environment.copilotDockEnabled) return;
         if (!aiEnabled) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;
@@ -498,7 +507,19 @@ const ProjectPage = () => {
                 members={members ?? []}
                 loading={pLoading || mLoading}
             />
-            {aiEnabled && (
+            {aiEnabled && !environment.copilotDockEnabled && (
+                /*
+                 * R-A M1 Issue #4: when the dock flag is on, the host
+                 * mounts a single CopilotDock surface that survives
+                 * navigations and consumes any pending prompt through
+                 * the bridge. Keeping this drawer mounted alongside
+                 * caused the prompt to be dispatched TWICE: once by
+                 * this drawer's ChatTabBody on /projects, then again
+                 * by the host's ChatTabBody after the user navigated
+                 * to /projects/p1/board — because the new instance
+                 * still saw `chatDrawer.pendingPrompt` in Redux and
+                 * its own `initialPromptHandled.current` was null.
+                 */
                 <AiChatDrawer
                     columns={[]}
                     initialPrompt={chatInitialPrompt}

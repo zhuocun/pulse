@@ -483,6 +483,16 @@ const BoardPage = () => {
     const triagedProjectsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
+        // R-A M1 Issue #2: when the CopilotDock flag is ON, the host
+        // owns the triage-agent mount and start-effect (see
+        // `copilotDockHost.tsx`). Without this guard, BOTH the host
+        // and the board page would call `startTriageAgent` for the
+        // same project, leading to two SSE stream POSTs and two
+        // independent `useAgent` instances writing to the same
+        // sessionStorage thread-id key. The legacy drawer mounts in
+        // this file are already flag-gated; we extend the same gate
+        // to the triage start-effect.
+        if (environment.copilotDockEnabled) return;
         if (!chatOpen) return;
         const pid = currentProject?._id;
         if (!pid) return;
@@ -545,8 +555,16 @@ const BoardPage = () => {
      * user submits a prompt in palette AI mode, the palette dispatches
      * a `boardCopilot:openChat` event with the prompt; we open the
      * drawer here so the chat hook can pick up the pre-populated value.
+     *
+     * R-A M1 Issue #2 follow-on: under the dock flag, `ProjectPage`'s
+     * mirror listener (or `CopilotDockHost`'s bridge if the user is
+     * already on board) handles the same event by dispatching the
+     * chat-drawer Redux action that the bridge forwards to the dock.
+     * Keeping this listener live with the flag on would dispatch the
+     * Redux action twice for the same palette submission.
      */
     useEffect(() => {
+        if (environment.copilotDockEnabled) return;
         if (!boardAiOn) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;

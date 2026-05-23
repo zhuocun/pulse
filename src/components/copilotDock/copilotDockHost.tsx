@@ -232,14 +232,36 @@ const ProjectScopedDock: React.FC<ProjectScopedDockProps> = ({ projectId }) => {
  * picks a board and the URL acquires a `projectId`.
  */
 const BridgeLegacyOverlayFlags: React.FC = () => {
-    const { open: chatOpen, pendingPrompt: chatInitialPrompt } =
-        useAiChatDrawer();
+    const {
+        open: chatOpen,
+        pendingPrompt: chatInitialPrompt,
+        openDrawer: openChatDrawer
+    } = useAiChatDrawer();
     const { open: briefOpen } = useBoardBriefDrawer();
     const { openDock } = useCopilotDock();
 
     const prevChatOpenRef = useRef(false);
     const prevBriefOpenRef = useRef(false);
     const prevChatPromptRef = useRef<string | null>(null);
+
+    /*
+     * R-A M1 Issue #2: under the dock flag, both `BoardPage` and
+     * `ProjectPage` gate off their `boardCopilot:openChat` listeners
+     * so the on-board palette → AI handoff doesn't trigger duplicate
+     * dispatches. The host owns the listener instead — it always
+     * runs (even when `projectId` is null) so palette submissions
+     * from any route reach the dock, mirroring what `BoardPage`'s
+     * listener did before the migration.
+     */
+    useEffect(() => {
+        const onOpenChat = (event: Event) => {
+            const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+            openChatDrawer(detail?.prompt);
+        };
+        window.addEventListener("boardCopilot:openChat", onOpenChat);
+        return () =>
+            window.removeEventListener("boardCopilot:openChat", onOpenChat);
+    }, [openChatDrawer]);
 
     /*
      * Watch transitions, not absolute values: `chatOpen=true` triggers
