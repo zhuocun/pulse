@@ -1,0 +1,71 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=badge 1`] = `
+<span
+  class="ant-tag ant-tag-filled css-1jv0p8g css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="purple"
+  data-copilot-chip-variant="badge"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=citation 1`] = `
+<span
+  class="ant-tag ant-tag-filled css-1jv0p8g css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="purple"
+  data-copilot-chip-variant="citation"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=confidence 1`] = `
+<span
+  class="ant-tag ant-tag-filled ant-tag-default css-pljicg css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="default"
+  data-copilot-chip-variant="confidence"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=engine 1`] = `
+<span
+  class="ant-tag ant-tag-filled css-1jv0p8g css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="purple"
+  data-copilot-chip-variant="engine"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=match 1`] = `
+<span
+  class="ant-tag ant-tag-filled ant-tag-default css-pljicg css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="default"
+  data-copilot-chip-variant="match"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=risk 1`] = `
+<span
+  class="ant-tag ant-tag-filled ant-tag-default css-pljicg css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="default"
+  data-copilot-chip-variant="risk"
+>
+  label
+</span>
+`;
+
+exports[`CopilotChip matches the variant snapshot for every supported variant: variant=suggested 1`] = `
+<span
+  class="ant-tag ant-tag-filled css-1jv0p8g css-dev-only-do-not-override-xogyor css-var-root"
+  data-copilot-chip-tone="purple"
+  data-copilot-chip-variant="suggested"
+>
+  label
+</span>
+`;
