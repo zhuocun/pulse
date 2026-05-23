@@ -174,6 +174,17 @@ const ProjectList: React.FC<Props> = ({
         // outcome of the explicit confirm-to-delete.
         () => {}
     );
+    // Companion POST mutation used purely as the undo closure for
+    // the activity-feed Undo button. Re-creates the deleted project
+    // with the captured before-state so the user can recover from an
+    // accidental delete. Fire-and-forget — errors are swallowed.
+    const { mutateAsync: undoDelete } = useReactMutation(
+        "projects",
+        "POST",
+        ["projects"],
+        undefined,
+        () => {}
+    );
     const { record: recordActivity } = useActivityFeed();
     const { startEditing, openModal } = useProjectModal();
 
@@ -200,13 +211,14 @@ const ProjectList: React.FC<Props> = ({
     );
 
     const onDelete = (projectId: string) => {
-        // Capture the project name BEFORE removal so the activity-feed
-        // row can render the localized "Deleted project '<name>'" copy
-        // (after the mutation the dataSource has been pruned and the
-        // lookup would return undefined).
-        const projectName =
-            dataSource?.find((project) => project._id === projectId)
-                ?.projectName ?? "";
+        // Capture the full project payload BEFORE removal so the
+        // activity-feed undo closure can POST it back if the user
+        // changes their mind. After the mutation the dataSource has
+        // been pruned and the lookup would return undefined.
+        const beforeState = dataSource?.find(
+            (project) => project._id === projectId
+        );
+        const projectName = beforeState?.projectName ?? "";
         Modal.confirm({
             centered: true,
             okText: microcopy.confirm.deleteProject.confirmLabel,
@@ -223,14 +235,27 @@ const ProjectList: React.FC<Props> = ({
                             // Phase 4.3 — record the delete into the
                             // activity feed only after the server
                             // confirms the deletion, so a 5xx leaves
-                            // the feed clean.
+                            // the feed clean. The 10s-window Undo
+                            // closure re-POSTs the captured project so
+                            // the user can recover from an accidental
+                            // delete.
                             recordActivity({
                                 kind: "project",
                                 action: "delete",
                                 summary: microcopyString(
                                     microcopy.activityFeed.descriptions
                                         .projectDeleted
-                                ).replace("{name}", projectName)
+                                ).replace("{name}", projectName),
+                                undo: beforeState
+                                    ? () => {
+                                          void undoDelete(
+                                              beforeState as unknown as Record<
+                                                  string,
+                                                  unknown
+                                              >
+                                          );
+                                      }
+                                    : undefined
                             });
                         },
                         onError: () =>
