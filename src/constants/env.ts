@@ -155,6 +155,20 @@ const bottomNavEnabledFlag = readEnv("REACT_APP_BOTTOM_NAV_ENABLED");
  */
 const taskPanelRoutedFlag = readEnv("REACT_APP_TASK_PANEL_ROUTED");
 
+/**
+ * Phase 3 A1 — CopilotDock. Opt-in until validated: when "true" the
+ * board mounts a single tabbed `<CopilotDock>` hosting Chat + Brief
+ * (plus future Inbox / Settings tabs) instead of the two legacy
+ * `<AiChatDrawer>` / `<BoardBriefDrawer>` surfaces. When the flag is
+ * unset or "false" (default) the legacy drawers continue to render
+ * exactly as today and the dock does not mount. The migration plan
+ * mirrors A2: one release with both surfaces alive behind the flag,
+ * then a follow-up PR removes the legacy drawers. Set
+ * `REACT_APP_COPILOT_DOCK_ENABLED=true` in a local `.env.development`
+ * or at deploy time to enable.
+ */
+const copilotDockEnabledFlag = readEnv("REACT_APP_COPILOT_DOCK_ENABLED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -180,7 +194,12 @@ const environment = {
      * Phase 3 A2 routed-task-panel flag. Default false (opt-in) — see
      * the `taskPanelRoutedFlag` block above for the rollout plan.
      */
-    taskPanelRouted: taskPanelRoutedFlag === "true"
+    taskPanelRouted: taskPanelRoutedFlag === "true",
+    /**
+     * Phase 3 A1 CopilotDock flag. Default false (opt-in) — see the
+     * `copilotDockEnabledFlag` block above for the rollout plan.
+     */
+    copilotDockEnabled: copilotDockEnabledFlag === "true"
 };
 
 export default environment;
