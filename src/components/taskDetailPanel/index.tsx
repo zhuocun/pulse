@@ -39,6 +39,7 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import useTaskPanelSiblings from "../../utils/hooks/useTaskPanelSiblings";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
@@ -282,6 +283,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      */
     const { goToNext, goToPrev, nextTaskId, prevTaskId } =
         useTaskPanelSiblings();
+    // Single source of truth for the panel URL contract; openSimilarTask
+    // routes through here so we don't hand-roll the path twice (R-C M1).
+    const { openTask } = useTaskPanelNavigation();
 
     /**
      * Dirty flag driven by `onValuesChange`. We can't rely on
@@ -1004,13 +1008,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                                 setFormTick((tick) => tick + 1);
                             }}
                             onOpenSimilarTask={(otherTaskId) => {
-                                // Same-tab navigation to a sibling
-                                // task. The dirty-guard intercepts
-                                // if needed.
-                                navigate(
-                                    `/projects/${projectId}/board/task/${otherTaskId}`,
-                                    { viewTransition: true }
-                                );
+                                // Same-tab navigation to a sibling task —
+                                // shared URL contract via useTaskPanelNavigation
+                                // so the path lives in one place. The
+                                // dirty-guard intercepts if needed.
+                                openTask(otherTaskId, projectId);
                             }}
                             values={liveValues}
                         />
