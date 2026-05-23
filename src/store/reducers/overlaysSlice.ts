@@ -93,11 +93,24 @@ export const overlaysSlice = createSlice({
          * a `pendingPrompt` is supplied, it lands in the dock state for
          * ChatTabBody to consume on the next render — this is the
          * command-palette → AI hand-off path.
+         *
+         * R-A M1 Issue #9 (MINOR): a payload-less `openCopilotDock()`
+         * call previously cleared any already-staged prompt because
+         * `payload?.pendingPrompt ?? null` ran unconditionally. The
+         * intent documented elsewhere ("idempotent open") is that an
+         * open dispatched with no payload should be a pure focus call
+         * — it must not destroy state staged by a prior explicit open.
+         * Only overwrite the prompt when the payload explicitly
+         * supplies one (including `null` to clear).
          */
         openCopilotDock(
             state,
             action: PayloadAction<
-                { tab?: CopilotDockTab; pendingPrompt?: string } | undefined
+                | {
+                      tab?: CopilotDockTab;
+                      pendingPrompt?: string | null;
+                  }
+                | undefined
             >
         ) {
             const payload = action.payload;
@@ -105,7 +118,9 @@ export const overlaysSlice = createSlice({
             if (payload?.tab) {
                 state.copilotDock.activeTab = payload.tab;
             }
-            state.copilotDock.initialPrompt = payload?.pendingPrompt ?? null;
+            if (payload && "pendingPrompt" in payload) {
+                state.copilotDock.initialPrompt = payload.pendingPrompt ?? null;
+            }
         },
         closeCopilotDock(state) {
             state.copilotDock.open = false;

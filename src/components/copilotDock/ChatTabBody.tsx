@@ -49,6 +49,7 @@ import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
 import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
+import useCopilotDock from "../../utils/hooks/useCopilotDock";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import type {
     AutonomyLevel,
@@ -283,6 +284,16 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const screens = Grid.useBreakpoint();
     const initialPromptHandled = useRef<string | null>(null);
     const { message } = App.useApp();
+    /*
+     * R-A M1 Issue #8: after we dispatch the prompt below, clear the
+     * Redux-staged `initialPrompt` so a subsequent ProjectScopedDock
+     * remount (e.g. after a project switch under the key={projectId}
+     * fix for Issues #1/#3/#7) does NOT see a leftover prompt and
+     * auto-dispatch it into the new project's chat. The body's local
+     * `initialPromptHandled` ref dedupes within a single mount; the
+     * Redux clear dedupes across remounts.
+     */
+    const { clearInitialPrompt } = useCopilotDock();
 
     useEffect(() => {
         if (!surfaceVisible) {
@@ -543,7 +554,12 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         if (initialPromptHandled.current === initialPrompt) return;
         initialPromptHandled.current = initialPrompt;
         dispatch(initialPrompt);
-    }, [dispatch, initialPrompt, surfaceVisible]);
+        // R-A M1 Issue #8: clear the staged prompt in Redux so a
+        // remount (e.g. project switch under the key-remount fix for
+        // Issues #1/#3/#7) does not see a leftover prompt and
+        // auto-dispatch it into the new project's chat.
+        clearInitialPrompt();
+    }, [clearInitialPrompt, dispatch, initialPrompt, surfaceVisible]);
 
     useEffect(() => {
         if (!dockOpen) initialPromptHandled.current = null;

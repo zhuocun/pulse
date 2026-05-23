@@ -28,9 +28,10 @@ import { useReduxDispatch, useReduxSelector } from "./useRedux";
  *     the chat body
  *   - `closeDock()`: closes the dock and clears the pending prompt
  *   - `setActiveTab(tab)`: swap tabs without touching open/prompt
- *   - `clearInitialPrompt()`: ChatTabBody calls this after consuming a
- *     pending prompt so a tab switch back doesn't re-dispatch the same
- *     prompt a second time
+ *   - `clearInitialPrompt()`: clears the staged initial prompt
+ *     without changing open/tab — used after ChatTabBody consumes the
+ *     prompt so a subsequent tab switch back doesn't re-dispatch the
+ *     same prompt
  */
 const useCopilotDock = () => {
     const dispatch = useReduxDispatch();

@@ -216,5 +216,51 @@ describe("overlaysSlice", () => {
                 initialPrompt: null
             });
         });
+
+        /*
+         * R-A M1 review Issue #9 (MINOR): a payload-less
+         * `openCopilotDock()` call previously cleared any already-
+         * staged prompt because the reducer ran
+         * `payload?.pendingPrompt ?? null` unconditionally. The
+         * documented intent is that an open dispatched with no payload
+         * is a pure focus call — it must NOT destroy state staged by
+         * a prior explicit open. Only an explicit
+         * `{ pendingPrompt: null }` should clear it.
+         */
+        it("openCopilotDock with NO payload preserves any already-staged prompt (#9)", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "Summarize"
+                })
+            );
+            // A subsequent payload-less open (e.g. a focus / re-open
+            // from the bottom nav) must not zero the staged prompt.
+            const reopened = overlaysSlice.reducer(
+                opened,
+                overlaysActions.openCopilotDock()
+            );
+            expect(reopened.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: "Summarize"
+            });
+        });
+
+        it("openCopilotDock with explicit pendingPrompt: null clears the staged prompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "x"
+                })
+            );
+            const cleared = overlaysSlice.reducer(
+                opened,
+                overlaysActions.openCopilotDock({ pendingPrompt: null })
+            );
+            expect(cleared.copilotDock.initialPrompt).toBeNull();
+        });
     });
 });

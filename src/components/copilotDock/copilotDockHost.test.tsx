@@ -461,6 +461,11 @@ describe("CopilotDockHost", () => {
     });
 
     it("threads a command-palette prompt through to the dock state when openChatDrawer carries a pendingPrompt", async () => {
+        // Spy on the chat hook's `send` so we can verify the prompt was
+        // delivered all the way through to the chat engine.
+        const sendSpy = jest.fn().mockResolvedValue(undefined);
+        mockedUseAiChat.mockReturnValue(baseAiChat({ send: sendSpy }));
+
         renderHarness();
 
         act(() => {
@@ -474,10 +479,16 @@ describe("CopilotDockHost", () => {
         await waitFor(() => {
             expect(store.getState().overlays.copilotDock.open).toBe(true);
         });
-        expect(store.getState().overlays.copilotDock.initialPrompt).toBe(
-            "Summarize the board"
-        );
+        // Active tab and open flag survive in Redux.
         expect(store.getState().overlays.copilotDock.activeTab).toBe("chat");
+
+        // The chat tab body consumed the prompt and dispatched it to
+        // the chat hook. Issue #8: after consumption the staged prompt
+        // in Redux is cleared so a remount doesn't auto-re-dispatch.
+        await waitFor(() => {
+            expect(sendSpy).toHaveBeenCalledWith("Summarize the board");
+        });
+        expect(store.getState().overlays.copilotDock.initialPrompt).toBeNull();
     });
 
     /*
@@ -492,6 +503,11 @@ describe("CopilotDockHost", () => {
      * any non-null change even when chatOpen stays true.
      */
     it("forwards a second palette prompt to the dock state while it is already open (#5)", async () => {
+        // Spy on the chat hook's `send` so we can verify BOTH prompts
+        // reach the chat engine, not just the first.
+        const sendSpy = jest.fn().mockResolvedValue(undefined);
+        mockedUseAiChat.mockReturnValue(baseAiChat({ send: sendSpy }));
+
         renderHarness();
 
         act(() => {
@@ -501,13 +517,9 @@ describe("CopilotDockHost", () => {
                 })
             );
         });
-
         await waitFor(() => {
-            expect(store.getState().overlays.copilotDock.open).toBe(true);
+            expect(sendSpy).toHaveBeenCalledWith("first prompt");
         });
-        expect(store.getState().overlays.copilotDock.initialPrompt).toBe(
-            "first prompt"
-        );
 
         // Second palette submission — dock is already open, so the
         // bridge MUST diff the prompt and forward it. Before this fix
@@ -520,12 +532,10 @@ describe("CopilotDockHost", () => {
                 })
             );
         });
-
         await waitFor(() => {
-            expect(store.getState().overlays.copilotDock.initialPrompt).toBe(
-                "second prompt"
-            );
+            expect(sendSpy).toHaveBeenCalledWith("second prompt");
         });
+
         // Dock stays open across the prompt update.
         expect(store.getState().overlays.copilotDock.open).toBe(true);
     });
