@@ -164,7 +164,7 @@ describe("routes", () => {
         );
     });
 
-    it("nests an index redirect and the board route below project detail", () => {
+    it("nests an index redirect, the board route, and the reports route below project detail", () => {
         const protectedBranch = routes[0].children?.[3];
         const projectDetailRoute = protectedBranch?.children?.find(
             (route) => route.path === "projects/:projectId"
@@ -173,11 +173,16 @@ describe("routes", () => {
         // Bare `/projects/:projectId` is handled by a declarative `index`
         // redirect (Navigate to "board"). The previous `useEffect`
         // force-redirect inside `ProjectDetailPage` was removed in QW-11.
+        // Phase 4.7 adds `reports` alongside `board` so the project
+        // detail nav has a second sibling surface to point at.
         const children = projectDetailRoute?.children ?? [];
         expect(children[0] && "index" in children[0] && children[0].index).toBe(
             true
         );
-        expect(children.slice(1).map((route) => route.path)).toEqual(["board"]);
+        expect(children.slice(1).map((route) => route.path)).toEqual([
+            "board",
+            "reports"
+        ]);
     });
 });
 
