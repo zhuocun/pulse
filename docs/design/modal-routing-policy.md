@@ -57,9 +57,9 @@ pay that bill back.
 
 ### Routed (do this)
 
-- **Routed task panel (A2)** — `src/routes/index.tsx:163-203` mounts
-  `<BoardRouteShell />` as a layout route, the board page renders
-  underneath, and the `task/:taskId` child mounts
+- **Routed task panel (A2)** — `src/routes/index.tsx:171-195` defines
+  `<BoardRouteShell />` (mounted as a layout route at `:314-325`), the
+  board page renders underneath, and the `task/:taskId` child mounts
   `<TaskDetailPanel />` over it. The board never unmounts when a task
   opens; the URL is the source of truth. See `useTaskPanelNavigation`
   in `src/utils/hooks/useTaskPanelNavigation.ts` for the navigation
@@ -70,8 +70,9 @@ pay that bill back.
   are extracted so they can be mounted by both the routed shell and
   the existing drawers behind a feature flag during rollout.
 - **Auth flows** — `/login`, `/register`, `/auth/forgot-password`,
-  `/auth/terms` (`src/routes/index.tsx:219-243`). Each is routed; each
-  is deep-linkable.
+  `/auth/terms` (`RequireGuest` + `PublicAuthShell` defined at
+  `src/routes/index.tsx:105-121`, mounted at `:246-271`). Each is
+  routed; each is deep-linkable.
 - **404 / not-found** — `src/routes/index.tsx:123-142`. The `EmptyState`
   with `tone="notFound"` is _the page_ at the unknown route, not a
   modal that pops over wherever the user happened to be.
@@ -80,16 +81,17 @@ pay that bill back.
 
 - **Delete column** — `src/components/column/index.tsx:425`.
 - **Delete project** — `src/components/projectList/index.tsx:201`.
-- **Delete task** — `src/components/taskModal/index.tsx:227`
-  (and the equivalent `src/components/taskDetailPanel/index.tsx:367`).
+- **Delete task** — `src/components/taskModal/index.tsx:230`
+  (and the equivalent `src/components/taskDetailPanel/index.tsx:422`).
   The dialog is transient; there is no `/are-you-sure-delete-task-foo`
   URL worth sharing.
 - **Discard unsaved edits.** Today this only fires from the routed
   `<TaskDetailPanel />` — see the `<Modal>` at
-  `src/components/taskDetailPanel/index.tsx:888-941`, driven by the
-  `useBlocker`-based dirty-form guard (around line 276). The legacy
+  `src/components/taskDetailPanel/index.tsx:998-1053` (intro comment
+  `:990-997`), driven by the `useBlocker`-based dirty-form guard at
+  `src/components/taskDetailPanel/index.tsx:331`. The legacy
   `<TaskModal>` doesn't have a discard-edits dialog yet; its "Discard
-  edits" affordance (`src/components/taskModal/index.tsx:493`) is a
+  edits" affordance (`src/components/taskModal/index.tsx:496`) is a
   Button on the "removed by others" alert that closes the modal
   directly. When `<TaskModal>` gains an inline-edits dirty guard, it
   should reuse the same `<Modal>` shape rather than reaching for a
@@ -157,7 +159,7 @@ Three properties to preserve:
    board's React tree, query cache, and scroll position survive the
    task panel opening and closing.
 2. **A route-level adapter reads params and hands them to a pure
-   panel.** `TaskDetailPanelRoute` in `src/routes/index.tsx:177-203`
+   panel.** `TaskDetailPanelRoute` in `src/routes/index.tsx:204-230`
    reads `projectId` / `taskId` from `useParams`, wires AI gating,
    then renders `<TaskDetailPanel projectId={...} taskId={...} />`.
    The panel itself stays propful and testable without routing
