@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "../App";
+import { microcopy } from "../constants/microcopy";
 import AppProviders from "../utils/appProviders";
 
 // Lazy route loading + multi-step navigation chains (login → projects →
@@ -39,7 +40,11 @@ jest.mock("../constants/env", () => ({
         apiBaseUrl: "http://localhost:8080/api/v1",
         aiBaseUrl: "",
         aiEnabled: false,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        // Phase 3 A3 — phone chassis. Default ON matches production
+        // so the bottom-tab bar mounts when matchMedia resolves to
+        // `(pointer: coarse)` (the mobile regression test below).
+        bottomNavEnabled: true
     }
 }));
 
@@ -416,4 +421,100 @@ describe("App integration (full providers + routes)", () => {
         // cleared at the backend. The route transition back to
         // ``/login`` is the user-visible signal.
     }, 20000);
+
+    /*
+     * Regression: BottomTabBar from board page (claude/fix-bottom-nav-board).
+     *
+     * User report: clicking a bottom-tab on a coarse-pointer viewport
+     * while the user is on `/projects/:projectId/board` updated the
+     * URL but the page stayed on the board until refresh. Same
+     * iOS Safari WebKit / Chrome Android purgatory `ProjectCard` and
+     * the brand logo already route around via `nativeNavigate`. The
+     * bar now mirrors that pattern.
+     */
+    it("clicking a BottomTabBar tab from the board page navigates to the new view (mobile)", async () => {
+        // Coarse pointer signals phone chrome — the bar mounts, the
+        // header right-cluster demotes. Width queries return false so
+        // AntD's Grid.useBreakpoint reads as phone. setupTests defines
+        // matchMedia with writable: true so we update via assignment
+        // rather than another defineProperty.
+        (
+            window as Window & { matchMedia: typeof window.matchMedia }
+        ).matchMedia = ((query: string) => ({
+            addEventListener: jest.fn(),
+            addListener: jest.fn(),
+            dispatchEvent: jest.fn(),
+            matches: query === "(pointer: coarse)",
+            media: query,
+            onchange: null,
+            removeEventListener: jest.fn(),
+            removeListener: jest.fn()
+        })) as unknown as typeof window.matchMedia;
+
+        setupAuthenticatedSessionMocks();
+        const user = userEvent.setup();
+        renderAppAt("/login");
+
+        // Establish the auth session first so RequireAuth lets the
+        // board route render — the stateful mock 401s `/users` until
+        // `/auth/login` flips its flag.
+        await user.type(
+            await screen.findByLabelText(/^email$/i, undefined, {
+                timeout: 5000
+            }),
+            "alice@example.com"
+        );
+        await user.type(screen.getByLabelText(/^password$/i), "secret");
+        await user.click(screen.getByRole("button", { name: /^log in$/i }));
+
+        await waitFor(() => {
+            expect(window.location.pathname).toBe("/projects");
+        });
+
+        // Now navigate to the board — the projects list is showing
+        // because that's where login lands.
+        await user.click(
+            await screen.findByRole(
+                "link",
+                { name: "Alpha" },
+                { timeout: 5000 }
+            )
+        );
+
+        await waitFor(() => {
+            expect(window.location.pathname).toBe("/projects/p1/board");
+        });
+
+        // Wait for the board to render — the heading proves the
+        // ProjectDetailPage + BoardPage tree resolved.
+        expect(
+            await screen.findByRole(
+                "heading",
+                { name: /alpha board/i },
+                { timeout: 5000 }
+            )
+        ).toBeInTheDocument();
+
+        // Click the Inbox tab in the bottom tab bar.
+        const inboxLink = await screen.findByRole(
+            "link",
+            { name: new RegExp(`^${microcopy.nav.tabs.inbox}$`, "i") },
+            { timeout: 5000 }
+        );
+        await user.click(inboxLink);
+
+        // URL updates AND the inbox page surfaces — the bug presented
+        // as the URL changing without the new view rendering.
+        await waitFor(() => {
+            expect(window.location.pathname).toBe("/inbox");
+        });
+        expect(
+            await screen.findByTestId("inbox-empty-state", undefined, {
+                timeout: 5000
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("heading", { name: /alpha board/i })
+        ).not.toBeInTheDocument();
+    }, 30000);
 });
