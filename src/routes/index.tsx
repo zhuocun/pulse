@@ -155,16 +155,43 @@ const RootShell = () => <Outlet />;
  * "modal route" — the parent layout keeps state across children, and
  * the child route lays the overlay on top.
  *
+ * Phase 3 A2 — column reflow. The shell is a horizontal flex container
+ * so the desktop docked rail (the `<aside>` rendered by
+ * `TaskDetailPanel` at `>= lg`) sits next to the board content and
+ * the kanban columns reflow into the remaining width. On phone and
+ * tablet the panel renders as an AntD `Drawer`, which is portaled to
+ * `document.body` — so the Drawer overlay doesn't consume flex space
+ * here and the layout still works with the column board taking 100%.
+ *
  * Only registered as a layout when `environment.taskPanelRouted` is
  * true. When the flag is off, `board` keeps its leaf-route shape and
  * the existing `TaskModal` overlay handles every task-open flow as
  * today — see `routes` below.
  */
 const BoardRouteShell = () => (
-    <>
-        <BoardPage />
+    <div
+        style={{
+            display: "flex",
+            flex: 1,
+            flexDirection: "row",
+            minHeight: 0,
+            minWidth: 0,
+            width: "100%"
+        }}
+    >
+        <div
+            style={{
+                display: "flex",
+                flex: "1 1 auto",
+                flexDirection: "column",
+                minHeight: 0,
+                minWidth: 0
+            }}
+        >
+            <BoardPage />
+        </div>
         <Outlet />
-    </>
+    </div>
 );
 
 /**
