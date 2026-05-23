@@ -52,6 +52,18 @@ const COMING_SOON_LENSES: ReadonlySet<LensId> = new Set([
     "at-risk"
 ]);
 
+/**
+ * Coerce a raw URL value into a `LensId`, or `null` if the string isn't
+ * a known lens.
+ *
+ * Note on first-occurrence semantics: callers pass `param.lens` from
+ * `useUrl`, which exposes `URLSearchParams#get` — that returns only the
+ * FIRST value for a key, so `?lens=today&lens=mine` resolves to `today`.
+ * That matches the URL-as-state contract the lens chip row builds on
+ * (only one lens active at a time) and is documented here so consumers
+ * don't expect a list. If we ever ship multi-lens, this function and
+ * the URL writer both have to be revisited.
+ */
 export const parseLensId = (value: string | null | undefined): LensId | null =>
     value && (KNOWN_LENS_IDS as readonly string[]).includes(value)
         ? (value as LensId)

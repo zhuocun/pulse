@@ -163,4 +163,19 @@ describe("parseLensId", () => {
         // No half-matches — exact strings only.
         expect(parseLensId("todays")).toBeNull();
     });
+
+    /*
+     * R2-L3: parseLensId is called with `param.lens` from useUrl, which
+     * proxies `URLSearchParams#get` — first-occurrence semantics. This
+     * test pins that contract so a future "multi-lens" change has to
+     * walk past both this test and the doc comment together.
+     */
+    it("first-occurrence semantics — the lens id parsed is whatever the URL writer set first", () => {
+        // Simulate what useUrl returns for ?lens=today&lens=mine — the
+        // hook calls `searchParams.get("lens")` which yields "today" (the
+        // first occurrence). The parser must accept that value and the
+        // multi-value case never reaches it.
+        const params = new URLSearchParams("lens=today&lens=mine");
+        expect(parseLensId(params.get("lens"))).toBe("today");
+    });
 });
