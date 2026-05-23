@@ -12,11 +12,14 @@ import {
 import { useNavigate } from "react-router";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
+import useTaskModal from "../../utils/hooks/useTaskModal";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isMacLike } from "../../utils/platform";
 import AiSparkleIcon from "../aiSparkleIcon";
 
@@ -31,6 +34,14 @@ interface PaletteEntry {
     sublabel?: string;
     kind: "project" | "task" | "column" | "member";
     href?: string;
+    /**
+     * Task entries carry the raw taskId + projectId so the selection
+     * handler can open the routed task panel (Phase 3 A2) when the
+     * `taskPanelRouted` flag is on; otherwise it falls back to opening
+     * the legacy modal via `useTaskModal`.
+     */
+    taskId?: string;
+    projectId?: string;
     /** Score components used to rank fuzzy matches. */
     rankBoost?: number;
 }
@@ -152,6 +163,8 @@ const indexEntries = (
             sublabel: t.epic,
             kind: "task",
             href: t.projectId ? `/projects/${t.projectId}` : undefined,
+            taskId: t._id,
+            projectId: t.projectId,
             rankBoost: 3
         });
     }
@@ -268,6 +281,8 @@ const groupByKind = (entries: PaletteEntry[]): RenderedItem[] => {
  */
 const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const navigate = useNavigate();
+    const { startEditing } = useTaskModal();
+    const { openTask } = useTaskPanelNavigation();
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [query, setQuery] = useState("");
     const [aiMode, setAiMode] = useState(false);
@@ -357,12 +372,29 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
 
     const handleEntrySelect = useCallback(
         (entry: PaletteEntry) => {
+            // Task entries land on the target task itself, not just the
+            // project (Phase 3 A2). Flag-aware: routed panel when the
+            // `taskPanelRouted` flag is on, legacy modal when off. In
+            // both branches we still navigate to the project URL first
+            // so non-task surfaces (column/member) keep their behavior.
+            if (entry.kind === "task" && entry.taskId && entry.projectId) {
+                if (environment.taskPanelRouted) {
+                    openTask(entry.taskId, entry.projectId);
+                } else {
+                    if (entry.href) {
+                        navigate(entry.href, { viewTransition: true });
+                    }
+                    startEditing(entry.taskId);
+                }
+                onClose();
+                return;
+            }
             if (entry.href) {
                 navigate(entry.href, { viewTransition: true });
             }
             onClose();
         },
-        [navigate, onClose]
+        [navigate, onClose, openTask, startEditing]
     );
 
     /**
