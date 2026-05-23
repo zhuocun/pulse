@@ -904,5 +904,81 @@ describe("CopilotDock", () => {
                 setAnalyticsSink(previous);
             }
         });
+
+        /*
+         * R-A M3 follow-up: the trailing setTimeout used to close over
+         * `fingerprint` at SCHEDULE time. Edge case: user changes
+         * B → C mid-gate (timer captures C); then undoes C → B before
+         * the timer fires. The trailing must NOT corrupt
+         * lastFingerprintRef with the stale C (a subsequent effect run
+         * would otherwise see a phantom fingerprintChanged and burn
+         * another refetch). The fix reads the live fingerprint via a
+         * ref at FIRE time and no-ops when nothing actually changed.
+         */
+        it("trailing timer reads the current fingerprint at fire time and no-ops on undo-within-gate", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // First change — fires immediately, arms the gate.
+                // Final state for "B" baseline is [task-1].
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Second change at T=5s (B → C, mid-gate). Schedules a
+                // trailing timer that — without the fix — closes over
+                // the fingerprint for [task-1, task-2].
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Third change at T=10s undoes C → B (back to [task-1]).
+                // The trailing timer is still armed. The current effect
+                // run sees fingerprint === lastFingerprintRef (B == B) so
+                // it goes through the no-change branch and the timer
+                // stays pending with its stale-C closure.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Cross the trailing-edge boundary (T=30s). The timer
+                // fires, reads the live fingerprint from the ref, sees
+                // it equals `lastFingerprintRef` (both B), and no-ops.
+                // Without the fix, the timer would track BRIEF_REFRESHED
+                // and stamp lastFingerprintRef with the stale C — a
+                // later effect run would then re-fire because
+                // current B !== stale C.
+                await advanceBy(20_000);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Sanity: a subsequent real change (B → D) still fires
+                // immediately (the no-op trailing left the gate alone).
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("3")]);
+                expect(countRefreshes(sink)).toBe(2);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
     });
 });

@@ -415,6 +415,16 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     // second auto-refetch 100ms later.
     const lastAutoRefreshAtRef = useRef<number>(0);
     const pendingTrailingTimerRef = useRef<number | null>(null);
+    // Always-current fingerprint snapshot for the trailing-edge timer
+    // (R-A M3 follow-up). The setTimeout callback otherwise closes over
+    // the fingerprint at SCHEDULE time, which goes stale if the user
+    // undoes a mid-gate change (B → C → B). When the trailing fires we
+    // re-read from this ref so the refetch reflects the LATEST state,
+    // and skip the refetch entirely when nothing actually changed.
+    const currentFingerprintRef = useRef<string>(fingerprint);
+    useEffect(() => {
+        currentFingerprintRef.current = fingerprint;
+    }, [fingerprint]);
 
     const runBrief = useCallback(
         async (options: { bypassCache?: boolean } = {}) => {
@@ -538,11 +548,15 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
 
         // R-A M3 — performs the actual refetch + analytics for a
         // fingerprint-driven refresh. Defined inline so it captures the
-        // current effect-scope closures (runBrief, fingerprint, etc.)
-        // and can be deferred via setTimeout for the trailing-edge path.
-        const fireFingerprintRefetch = () => {
+        // current effect-scope closures (runBrief, etc.) and can be
+        // deferred via setTimeout for the trailing-edge path. The
+        // fingerprint is passed in by the caller so the trailing path
+        // can read it at FIRE time (from `currentFingerprintRef`) rather
+        // than at SCHEDULE time — closure-captured fingerprints go stale
+        // if the user undoes a mid-gate change.
+        const fireFingerprintRefetch = (fpAtFire: string) => {
             track(ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE);
-            lastFingerprintRef.current = fingerprint;
+            lastFingerprintRef.current = fpAtFire;
             lastAutoRefreshAtRef.current = Date.now();
             if (!isRemote) {
                 void runBrief();
@@ -563,18 +577,25 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
             }
             const elapsed = Date.now() - lastAutoRefreshAtRef.current;
             if (elapsed >= BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS) {
-                // Gate clear: refetch right away.
-                fireFingerprintRefetch();
+                // Gate clear: refetch right away with the current
+                // effect-scope fingerprint (which is the latest by
+                // definition — the effect just re-ran for it).
+                fireFingerprintRefetch(fingerprint);
             } else {
                 // Gate active: schedule a trailing-edge refetch for the
                 // remainder of the window. If the user keeps editing the
                 // board, each successive effect run replaces this timer
                 // with one keyed to the latest fingerprint — so at most
-                // one refetch lands when the dust settles.
+                // one refetch lands when the dust settles. The callback
+                // re-reads the fingerprint at FIRE time so an undo
+                // landed in-between (B → C → B) becomes a no-op instead
+                // of corrupting `lastFingerprintRef` with the stale C.
                 const remaining = BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS - elapsed;
                 pendingTrailingTimerRef.current = window.setTimeout(() => {
                     pendingTrailingTimerRef.current = null;
-                    fireFingerprintRefetch();
+                    const fpAtFire = currentFingerprintRef.current;
+                    if (fpAtFire === lastFingerprintRef.current) return;
+                    fireFingerprintRefetch(fpAtFire);
                 }, remaining);
             }
         } else if (!isRemote) {
