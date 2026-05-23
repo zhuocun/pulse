@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Modal } from "antd";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -358,30 +359,50 @@ describe("Column", () => {
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {
-        renderColumn();
+        jest.useFakeTimers();
+        try {
+            renderColumn();
 
-        fireEvent.click(screen.getByText("Build task"));
-        fireEvent.click(screen.getByText("Optimistic task"));
+            // The card defers `onOpen` by 250 ms so that a real
+            // browser's `click → click → dblclick` sequence has a
+            // chance to cancel the modal before it opens. Advance
+            // timers to drain that window.
+            fireEvent.click(screen.getByText("Build task"));
+            fireEvent.click(screen.getByText("Optimistic task"));
+            act(() => {
+                jest.runAllTimers();
+            });
 
-        expect(startEditing).toHaveBeenCalledTimes(1);
-        expect(startEditing).toHaveBeenCalledWith("task-1");
-        // Routed-panel path is NOT taken when the flag is off.
-        expect(openTask).not.toHaveBeenCalled();
+            expect(startEditing).toHaveBeenCalledTimes(1);
+            expect(startEditing).toHaveBeenCalledWith("task-1");
+            // Routed-panel path is NOT taken when the flag is off.
+            expect(openTask).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("routes the click through useTaskPanelNavigation when the flag is on (Phase 3 A2)", () => {
-        // Flip the mocked environment flag. The column reads it lazily
-        // on render so this needs to happen before renderColumn().
-        mockedEnvironment.taskPanelRouted = true;
-        renderColumn();
+        jest.useFakeTimers();
+        try {
+            // Flip the mocked environment flag. The column reads it lazily
+            // on render so this needs to happen before renderColumn().
+            mockedEnvironment.taskPanelRouted = true;
+            renderColumn();
 
-        fireEvent.click(screen.getByText("Build task"));
+            fireEvent.click(screen.getByText("Build task"));
+            act(() => {
+                jest.runAllTimers();
+            });
 
-        // openTask is wired; the legacy modal-opening startEditing is
-        // not called at all when the flag is on.
-        expect(openTask).toHaveBeenCalledTimes(1);
-        expect(openTask).toHaveBeenCalledWith("task-1");
-        expect(startEditing).not.toHaveBeenCalled();
+            // openTask is wired; the legacy modal-opening startEditing is
+            // not called at all when the flag is on.
+            expect(openTask).toHaveBeenCalledTimes(1);
+            expect(openTask).toHaveBeenCalledWith("task-1");
+            expect(startEditing).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("disables drag and open behavior when a task id is empty", () => {
@@ -674,6 +695,64 @@ describe("Column", () => {
             expect(
                 screen.queryByTestId("task-card-title-input")
             ).not.toBeInTheDocument();
+        });
+
+        /*
+         * Regression: a real browser fires `click → click → dblclick`
+         * for a double-click. `fireEvent.doubleClick` only synthesises
+         * the trailing `dblclick`, so the previous test suite missed a
+         * production bug where the first `click` of a dblclick sequence
+         * bubbled to TaskCardOuter and opened the modal before the
+         * inline-edit Input could mount. `userEvent.dblClick` simulates
+         * the full sequence, and the timer-deferred open in the card
+         * gives `enterEditing` a window to cancel the pending modal.
+         */
+        it("enters edit mode WITHOUT opening the modal when the user really double-clicks the title", async () => {
+            jest.useFakeTimers();
+            try {
+                const user = userEvent.setup({
+                    advanceTimers: jest.advanceTimersByTime
+                });
+                renderColumn();
+                const title = screen.getAllByTestId("task-card-title")[0];
+                await user.dblClick(title);
+                // The inline-edit Input mounts immediately.
+                expect(
+                    screen.getByTestId("task-card-title-input")
+                ).toBeInTheDocument();
+                // Drain the 250 ms open-timer; if the dblclick failed
+                // to cancel it, the modal handler would fire here.
+                act(() => {
+                    jest.runAllTimers();
+                });
+                expect(startEditing).not.toHaveBeenCalled();
+                expect(openTask).not.toHaveBeenCalled();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("still opens the modal on a plain single click after the timer resolves", async () => {
+            jest.useFakeTimers();
+            try {
+                const user = userEvent.setup({
+                    advanceTimers: jest.advanceTimersByTime
+                });
+                renderColumn();
+                const card = screen.getByRole("button", {
+                    name: /open task build task/i
+                });
+                await user.click(card);
+                // Before the 250 ms window elapses, no modal opens.
+                expect(startEditing).not.toHaveBeenCalled();
+                act(() => {
+                    jest.advanceTimersByTime(250);
+                });
+                expect(startEditing).toHaveBeenCalledTimes(1);
+                expect(startEditing).toHaveBeenCalledWith("task-1");
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 });
