@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import type { NavigateOptions } from "react-router-dom";
 import { URLSearchParamsInit, useSearchParams } from "react-router-dom";
 
 import filterRequest from "../filterRequest";
@@ -80,14 +81,14 @@ const useUrl = <K extends string>(keys: K[]) => {
     }, [searchParams, stateKeys, tick]);
 
     const setUrlParams = useCallback(
-        (next: Partial<{ [key in K]: unknown }>) => {
+        (next: Partial<{ [key in K]: unknown }>, options?: NavigateOptions) => {
             setSearchParams((prev) => {
                 const obj = filterRequest({
                     ...Object.fromEntries(prev.entries()),
                     ...next
                 }) as URLSearchParamsInit;
                 return obj;
-            });
+            }, options);
             /*
              * `setSearchParams` calls `history.pushState` synchronously,
              * which updates `window.location.search`. Queue notify on a
