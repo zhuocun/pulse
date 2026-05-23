@@ -429,8 +429,15 @@ export const enSource = {
             emptyDescription:
                 "Copilot will surface triage nudges here as it spots issues on your board.",
             seeAll: "See all in Inbox",
-            unreadBadgeAriaLabel:
-                "{count} unread Copilot {count, plural, one {nudge} other {nudges}}",
+            // Plural pair (one/other) follows the `counts.*` pattern in
+            // this file. Call sites pick the right key off the count
+            // and `.replace("{count}", String(count))` to interpolate.
+            // We intentionally do NOT embed ICU plural syntax in the
+            // value because this codebase has no ICU formatter; a
+            // single-string `{count, plural, one {nudge} other {nudges}}`
+            // would render literally to screen-reader users.
+            unreadBadgeAriaLabelOne: "{count} unread Copilot nudge",
+            unreadBadgeAriaLabelOther: "{count} unread Copilot nudges",
             sectionLabel: "Triage nudges",
             actionLabel: "Open task",
             dismissLabel: "Dismiss"

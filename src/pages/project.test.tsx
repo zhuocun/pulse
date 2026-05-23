@@ -408,6 +408,46 @@ describe("ProjectPage", () => {
         });
     });
 
+    /*
+     * Phase 4 A8 review M2 regression: the badge aria-label MUST be a
+     * human-readable sentence, NOT raw template syntax. The original
+     * locale string embedded ICU plural syntax
+     * (`{count, plural, one {nudge} other {nudges}}`) but this codebase
+     * has no ICU formatter — `String.prototype.replace("{count}", …)` on
+     * the call site leaves the ICU braces intact, exposing the
+     * implementation syntax to screen-reader users. Replaced with two
+     * static `one` / `other` keys; the call site picks the right key
+     * off the count and interpolates.
+     */
+    it("renders the launcher badge aria-label as a human-readable string (no ICU template syntax)", async () => {
+        // Seed an unread count so the badge renders its aria-label.
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(3));
+        renderPage();
+        await screen.findByText("Roadmap");
+
+        const badge = screen.getByTestId("copilot-launcher-badge");
+        const ariaLabel = badge.getAttribute("aria-label") ?? "";
+        // Plural branch (3 > 1) renders the "other" key with the count
+        // interpolated. No leftover ICU braces, no `{count}` placeholder.
+        expect(ariaLabel).toBe("3 unread Copilot nudges");
+        expect(ariaLabel).not.toContain("{count");
+        expect(ariaLabel).not.toContain("plural");
+
+        // Reset for sibling tests.
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(0));
+    });
+
+    it("uses the singular aria-label form when the unread count is exactly 1", async () => {
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(1));
+        renderPage();
+        await screen.findByText("Roadmap");
+
+        const badge = screen.getByTestId("copilot-launcher-badge");
+        expect(badge.getAttribute("aria-label")).toBe("1 unread Copilot nudge");
+
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(0));
+    });
+
     // PWA manifest shortcuts (`/projects?openTaskCreator=1`,
     // `/projects?openCopilot=1`) fire from the OS launcher long-press menu.
     // On mount, the page dispatches the matching open action and strips the

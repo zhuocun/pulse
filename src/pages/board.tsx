@@ -457,11 +457,15 @@ const BoardPage = () => {
      * collapses to nothing (AntD treats `count={0}` as no-badge).
      */
     const { inboxUnreadCount: copilotInboxUnread } = useCopilotDock();
+    // Pick the one/other locale key off the count and interpolate. The
+    // strings are plain placeholders (no ICU syntax); the .replace call
+    // is the entire formatter. Skip altogether when count is zero so the
+    // Badge collapses without an aria-label.
     const copilotUnreadAriaLabel = copilotInboxUnread
-        ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabel.replace(
-              "{count}",
-              String(copilotInboxUnread)
-          )
+        ? (copilotInboxUnread === 1
+              ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOne
+              : microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOther
+          ).replace("{count}", String(copilotInboxUnread))
         : undefined;
     /*
      * R-A M1: the CopilotDock is now mounted in `MainLayout` by
