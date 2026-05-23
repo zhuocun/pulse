@@ -62,6 +62,12 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
         ? { placement: "bottom" as const, size: "100%" as const }
         : { placement: "right" as const, size: 420 };
 
+    // Both bodies stay mounted across tab switches (`destroyOnHidden={false}`
+    // below). `dockOpen` drives close-side teardown ONLY; `tabActive`
+    // drives focus/dispatch/initial requests/etc. This split is the
+    // R1-H1 / R1-H2 fix — passing a single `open` collapsed to `dockOpen
+    // && activeTab === "<self>"` aborted in-flight work on every tab
+    // switch.
     const tabItems = [
         {
             key: "chat",
@@ -69,6 +75,7 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
             children: (
                 <ChatTabBody
                     columns={columns}
+                    dockOpen={open}
                     initialPrompt={initialPrompt}
                     knownProjectIds={knownProjectIds}
                     members={members}
@@ -77,10 +84,10 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
                     onDismissNudge={onDismissNudge}
                     onRejectProposal={onRejectProposal}
                     onUndoProposal={onUndoProposal}
-                    open={open && activeTab === "chat"}
                     pendingNudges={pendingNudges}
                     pendingProposal={pendingProposal}
                     project={project}
+                    tabActive={activeTab === "chat"}
                     tasks={tasks}
                 />
             )
@@ -91,9 +98,10 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
             children: (
                 <BriefTabBody
                     columns={columns}
+                    dockOpen={open}
                     members={members}
-                    open={open && activeTab === "brief"}
                     project={project ?? undefined}
+                    tabActive={activeTab === "brief"}
                     tasks={tasks}
                 />
             )
@@ -103,7 +111,12 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
     return (
         <Drawer
             {...drawerProps}
-            aria-label={microcopy.copilotDock.ariaLabel}
+            // The dialog's accessible name is the visible "Copilot" title.
+            // Linking via `aria-labelledby` (the actual heading element)
+            // is stronger than `aria-label` because it stays in sync with
+            // any future copy change and announces the same string the
+            // user sees (R1-M3).
+            aria-labelledby="copilot-dock-title"
             data-placement={drawerProps.placement}
             data-testid="copilot-dock"
             onClose={onClose}
@@ -122,11 +135,17 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
             title={
                 <Space align="center" size={space.xs}>
                     <AiSparkleIcon aria-hidden />
-                    <Typography.Text
-                        style={{ fontWeight: fontWeight.semibold }}
+                    <Typography.Title
+                        id="copilot-dock-title"
+                        level={4}
+                        style={{
+                            fontSize: "inherit",
+                            fontWeight: fontWeight.semibold,
+                            margin: 0
+                        }}
                     >
                         {microcopy.copilotDock.title}
-                    </Typography.Text>
+                    </Typography.Title>
                     <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
                 </Space>
             }
@@ -136,12 +155,13 @@ const CopilotDock: React.FC<CopilotDockProps> = ({
                 aria-label={microcopy.copilotDock.tabListLabel}
                 data-testid="copilot-dock-tabs"
                 /*
-                 * `destroyInactiveTabPane={false}` keeps inactive tabs
-                 * mounted so chat history + the brief cache survive a
-                 * tab switch — both bodies own their own state and
-                 * teardown via their `open` prop.
+                 * `destroyOnHidden={false}` keeps inactive tabs mounted
+                 * so chat history + the brief cache survive a tab switch
+                 * — both bodies own their own state and teardown via
+                 * their `dockOpen` prop. Replaces the deprecated
+                 * `destroyInactiveTabPane` (AntD 5.18+).
                  */
-                destroyInactiveTabPane={false}
+                destroyOnHidden={false}
                 items={tabItems}
                 onChange={(key) => onTabChange(key as CopilotDockTab)}
                 size="small"

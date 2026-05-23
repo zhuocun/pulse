@@ -51,8 +51,8 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
         >
             <BriefTabBody
                 columns={columns}
+                dockOpen={open}
                 members={members}
-                open={open}
                 project={project}
                 tasks={tasks}
             />

@@ -87,6 +87,7 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
         >
             <ChatTabBody
                 columns={columns}
+                dockOpen={open}
                 initialPrompt={initialPrompt}
                 knownProjectIds={knownProjectIds}
                 members={members}
@@ -95,7 +96,6 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                 onDismissNudge={onDismissNudge}
                 onRejectProposal={onRejectProposal}
                 onUndoProposal={onUndoProposal}
-                open={open}
                 pendingNudges={pendingNudges}
                 pendingProposal={pendingProposal}
                 project={project}
