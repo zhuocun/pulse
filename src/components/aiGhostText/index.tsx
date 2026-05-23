@@ -279,12 +279,30 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
     }, [enabled, suggestion]);
 
     // ---- Mirror scroll sync ----------------------------------------
+    //
+    // The overlay is `overflow: hidden`, so a scroll desync between
+    // the textarea and the mirror silently truncates the suggestion.
+    // Two signals can change `ta.scrollTop`:
+    //   1. Typing past the visible area — covered by the layout effect
+    //      re-running on each render after `currentValue`/`suggestion`.
+    //   2. The user scrolling the textarea directly (wheel, drag,
+    //      keyboard nav) — *not* covered by render alone, which is the
+    //      reviewer's flagged regression. Attach a native `scroll`
+    //      listener to the textarea so the mirror tracks the live
+    //      scroll position on every frame.
     useLayoutEffect(() => {
         const ta = textAreaRef.current?.resizableTextArea?.textArea;
         const mirror = mirrorRef.current;
         if (!ta || !mirror) return;
-        mirror.scrollTop = ta.scrollTop;
-        mirror.scrollLeft = ta.scrollLeft;
+        const syncScroll = () => {
+            mirror.scrollTop = ta.scrollTop;
+            mirror.scrollLeft = ta.scrollLeft;
+        };
+        syncScroll();
+        ta.addEventListener("scroll", syncScroll);
+        return () => {
+            ta.removeEventListener("scroll", syncScroll);
+        };
     });
 
     const dismiss = useCallback(() => {
