@@ -29,6 +29,8 @@ import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
 import EmptyState from "../components/emptyState";
+import LensChips, { parseLensId } from "../components/lensChips";
+import { buildLensPredicate } from "../components/lensChips/lensPredicate";
 import MemberPopover from "../components/memberPopover";
 import Row from "../components/row";
 import TaskModal from "../components/taskModal";
@@ -49,6 +51,7 @@ import type { TriageNudge } from "../interfaces/agent";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useDragEnd from "../utils/hooks/useDragEnd";
@@ -329,8 +332,11 @@ const BoardPage = () => {
         "taskName",
         "coordinatorId",
         "type",
-        "semanticIds"
+        "semanticIds",
+        "lens"
     ]);
+    const { user } = useAuth();
+    const activeLens = parseLensId(param.lens);
     const { data: currentProject, isLoading: pLoading } =
         useReactQuery<IProject>("projects", {
             projectId
@@ -372,9 +378,18 @@ const BoardPage = () => {
         tasksEnabled: Boolean(board)
     });
     const visibleTasks = tasks ?? [];
+    // Phase 3 A7 — lens predicate narrows the task universe before the
+    // filter rail's per-column predicate runs in `column.tsx`.
+    const lensedTasks = useMemo(() => {
+        const predicate = buildLensPredicate({
+            lens: activeLens,
+            currentUserId: user?._id
+        });
+        return activeLens ? visibleTasks.filter(predicate) : visibleTasks;
+    }, [activeLens, user?._id, visibleTasks]);
     const tasksByColumn = useMemo(() => {
         const buckets = new Map<string, ITask[]>();
-        for (const t of visibleTasks) {
+        for (const t of lensedTasks) {
             const list = buckets.get(t.columnId);
             if (list) {
                 list.push(t);
@@ -383,7 +398,7 @@ const BoardPage = () => {
             }
         }
         return buckets;
-    }, [visibleTasks]);
+    }, [lensedTasks]);
     const resetBoardFilters = useCallback(() => {
         setParam({
             taskName: undefined,
@@ -557,7 +572,7 @@ const BoardPage = () => {
      * for keyboard users who can't see the kanban columns visually.
      */
     const visibleFilteredCount = useMemo(() => {
-        return visibleTasks.filter(
+        return lensedTasks.filter(
             (task) =>
                 (!param.type || task.type === param.type) &&
                 (!param.coordinatorId ||
@@ -569,9 +584,13 @@ const BoardPage = () => {
                         .filter(Boolean)
                         .includes(task._id))
         ).length;
-    }, [visibleTasks, param]);
+    }, [lensedTasks, param]);
     const hasActiveFilters = Boolean(
-        param.taskName || param.coordinatorId || param.type || param.semanticIds
+        param.taskName ||
+        param.coordinatorId ||
+        param.type ||
+        param.semanticIds ||
+        activeLens
     );
     const filterStatusMessage = hasActiveFilters
         ? (visibleFilteredCount === 1
@@ -751,6 +770,15 @@ const BoardPage = () => {
                         </BoardActions>
                     </Row>
                 </BoardHeader>
+                <LensChips
+                    active={activeLens}
+                    onChange={(next) =>
+                        setParam(
+                            { lens: next ?? undefined },
+                            { viewTransition: true }
+                        )
+                    }
+                />
                 <TaskSearchPanel
                     tasks={visibleTasks}
                     param={param}
