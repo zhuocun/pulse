@@ -1,11 +1,12 @@
 import styled from "@emotion/styled";
-import { App, Button, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Tooltip, Typography } from "antd";
 import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { CitationRef } from "../../interfaces/agent";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { space } from "../../theme/tokens";
+import CopilotChip from "../copilotChip";
 
 /**
  * Inline citation chip (PRD v3 §10.2). Renders as a small superscript tag
@@ -13,29 +14,12 @@ import { fontSize, fontWeight, space } from "../../theme/tokens";
  * `onNavigate` so the surface can scroll the row into view and pulse it
  * per C-R7). Verbatim `quote` is mandatory and always shown in the
  * tooltip / popover so users can verify what the agent saw.
+ *
+ * The pill geometry is owned by the shared `<CopilotChip variant="citation">`
+ * (Ambition 6 / 2026-05 review §6). The superscript positioning and 2 px
+ * outer margin remain citation-specific so the chip slots inline with body
+ * text without floating off the baseline.
  */
-const Chip = styled(Tag)`
-    && {
-        background: var(--color-copilot-badge-bg);
-        border-color: var(--color-copilot-bg-medium);
-        border-radius: 999px;
-        color: var(--color-copilot-badge);
-        cursor: pointer;
-        font-size: ${fontSize.xs - 1}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: 1;
-        margin: 0 2px;
-        padding: 1px 6px;
-        vertical-align: super;
-    }
-
-    &&:hover,
-    &&:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 1px;
-    }
-`;
-
 const TooltipBody = styled.div`
     display: flex;
     flex-direction: column;
@@ -85,7 +69,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
         });
         onNavigate?.(citation);
     };
-    const onKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>) => {
+    const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             handleActivate();
@@ -103,6 +87,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
         });
         message.success(microcopy.ai.citationFlagConfirm);
     };
+    const navigable = typeof onNavigate === "function";
     return (
         <Tooltip
             title={
@@ -132,18 +117,25 @@ const CitationChip: React.FC<CitationChipProps> = ({
                 </TooltipBody>
             }
         >
-            <Chip
+            <CopilotChip
                 aria-label={microcopy.ai.citationAriaLabel
                     .replace("{index}", String(index))
                     .replace("{source}", getSourceLabel(citation.source))
                     .replace("{id}", citation.id)}
+                compact
+                interactive={navigable}
                 onClick={handleActivate}
                 onKeyDown={onKeyDown}
-                role={onNavigate ? "button" : "note"}
-                tabIndex={onNavigate ? 0 : -1}
+                role={navigable ? "button" : "note"}
+                style={{
+                    margin: "0 2px",
+                    verticalAlign: "super"
+                }}
+                tabIndex={navigable ? 0 : -1}
+                variant="citation"
             >
                 [{index}]
-            </Chip>
+            </CopilotChip>
         </Tooltip>
     );
 };

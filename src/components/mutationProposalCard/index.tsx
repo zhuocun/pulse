@@ -7,6 +7,7 @@ import { microcopy, microcopyString } from "../../constants/microcopy";
 import type { MutationProposal, TaskUpdate } from "../../interfaces/agent";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import useAiLedger from "../../utils/hooks/useAiLedger";
+import CopilotChip, { type CopilotChipTone } from "../copilotChip";
 
 /**
  * Mutation preview card (PRD v3 §10.1, §7.4, C-R9). Renders the proposed
@@ -78,7 +79,7 @@ interface MutationProposalCardProps {
     title?: string;
 }
 
-const riskColor = (risk: MutationProposal["risk"]) => {
+const riskTone = (risk: MutationProposal["risk"]): CopilotChipTone => {
     if (risk === "high") return "red";
     if (risk === "med") return "orange";
     return "green";
@@ -345,9 +346,9 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 <Typography.Text strong style={{ fontSize: fontSize.base }}>
                     {heading}
                 </Typography.Text>
-                <Tag color={riskColor(proposal.risk)}>
+                <CopilotChip tone={riskTone(proposal.risk)} variant="risk">
                     {riskLabel(proposal.risk)}
-                </Tag>
+                </CopilotChip>
                 {proposal.undoable && phase === "idle" && (
                     <Tag
                         color="default"

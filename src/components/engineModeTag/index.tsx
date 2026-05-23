@@ -1,8 +1,9 @@
-import { Tag, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import React from "react";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
+import CopilotChip from "../copilotChip";
 
 /**
  * Shows whether the current AI surface is running through the local
@@ -13,6 +14,11 @@ import { microcopy } from "../../constants/microcopy";
  * The tooltip explains the capability difference plainly — local mode
  * users should not blame "AI" for rule-based mistakes, and remote mode
  * users should know they're getting language-model output (review first).
+ *
+ * Pill geometry flows through the shared `<CopilotChip variant="engine">`
+ * (Ambition 6 / 2026-05 review §6). The local engine renders in the
+ * neutral tone; the remote engine renders in the brand `purple` tone so
+ * users get a stronger visual cue that data leaves the device.
  */
 const EngineModeTag: React.FC = () => {
     const isLocal = environment.aiUseLocalEngine;
@@ -24,12 +30,9 @@ const EngineModeTag: React.FC = () => {
         : microcopy.ai.engineCapabilityRemote;
     return (
         <Tooltip title={tooltip}>
-            <Tag
-                color={isLocal ? "default" : "purple"}
-                style={{ marginInlineEnd: 0 }}
-            >
+            <CopilotChip tone={isLocal ? "default" : "purple"} variant="engine">
                 {label}
-            </Tag>
+            </CopilotChip>
         </Tooltip>
     );
 };
