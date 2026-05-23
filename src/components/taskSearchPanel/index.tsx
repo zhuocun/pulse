@@ -1,9 +1,17 @@
-import { SearchOutlined } from "@ant-design/icons";
+import { CloseOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Segmented, Select, Space } from "antd";
-import React, { useMemo } from "react";
+import { App, Button, Input, Popover, Segmented, Select, Space } from "antd";
+import React, { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 
 import { microcopy } from "../../constants/microcopy";
+import type { ReduxDispatch, RootState } from "../../store";
+import {
+    SAVED_FILTER_PRESET_LIMIT,
+    userPreferencesActions,
+    type SavedFilterPresetState
+} from "../../store/reducers/userPreferencesSlice";
 import { breakpoints, radius, space } from "../../theme/tokens";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
@@ -106,9 +114,10 @@ const ResetButtonSlot = styled.div`
 `;
 
 /*
- * Phase 4.2 — trailing preference row that holds the density toggle.
- * Sits below the primary filter row so it doesn't push the filter
- * inputs around. On phone widths it stacks vertically.
+ * Trailing row that holds the per-user preference controls — density
+ * toggle on the left, preset save + load on the right. Sits below the
+ * primary filter row so it doesn't push the filter inputs around when
+ * presets are saved/loaded. On phone widths it stacks vertically.
  */
 const PrefRow = styled.div`
     align-items: stretch;
@@ -128,6 +137,55 @@ const PrefRow = styled.div`
     }
 `;
 
+const PrefRowTrailing = styled.div`
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xs}px;
+
+    @media (min-width: ${breakpoints.md}px) {
+        margin-inline-start: auto;
+    }
+`;
+
+const PresetSelectInner = styled.span`
+    align-items: center;
+    display: inline-flex;
+    gap: ${space.xs}px;
+    justify-content: space-between;
+    width: 100%;
+`;
+
+const PresetDeleteButton = styled.button`
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: ${radius.sm}px;
+    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
+    cursor: pointer;
+    display: inline-flex;
+    height: 24px;
+    justify-content: center;
+    margin-inline-start: ${space.xs}px;
+    padding: 0;
+    width: 24px;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+    }
+`;
+
+const formatTemplate = (
+    template: string,
+    values: Record<string, string | number>
+): string =>
+    Object.entries(values).reduce(
+        (acc, [k, v]) => acc.replace(`{${k}}`, String(v)),
+        template
+    );
+
 const TaskSearchPanel: React.FC<Props> = ({
     tasks,
     param,
@@ -137,7 +195,14 @@ const TaskSearchPanel: React.FC<Props> = ({
     aiSearchSlot
 }) => {
     const { user } = useAuth();
+    const { projectId } = useParams<{ projectId: string }>();
+    const dispatch = useDispatch<ReduxDispatch>();
+    const { message } = App.useApp();
     const { density, setDensity } = useBoardDensity();
+    const presets = useSelector<RootState, SavedFilterPresetState[]>(
+        (state) => state.userPreferences.savedFilterPresets
+    );
+
     const coordinators = useMemo(() => {
         const result: IMember[] = [];
         const seen = new Set<string>();
@@ -230,6 +295,151 @@ const TaskSearchPanel: React.FC<Props> = ({
         else if (key === "semanticIds")
             setParam({ ...param, semanticIds: undefined });
     };
+
+    /*
+     * Phase 4.2 — preset state. The save popover is anchored to the
+     * trailing save button; we hold the in-flight draft name in local
+     * state so a user can type then hit Save without round-tripping
+     * through Redux on every keystroke. Once they confirm, the
+     * `addSavedFilterPreset` reducer appends and the localStorage
+     * middleware persists in the same dispatch tick.
+     */
+    const [saveOpen, setSaveOpen] = useState(false);
+    const [draftName, setDraftName] = useState("");
+
+    /*
+     * Scope presets to the current project (which == one board today).
+     * `boardId === null` would mean "global"; we don't currently expose
+     * a UI to create global presets, but the load filter honours both
+     * so future migrations can opt in.
+     */
+    const currentBoardId = projectId ?? null;
+    const visiblePresets = useMemo(
+        () =>
+            presets.filter(
+                (p) => p.boardId === null || p.boardId === currentBoardId
+            ),
+        [presets, currentBoardId]
+    );
+
+    const handleSavePreset = () => {
+        const trimmed = draftName.trim();
+        if (!trimmed) return;
+        if (presets.length >= SAVED_FILTER_PRESET_LIMIT) {
+            message.warning({
+                content: formatTemplate(
+                    microcopy.board.presets.limitReachedBody,
+                    { limit: SAVED_FILTER_PRESET_LIMIT }
+                )
+            });
+            setSaveOpen(false);
+            setDraftName("");
+            return;
+        }
+        const preset: SavedFilterPresetState = {
+            id: `preset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: trimmed,
+            boardId: currentBoardId,
+            filterState: {
+                taskName: param.taskName ?? "",
+                coordinatorId: param.coordinatorId ?? "",
+                type: param.type ?? ""
+            },
+            createdAt: Date.now()
+        };
+        dispatch(userPreferencesActions.addSavedFilterPreset(preset));
+        message.success({ content: microcopy.board.presets.saved });
+        setSaveOpen(false);
+        setDraftName("");
+    };
+
+    /**
+     * Apply a preset back into URL state.
+     *
+     * Each field is sanity-checked against the live data before being
+     * written: a coordinatorId is only re-applied if a member with that
+     * id is still on the project, and a type is only re-applied if the
+     * observed task types still include it. When a value is silently
+     * dropped we surface an inline warning toast so the user knows the
+     * preset has gone stale.
+     *
+     * `taskName` is a free-text search so it's always safe to re-apply.
+     */
+    const handleApplyPreset = (presetId: string) => {
+        const preset = presets.find((p) => p.id === presetId);
+        if (!preset) return;
+
+        const liveCoordinatorIds = new Set((members ?? []).map((m) => m._id));
+        const liveTypes = new Set(types);
+
+        let staleDetected = false;
+        const nextCoordinator = preset.filterState.coordinatorId;
+        const nextType = preset.filterState.type;
+        const applyCoordinator =
+            nextCoordinator && liveCoordinatorIds.has(nextCoordinator)
+                ? nextCoordinator
+                : "";
+        const applyType = nextType && liveTypes.has(nextType) ? nextType : "";
+        if (nextCoordinator && applyCoordinator === "") staleDetected = true;
+        if (nextType && applyType === "") staleDetected = true;
+
+        setParam({
+            taskName: preset.filterState.taskName || undefined,
+            coordinatorId: applyCoordinator || undefined,
+            type: applyType || undefined,
+            semanticIds: undefined
+        });
+        message.info({
+            content: formatTemplate(microcopy.board.presets.applied, {
+                name: preset.name
+            })
+        });
+        if (staleDetected) {
+            message.warning({
+                content: microcopy.board.presets.staleValueWarning
+            });
+        }
+    };
+
+    const handleDeletePreset = (presetId: string) => {
+        dispatch(userPreferencesActions.removeSavedFilterPreset(presetId));
+    };
+
+    const presetOptions = useMemo(
+        () =>
+            visiblePresets.map((p) => ({
+                value: p.id,
+                label: (
+                    <PresetSelectInner>
+                        <span>{p.name}</span>
+                        <PresetDeleteButton
+                            aria-label={formatTemplate(
+                                microcopy.board.presets
+                                    .deleteAriaLabel as string,
+                                { name: p.name }
+                            )}
+                            onClick={(e) => {
+                                /*
+                                 * Stop propagation + prevent default so
+                                 * clicking the delete glyph inside a
+                                 * Select option doesn't also fire the
+                                 * Select's "option chosen" path —
+                                 * otherwise we'd delete and apply on the
+                                 * same gesture.
+                                 */
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleDeletePreset(p.id);
+                            }}
+                            type="button"
+                        >
+                            <CloseOutlined aria-hidden />
+                        </PresetDeleteButton>
+                    </PresetSelectInner>
+                )
+            })),
+        [visiblePresets]
+    );
 
     return (
         <FilterShell>
@@ -357,6 +567,89 @@ const TaskSearchPanel: React.FC<Props> = ({
                         value={density}
                     />
                 </Space>
+                <PrefRowTrailing>
+                    <Select
+                        allowClear
+                        aria-label={microcopy.board.presets.loadAriaLabel}
+                        data-testid="task-search-panel-presets-select"
+                        notFoundContent={microcopy.empty.savedPresets.empty}
+                        onChange={(value) => {
+                            /*
+                             * AntD `Select` with `allowClear` returns
+                             * `undefined` on clear; we ignore that so a
+                             * clear gesture doesn't reset the active
+                             * filters by applying an empty preset.
+                             */
+                            if (typeof value === "string")
+                                handleApplyPreset(value);
+                        }}
+                        options={presetOptions}
+                        placeholder={microcopy.board.presets.loadPlaceholder}
+                        size="small"
+                        style={{ minWidth: 160 }}
+                        value={null}
+                    />
+                    <Popover
+                        content={
+                            <Space orientation="vertical" size="small">
+                                <Input
+                                    aria-label={
+                                        microcopy.board.presets.namePlaceholder
+                                    }
+                                    autoFocus
+                                    data-testid="task-search-panel-preset-name-input"
+                                    maxLength={60}
+                                    onChange={(e) =>
+                                        setDraftName(e.target.value)
+                                    }
+                                    onPressEnter={handleSavePreset}
+                                    placeholder={
+                                        microcopy.board.presets.namePlaceholder
+                                    }
+                                    value={draftName}
+                                />
+                                <Space size="small">
+                                    <Button
+                                        onClick={handleSavePreset}
+                                        disabled={!draftName.trim()}
+                                        size="small"
+                                        type="primary"
+                                    >
+                                        {microcopy.board.presets.saveConfirm}
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            setSaveOpen(false);
+                                            setDraftName("");
+                                        }}
+                                        size="small"
+                                    >
+                                        {microcopy.board.presets.saveCancel}
+                                    </Button>
+                                </Space>
+                            </Space>
+                        }
+                        onOpenChange={(open) => {
+                            setSaveOpen(open);
+                            if (!open) setDraftName("");
+                        }}
+                        open={saveOpen}
+                        placement="bottomRight"
+                        title={microcopy.board.presets.saveAction}
+                        trigger="click"
+                    >
+                        <Button
+                            aria-label={microcopy.board.presets.saveAriaLabel}
+                            data-testid="task-search-panel-save-preset"
+                            disabled={chips.length === 0}
+                            icon={<SaveOutlined aria-hidden />}
+                            size="small"
+                            type="text"
+                        >
+                            {microcopy.board.presets.saveAction}
+                        </Button>
+                    </Popover>
+                </PrefRowTrailing>
             </PrefRow>
         </FilterShell>
     );

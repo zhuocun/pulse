@@ -13,18 +13,22 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
  * and feeds the `preloadedState` of the store builder. If the key is
  * missing or unparseable we fall back to the slice's `initialState` so a
  * malformed localStorage entry never wedges the app.
- *
- * The first wave (this commit) wires the density toggle. Saved filter
- * presets land in a follow-up commit that reuses the same persistence
- * scaffolding via the `savedFilterPresets` slot below.
  */
 export type BoardDensity = "comfortable" | "compact";
 
 /**
  * The serialized shape of a single filter preset. `filterState` mirrors
- * the URL-state surface owned by `taskSearchPanel`. The follow-up Part B
- * commit wires the reducers; the field is declared up-front so the
- * persistence shape stays stable from day one.
+ * the URL-state surface owned by `taskSearchPanel`: `taskName`,
+ * `coordinatorId`, `type`. We deliberately store empty strings instead of
+ * `null`/`undefined` because the `useUrl` writer round-trips `""` as the
+ * "remove this key" signal, so a preset that wants to leave a filter
+ * un-set stores it as `""` and the apply path can write the same value
+ * back without translation.
+ *
+ * `boardId === null` marks a "global" preset visible on every board; a
+ * specific id scopes it to that board only. The taskSearchPanel filters
+ * presets by `(p.boardId === currentBoardId || p.boardId === null)` on
+ * render so users see a single dropdown.
  */
 export interface SavedFilterPresetState {
     id: string;
@@ -42,6 +46,15 @@ export interface UserPreferencesState {
     boardDensity: BoardDensity;
     savedFilterPresets: SavedFilterPresetState[];
 }
+
+/**
+ * Phase 4.2 — capped at 10 to keep the dropdown navigable and the
+ * localStorage payload modest. The 11th save attempt triggers a
+ * user-facing toast in `taskSearchPanel`; FIFO eviction happens here on
+ * the reducer side so the slice is the single point of truth for the
+ * cap.
+ */
+export const SAVED_FILTER_PRESET_LIMIT = 10;
 
 export const USER_PREFERENCES_STORAGE_KEY = "pulse:userPreferences";
 
@@ -100,7 +113,7 @@ export const loadPersistedUserPreferences = (): UserPreferencesState => {
             boardDensity: isBoardDensity(candidate.boardDensity)
                 ? candidate.boardDensity
                 : initialState.boardDensity,
-            savedFilterPresets: presets
+            savedFilterPresets: presets.slice(-SAVED_FILTER_PRESET_LIMIT)
         };
     } catch {
         return initialState;
@@ -132,6 +145,31 @@ export const userPreferencesSlice = createSlice({
     reducers: {
         setBoardDensity(state, action: PayloadAction<BoardDensity>) {
             state.boardDensity = action.payload;
+        },
+        /**
+         * Append a preset. If the list would exceed the cap, the OLDEST
+         * preset is dropped to make room (FIFO). The reducer returns the
+         * new list as-is; the caller (the save UI) detects "we hit the
+         * cap" by comparing list length to the cap BEFORE dispatching
+         * so a toast can fire on the 11th attempt.
+         */
+        addSavedFilterPreset(
+            state,
+            action: PayloadAction<SavedFilterPresetState>
+        ) {
+            state.savedFilterPresets.push(action.payload);
+            if (state.savedFilterPresets.length > SAVED_FILTER_PRESET_LIMIT) {
+                state.savedFilterPresets.splice(
+                    0,
+                    state.savedFilterPresets.length - SAVED_FILTER_PRESET_LIMIT
+                );
+            }
+        },
+        removeSavedFilterPreset(state, action: PayloadAction<string>) {
+            const idx = state.savedFilterPresets.findIndex(
+                (p) => p.id === action.payload
+            );
+            if (idx >= 0) state.savedFilterPresets.splice(idx, 1);
         }
     }
 });
