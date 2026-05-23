@@ -1,6 +1,6 @@
 import { Button } from "antd";
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
 import { PageSpin } from "../components/status";
@@ -28,6 +28,10 @@ const TermsPage = lazy(() => import("../pages/terms"));
 const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
+const SharePage = lazy(() => import("../pages/share"));
+const InboxPage = lazy(() => import("../pages/inbox"));
+const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
+const SettingsPage = lazy(() => import("../pages/settings"));
 
 /**
  * Resolves the root URL by consulting authentication once, at the route
@@ -56,8 +60,23 @@ const RootRedirect = () => {
  */
 const RequireAuth = () => {
     const { isAuthenticated } = useAuth();
+    const location = useLocation();
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        /*
+         * Forward the originally-requested location as router state so
+         * the login form can return the user to where they were
+         * heading (e.g. `/share?title=foo` from an external app's share
+         * sheet). Without this hint, every post-login navigate landed
+         * on `/projects` and dropped the share-target params on the
+         * floor.
+         */
+        return (
+            <Navigate
+                to="/login"
+                replace
+                state={{ from: location.pathname + location.search }}
+            />
+        );
     }
     return <MainLayout />;
 };
@@ -187,6 +206,43 @@ const routes = [
                                 element: <BoardPage />
                             }
                         ]
+                    },
+                    /*
+                     * Web Share Target landing page (Phase 3 A4). Wired to
+                     * the manifest's `share_target.action = "/share"`
+                     * entry — the browser navigates here with title / text
+                     * / url URL params when an external app shares into
+                     * Pulse. Guarded by `<RequireAuth>` because the page
+                     * needs an authenticated session to fetch projects +
+                     * post the resulting task; unauthenticated visitors
+                     * follow the same `/login` redirect path as every
+                     * other protected route.
+                     */
+                    {
+                        path: "share",
+                        element: <SharePage />
+                    },
+                    /*
+                     * Bottom-tab destinations (Phase 3 A3). Inbox is the
+                     * future home of triage / mentions / AI activity (a
+                     * placeholder until A8 lands); Copilot is the no-board
+                     * landing surface that delegates to the existing chat
+                     * and brief drawers; Settings consolidates theme,
+                     * language, AI on/off, and logout in one routed page
+                     * so the phone header can drop its right-cluster
+                     * dropdown.
+                     */
+                    {
+                        path: "inbox",
+                        element: <InboxPage />
+                    },
+                    {
+                        path: "copilot",
+                        element: <CopilotLandingPage />
+                    },
+                    {
+                        path: "settings",
+                        element: <SettingsPage />
                     }
                 ]
             },

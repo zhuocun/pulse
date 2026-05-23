@@ -131,6 +131,17 @@ const aiKnowledgeCutoff =
     readEnv("REACT_APP_AI_KNOWLEDGE_CUTOFF")?.trim() ||
     DEFAULT_AI_KNOWLEDGE_CUTOFF;
 
+/**
+ * Phase 3 A3 — Bottom tab bar + demoted header. Default ON so the new
+ * chassis is the live experience without a release toggle; set
+ * `REACT_APP_BOTTOM_NAV_ENABLED=false` for a one-flag rollback to the
+ * previous header-only chrome (the dropdown right-cluster comes back,
+ * the bottom tab bar does not mount). When the env var is missing
+ * entirely (production parity), the flag still defaults to true so
+ * deployed builds get the new chassis.
+ */
+const bottomNavEnabledFlag = readEnv("REACT_APP_BOTTOM_NAV_ENABLED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -145,7 +156,13 @@ const environment = {
     aiMutationProposalsEnabled:
         aiMutationProposalsEnabledFlag === "false" ? false : true,
     /** Override via `REACT_APP_AI_KNOWLEDGE_CUTOFF` (see file header). */
-    aiKnowledgeCutoff
+    aiKnowledgeCutoff,
+    /**
+     * Phase 3 A3 mobile-chassis flag. Default true so the new bottom
+     * tab bar mounts on phones and the header demotes its right
+     * cluster; set `REACT_APP_BOTTOM_NAV_ENABLED=false` to roll back.
+     */
+    bottomNavEnabled: bottomNavEnabledFlag === "false" ? false : true
 };
 
 export default environment;

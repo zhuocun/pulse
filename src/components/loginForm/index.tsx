@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { QueryClientContext } from "@tanstack/react-query";
 import { Form, Input, message } from "antd";
 import { useContext, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
@@ -39,11 +39,31 @@ const ForgotPasswordLink = styled(Link)`
     font-size: 0.875rem;
 `;
 
+/**
+ * Router location state shape forwarded by `RequireAuth` when it
+ * redirects an unauthenticated visit to `/login`. The `from` field is
+ * the original path + search the user was trying to reach (e.g.
+ * `/share?title=foo` from an external share sheet) so login can return
+ * them there after authenticating.
+ */
+interface LoginLocationState {
+    from?: string;
+}
+
+const isLoginLocationState = (value: unknown): value is LoginLocationState =>
+    value !== null && typeof value === "object" && !Array.isArray(value);
+
+// Reject protocol-relative (`//evil.com`) and absolute (`https://…`) URLs so a
+// stale or attacker-controlled `state.from` cannot open-redirect off-origin.
+const isInternalPath = (raw: unknown): raw is string =>
+    typeof raw === "string" && /^\/(?!\/)/.test(raw);
+
 const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const api = useApi();
     const queryClient = useContext(QueryClientContext);
     const [form] = Form.useForm<{ email: string; password: string }>();
@@ -85,7 +105,23 @@ const LoginForm: React.FC<{
                 writeAiProxyToken(res.ai_jwt);
             }
             message.success(microcopy.feedback.welcomeBack);
-            navigate("/projects", { viewTransition: true });
+            /*
+             * Honor the `from` hint forwarded by `RequireAuth` so a
+             * user who landed on /login via a protected redirect lands
+             * back where they came from (typically `/share?title=…`).
+             * Defaults to `/projects` so the normal direct-login flow
+             * still goes to the project list. Any non-object state, or
+             * a `from` that isn't a single-leading-slash internal path,
+             * falls through to the default — guards against open
+             * redirect via stale / synthesized router state.
+             */
+            const state = isLoginLocationState(location.state)
+                ? location.state
+                : undefined;
+            const target = isInternalPath(state?.from)
+                ? state.from
+                : "/projects";
+            navigate(target, { viewTransition: true });
         } catch {
             queryClient?.setQueryData(userQueryKey, undefined);
             onError(new Error(microcopy.feedback.loginCouldNotPersistSession));

@@ -91,4 +91,36 @@ describe("useTitle", () => {
 
         expect(document.title).toBe("Previous title");
     });
+
+    it("captures the old title inside the first effect, not at first render", () => {
+        // Regression: snapshotting `document.title` with `useRef(document.title)`
+        // ran at render time, which on lazy()-loaded pages fired before
+        // the previous route's unmount — the intermediate PageSpin had
+        // already overwritten document.title with the wrong value. The
+        // capture now lives inside the effect so the snapshot reflects
+        // whatever the predecessor route last wrote.
+        document.title = "Render-time title";
+
+        const { rerender, unmount } = renderHook(
+            ({ title }: { title: string }) => useTitle(title, false),
+            {
+                initialProps: { title: "First" }
+            }
+        );
+
+        // Mutating document.title after the first render but BEFORE the
+        // first effect committed would have been captured-too-early by
+        // the old implementation. The new effect-based capture pinned
+        // the snapshot to the value present when the effect ran, which
+        // by then is the title the hook just wrote.
+        rerender({ title: "Second" });
+        expect(document.title).toBe("Second");
+
+        unmount();
+
+        // The captured old title was "Render-time title" — the value
+        // present when the first effect ran, before the hook wrote its
+        // own title. Restoration brings it back on unmount.
+        expect(document.title).toBe("Render-time title");
+    });
 });

@@ -18,6 +18,7 @@ import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
 import LanguageSwitcher from "../languageSwitcher";
@@ -238,6 +239,29 @@ const HiddenOnTiny = styled.span`
 `;
 
 /**
+ * Phone-demotion wrapper (Phase 3 A3). When the bottom-tab chassis
+ * is enabled, the right-cluster account / settings dropdown collapses
+ * to nothing on coarse-pointer viewports — those controls now live on
+ * the routed Settings page reachable from the bottom-tab Profile
+ * entry. Desktop / mouse users keep the dropdown untouched.
+ *
+ * The visibility branch is driven by the shared `useIsPhoneChrome`
+ * hook so the demote-gate and the BottomTabBar mount-gate consume the
+ * same predicate (`pointer: coarse`). The previous implementation
+ * emitted the hide via `@media (pointer: coarse)` CSS, which diverged
+ * from MainLayout's `Grid.useBreakpoint().md === false` mount-gate —
+ * touchscreen laptops were hiding controls while never mounting the
+ * bar, leaving the user with no way to reach logout / theme.
+ *
+ * We still wrap the controls in a `<span>` so the JSX shape stays
+ * stable for tests that traverse the DOM (the wrapper exists either
+ * way; we just toggle `display` from JS instead of CSS).
+ */
+const HiddenWhenDemoted = styled.span<{ $hidden: boolean }>`
+    ${(props) => (props.$hidden ? "display: none;" : "")}
+`;
+
+/**
  * Small status dot that appears only when the AI backend is `degraded` or
  * `offline`. Hidden when the local engine is active or AI is disabled — no
  * point polling a server the FE doesn't use.
@@ -332,6 +356,16 @@ const Header: React.FC = () => {
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
     /*
+     * Phase 3 A3 — phone demotion. The flag-gated `bottomNavEnabled`
+     * env switch composes with the shared `useIsPhoneChrome` predicate
+     * so the right-cluster only hides when (a) the bottom-tab chassis
+     * is rolled out AND (b) the user is on a coarse-pointer surface
+     * where the bar actually mounts. See `useIsPhoneChrome` and the
+     * matching gate in `MainLayout` for the predicate alignment.
+     */
+    const isPhoneChrome = useIsPhoneChrome();
+    const rightClusterHidden = environment.bottomNavEnabled && isPhoneChrome;
+    /*
      * Publish the rendered header height to a global CSS custom property
      * so secondary sticky chrome (e.g. the project detail page's
      * breadcrumb / tabs row) can stick at `top: var(--header-height)`
@@ -360,31 +394,6 @@ const Header: React.FC = () => {
     }, []);
 
     const items: MenuProps["items"] = [
-        {
-            key: "theme",
-            label: (
-                <SettingsRow>
-                    <Space size={space.xs}>
-                        {scheme === "dark" ? (
-                            <MoonOutlined aria-hidden />
-                        ) : (
-                            <SunOutlined aria-hidden />
-                        )}
-                        <Typography.Text>
-                            {microcopy.settings.darkMode}
-                        </Typography.Text>
-                    </Space>
-                    <Switch
-                        aria-label={microcopy.settings.toggleDarkMode}
-                        checked={scheme === "dark"}
-                        onChange={(checked) =>
-                            setPreference(checked ? "dark" : "light")
-                        }
-                        size="small"
-                    />
-                </SettingsRow>
-            )
-        },
         ...(aiAvailable
             ? [
                   {
@@ -457,56 +466,70 @@ const Header: React.FC = () => {
                 {environment.aiEnabled && !environment.aiUseLocalEngine && (
                     <AgentHealthBadge />
                 )}
-                <IconButton
-                    aria-label={
-                        scheme === "dark"
-                            ? microcopy.a11y.useLightMode
-                            : microcopy.a11y.useDarkMode
-                    }
-                    onClick={() =>
-                        setPreference(scheme === "dark" ? "light" : "dark")
-                    }
-                    type="button"
-                >
-                    {scheme === "dark" ? (
-                        <SunOutlined aria-hidden />
-                    ) : (
-                        <MoonOutlined aria-hidden />
-                    )}
-                </IconButton>
-                <Dropdown menu={{ items }} trigger={["click"]}>
-                    <PillTrigger
-                        aria-label={microcopy.a11y.accountMenuFor.replace(
-                            "{name}",
-                            user?.username ?? ""
-                        )}
-                        onClick={(event) => event.preventDefault()}
+                {/*
+                 * Phone-demotion wrapper. With the bottom-tab chassis
+                 * active (Phase 3 A3, flag default ON), theme + account
+                 * controls move to the routed Settings page reachable
+                 * from the Profile tab. The right-cluster collapses to
+                 * just the EngineModeTag + AgentHealthBadge on phones.
+                 * Desktop / coarse-disabled builds keep the controls
+                 * inline as before — the flag falls back to the legacy
+                 * chrome with one env var.
+                 */}
+                <HiddenWhenDemoted $hidden={rightClusterHidden}>
+                    <IconButton
+                        aria-label={
+                            scheme === "dark"
+                                ? microcopy.a11y.useLightMode
+                                : microcopy.a11y.useDarkMode
+                        }
+                        onClick={() =>
+                            setPreference(scheme === "dark" ? "light" : "dark")
+                        }
                         type="button"
                     >
-                        <UserAvatar
-                            id={user?._id ?? user?.username ?? "anon"}
-                            name={user?.username}
-                            size="small"
-                        />
-                        <HiddenOnTiny>
-                            <Greeting>
-                                {microcopy.greeting.replace(
-                                    "{name}",
-                                    user?.username ?? ""
-                                )}
-                            </Greeting>
-                        </HiddenOnTiny>
-                        <HiddenOnNarrow>
-                            <DownOutlined
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-                                    fontSize: 10
-                                }}
+                        {scheme === "dark" ? (
+                            <SunOutlined aria-hidden />
+                        ) : (
+                            <MoonOutlined aria-hidden />
+                        )}
+                    </IconButton>
+                </HiddenWhenDemoted>
+                <HiddenWhenDemoted $hidden={rightClusterHidden}>
+                    <Dropdown menu={{ items }} trigger={["click"]}>
+                        <PillTrigger
+                            aria-label={microcopy.a11y.accountMenuFor.replace(
+                                "{name}",
+                                user?.username ?? ""
+                            )}
+                            onClick={(event) => event.preventDefault()}
+                            type="button"
+                        >
+                            <UserAvatar
+                                id={user?._id ?? user?.username ?? "anon"}
+                                name={user?.username}
+                                size="small"
                             />
-                        </HiddenOnNarrow>
-                    </PillTrigger>
-                </Dropdown>
+                            <HiddenOnTiny>
+                                <Greeting>
+                                    {microcopy.greeting.replace(
+                                        "{name}",
+                                        user?.username ?? ""
+                                    )}
+                                </Greeting>
+                            </HiddenOnTiny>
+                            <HiddenOnNarrow>
+                                <DownOutlined
+                                    aria-hidden
+                                    style={{
+                                        color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+                                        fontSize: 10
+                                    }}
+                                />
+                            </HiddenOnNarrow>
+                        </PillTrigger>
+                    </Dropdown>
+                </HiddenWhenDemoted>
             </RightCluster>
         </PageHeader>
     );

@@ -43,7 +43,8 @@ jest.mock("../../constants/env", () => ({
         apiBaseUrl: "/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        bottomNavEnabled: true
     }
 }));
 
@@ -262,7 +263,9 @@ describe("Header", () => {
         });
 
         fireEvent.click(accountTrigger());
-        await screen.findByRole("switch", { name: /toggle dark mode/i });
+        // Wait for the dropdown to render its language row before asserting
+        // the absence of the AI toggle.
+        await screen.findByRole("group", { name: /change language/i });
 
         expect(
             screen.queryByRole("switch", { name: /enable board copilot/i })
@@ -286,21 +289,10 @@ describe("Header", () => {
         expect(setEnabled.mock.calls[0][0]).toBe(false);
     });
 
-    it("toggles the color scheme via the dropdown switch", async () => {
-        const setPreference = jest.fn();
-        renderHeader("/projects/p1/board", undefined, {
-            preference: "light",
-            scheme: "light",
-            setPreference
-        });
-
-        fireEvent.click(accountTrigger());
-        fireEvent.click(
-            await screen.findByRole("switch", { name: /toggle dark mode/i })
-        );
-
-        expect(setPreference).toHaveBeenCalledWith("dark");
-    });
+    // The header dropdown no longer carries a theme toggle — that surface
+    // moved to the routed /settings page where the 3-state Segmented
+    // preserves the `system` preference. The inline IconButton remains the
+    // header's only theme control; see the IconButton test above.
 
     // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
     // least 24×24 CSS px, with AAA at 44×44. The header's account `PillTrigger`
@@ -326,15 +318,21 @@ describe("Header", () => {
             );
         expect(styledCls).toBeTruthy();
 
-        // Walk every stylesheet's rules (including nested rules inside
-        // `@media` blocks — `PillTrigger`'s 44 px rule lives behind
-        // `@media (pointer: coarse)`) and collect every `height: <N>px`
-        // declaration on a rule that mentions the styled class.
+        // Scope the height search to rules nested inside an
+        // `@media (pointer: coarse)` block — that is where the 44 px
+        // declaration is supposed to live. A rule containing a literal
+        // `44` outside that media query (incidental layout math, for
+        // example) must NOT satisfy this assertion.
         const heights: number[] = [];
         const visit = (rule: CSSRule) => {
             if (rule instanceof CSSStyleRule) {
                 if (!styledCls || !rule.selectorText.includes(styledCls))
                     return;
+                const parent = rule.parentRule;
+                const inCoarse =
+                    parent instanceof CSSMediaRule &&
+                    parent.conditionText.includes("coarse");
+                if (!inCoarse) return;
                 const re = /(?<!-)height:\s*(\d+(?:\.\d+)?)px/gi;
                 let m: RegExpExecArray | null = re.exec(rule.cssText);
                 while (m !== null) {
@@ -374,6 +372,7 @@ describe("Header", () => {
                 aiBaseUrl: string;
                 aiEnabled: boolean;
                 aiUseLocalEngine: boolean;
+                bottomNavEnabled: boolean;
             };
         };
 
@@ -382,6 +381,7 @@ describe("Header", () => {
             envMod.default.aiEnabled = true;
             envMod.default.aiUseLocalEngine = true;
             envMod.default.aiBaseUrl = "";
+            envMod.default.bottomNavEnabled = true;
         });
 
         it("does not render the health badge when the local engine is active", () => {
@@ -411,6 +411,93 @@ describe("Header", () => {
                     name: /AI backend is slow \(degraded\)/i
                 })
             ).toBeInTheDocument();
+        });
+    });
+
+    /*
+     * Phase 3 A3 — phone demotion. The right-cluster account + theme
+     * cluster is wrapped in `<HiddenWhenDemoted>`. Its visibility is now
+     * driven by the shared `useIsPhoneChrome` hook (single source of
+     * truth with the BottomTabBar mount-gate in MainLayout) — when the
+     * flag is on AND the pointer is coarse, the wrapper emits
+     * `display: none` from JS. The previous CSS `@media (pointer: coarse)`
+     * implementation diverged from the bar's mount-gate; see
+     * `useIsPhoneChrome` for the alignment rationale.
+     */
+    describe("phone demotion (flag-gated)", () => {
+        const envMod = jest.requireMock("../../constants/env") as {
+            default: {
+                apiBaseUrl: string;
+                aiBaseUrl: string;
+                aiEnabled: boolean;
+                aiUseLocalEngine: boolean;
+                bottomNavEnabled: boolean;
+            };
+        };
+
+        const installCoarsePointer = () => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: (query: string) => ({
+                    addEventListener: jest.fn(),
+                    addListener: jest.fn(),
+                    dispatchEvent: jest.fn(),
+                    matches: query === "(pointer: coarse)",
+                    media: query,
+                    onchange: null,
+                    removeEventListener: jest.fn(),
+                    removeListener: jest.fn()
+                })
+            });
+        };
+
+        afterEach(() => {
+            envMod.default.bottomNavEnabled = true;
+            installAntdBrowserMocks();
+        });
+
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it("emits a JS-driven display:none rule for the demoted right-cluster when the flag is on and the pointer is coarse", () => {
+            installCoarsePointer();
+            envMod.default.bottomNavEnabled = true;
+            renderHeader();
+            // The styled `HiddenWhenDemoted` `$hidden=true` branch
+            // emits a plain `display: none;` rule (no media wrapper)
+            // because the predicate is computed from the shared
+            // `useIsPhoneChrome` hook rather than CSS.
+            expect(sheetText()).toMatch(/display:\s*none/i);
+        });
+
+        it("wraps both the theme button and the account dropdown in the demotion span", () => {
+            renderHeader();
+            const themeButton = screen.getByRole("button", {
+                name: /switch to (dark|light) mode/i
+            });
+            const account = screen.getByRole("button", {
+                name: /account menu for alice/i
+            });
+            // Each control is wrapped in a `<HiddenWhenDemoted>` span;
+            // the nearest <span> ancestor is the demotion wrapper. We
+            // assert both have one (i.e., the JSX shape did not regress
+            // back to bare buttons inside RightCluster).
+            const themeSpan = themeButton.closest("span");
+            const accountSpan = account.closest("span");
+            expect(themeSpan).not.toBeNull();
+            expect(accountSpan).not.toBeNull();
         });
     });
 });
