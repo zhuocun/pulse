@@ -1,9 +1,11 @@
 /* eslint-disable global-require */
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
 import App from "./App";
+import { store } from "./store";
 
 /*
  * The legacy `pages/home.tsx` wrapper was removed in QW-4; the routes file
@@ -96,11 +98,13 @@ const renderAppAt = (path: string, authedUser?: IUser) => {
     }
 
     render(
-        <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-                <App />
-            </BrowserRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
