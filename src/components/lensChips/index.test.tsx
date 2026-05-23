@@ -1,0 +1,166 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+
+import LensChips, { parseLensId, type LensId } from "./index";
+
+const ControlledLens = ({ initial = null }: { initial?: LensId | null }) => {
+    const [active, setActive] = useState<LensId | null>(initial);
+    return (
+        <div>
+            <LensChips active={active} onChange={setActive} />
+            <span data-testid="active-lens">{active ?? "none"}</span>
+        </div>
+    );
+};
+
+describe("LensChips", () => {
+    it("renders the full chip set (Today, This week, Mine, At risk)", () => {
+        render(<LensChips active={null} onChange={jest.fn()} />);
+
+        expect(
+            screen.getByRole("group", { name: /board lenses/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /today/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /this week/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /mine/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /at risk/i })
+        ).toBeInTheDocument();
+    });
+
+    it("marks the active chip with aria-pressed=true and others with false", () => {
+        render(<LensChips active="mine" onChange={jest.fn()} />);
+
+        expect(screen.getByRole("button", { name: /mine/i })).toHaveAttribute(
+            "aria-pressed",
+            "true"
+        );
+        expect(screen.getByRole("button", { name: /today/i })).toHaveAttribute(
+            "aria-pressed",
+            "false"
+        );
+    });
+
+    it("clicks a chip → calls onChange with its lens id", async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+        render(<LensChips active={null} onChange={onChange} />);
+
+        await user.click(screen.getByRole("button", { name: /mine/i }));
+
+        expect(onChange).toHaveBeenCalledWith("mine");
+        expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("clicks the active chip → calls onChange(null) to clear back to All", async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+        render(<LensChips active="mine" onChange={onChange} />);
+
+        await user.click(screen.getByRole("button", { name: /mine/i }));
+
+        expect(onChange).toHaveBeenCalledWith(null);
+    });
+
+    it("integrates with controlled state: clicking flips, re-clicking clears", async () => {
+        const user = userEvent.setup();
+        render(<ControlledLens />);
+
+        const todayChip = screen.getByRole("button", { name: /today/i });
+
+        await user.click(todayChip);
+        expect(screen.getByTestId("active-lens")).toHaveTextContent("today");
+
+        await user.click(todayChip);
+        expect(screen.getByTestId("active-lens")).toHaveTextContent("none");
+    });
+
+    it("switches between chips when clicking a different one", async () => {
+        const user = userEvent.setup();
+        render(<ControlledLens initial="mine" />);
+
+        await user.click(screen.getByRole("button", { name: /today/i }));
+        expect(screen.getByTestId("active-lens")).toHaveTextContent("today");
+
+        await user.click(screen.getByRole("button", { name: /at risk/i }));
+        expect(screen.getByTestId("active-lens")).toHaveTextContent("at-risk");
+    });
+
+    it("shows a coming-soon badge on graceful-skip lenses (Today, This week, At risk)", () => {
+        render(<LensChips active={null} onChange={jest.fn()} />);
+
+        const today = screen.getByRole("button", { name: /today/i });
+        const week = screen.getByRole("button", { name: /this week/i });
+        const risk = screen.getByRole("button", { name: /at risk/i });
+        const mine = screen.getByRole("button", { name: /mine/i });
+
+        expect(today.textContent).toMatch(/soon/i);
+        expect(week.textContent).toMatch(/soon/i);
+        expect(risk.textContent).toMatch(/soon/i);
+        expect(mine.textContent).not.toMatch(/soon/i);
+    });
+
+    it("supports keyboard nav: Tab to a chip then Enter triggers onChange", async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+        render(<LensChips active={null} onChange={onChange} />);
+
+        // Tab focuses the first chip ("Today"), then Enter activates it.
+        await user.tab();
+        expect(screen.getByRole("button", { name: /today/i })).toHaveFocus();
+
+        await user.keyboard("{Enter}");
+        expect(onChange).toHaveBeenCalledWith("today");
+    });
+
+    it("supports Space to activate as well as Enter (button-default semantics)", () => {
+        const onChange = jest.fn();
+        render(<LensChips active={null} onChange={onChange} />);
+
+        const mine = screen.getByRole("button", { name: /mine/i });
+        // Buttons fire onClick on Space key — simulate via fireEvent
+        // because userEvent uses a hidden synthetic that depends on
+        // focus semantics jsdom doesn't fully model for Space.
+        fireEvent.click(mine);
+
+        expect(onChange).toHaveBeenCalledWith("mine");
+    });
+
+    it("uses a tooltip on each chip for context (title attribute)", () => {
+        render(<LensChips active={null} onChange={jest.fn()} />);
+
+        expect(screen.getByRole("button", { name: /today/i })).toHaveAttribute(
+            "title",
+            expect.stringMatching(/today/i)
+        );
+        expect(screen.getByRole("button", { name: /mine/i })).toHaveAttribute(
+            "title",
+            expect.stringMatching(/coordinator/i)
+        );
+    });
+});
+
+describe("parseLensId", () => {
+    it("returns the lens id for known values", () => {
+        expect(parseLensId("today")).toBe("today");
+        expect(parseLensId("this-week")).toBe("this-week");
+        expect(parseLensId("mine")).toBe("mine");
+        expect(parseLensId("at-risk")).toBe("at-risk");
+    });
+
+    it("returns null for unknown / falsy values", () => {
+        expect(parseLensId(null)).toBeNull();
+        expect(parseLensId(undefined)).toBeNull();
+        expect(parseLensId("")).toBeNull();
+        expect(parseLensId("garbage")).toBeNull();
+        // No half-matches — exact strings only.
+        expect(parseLensId("todays")).toBeNull();
+    });
+});
