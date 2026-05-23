@@ -849,6 +849,25 @@ describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
         installAntdBrowserMocks();
     });
 
+    it("moves focus into the aside on mount in rail mode (R-B H1)", async () => {
+        installDesktopLgMock();
+        renderPanelAt("/projects/project-1/board/task/task-1");
+
+        await screen.findByText(/edit task · build task/i);
+
+        // The rail mount effect moves focus to the aside landmark so
+        // screen readers announce the panel; assert by walking up from
+        // document.activeElement to the rail surface.
+        const panel = document.querySelector(
+            "[data-testid='task-detail-panel']"
+        );
+        expect(panel).not.toBeNull();
+        await waitFor(() => {
+            expect(document.activeElement).toBe(panel);
+        });
+        installAntdBrowserMocks();
+    });
+
     it("falls back to AntD Drawer on coarse-pointer phone even at >= lg width", async () => {
         // Touchscreen-laptop case: pointer:coarse=true AND screens.lg=true.
         // useIsPhoneChrome wins — the bottom-sheet Drawer is the right
