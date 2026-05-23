@@ -450,9 +450,15 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         // Kick the remote brief request only when the user is actually
         // looking at the Brief surface. Tearing it down is wired to
         // `dockOpen` below so a Chat ↔ Brief tab switch doesn't abort the
-        // in-flight stream (R1-H2).
+        // in-flight stream (R1-H2). Skip the start call when a stream is
+        // already running OR a suggestion has already rendered — coming
+        // back to the tab must NOT abort the in-flight stream and restart
+        // it (R-A H1). The fingerprint-change refetch path handles the
+        // "board moved underneath you" case below.
         if (surfaceVisible && projectId) {
-            void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+            if (!remoteBriefIsStreaming && !remoteBriefSuggestion) {
+                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+            }
         } else if (!dockOpen) {
             abortRemoteBrief();
             clearRemoteBriefSuggestion();
@@ -462,6 +468,8 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         dockOpen,
         isRemote,
         projectId,
+        remoteBriefIsStreaming,
+        remoteBriefSuggestion,
         startRemoteBrief,
         abortRemoteBrief,
         clearRemoteBriefSuggestion
