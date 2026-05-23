@@ -213,7 +213,7 @@ describe("BottomTabBar", () => {
         expect(tabs[tabs.length - 1]).toHaveFocus();
     });
 
-    it("hides the bar when the soft keyboard raises (visualViewport shrinks below ratio with input focused)", () => {
+    it("hides the bar via `inert` when the soft keyboard raises (visualViewport shrinks below ratio with input focused)", () => {
         // The production handler fires on both `resize` and `scroll`,
         // and requires an input to be focused before treating a viewport
         // shrink as the keyboard. Capture the listener callback the
@@ -239,8 +239,8 @@ describe("BottomTabBar", () => {
 
         renderBar();
         const nav = screen.getByTestId("bottom-tab-bar");
-        // Tall viewport + no input focused → bar visible.
-        expect(nav).toHaveAttribute("aria-hidden", "false");
+        // Tall viewport + no input focused → bar visible (no `inert`).
+        expect(nav).not.toHaveAttribute("inert");
 
         // Focus a text input and shrink the visual viewport, then fire
         // the captured handler. The bar should hide.
@@ -251,14 +251,14 @@ describe("BottomTabBar", () => {
         act(() => {
             listeners.forEach((cb) => cb());
         });
-        expect(nav).toHaveAttribute("aria-hidden", "true");
+        expect(nav).toHaveAttribute("inert");
 
         // Restore the tall viewport (keyboard dismisses) → bar re-shows.
         mockViewport.height = 700;
         act(() => {
             listeners.forEach((cb) => cb());
         });
-        expect(nav).toHaveAttribute("aria-hidden", "false");
+        expect(nav).not.toHaveAttribute("inert");
         document.body.removeChild(input);
     });
 
@@ -291,12 +291,12 @@ describe("BottomTabBar", () => {
         });
         const nav = screen.getByTestId("bottom-tab-bar");
         // 600 / 700 ≈ 0.86 > 0.75, AND no input focused → still visible.
-        expect(nav).toHaveAttribute("aria-hidden", "false");
+        expect(nav).not.toHaveAttribute("inert");
     });
 
-    it("keeps the bar visible when visualViewport is undefined", () => {
+    it("keeps the bar visible (no `inert`) when visualViewport is undefined", () => {
         renderBar();
         const nav = screen.getByTestId("bottom-tab-bar");
-        expect(nav).toHaveAttribute("aria-hidden", "false");
+        expect(nav).not.toHaveAttribute("inert");
     });
 });
