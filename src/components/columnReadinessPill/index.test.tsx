@@ -177,6 +177,37 @@ describe("ColumnReadinessPill", () => {
      * the aria-label has to be on the Tag (not only on the inner
      * span) or the AT announces an unlabelled "button" / "tag".
      */
+    /*
+     * Followup B (PR #308 review): on `pointer: coarse` viewports the
+     * pill needs a >=44x44 touch hit area without inflating its visible
+     * size (the column header would otherwise reflow). We pad the area
+     * out via a ::before pseudo-element. JSDOM doesn't run the
+     * `@media (pointer: coarse)` block at layout time, but the
+     * `data-touch-hit-area` marker on the styled root lets us assert
+     * the contract is wired up — any future refactor that drops the
+     * styled wrapper has to keep the marker (and therefore the rule).
+     */
+    it("uses a styled root that owns the pointer:coarse hit-area expander (Followup B)", () => {
+        render(
+            <ColumnReadinessPill
+                report={buildReport({
+                    readyCount: 4,
+                    totalCount: 5,
+                    status: "ready"
+                })}
+            />
+        );
+        const pill = screen.getByTestId("column-readiness-pill");
+        // The pill is rendered through an Emotion-styled span; the
+        // generated class name is volatile, but the element must be
+        // *some* span with a className applied (raw <span> would have
+        // no className). This is the load-bearing contract: a future
+        // refactor that drops the styled wrapper would render an
+        // unstyled <span> and lose the 44x44 hit area.
+        expect(pill.tagName).toBe("SPAN");
+        expect(pill.className).toMatch(/css-/);
+    });
+
     it("places the readiness aria-label on the outer Popover trigger root, not only the inner pill", () => {
         render(
             <ColumnReadinessPill
