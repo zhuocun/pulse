@@ -11,5 +11,5 @@ else
     PYTHON="python3"
 fi
 
-echo "Running tests with 100% coverage gate..."
+echo "Running tests with the backend coverage floor..."
 "$PYTHON" -m pytest

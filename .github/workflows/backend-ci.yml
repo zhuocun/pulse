@@ -18,7 +18,7 @@ on:
     workflow_dispatch:
         inputs:
             mode:
-                description: "Jobs to run; target branch is selected in Run workflow. test-full = pytest with .[dev,ai]; test-slim = .[dev] + import app.main."
+                description: "Jobs to run; target branch is selected in Run workflow. test-full = ruff + pytest with .[dev,ai]; test-slim = requirements.txt + import app.main."
                 type: choice
                 default: both
                 options:
@@ -44,6 +44,7 @@ jobs:
               with:
                   python-version: "3.12"
             - run: pip install -e ".[dev,ai]"
+            - run: ruff check .
             - run: pytest
 
     test-slim:
@@ -54,5 +55,5 @@ jobs:
             - uses: actions/setup-python@v5
               with:
                   python-version: "3.12"
-            - run: pip install -e ".[dev]"
+            - run: pip install -r requirements.txt
             - run: python -c "import app.main"

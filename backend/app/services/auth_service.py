@@ -2,6 +2,7 @@ from http import HTTPStatus
 from typing import Any, Dict
 
 from app.database import USERS
+from app.domain.password_policy import MIN_PASSWORD_LENGTH
 from app.repositories import repository
 from app.security import (
     JWT_SECRET_MIN_LENGTH,
@@ -65,12 +66,12 @@ def register(data: Dict[str, Any]) -> str:
     password = data.get("password")
     if not isinstance(password, str) or password == "":
         errors.append(body_error(data, "password", "Password cannot be empty"))
-    elif len(password) < 5:
+    elif len(password) < MIN_PASSWORD_LENGTH:
         errors.append(
             body_error(
                 data,
                 "password",
-                "Length of password cannot be less than 5",
+                f"Length of password cannot be less than {MIN_PASSWORD_LENGTH}",
             )
         )
 

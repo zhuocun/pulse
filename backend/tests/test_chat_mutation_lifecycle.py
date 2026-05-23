@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
@@ -305,6 +305,75 @@ def test_chat_real_model_read_tool_call_interrupts_and_resumes(
             context=ctx,
         )
         assert final["messages"][-1].content == "Found one matching task."
+
+    asyncio.run(run())
+
+
+def test_chat_read_tool_result_survives_mixed_mutation_batch(
+    chat_graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _FakeBound:
+        async def ainvoke(self, messages, config=None):  # type: ignore[no-untyped-def]
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "id": "call-tasks",
+                        "name": "listTasks",
+                        "args": {"projectId": "p-test"},
+                        "type": "tool_call",
+                    },
+                    {
+                        "id": "call-proposal",
+                        "name": "requestMutationApproval",
+                        "args": {
+                            "proposal_id": "organic-1",
+                            "description": "Rename the task",
+                            "risk": "low",
+                            "diff": {
+                                "task_updates": [
+                                    {
+                                        "task_id": "t1",
+                                        "field": "taskName",
+                                        "from": "Old title",
+                                        "to": "New title",
+                                    }
+                                ]
+                            },
+                        },
+                        "type": "tool_call",
+                    },
+                ],
+            )
+
+    import app.agents.catalog.chat as chat_module
+
+    monkeypatch.setattr(chat_module, "_get_bound", lambda _model: _FakeBound())
+    monkeypatch.setattr(chat_module, "is_stub_model", lambda _model: False)
+
+    async def run() -> None:
+        cfg = {"configurable": {"thread_id": "mixed-tools-1"}}
+        first = await chat_graph.ainvoke(
+            {"messages": [HumanMessage(content="list tasks and rename one")]},
+            config=cfg,
+            context=_ctx() | {"chat_model": object()},
+        )
+        interrupts = first.get("__interrupt__") or []
+        assert interrupts[0].value["tool"] == "fe.listTasks"
+
+        second = await chat_graph.ainvoke(
+            Command(resume={"tasks": [{"_id": "t1", "taskName": "Old title"}]}),
+            config=cfg,
+            context=_ctx() | {"chat_model": object()},
+        )
+        interrupts = second.get("__interrupt__") or []
+        assert interrupts[0].value["tool"] == "fe.requestMutationApproval"
+        assert any(
+            isinstance(message, ToolMessage)
+            and message.tool_call_id == "call-tasks"
+            and message.name == "listTasks"
+            for message in second["messages"]
+        )
 
     asyncio.run(run())
 

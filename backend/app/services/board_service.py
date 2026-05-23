@@ -3,11 +3,9 @@ from typing import Any, Dict, List, Optional, Union
 from app.database import COLUMNS, PROJECTS, TASKS
 from app.domain.ordering import column_reorder_updates
 from app.repositories import repository
+from app.services.column_seed import ensure_default_columns
 from app.services.project_service import is_project_manager
 from app.validation import sorted_by_index
-
-
-DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"]
 
 
 def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]:
@@ -16,24 +14,7 @@ def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]
     if not is_project_manager(project_id, user_id):
         return "Forbidden"
 
-    columns = repository.find_many(COLUMNS, {"projectId": project_id})
-    if not columns:
-        # Lazy seeding from a GET is not ideal (it makes the endpoint
-        # non-idempotent and racy under concurrent first reads), but we
-        # keep it for backwards compatibility with the FE that depends on
-        # always seeing three columns. The race is bounded because there
-        # is no unique constraint to violate -- duplicate columns would
-        # be rare and visible.
-        for index, column_name in enumerate(DEFAULT_COLUMNS):
-            repository.insert_one(
-                COLUMNS,
-                {
-                    "columnName": column_name,
-                    "projectId": project_id,
-                    "index": index,
-                },
-            )
-        columns = repository.find_many(COLUMNS, {"projectId": project_id})
+    columns = ensure_default_columns(project_id)
 
     return repository.serialize_documents(sorted_by_index(columns))
 
@@ -46,9 +27,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     if not is_project_manager(project_id, user_id):
         return "Forbidden"
 
-    columns = repository.find_many(COLUMNS, {"projectId": project_id})
-    if not columns:
-        return None
+    columns = ensure_default_columns(project_id)
 
     repository.insert_one(
         COLUMNS,

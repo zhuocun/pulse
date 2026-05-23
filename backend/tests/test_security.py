@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import security
+from app.database import USERS
 from app.security import (
     create_ai_proxy_token,
     create_token,
@@ -96,6 +97,44 @@ def test_rest_token_still_lists_projects(client: TestClient) -> None:
     wide = create_token("user-2")
     headers = {"Authorization": f"Bearer {wide}"}
     assert client.get("/api/v1/projects", headers=headers).status_code == 200
+
+
+def test_bearer_header_overrides_session_cookie(client: TestClient, store) -> None:
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "cookie-user",
+            "email": "cookie@example.com",
+            "password": "secret",
+        },
+    )
+    assert response.status_code == 201
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "cookie@example.com", "password": "secret"},
+    )
+    assert response.status_code == 200
+    assert client.cookies.get("Token")
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "header-user",
+            "email": "header@example.com",
+            "password": "secret",
+        },
+    )
+    assert response.status_code == 201
+    header_user = store.find_one(USERS, {"email": "header@example.com"})
+    assert header_user is not None
+
+    response = client.get(
+        "/api/v1/users/",
+        headers={"Authorization": f"Bearer {create_token(str(header_user['_id']))}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "header@example.com"
 
 
 def test_dummy_password_hash_never_matches_a_real_password() -> None:

@@ -249,6 +249,20 @@ def unpack_similar_payload(payload: Any) -> list[Any]:
     return payload or []
 
 
+def _project_id_from_context() -> str | None:
+    from langgraph.runtime import get_runtime
+
+    from app.agents.context import ChatContext
+
+    try:
+        runtime = get_runtime(ChatContext)
+    except RuntimeError:
+        return None
+    context = runtime.context or {}
+    project_id = context.get("project_id")
+    return project_id if isinstance(project_id, str) else None
+
+
 def fetch_snapshot_node(state: Any) -> dict[str, Any]:
     """Shared ``fetch_snapshot`` node body for board-brief and triage agents.
 
@@ -276,7 +290,7 @@ def fetch_snapshot_node(state: Any) -> dict[str, Any]:
     snapshot = interrupt(
         interrupt_payload(
             FE_BOARD_SNAPSHOT,
-            {"project_id": state.get("project_id")},
+            {"project_id": _project_id_from_context()},
         )
     )
     return {"board_snapshot": snapshot}
@@ -312,7 +326,7 @@ def fetch_similar_node(state: Any) -> dict[str, Any]:
         interrupt_payload(
             FE_SIMILAR_TASKS,
             {
-                "project_id": state.get("project_id"),
+                "project_id": _project_id_from_context(),
                 "query": query,
             },
         )
