@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
 import { useEffect } from "react";
 import {
@@ -32,59 +33,114 @@ const ParamProbe: React.FC = () => {
     return <div data-testid="param">{params.projectId ?? ""}</div>;
 };
 
-const renderHook = (initialPath = "/projects/p1/board") => {
+/*
+ * Build a QueryClient with the board's `boards` and `tasks` cache
+ * keys pre-seeded so the hook computes sibling IDs synchronously. The
+ * hook uses `useReactQuery(endPoint, { projectId })` which keys into
+ * `[endPoint, { projectId }]` — same shape as BoardPage and
+ * TaskDetailPanel, so the same pre-seed pattern works here.
+ */
+const buildQueryClient = (
+    projectId: string,
+    columns: IColumn[],
+    tasks: ITask[]
+) => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            mutations: { retry: false },
+            queries: { retry: false, staleTime: Infinity }
+        }
+    });
+    queryClient.setQueryData(["boards", { projectId }], columns);
+    queryClient.setQueryData(["tasks", { projectId }], tasks);
+    return queryClient;
+};
+
+const renderHook = (
+    initialPath = "/projects/p1/board",
+    seed?: { columns: IColumn[]; tasks: ITask[]; projectId?: string }
+) => {
     const ref: { current: ReturnType<typeof useTaskPanelNavigation> | null } = {
         current: null
     };
-    const utils = render(
-        <MemoryRouter initialEntries={[initialPath]}>
-            <Routes>
-                <Route
-                    path="/projects/:projectId/board"
-                    element={
-                        <>
-                            <Probe
-                                onReady={(api) => {
-                                    ref.current = api;
-                                }}
-                            />
-                            <LocationProbe />
-                            <ParamProbe />
-                        </>
-                    }
-                />
-                <Route
-                    path="/projects/:projectId/board/task/:taskId"
-                    element={
-                        <>
-                            <Probe
-                                onReady={(api) => {
-                                    ref.current = api;
-                                }}
-                            />
-                            <LocationProbe />
-                            <ParamProbe />
-                        </>
-                    }
-                />
-                <Route
-                    path="/projects"
-                    element={
-                        <>
-                            <Probe
-                                onReady={(api) => {
-                                    ref.current = api;
-                                }}
-                            />
-                            <LocationProbe />
-                        </>
-                    }
-                />
-            </Routes>
-        </MemoryRouter>
+    const queryClient = buildQueryClient(
+        seed?.projectId ?? "p1",
+        seed?.columns ?? [],
+        seed?.tasks ?? []
     );
-    return { ref, ...utils };
+    const utils = render(
+        <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={[initialPath]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={
+                            <>
+                                <Probe
+                                    onReady={(api) => {
+                                        ref.current = api;
+                                    }}
+                                />
+                                <LocationProbe />
+                                <ParamProbe />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/projects/:projectId/board/task/:taskId"
+                        element={
+                            <>
+                                <Probe
+                                    onReady={(api) => {
+                                        ref.current = api;
+                                    }}
+                                />
+                                <LocationProbe />
+                                <ParamProbe />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/projects"
+                        element={
+                            <>
+                                <Probe
+                                    onReady={(api) => {
+                                        ref.current = api;
+                                    }}
+                                />
+                                <LocationProbe />
+                            </>
+                        }
+                    />
+                </Routes>
+            </MemoryRouter>
+        </QueryClientProvider>
+    );
+    return { ref, queryClient, ...utils };
 };
+
+const column = (overrides: Partial<IColumn> = {}): IColumn => ({
+    _id: "column-1",
+    columnName: "Todo",
+    index: 0,
+    projectId: "p1",
+    ...overrides
+});
+
+const task = (overrides: Partial<ITask> = {}): ITask => ({
+    _id: "task-1",
+    columnId: "column-1",
+    coordinatorId: "member-1",
+    epic: "Feature",
+    index: 0,
+    note: "",
+    projectId: "p1",
+    storyPoints: 1,
+    taskName: "Task 1",
+    type: "Task",
+    ...overrides
+});
 
 describe("useTaskPanelNavigation", () => {
     it("navigates to /projects/:projectId/board/task/:taskId via openTask", () => {
@@ -162,25 +218,30 @@ describe("useTaskPanelNavigation", () => {
             void tick;
             return null;
         };
+        const queryClient = buildQueryClient("p1", [], []);
         const { rerender } = render(
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={<Capture tick={0} />}
-                    />
-                </Routes>
-            </MemoryRouter>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<Capture tick={0} />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
         );
         rerender(
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={<Capture tick={1} />}
-                    />
-                </Routes>
-            </MemoryRouter>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<Capture tick={1} />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
         );
         expect(captured.length).toBeGreaterThanOrEqual(2);
         const first = captured[0];

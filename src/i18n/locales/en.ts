@@ -138,7 +138,9 @@ export const enSource = {
         moreActionsForProject: "More actions for {name}",
         likeProject: "Like {name}",
         unlikeProject: "Unlike {name}",
-        applyReadinessSuggestion: "Apply readiness suggestion for {field}"
+        applyReadinessSuggestion: "Apply readiness suggestion for {field}",
+        lensChips: "Board lenses",
+        lensComingSoon: "Coming soon"
     },
     dragHints: {
         taskCardKeyboard:
@@ -293,6 +295,23 @@ export const enSource = {
         ai: "AI",
         smartMatch: "Smart match"
     },
+    /**
+     * Phase 3 A7 — Lens chip row above the board filter rail. The
+     * "coming soon" badge is shown on lenses whose data field is not
+     * yet on `ITask` (dueDate, aiRisk — Phase 4) so users see the
+     * shape of the feature without the predicate silently no-op'ing.
+     */
+    lenses: {
+        today: "Today",
+        thisWeek: "This week",
+        mine: "Mine",
+        atRisk: "At risk",
+        todayTooltip: "Tasks due today",
+        thisWeekTooltip: "Tasks due in this ISO week (Mon–Sun)",
+        mineTooltip: "Tasks where you're the coordinator",
+        atRiskTooltip: "Tasks AI-flagged as high or medium risk",
+        comingSoonBadge: "Soon"
+    },
     confirm: {
         deleteProject: {
             title: "Delete this project?",
@@ -390,7 +409,20 @@ export const enSource = {
         confirmDiscardTitle: "Discard unsaved changes?",
         confirmDiscardBody: "Your edits to this task will be lost.",
         confirmDiscardOk: "Discard",
-        confirmDiscardCancel: "Keep editing"
+        confirmDiscardCancel: "Keep editing",
+        siblingNextLabel: "Next task",
+        siblingPrevLabel: "Previous task",
+        siblingPositionLabel: "Task {position} of {total}",
+        ariaLabel: "Task details",
+        siblingNavAriaLabel: "Sibling task navigation"
+    },
+    copilotDock: {
+        title: "Copilot",
+        ariaLabel: "Copilot dock",
+        closeLabel: "Close Copilot",
+        tabChat: "Chat",
+        tabBrief: "Brief",
+        tabListLabel: "Copilot surfaces"
     },
     projectsPage: {
         title: "Projects",

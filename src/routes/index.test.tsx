@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactElement } from "react";
+import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
 import App from "../App";
+import { store } from "../store";
 
 import routes, {
     PublicAuthShell,
@@ -196,11 +198,13 @@ describe("auth/terms reachability (Bug 1)", () => {
             queryClient.setQueryData(["users"], authedUser);
         }
         render(
-            <QueryClientProvider client={queryClient}>
-                <BrowserRouter>
-                    <App />
-                </BrowserRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <BrowserRouter>
+                        <App />
+                    </BrowserRouter>
+                </QueryClientProvider>
+            </Provider>
         );
     };
 
@@ -254,11 +258,13 @@ describe("bottom-tab routes (Phase 3 A3)", () => {
             queryClient.setQueryData(["users"], authedUser);
         }
         render(
-            <QueryClientProvider client={queryClient}>
-                <BrowserRouter>
-                    <App />
-                </BrowserRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <BrowserRouter>
+                        <App />
+                    </BrowserRouter>
+                </QueryClientProvider>
+            </Provider>
         );
     };
 

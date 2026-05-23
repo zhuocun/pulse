@@ -6,7 +6,8 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Alert, Button, Typography } from "antd";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
@@ -262,6 +263,45 @@ const ProjectPage = () => {
         return () =>
             window.removeEventListener("boardCopilot:openChat", onOpenChat);
     }, [aiEnabled, openChatDrawer]);
+    /*
+     * PWA manifest shortcuts (`/projects?openTaskCreator=1`,
+     * `/projects?openCopilot=1`) fire from the OS launcher long-press menu.
+     * Read the params on mount, dispatch the matching open action, then
+     * strip the param so the back-button gesture (and a remount) don't
+     * re-fire. The ref guard makes the once-per-mount contract explicit
+     * — without it, the URL-strip below would re-enter this effect via
+     * the searchParams subscription on the very next render.
+     *
+     * The `openTaskCreator` param is a historical name kept for backwards
+     * compatibility with installed manifests; the user-facing PWA
+     * shortcut is "New project" because the project list page has no
+     * task creator — `openModal()` opens the project-create modal.
+     */
+    const [shortcutSearchParams, setShortcutSearchParams] = useSearchParams();
+    const shortcutsFiredRef = useRef(false);
+    useEffect(() => {
+        if (shortcutsFiredRef.current) return;
+        const wantsTaskCreator =
+            shortcutSearchParams.get("openTaskCreator") === "1";
+        const wantsCopilot = shortcutSearchParams.get("openCopilot") === "1";
+        if (!wantsTaskCreator && !wantsCopilot) return;
+        shortcutsFiredRef.current = true;
+        // `openTaskCreator` (legacy param name) opens the project-create
+        // modal — the PWA shortcut is labeled "New project" to match
+        // actual behavior. `openCopilot` opens the legacy AI chat drawer
+        // mounted below (the CopilotDock lives only on board.tsx).
+        if (wantsTaskCreator) openModal();
+        if (wantsCopilot) openChatDrawer();
+        const next = new URLSearchParams(shortcutSearchParams);
+        next.delete("openTaskCreator");
+        next.delete("openCopilot");
+        setShortcutSearchParams(next, { replace: true });
+    }, [
+        openChatDrawer,
+        openModal,
+        setShortcutSearchParams,
+        shortcutSearchParams
+    ]);
     const [param, setParam] = useUrl([
         "projectName",
         "managerId",

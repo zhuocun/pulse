@@ -19,18 +19,28 @@ import {
     isValidElement,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState
 } from "react";
+import type { TouchEvent as ReactTouchEvent } from "react";
 import { useBlocker, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, fontSize, fontWeight, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    fontSize,
+    fontWeight,
+    radius,
+    space
+} from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
+import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import useTaskPanelSiblings from "../../utils/hooks/useTaskPanelSiblings";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
@@ -49,8 +59,31 @@ import ErrorBox from "../errorBox";
  * and trying to share fragments now would couple two surfaces that
  * are about to merge anyway.
  *
+ * Three chassis modes:
+ *   - Phone (coarse pointer): bottom-sheet via AntD `Drawer`.
+ *   - Tablet (md/lg-but-fine-pointer): right-overlay via AntD `Drawer`.
+ *   - Desktop (>= lg + fine pointer): docked 480px right rail with no
+ *     mask, no overlay, no Drawer chrome. The kanban columns reflow
+ *     because `BoardRouteShell` (`src/routes/index.tsx`) renders this
+ *     panel as a flex sibling to `BoardPage`; the rail consumes its
+ *     480px and the board takes the remaining viewport. No URL matching
+ *     or grid-width trimming happens — the flex shell does the work.
+ *
  * See `docs/design/ui-ux-comprehensive-review-2026-05.md` §A2.
  */
+
+// Width of the desktop docked rail (Phase 3 A2 spec — Line 23 + 171).
+const DESKTOP_RAIL_WIDTH_PX = 480;
+
+// Horizontal swipe threshold for next/prev navigation. 50 px is the
+// minimum cleanly-distinguishable swipe on a thumbboard; anything
+// shorter would conflict with vertical scroll gestures inside the
+// long-note textarea.
+const SWIPE_THRESHOLD_PX = 50;
+// Vertical-to-horizontal slop ratio that disqualifies a gesture as a
+// swipe. If the user's finger moves more than half as much vertically
+// as horizontally, the gesture is scroll-not-swipe.
+const SWIPE_VERTICAL_TOLERANCE = 0.5;
 
 // Replaces lodash/isEqual for the panel's diff check. Matches the same
 // shallow comparison logic as `TaskModal` (same ITask shape).
@@ -123,6 +156,10 @@ interface TaskDetailPanelProps {
  * `maskMotion={null}` removes the transition entirely. We don't import
  * `rc-motion` types here — `motion={null}` is a documented escape
  * hatch.
+ *
+ * Also gates the swipe-to-next animation. When the user has reduced
+ * motion enabled, the swipe still navigates but skips any cosmetic
+ * easing.
  */
 const usePrefersReducedMotion = (): boolean => {
     const [reduced, setReduced] = useState<boolean>(() => {
@@ -167,6 +204,25 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const isPhone = useIsPhoneChrome();
     const prefersReducedMotion = usePrefersReducedMotion();
     const screens = Grid.useBreakpoint();
+    /*
+     * Three chassis modes — see the file header. Desktop docked rail
+     * only fires when (a) the user is on a fine pointer (NOT phone)
+     * AND (b) the viewport is >= lg per AntD's breakpoint hook. Phone
+     * always wins regardless of width because a touchscreen laptop
+     * still wants the bottom-sheet (B-H1).
+     */
+    const isDesktopRail = !isPhone && screens.lg === true;
+    /*
+     * Rail focus management (R-B H1). The AntD Drawer used by the
+     * phone/tablet chassis handles focus trap + restore on its own; the
+     * desktop rail is a plain `<aside>` so we wire equivalent SR/keyboard
+     * affordances by hand. On mount we capture the previously-focused
+     * element, then move focus into the aside so screen readers announce
+     * the panel landmark; on unmount we restore focus to that element so
+     * keyboard users land back on the column card that opened the task.
+     */
+    const asideRef = useRef<HTMLElement | null>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
     const [appliedFieldOrigin, setAppliedFieldOrigin] = useState<
@@ -216,6 +272,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     );
     const { data: membersData } = useMembersList();
     const members = membersData ?? [];
+
+    /*
+     * Sibling navigation (Phase 3 A2 — swipe-between-tasks). The hook
+     * computes `nextTaskId` / `prevTaskId` from the same `boards` +
+     * `tasks` cache the board reads, so swiping advances along the
+     * visual top-to-bottom-left-to-right reading order. The
+     * useBlocker guard intercepts dirty-edit swipes the same way it
+     * intercepts a programmatic close — one confirm dialog covers
+     * every navigation away.
+     */
+    const { goToNext, goToPrev, nextTaskId, prevTaskId } =
+        useTaskPanelSiblings();
+    // Single source of truth for the panel URL contract; openSimilarTask
+    // routes through here so we don't hand-roll the path twice (R-C M1).
+    const { openTask } = useTaskPanelNavigation();
 
     /**
      * Dirty flag driven by `onValuesChange`. We can't rely on
@@ -267,11 +338,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * Dirty-state guard via React Router 7's `useBlocker`. Returns
      * `true` to intercept any navigation away from the panel route
      * while the form has uncommitted edits — covers programmatic
-     * `navigate(...)`, browser back, iOS swipe-back, and Android
-     * system back, because react-router 7's blocker hooks into the
-     * History API for all three. The mask-click path is handled
-     * separately by `requestClose` below; both surfaces converge on
-     * the same `Modal.confirm`.
+     * `navigate(...)`, browser back, iOS swipe-back, Android system
+     * back, AND the swipe-between-tasks gesture (which routes through
+     * `goToNext` / `goToPrev`, i.e. the same `navigate(...)`).
+     * The mask-click path is handled separately by `requestClose`
+     * below; both surfaces converge on the same `Modal.confirm`.
      */
     const blocker = useBlocker(({ currentLocation, nextLocation }) => {
         // Don't block self-navigation (StrictMode re-renders, or the
@@ -427,6 +498,83 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         }
     }, [closePanel, dLoading, editingTask, form, taskId, tasks]);
 
+    /*
+     * Rail focus management (R-B H1). On mount in desktop-rail mode,
+     * remember whatever was focused (typically the column card the user
+     * activated), then move focus to the aside so screen readers
+     * announce the new landmark; on unmount, restore focus so keyboard
+     * users land back on the trigger. The drawer chassis (phone/tablet)
+     * gets focus trap + restore from AntD's Drawer, so this only fires
+     * for the bare `<aside>`.
+     */
+    useEffect(() => {
+        if (!isDesktopRail) return;
+        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        asideRef.current?.focus();
+        return () => {
+            previousFocusRef.current?.focus?.();
+        };
+    }, [isDesktopRail]);
+
+    /*
+     * Swipe-between-tasks handlers (Phase 3 A2 — Line 171 of the
+     * design doc). The touchstart records origin; touchend computes
+     * delta and routes through `goToNext` / `goToPrev` when the
+     * horizontal delta exceeds the threshold AND the gesture is more
+     * horizontal than vertical. Vertical-dominant moves are scrolls
+     * (long notes inside the form) and must NOT trigger navigation.
+     *
+     * The handlers attach to the panel surface — Drawer body for
+     * phone/tablet, the docked `<aside>` for desktop. The dirty-state
+     * guard intercepts via `useBlocker` because `goToNext` / `goToPrev`
+     * route through `navigate(...)` like every other close path.
+     */
+    const swipeOriginRef = useRef<{
+        x: number;
+        y: number;
+        identifier: number;
+    } | null>(null);
+    const onTouchStart = useCallback((event: ReactTouchEvent) => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        swipeOriginRef.current = {
+            x: touch.clientX,
+            y: touch.clientY,
+            identifier: touch.identifier
+        };
+    }, []);
+    const onTouchEnd = useCallback(
+        (event: ReactTouchEvent) => {
+            const origin = swipeOriginRef.current;
+            swipeOriginRef.current = null;
+            if (!origin) return;
+            const touch = Array.from(event.changedTouches).find(
+                (t) => t.identifier === origin.identifier
+            );
+            if (!touch) return;
+            const deltaX = touch.clientX - origin.x;
+            const deltaY = touch.clientY - origin.y;
+            // Reject swipes that don't clear the threshold (likely a
+            // tap with finger drift) or that are scroll-dominant.
+            if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) return;
+            if (
+                Math.abs(deltaY) >
+                Math.abs(deltaX) * SWIPE_VERTICAL_TOLERANCE
+            ) {
+                return;
+            }
+            // Right-swipe (positive X) → previous task; left-swipe
+            // (negative X) → next task. Matches the natural "drag the
+            // page toward you" mental model.
+            if (deltaX > 0) {
+                goToPrev();
+            } else {
+                goToNext();
+            }
+        },
+        [goToNext, goToPrev]
+    );
+
     const liveValues = (() => {
         const fromForm = form.getFieldsValue();
         return {
@@ -569,9 +717,483 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         </div>
     );
 
-    // Placement matches the chassis `useIsPhoneChrome` signal so the
-    // bottom-tab bar and the panel never collide on touchscreen
-    // laptops / tablets (B-H1).
+    /*
+     * Sibling hint shows the prev/next task IDs (or "First task" /
+     * "Last task" placeholders) below the form on viewports where the
+     * swipe gesture is reachable. Always rendered when at least one
+     * sibling exists so keyboard / non-touch users can also tap the
+     * pills to advance — the swipe is the accelerator, not the only
+     * path.
+     */
+    const siblingHint = useMemo(() => {
+        if (!nextTaskId && !prevTaskId) return null;
+        return (
+            // <nav> + dedicated aria-label so ATs surface this as a
+            // sibling-task navigation landmark (R-B H2). A bare <div>
+            // dropped the aria-label, and reusing the panel's generic
+            // "Task details" string didn't describe the widget itself.
+            <nav
+                aria-label={microcopy.taskDetailPanel.siblingNavAriaLabel}
+                style={{
+                    alignItems: "center",
+                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55))",
+                    display: "flex",
+                    fontSize: fontSize.xs,
+                    gap: space.sm,
+                    justifyContent: "space-between",
+                    marginBlockStart: space.md,
+                    paddingBlockStart: space.sm,
+                    borderBlockStart:
+                        "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))"
+                }}
+            >
+                <Button
+                    disabled={!prevTaskId}
+                    onClick={() => goToPrev()}
+                    size="small"
+                    type="text"
+                >
+                    {`← ${microcopy.taskDetailPanel.siblingPrevLabel}`}
+                </Button>
+                <Button
+                    disabled={!nextTaskId}
+                    onClick={() => goToNext()}
+                    size="small"
+                    type="text"
+                >
+                    {`${microcopy.taskDetailPanel.siblingNextLabel} →`}
+                </Button>
+            </nav>
+        );
+    }, [goToNext, goToPrev, nextTaskId, prevTaskId]);
+
+    /*
+     * The form body and chrome render identically across all three
+     * chassis modes; only the wrapper differs. Extracting the body
+     * once keeps the JSX in lockstep and the responsive branch
+     * trivially shallow.
+     */
+    const bodyContent = (
+        <div style={{ position: "relative", width: "100%" }}>
+            {awaitingTaskResolution ? (
+                <div
+                    style={{
+                        alignItems: "center",
+                        display: "flex",
+                        justifyContent: "center",
+                        marginBlock: space.xxl,
+                        minHeight: space.xxl * 3,
+                        width: "100%"
+                    }}
+                >
+                    <Spin
+                        aria-label={microcopy.a11y.loadingBoard}
+                        size="large"
+                    />
+                </div>
+            ) : null}
+            <div hidden={awaitingTaskResolution}>
+                {taskMissingAfterLoad ? (
+                    <Alert
+                        action={
+                            <Button
+                                danger
+                                onClick={() => {
+                                    // Bypass the dirty-guard — the
+                                    // user just told us to discard.
+                                    form.resetFields();
+                                    closePanel();
+                                }}
+                                size="small"
+                                type="text"
+                            >
+                                {microcopy.taskModal.discardEdits}
+                            </Button>
+                        }
+                        description={microcopy.taskModal.removedByOthersBody}
+                        message={microcopy.taskModal.removedByOthersTitle}
+                        role="alert"
+                        showIcon
+                        style={{ marginBlockEnd: space.md }}
+                        type="warning"
+                    />
+                ) : null}
+                {/* Save-as-new follow-up tracked in the doc — see
+                 * TaskModal's mirror comment. Discard above is the
+                 * minimum viable recovery; same logic applies. */}
+                <ErrorBox error={saveError} />
+                <Form
+                    form={form}
+                    initialValues={editingTask}
+                    layout="vertical"
+                    onValuesChange={(changedValues, allValues) => {
+                        setFormTick((tick) => tick + 1);
+                        if (saveError) setSaveError(null);
+                        clearOriginOnManualEdits(changedValues);
+                        /*
+                         * Flip the dirty flag iff the current
+                         * form contents diverge from the
+                         * persisted task. Trim the taskName
+                         * before comparing so trailing whitespace
+                         * doesn't read as a real edit. Mirroring
+                         * the same trim that `onSubmit` applies
+                         * keeps the dirty signal in lockstep
+                         * with the persistence boundary.
+                         */
+                        if (!editingTask) return;
+                        const trimmedName =
+                            typeof allValues.taskName === "string"
+                                ? allValues.taskName.trim()
+                                : allValues.taskName;
+                        const merged = {
+                            ...editingTask,
+                            ...allValues,
+                            taskName: trimmedName
+                        };
+                        const nextDirty = !shallowEqual(merged, editingTask);
+                        setIsFormDirty(nextDirty);
+                        isFormDirtyRef.current = nextDirty;
+                    }}
+                >
+                    <Form.Item
+                        label={microcopy.fields.taskName}
+                        name="taskName"
+                        required
+                        rules={[
+                            {
+                                required: true,
+                                whitespace: true,
+                                message: microcopy.validation.taskNameRequired
+                            }
+                        ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
+                    >
+                        <Input
+                            autoComplete="off"
+                            enterKeyHint="next"
+                            inputMode="text"
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        label={microcopy.fields.coordinator}
+                        name="coordinatorId"
+                        required
+                        rules={[
+                            {
+                                required: true,
+                                message:
+                                    microcopy.validation.coordinatorRequired
+                            }
+                        ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
+                    >
+                        <Select
+                            options={members.map((m) => ({
+                                label: m.username,
+                                value: m._id
+                            }))}
+                            placeholder={
+                                microcopy.placeholders.selectCoordinator
+                            }
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        label={microcopy.fields.type}
+                        name="type"
+                        required
+                        rules={[
+                            {
+                                required: true,
+                                message: microcopy.validation.taskTypeRequired
+                            }
+                        ]}
+                        validateTrigger={["onBlur", "onSubmit"]}
+                    >
+                        <Select
+                            options={TASK_TYPE_OPTIONS}
+                            placeholder={microcopy.placeholders.selectType}
+                        />
+                    </Form.Item>
+                    <Form.Item label={microcopy.fields.epic} name="epic">
+                        <Input
+                            autoComplete="off"
+                            enterKeyHint="next"
+                            inputMode="text"
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        label={
+                            <span
+                                style={{
+                                    alignItems: "center",
+                                    display: "inline-flex",
+                                    gap: space.xs
+                                }}
+                            >
+                                {microcopy.fields.storyPoints}
+                                {appliedFieldOrigin.storyPoints ===
+                                "copilot" ? (
+                                    <Tag
+                                        color="purple"
+                                        style={{ marginInlineEnd: 0 }}
+                                    >
+                                        {microcopy.ai.suggestedByCopilot}
+                                    </Tag>
+                                ) : null}
+                            </span>
+                        }
+                        name="storyPoints"
+                    >
+                        <Select
+                            onChange={() => {
+                                setAppliedFieldOrigin((prev) => {
+                                    if (!prev.storyPoints) return prev;
+                                    const next = { ...prev };
+                                    delete next.storyPoints;
+                                    return next;
+                                });
+                            }}
+                            options={STORY_POINT_OPTIONS}
+                            placeholder={
+                                microcopy.placeholders.selectStoryPoints
+                            }
+                        />
+                    </Form.Item>
+                    <Form.Item label={microcopy.fields.notes} name="note">
+                        <Input.TextArea
+                            autoComplete="off"
+                            enterKeyHint="done"
+                            inputMode="text"
+                            placeholder={
+                                microcopy.placeholders.notesAcceptanceCriteria
+                            }
+                            rows={4}
+                        />
+                    </Form.Item>
+                </Form>
+                {aiEnabled &&
+                    boardAiOn &&
+                    editingTask &&
+                    taskId &&
+                    !isOptimisticPlaceholderId(taskId) && (
+                        <AiTaskAssistPanel
+                            excludeTaskId={taskId}
+                            onApplyStoryPoints={(value) => {
+                                markFieldAsCopilotApplied("storyPoints");
+                                form.setFieldsValue({ storyPoints: value });
+                                setFormTick((tick) => tick + 1);
+                            }}
+                            onApplySuggestion={(field, suggestion, options) => {
+                                if (
+                                    !options?.replace &&
+                                    suggestion !== undefined &&
+                                    isTaskPanelField(field)
+                                ) {
+                                    markFieldAsCopilotApplied(field);
+                                }
+                                const current = form.getFieldValue(field) ?? "";
+                                if (options?.replace) {
+                                    form.setFieldValue(field, suggestion);
+                                } else if (suggestion === undefined) {
+                                    return;
+                                } else if (field === "note") {
+                                    const appended = `${current}${
+                                        current ? "\n\n" : ""
+                                    }## Acceptance criteria\n- ${suggestion}`;
+                                    form.setFieldsValue({ note: appended });
+                                } else {
+                                    form.setFieldsValue({
+                                        [field]: suggestion
+                                    });
+                                }
+                                setFormTick((tick) => tick + 1);
+                            }}
+                            onOpenSimilarTask={(otherTaskId) => {
+                                // Same-tab navigation to a sibling task —
+                                // shared URL contract via useTaskPanelNavigation
+                                // so the path lives in one place. The
+                                // dirty-guard intercepts if needed.
+                                openTask(otherTaskId, projectId);
+                            }}
+                            values={liveValues}
+                        />
+                    )}
+                {siblingHint}
+            </div>
+        </div>
+    );
+
+    /*
+     * Discard-confirm dialog rendered once, shared by all three
+     * chassis modes. Driven by EITHER the mask-click path
+     * (`requestClose` → `pendingClose`) or the `useBlocker`
+     * programmatic-navigation interception (`blocker.state ===
+     * "blocked"`). Both surfaces share the same buttons so the user
+     * gets one consistent UX no matter how they tried to leave.
+     */
+    const discardConfirm = (
+        <Modal
+            centered
+            cancelText={microcopy.taskDetailPanel.confirmDiscardCancel}
+            okText={microcopy.taskDetailPanel.confirmDiscardOk}
+            okButtonProps={{ danger: true }}
+            onCancel={() => {
+                setPendingClose(false);
+                // "Keep editing" — cancel the navigation if the
+                // blocker fired, otherwise just dismiss the
+                // dialog and leave the panel open.
+                if (blocker.state === "blocked") {
+                    blocker.reset?.();
+                }
+            }}
+            onOk={() => {
+                setPendingClose(false);
+                // "Discard" — clear the form first so the
+                // blocker re-reads `isFormDirty` as false and
+                // doesn't intercept the proceed-or-close call.
+                form.resetFields();
+                setIsFormDirty(false);
+                isFormDirtyRef.current = false;
+                if (blocker.state === "blocked") {
+                    blocker.proceed?.();
+                } else {
+                    closePanel();
+                }
+            }}
+            open={pendingClose || blocker.state === "blocked"}
+            title={microcopy.taskDetailPanel.confirmDiscardTitle}
+            width={Math.min(420, breakpoints.sm)}
+            // Link the body to the dialog via aria-describedby so SR
+            // users hear the description right after the title (B-M4).
+            // rc-dialog renders the dialog div with hardcoded
+            // aria-labelledby only; modalRender wraps the inner
+            // container and lets us inject the aria attribute there.
+            modalRender={(node) =>
+                isValidElement(node)
+                    ? cloneElement(
+                          node as React.ReactElement<{
+                              "aria-describedby"?: string;
+                          }>,
+                          {
+                              "aria-describedby":
+                                  "task-detail-panel-discard-body"
+                          }
+                      )
+                    : node
+            }
+        >
+            <div id="task-detail-panel-discard-body">
+                {microcopy.taskDetailPanel.confirmDiscardBody}
+            </div>
+        </Modal>
+    );
+
+    /*
+     * Desktop docked rail (Phase 3 A2 — Line 23 + 171). When the
+     * viewport is >= lg AND the user is not on a coarse pointer, the
+     * panel renders as a fixed-width 480 px aside docked to the right
+     * edge of the board's content region. No Drawer, no mask, no
+     * scrim — the rail is part of the layout. Column reflow is owned
+     * by the `BoardRouteShell` flex row in `src/routes/index.tsx`,
+     * which renders this panel as the second flex child and lets the
+     * 480 px aside take a fixed slice while the kanban surface
+     * (`BoardPage`) takes the remaining viewport via `flex: 1 1 auto`.
+     */
+    if (isDesktopRail) {
+        return (
+            <>
+                <aside
+                    aria-label={microcopy.taskDetailPanel.ariaLabel}
+                    data-testid="task-detail-panel"
+                    data-placement="rail"
+                    // Touch handlers ride the aside surface directly
+                    // so swipe gestures captured anywhere within the
+                    // rail (header, body, footer) advance the URL.
+                    onTouchEnd={onTouchEnd}
+                    onTouchStart={onTouchStart}
+                    ref={asideRef}
+                    // tabIndex=-1 so the rail mount effect can focus the
+                    // landmark for screen-reader announcement (R-B H1).
+                    tabIndex={-1}
+                    style={{
+                        background:
+                            "var(--ant-color-bg-container, var(--pulse-bg-surface, #ffffff))",
+                        borderInlineStart:
+                            "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        flex: `0 0 ${DESKTOP_RAIL_WIDTH_PX}px`,
+                        height: "100%",
+                        minHeight: 0,
+                        overflow: "hidden",
+                        // BoardRouteShell's flex row reserves the rail
+                        // slot via this `flex` basis; we just paint it.
+                        position: "sticky",
+                        right: 0,
+                        top: 0,
+                        // Above the columns scroller's edge fades, below
+                        // any AntD overlays (popovers, dropdowns) which
+                        // run at z-index >= 1050.
+                        zIndex: 100
+                    }}
+                >
+                    <header
+                        style={{
+                            alignItems: "center",
+                            borderBlockEnd:
+                                "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                            display: "flex",
+                            flex: "0 0 auto",
+                            gap: space.sm,
+                            justifyContent: "space-between",
+                            padding: `${space.md}px ${space.lg}px`
+                        }}
+                    >
+                        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                            {titleNode}
+                        </div>
+                        <Button
+                            aria-label={microcopy.actions.cancel}
+                            onClick={requestClose}
+                            size="small"
+                            type="text"
+                            style={{ borderRadius: radius.pill }}
+                        >
+                            ×
+                        </Button>
+                    </header>
+                    <div
+                        style={{
+                            flex: "1 1 auto",
+                            minHeight: 0,
+                            overflowY: "auto",
+                            padding: `${space.lg}px ${space.lg}px ${space.md}px`
+                        }}
+                    >
+                        {bodyContent}
+                    </div>
+                    <footer
+                        style={{
+                            borderBlockStart:
+                                "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                            flex: "0 0 auto",
+                            padding: `${space.md}px ${space.lg}px`,
+                            paddingBlockEnd: `max(${space.md}px, env(safe-area-inset-bottom))`
+                        }}
+                    >
+                        {footerNode}
+                    </footer>
+                </aside>
+                {discardConfirm}
+            </>
+        );
+    }
+
+    // Phone (bottom-sheet) and tablet (right-overlay) both use the
+    // AntD Drawer chassis. Placement matches the chassis
+    // `useIsPhoneChrome` signal so the bottom-tab bar and the panel
+    // never collide on touchscreen laptops / tablets (B-H1).
     const drawerProps = isPhone
         ? { placement: "bottom" as const, size: "large" as const }
         : { placement: "right" as const, size: "large" as const };
@@ -615,330 +1237,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             }}
             data-testid="task-detail-panel"
             data-placement={drawerProps.placement}
+            // Touch handlers ride the body div via styles — but on the
+            // Drawer surface they need to attach to the inner content
+            // container; AntD doesn't expose that directly. Wrap the
+            // body in our own div with the handlers so the gesture
+            // is captured anywhere inside the drawer.
         >
-            <div style={{ position: "relative", width: "100%" }}>
-                {awaitingTaskResolution ? (
-                    <div
-                        style={{
-                            alignItems: "center",
-                            display: "flex",
-                            justifyContent: "center",
-                            marginBlock: space.xxl,
-                            minHeight: space.xxl * 3,
-                            width: "100%"
-                        }}
-                    >
-                        <Spin
-                            aria-label={microcopy.a11y.loadingBoard}
-                            size="large"
-                        />
-                    </div>
-                ) : null}
-                <div hidden={awaitingTaskResolution}>
-                    {taskMissingAfterLoad ? (
-                        <Alert
-                            action={
-                                <Button
-                                    danger
-                                    onClick={() => {
-                                        // Bypass the dirty-guard — the
-                                        // user just told us to discard.
-                                        form.resetFields();
-                                        closePanel();
-                                    }}
-                                    size="small"
-                                    type="text"
-                                >
-                                    {microcopy.taskModal.discardEdits}
-                                </Button>
-                            }
-                            description={
-                                microcopy.taskModal.removedByOthersBody
-                            }
-                            message={microcopy.taskModal.removedByOthersTitle}
-                            role="alert"
-                            showIcon
-                            style={{ marginBlockEnd: space.md }}
-                            type="warning"
-                        />
-                    ) : null}
-                    {/* Save-as-new follow-up tracked in the doc — see
-                     * TaskModal's mirror comment. Discard above is the
-                     * minimum viable recovery; same logic applies. */}
-                    <ErrorBox error={saveError} />
-                    <Form
-                        form={form}
-                        initialValues={editingTask}
-                        layout="vertical"
-                        onValuesChange={(changedValues, allValues) => {
-                            setFormTick((tick) => tick + 1);
-                            if (saveError) setSaveError(null);
-                            clearOriginOnManualEdits(changedValues);
-                            /*
-                             * Flip the dirty flag iff the current
-                             * form contents diverge from the
-                             * persisted task. Trim the taskName
-                             * before comparing so trailing whitespace
-                             * doesn't read as a real edit. Mirroring
-                             * the same trim that `onSubmit` applies
-                             * keeps the dirty signal in lockstep
-                             * with the persistence boundary.
-                             */
-                            if (!editingTask) return;
-                            const trimmedName =
-                                typeof allValues.taskName === "string"
-                                    ? allValues.taskName.trim()
-                                    : allValues.taskName;
-                            const merged = {
-                                ...editingTask,
-                                ...allValues,
-                                taskName: trimmedName
-                            };
-                            const nextDirty = !shallowEqual(
-                                merged,
-                                editingTask
-                            );
-                            setIsFormDirty(nextDirty);
-                            isFormDirtyRef.current = nextDirty;
-                        }}
-                    >
-                        <Form.Item
-                            label={microcopy.fields.taskName}
-                            name="taskName"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    whitespace: true,
-                                    message:
-                                        microcopy.validation.taskNameRequired
-                                }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Input
-                                autoComplete="off"
-                                enterKeyHint="next"
-                                inputMode="text"
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={microcopy.fields.coordinator}
-                            name="coordinatorId"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    message:
-                                        microcopy.validation.coordinatorRequired
-                                }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Select
-                                options={members.map((m) => ({
-                                    label: m.username,
-                                    value: m._id
-                                }))}
-                                placeholder={
-                                    microcopy.placeholders.selectCoordinator
-                                }
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={microcopy.fields.type}
-                            name="type"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    message:
-                                        microcopy.validation.taskTypeRequired
-                                }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Select
-                                options={TASK_TYPE_OPTIONS}
-                                placeholder={microcopy.placeholders.selectType}
-                            />
-                        </Form.Item>
-                        <Form.Item label={microcopy.fields.epic} name="epic">
-                            <Input
-                                autoComplete="off"
-                                enterKeyHint="next"
-                                inputMode="text"
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={
-                                <span
-                                    style={{
-                                        alignItems: "center",
-                                        display: "inline-flex",
-                                        gap: space.xs
-                                    }}
-                                >
-                                    {microcopy.fields.storyPoints}
-                                    {appliedFieldOrigin.storyPoints ===
-                                    "copilot" ? (
-                                        <Tag
-                                            color="purple"
-                                            style={{ marginInlineEnd: 0 }}
-                                        >
-                                            {microcopy.ai.suggestedByCopilot}
-                                        </Tag>
-                                    ) : null}
-                                </span>
-                            }
-                            name="storyPoints"
-                        >
-                            <Select
-                                onChange={() => {
-                                    setAppliedFieldOrigin((prev) => {
-                                        if (!prev.storyPoints) return prev;
-                                        const next = { ...prev };
-                                        delete next.storyPoints;
-                                        return next;
-                                    });
-                                }}
-                                options={STORY_POINT_OPTIONS}
-                                placeholder={
-                                    microcopy.placeholders.selectStoryPoints
-                                }
-                            />
-                        </Form.Item>
-                        <Form.Item label={microcopy.fields.notes} name="note">
-                            <Input.TextArea
-                                autoComplete="off"
-                                enterKeyHint="done"
-                                inputMode="text"
-                                placeholder={
-                                    microcopy.placeholders
-                                        .notesAcceptanceCriteria
-                                }
-                                rows={4}
-                            />
-                        </Form.Item>
-                    </Form>
-                    {aiEnabled &&
-                        boardAiOn &&
-                        editingTask &&
-                        taskId &&
-                        !isOptimisticPlaceholderId(taskId) && (
-                            <AiTaskAssistPanel
-                                excludeTaskId={taskId}
-                                onApplyStoryPoints={(value) => {
-                                    markFieldAsCopilotApplied("storyPoints");
-                                    form.setFieldsValue({ storyPoints: value });
-                                    setFormTick((tick) => tick + 1);
-                                }}
-                                onApplySuggestion={(
-                                    field,
-                                    suggestion,
-                                    options
-                                ) => {
-                                    if (
-                                        !options?.replace &&
-                                        suggestion !== undefined &&
-                                        isTaskPanelField(field)
-                                    ) {
-                                        markFieldAsCopilotApplied(field);
-                                    }
-                                    const current =
-                                        form.getFieldValue(field) ?? "";
-                                    if (options?.replace) {
-                                        form.setFieldValue(field, suggestion);
-                                    } else if (suggestion === undefined) {
-                                        return;
-                                    } else if (field === "note") {
-                                        const appended = `${current}${
-                                            current ? "\n\n" : ""
-                                        }## Acceptance criteria\n- ${suggestion}`;
-                                        form.setFieldsValue({ note: appended });
-                                    } else {
-                                        form.setFieldsValue({
-                                            [field]: suggestion
-                                        });
-                                    }
-                                    setFormTick((tick) => tick + 1);
-                                }}
-                                onOpenSimilarTask={(otherTaskId) => {
-                                    // Same-tab navigation to a sibling
-                                    // task. The dirty-guard intercepts
-                                    // if needed.
-                                    navigate(
-                                        `/projects/${projectId}/board/task/${otherTaskId}`,
-                                        { viewTransition: true }
-                                    );
-                                }}
-                                values={liveValues}
-                            />
-                        )}
-                </div>
-            </div>
-            {/*
-             * Dirty-state confirm dialog. Driven by EITHER the mask-
-             * click path (`requestClose` → `pendingClose`) or the
-             * `useBlocker` programmatic-navigation interception
-             * (`blocker.state === "blocked"`). Both surfaces share the
-             * same buttons so the user gets one consistent UX no matter
-             * how they tried to leave.
-             */}
-            <Modal
-                centered
-                cancelText={microcopy.taskDetailPanel.confirmDiscardCancel}
-                okText={microcopy.taskDetailPanel.confirmDiscardOk}
-                okButtonProps={{ danger: true }}
-                onCancel={() => {
-                    setPendingClose(false);
-                    // "Keep editing" — cancel the navigation if the
-                    // blocker fired, otherwise just dismiss the
-                    // dialog and leave the panel open.
-                    if (blocker.state === "blocked") {
-                        blocker.reset?.();
-                    }
-                }}
-                onOk={() => {
-                    setPendingClose(false);
-                    // "Discard" — clear the form first so the
-                    // blocker re-reads `isFormDirty` as false and
-                    // doesn't intercept the proceed-or-close call.
-                    form.resetFields();
-                    setIsFormDirty(false);
-                    isFormDirtyRef.current = false;
-                    if (blocker.state === "blocked") {
-                        blocker.proceed?.();
-                    } else {
-                        closePanel();
-                    }
-                }}
-                open={pendingClose || blocker.state === "blocked"}
-                title={microcopy.taskDetailPanel.confirmDiscardTitle}
-                width={Math.min(420, breakpoints.sm)}
-                // Link the body to the dialog via aria-describedby so SR
-                // users hear the description right after the title (B-M4).
-                // rc-dialog renders the dialog div with hardcoded
-                // aria-labelledby only; modalRender wraps the inner
-                // container and lets us inject the aria attribute there.
-                modalRender={(node) =>
-                    isValidElement(node)
-                        ? cloneElement(
-                              node as React.ReactElement<{
-                                  "aria-describedby"?: string;
-                              }>,
-                              {
-                                  "aria-describedby":
-                                      "task-detail-panel-discard-body"
-                              }
-                          )
-                        : node
-                }
+            <div
+                data-testid="task-detail-panel-swipe-target"
+                onTouchEnd={onTouchEnd}
+                onTouchStart={onTouchStart}
+                style={{ minHeight: "100%" }}
             >
-                <div id="task-detail-panel-discard-body">
-                    {microcopy.taskDetailPanel.confirmDiscardBody}
-                </div>
-            </Modal>
+                {bodyContent}
+            </div>
+            {discardConfirm}
         </Drawer>
     );
 };

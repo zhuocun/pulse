@@ -25,6 +25,10 @@ export const ANALYTICS_EVENTS = {
     AGENT_TTFT: "agent.ttft",
     AGENT_TTFT_SLOW: "agent.ttft.slow",
     BRIEF_REFRESHED: "brief.refreshed",
+    // Fires when the Brief tab refetches because the board fingerprint
+    // changed while the user was on another dock tab — distinct from a
+    // true open transition (COPILOT_BRIEF_OPEN).
+    BRIEF_REFRESHED_BY_BOARD_CHANGE: "brief.refreshed_by_board_change",
     BREAKDOWN_AXIS_CHANGED: "breakdown.axis_changed",
     SEARCH_RESULT_RATIONALE_VIEWED: "search.result_rationale_viewed",
     UNDO_APPLIED: "undo.applied",

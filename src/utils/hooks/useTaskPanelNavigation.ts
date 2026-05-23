@@ -17,22 +17,25 @@ import { useNavigate, useParams } from "react-router";
  * `closeTask()` pair so callers can pass them through `useCallback`
  * dependencies without retriggering renders.
  *
- * `projectId` is read from the current URL via `useParams`. If the
- * caller is rendered outside any `:projectId` route (rare; only
- * happens in the `/projects` list page), the hook will refuse to
- * navigate — there's no board context to land in. Callers that need
- * to navigate with an explicit projectId can pass one to `openTask`
- * as the second arg.
+ * Sibling navigation (`goToNext` / `goToPrev`) lives in the separate
+ * `useTaskPanelSiblings` hook — only `TaskDetailPanel` itself needs
+ * those, and they pull in React Query subscriptions that would
+ * otherwise fire app-wide just because the command palette calls
+ * `useTaskPanelNavigation` to get `openTask`.
  */
 const useTaskPanelNavigation = () => {
     const navigate = useNavigate();
-    const { projectId: currentProjectId } = useParams<{ projectId: string }>();
+    const { projectId: currentProjectId } = useParams<{
+        projectId: string;
+    }>();
 
     const openTask = useCallback(
         (taskId: string, projectId?: string) => {
             const pid = projectId ?? currentProjectId;
             if (!pid || !taskId) return;
-            navigate(`/projects/${pid}/board/task/${taskId}`);
+            navigate(`/projects/${pid}/board/task/${taskId}`, {
+                viewTransition: true
+            });
         },
         [currentProjectId, navigate]
     );
@@ -47,7 +50,7 @@ const useTaskPanelNavigation = () => {
                 navigate("/projects", { viewTransition: true });
                 return;
             }
-            navigate(`/projects/${pid}/board`);
+            navigate(`/projects/${pid}/board`, { viewTransition: true });
         },
         [currentProjectId, navigate]
     );

@@ -155,6 +155,47 @@ describe("environment", () => {
         }
     });
 
+    it("defaults the CopilotDock flag to false (opt-in) and only flips on for `true`", () => {
+        // Phase 3 A1: the new tabbed CopilotDock ships behind a feature
+        // flag. Default false until validated; strict literal "true" opt-in
+        // so values like "TRUE" or "1" do not accidentally flip the rollout.
+        const originalFlag = process.env.REACT_APP_COPILOT_DOCK_ENABLED;
+        try {
+            delete process.env.REACT_APP_COPILOT_DOCK_ENABLED;
+            process.env.REACT_APP_AI_USE_LOCAL = "true";
+
+            jest.resetModules();
+            const defaultEnv = require("./env").default;
+            expect(defaultEnv.copilotDockEnabled).toBe(false);
+
+            process.env.REACT_APP_COPILOT_DOCK_ENABLED = "false";
+            jest.resetModules();
+            const offEnv = require("./env").default;
+            expect(offEnv.copilotDockEnabled).toBe(false);
+
+            process.env.REACT_APP_COPILOT_DOCK_ENABLED = "true";
+            jest.resetModules();
+            const onEnv = require("./env").default;
+            expect(onEnv.copilotDockEnabled).toBe(true);
+
+            process.env.REACT_APP_COPILOT_DOCK_ENABLED = "TRUE";
+            jest.resetModules();
+            const strictEnv = require("./env").default;
+            expect(strictEnv.copilotDockEnabled).toBe(false);
+
+            process.env.REACT_APP_COPILOT_DOCK_ENABLED = "1";
+            jest.resetModules();
+            const numericEnv = require("./env").default;
+            expect(numericEnv.copilotDockEnabled).toBe(false);
+        } finally {
+            if (originalFlag === undefined) {
+                delete process.env.REACT_APP_COPILOT_DOCK_ENABLED;
+            } else {
+                process.env.REACT_APP_COPILOT_DOCK_ENABLED = originalFlag;
+            }
+        }
+    });
+
     it("uses the remote proxy when an AI base URL is provided", () => {
         process.env.REACT_APP_AI_BASE_URL = "https://copilot.example";
 

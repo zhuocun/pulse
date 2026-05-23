@@ -14,6 +14,21 @@ import Column from ".";
 
 jest.mock("../../utils/hooks/useReactMutation");
 jest.mock("../../utils/hooks/useTaskModal");
+// Phase 3 A2 — `useTaskPanelNavigation` now reads from `useReactQuery`
+// so Column needs the hook to be either mocked or wrapped in a
+// QueryClientProvider. Mock here mirrors what `column/index.test.tsx`
+// already does; the DnD suite focuses on drag behaviour, not navigation.
+jest.mock("../../utils/hooks/useTaskPanelNavigation", () => ({
+    __esModule: true,
+    default: () => ({
+        openTask: jest.fn(),
+        closeTask: jest.fn(),
+        goToNext: jest.fn(),
+        goToPrev: jest.fn(),
+        nextTaskId: null,
+        prevTaskId: null
+    })
+}));
 
 type TaskCreatorMockProps = {
     columnId?: string;

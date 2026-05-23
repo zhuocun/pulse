@@ -25,10 +25,13 @@ import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import Column from "../components/column";
+import CopilotDock, { type CopilotDockTab } from "../components/copilotDock";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
 import EmptyState from "../components/emptyState";
+import LensChips, { parseLensId } from "../components/lensChips";
+import { buildLensPredicate } from "../components/lensChips/lensPredicate";
 import MemberPopover from "../components/memberPopover";
 import Row from "../components/row";
 import TaskModal from "../components/taskModal";
@@ -49,6 +52,7 @@ import type { TriageNudge } from "../interfaces/agent";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useDragEnd from "../utils/hooks/useDragEnd";
@@ -329,8 +333,11 @@ const BoardPage = () => {
         "taskName",
         "coordinatorId",
         "type",
-        "semanticIds"
+        "semanticIds",
+        "lens"
     ]);
+    const { user } = useAuth();
+    const activeLens = parseLensId(param.lens);
     const { data: currentProject, isLoading: pLoading } =
         useReactQuery<IProject>("projects", {
             projectId
@@ -372,9 +379,18 @@ const BoardPage = () => {
         tasksEnabled: Boolean(board)
     });
     const visibleTasks = tasks ?? [];
+    // Phase 3 A7 — lens predicate narrows the task universe before the
+    // filter rail's per-column predicate runs in `column.tsx`.
+    const lensedTasks = useMemo(() => {
+        const predicate = buildLensPredicate({
+            lens: activeLens,
+            currentUserId: user?._id
+        });
+        return activeLens ? visibleTasks.filter(predicate) : visibleTasks;
+    }, [activeLens, user?._id, visibleTasks]);
     const tasksByColumn = useMemo(() => {
         const buckets = new Map<string, ITask[]>();
-        for (const t of visibleTasks) {
+        for (const t of lensedTasks) {
             const list = buckets.get(t.columnId);
             if (list) {
                 list.push(t);
@@ -383,7 +399,7 @@ const BoardPage = () => {
             }
         }
         return buckets;
-    }, [visibleTasks]);
+    }, [lensedTasks]);
     const resetBoardFilters = useCallback(() => {
         setParam({
             taskName: undefined,
@@ -432,6 +448,35 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
+    // Phase 3 A1 — when `copilotDockEnabled` is on, both legacy overlay
+    // flags collapse into a single dock with `dockActiveTab` deciding
+    // which body is visible. The most recently opened surface wins so
+    // existing trigger callsites (CopilotMenu, palette hand-off, welcome
+    // banner CTA) open the dock on the right tab without bespoke wiring.
+    const [dockActiveTab, setDockActiveTab] = useState<CopilotDockTab>("chat");
+    useEffect(() => {
+        if (!environment.copilotDockEnabled) return;
+        if (chatOpen) setDockActiveTab("chat");
+        else if (briefOpen) setDockActiveTab("brief");
+    }, [chatOpen, briefOpen]);
+    const dockOpen = chatOpen || briefOpen;
+    const closeDock = useCallback(() => {
+        closeChatDrawer();
+        closeBriefDrawer();
+    }, [closeBriefDrawer, closeChatDrawer]);
+    const handleDockTabChange = useCallback(
+        (tab: CopilotDockTab) => {
+            setDockActiveTab(tab);
+            if (tab === "chat") {
+                openChatDrawer();
+                closeBriefDrawer();
+            } else {
+                openBriefDrawer();
+                closeChatDrawer();
+            }
+        },
+        [closeBriefDrawer, closeChatDrawer, openBriefDrawer, openChatDrawer]
+    );
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -497,10 +542,13 @@ const BoardPage = () => {
             if (!taskId) return;
             // Route through the panel when the routed-task-panel flag
             // is on; otherwise fall back to the legacy modal (B-H5).
-            if (environment.taskPanelRouted) openTaskPanel(taskId);
+            // Pass projectId explicitly so the open survives a URL transit
+            // mid-handler instead of relying on useParams inside the hook.
+            if (environment.taskPanelRouted)
+                openTaskPanel(taskId, currentProject?._id);
             else openTaskModal(taskId);
         },
-        [openTaskModal, openTaskPanel, visibleTasks]
+        [currentProject?._id, openTaskModal, openTaskPanel, visibleTasks]
     );
     const handleTriageNudgeDismiss = useCallback(
         (nudge: TriageNudge) => {
@@ -557,7 +605,7 @@ const BoardPage = () => {
      * for keyboard users who can't see the kanban columns visually.
      */
     const visibleFilteredCount = useMemo(() => {
-        return visibleTasks.filter(
+        return lensedTasks.filter(
             (task) =>
                 (!param.type || task.type === param.type) &&
                 (!param.coordinatorId ||
@@ -569,9 +617,13 @@ const BoardPage = () => {
                         .filter(Boolean)
                         .includes(task._id))
         ).length;
-    }, [visibleTasks, param]);
+    }, [lensedTasks, param]);
     const hasActiveFilters = Boolean(
-        param.taskName || param.coordinatorId || param.type || param.semanticIds
+        param.taskName ||
+        param.coordinatorId ||
+        param.type ||
+        param.semanticIds ||
+        activeLens
     );
     const filterStatusMessage = hasActiveFilters
         ? (visibleFilteredCount === 1
@@ -751,6 +803,15 @@ const BoardPage = () => {
                         </BoardActions>
                     </Row>
                 </BoardHeader>
+                <LensChips
+                    active={activeLens}
+                    onChange={(next) =>
+                        setParam(
+                            { lens: next ?? undefined },
+                            { viewTransition: true }
+                        )
+                    }
+                />
                 <TaskSearchPanel
                     tasks={visibleTasks}
                     param={param}
@@ -913,17 +974,10 @@ const BoardPage = () => {
                 {!environment.taskPanelRouted && (
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
-                {boardAiOn && (
-                    <>
-                        <BoardBriefDrawer
-                            columns={board ?? []}
-                            members={members ?? []}
-                            onClose={closeBriefDrawer}
-                            open={briefOpen}
-                            project={currentProject}
-                            tasks={visibleTasks}
-                        />
-                        <AiChatDrawer
+                {boardAiOn &&
+                    (environment.copilotDockEnabled ? (
+                        <CopilotDock
+                            activeTab={dockActiveTab}
                             columns={board ?? []}
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
@@ -933,13 +987,14 @@ const BoardPage = () => {
                                     ? handleTriageNudgeAction
                                     : undefined
                             }
-                            onClose={closeChatDrawer}
+                            onClose={closeDock}
                             onDismissNudge={
                                 !environment.aiUseLocalEngine
                                     ? handleTriageNudgeDismiss
                                     : undefined
                             }
-                            open={chatOpen}
+                            onTabChange={handleDockTabChange}
+                            open={dockOpen}
                             pendingNudges={
                                 !environment.aiUseLocalEngine
                                     ? triageAgent.nudges
@@ -948,8 +1003,43 @@ const BoardPage = () => {
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />
-                    </>
-                )}
+                    ) : (
+                        <>
+                            <BoardBriefDrawer
+                                columns={board ?? []}
+                                members={members ?? []}
+                                onClose={closeBriefDrawer}
+                                open={briefOpen}
+                                project={currentProject}
+                                tasks={visibleTasks}
+                            />
+                            <AiChatDrawer
+                                columns={board ?? []}
+                                initialPrompt={chatInitialPrompt}
+                                knownProjectIds={projectId ? [projectId] : []}
+                                members={members ?? []}
+                                onActionNudge={
+                                    !environment.aiUseLocalEngine
+                                        ? handleTriageNudgeAction
+                                        : undefined
+                                }
+                                onClose={closeChatDrawer}
+                                onDismissNudge={
+                                    !environment.aiUseLocalEngine
+                                        ? handleTriageNudgeDismiss
+                                        : undefined
+                                }
+                                open={chatOpen}
+                                pendingNudges={
+                                    !environment.aiUseLocalEngine
+                                        ? triageAgent.nudges
+                                        : undefined
+                                }
+                                project={currentProject ?? null}
+                                tasks={visibleTasks}
+                            />
+                        </>
+                    ))}
             </BoardShell>
         </DragDropContext>
     );

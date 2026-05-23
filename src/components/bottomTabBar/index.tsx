@@ -99,6 +99,10 @@ const Nav = styled.nav<{ $hidden: boolean }>`
      * it. Route-level drawers now stack cleanly on top via their
      * own z-index without the bar peeking through the dimmer. */
     z-index: ${zIndex.navBar};
+    /* Opt the bar out of the route cross-fade (matches the header's
+       pulse-header treatment); keeps it pinned across navigations
+       instead of flickering with the body swap. */
+    view-transition-name: pulse-tabbar;
     /* Keyboard hide: translate out of the viewport when the soft keyboard
      * pushes the visual viewport up. The translate gives us a deterministic
      * hide-vs-show contract instead of clipping the bar mid-input. */
@@ -275,7 +279,10 @@ const BottomTabBar: React.FC = () => {
     return (
         <Nav
             $hidden={keyboardOpen}
-            aria-hidden={keyboardOpen}
+            // `inert` removes the subtree from the a11y tree AND blocks
+            // pointer/focus in one declarative attribute — replaces the
+            // legacy aria-hidden+tabIndex=-1 hand-rolled pattern.
+            inert={keyboardOpen || undefined}
             aria-label={microcopy.nav.primaryLandmarkLabel}
             data-testid="bottom-tab-bar"
             onKeyDown={onKeyDown}
@@ -302,7 +309,6 @@ const BottomTabBar: React.FC = () => {
                         ref={(node: HTMLAnchorElement | null) => {
                             tabsRef.current[idx] = node as HTMLAnchorElement;
                         }}
-                        tabIndex={keyboardOpen ? -1 : 0}
                         to={tab.to}
                     >
                         <TabIcon>{tab.icon}</TabIcon>

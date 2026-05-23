@@ -407,4 +407,81 @@ describe("ProjectPage", () => {
             expect(store.getState().overlays.chatDrawer.open).toBe(true);
         });
     });
+
+    // PWA manifest shortcuts (`/projects?openTaskCreator=1`,
+    // `/projects?openCopilot=1`) fire from the OS launcher long-press menu.
+    // On mount, the page dispatches the matching open action and strips the
+    // param so the back-button gesture / a remount don't re-fire.
+    describe("PWA shortcut params", () => {
+        it("opens the project modal and strips ?openTaskCreator=1", async () => {
+            renderPage("/projects?openTaskCreator=1");
+
+            await waitFor(() => {
+                expect(store.getState().projectModal.isModalOpened).toBe(true);
+            });
+            // Param is stripped — LocationProbe shows the cleaned search.
+            await waitFor(() => {
+                expect(
+                    screen.getByTestId("location").textContent ?? ""
+                ).not.toContain("openTaskCreator");
+            });
+            // Chat drawer must stay closed.
+            expect(store.getState().overlays.chatDrawer.open).toBe(false);
+        });
+
+        it("opens the AI chat drawer and strips ?openCopilot=1", async () => {
+            renderPage("/projects?openCopilot=1");
+
+            await waitFor(() => {
+                expect(store.getState().overlays.chatDrawer.open).toBe(true);
+            });
+            await waitFor(() => {
+                expect(
+                    screen.getByTestId("location").textContent ?? ""
+                ).not.toContain("openCopilot");
+            });
+            // Project modal must stay closed.
+            expect(store.getState().projectModal.isModalOpened).toBe(false);
+        });
+
+        it("opens both overlays and strips both params when fired together", async () => {
+            renderPage("/projects?openTaskCreator=1&openCopilot=1");
+
+            await waitFor(() => {
+                expect(store.getState().projectModal.isModalOpened).toBe(true);
+            });
+            await waitFor(() => {
+                expect(store.getState().overlays.chatDrawer.open).toBe(true);
+            });
+            await waitFor(() => {
+                const search = screen.getByTestId("location").textContent ?? "";
+                expect(search).not.toContain("openTaskCreator");
+                expect(search).not.toContain("openCopilot");
+            });
+        });
+
+        it("does not open either overlay when no shortcut param is present", async () => {
+            renderPage();
+
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+            expect(store.getState().projectModal.isModalOpened).toBe(false);
+            expect(store.getState().overlays.chatDrawer.open).toBe(false);
+        });
+
+        it("preserves unrelated query params when stripping shortcut params", async () => {
+            renderPage(
+                "/projects?openTaskCreator=1&projectName=Road&managerId=member-1"
+            );
+
+            await waitFor(() => {
+                expect(store.getState().projectModal.isModalOpened).toBe(true);
+            });
+            await waitFor(() => {
+                const search = screen.getByTestId("location").textContent ?? "";
+                expect(search).not.toContain("openTaskCreator");
+                expect(search).toContain("projectName=Road");
+                expect(search).toContain("managerId=member-1");
+            });
+        });
+    });
 });

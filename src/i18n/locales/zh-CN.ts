@@ -141,7 +141,9 @@ const zhCN: Dictionary = {
         moreActionsForProject: "{name} 的更多操作",
         likeProject: "收藏 {name}",
         unlikeProject: "取消收藏 {name}",
-        applyReadinessSuggestion: "应用 {field} 的就绪建议"
+        applyReadinessSuggestion: "应用 {field} 的就绪建议",
+        lensChips: "看板视图",
+        lensComingSoon: "敬请期待"
     },
     dragHints: {
         taskCardKeyboard:
@@ -288,6 +290,22 @@ const zhCN: Dictionary = {
         ai: "AI",
         smartMatch: "智能匹配"
     },
+    /**
+     * Phase 3 A7 — 看板筛选视图。`comingSoonBadge` 出现在依赖 ITask 的
+     * 新字段（dueDate、aiRisk —— Phase 4）的视图上，提示用户该视图当前
+     * 不会进行筛选，但已经在规划中。
+     */
+    lenses: {
+        today: "今天",
+        thisWeek: "本周",
+        mine: "我的",
+        atRisk: "存在风险",
+        todayTooltip: "今天到期的任务",
+        thisWeekTooltip: "本周内（周一至周日）到期的任务",
+        mineTooltip: "你作为协调人的任务",
+        atRiskTooltip: "AI 标记为高或中风险的任务",
+        comingSoonBadge: "敬请期待"
+    },
     confirm: {
         deleteProject: {
             title: "确认删除该项目?",
@@ -369,7 +387,20 @@ const zhCN: Dictionary = {
         confirmDiscardTitle: "放弃未保存的更改?",
         confirmDiscardBody: "对此任务的编辑将会丢失。",
         confirmDiscardOk: "放弃",
-        confirmDiscardCancel: "继续编辑"
+        confirmDiscardCancel: "继续编辑",
+        siblingNextLabel: "下一个任务",
+        siblingPrevLabel: "上一个任务",
+        siblingPositionLabel: "第 {position} 个,共 {total} 个",
+        ariaLabel: "任务详情",
+        siblingNavAriaLabel: "同级任务导航"
+    },
+    copilotDock: {
+        title: "Copilot",
+        ariaLabel: "Copilot 工作台",
+        closeLabel: "关闭 Copilot",
+        tabChat: "聊天",
+        tabBrief: "简报",
+        tabListLabel: "Copilot 视图"
     },
     projectsPage: {
         title: "项目",
