@@ -186,6 +186,13 @@ describe("ColumnReadinessPill", () => {
      * `data-touch-hit-area` marker on the styled root lets us assert
      * the contract is wired up — any future refactor that drops the
      * styled wrapper has to keep the marker (and therefore the rule).
+     *
+     * PR #309 review follow-up: the previous version asserted
+     * `pill.className.match(/css-/)` which broke any time Emotion's
+     * class hash format changed (even a styled-components dep bump
+     * could flip it). Replace with a hard-coded `data-touch-hit-area`
+     * attribute on the styled root — a real contract that survives
+     * future class-name shape changes.
      */
     it("uses a styled root that owns the pointer:coarse hit-area expander (Followup B)", () => {
         render(
@@ -198,14 +205,13 @@ describe("ColumnReadinessPill", () => {
             />
         );
         const pill = screen.getByTestId("column-readiness-pill");
-        // The pill is rendered through an Emotion-styled span; the
-        // generated class name is volatile, but the element must be
-        // *some* span with a className applied (raw <span> would have
-        // no className). This is the load-bearing contract: a future
-        // refactor that drops the styled wrapper would render an
-        // unstyled <span> and lose the 44x44 hit area.
         expect(pill.tagName).toBe("SPAN");
-        expect(pill.className).toMatch(/css-/);
+        // Load-bearing contract: the styled root tags itself with the
+        // `data-touch-hit-area` marker so the WCAG 2.5.5 expander
+        // can't silently regress. A refactor that drops the PillRoot
+        // wrapper would render a raw <span> with no attribute and
+        // this assertion would fail loudly.
+        expect(pill).toHaveAttribute("data-touch-hit-area", "44");
     });
 
     it("places the readiness aria-label on the outer Popover trigger root, not only the inner pill", () => {

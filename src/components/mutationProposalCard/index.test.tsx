@@ -436,6 +436,96 @@ describe("MutationProposalCard", () => {
                 })
             ).toHaveTextContent(/^Apply$/i);
         });
+
+        /*
+         * PR #309 review follow-up: the existing 5 verb-derivation
+         * tests didn't cover three real diff shapes — pure
+         * bulk_apply.operation = "create" / "delete", and a
+         * column-only diff that touches a non-`name` field (e.g.
+         * `order`). The verb resolver has explicit branches for all
+         * three; pin them with assertions so any future refactor
+         * that drops a branch fails loud.
+         */
+        it("surfaces `Create` for a bulk_apply with operation=create", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        bulk_apply: [
+                            {
+                                operation: "create",
+                                targets: ["new-task-1", "new-task-2"],
+                                payload: {
+                                    type: "Task",
+                                    columnId: "c-backlog"
+                                }
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/^Create$/i);
+        });
+
+        it("surfaces `Delete` for a bulk_apply with operation=delete", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        bulk_apply: [
+                            {
+                                operation: "delete",
+                                targets: ["task-1", "task-2", "task-3"],
+                                payload: {}
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/^Delete$/i);
+        });
+
+        it("falls back to the generic `Apply` verb for a column-only diff that touches a non-name field (e.g. order)", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        column_updates: [
+                            {
+                                column_id: "c-doing",
+                                field: "order",
+                                from: 1,
+                                to: 2
+                            }
+                        ]
+                    }
+                }
+            });
+            // The resolver explicitly returns `null` for non-`name`
+            // column updates → caller substitutes the generic Apply
+            // verb. This is the safe behaviour: "Rename" would be a
+            // lie when the field is `order`, and there's no specific
+            // verb for column reorders in the microcopy.
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/^Apply$/i);
+        });
     });
 
     /*
