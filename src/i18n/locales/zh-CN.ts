@@ -159,6 +159,7 @@ const zhCN: Dictionary = {
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
+        reports: "报告",
         briefShort: "简报",
         copilotShort: "Copilot",
         askShort: "提问",
@@ -192,6 +193,21 @@ const zhCN: Dictionary = {
         emptyTitle: "收件箱为空",
         emptyDescription: "整理提议、提及和 AI 活动将显示在此处。",
         heading: "收件箱"
+    },
+    /*
+     * Phase 4.7 报告占位页面。该路由是「我们听到了」的页面,
+     * 在指标引擎上线之前先建立 URL 和导航位。文案有意传达
+     * 「即将到来,期待您的反馈」而非含糊的「即将推出」,
+     * 让用户知道团队正在倾听功能请求。
+     */
+    reports: {
+        heading: "报告",
+        emptyTitle: "报告功能即将推出",
+        emptyDescription:
+            "速度图、燃尽图等项目指标即将到来。我们正在倾听 — 告诉我们您最想看到什么。",
+        feedbackCta: "分享反馈",
+        feedbackHref:
+            "mailto:feedback@pulse.app?subject=Reports%20feedback&body=Tell%20us%20what%20you%27d%20like%20to%20see%20in%20Reports."
     },
     copilotLanding: {
         heading: "Copilot",
@@ -366,7 +382,8 @@ const zhCN: Dictionary = {
         logoLabel: "Pulse 首页"
     },
     breadcrumb: {
-        projects: "项目"
+        projects: "项目",
+        reports: "报告"
     },
     board: {
         title: "看板",
@@ -498,7 +515,13 @@ const zhCN: Dictionary = {
         inbox: "收件箱",
         copilot: "Copilot",
         settings: "设置",
-        share: "分享到 Pulse"
+        share: "分享到 Pulse",
+        /*
+         * Phase 4.7: 项目报告着陆页。项目名称在页面层级插入 ——
+         * 详见 `pages/reports.tsx`。在项目查询完成前回退到无名版本。
+         */
+        reports: "报告",
+        reportsWithProject: "报告 · {project}"
     },
     empty: {
         projects: {

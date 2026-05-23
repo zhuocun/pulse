@@ -194,6 +194,24 @@ export const enSource = {
             "Triage proposals, mentions, and AI activity will appear here.",
         heading: "Inbox"
     },
+    /*
+     * Phase 4.7 reports placeholder. The route is a "we hear you"
+     * surface that establishes the URL + nav slot before the metrics
+     * engine lands. Copy intentionally signals "soon, with your input"
+     * rather than vague "coming soon" so users know the team is
+     * listening for feature requests. Keep the description short
+     * (one sentence + one CTA microcopy) so the placeholder doesn't
+     * become its own design surface.
+     */
+    reports: {
+        heading: "Reports",
+        emptyTitle: "Reports are coming soon",
+        emptyDescription:
+            "Velocity, burndown, and other project metrics are on their way. We're listening — let us know what you'd like to see first.",
+        feedbackCta: "Share feedback",
+        feedbackHref:
+            "mailto:feedback@pulse.app?subject=Reports%20feedback&body=Tell%20us%20what%20you%27d%20like%20to%20see%20in%20Reports."
+    },
     copilotLanding: {
         heading: "Copilot",
         subtitle: "Ask a question or open a brief for the current board.",
@@ -210,6 +228,7 @@ export const enSource = {
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
+        reports: "Reports",
         briefShort: "Brief",
         copilotShort: "Copilot",
         askShort: "Ask",
@@ -394,7 +413,8 @@ export const enSource = {
         logoLabel: "Pulse home"
     },
     breadcrumb: {
-        projects: "Projects"
+        projects: "Projects",
+        reports: "Reports"
     },
     board: {
         title: "Board",
@@ -582,7 +602,15 @@ export const enSource = {
         inbox: "Inbox",
         copilot: "Copilot",
         settings: "Settings",
-        share: "Share to Pulse"
+        share: "Share to Pulse",
+        /*
+         * Phase 4.7: project reports landing. The template gets the
+         * project name interpolated in at the page level — see
+         * `pages/reports.tsx`. The bare "Reports" form is the fallback
+         * before the project query resolves.
+         */
+        reports: "Reports",
+        reportsWithProject: "Reports · {project}"
     },
     empty: {
         projects: {

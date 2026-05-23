@@ -36,6 +36,7 @@ const TermsPage = lazy(() => import("../pages/terms"));
 const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
+const ReportsPage = lazy(() => import("../pages/reports"));
 const SharePage = lazy(() => import("../pages/share"));
 const InboxPage = lazy(() => import("../pages/inbox"));
 const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
@@ -326,7 +327,25 @@ const routes = [
                                 : {
                                       path: "board",
                                       element: <BoardPage />
-                                  }
+                                  },
+                            /*
+                             * Phase 4.7 reports landing. Placeholder
+                             * surface — establishes the URL + nav
+                             * slot so the project detail nav can
+                             * surface a "Reports" entry alongside
+                             * Board without a 404. Real velocity /
+                             * burndown / cycle-time charts land in
+                             * a later phase; this route ships now
+                             * so the IA is stable and the team can
+                             * collect "what would you want in
+                             * Reports?" feedback via the page's
+                             * mailto CTA while the engine is
+                             * designed.
+                             */
+                            {
+                                path: "reports",
+                                element: <ReportsPage />
+                            }
                         ]
                     },
                     /*
