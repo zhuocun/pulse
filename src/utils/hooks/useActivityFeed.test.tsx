@@ -293,6 +293,32 @@ describe("useActivityFeed", () => {
         ).toHaveLength(1);
     });
 
+    it("drops the activity-feed AI row when the backing ledger entry is removed (bridge reverse observation)", () => {
+        const probe = renderProbe();
+        const ledgerId = "ledger-test-bridge-remove";
+        act(() => {
+            store.dispatch(
+                aiLedgerActions.recordAiLedgerEntry({
+                    id: ledgerId,
+                    timestamp: Date.now(),
+                    description: "Applied story points",
+                    surface: "task-assist",
+                    undoable: true
+                })
+            );
+        });
+        expect(probe.getApi().events).toHaveLength(1);
+        // Simulate the user clicking Revert inside `aiActivityLog`,
+        // which removes the ledger entry directly. The bridge must
+        // observe the removal and drop the matching feed row so the
+        // drawer never renders a stale phantom (option A — hard
+        // remove).
+        act(() => {
+            store.dispatch(aiLedgerActions.removeAiLedgerEntry(ledgerId));
+        });
+        expect(probe.getApi().events).toHaveLength(0);
+    });
+
     it("AI rows route Undo through useAiLedger.revert, not a local closure", async () => {
         const probe = renderProbe();
         // Push a real ledger entry with a live closure into the ledger

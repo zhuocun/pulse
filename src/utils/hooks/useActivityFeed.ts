@@ -38,8 +38,11 @@ import { useReduxDispatch, useReduxSelector } from "./useRedux";
  *     `useAiLedger().revert(aiLedgerId)` — NOT through this hook's local
  *     undo Map — so a single Revert path is the authoritative side
  *     effect and an "Undo" press on the drawer can never run a second
- *     revert. The reverse direction (activity feed -> AI ledger) does
- *     not exist; new AI entries always originate at `useAiLedger`.
+ *     revert. New AI entries always originate at `useAiLedger`. The
+ *     reverse direction is a passive observation: when a ledger entry
+ *     disappears (the user reverted from `aiActivityLog`), the bridge
+ *     removes the matching feed row so the drawer doesn't render a
+ *     stale phantom. See `useAiLedgerBridge` for details.
  */
 
 interface RecordableEvent {
@@ -125,22 +128,35 @@ export const __resetActivityFeedUndoCallbacksForTests = (): void => {
 };
 
 /**
- * AI -> activity-feed bridge.
+ * AI <-> activity-feed bridge.
  *
- * Subscribes to `aiLedgerSlice.entries` and forwards any new entry into
- * `activityFeedSlice` with `kind: "ai"`. The forwarded entry's
- * `aiLedgerId` carries the original id so the drawer's Undo button on an
- * AI row dispatches through `useAiLedger().revert(aiLedgerId)`. This is a
- * ONE-WAY bridge — new AI events always originate at `useAiLedger`, and
- * the activity feed never re-issues them back.
+ * Subscribes to `aiLedgerSlice.entries` and synchronises the feed in
+ * both directions:
  *
- * Idempotency: the effect compares the bridged ledger-id set against the
- * already-forwarded set (derived from the current activity-feed events)
- * so a slice-only render (e.g. another reducer dispatched in the same
- * tick) doesn't re-forward already-recorded rows. We use the snapshot
- * from `useReduxSelector` for the diff because the only legitimate writer
- * here is this effect itself — no other code path stamps `kind === "ai"`
- * onto the feed.
+ *   • Forward: any new ledger entry is forwarded into
+ *     `activityFeedSlice` with `kind: "ai"`. The forwarded entry's
+ *     `aiLedgerId` carries the original id so the drawer's Undo button
+ *     on an AI row dispatches through `useAiLedger().revert(aiLedgerId)`
+ *     — new AI events always originate at `useAiLedger`, never here.
+ *
+ *   • Reverse: when an AI feed row's backing ledger entry has been
+ *     removed (the user clicked Revert inside `aiActivityLog`, which
+ *     removes the ledger entry directly), the bridge drops the now-
+ *     stale feed row via `removeActivityEvent`. Without this sweep the
+ *     drawer would render a row that visually presents as valid but
+ *     whose Undo is hidden because the closure was already consumed —
+ *     a confusing dead state. We chose hard remove over a soft
+ *     "(reverted)" suffix because the activity feed is presentation
+ *     and the user has already seen the Revert confirmation toast
+ *     inside aiActivityLog; preserving a phantom row adds no audit
+ *     value the ledger doesn't already own.
+ *
+ * Idempotency: the effect compares the bridged ledger-id set against
+ * the already-forwarded set (derived from the current activity-feed
+ * events) so a slice-only render (e.g. another reducer dispatched in
+ * the same tick) doesn't re-forward already-recorded rows. The reverse
+ * sweep is symmetric: it only acts on rows whose ledger id is missing
+ * from the live set.
  */
 const useAiLedgerBridge = (): void => {
     const dispatch = useReduxDispatch();
@@ -148,15 +164,21 @@ const useAiLedgerBridge = (): void => {
     const ledgerEntries = useReduxSelector((s) => s.aiLedger.entries);
 
     useEffect(() => {
-        const liveFeedAiIds = new Set(
-            store
-                .getState()
-                .activityFeed.events.filter((event) => event.kind === "ai")
+        const liveLedgerIds = new Set(
+            ledgerEntries.map((ledgerEntry) => ledgerEntry.id)
+        );
+        const feedAiRows = store
+            .getState()
+            .activityFeed.events.filter((event) => event.kind === "ai");
+        const feedAiIds = new Set(
+            feedAiRows
                 .map((event) => event.aiLedgerId)
                 .filter((id): id is string => typeof id === "string")
         );
+        // Forward direction: any ledger entry not yet in the feed → push
+        // a new kind:"ai" row.
         for (const ledgerEntry of ledgerEntries) {
-            if (liveFeedAiIds.has(ledgerEntry.id)) continue;
+            if (feedAiIds.has(ledgerEntry.id)) continue;
             const reduxEntry: ActivityEventState = {
                 id: generateActivityEventId(),
                 timestamp: ledgerEntry.timestamp,
@@ -169,6 +191,22 @@ const useAiLedgerBridge = (): void => {
                 isRead: false
             };
             dispatch(activityFeedActions.recordActivityEvent(reduxEntry));
+        }
+        // Reverse direction: any kind:"ai" feed row whose backing
+        // ledger entry has disappeared → remove the stale row. This
+        // path fires when the user clicks Revert inside `aiActivityLog`
+        // (which removes the ledger entry directly) and prevents the
+        // activity drawer from rendering a ghost row that visually
+        // looks valid but whose Undo button is hidden because the
+        // closure is gone. Picked option A (hard remove) over option B
+        // (soft "(reverted)" suffix) per the reviewer's note: the
+        // activity feed is presentation; ledger Revert is the
+        // authoritative side effect and the user has already seen the
+        // confirmation toast inside aiActivityLog.
+        for (const feedRow of feedAiRows) {
+            if (!feedRow.aiLedgerId) continue;
+            if (liveLedgerIds.has(feedRow.aiLedgerId)) continue;
+            dispatch(activityFeedActions.removeActivityEvent(feedRow.id));
         }
     }, [dispatch, ledgerEntries, store]);
 };
