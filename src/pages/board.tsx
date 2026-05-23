@@ -25,6 +25,7 @@ import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
+import BoardMinimap from "../components/boardMinimap";
 import Column from "../components/column";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
@@ -418,6 +419,36 @@ const BoardPage = () => {
             trigger.focus();
         }
     }, []);
+    /**
+     * Phase 4.6 — horizontal scroll ref for the board minimap. The
+     * minimap reads `scrollLeft + clientWidth` from this ref to
+     * compute which columns are currently in the viewport and writes
+     * `scrollLeft` (via `Element.scrollTo`) to bring a column into
+     * view on click. Lives on the `ColumnContainer` styled-div, which
+     * is the actual `overflow-x: auto` element; threading the ref
+     * directly (rather than putting scroll state in Redux) keeps
+     * scroll position out of the React tree and avoids a re-render
+     * every frame while the user scrubs.
+     */
+    const boardScrollRef = useRef<HTMLDivElement | null>(null);
+    /**
+     * Per-column task counts for the minimap aria-labels. We project
+     * `tasksByColumn` (already-bucketed by column id, lensed but not
+     * filtered further) into a flat number map — the minimap surface
+     * shouldn't reflect the search/coordinator filter because doing so
+     * would make the in-view affordance change shape mid-search,
+     * which is disorienting. The count we expose is the column's true
+     * task count under the active lens (matching what the column
+     * header's count badge would display when filters are cleared).
+     */
+    const minimapColumns = useMemo(() => {
+        if (!board) return [];
+        return board.map((col) => ({
+            id: col._id,
+            name: col.columnName,
+            taskCount: tasksByColumn.get(col._id)?.length ?? 0
+        }));
+    }, [board, tasksByColumn]);
     const { enabled: aiEnabled } = useAiEnabled();
     const {
         disabled: aiDisabledForProject,
@@ -941,8 +972,14 @@ const BoardPage = () => {
                                         </SwipeHintClose>
                                     </SwipeHint>
                                 )}
+                            {environment.boardMinimapEnabled && (
+                                <BoardMinimap
+                                    columns={minimapColumns}
+                                    scrollContainerRef={boardScrollRef}
+                                />
+                            )}
                             <ColumnsViewport>
-                                <ColumnContainer>
+                                <ColumnContainer ref={boardScrollRef}>
                                     <Drop
                                         droppableId="column"
                                         type="COLUMN"
@@ -972,6 +1009,9 @@ const BoardPage = () => {
                                                             ) ?? []
                                                         }
                                                         column={column}
+                                                        data-minimap-column-id={
+                                                            column._id
+                                                        }
                                                         members={members ?? []}
                                                         param={param}
                                                         onResetFilters={

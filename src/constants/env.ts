@@ -182,6 +182,20 @@ const aiColumnReadinessEnabledFlag = readEnv(
     "REACT_APP_AI_COLUMN_READINESS_ENABLED"
 );
 
+/**
+ * Phase 4.6 — Board minimap. Renders a thin horizontal overview strip
+ * above the column container, showing every column as a proportional
+ * segment with the user's current viewport highlighted; clicking a
+ * segment smooth-scrolls the board to bring that column into view
+ * (docs/todo/ui-todo.md §1.6). Default ON because the in-component gate
+ * (`columns.length >= 5`) already hides the strip on boards with few
+ * columns; this env var is a hard kill-switch for the entire feature
+ * (e.g. if a layout regression is discovered post-deploy and we want a
+ * one-flag rollback). Set `REACT_APP_BOARD_MINIMAP_ENABLED=false` to
+ * disable.
+ */
+const boardMinimapEnabledFlag = readEnv("REACT_APP_BOARD_MINIMAP_ENABLED");
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -219,7 +233,14 @@ const environment = {
      * synchronously against the deterministic local engine so flipping
      * the flag has no remote cost.
      */
-    aiColumnReadinessEnabled: aiColumnReadinessEnabledFlag === "true"
+    aiColumnReadinessEnabled: aiColumnReadinessEnabledFlag === "true",
+    /**
+     * Phase 4.6 board-minimap flag. Default true (kill-switch) — the
+     * component-level gate (`columns.length >= minColumnsToShow`)
+     * already hides the strip on small boards. See the
+     * `boardMinimapEnabledFlag` block above.
+     */
+    boardMinimapEnabled: boardMinimapEnabledFlag === "false" ? false : true
 };
 
 export default environment;
