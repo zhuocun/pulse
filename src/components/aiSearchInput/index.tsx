@@ -70,14 +70,23 @@ const reformulate = (query: string): string[] => {
     if (trimmed.length === 0) return [];
     const words = trimmed.split(/\s+/);
     const head = words[0];
+    const lowerHead = head?.toLowerCase() ?? "";
+    // Guard rails so we don't spit back nonsense like "open open the door"
+    // or "tasks about tasks about X" when the user already prefixed with
+    // a verb the templates also use. Each candidate template is only
+    // appended when its leading verb isn't already the first word.
+    const startsWith = (prefix: string): boolean =>
+        lowerHead === prefix.toLowerCase();
     const candidates: string[] = [];
     if (words.length > 2) {
         candidates.push(words.slice(0, 2).join(" "));
     }
-    if (head && head.length > 3) {
+    if (head && head.length > 3 && !startsWith("tasks")) {
         candidates.push(`tasks about ${trimmed}`);
     }
-    candidates.push(`open ${trimmed}`);
+    if (!startsWith("open")) {
+        candidates.push(`open ${trimmed}`);
+    }
     // Dedupe while preserving order, drop self-matches.
     const seen = new Set<string>([trimmed.toLowerCase()]);
     return candidates
@@ -681,3 +690,8 @@ const AiSearchInput: React.FC<Props> = (props) => {
 };
 
 export default AiSearchInput;
+
+// Exported for unit tests — the "Did you mean?" reformulator is a pure
+// function and easier to pin behaviorally with a small table than via a
+// full DOM harness.
+export { reformulate as __testing_reformulate };
