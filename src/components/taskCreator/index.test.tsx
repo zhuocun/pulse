@@ -295,6 +295,92 @@ describe("TaskCreator", () => {
         });
     });
 
+    /*
+     * Phase 4.3 — undo closure test. The brief required each
+     * create site to register a fire-and-forget undo on the
+     * activity feed so the 10s-window Undo button in the drawer
+     * actually reverses the action. For task create the closure
+     * DELETEs the just-created task; this test triggers the
+     * closure through the public `undo(id)` surface and asserts
+     * the DELETE request goes through. One test per closure SHAPE
+     * is enough — the other create sites share the pattern.
+     */
+    it("registers an undo closure that DELETEs the created task", async () => {
+        // Mock the responses: POST returns a task with a known
+        // `_id` so the undo closure has something to target; the
+        // DELETE response can be any 2xx.
+        fetchMock.mockReset();
+        fetchMock.mockImplementation((input, init) => {
+            const method = (init as RequestInit | undefined)?.method ?? "GET";
+            if (method === "POST") {
+                return Promise.resolve(
+                    response({ _id: "server-task-id", taskName: "Reversible" })
+                );
+            }
+            if (method === "DELETE") {
+                return Promise.resolve(response({ ok: true }));
+            }
+            return Promise.resolve(response({}));
+        });
+
+        renderCreator();
+        fireEvent.click(createButton());
+        fireEvent.change(
+            screen.getByPlaceholderText("What needs to be done?"),
+            {
+                target: { value: "Reversible" }
+            }
+        );
+        fireEvent.keyDown(
+            screen.getByPlaceholderText("What needs to be done?"),
+            {
+                charCode: 13,
+                code: "Enter",
+                key: "Enter"
+            }
+        );
+        // Wait for the create POST + activity event landing.
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].undoable).toBe(true);
+        });
+
+        // Drive the activity-feed undo from a probe that uses the
+        // same Provider, so the module-scope closure Map is
+        // reachable. We can't import the hook output directly into
+        // a non-React scope; rendering a probe is the canonical
+        // pattern shared with `useActivityFeed.test.tsx`.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+        const { default: useActivityFeed } =
+            require("../../utils/hooks/useActivityFeed") as typeof import("../../utils/hooks/useActivityFeed");
+        let capturedUndo: ((id: string) => Promise<void>) | null = null;
+        const UndoProbe: React.FC = () => {
+            const api = useActivityFeed();
+            capturedUndo = api.undo;
+            return null;
+        };
+        render(
+            <Provider store={store}>
+                <UndoProbe />
+            </Provider>
+        );
+        const eventId = store.getState().activityFeed.events[0].id;
+        await act(async () => {
+            await capturedUndo!(eventId);
+        });
+
+        // The undo() call must have issued a DELETE on the
+        // tasks endpoint targeting the server-side id from the
+        // create response.
+        const deleteCall = fetchMock.mock.calls.find(
+            ([, init]) => (init as RequestInit | undefined)?.method === "DELETE"
+        );
+        expect(deleteCall).toBeDefined();
+        expect(String(deleteCall?.[0])).toContain("/api/v1/tasks");
+        expect(String(deleteCall?.[0])).toContain("taskId=server-task-id");
+    });
+
     it("closes the draft modal and returns to link mode", async () => {
         renderCreator();
         fireEvent.click(screen.getByLabelText(microcopy.actions.draftWithAi));
