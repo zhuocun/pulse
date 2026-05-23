@@ -1,10 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 
 import TaskCreator from ".";
 
@@ -89,6 +96,17 @@ describe("TaskCreator", () => {
                 taskName: "New task"
             })
         );
+        // Clear the activity feed between tests so the integration
+        // assertion below can read a deterministic event list.
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
+    });
+
+    afterEach(() => {
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
     });
 
     afterAll(() => {
@@ -241,6 +259,40 @@ describe("TaskCreator", () => {
         // 44px }` rule must surface. A regression to a smaller value or a
         // removed rule fails loudly.
         expect(heights).toContain(44);
+    });
+
+    /*
+     * Phase 4.3 — integration assertion. A task-create flow that
+     * goes through `useReactMutation` must surface a corresponding
+     * row in the activity feed (the bell-icon source of truth). The
+     * assertion reads Redux directly so it's independent of any
+     * particular drawer-UI affordance.
+     */
+    it("records an activity-feed event when a task is created (Phase 4.3 integration)", async () => {
+        renderCreator();
+        fireEvent.click(createButton());
+        fireEvent.change(
+            screen.getByPlaceholderText("What needs to be done?"),
+            {
+                target: { value: "Ship the activity feed" }
+            }
+        );
+        fireEvent.keyDown(
+            screen.getByPlaceholderText("What needs to be done?"),
+            {
+                charCode: 13,
+                code: "Enter",
+                key: "Enter"
+            }
+        );
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("task");
+            expect(events[0].action).toBe("create");
+            expect(events[0].summary).toContain("Ship the activity feed");
+        });
     });
 
     it("closes the draft modal and returns to link mode", async () => {

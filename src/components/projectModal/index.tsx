@@ -2,8 +2,9 @@ import { Form, Grid, Input, Modal, Select, Spin, Typography } from "antd";
 import { useForm } from "antd/lib/form/Form";
 import { useEffect, useState } from "react";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, lineHeight, modalWidthCss, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -43,6 +44,7 @@ const ProjectModal: React.FC = () => {
         ? updateProjectMutation
         : createProjectMutation;
     const { mutateAsync, isLoading: mutateLoading } = activeMutation;
+    const { record: recordActivity } = useActivityFeed();
 
     const [form] = useForm();
     const onClose = () => {
@@ -68,6 +70,21 @@ const ProjectModal: React.FC = () => {
         try {
             await mutateAsync(payload);
             setSaveError(null);
+            /*
+             * Phase 4.3 — record the project create/update into the
+             * activity feed before closing. We thread through the
+             * intent (create vs update) and the project name so the
+             * drawer row reads naturally for the user.
+             */
+            recordActivity({
+                kind: "project",
+                action: isEditing ? "update" : "create",
+                summary: microcopyString(
+                    isEditing
+                        ? microcopy.activityFeed.descriptions.projectUpdated
+                        : microcopy.activityFeed.descriptions.projectCreated
+                ).replace("{name}", input.projectName)
+            });
             onClose();
         } catch {
             // ErrorBox surfaces the message via the onError callback above;

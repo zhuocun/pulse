@@ -5,8 +5,9 @@ import type { InputRef } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontWeight, radius, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiDraftModal from "../../utils/hooks/useAiDraftModal";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAuth from "../../utils/hooks/useAuth";
@@ -101,6 +102,7 @@ const TaskCreator: React.FC<{
         ["tasks", { projectId }],
         newTaskCallback
     );
+    const { record: recordActivity } = useActivityFeed();
     const submit = async () => {
         const trimmed = taskName.trim();
         if (!trimmed) {
@@ -115,6 +117,21 @@ const TaskCreator: React.FC<{
             projectId,
             columnId,
             coordinatorId: user?._id
+        });
+        /*
+         * Phase 4.3 — record the create event into the activity feed
+         * so the bell icon surfaces it. The mutation has resolved by
+         * this point so the event reflects an actually-persisted task;
+         * if `mutateAsync` rejects, the error bubbles and `record()`
+         * is skipped (the optimistic React Query update rolls back via
+         * `useReactMutation`'s `onError` handler).
+         */
+        recordActivity({
+            kind: "task",
+            action: "create",
+            summary: microcopyString(
+                microcopy.activityFeed.descriptions.taskCreated
+            ).replace("{name}", trimmed)
         });
     };
     const toggle = () => {
