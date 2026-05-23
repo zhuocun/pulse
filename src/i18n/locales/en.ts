@@ -144,7 +144,15 @@ export const enSource = {
         renameTask: "Rename task",
         columnReadinessReady: "{ready} of {total} tasks ready",
         columnReadinessGrooming:
-            "{ready} of {total} tasks ready — needs grooming"
+            "{ready} of {total} tasks ready — needs grooming",
+        /*
+         * QW#13 (2026-05 review §Quick Wins): the AiConfidenceIndicator
+         * aria-label template. The numeric percentage *and* the plain-
+         * language band (Low / Moderate / High) both ride in the label
+         * so screen-reader users get the same paired signal sighted
+         * users see in the visible chip.
+         */
+        confidenceAriaLabel: "Confidence {band}, {percent}"
     },
     dragHints: {
         taskCardKeyboard:
