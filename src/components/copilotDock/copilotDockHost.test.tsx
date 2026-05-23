@@ -671,4 +671,69 @@ describe("CopilotDockHost", () => {
         });
         expect(sawP2).toBe(true);
     });
+
+    /*
+     * Regression for R-A M1 review Issue #10 (test coverage gap):
+     * verify the palette → AI hand-off via the
+     * `boardCopilot:openChat` window event reaches the dock and
+     * lands the prompt in the chat hook's `send`. Under the dock
+     * flag, the host owns the listener (the BoardPage / ProjectPage
+     * mirror listeners are gated off — see Issue #2 fix).
+     */
+    it("handles a boardCopilot:openChat window event and dispatches the prompt to the chat engine", async () => {
+        const sendSpy = jest.fn().mockResolvedValue(undefined);
+        mockedUseAiChat.mockReturnValue(baseAiChat({ send: sendSpy }));
+
+        renderHarness();
+
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent("boardCopilot:openChat", {
+                    detail: { prompt: "What's blocking us this week?" }
+                })
+            );
+        });
+
+        await waitFor(() => {
+            expect(
+                document.querySelector("[data-testid='copilot-dock']")
+            ).not.toBeNull();
+        });
+        await waitFor(() => {
+            expect(sendSpy).toHaveBeenCalledWith(
+                "What's blocking us this week?"
+            );
+        });
+    });
+
+    /*
+     * Coverage for Issue #10: a bare `closeChatDrawer` dispatch
+     * (legacy callsite) propagates to dock close through the dock's
+     * close handler chain. This is the trigger an auth-state change
+     * would use to dismiss the dock from outside the React tree.
+     */
+    it("a closeChatDrawer dispatch propagates to dock close via the host handler chain", async () => {
+        renderHarness();
+        act(() => {
+            store.dispatch(overlaysActions.openChatDrawer());
+        });
+        await waitFor(() => {
+            expect(store.getState().overlays.copilotDock.open).toBe(true);
+        });
+
+        // Simulate the user dismissing the dock via its mask click —
+        // the host's `handleClose` calls closeDock + closeChatDrawer +
+        // closeBoardBrief so the legacy flags fan out and the dock
+        // does not silently reopen on the next render.
+        const mask = document.querySelector(".ant-drawer-mask");
+        expect(mask).not.toBeNull();
+        fireEvent.click(mask as Element);
+
+        await waitFor(() => {
+            expect(store.getState().overlays.copilotDock.open).toBe(false);
+        });
+        expect(store.getState().overlays.chatDrawer.open).toBe(false);
+        // initialPrompt is also cleared by the closeCopilotDock reducer.
+        expect(store.getState().overlays.copilotDock.initialPrompt).toBeNull();
+    });
 });
