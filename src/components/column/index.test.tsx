@@ -17,7 +17,7 @@ jest.mock("../../utils/hooks/useTaskModal");
 jest.mock("../../utils/hooks/useTaskPanelNavigation");
 jest.mock("../../constants/env", () => ({
     __esModule: true,
-    default: { taskPanelRouted: false }
+    default: { taskPanelRouted: false, aiColumnReadinessEnabled: false }
 }));
 
 type DragMockProps = {
@@ -133,7 +133,10 @@ jest.mock("antd", () => {
 const mockedUseReactMutation = useReactMutation as jest.Mock;
 const mockedUseTaskModal = useTaskModal as jest.Mock;
 const mockedUseTaskPanelNavigation = useTaskPanelNavigation as jest.Mock;
-const mockedEnvironment = environment as { taskPanelRouted: boolean };
+const mockedEnvironment = environment as {
+    taskPanelRouted: boolean;
+    aiColumnReadinessEnabled: boolean;
+};
 
 const column = (overrides: Partial<IColumn> = {}): IColumn => ({
     _id: "column-1",
@@ -224,6 +227,7 @@ describe("Column", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockedEnvironment.taskPanelRouted = false;
+        mockedEnvironment.aiColumnReadinessEnabled = false;
     });
 
     it("renders the column title, matching task cards, and TaskCreator state", () => {
@@ -505,5 +509,51 @@ describe("Column", () => {
         expect(removeColumn).not.toHaveBeenCalled();
 
         confirmSpy.mockRestore();
+    });
+
+    it("does NOT render the readiness pill when the env flag is off (default)", () => {
+        // With aiColumnReadinessEnabled=false the pill never mounts even if
+        // the column has enough tasks to clear the 3-task floor.
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready 1" }),
+                task({ _id: "t2", taskName: "Ready 2" }),
+                task({ _id: "t3", taskName: "Ready 3" }),
+                task({ _id: "t4", taskName: "Ready 4" })
+            ]
+        });
+        expect(
+            screen.queryByTestId("column-readiness-pill")
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders the readiness pill when the env flag is on AND ≥80% of tasks are ready", () => {
+        mockedEnvironment.aiColumnReadinessEnabled = true;
+        // 4 fully-ready tasks → 100% → "Ready to ship".
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready 1" }),
+                task({ _id: "t2", taskName: "Ready 2" }),
+                task({ _id: "t3", taskName: "Ready 3" }),
+                task({ _id: "t4", taskName: "Ready 4" })
+            ]
+        });
+        const pill = screen.getByTestId("column-readiness-pill");
+        expect(pill).toHaveAttribute("data-status", "ready");
+    });
+
+    it("renders the grooming pill when the env flag is on AND <60% are ready", () => {
+        mockedEnvironment.aiColumnReadinessEnabled = true;
+        // 1 ready, 3 blocked (no coordinator) → 25% → grooming.
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready" }),
+                task({ _id: "t2", taskName: "Blocked 1", coordinatorId: "" }),
+                task({ _id: "t3", taskName: "Blocked 2", coordinatorId: "" }),
+                task({ _id: "t4", taskName: "Blocked 3", coordinatorId: "" })
+            ]
+        });
+        const pill = screen.getByTestId("column-readiness-pill");
+        expect(pill).toHaveAttribute("data-status", "needs-grooming");
     });
 });

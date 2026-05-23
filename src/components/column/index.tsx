@@ -30,12 +30,14 @@ import {
     touchTargetMin
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
+import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
+import ColumnReadinessPill from "../columnReadinessPill";
 import {
     Drag,
     Drop,
@@ -649,6 +651,20 @@ const Column = React.forwardRef<
         );
         const hasTasksHiddenByFilter =
             tasks.length > 0 && filteredTasks.length === 0;
+        /*
+         * Column-readiness batch (Phase 4 W3). Runs the deterministic
+         * readiness engine over the (unfiltered) task list — the score
+         * is a property of the column's actual work, not of whatever
+         * filter the user has typed into the search bar. The hook
+         * short-circuits to a neutral report when the env flag is off,
+         * and `<ColumnReadinessPill>` renders nothing for the neutral
+         * state, so the header stays empty by default.
+         */
+        const readinessReport = useColumnReadiness({
+            tasks,
+            columnId: column._id,
+            enabled: environment.aiColumnReadinessEnabled
+        });
         return (
             <ColumnContainer {...props} ref={ref}>
                 <ColumnHeader between>
@@ -688,6 +704,7 @@ const Column = React.forwardRef<
                                 fontWeight: 600
                             }}
                         />
+                        <ColumnReadinessPill report={readinessReport} />
                     </span>
                     <DeleteDropDown
                         columnId={column._id}
