@@ -169,6 +169,19 @@ const taskPanelRoutedFlag = readEnv("REACT_APP_TASK_PANEL_ROUTED");
  */
 const copilotDockEnabledFlag = readEnv("REACT_APP_COPILOT_DOCK_ENABLED");
 
+/**
+ * Phase 4 W3 — Column readiness pill. Runs the deterministic readiness
+ * engine in batch over each column's tasks at column-open time and
+ * surfaces a "Ready to ship" / "Needs grooming" indicator in the column
+ * header (docs/design/_review-2026-05/04-ai-copilot.md §Ambition 5).
+ * Default off so the indicator stays opt-in until the threshold tuning
+ * is validated on real boards. Set
+ * `REACT_APP_AI_COLUMN_READINESS_ENABLED=true` to enable.
+ */
+const aiColumnReadinessEnabledFlag = readEnv(
+    "REACT_APP_AI_COLUMN_READINESS_ENABLED"
+);
+
 const environment = {
     apiBaseUrl,
     aiBaseUrl,
@@ -199,7 +212,14 @@ const environment = {
      * Phase 3 A1 CopilotDock flag. Default false (opt-in) — see the
      * `copilotDockEnabledFlag` block above for the rollout plan.
      */
-    copilotDockEnabled: copilotDockEnabledFlag === "true"
+    copilotDockEnabled: copilotDockEnabledFlag === "true",
+    /**
+     * Phase 4 W3 column-readiness flag. Default false (opt-in) — see the
+     * `aiColumnReadinessEnabledFlag` block above. The hook runs entirely
+     * synchronously against the deterministic local engine so flipping
+     * the flag has no remote cost.
+     */
+    aiColumnReadinessEnabled: aiColumnReadinessEnabledFlag === "true"
 };
 
 export default environment;

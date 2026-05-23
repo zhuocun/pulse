@@ -27,6 +27,7 @@ import {
     AiSearchProjectsContext,
     semanticSearch
 } from "../../utils/ai/engine";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { isProjectAiDisabled } from "../../utils/ai/projectAiStorage";
 import { validateSearch } from "../../utils/ai/validate";
@@ -70,14 +71,23 @@ const reformulate = (query: string): string[] => {
     if (trimmed.length === 0) return [];
     const words = trimmed.split(/\s+/);
     const head = words[0];
+    const lowerHead = head?.toLowerCase() ?? "";
+    // Guard rails so we don't spit back nonsense like "open open the door"
+    // or "tasks about tasks about X" when the user already prefixed with
+    // a verb the templates also use. Each candidate template is only
+    // appended when its leading verb isn't already the first word.
+    const startsWith = (prefix: string): boolean =>
+        lowerHead === prefix.toLowerCase();
     const candidates: string[] = [];
     if (words.length > 2) {
         candidates.push(words.slice(0, 2).join(" "));
     }
-    if (head && head.length > 3) {
+    if (head && head.length > 3 && !startsWith("tasks")) {
         candidates.push(`tasks about ${trimmed}`);
     }
-    candidates.push(`open ${trimmed}`);
+    if (!startsWith("open")) {
+        candidates.push(`open ${trimmed}`);
+    }
     // Dedupe while preserving order, drop self-matches.
     const seen = new Set<string>([trimmed.toLowerCase()]);
     return candidates
@@ -468,27 +478,13 @@ const AiSearchInput: React.FC<Props> = (props) => {
                     {labels.helper}
                 </Typography.Paragraph>
             </div>
-            <span
-                /*
-                 * Polite, not assertive — search status is non-urgent
-                 * background information and `assertive` interrupts whatever
-                 * the screen reader is currently saying (e.g. the row of
-                 * recently rendered results), which is hostile UX.
-                 */
-                aria-live="polite"
-                id={announcerId}
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
+            {/*
+             * Polite, not assertive — search status is non-urgent
+             * background information and `assertive` interrupts whatever
+             * the screen reader is currently saying (e.g. the row of
+             * recently rendered results), which is hostile UX.
+             */}
+            <SrOnlyLive id={announcerId}>
                 {busy
                     ? microcopy.feedback.searching
                     : semanticActive && matchRationale
@@ -497,7 +493,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
                             matchRationale
                         )
                       : (noMatchHint ?? "")}
-            </span>
+            </SrOnlyLive>
             {matchSummary && matchSummary.total > 0 && (
                 <div
                     style={{
@@ -681,3 +677,8 @@ const AiSearchInput: React.FC<Props> = (props) => {
 };
 
 export default AiSearchInput;
+
+// Exported for unit tests — the "Did you mean?" reformulator is a pure
+// function and easier to pin behaviorally with a small table than via a
+// full DOM harness.
+export { reformulate as __testing_reformulate };

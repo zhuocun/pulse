@@ -631,6 +631,29 @@ describe("AiChatDrawer", () => {
         expect(hint.className).toMatch(/warning/i);
     });
 
+    it("swaps the counter hint to the at-limit microcopy when input reaches the cap (Quick win 20)", () => {
+        renderDrawer(true);
+        const input = screen.getByLabelText("Message Board Copilot");
+        const cap = microcopy.ai.characterCounterMax as number;
+        // Just below the cap shows the quiet "N/max" template.
+        fireEvent.change(input, { target: { value: "x".repeat(cap - 1) } });
+        const hint = screen.getByTestId("chat-prompt-char-hint");
+        expect(hint.textContent).toContain(String(cap - 1));
+        expect(hint.textContent).not.toContain(
+            (microcopy.ai.characterCountAtLimit as string).replace(
+                "{count}/{max} — ",
+                ""
+            )
+        );
+        // At the cap the stronger "limit reached" copy fires so the user
+        // understands the textarea stopped accepting characters.
+        fireEvent.change(input, { target: { value: "x".repeat(cap) } });
+        const atLimitTail = (
+            microcopy.ai.characterCountAtLimit as string
+        ).replace("{count}/{max} — ", "");
+        expect(hint.textContent).toContain(atLimitTail);
+    });
+
     it("wires onUndoProposal so the post-commit Undo button is reachable inside chat (regression for 04·F2)", () => {
         // The chat drawer used to render the proposal card without an
         // `onUndo` callback. As a result `MutationProposalCard`'s

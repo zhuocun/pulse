@@ -3,6 +3,8 @@ import styled from "@emotion/styled";
 import {
     Badge,
     Dropdown,
+    Input,
+    type InputRef,
     MenuProps,
     Modal,
     Tag,
@@ -30,12 +32,14 @@ import {
     touchTargetMin
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
+import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
+import ColumnReadinessPill from "../columnReadinessPill";
 import {
     Drag,
     Drop,
@@ -485,12 +489,176 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         { task, members, onOpen, isMock, "aria-label": ariaLabel, ...rest },
         ref
     ) => {
+        const { projectId } = useParams<{ projectId: string }>();
         const coordinator = members.find((m) => m._id === task.coordinatorId);
         const isBug = task.type === "Bug";
         // Read per-result strength from the AI search cache (P1-2). Returns
         // null when no semantic filter is active, so the badge stays out of
         // the way during normal browsing.
         const strength = getAiSearchStrength("tasks", task._id);
+        /*
+         * Inline-edit title (Phase 4.5 of `docs/todo/ui-todo.md`):
+         * double-click the title to swap it for an Input that mutates the
+         * task in place. We reuse the SAME ``tasks PUT`` mutation that
+         * `taskModal` uses so optimistic update + cache invalidation work
+         * identically across both surfaces — the rename flows through
+         * `/api/v1/tasks` like any modal save.
+         *
+         * Why double-click instead of single-click? Single-click is
+         * already bound to "open the task" (modal or routed panel). The
+         * cross-cutting `e` shortcut in `docs/todo/ui-todo.md` §2.A.9
+         * also opens the modal, so trading "e" for inline-rename would
+         * silently break a global affordance. Double-click is a Linear /
+         * Notion / GitHub project convention for "I meant the title,
+         * not the row," so users familiar with those tools find it
+         * intuitively.
+         *
+         * Why blur → commit? Two reasons. (1) Linear is the dominant
+         * convention for task-card inline edits, and committing on blur
+         * matches the user's mental model of "I clicked away, save what
+         * I typed." (2) The alternative — revert on blur — silently
+         * eats typed edits when the user thinks they've already
+         * committed; that's a worse failure mode than an accidental
+         * commit (Enter / Esc are both available to disambiguate
+         * deliberately).
+         */
+        const { mutate: updateTask, isLoading: isUpdating } = useReactMutation(
+            "tasks",
+            "PUT",
+            ["tasks", { projectId }]
+        );
+        const [editing, setEditing] = React.useState(false);
+        const [draft, setDraft] = React.useState(task.taskName);
+        const cardRef = React.useRef<HTMLButtonElement | null>(null);
+        const inputRef = React.useRef<InputRef | null>(null);
+        /*
+         * Browsers fire `click → click → dblclick` for a real
+         * double-click. Stopping propagation on `dblclick` alone is
+         * not enough — both preceding `click` events would still
+         * bubble to TaskCardOuter and trigger `onOpen()`, opening
+         * the modal underneath the inline-edit Input. We defer the
+         * outer-card open by ~250 ms; if a `dblclick` lands inside
+         * that window, `enterEditing` cancels the pending timer and
+         * the modal never fires. The timeout id is kept in a ref so
+         * the cancellation path can find it across renders.
+         *
+         * 250 ms matches the OS-level dblclick threshold on macOS /
+         * Windows (Linear / Notion use the same envelope). Lower
+         * values race against slow-finger users; higher values add
+         * perceptible lag to a plain single click.
+         */
+        const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+            null
+        );
+        // Cancel any pending open timer on unmount so we don't open
+        // a modal for a card that has scrolled out of the column.
+        React.useEffect(
+            () => () => {
+                if (openTimerRef.current !== null) {
+                    clearTimeout(openTimerRef.current);
+                    openTimerRef.current = null;
+                }
+            },
+            []
+        );
+        // Bridge the outer forwardRef to our local cardRef so we can
+        // restore focus on commit/revert without losing parent-supplied
+        // refs (react-router, dnd, etc.).
+        const setCardRef = React.useCallback(
+            (node: HTMLButtonElement | null) => {
+                cardRef.current = node;
+                if (typeof ref === "function") ref(node);
+                else if (ref) {
+                    (
+                        ref as React.MutableRefObject<HTMLButtonElement | null>
+                    ).current = node;
+                }
+            },
+            [ref]
+        );
+        /*
+         * Sync `draft` to upstream renames (server roundtrip finishes,
+         * react-query refetch, or another client edits the same task).
+         * Compare against the source of truth — `task.taskName` — and
+         * only mirror it back into the draft when the user is NOT
+         * actively editing, otherwise we'd clobber in-flight keystrokes.
+         */
+        React.useEffect(() => {
+            if (!editing) setDraft(task.taskName);
+        }, [editing, task.taskName]);
+        const exitEditing = React.useCallback(
+            (opts?: { restoreFocus?: boolean }) => {
+                setEditing(false);
+                if (opts?.restoreFocus !== false) {
+                    // Defer until after the Input has unmounted so React
+                    // doesn't fight the focus-on-mount of the next card
+                    // when the user tabs away.
+                    queueMicrotask(() => cardRef.current?.focus());
+                }
+            },
+            []
+        );
+        const commitDraft = React.useCallback(() => {
+            const trimmed = draft.trim();
+            // No-op commit when the trimmed value equals the current
+            // server value — saves a request AND avoids react-query
+            // invalidating a list that didn't actually change.
+            if (!trimmed || trimmed === task.taskName) {
+                exitEditing();
+                return;
+            }
+            updateTask({ ...task, taskName: trimmed });
+            exitEditing();
+        }, [draft, exitEditing, task, updateTask]);
+        const revertDraft = React.useCallback(() => {
+            setDraft(task.taskName);
+            exitEditing();
+        }, [exitEditing, task.taskName]);
+        const enterEditing = React.useCallback(
+            (event: React.MouseEvent<HTMLDivElement>) => {
+                // Double-click on the title — stop propagation so the
+                // outer `onClick={onOpen}` doesn't also fire and open
+                // the modal underneath our Input. Stopping propagation
+                // suppresses the `dblclick` bubble; the click-timer
+                // cancellation below handles the two preceding `click`
+                // events that already fired before this handler runs.
+                event.stopPropagation();
+                if (openTimerRef.current !== null) {
+                    clearTimeout(openTimerRef.current);
+                    openTimerRef.current = null;
+                }
+                if (isMock) return;
+                setDraft(task.taskName);
+                setEditing(true);
+                // Defer the focus so AntD Input's own autoFocus path
+                // has time to mount the underlying <input>.
+                queueMicrotask(() =>
+                    inputRef.current?.focus({ cursor: "all" })
+                );
+            },
+            [isMock, task.taskName]
+        );
+        /*
+         * Outer card click → deferred `onOpen`. The first `click` of
+         * a real double-click sequence lands here ~10–30 ms before
+         * the matching `dblclick` reaches `enterEditing` on the
+         * title; the 250 ms timer gives `enterEditing` a window to
+         * cancel before the modal opens. A plain single click
+         * resolves the timer normally — there's a ~250 ms perceived
+         * lag, but it sits below the 300 ms threshold most users
+         * register as "delayed" and matches Linear's behaviour for
+         * card rows that support inline edit.
+         */
+        const handleCardClick = React.useCallback(() => {
+            if (!onOpen) return;
+            if (openTimerRef.current !== null) {
+                clearTimeout(openTimerRef.current);
+            }
+            openTimerRef.current = setTimeout(() => {
+                openTimerRef.current = null;
+                onOpen();
+            }, 250);
+        }, [onOpen]);
         return (
             <TaskCardOuter
                 aria-label={
@@ -501,8 +669,8 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 }
                 aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 disabled={isMock}
-                onClick={onOpen}
-                ref={ref}
+                onClick={handleCardClick}
+                ref={setCardRef}
                 title={microcopy.dragHints.taskCardKeyboard}
                 type="button"
                 {...rest}
@@ -515,7 +683,56 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         {task.epic}
                     </EpicTag>
                 ) : null}
-                <CardTitle>{task.taskName}</CardTitle>
+                {editing ? (
+                    <CardTitle
+                        // The Input is a button child — every pointer/
+                        // key event has to be quarantined or the parent
+                        // <button> would treat typing as a click and
+                        // open the modal underneath. The CardTitle is
+                        // already non-interactive so wrapping the Input
+                        // in it preserves the card's vertical rhythm.
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <Input
+                            aria-label={microcopy.a11y.renameTask as string}
+                            autoFocus
+                            data-testid="task-card-title-input"
+                            disabled={isUpdating}
+                            onBlur={commitDraft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            /*
+                             * Enter / Esc are handled in `onKeyDown`
+                             * rather than AntD's `onPressEnter` so a
+                             * single commit fires per keypress — using
+                             * both raises the mutation twice on the same
+                             * Enter event.
+                             */
+                            onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    commitDraft();
+                                } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    revertDraft();
+                                }
+                            }}
+                            ref={inputRef}
+                            size="small"
+                            value={draft}
+                        />
+                    </CardTitle>
+                ) : (
+                    <CardTitle
+                        data-testid="task-card-title"
+                        onDoubleClick={enterEditing}
+                    >
+                        {task.taskName}
+                    </CardTitle>
+                )}
                 <CardFooter>
                     {/* The label "Bug"/"Task" reads as the visible text and
                      * the icon is decorative, so no Tooltip is needed —
@@ -649,6 +866,20 @@ const Column = React.forwardRef<
         );
         const hasTasksHiddenByFilter =
             tasks.length > 0 && filteredTasks.length === 0;
+        /*
+         * Column-readiness batch (Phase 4 W3). Runs the deterministic
+         * readiness engine over the (unfiltered) task list — the score
+         * is a property of the column's actual work, not of whatever
+         * filter the user has typed into the search bar. The hook
+         * short-circuits to a neutral report when the env flag is off,
+         * and `<ColumnReadinessPill>` renders nothing for the neutral
+         * state, so the header stays empty by default.
+         */
+        const readinessReport = useColumnReadiness({
+            tasks,
+            columnId: column._id,
+            enabled: environment.aiColumnReadinessEnabled
+        });
         return (
             <ColumnContainer {...props} ref={ref}>
                 <ColumnHeader between>
@@ -688,6 +919,7 @@ const Column = React.forwardRef<
                                 fontWeight: 600
                             }}
                         />
+                        <ColumnReadinessPill report={readinessReport} />
                     </span>
                     <DeleteDropDown
                         columnId={column._id}

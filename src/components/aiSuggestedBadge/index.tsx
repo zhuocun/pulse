@@ -1,9 +1,9 @@
-import styled from "@emotion/styled";
-import { Popover, Tag, Typography } from "antd";
+import { Popover, Typography } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { space } from "../../theme/tokens";
+import CopilotChip from "../copilotChip";
 
 /**
  * "Suggested by Copilot" provenance badge (PRD v3 T-R3, D-R2).
@@ -15,21 +15,12 @@ import { fontSize, fontWeight, space } from "../../theme/tokens";
  *
  * Click/keyboard activation opens a Popover with a "Revert to previous"
  * affordance — the consumer wires the actual revert via `onRevert`.
+ *
+ * The chip itself is now the shared `<CopilotChip variant="suggested">`
+ * (Ambition 6 / 2026-05 review §6). Previously this component rolled its
+ * own styled `<Tag>` with bespoke padding / font weight; the shared chip
+ * pins the geometry so all six AI pills stay shape-consistent.
  */
-const BadgeTag = styled(Tag)`
-    && {
-        background: var(--color-copilot-badge-bg);
-        border-color: var(--color-copilot-bg-medium);
-        border-radius: 999px;
-        color: var(--color-copilot-badge);
-        cursor: pointer;
-        font-size: ${fontSize.xs - 1}px;
-        font-weight: ${fontWeight.semibold};
-        margin-inline-end: 0;
-        padding: 1px 8px;
-    }
-`;
-
 interface AiSuggestedBadgeProps {
     /** Optional explanatory text shown in the popover. */
     rationale?: string;
@@ -78,14 +69,15 @@ const AiSuggestedBadge: React.FC<AiSuggestedBadgeProps> = ({
      */
     return (
         <Popover content={popoverContent} trigger={["hover", "click"]}>
-            <BadgeTag
+            <CopilotChip
                 aria-label={microcopy.ai.appliedSuggestion}
-                role="button"
+                compact={compact}
+                interactive
                 style={style}
-                tabIndex={0}
+                variant="suggested"
             >
                 {label}
-            </BadgeTag>
+            </CopilotChip>
         </Popover>
     );
 };

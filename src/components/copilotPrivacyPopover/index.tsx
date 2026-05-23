@@ -162,9 +162,15 @@ const CopilotPrivacyPopover: React.FC<CopilotPrivacyPopoverProps> = ({
 };
 
 /**
- * One-shot disclosure used in modals (PRD D-R8). Reads
- * `boardCopilot:privacyShown` from `localStorage`; renders the inline
- * disclosure block when not yet acknowledged, with two buttons.
+ * One-shot disclosure used in modals (PRD D-R8). Reads from
+ * `localStorage`; renders the inline disclosure block when not yet
+ * acknowledged, with two buttons.
+ *
+ * Storage key is route-scoped (Review F10): each surface presents a
+ * different data scope, so acknowledging "what is shared with the
+ * estimator" must not silently dismiss the disclosure for "what is
+ * shared with the task drafter". Callers can still pass an explicit
+ * `storageKey` to override the default scoping (legacy callers, tests).
  *
  * Returns `null` once dismissed so subsequent renders skip the markup.
  */
@@ -175,13 +181,17 @@ interface CopilotPrivacyDisclosureProps {
     route?: AiRoute | "chat";
 }
 
+const buildDefaultStorageKey = (route?: AiRoute | "chat"): string =>
+    route ? `boardCopilot:privacyShown:${route}` : "boardCopilot:privacyShown";
+
 export const CopilotPrivacyDisclosure: React.FC<
     CopilotPrivacyDisclosureProps
-> = ({ storageKey = "boardCopilot:privacyShown", onAcknowledge, route }) => {
+> = ({ storageKey, onAcknowledge, route }) => {
+    const resolvedStorageKey = storageKey ?? buildDefaultStorageKey(route);
     const [shown, setShown] = React.useState<boolean>(() => {
         if (typeof window === "undefined") return false;
         try {
-            return window.localStorage.getItem(storageKey) === "1";
+            return window.localStorage.getItem(resolvedStorageKey) === "1";
         } catch {
             return false;
         }
@@ -192,7 +202,7 @@ export const CopilotPrivacyDisclosure: React.FC<
     const summary = scope ? scope.summary : microcopy.ai.privacyDisclosure;
     const acknowledge = () => {
         try {
-            window.localStorage.setItem(storageKey, "1");
+            window.localStorage.setItem(resolvedStorageKey, "1");
         } catch {
             /* private mode — keep state in memory only */
         }

@@ -84,4 +84,38 @@ describe("CopilotPrivacyDisclosure", () => {
         );
         expect(container.firstChild).toBeNull();
     });
+
+    it("namespaces the default storage key by route (Review F10)", () => {
+        // Each surface ships a different data scope; acknowledging chat
+        // must not silently dismiss the estimate disclosure (and vice
+        // versa). Pre-seeding the chat-scoped key should leave the
+        // estimate-route render untouched.
+        window.localStorage.setItem("boardCopilot:privacyShown:chat", "1");
+        // Chat is acknowledged → null render.
+        const { container, unmount } = render(
+            <CopilotPrivacyDisclosure route="chat" />
+        );
+        expect(container.firstChild).toBeNull();
+        unmount();
+        // A fresh mount on a different route still surfaces the
+        // disclosure because that key was never set.
+        render(<CopilotPrivacyDisclosure route="estimate" />);
+        expect(screen.getByText(microcopy.ai.privacyTitle)).toBeInTheDocument();
+    });
+
+    it("writes the route-scoped key when the user acknowledges", () => {
+        render(<CopilotPrivacyDisclosure route="board-brief" />);
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.ai.privacyAcknowledge
+            })
+        );
+        expect(
+            window.localStorage.getItem("boardCopilot:privacyShown:board-brief")
+        ).toBe("1");
+        // Other routes remain untouched.
+        expect(
+            window.localStorage.getItem("boardCopilot:privacyShown:chat")
+        ).toBeNull();
+    });
 });

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Modal } from "antd";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -17,7 +18,7 @@ jest.mock("../../utils/hooks/useTaskModal");
 jest.mock("../../utils/hooks/useTaskPanelNavigation");
 jest.mock("../../constants/env", () => ({
     __esModule: true,
-    default: { taskPanelRouted: false }
+    default: { taskPanelRouted: false, aiColumnReadinessEnabled: false }
 }));
 
 type DragMockProps = {
@@ -133,7 +134,10 @@ jest.mock("antd", () => {
 const mockedUseReactMutation = useReactMutation as jest.Mock;
 const mockedUseTaskModal = useTaskModal as jest.Mock;
 const mockedUseTaskPanelNavigation = useTaskPanelNavigation as jest.Mock;
-const mockedEnvironment = environment as { taskPanelRouted: boolean };
+const mockedEnvironment = environment as {
+    taskPanelRouted: boolean;
+    aiColumnReadinessEnabled: boolean;
+};
 
 const column = (overrides: Partial<IColumn> = {}): IColumn => ({
     _id: "column-1",
@@ -164,6 +168,7 @@ const defaultParam: TaskSearchParam = {
 };
 
 const removeColumn = jest.fn();
+const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
 const closeTask = jest.fn();
@@ -195,7 +200,15 @@ const renderColumn = ({
     tasks?: ITask[];
     boardAiOn?: boolean;
 } = {}) => {
-    mockedUseReactMutation.mockReturnValue({ mutate: removeColumn });
+    // The component calls `useReactMutation` twice: once for the column
+    // delete (endpoint="boards") and once for the task rename
+    // (endpoint="tasks"). Route by the first arg so the two mutations
+    // don't collide in test assertions.
+    mockedUseReactMutation.mockImplementation((endPoint: string) =>
+        endPoint === "tasks"
+            ? { mutate: updateTask, isLoading: false }
+            : { mutate: removeColumn, isLoading: false }
+    );
     mockedUseTaskModal.mockReturnValue({ startEditing });
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
 
@@ -224,6 +237,7 @@ describe("Column", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockedEnvironment.taskPanelRouted = false;
+        mockedEnvironment.aiColumnReadinessEnabled = false;
     });
 
     it("renders the column title, matching task cards, and TaskCreator state", () => {
@@ -345,30 +359,50 @@ describe("Column", () => {
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {
-        renderColumn();
+        jest.useFakeTimers();
+        try {
+            renderColumn();
 
-        fireEvent.click(screen.getByText("Build task"));
-        fireEvent.click(screen.getByText("Optimistic task"));
+            // The card defers `onOpen` by 250 ms so that a real
+            // browser's `click → click → dblclick` sequence has a
+            // chance to cancel the modal before it opens. Advance
+            // timers to drain that window.
+            fireEvent.click(screen.getByText("Build task"));
+            fireEvent.click(screen.getByText("Optimistic task"));
+            act(() => {
+                jest.runAllTimers();
+            });
 
-        expect(startEditing).toHaveBeenCalledTimes(1);
-        expect(startEditing).toHaveBeenCalledWith("task-1");
-        // Routed-panel path is NOT taken when the flag is off.
-        expect(openTask).not.toHaveBeenCalled();
+            expect(startEditing).toHaveBeenCalledTimes(1);
+            expect(startEditing).toHaveBeenCalledWith("task-1");
+            // Routed-panel path is NOT taken when the flag is off.
+            expect(openTask).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("routes the click through useTaskPanelNavigation when the flag is on (Phase 3 A2)", () => {
-        // Flip the mocked environment flag. The column reads it lazily
-        // on render so this needs to happen before renderColumn().
-        mockedEnvironment.taskPanelRouted = true;
-        renderColumn();
+        jest.useFakeTimers();
+        try {
+            // Flip the mocked environment flag. The column reads it lazily
+            // on render so this needs to happen before renderColumn().
+            mockedEnvironment.taskPanelRouted = true;
+            renderColumn();
 
-        fireEvent.click(screen.getByText("Build task"));
+            fireEvent.click(screen.getByText("Build task"));
+            act(() => {
+                jest.runAllTimers();
+            });
 
-        // openTask is wired; the legacy modal-opening startEditing is
-        // not called at all when the flag is on.
-        expect(openTask).toHaveBeenCalledTimes(1);
-        expect(openTask).toHaveBeenCalledWith("task-1");
-        expect(startEditing).not.toHaveBeenCalled();
+            // openTask is wired; the legacy modal-opening startEditing is
+            // not called at all when the flag is on.
+            expect(openTask).toHaveBeenCalledTimes(1);
+            expect(openTask).toHaveBeenCalledWith("task-1");
+            expect(startEditing).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("disables drag and open behavior when a task id is empty", () => {
@@ -457,7 +491,11 @@ describe("Column", () => {
 
     it("invokes onResetFilters when the reset button is clicked", () => {
         const onResetFilters = jest.fn();
-        mockedUseReactMutation.mockReturnValue({ mutate: removeColumn });
+        mockedUseReactMutation.mockImplementation((endPoint: string) =>
+            endPoint === "tasks"
+                ? { mutate: updateTask, isLoading: false }
+                : { mutate: removeColumn, isLoading: false }
+        );
         mockedUseTaskModal.mockReturnValue({ startEditing });
 
         render(
@@ -505,5 +543,216 @@ describe("Column", () => {
         expect(removeColumn).not.toHaveBeenCalled();
 
         confirmSpy.mockRestore();
+    });
+
+    it("does NOT render the readiness pill when the env flag is off (default)", () => {
+        // With aiColumnReadinessEnabled=false the pill never mounts even if
+        // the column has enough tasks to clear the 3-task floor.
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready 1" }),
+                task({ _id: "t2", taskName: "Ready 2" }),
+                task({ _id: "t3", taskName: "Ready 3" }),
+                task({ _id: "t4", taskName: "Ready 4" })
+            ]
+        });
+        expect(
+            screen.queryByTestId("column-readiness-pill")
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders the readiness pill when the env flag is on AND ≥80% of tasks are ready", () => {
+        mockedEnvironment.aiColumnReadinessEnabled = true;
+        // 4 fully-ready tasks → 100% → "Ready to ship".
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready 1" }),
+                task({ _id: "t2", taskName: "Ready 2" }),
+                task({ _id: "t3", taskName: "Ready 3" }),
+                task({ _id: "t4", taskName: "Ready 4" })
+            ]
+        });
+        const pill = screen.getByTestId("column-readiness-pill");
+        expect(pill).toHaveAttribute("data-status", "ready");
+    });
+
+    it("renders the grooming pill when the env flag is on AND <60% are ready", () => {
+        mockedEnvironment.aiColumnReadinessEnabled = true;
+        // 1 ready, 3 blocked (no coordinator) → 25% → grooming.
+        renderColumn({
+            tasks: [
+                task({ _id: "t1", taskName: "Ready" }),
+                task({ _id: "t2", taskName: "Blocked 1", coordinatorId: "" }),
+                task({ _id: "t3", taskName: "Blocked 2", coordinatorId: "" }),
+                task({ _id: "t4", taskName: "Blocked 3", coordinatorId: "" })
+            ]
+        });
+        const pill = screen.getByTestId("column-readiness-pill");
+        expect(pill).toHaveAttribute("data-status", "needs-grooming");
+    });
+
+    /*
+     * Part B — inline-edit task card title (Phase 4.5 of `ui-todo.md`).
+     */
+    describe("inline-edit task title", () => {
+        it("enters edit mode on double-click of the title and shows an autofocused Input", () => {
+            renderColumn();
+            const title = screen.getAllByTestId("task-card-title")[0];
+            fireEvent.doubleClick(title);
+            const input = screen.getByTestId(
+                "task-card-title-input"
+            ) as HTMLInputElement;
+            expect(input).toBeInTheDocument();
+            // AntD's Input wraps a native <input>; the value mirrors the
+            // task name when edit mode opens.
+            expect(input.value).toBe("Build task");
+            expect(input).toHaveAccessibleName("Rename task");
+        });
+
+        it("commits the rename through the task PUT mutation on Enter", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Renamed task" } });
+            fireEvent.keyDown(input, { key: "Enter" });
+            expect(updateTask).toHaveBeenCalledTimes(1);
+            expect(updateTask).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    _id: "task-1",
+                    taskName: "Renamed task"
+                })
+            );
+        });
+
+        it("reverts and skips the mutation on Esc", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Renamed task" } });
+            fireEvent.keyDown(input, { key: "Escape" });
+            expect(updateTask).not.toHaveBeenCalled();
+            // The card title text reverts to the original.
+            expect(screen.getByText("Build task")).toBeInTheDocument();
+            // The Input is unmounted.
+            expect(
+                screen.queryByTestId("task-card-title-input")
+            ).not.toBeInTheDocument();
+        });
+
+        it("commits on blur (Linear convention) when the value actually changed", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "Blurred name" } });
+            fireEvent.blur(input);
+            expect(updateTask).toHaveBeenCalledTimes(1);
+            expect(updateTask).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    _id: "task-1",
+                    taskName: "Blurred name"
+                })
+            );
+        });
+
+        it("does not call the mutation when blur fires with an unchanged value", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.blur(input);
+            expect(updateTask).not.toHaveBeenCalled();
+        });
+
+        it("does not call the mutation when the trimmed value is empty (whitespace-only)", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.change(input, { target: { value: "   " } });
+            fireEvent.keyDown(input, { key: "Enter" });
+            expect(updateTask).not.toHaveBeenCalled();
+        });
+
+        it("stops click propagation from the Input so the modal doesn't open underneath", () => {
+            renderColumn();
+            fireEvent.doubleClick(screen.getAllByTestId("task-card-title")[0]);
+            const input = screen.getByTestId("task-card-title-input");
+            fireEvent.click(input);
+            // The card-level open handler is `startEditing` (modal flow,
+            // since `taskPanelRouted` is false in this suite). It must
+            // NOT have fired despite the click landing inside the card.
+            expect(startEditing).not.toHaveBeenCalled();
+        });
+
+        it("does not enter edit mode for mock (optimistic-placeholder) tasks", () => {
+            renderColumn();
+            // The third task in the fixture is the optimistic placeholder
+            // ("Optimistic task" with _id="mock"); its title must remain
+            // a plain non-editable label.
+            const optimisticTitle = screen
+                .getAllByTestId("task-card-title")
+                .find((node) => node.textContent === "Optimistic task");
+            expect(optimisticTitle).toBeTruthy();
+            fireEvent.doubleClick(optimisticTitle!);
+            expect(
+                screen.queryByTestId("task-card-title-input")
+            ).not.toBeInTheDocument();
+        });
+
+        /*
+         * Regression: a real browser fires `click → click → dblclick`
+         * for a double-click. `fireEvent.doubleClick` only synthesises
+         * the trailing `dblclick`, so the previous test suite missed a
+         * production bug where the first `click` of a dblclick sequence
+         * bubbled to TaskCardOuter and opened the modal before the
+         * inline-edit Input could mount. `userEvent.dblClick` simulates
+         * the full sequence, and the timer-deferred open in the card
+         * gives `enterEditing` a window to cancel the pending modal.
+         */
+        it("enters edit mode WITHOUT opening the modal when the user really double-clicks the title", async () => {
+            jest.useFakeTimers();
+            try {
+                const user = userEvent.setup({
+                    advanceTimers: jest.advanceTimersByTime
+                });
+                renderColumn();
+                const title = screen.getAllByTestId("task-card-title")[0];
+                await user.dblClick(title);
+                // The inline-edit Input mounts immediately.
+                expect(
+                    screen.getByTestId("task-card-title-input")
+                ).toBeInTheDocument();
+                // Drain the 250 ms open-timer; if the dblclick failed
+                // to cancel it, the modal handler would fire here.
+                act(() => {
+                    jest.runAllTimers();
+                });
+                expect(startEditing).not.toHaveBeenCalled();
+                expect(openTask).not.toHaveBeenCalled();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("still opens the modal on a plain single click after the timer resolves", async () => {
+            jest.useFakeTimers();
+            try {
+                const user = userEvent.setup({
+                    advanceTimers: jest.advanceTimersByTime
+                });
+                renderColumn();
+                const card = screen.getByRole("button", {
+                    name: /open task build task/i
+                });
+                await user.click(card);
+                // Before the 250 ms window elapses, no modal opens.
+                expect(startEditing).not.toHaveBeenCalled();
+                act(() => {
+                    jest.advanceTimersByTime(250);
+                });
+                expect(startEditing).toHaveBeenCalledTimes(1);
+                expect(startEditing).toHaveBeenCalledWith("task-1");
+            } finally {
+                jest.useRealTimers();
+            }
+        });
     });
 });

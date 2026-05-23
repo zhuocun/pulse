@@ -38,6 +38,7 @@ import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
 import {
@@ -725,9 +726,15 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     );
 
     const promptCharMax = microcopy.ai.characterCounterMax;
-    const promptCharHintText = microcopyString(
-        microcopy.ai.characterCountTemplate
-    )
+    // At the hard cap the textarea's `maxLength` blocks further input;
+    // surface a stronger "limit reached" hint so the user knows to trim
+    // their prompt instead of wondering why typing stopped registering
+    // (Quick win 20). Below the cap the counter stays a quiet "N/max".
+    const atCharLimit = input.length >= promptCharMax;
+    const promptCharHintTemplate = atCharLimit
+        ? microcopy.ai.characterCountAtLimit
+        : microcopy.ai.characterCountTemplate;
+    const promptCharHintText = microcopyString(promptCharHintTemplate)
         .replace("{count}", String(input.length))
         .replace("{max}", String(promptCharMax));
     const promptCharHintWarning = input.length > promptCharMax * 0.9;
@@ -924,41 +931,8 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                         type={healthStatus === "offline" ? "error" : "warning"}
                     />
                 )}
-            <div
-                aria-atomic="true"
-                aria-live="polite"
-                role="status"
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
-                {completionAnnouncement}
-            </div>
-            <div
-                aria-live="polite"
-                role="status"
-                style={{
-                    border: 0,
-                    clip: "rect(0 0 0 0)",
-                    height: 1,
-                    margin: -1,
-                    overflow: "hidden",
-                    padding: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    width: 1
-                }}
-            >
-                {streamingAnnouncement}
-            </div>
+            <SrOnlyLive>{completionAnnouncement}</SrOnlyLive>
+            <SrOnlyLive aria-atomic={false}>{streamingAnnouncement}</SrOnlyLive>
             <div
                 style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}
             >

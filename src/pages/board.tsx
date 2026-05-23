@@ -49,6 +49,7 @@ import {
     space as themeSpace
 } from "../theme/tokens";
 import type { TriageNudge } from "../interfaces/agent";
+import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
@@ -656,13 +657,7 @@ const BoardPage = () => {
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <BoardShell>
-                {boardAiOn && (
-                    <CopilotWelcomeBanner
-                        onCta={() => {
-                            openBriefDrawer();
-                        }}
-                    />
-                )}
+                {boardAiOn && <CopilotWelcomeBanner />}
                 <BoardHeader>
                     <Row
                         between
@@ -904,21 +899,7 @@ const BoardPage = () => {
                         type="error"
                     />
                 ) : null}
-                <span
-                    aria-atomic="true"
-                    aria-live="polite"
-                    style={{
-                        clip: "rect(0 0 0 0)",
-                        height: 1,
-                        overflow: "hidden",
-                        pointerEvents: "none",
-                        position: "absolute",
-                        whiteSpace: "nowrap",
-                        width: 1
-                    }}
-                >
-                    {filterStatusMessage}
-                </span>
+                <SrOnlyLive>{filterStatusMessage}</SrOnlyLive>
                 {!(bLoading || tLoading) ? (
                     (board?.length ?? 0) === 0 && !(bError || tError) ? (
                         <>

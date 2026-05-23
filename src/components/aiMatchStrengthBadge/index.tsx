@@ -1,7 +1,8 @@
-import { Tag, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
+import CopilotChip, { type CopilotChipTone } from "../copilotChip";
 
 /**
  * Per-result match-strength chip (Optimization Plan §3 P1-2).
@@ -16,13 +17,17 @@ import { microcopy } from "../../constants/microcopy";
  *
  * Returns `null` when the strength is unknown (older remote engine,
  * search not active) so consumers can render this unconditionally.
+ *
+ * Pill geometry flows through the shared `<CopilotChip variant="match">`
+ * (Ambition 6 / 2026-05 review §6). Compact mode keeps the historical
+ * 6 px coloured dot — the chip lets the surface customize geometry via
+ * `style` while the shared component still pins font / radius / border.
  */
-const TAG_COLOR: Record<AiSearchMatchStrength, "green" | "orange" | "default"> =
-    {
-        strong: "green",
-        moderate: "orange",
-        weak: "default"
-    };
+const TONE_FOR_STRENGTH: Record<AiSearchMatchStrength, CopilotChipTone> = {
+    strong: "green",
+    moderate: "orange",
+    weak: "default"
+};
 
 interface AiMatchStrengthBadgeProps {
     strength: AiSearchMatchStrength | null;
@@ -44,10 +49,10 @@ const AiMatchStrengthBadge: React.FC<AiMatchStrengthBadgeProps> = ({
         "{strength}",
         label
     );
+    const tone = TONE_FOR_STRENGTH[strength];
     const tag = (
-        <Tag
+        <CopilotChip
             aria-label={ariaLabel}
-            color={TAG_COLOR[strength]}
             /*
              * Compact mode renders an empty visible tag (a coloured dot).
              * Without an explicit role the element is a generic span and
@@ -59,9 +64,8 @@ const AiMatchStrengthBadge: React.FC<AiMatchStrengthBadgeProps> = ({
              * text already conveys it).
              */
             role="img"
-            style={{
-                marginInlineEnd: 0,
-                ...(compact
+            style={
+                compact
                     ? {
                           height: 6,
                           minWidth: 6,
@@ -70,11 +74,13 @@ const AiMatchStrengthBadge: React.FC<AiMatchStrengthBadgeProps> = ({
                           borderRadius: 999,
                           verticalAlign: "middle"
                       }
-                    : {})
-            }}
+                    : undefined
+            }
+            tone={tone}
+            variant="match"
         >
             {compact ? "" : label}
-        </Tag>
+        </CopilotChip>
     );
     if (!compact) return tag;
     // Compact mode only renders a colored dot; keep the band name

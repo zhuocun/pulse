@@ -143,7 +143,10 @@ const zhCN: Dictionary = {
         unlikeProject: "取消收藏 {name}",
         applyReadinessSuggestion: "应用 {field} 的就绪建议",
         lensChips: "看板视图",
-        lensComingSoon: "敬请期待"
+        lensComingSoon: "敬请期待",
+        renameTask: "重命名任务",
+        columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
+        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理"
     },
     dragHints: {
         taskCardKeyboard:
@@ -573,6 +576,7 @@ const zhCN: Dictionary = {
         toolRoundExhausted: "无法完成回答(步骤过多),请换一个更具体的问题。",
         suggestedStoryPoints: "建议故事点",
         estimateTaskNameHint: "请先在上方输入任务名称以获取估算。",
+        estimateConfidenceTooltip: "依据本看板中的相似任务。",
         estimatingPoints: "正在估算故事点",
         suggestedPointsAria: "建议故事点:{points}",
         applyPointsAria: "应用建议的故事点",
@@ -692,6 +696,7 @@ const zhCN: Dictionary = {
         toolDetailsToggle: "显示详情",
         toolDetailsHide: "隐藏详情",
         characterCountTemplate: "{count}/{max}",
+        characterCountAtLimit: "{count}/{max} — 已达字符上限。",
         toolEmptyResult: "空结果",
         toolVerbs: {
             checkedProjects: "已检查项目",
@@ -763,7 +768,15 @@ const zhCN: Dictionary = {
         autonomyLevelAuto: "自动",
         autonomySelectorAriaLabel: "选择 Copilot 自主模式",
         autonomyAutoDisabledTooltip:
-            "自动模式需要支持预批准工具的智能体,将在 v3 提供。"
+            "自动模式需要支持预批准工具的智能体,将在 v3 提供。",
+        columnReadiness: {
+            readyLabel: "已就绪",
+            groomingLabel: "需整理",
+            popoverTitleReady: "已就绪 · {ready}/{total}",
+            popoverTitleGrooming: "需整理 · {ready}/{total}",
+            popoverEmptyReady: "本列中的所有任务都已通过检查。",
+            popoverBlockerListLabel: "仍需完善的任务"
+        }
     },
     auth: {
         loginTitle: "登录账号",

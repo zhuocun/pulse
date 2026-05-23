@@ -1,4 +1,4 @@
-import { Tag, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
@@ -8,6 +8,7 @@ import {
     confidencePercent,
     type ConfidenceBand
 } from "../../utils/ai/confidenceBand";
+import CopilotChip, { type CopilotChipTone } from "../copilotChip";
 
 /**
  * Shared confidence indicator (Optimization Plan §3 P2-1).
@@ -23,6 +24,10 @@ import {
  * band per the AI UX best practices doc: NN/g and PAIR research shows
  * users underweight bare numbers (e.g. "82%") and overweight bare bands
  * ("High"). Showing both lets each audience read what they trust.
+ *
+ * The pill geometry now flows through the shared `<CopilotChip>`
+ * (Ambition 6 / 2026-05 review §6) so the confidence band sits on the
+ * same shape token as every other AI pill.
  */
 interface AiConfidenceIndicatorProps {
     /** Raw 0–1 confidence value, typically from a model. */
@@ -50,19 +55,21 @@ const AiConfidenceIndicator: React.FC<AiConfidenceIndicatorProps> = ({
 }) => {
     const band = confidenceBand(confidence);
     const percent = confidencePercent(confidence);
-    const color = confidenceColor(band);
+    /*
+     * `confidenceColor` returns AntD-named colors ("green" / "orange" /
+     * "red") that line up 1:1 with the shared chip's tone palette, so we
+     * pass the value straight through. Adding a new band only requires a
+     * change in `confidenceBand.ts`.
+     */
+    const tone = confidenceColor(band) as CopilotChipTone;
     const text = compact
         ? BAND_LABEL[band]
         : `${BAND_LABEL[band]} (${percent})`;
     const ariaLabel = `Confidence ${BAND_LABEL[band].toLowerCase()}, ${percent}`;
     const node = (
-        <Tag
-            aria-label={ariaLabel}
-            color={color}
-            style={{ marginInlineEnd: 0 }}
-        >
+        <CopilotChip aria-label={ariaLabel} tone={tone} variant="confidence">
             {text}
-        </Tag>
+        </CopilotChip>
     );
     if (!tooltip) return node;
     return <Tooltip title={tooltip}>{node}</Tooltip>;

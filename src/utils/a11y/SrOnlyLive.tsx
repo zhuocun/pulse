@@ -34,6 +34,11 @@ interface SrOnlyLiveProps {
      * pattern used by `aiTaskAssistPanel`, `boardBriefDrawer`, etc.
      */
     "aria-atomic"?: boolean;
+    /**
+     * Optional DOM id so callers that target this live region via
+     * `aria-controls` / `aria-describedby` keep their wiring intact.
+     */
+    id?: string;
     children?: ReactNode;
 }
 
@@ -41,11 +46,13 @@ const SrOnlyLive = ({
     "aria-live": ariaLive = "polite",
     "aria-atomic": ariaAtomic = true,
     role = "status",
+    id,
     children
 }: SrOnlyLiveProps) => (
     <div
         aria-atomic={ariaAtomic}
         aria-live={ariaLive}
+        id={id}
         role={role}
         style={srOnlyLiveRegionStyle}
     >

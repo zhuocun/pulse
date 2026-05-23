@@ -140,7 +140,11 @@ export const enSource = {
         unlikeProject: "Unlike {name}",
         applyReadinessSuggestion: "Apply readiness suggestion for {field}",
         lensChips: "Board lenses",
-        lensComingSoon: "Coming soon"
+        lensComingSoon: "Coming soon",
+        renameTask: "Rename task",
+        columnReadinessReady: "{ready} of {total} tasks ready",
+        columnReadinessGrooming:
+            "{ready} of {total} tasks ready — needs grooming"
     },
     dragHints: {
         taskCardKeyboard:
@@ -638,6 +642,7 @@ export const enSource = {
             "Could not finish the answer (too many steps). Try a narrower question.",
         suggestedStoryPoints: "Suggested story points",
         estimateTaskNameHint: "Type a task name above to get an estimate.",
+        estimateConfidenceTooltip: "Based on similar tasks on this board.",
         estimatingPoints: "Estimating story points",
         suggestedPointsAria: "Suggested story points: {points}",
         applyPointsAria: "Apply suggested story points",
@@ -770,6 +775,7 @@ export const enSource = {
         toolDetailsToggle: "Show details",
         toolDetailsHide: "Hide details",
         characterCountTemplate: "{count}/{max}",
+        characterCountAtLimit: "{count}/{max} — character limit reached.",
         toolEmptyResult: "empty result",
         toolVerbs: {
             checkedProjects: "Checked projects",
@@ -849,7 +855,22 @@ export const enSource = {
         autonomyLevelAuto: "Auto",
         autonomySelectorAriaLabel: "Select Copilot autonomy mode",
         autonomyAutoDisabledTooltip:
-            "Auto requires an agent that supports preapproved tools. Available in v3."
+            "Auto requires an agent that supports preapproved tools. Available in v3.",
+        /**
+         * Column-readiness pill (Phase 4 W3 — docs/design/_review-2026-05
+         * /04-ai-copilot.md §Ambition 5). The pill summarises the
+         * deterministic readiness engine's verdict for every task in a
+         * column; the popover lists the individual blocker tasks so the
+         * user can jump in and groom them.
+         */
+        columnReadiness: {
+            readyLabel: "Ready to ship",
+            groomingLabel: "Needs grooming",
+            popoverTitleReady: "Ready to ship · {ready}/{total}",
+            popoverTitleGrooming: "Needs grooming · {ready}/{total}",
+            popoverEmptyReady: "Every task in this column passed the check.",
+            popoverBlockerListLabel: "Tasks still needing work"
+        }
     },
     auth: {
         loginTitle: "Log in to your account",
