@@ -25,6 +25,7 @@ import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import Column from "../components/column";
+import CopilotDock, { type CopilotDockTab } from "../components/copilotDock";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
@@ -432,6 +433,35 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
+    // Phase 3 A1 — when `copilotDockEnabled` is on, both legacy overlay
+    // flags collapse into a single dock with `dockActiveTab` deciding
+    // which body is visible. The most recently opened surface wins so
+    // existing trigger callsites (CopilotMenu, palette hand-off, welcome
+    // banner CTA) open the dock on the right tab without bespoke wiring.
+    const [dockActiveTab, setDockActiveTab] = useState<CopilotDockTab>("chat");
+    useEffect(() => {
+        if (!environment.copilotDockEnabled) return;
+        if (chatOpen) setDockActiveTab("chat");
+        else if (briefOpen) setDockActiveTab("brief");
+    }, [chatOpen, briefOpen]);
+    const dockOpen = chatOpen || briefOpen;
+    const closeDock = useCallback(() => {
+        closeChatDrawer();
+        closeBriefDrawer();
+    }, [closeBriefDrawer, closeChatDrawer]);
+    const handleDockTabChange = useCallback(
+        (tab: CopilotDockTab) => {
+            setDockActiveTab(tab);
+            if (tab === "chat") {
+                openChatDrawer();
+                closeBriefDrawer();
+            } else {
+                openBriefDrawer();
+                closeChatDrawer();
+            }
+        },
+        [closeBriefDrawer, closeChatDrawer, openBriefDrawer, openChatDrawer]
+    );
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -913,17 +943,10 @@ const BoardPage = () => {
                 {!environment.taskPanelRouted && (
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
-                {boardAiOn && (
-                    <>
-                        <BoardBriefDrawer
-                            columns={board ?? []}
-                            members={members ?? []}
-                            onClose={closeBriefDrawer}
-                            open={briefOpen}
-                            project={currentProject}
-                            tasks={visibleTasks}
-                        />
-                        <AiChatDrawer
+                {boardAiOn &&
+                    (environment.copilotDockEnabled ? (
+                        <CopilotDock
+                            activeTab={dockActiveTab}
                             columns={board ?? []}
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
@@ -933,13 +956,14 @@ const BoardPage = () => {
                                     ? handleTriageNudgeAction
                                     : undefined
                             }
-                            onClose={closeChatDrawer}
+                            onClose={closeDock}
                             onDismissNudge={
                                 !environment.aiUseLocalEngine
                                     ? handleTriageNudgeDismiss
                                     : undefined
                             }
-                            open={chatOpen}
+                            onTabChange={handleDockTabChange}
+                            open={dockOpen}
                             pendingNudges={
                                 !environment.aiUseLocalEngine
                                     ? triageAgent.nudges
@@ -948,8 +972,43 @@ const BoardPage = () => {
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />
-                    </>
-                )}
+                    ) : (
+                        <>
+                            <BoardBriefDrawer
+                                columns={board ?? []}
+                                members={members ?? []}
+                                onClose={closeBriefDrawer}
+                                open={briefOpen}
+                                project={currentProject}
+                                tasks={visibleTasks}
+                            />
+                            <AiChatDrawer
+                                columns={board ?? []}
+                                initialPrompt={chatInitialPrompt}
+                                knownProjectIds={projectId ? [projectId] : []}
+                                members={members ?? []}
+                                onActionNudge={
+                                    !environment.aiUseLocalEngine
+                                        ? handleTriageNudgeAction
+                                        : undefined
+                                }
+                                onClose={closeChatDrawer}
+                                onDismissNudge={
+                                    !environment.aiUseLocalEngine
+                                        ? handleTriageNudgeDismiss
+                                        : undefined
+                                }
+                                open={chatOpen}
+                                pendingNudges={
+                                    !environment.aiUseLocalEngine
+                                        ? triageAgent.nudges
+                                        : undefined
+                                }
+                                project={currentProject ?? null}
+                                tasks={visibleTasks}
+                            />
+                        </>
+                    ))}
             </BoardShell>
         </DragDropContext>
     );
