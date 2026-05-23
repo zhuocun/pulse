@@ -560,4 +560,101 @@ describe("BoardPage", () => {
             screen.queryByRole("heading", { level: 4 })
         ).not.toBeInTheDocument();
     });
+
+    describe("A7 lenses", () => {
+        it("mounts the lens chip row above the filter rail", async () => {
+            renderBoard();
+
+            expect(
+                await screen.findByText("Roadmap board")
+            ).toBeInTheDocument();
+
+            expect(
+                screen.getByRole("group", { name: /board lenses/i })
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("button", { name: /mine/i })
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("button", { name: /this week/i })
+            ).toBeInTheDocument();
+        });
+
+        it("applies the Mine lens after the filter rail, narrowing to the current user's tasks", async () => {
+            renderBoard("/projects/project-1/board?lens=mine");
+
+            // Wait for the board to render; the seeded user is member-1
+            // (Alice), so only "Build task" (coordinatorId: member-1)
+            // should remain on the board. "Fix bug" belongs to member-2.
+            expect(
+                await screen.findByText("Roadmap board")
+            ).toBeInTheDocument();
+            await waitFor(() => {
+                expect(screen.getByText("Build task")).toBeInTheDocument();
+            });
+            expect(screen.queryByText("Fix bug")).not.toBeInTheDocument();
+
+            // The filter rail's underlying field still shows in the URL —
+            // lens layers on top of (does not replace) the existing rail.
+            expect(screen.getByTestId("current-search")).toHaveTextContent(
+                "lens=mine"
+            );
+        });
+
+        it("layers the lens predicate on top of filter-rail filters (AND semantics)", async () => {
+            // Filter rail narrows to type=Task; lens narrows to mine.
+            // Both must apply.
+            renderBoard("/projects/project-1/board?lens=mine&type=Task");
+
+            expect(
+                await screen.findByText("Roadmap board")
+            ).toBeInTheDocument();
+            // Build task is type=Task AND coordinated by member-1 → visible.
+            expect(screen.getByText("Build task")).toBeInTheDocument();
+            // Fix bug is type=Bug AND coordinated by member-2 → hidden by
+            // both filters.
+            expect(screen.queryByText("Fix bug")).not.toBeInTheDocument();
+        });
+
+        it("graceful-skips the Today lens (no dueDate on ITask yet) — board renders unchanged", async () => {
+            renderBoard("/projects/project-1/board?lens=today");
+
+            expect(
+                await screen.findByText("Roadmap board")
+            ).toBeInTheDocument();
+            // No dueDate → predicate is a no-op → both tasks visible.
+            await waitFor(() => {
+                expect(screen.getByText("Build task")).toBeInTheDocument();
+            });
+            expect(screen.getByText("Fix bug")).toBeInTheDocument();
+        });
+
+        it("toggles the lens via URL when chips are clicked, and clears on re-click", async () => {
+            renderBoard();
+
+            expect(
+                await screen.findByText("Roadmap board")
+            ).toBeInTheDocument();
+
+            const mineChip = screen.getByRole("button", { name: /mine/i });
+            fireEvent.click(mineChip);
+
+            await waitFor(() => {
+                expect(screen.getByTestId("current-search")).toHaveTextContent(
+                    "lens=mine"
+                );
+            });
+            // Board now only renders the current user's task.
+            expect(screen.queryByText("Fix bug")).not.toBeInTheDocument();
+
+            // Re-clicking the active lens clears it back to All.
+            fireEvent.click(screen.getByRole("button", { name: /mine/i }));
+            await waitFor(() => {
+                expect(
+                    screen.getByTestId("current-search")
+                ).not.toHaveTextContent("lens");
+            });
+            expect(screen.getByText("Fix bug")).toBeInTheDocument();
+        });
+    });
 });
