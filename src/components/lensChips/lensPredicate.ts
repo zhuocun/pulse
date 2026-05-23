@@ -8,10 +8,14 @@ import type { LensId } from "./index";
  * that hasn't shipped yet (`dueDate`, AI risk score — Phase 4 roadmap).
  *
  * Predicate semantics:
- *   - `mine`       — task.coordinatorId === currentUserId (functional)
- *   - `today`      — task.dueDate falls on the local "today" (graceful skip)
- *   - `this-week`  — task.dueDate within current ISO week, Mon-Sun (skip)
- *   - `at-risk`    — task.aiRisk === "high" (graceful skip)
+ *   - `mine`       — task.coordinatorId === currentUserId (functional;
+ *                    no-op when current user is unresolved)
+ *   - `today`      — task.dueDate falls on the local-calendar "today",
+ *                    compared as a `YYYY-MM-DD` string in the runtime
+ *                    timezone (graceful-skip until dueDate ships)
+ *   - `this-week`  — task.dueDate within current ISO week, Mon-Sun
+ *                    (graceful-skip)
+ *   - `at-risk`    — task.aiRisk in {"high", "medium"} (graceful skip)
  *
  * The "graceful skip" lenses still appear in the chip row so the spec
  * surfaces; selecting them just returns every task. UX-wise the chip
@@ -27,13 +31,22 @@ type LensTask = Pick<ITask, "coordinatorId"> & {
 };
 
 /**
- * Returns the start of "today" in the runtime timezone. Hoisted so we
- * read `Date.now()` once per predicate build, not once per task.
+ * Returns the "today" anchor in the runtime timezone. We return the
+ * local-calendar `YYYY-MM-DD` string rather than a millisecond timestamp
+ * so the comparison is timezone-agnostic for any input shape.
+ *
+ * Why a date-only string instead of a timestamp window:
+ *   A task with `dueDate: "2026-05-24T00:01:00Z"` viewed by a Pacific
+ *   user at 17:01 local on May 23 used to be excluded (the UTC timestamp
+ *   fell into "tomorrow" in the local-midnight window) even though it's
+ *   still May 23 on the user's wall clock. Comparing date-only strings
+ *   keeps the answer aligned with what the user sees on the calendar.
  */
-const startOfToday = (now: Date): number => {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+const localDateString = (input: Date): string => {
+    const year = input.getFullYear();
+    const month = String(input.getMonth() + 1).padStart(2, "0");
+    const day = String(input.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
 };
 
 /**
@@ -67,20 +80,23 @@ export const buildLensPredicate = ({
     if (!lens) return () => true;
 
     if (lens === "mine") {
-        // Without a signed-in user the lens is a hard "no tasks" — better
-        // to surface nothing than to silently match every task.
-        if (!currentUserId) return () => false;
+        // Without a signed-in user the lens is a no-op (`() => true`)
+        // rather than a hard "show nothing". Auth-refresh / login
+        // propagation can leave `currentUserId` briefly undefined, and
+        // returning `false` there flickered the entire board to empty
+        // (R2-M2). The user data is authoritative when present; until
+        // then, leave the visible task set alone.
+        if (!currentUserId) return () => true;
         return (task) => task.coordinatorId === currentUserId;
     }
 
     if (lens === "today") {
-        const today = startOfToday(now);
-        const tomorrow = today + 24 * 60 * 60 * 1000;
+        const today = localDateString(now);
         return (task) => {
             if (!task.dueDate) return true; // Phase 4 — graceful skip.
-            const ts = new Date(task.dueDate).getTime();
-            if (Number.isNaN(ts)) return true;
-            return ts >= today && ts < tomorrow;
+            const parsed = new Date(task.dueDate);
+            if (Number.isNaN(parsed.getTime())) return true;
+            return localDateString(parsed) === today;
         };
     }
 
@@ -95,7 +111,15 @@ export const buildLensPredicate = ({
     }
 
     if (lens === "at-risk") {
-        return (task) => (task.aiRisk ? task.aiRisk === "high" : true);
+        // Both "high" and "medium" surface — the chip reads "At risk",
+        // which most teams interpret as "any AI flag worth a second
+        // look", not just the most-critical bucket. Narrowing to "high"
+        // (R2-L2) hid the "yellow" tasks teams typically want to triage
+        // alongside the red ones.
+        return (task) =>
+            task.aiRisk
+                ? task.aiRisk === "high" || task.aiRisk === "medium"
+                : true;
     }
 
     return () => true;
