@@ -571,22 +571,21 @@ describe("CopilotDockHost", () => {
         );
 
         // p1's chat hook returns a non-empty messages buffer to simulate
-        // a conversation that's already happened on p1. The post-navigation
-        // mount MUST see a fresh `messages: []` buffer — that's what the
-        // key={projectId} remount on `ProjectScopedDock` produces. Using
-        // `mockReturnValueOnce(p1)` + `mockReturnValue([])` makes the test
-        // a real regression guard: if a future change reverts
-        // `key={projectId}`, the SAME hook instance would keep returning
-        // `messages: p1Messages` even after the navigation, the save
-        // effect would write the stale p1 messages into p2's storage,
-        // and this test would FAIL — which is exactly what we want.
+        // a conversation that's already happened on p1. We keep the
+        // SAME mock return value across the navigation deliberately: if
+        // a future change reverts `key={projectId}` on ProjectScopedDock,
+        // the dock body would NOT remount, the chat hook instance would
+        // keep returning `messages: p1Messages`, and the save effect in
+        // ChatTabBody would write those stale messages into p2's
+        // `copilot_history_p2` storage — exactly the corruption path
+        // this test guards against. The remount fix breaks that chain
+        // because the body unmounts before the save effect can run with
+        // the wrong projectId, so the post-nav assertion stays green.
         const p1Messages = [
             { role: "user" as const, content: "p1 question" },
             { role: "assistant" as const, content: "p1 answer" }
         ];
-        mockedUseAiChat
-            .mockReturnValueOnce(baseAiChat({ messages: p1Messages }))
-            .mockReturnValue(baseAiChat({ messages: [] }));
+        mockedUseAiChat.mockReturnValue(baseAiChat({ messages: p1Messages }));
 
         renderHarness();
 
