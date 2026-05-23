@@ -194,6 +194,24 @@ export const enSource = {
             "Triage proposals, mentions, and AI activity will appear here.",
         heading: "Inbox"
     },
+    /*
+     * Phase 4.7 reports placeholder. The route is a "we hear you"
+     * surface that establishes the URL + nav slot before the metrics
+     * engine lands. Copy intentionally signals "soon, with your input"
+     * rather than vague "coming soon" so users know the team is
+     * listening for feature requests. Keep the description short
+     * (one sentence + one CTA microcopy) so the placeholder doesn't
+     * become its own design surface.
+     */
+    reports: {
+        heading: "Reports",
+        emptyTitle: "Reports are coming soon",
+        emptyDescription:
+            "Velocity, burndown, and other project metrics are on their way. We're listening — let us know what you'd like to see first.",
+        feedbackCta: "Share feedback",
+        feedbackHref:
+            "mailto:feedback@pulse.app?subject=Reports%20feedback&body=Tell%20us%20what%20you%27d%20like%20to%20see%20in%20Reports."
+    },
     copilotLanding: {
         heading: "Copilot",
         subtitle: "Ask a question or open a brief for the current board.",
@@ -210,6 +228,7 @@ export const enSource = {
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
+        reports: "Reports",
         briefShort: "Brief",
         copilotShort: "Copilot",
         askShort: "Ask",
@@ -394,7 +413,8 @@ export const enSource = {
         logoLabel: "Pulse home"
     },
     breadcrumb: {
-        projects: "Projects"
+        projects: "Projects",
+        reports: "Reports"
     },
     board: {
         title: "Board",
@@ -405,6 +425,38 @@ export const enSource = {
         copilotMenuBrief: "Board brief",
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project.",
+        /*
+         * Phase 4.2 — board density toggle. Comfortable is the legacy
+         * spacing rhythm; Compact tightens the card padding ~25–30% so
+         * power users can fit more cards in a column without
+         * scrolling. The aria-label rides on the AntD Segmented so
+         * screen-reader users hear "Board density" before the
+         * selected option name.
+         */
+        densityLabel: "Board density",
+        densityComfortable: "Comfortable",
+        densityCompact: "Compact",
+        /*
+         * Phase 4.2 — saved filter presets on the board. Sit in the
+         * task-search panel as a small dropdown + save action.
+         */
+        presets: {
+            saveAction: "Save filter as preset…",
+            saveAriaLabel: "Save current filter as preset",
+            namePlaceholder: "Preset name",
+            saveConfirm: "Save",
+            saveCancel: "Cancel",
+            loadAriaLabel: "Load saved filter preset",
+            loadPlaceholder: "Saved presets",
+            deleteAriaLabel: "Delete preset {name}",
+            limitReachedTitle: "Preset limit reached",
+            limitReachedBody:
+                "You can save up to {limit} presets. Delete one before saving another.",
+            saved: "Preset saved",
+            applied: "Applied preset {name}",
+            staleValueWarning:
+                "Some values in this preset no longer exist and were skipped."
+        },
         /*
          * Phase 4.6 board minimap (sticky overview strip). Visible
          * label hidden — the minimap is purely visual chrome, the
@@ -484,6 +536,58 @@ export const enSource = {
             dismissLabel: "Dismiss"
         }
     },
+    activityFeed: {
+        // Bell-icon aria-label. One/other plural pair — the consumer
+        // picks the right key off the unread count and interpolates
+        // `{count}`. We intentionally do NOT embed ICU plural syntax
+        // because this codebase has no ICU formatter; a literal
+        // `{count, plural, one {…} other {…}}` would read out to
+        // screen-reader users verbatim.
+        bellAriaLabelZero: "Activity feed, no new notifications",
+        bellAriaLabelOne: "Activity feed, {count} unread notification",
+        bellAriaLabelOther: "Activity feed, {count} unread notifications",
+        drawerTitle: "Activity",
+        drawerCloseLabel: "Close activity drawer",
+        markAllRead: "Mark all as read",
+        markAllReadAriaLabel: "Mark all activity as read",
+        empty: "All quiet. New activity will show up here.",
+        groupToday: "Today",
+        groupYesterday: "Yesterday",
+        groupEarlier: "Earlier",
+        // Date-relative ticker reused from the AI-activity log shape so
+        // the two surfaces speak the same temporal language; this lives
+        // under `activityFeed.relative*` so future tuning is local.
+        relativeJustNow: "just now",
+        relativeOneMinute: "1 min ago",
+        relativeMinutes: "{count} min ago",
+        relativeOneHour: "1 hour ago",
+        relativeHours: "{count} hours ago",
+        relativeOneDay: "1 day ago",
+        relativeDays: "{count} days ago",
+        undo: "Undo",
+        undoAriaLabel: "Undo: {summary}",
+        undoFailedToast: "Couldn't undo: {error}",
+        kindLabels: {
+            task: "Task",
+            column: "Column",
+            project: "Project",
+            ai: "AI"
+        },
+        descriptions: {
+            taskCreated: "Created task “{name}”",
+            taskUpdated: "Updated task “{name}”",
+            taskDeleted: "Deleted task “{name}”",
+            taskRenamed: "Renamed task to “{name}”",
+            taskMoved: "Moved task “{name}”",
+            columnCreated: "Created column “{name}”",
+            columnUpdated: "Updated column “{name}”",
+            columnDeleted: "Deleted column “{name}”",
+            columnRenamed: "Renamed column to “{name}”",
+            projectCreated: "Created project “{name}”",
+            projectUpdated: "Updated project “{name}”",
+            projectDeleted: "Deleted project “{name}”"
+        }
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",
@@ -550,7 +654,15 @@ export const enSource = {
         inbox: "Inbox",
         copilot: "Copilot",
         settings: "Settings",
-        share: "Share to Pulse"
+        share: "Share to Pulse",
+        /*
+         * Phase 4.7: project reports landing. The template gets the
+         * project name interpolated in at the page level — see
+         * `pages/reports.tsx`. The bare "Reports" form is the fallback
+         * before the project query resolves.
+         */
+        reports: "Reports",
+        reportsWithProject: "Reports · {project}"
     },
     empty: {
         projects: {
@@ -576,6 +688,9 @@ export const enSource = {
         filteredColumn: {
             title: "No tasks match the current filters",
             cta: "Reset filters"
+        },
+        savedPresets: {
+            empty: "No saved presets yet."
         },
         commandPalette: {
             loading: "Loading…",

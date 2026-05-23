@@ -51,6 +51,36 @@ describe("CopilotPrivacyPopover", () => {
             screen.getByText(microcopy.ai.localProcessingDisclosure)
         ).toBeInTheDocument();
     });
+
+    /*
+     * Lane M follow-up (PR #309 review): the ghost-text surface used
+     * to fall back to the generic global disclosure copy because
+     * `task-note` wasn't a key in `AI_DATA_SCOPES`. Now that
+     * `aiDataScope` carries a dedicated entry, asserting the
+     * route-specific summary appears confirms the wiring is complete.
+     */
+    it("renders the task-note specific scope copy when route=task-note", () => {
+        render(<CopilotPrivacyPopover route="task-note" />);
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.ai.privacyLink })
+        );
+        // The summary is the load-bearing contract — it's the first
+        // line a user reads when the popover opens and it varies by
+        // surface. A regression that drops the `task-note` scope
+        // entry would surface the generic privacy disclosure here.
+        expect(
+            screen.getByText(/Ghost-text completions use the task/i)
+        ).toBeInTheDocument();
+        // The bullet list also has to call out the ghost-text-only
+        // fields (column, task name + type, in-progress note text)
+        // so the user can see exactly what the engine reads.
+        expect(
+            screen.getByText(/The column you're editing in/i)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/The in-progress note text/i)
+        ).toBeInTheDocument();
+    });
 });
 
 describe("CopilotPrivacyDisclosure", () => {

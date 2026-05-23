@@ -1,6 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 
 import ColumnCreator from ".";
 
@@ -20,16 +30,18 @@ const renderCreator = () => {
     });
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={<ColumnCreator />}
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<ColumnCreator />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
@@ -46,10 +58,21 @@ describe("ColumnCreator", () => {
                 projectId: "project-1"
             })
         );
+        // Clear the activity feed so the Phase 4.3 integration
+        // assertion below reads a deterministic event list.
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
     });
 
     afterAll(() => {
         fetchMock.mockRestore();
+    });
+
+    afterEach(() => {
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+        });
     });
 
     const expandIntoInput = async () => {
@@ -204,6 +227,34 @@ describe("ColumnCreator", () => {
 
         expect(heights.length).toBeGreaterThan(0);
         expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+    });
+
+    /*
+     * Phase 4.3 — integration assertion. The column-create flow
+     * must surface a corresponding row in the activity feed (the
+     * bell-icon source of truth). The assertion reads Redux
+     * directly so it's independent of any particular drawer-UI
+     * affordance.
+     */
+    it("records an activity-feed event when a column is created (Phase 4.3 integration)", async () => {
+        renderCreator();
+        const input = await expandIntoInput();
+
+        fireEvent.change(input, { target: { value: "QA" } });
+        fireEvent.keyDown(input, {
+            charCode: 13,
+            code: "Enter",
+            key: "Enter"
+        });
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("column");
+            expect(events[0].action).toBe("create");
+            expect(events[0].summary).toContain("QA");
+        });
     });
 
     it("does not submit a named column just because the input blurs", async () => {

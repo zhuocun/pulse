@@ -5,7 +5,7 @@ import type { InputRef } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
     breakpoints,
     fontWeight,
@@ -13,8 +13,10 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
+import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 
 const Slot = styled.div`
     align-self: flex-start;
@@ -80,12 +82,24 @@ const ColumnCreator: React.FC = () => {
     const [editing, setEditing] = useState(false);
     const inputRef = useRef<InputRef>(null);
     const { projectId } = useParams<{ projectId: string }>();
-    const { mutateAsync, isLoading } = useReactMutation(
+    const { mutateAsync, isLoading } = useReactMutation<IColumn>(
         "boards",
         "POST",
         ["boards", { projectId }],
         newColumnCallback
     );
+    // Companion DELETE mutation used purely as the undo closure for
+    // the activity-feed Undo button. Fire-and-forget — errors are
+    // swallowed because the auto-revert toast would surface on top of
+    // the user's deliberate Undo gesture.
+    const { mutateAsync: undoCreate } = useReactMutation(
+        "boards",
+        "DELETE",
+        ["boards", { projectId }],
+        deleteColumnCallback,
+        () => {}
+    );
+    const { record: recordActivity } = useActivityFeed();
 
     const collapse = useCallback(() => {
         setEditing(false);
@@ -99,8 +113,28 @@ const ColumnCreator: React.FC = () => {
             return;
         }
         setColumnName("");
-        await mutateAsync({ columnName: trimmed, projectId });
+        const created = await mutateAsync({
+            columnName: trimmed,
+            projectId
+        });
         setEditing(false);
+        // Phase 4.3 — record column create into the activity feed.
+        // The 10s-window Undo closure DELETEs the just-created column
+        // by id; we bail out if the response is missing an id so a
+        // malformed payload doesn't render a broken Undo button.
+        const createdId = created?._id;
+        recordActivity({
+            kind: "column",
+            action: "create",
+            summary: microcopyString(
+                microcopy.activityFeed.descriptions.columnCreated
+            ).replace("{name}", trimmed),
+            undo: createdId
+                ? () => {
+                      void undoCreate({ columnId: createdId });
+                  }
+                : undefined
+        });
     };
 
     useEffect(() => {

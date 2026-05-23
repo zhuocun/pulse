@@ -1,6 +1,23 @@
 import type { AiRoute } from "../hooks/useAi";
 
 /**
+ * Surfaces outside `useAi`'s route union (chat is served by the agent
+ * client, ghost text is served by the local engine in `utils/ai/engine`).
+ * Listed alongside `AiRoute` here so the privacy popover / one-shot
+ * disclosure can present a route-specific scope for every Copilot
+ * surface in the app, not just the structured AI routes.
+ *
+ *   - `chat`      — Board Copilot chat drawer.
+ *   - `task-note` — inline ghost-text completions on task-note
+ *                   textareas (Wave 3 Ambition 2). Local-engine-only
+ *                   at the moment; the scope still lists the fields
+ *                   the engine reads so the disclosure copy is
+ *                   accurate if the surface ever flips to a remote
+ *                   round-trip.
+ */
+export type AiNonRoute = "chat" | "task-note";
+
+/**
  * Per-route AI data scope (Optimization Plan §3 P0-1).
  *
  * The privacy popover shows users *exactly* which board fields a given AI
@@ -28,7 +45,7 @@ const TASK_NOTE_LINE = "Task notes (free-text descriptions)";
  * Static scope table. Routes that share fields keep separate entries so the
  * popover can be precise instead of saying "the same as everywhere else".
  */
-export const AI_DATA_SCOPES: Record<AiRoute | "chat", AiDataScope> = {
+export const AI_DATA_SCOPES: Record<AiRoute | AiNonRoute, AiDataScope> = {
     "task-draft": {
         summary: "Drafting a task uses your prompt plus the current board.",
         items: [
@@ -95,10 +112,35 @@ export const AI_DATA_SCOPES: Record<AiRoute | "chat", AiDataScope> = {
             "Any task you ask Copilot to open by id (including its notes)"
         ],
         sendsNotes: true
+    },
+    "task-note": {
+        /*
+         * Phase 4.6 Lane M follow-up (PR #309 review): the ghost-text
+         * surface previously fell back to the generic disclosure copy
+         * because `task-note` wasn't a known scope key. Surface a
+         * dedicated entry that lists only the fields the local
+         * `noteCompletion` engine actually reads — the column you're
+         * editing in, the task's name + type, and the in-progress
+         * text. The engine is local-only today (no remote round-trip),
+         * so the scope intentionally omits project / member context
+         * that other AI routes need. `sendsNotes: true` because the
+         * partially-typed note is itself the input the engine
+         * completes from; if the surface ever flips to a remote
+         * engine, the existing `sanitizeRemotePayloadForRoute` walker
+         * will pick this scope up automatically.
+         */
+        summary:
+            "Ghost-text completions use the task you're editing and your in-progress note.",
+        items: [
+            "The column you're editing in",
+            "The task's name and type (Task or Bug)",
+            "The in-progress note text you have typed so far"
+        ],
+        sendsNotes: true
     }
 } as const;
 
-export const getAiDataScope = (route: AiRoute | "chat"): AiDataScope => {
+export const getAiDataScope = (route: AiRoute | AiNonRoute): AiDataScope => {
     return AI_DATA_SCOPES[route];
 };
 
@@ -118,7 +160,7 @@ const stripTaskNotes = <T extends AnyTask>(tasks: readonly T[]): T[] =>
 export const sanitizeRemotePayloadForRoute = <
     P extends Record<string, unknown>
 >(
-    route: AiRoute | "chat",
+    route: AiRoute | AiNonRoute,
     payload: P
 ): P => {
     const scope = AI_DATA_SCOPES[route];

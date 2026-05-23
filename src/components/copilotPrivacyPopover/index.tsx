@@ -7,6 +7,7 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { getAiDataScope } from "../../utils/ai/aiDataScope";
+import type { AiNonRoute } from "../../utils/ai/aiDataScope";
 import type { AiRoute } from "../../utils/hooks/useAi";
 
 /**
@@ -90,7 +91,7 @@ interface CopilotPrivacyPopoverProps {
      * scope. `chat` is treated as a route here even though it's served by a
      * different hook. Omit for global affordances like the header link.
      */
-    route?: AiRoute | "chat";
+    route?: AiRoute | AiNonRoute;
 }
 
 const CopilotPrivacyPopover: React.FC<CopilotPrivacyPopoverProps> = ({
@@ -178,12 +179,12 @@ interface CopilotPrivacyDisclosureProps {
     storageKey?: string;
     onAcknowledge?: () => void;
     /** Route-aware scope, see {@link CopilotPrivacyPopover}. */
-    route?: AiRoute | "chat";
+    route?: AiRoute | AiNonRoute;
 }
 
 const LEGACY_GLOBAL_KEY = "boardCopilot:privacyShown";
 
-const buildDefaultStorageKey = (route?: AiRoute | "chat"): string =>
+const buildDefaultStorageKey = (route?: AiRoute | AiNonRoute): string =>
     route ? `boardCopilot:privacyShown:${route}` : LEGACY_GLOBAL_KEY;
 
 /**

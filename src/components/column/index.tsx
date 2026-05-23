@@ -34,6 +34,7 @@ import {
     zIndex
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
+import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -63,7 +64,45 @@ const formatTemplate = (
         template
     );
 
+/**
+ * Phase 4.2 — density-driven CSS custom properties. The column reads
+ * the user's preference from Redux via `useBoardDensity()` and writes
+ * `data-density` on the container; the variables below cascade into
+ * every styled-component child without us having to re-thread the
+ * density value through props. Comfortable values mirror the legacy
+ * tokens (8 / 12 / 16 / 14 px) so the default UI is byte-identical.
+ *
+ * Density deltas vs. comfortable (legacy) baseline:
+ *   - --density-card-padding-y     12 → 8  (−33%)
+ *   - --density-card-padding-x     16 → 12 (−25%)
+ *   - --density-card-gap            8 → 4  (−50%)
+ *   - --density-card-title-mb       8 → 4  (−50%)
+ *   - --density-card-title-fs       14 → 13 (−7%)
+ *   - --density-card-footer-fs      12 → 11 (−8%)
+ *
+ * Tightening padding ~25–30% (the brief), title margin & inter-card gap
+ * by 50%, and trimming the title down a step gives ~3 more cards per
+ * 720 px-tall column without compromising hit targets (the click target
+ * is still a 44+px button thanks to the 8 px top/bottom + line-height
+ * 1.4 of the title).
+ */
 export const ColumnContainer = styled.div`
+    --density-card-padding-y: ${space.sm}px;
+    --density-card-padding-x: ${space.md}px;
+    --density-card-gap: ${space.xs}px;
+    --density-card-title-mb: ${space.xs}px;
+    --density-card-title-fs: ${fontSize.base}px;
+    --density-card-footer-fs: ${fontSize.xs}px;
+
+    &[data-density="compact"] {
+        --density-card-padding-y: ${space.xs}px;
+        --density-card-padding-x: ${space.sm}px;
+        --density-card-gap: ${space.xxs}px;
+        --density-card-title-mb: ${space.xxs}px;
+        --density-card-title-fs: ${fontSize.sm}px;
+        --density-card-footer-fs: 11px;
+    }
+
     background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
     border: 1px solid transparent;
     border-radius: ${radius.lg}px;
@@ -132,7 +171,8 @@ const TaskContainer = styled.div`
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: ${space.xs}px;
+    /* Density: var falls back to the legacy 8 px (space.xs) rhythm. */
+    gap: var(--density-card-gap, ${space.xs}px);
     overflow-y: auto;
     padding-bottom: ${space.xs}px;
 
@@ -224,7 +264,13 @@ const TaskCardOuter = styled.button`
     box-shadow: ${shadow.xs};
     cursor: pointer;
     display: block;
-    padding: ${space.sm}px ${space.md}px;
+    /* Density-driven padding. Comfortable resolves the var to the
+     * legacy 12 / 16 px (space.sm / space.md) rhythm; compact tightens
+     * to 8 / 12 px (~33% / 25% reduction). The fallback after the
+     * comma keeps a card rendered outside the ColumnContainer (e.g.
+     * the storybook in column-dnd.test) looking like before. */
+    padding: var(--density-card-padding-y, ${space.sm}px)
+        var(--density-card-padding-x, ${space.md}px);
     text-align: left;
     transition:
         border-color 120ms ease-out,
@@ -277,10 +323,12 @@ const TaskCardOuter = styled.button`
 const CardTitle = styled.div`
     color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
     display: -webkit-box;
-    font-size: ${fontSize.base}px;
+    /* Density-driven title size — comfortable resolves to 14 px
+     * (legacy), compact to 13 px (fontSize.sm). */
+    font-size: var(--density-card-title-fs, ${fontSize.base}px);
     font-weight: ${fontWeight.medium};
     line-height: 1.4;
-    margin-bottom: ${space.xs}px;
+    margin-bottom: var(--density-card-title-mb, ${space.xs}px);
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -296,7 +344,8 @@ const CardFooter = styled.div`
     align-items: center;
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
     display: flex;
-    font-size: ${fontSize.xs}px;
+    /* Density: 12 px (comfortable) / 11 px (compact). */
+    font-size: var(--density-card-footer-fs, ${fontSize.xs}px);
     gap: ${space.xs}px;
     justify-content: space-between;
 `;
@@ -950,6 +999,17 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             ? openViaPanel
             : openViaModal;
         const columnDragHandleProps = useDetachedDragHandleProps();
+        /*
+         * Phase 4.2 — apply the user's board-density preference as a
+         * `data-density` data-attr on `ColumnContainer`. The styled
+         * component above writes the density-aware CSS custom
+         * properties under `&[data-density="compact"]`; reading the
+         * hook here lets the CSS cascade do the rest without
+         * threading the value through every styled child. The hook
+         * subscribes to Redux so a toggle in `taskSearchPanel`
+         * re-renders every column in lockstep.
+         */
+        const { density } = useBoardDensity();
         const filteredTasks = tasks.filter(
             (task) =>
                 (!param.type || task.type === param.type) &&
@@ -979,7 +1039,7 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             enabled: environment.aiColumnReadinessEnabled
         });
         return (
-            <ColumnContainer {...props} ref={ref}>
+            <ColumnContainer data-density={density} {...props} ref={ref}>
                 {/*
                  * Phase 4.6 — the ColumnHeader is now rendered *inside*
                  * TaskContainer so its `position: sticky` pins against

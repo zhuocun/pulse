@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { Button, message, Modal, Select } from "antd";
 import { useCallback, useMemo, useState } from "react";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
 import {
     breakpoints,
@@ -12,6 +12,7 @@ import {
     letterSpacing,
     space
 } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAuth from "../../utils/hooks/useAuth";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -173,6 +174,18 @@ const ProjectList: React.FC<Props> = ({
         // outcome of the explicit confirm-to-delete.
         () => {}
     );
+    // Companion POST mutation used purely as the undo closure for
+    // the activity-feed Undo button. Re-creates the deleted project
+    // with the captured before-state so the user can recover from an
+    // accidental delete. Fire-and-forget — errors are swallowed.
+    const { mutateAsync: undoDelete } = useReactMutation(
+        "projects",
+        "POST",
+        ["projects"],
+        undefined,
+        () => {}
+    );
+    const { record: recordActivity } = useActivityFeed();
     const { startEditing, openModal } = useProjectModal();
 
     const sortedProjects = useMemo(
@@ -198,6 +211,14 @@ const ProjectList: React.FC<Props> = ({
     );
 
     const onDelete = (projectId: string) => {
+        // Capture the full project payload BEFORE removal so the
+        // activity-feed undo closure can POST it back if the user
+        // changes their mind. After the mutation the dataSource has
+        // been pruned and the lookup would return undefined.
+        const beforeState = dataSource?.find(
+            (project) => project._id === projectId
+        );
+        const projectName = beforeState?.projectName ?? "";
         Modal.confirm({
             centered: true,
             okText: microcopy.confirm.deleteProject.confirmLabel,
@@ -209,8 +230,34 @@ const ProjectList: React.FC<Props> = ({
                 remove(
                     { projectId },
                     {
-                        onSuccess: () =>
-                            message.success(microcopy.feedback.projectDeleted),
+                        onSuccess: () => {
+                            message.success(microcopy.feedback.projectDeleted);
+                            // Phase 4.3 — record the delete into the
+                            // activity feed only after the server
+                            // confirms the deletion, so a 5xx leaves
+                            // the feed clean. The 10s-window Undo
+                            // closure re-POSTs the captured project so
+                            // the user can recover from an accidental
+                            // delete.
+                            recordActivity({
+                                kind: "project",
+                                action: "delete",
+                                summary: microcopyString(
+                                    microcopy.activityFeed.descriptions
+                                        .projectDeleted
+                                ).replace("{name}", projectName),
+                                undo: beforeState
+                                    ? () => {
+                                          void undoDelete(
+                                              beforeState as unknown as Record<
+                                                  string,
+                                                  unknown
+                                              >
+                                          );
+                                      }
+                                    : undefined
+                            });
+                        },
                         onError: () =>
                             message.error(microcopy.feedback.saveFailed)
                     }

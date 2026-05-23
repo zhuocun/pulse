@@ -1,11 +1,14 @@
+import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Modal } from "antd";
 import type { ReactNode } from "react";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
+import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -173,12 +176,33 @@ const startEditing = jest.fn();
 const openTask = jest.fn();
 const closeTask = jest.fn();
 
+/**
+ * Phase 4.2 — the column now reads its density from the Redux
+ * `userPreferences` slice via `useBoardDensity()`, so the test render
+ * helper wraps the tree in a fresh store per render. We don't reuse the
+ * app-level singleton because `beforeEach` already runs between tests
+ * but the singleton persists user-preferences across tests, which would
+ * leak compact-density across suites. A throwaway store keyed off the
+ * slice's reducer keeps each test isolated.
+ */
+const makeTestStore = (density: "comfortable" | "compact" = "comfortable") =>
+    configureStore({
+        reducer: { userPreferences: userPreferencesSlice.reducer },
+        preloadedState: {
+            userPreferences: {
+                boardDensity: density,
+                savedFilterPresets: []
+            }
+        }
+    });
+
 const renderColumn = ({
     boardColumn = column(),
     isDragDisabled = false,
     taskDragDisabled,
     boardAiOn = true,
     param = defaultParam,
+    boardDensity = "comfortable",
     tasks = [
         task(),
         task({
@@ -199,6 +223,7 @@ const renderColumn = ({
     param?: TaskSearchParam;
     tasks?: ITask[];
     boardAiOn?: boolean;
+    boardDensity?: "comfortable" | "compact";
 } = {}) => {
     // The component calls `useReactMutation` twice: once for the column
     // delete (endpoint="boards") and once for the task rename
@@ -213,23 +238,25 @@ const renderColumn = ({
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
 
     return render(
-        <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-            <Routes>
-                <Route
-                    path="/projects/:projectId/board"
-                    element={
-                        <Column
-                            boardAiOn={boardAiOn}
-                            column={boardColumn}
-                            isDragDisabled={isDragDisabled}
-                            param={param}
-                            taskDragDisabled={taskDragDisabled}
-                            tasks={tasks}
-                        />
-                    }
-                />
-            </Routes>
-        </MemoryRouter>
+        <Provider store={makeTestStore(boardDensity)}>
+            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={
+                            <Column
+                                boardAiOn={boardAiOn}
+                                column={boardColumn}
+                                isDragDisabled={isDragDisabled}
+                                param={param}
+                                taskDragDisabled={taskDragDisabled}
+                                tasks={tasks}
+                            />
+                        }
+                    />
+                </Routes>
+            </MemoryRouter>
+        </Provider>
     );
 };
 
@@ -499,25 +526,27 @@ describe("Column", () => {
         mockedUseTaskModal.mockReturnValue({ startEditing });
 
         render(
-            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <Column
-                                column={column()}
-                                isDragDisabled={false}
-                                onResetFilters={onResetFilters}
-                                param={{
-                                    ...defaultParam,
-                                    taskName: "no-such-task"
-                                }}
-                                tasks={[task()]}
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
+            <Provider store={makeTestStore()}>
+                <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <Column
+                                    column={column()}
+                                    isDragDisabled={false}
+                                    onResetFilters={onResetFilters}
+                                    param={{
+                                        ...defaultParam,
+                                        taskName: "no-such-task"
+                                    }}
+                                    tasks={[task()]}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </Provider>
         );
 
         const resetBtn = screen.getByRole("button", {
@@ -811,6 +840,36 @@ describe("Column", () => {
             } finally {
                 jest.useRealTimers();
             }
+        });
+    });
+
+    /*
+     * Phase 4.2 — Board density toggle. The column reads its density
+     * from the Redux `userPreferences` slice via `useBoardDensity()` and
+     * writes `data-density` on `ColumnContainer`. Comfortable resolves
+     * the density CSS vars to their legacy values; compact tightens
+     * card padding, gap, and title size (see `index.tsx` for the deltas).
+     */
+    describe("board density (Phase 4.2)", () => {
+        it('renders with data-density="comfortable" by default', () => {
+            const { container } = renderColumn();
+            const columnContainer = container.querySelector(
+                "[data-density]"
+            ) as HTMLElement | null;
+            expect(columnContainer).not.toBeNull();
+            expect(columnContainer).toHaveAttribute(
+                "data-density",
+                "comfortable"
+            );
+        });
+
+        it('renders with data-density="compact" when the slice is in compact mode', () => {
+            const { container } = renderColumn({ boardDensity: "compact" });
+            const columnContainer = container.querySelector(
+                "[data-density]"
+            ) as HTMLElement | null;
+            expect(columnContainer).not.toBeNull();
+            expect(columnContainer).toHaveAttribute("data-density", "compact");
         });
     });
 });

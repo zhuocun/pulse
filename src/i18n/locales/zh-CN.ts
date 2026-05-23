@@ -159,6 +159,7 @@ const zhCN: Dictionary = {
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
+        reports: "报告",
         briefShort: "简报",
         copilotShort: "Copilot",
         askShort: "提问",
@@ -192,6 +193,21 @@ const zhCN: Dictionary = {
         emptyTitle: "收件箱为空",
         emptyDescription: "整理提议、提及和 AI 活动将显示在此处。",
         heading: "收件箱"
+    },
+    /*
+     * Phase 4.7 报告占位页面。该路由是「我们听到了」的页面,
+     * 在指标引擎上线之前先建立 URL 和导航位。文案有意传达
+     * 「即将到来,期待您的反馈」而非含糊的「即将推出」,
+     * 让用户知道团队正在倾听功能请求。
+     */
+    reports: {
+        heading: "报告",
+        emptyTitle: "报告功能即将推出",
+        emptyDescription:
+            "速度图、燃尽图等项目指标即将到来。我们正在倾听 — 告诉我们您最想看到什么。",
+        feedbackCta: "分享反馈",
+        feedbackHref:
+            "mailto:feedback@pulse.app?subject=Reports%20feedback&body=Tell%20us%20what%20you%27d%20like%20to%20see%20in%20Reports."
     },
     copilotLanding: {
         heading: "Copilot",
@@ -366,7 +382,8 @@ const zhCN: Dictionary = {
         logoLabel: "Pulse 首页"
     },
     breadcrumb: {
-        projects: "项目"
+        projects: "项目",
+        reports: "报告"
     },
     board: {
         title: "看板",
@@ -377,6 +394,25 @@ const zhCN: Dictionary = {
         copilotMenuBrief: "看板简报",
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。",
+        densityLabel: "看板密度",
+        densityComfortable: "宽松",
+        densityCompact: "紧凑",
+        presets: {
+            saveAction: "保存当前筛选为预设…",
+            saveAriaLabel: "保存当前筛选为预设",
+            namePlaceholder: "预设名称",
+            saveConfirm: "保存",
+            saveCancel: "取消",
+            loadAriaLabel: "加载已保存的筛选预设",
+            loadPlaceholder: "已保存的预设",
+            deleteAriaLabel: "删除预设 {name}",
+            limitReachedTitle: "已达到预设上限",
+            limitReachedBody:
+                "最多可保存 {limit} 个预设。请先删除一个再保存新预设。",
+            saved: "预设已保存",
+            applied: "已应用预设 {name}",
+            staleValueWarning: "此预设中部分值已不存在,已跳过。"
+        },
         minimap: {
             aria: "看板缩略图",
             segmentAriaOne: "{name} 列,1 个任务,当前{status}",
@@ -422,6 +458,49 @@ const zhCN: Dictionary = {
             sectionLabel: "整理提醒",
             actionLabel: "打开任务",
             dismissLabel: "忽略"
+        }
+    },
+    activityFeed: {
+        bellAriaLabelZero: "活动通知,暂无新通知",
+        bellAriaLabelOne: "活动通知,{count} 条未读",
+        bellAriaLabelOther: "活动通知,{count} 条未读",
+        drawerTitle: "活动",
+        drawerCloseLabel: "关闭活动抽屉",
+        markAllRead: "全部标记为已读",
+        markAllReadAriaLabel: "将所有活动标记为已读",
+        empty: "目前没有新的动态。这里会显示新发生的活动。",
+        groupToday: "今天",
+        groupYesterday: "昨天",
+        groupEarlier: "更早",
+        relativeJustNow: "刚刚",
+        relativeOneMinute: "1 分钟前",
+        relativeMinutes: "{count} 分钟前",
+        relativeOneHour: "1 小时前",
+        relativeHours: "{count} 小时前",
+        relativeOneDay: "1 天前",
+        relativeDays: "{count} 天前",
+        undo: "撤销",
+        undoAriaLabel: "撤销:{summary}",
+        undoFailedToast: "无法撤销:{error}",
+        kindLabels: {
+            task: "任务",
+            column: "列",
+            project: "项目",
+            ai: "AI"
+        },
+        descriptions: {
+            taskCreated: "已创建任务 “{name}”",
+            taskUpdated: "已更新任务 “{name}”",
+            taskDeleted: "已删除任务 “{name}”",
+            taskRenamed: "任务已重命名为 “{name}”",
+            taskMoved: "已移动任务 “{name}”",
+            columnCreated: "已创建列 “{name}”",
+            columnUpdated: "已更新列 “{name}”",
+            columnDeleted: "已删除列 “{name}”",
+            columnRenamed: "列已重命名为 “{name}”",
+            projectCreated: "已创建项目 “{name}”",
+            projectUpdated: "已更新项目 “{name}”",
+            projectDeleted: "已删除项目 “{name}”"
         }
     },
     aiActivityLog: {
@@ -479,7 +558,13 @@ const zhCN: Dictionary = {
         inbox: "收件箱",
         copilot: "Copilot",
         settings: "设置",
-        share: "分享到 Pulse"
+        share: "分享到 Pulse",
+        /*
+         * Phase 4.7: 项目报告着陆页。项目名称在页面层级插入 ——
+         * 详见 `pages/reports.tsx`。在项目查询完成前回退到无名版本。
+         */
+        reports: "报告",
+        reportsWithProject: "报告 · {project}"
     },
     empty: {
         projects: {
@@ -504,6 +589,9 @@ const zhCN: Dictionary = {
         filteredColumn: {
             title: "没有任务匹配当前筛选条件",
             cta: "重置筛选"
+        },
+        savedPresets: {
+            empty: "暂无已保存的预设。"
         },
         commandPalette: {
             loading: "加载中…",

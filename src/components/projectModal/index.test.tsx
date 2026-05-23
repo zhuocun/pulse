@@ -12,7 +12,10 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
 import zhCN from "../../i18n/locales/zh-CN";
 import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
+import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
 import { projectActions } from "../../store/reducers/projectModalSlice";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 
 import ProjectModal from ".";
 
@@ -151,6 +154,12 @@ describe("ProjectModal", () => {
 
     beforeEach(() => {
         store.dispatch(projectActions.closeModal());
+        // Clear both slices so cross-test pollution from earlier
+        // suites doesn't pre-populate the activity feed.
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+            store.dispatch(aiLedgerActions.clearAiLedger());
+        });
         fetchMock.mockReset();
         fetchMock.mockImplementation((input, init) => {
             const url = String(input);
@@ -187,6 +196,10 @@ describe("ProjectModal", () => {
 
     afterEach(() => {
         setActiveLocale(DEFAULT_LOCALE);
+        act(() => {
+            store.dispatch(activityFeedActions.clearActivityFeed());
+            store.dispatch(aiLedgerActions.clearAiLedger());
+        });
     });
 
     it("opens with the Create title and an empty form even when the project list cache is populated", async () => {
@@ -516,5 +529,73 @@ describe("ProjectModal", () => {
         expect(store.getState().projectModal.editingProjectId).toBe(
             "project-1"
         );
+    });
+
+    /*
+     * Phase 4.3 — undo closure test. The brief required each
+     * update site to register a fire-and-forget undo on the
+     * activity feed so the 10s-window Undo button in the drawer
+     * reverses the action. For project update the closure PUTs
+     * the captured before-state; this test triggers the closure
+     * through the public `undo(id)` surface and asserts the PUT
+     * lands with the original organization.
+     */
+    it("registers an undo closure that PUTs the project before-state", async () => {
+        renderProjectModal({ type: "edit", id: "project-1" });
+
+        expect(
+            await screen.findByRole("dialog", { name: "Edit project" })
+        ).toBeInTheDocument();
+        await act(async () => {
+            fireEvent.change(screen.getByDisplayValue("Product"), {
+                target: { value: "Platform" }
+            });
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        });
+
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("project");
+            expect(events[0].action).toBe("update");
+            expect(events[0].undoable).toBe(true);
+        });
+
+        // Drive the activity-feed undo from a probe that uses the
+        // same Provider, so the module-scope closure Map is
+        // reachable (mirrors the pattern in
+        // `useActivityFeed.test.tsx`).
+        let capturedUndo: ((id: string) => Promise<void>) | null = null;
+        const UndoProbe: React.FC = () => {
+            const api = useActivityFeed();
+            capturedUndo = api.undo;
+            return null;
+        };
+        render(
+            <Provider store={store}>
+                <UndoProbe />
+            </Provider>
+        );
+        const eventId = store.getState().activityFeed.events[0].id;
+        await act(async () => {
+            await capturedUndo!(eventId);
+        });
+
+        // After undo, a second PUT should have been issued with the
+        // original "Product" organization restored from before-state.
+        await waitFor(() => {
+            const putCalls = fetchMock.mock.calls.filter(
+                ([, init]) =>
+                    String(
+                        (init as RequestInit | undefined)?.method
+                    ).toUpperCase() === "PUT"
+            );
+            expect(putCalls.length).toBeGreaterThanOrEqual(2);
+            const lastPut = putCalls.at(-1)!;
+            const body = JSON.parse((lastPut[1] as RequestInit).body as string);
+            expect(body.organization).toBe("Product");
+        });
     });
 });

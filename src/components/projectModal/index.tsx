@@ -2,11 +2,13 @@ import { Form, Grid, Input, Modal, Select, Spin, Typography } from "antd";
 import { useForm } from "antd/lib/form/Form";
 import { useEffect, useState } from "react";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, lineHeight, modalWidthCss, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import deleteProjectCallback from "../../utils/optimisticUpdate/deleteProject";
 import ErrorBox from "../errorBox";
 
 /**
@@ -43,6 +45,27 @@ const ProjectModal: React.FC = () => {
         ? updateProjectMutation
         : createProjectMutation;
     const { mutateAsync, isLoading: mutateLoading } = activeMutation;
+    // Companion mutations used purely as undo closures for the
+    // activity-feed Undo button:
+    //   • create undo → DELETE the just-created project
+    //   • update undo → PUT the captured before-state
+    // Both are fire-and-forget — errors are swallowed so an Undo
+    // gesture doesn't double-surface the auto-revert toast.
+    const { mutateAsync: undoCreate } = useReactMutation(
+        "projects",
+        "DELETE",
+        ["projects"],
+        deleteProjectCallback,
+        () => {}
+    );
+    const { mutateAsync: undoUpdate } = useReactMutation(
+        "projects",
+        "PUT",
+        undefined,
+        undefined,
+        () => {}
+    );
+    const { record: recordActivity } = useActivityFeed();
 
     const [form] = useForm();
     const onClose = () => {
@@ -65,9 +88,53 @@ const ProjectModal: React.FC = () => {
         const payload = isEditing
             ? { ...editingProject, ...input }
             : { ...editingProject, ...createOnly };
+        // Capture the pre-update IProject before the PUT lands so the
+        // activity-feed undo can PUT it back. Snapshot here rather than
+        // inside the closure because the cache flips to the updated
+        // payload once `mutateAsync` resolves.
+        const beforeState = isEditing
+            ? ({ ...editingProject } as IProject | undefined)
+            : undefined;
         try {
-            await mutateAsync(payload);
+            const persisted = await mutateAsync(payload);
             setSaveError(null);
+            /*
+             * Phase 4.3 — record the project create/update into the
+             * activity feed before closing. We thread through the
+             * intent (create vs update) and the project name so the
+             * drawer row reads naturally for the user.
+             *
+             * Undo closures:
+             *   • create → DELETE the project by its server id
+             *   • update → PUT the captured before-state
+             * Both are fire-and-forget; the closure is undefined when
+             * the response is missing the id we need so a malformed
+             * payload doesn't render a broken Undo button.
+             */
+            const createdId = persisted?._id;
+            const undoCallback = isEditing
+                ? beforeState
+                    ? () => {
+                          void undoUpdate(
+                              beforeState as unknown as Record<string, unknown>
+                          );
+                      }
+                    : undefined
+                : createdId
+                  ? () => {
+                        void undoCreate({ projectId: createdId });
+                    }
+                  : undefined;
+            recordActivity({
+                kind: "project",
+                action: isEditing ? "update" : "create",
+                summary: microcopyString(
+                    isEditing
+                        ? microcopy.activityFeed.descriptions.projectUpdated
+                        : microcopy.activityFeed.descriptions.projectCreated
+                ).replace("{name}", input.projectName),
+                undo: undoCallback
+            });
             onClose();
         } catch {
             // ErrorBox surfaces the message via the onError callback above;

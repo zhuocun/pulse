@@ -1,6 +1,14 @@
 import styled from "@emotion/styled";
 import { Alert, Breadcrumb, Button, Skeleton } from "antd";
-import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
+import {
+    Link,
+    NavLink,
+    Outlet,
+    useLocation,
+    useNavigate,
+    useParams
+} from "react-router-dom";
 
 import EmptyState from "../components/emptyState";
 import { microcopy } from "../constants/microcopy";
@@ -9,11 +17,11 @@ import {
     breakpoints,
     fontSize,
     fontWeight,
+    radius,
     shadow,
     space
 } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
-import useTitle from "../utils/hooks/useTitle";
 
 const Container = styled.div`
     display: flex;
@@ -130,8 +138,67 @@ const Body = styled.div`
     overflow: auto;
 `;
 
+/*
+ * Phase 4.7: re-introduce a small in-page nav alongside the
+ * breadcrumb now that the project detail has more than one child
+ * route (Board + Reports). Renders as a row of `<NavLink>`s with a
+ * stable `aria-current="page"` attribute on the active link so
+ * keyboard / SR users can tell where they are. We deliberately ship
+ * a plain link row (not AntD Tabs) so a future third entry doesn't
+ * have to re-introduce the Tabs/ink-bar machinery QW-11 deleted.
+ *
+ * Keep the row inside the same TopBar so the chrome stays a single
+ * sticky band; `flex-wrap: wrap` lets the breadcrumb and the nav
+ * row sit side by side on wide viewports and stack on phones.
+ */
+const ChildNav = styled.nav`
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: ${space.xs}px;
+`;
+
+const ChildNavLink = styled(NavLink)`
+    border-radius: ${radius.sm}px;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+    font-size: ${fontSize.sm}px;
+    font-weight: ${fontWeight.medium};
+    line-height: 1.2;
+    padding: ${space.xs}px ${space.sm}px;
+    text-decoration: none;
+    /*
+     * 44 px minimum tap target on the link row. WCAG 2.5.5 — the
+     * link row is one of the first interactive surfaces a touch
+     * user reaches when entering a project, so the floor is on
+     * everywhere rather than gated on coarse pointers.
+     */
+    min-height: 36px;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.06));
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--ant-color-primary, #ea580c);
+        outline-offset: 1px;
+    }
+
+    /* React Router's NavLink toggles an aria-current attribute when
+     * the link is the active route — paint the active state on that
+     * attribute so the visible style and the AT contract stay in
+     * lockstep. */
+    &[aria-current="page"] {
+        background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06));
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+        font-weight: ${fontWeight.semibold};
+    }
+`;
+
 const ProjectDetailPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
+    const { pathname } = useLocation();
     const navigate = useNavigate();
 
     const {
@@ -141,12 +208,6 @@ const ProjectDetailPage = () => {
         error: pError,
         refetch: refetchProject
     } = useReactQuery<IProject>("projects", { projectId });
-    /*
-     * Browser tab title mirrors the current project. Until the query resolves
-     * we keep a generic "Project" so the previous page's title (likely
-     * "Projects") is replaced with something accurate to this shell.
-     */
-    useTitle(project?.projectName ?? microcopy.labels.project);
 
     /*
      * A successful query that returns a falsy body is treated as not-found —
@@ -156,37 +217,116 @@ const ProjectDetailPage = () => {
      */
     const isNotFound = pSuccess && !project;
 
+    /*
+     * Detect the active child route from the URL so the breadcrumb
+     * can append a third crumb for sibling surfaces. Board is the
+     * project's index destination — keeping "Projects > Atlas" as
+     * the full crumb there avoids redundant chrome. Reports (and
+     * any future non-board surface) gets its own leaf crumb so the
+     * user can see exactly where they are.
+     */
+    const segments = pathname.split("/").filter(Boolean);
+    const activeChild = segments[segments.length - 1];
+    const childCrumbTitle =
+        activeChild === "reports" ? microcopy.breadcrumb.reports : null;
+
+    /*
+     * Browser tab title mirrors the current project. Leaf child
+     * routes that need a page-qualified title (e.g. "Reports ·
+     * Atlas") call `useTitle` themselves; React commits effects
+     * child-before-parent, so on a naive `useTitle(projectName)`
+     * here the parent's effect would fire after the leaf's and
+     * undo the qualifier on every re-render.
+     *
+     * Inline the effect (rather than relying on `useTitle`) so we
+     * can skip the write entirely when a child route owns the title.
+     * The board / index route lets the shell own the title; the
+     * Reports route skips so its own `useTitle("Reports · {project}")`
+     * commits last and sticks.
+     */
+    const shellOwnsTitle = activeChild !== "reports";
+    const shellTitle = project?.projectName ?? microcopy.labels.project;
+    useEffect(() => {
+        if (!shellOwnsTitle) return;
+        document.title = shellTitle;
+    }, [shellOwnsTitle, shellTitle]);
+
+    const breadcrumbItems = [
+        {
+            title: (
+                <Link to="/projects" viewTransition>
+                    {microcopy.breadcrumb.projects}
+                </Link>
+            )
+        },
+        {
+            title:
+                pLoading && !project ? (
+                    <Skeleton.Input
+                        active
+                        size="small"
+                        style={{ width: 160 }}
+                    />
+                ) : childCrumbTitle ? (
+                    /*
+                     * When a child route is active, the project name
+                     * becomes a link back to the project root (which
+                     * declaratively redirects to /board) so the user
+                     * can navigate up from Reports back to the board
+                     * via the breadcrumb. The leaf crumb carries
+                     * `aria-current="page"`.
+                     */
+                    <Link to={`/projects/${projectId}`} viewTransition>
+                        {project?.projectName ?? microcopy.labels.project}
+                    </Link>
+                ) : (
+                    <span aria-current="page">
+                        {project?.projectName ?? microcopy.labels.project}
+                    </span>
+                )
+        },
+        ...(childCrumbTitle
+            ? [
+                  {
+                      title: <span aria-current="page">{childCrumbTitle}</span>
+                  }
+              ]
+            : [])
+    ];
+
     return (
         <Container>
             <TopBar data-testid="project-detail-chrome">
                 <BreadcrumbWrapper>
-                    <Breadcrumb
-                        items={[
-                            {
-                                title: (
-                                    <Link to="/projects" viewTransition>
-                                        {microcopy.breadcrumb.projects}
-                                    </Link>
-                                )
-                            },
-                            {
-                                title:
-                                    pLoading && !project ? (
-                                        <Skeleton.Input
-                                            active
-                                            size="small"
-                                            style={{ width: 160 }}
-                                        />
-                                    ) : (
-                                        <span aria-current="page">
-                                            {project?.projectName ??
-                                                microcopy.labels.project}
-                                        </span>
-                                    )
-                            }
-                        ]}
-                    />
+                    <Breadcrumb items={breadcrumbItems} />
                 </BreadcrumbWrapper>
+                {/*
+                 * In-project navigation (Phase 4.7). Hidden while the
+                 * project query is in-flight to avoid a layout
+                 * flicker; we surface it as soon as the project
+                 * resolves so the nav row can't outlive a 404 body.
+                 */}
+                {project && projectId ? (
+                    <ChildNav
+                        aria-label={microcopy.labels.project}
+                        data-testid="project-detail-child-nav"
+                    >
+                        <ChildNavLink
+                            end
+                            to={`/projects/${projectId}/board`}
+                            viewTransition
+                        >
+                            {microcopy.labels.board}
+                        </ChildNavLink>
+                        <ChildNavLink
+                            end
+                            to={`/projects/${projectId}/reports`}
+                            viewTransition
+                        >
+                            {microcopy.labels.reports}
+                        </ChildNavLink>
+                    </ChildNav>
+                ) : null}
             </TopBar>
             <Body>
                 {pError ? (

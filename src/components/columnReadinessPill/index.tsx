@@ -102,6 +102,18 @@ const PillBody: React.FC<{
             aria-label={ariaLabel}
             data-status={status}
             data-testid="column-readiness-pill"
+            /*
+             * `data-touch-hit-area` is the stable contract marker for
+             * the WCAG 2.5.5 hit-area expander (PR #308 Followup B).
+             * Tests assert this attribute is present on the styled
+             * root so a future refactor that drops the PillRoot
+             * wrapper would trip the assertion — Emotion's generated
+             * class hash is intentionally NOT load-bearing (it can
+             * change with any styled-components bump). PR #309 review
+             * flagged the previous `match(/css-/)` test as brittle;
+             * this attribute is the explicit replacement.
+             */
+            data-touch-hit-area="44"
             onKeyDown={onKeyDown}
             role="button"
             style={{

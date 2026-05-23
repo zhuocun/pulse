@@ -1,12 +1,22 @@
 /* eslint-disable global-require */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
+import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { useNavigate } from "react-router";
 
+import { store } from "../../store";
+import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
+import { __resetActivityFeedUndoCallbacksForTests } from "../../utils/hooks/useActivityFeed";
 
 import { microcopy } from "../../constants/microcopy";
 
@@ -44,7 +54,8 @@ jest.mock("../../constants/env", () => ({
         aiBaseUrl: "",
         aiEnabled: true,
         aiUseLocalEngine: true,
-        bottomNavEnabled: true
+        bottomNavEnabled: true,
+        activityFeedEnabled: true
     }
 }));
 
@@ -127,9 +138,11 @@ const renderHeader = (
     window.history.pushState({}, "Header", path);
 
     render(
-        <BrowserRouter>
-            <Header />
-        </BrowserRouter>
+        <Provider store={store}>
+            <BrowserRouter>
+                <Header />
+            </BrowserRouter>
+        </Provider>
     );
 
     return { logout, navigate };
@@ -142,6 +155,16 @@ describe("Header", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // Clear the activity feed before each test so the bell badge
+        // count starts at zero. Otherwise a feed populated by a
+        // previous test leaks into the next.
+        store.dispatch(activityFeedActions.clearActivityFeed());
+        __resetActivityFeedUndoCallbacksForTests();
+    });
+
+    afterEach(() => {
+        store.dispatch(activityFeedActions.clearActivityFeed());
+        __resetActivityFeedUndoCallbacksForTests();
     });
 
     const accountTrigger = () =>
@@ -373,6 +396,7 @@ describe("Header", () => {
                 aiEnabled: boolean;
                 aiUseLocalEngine: boolean;
                 bottomNavEnabled: boolean;
+                activityFeedEnabled: boolean;
             };
         };
 
@@ -432,6 +456,7 @@ describe("Header", () => {
                 aiEnabled: boolean;
                 aiUseLocalEngine: boolean;
                 bottomNavEnabled: boolean;
+                activityFeedEnabled: boolean;
             };
         };
 
@@ -498,6 +523,90 @@ describe("Header", () => {
             const accountSpan = account.closest("span");
             expect(themeSpan).not.toBeNull();
             expect(accountSpan).not.toBeNull();
+        });
+    });
+
+    /*
+     * Phase 4.3 — activity feed bell. The header mounts an
+     * `<ActivityFeedBell>` whose aria-label tracks the live unread
+     * count from the activity feed slice; clicking it opens the
+     * drawer (rendered by the same `<Header>`).
+     */
+    describe("activity feed bell (Phase 4.3)", () => {
+        const envMod = jest.requireMock("../../constants/env") as {
+            default: {
+                apiBaseUrl: string;
+                aiBaseUrl: string;
+                aiEnabled: boolean;
+                aiUseLocalEngine: boolean;
+                bottomNavEnabled: boolean;
+                activityFeedEnabled: boolean;
+            };
+        };
+
+        afterEach(() => {
+            envMod.default.activityFeedEnabled = true;
+        });
+
+        it("renders the bell with the zero-unread copy when the feed is empty", () => {
+            renderHeader();
+            const bell = screen.getByTestId("activity-feed-bell");
+            expect(bell).toHaveAccessibleName(/no new notifications/i);
+        });
+
+        it("includes the unread count in the bell aria-label", () => {
+            renderHeader();
+            act(() => {
+                store.dispatch(
+                    activityFeedActions.recordActivityEvent({
+                        id: "evt-header-a",
+                        timestamp: Date.now(),
+                        kind: "task",
+                        action: "create",
+                        summary: "A",
+                        undoable: false,
+                        isRead: false
+                    })
+                );
+                store.dispatch(
+                    activityFeedActions.recordActivityEvent({
+                        id: "evt-header-b",
+                        timestamp: Date.now(),
+                        kind: "task",
+                        action: "create",
+                        summary: "B",
+                        undoable: false,
+                        isRead: false
+                    })
+                );
+            });
+            const bell = screen.getByTestId("activity-feed-bell");
+            expect(bell).toHaveAccessibleName(/2 unread notifications/i);
+        });
+
+        it("opens the drawer on click and exposes the drawer body", () => {
+            renderHeader();
+            const bell = screen.getByTestId("activity-feed-bell");
+            // Before click the drawer body is not mounted into the DOM.
+            expect(
+                screen.queryByTestId("activity-feed-drawer-body")
+            ).not.toBeInTheDocument();
+            fireEvent.click(bell);
+            // AntD renders the drawer body inside a portal; it appears
+            // after the click. Use `findBy*` to await the portal mount.
+            return waitFor(() => {
+                expect(
+                    screen.getByTestId("activity-feed-drawer-body")
+                ).toBeInTheDocument();
+            });
+        });
+
+        it("does not mount the bell when the activity-feed env flag is off", () => {
+            envMod.default.activityFeedEnabled = false;
+            renderHeader();
+            expect(
+                screen.queryByTestId("activity-feed-bell")
+            ).not.toBeInTheDocument();
         });
     });
 });

@@ -5,13 +5,15 @@ import type { InputRef } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontWeight, radius, space } from "../../theme/tokens";
+import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiDraftModal from "../../utils/hooks/useAiDraftModal";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAuth from "../../utils/hooks/useAuth";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
+import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiSparkleIcon from "../aiSparkleIcon";
 import AiTaskDraftModal from "../aiTaskDraftModal";
 
@@ -95,12 +97,26 @@ const TaskCreator: React.FC<{
         aiDraftColumnId !== undefined && aiDraftColumnId === columnId;
     const { enabled: aiEnabled } = useAiEnabled();
     const { projectId } = useParams<{ projectId: string }>();
-    const { mutateAsync, isLoading } = useReactMutation(
+    const { mutateAsync, isLoading } = useReactMutation<ITask>(
         "tasks",
         "POST",
         ["tasks", { projectId }],
         newTaskCallback
     );
+    // Companion DELETE mutation used purely as the undo closure for
+    // the activity-feed Undo button. Shares the cache key so the
+    // optimistic remove + invalidation lands in the same list the
+    // board is reading. Errors are swallowed: the undo path is fire-
+    // and-forget and the auto-revert toast would feel like an extra
+    // surprise on top of the user already clicking Undo.
+    const { mutateAsync: undoCreate } = useReactMutation(
+        "tasks",
+        "DELETE",
+        ["tasks", { projectId }],
+        deleteTaskCallback,
+        () => {}
+    );
+    const { record: recordActivity } = useActivityFeed();
     const submit = async () => {
         const trimmed = taskName.trim();
         if (!trimmed) {
@@ -110,11 +126,38 @@ const TaskCreator: React.FC<{
             return;
         }
         setInputMode(false);
-        await mutateAsync({
+        const created = await mutateAsync({
             taskName: trimmed,
             projectId,
             columnId,
             coordinatorId: user?._id
+        });
+        /*
+         * Phase 4.3 — record the create event into the activity feed
+         * so the bell icon surfaces it. The mutation has resolved by
+         * this point so the event reflects an actually-persisted task;
+         * if `mutateAsync` rejects, the error bubbles and `record()`
+         * is skipped (the optimistic React Query update rolls back via
+         * `useReactMutation`'s `onError` handler).
+         *
+         * Undo closure: the 10s-window button in the activity drawer
+         * deletes the just-created task by id. Bail out if the
+         * response doesn't carry an id (defensive — every persisted
+         * task has one in practice) so a malformed payload doesn't
+         * trip the drawer's Undo button.
+         */
+        const createdId = created?._id;
+        recordActivity({
+            kind: "task",
+            action: "create",
+            summary: microcopyString(
+                microcopy.activityFeed.descriptions.taskCreated
+            ).replace("{name}", trimmed),
+            undo: createdId
+                ? () => {
+                      void undoCreate({ taskId: createdId });
+                  }
+                : undefined
         });
     };
     const toggle = () => {
