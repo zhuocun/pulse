@@ -301,6 +301,144 @@ describe("MutationProposalCard", () => {
     });
 
     /*
+     * QW#10 (2026-05 review §Quick Wins): the visible Apply verb is
+     * derived from the diff shape — a coordinatorId-only task diff
+     * surfaces "Reassign", a columnId-only diff surfaces "Move",
+     * column-name-only diffs surface "Rename", and bulk_apply
+     * operations carry an explicit `operation` we can read.
+     * Heterogeneous diffs fall through to the generic "Apply" verb.
+     */
+    describe("QW#10 — Apply button verb derivation", () => {
+        it("surfaces `Reassign` for a coordinatorId-only task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: baseProposal
+            });
+            // baseProposal is a single coordinatorId task update → reassign.
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Reassign/i);
+        });
+
+        it("surfaces `Move` for a columnId-only task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "columnId",
+                                from: "c-todo",
+                                to: "c-doing"
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Move/i);
+        });
+
+        it("surfaces `Save changes` for a mixed-field task diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "epic",
+                                from: "Old",
+                                to: "New"
+                            },
+                            {
+                                task_id: "t-1",
+                                field: "storyPoints",
+                                from: 3,
+                                to: 5
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Save changes/i);
+        });
+
+        it("surfaces `Rename` for a column-name-only diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        column_updates: [
+                            {
+                                column_id: "c-1",
+                                field: "name",
+                                from: "Doing",
+                                to: "In Progress"
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/Rename/i);
+        });
+
+        it("falls back to the generic `Apply` verb for a heterogeneous diff", () => {
+            renderCard({
+                onAccept: jest.fn(),
+                onReject: jest.fn(),
+                proposal: {
+                    ...baseProposal,
+                    diff: {
+                        task_updates: [
+                            {
+                                task_id: "t-1",
+                                field: "columnId",
+                                from: "c-todo",
+                                to: "c-doing"
+                            }
+                        ],
+                        column_updates: [
+                            {
+                                column_id: "c-doing",
+                                field: "order",
+                                from: 1,
+                                to: 2
+                            }
+                        ]
+                    }
+                }
+            });
+            expect(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.acceptProposal as string
+                })
+            ).toHaveTextContent(/^Apply$/i);
+        });
+    });
+
+    /*
      * Regression test for A8 review issue #2. Before the fix, the in-card
      * post-commit Undo button and the ledger entry's undo closure both
      * called onUndo() — clicking in-card Undo and later opening the dock

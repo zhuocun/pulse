@@ -975,7 +975,15 @@ const zhCN: Dictionary = {
             current: "当前值",
             proposed: "建议值"
         },
-        columnFieldLabel: "列{field}"
+        columnFieldLabel: "列{field}",
+        applyVerbs: {
+            create: "创建",
+            update: "保存更改",
+            delete: "删除",
+            move: "移动",
+            reassign: "重新分配",
+            renameColumn: "重命名"
+        }
     },
     share: {
         headline: "分享到 Pulse",
