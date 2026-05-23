@@ -11,6 +11,7 @@
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import type { UseAgentResult } from "../../utils/hooks/useAgent";
@@ -44,6 +45,7 @@ jest.mock("../../constants/env", () => ({
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
 import useAgent from "../../utils/hooks/useAgent";
+import { store } from "../../store";
 
 import AiTaskDraftModal from ".";
 
@@ -151,22 +153,24 @@ const renderModal = (
     mockedUseAgent.mockReturnValue(baseAgent(agentOverrides));
     const queryClient = seedClient();
     const utils = render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <AiTaskDraftModal
-                                columnId="c1"
-                                onClose={onClose}
-                                open={open}
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskDraftModal
+                                    columnId="c1"
+                                    onClose={onClose}
+                                    open={open}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
     return { ...utils, onClose };
 };
@@ -276,22 +280,24 @@ describe("AiTaskDraftModal — remote agent path", () => {
         );
 
         const { rerender } = render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={onClose}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={onClose}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         await waitFor(() =>
@@ -310,22 +316,24 @@ describe("AiTaskDraftModal — remote agent path", () => {
         );
 
         rerender(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={onClose}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={onClose}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         await waitFor(() => expect(clearSuggestion).toHaveBeenCalledTimes(1));
@@ -377,42 +385,46 @@ describe("AiTaskDraftModal — remote agent path", () => {
 
         mockedUseAgent.mockReturnValue(baseAgent({ abort, clearSuggestion }));
         const { rerender } = render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={onClose}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={onClose}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         mockedUseAgent.mockReturnValue(baseAgent({ abort, clearSuggestion }));
         rerender(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={onClose}
-                                    open={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={onClose}
+                                        open={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         expect(abort).toHaveBeenCalled();
@@ -487,22 +499,24 @@ describe("AiTaskDraftModal — projectName from cache (F-3)", () => {
         mockedUseAgent.mockReturnValue(baseAgent());
 
         render(
-            <QueryClientProvider client={qc}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={jest.fn()}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={qc}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={jest.fn()}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         // The component renders without error when the project is cached.

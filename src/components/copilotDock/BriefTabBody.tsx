@@ -21,7 +21,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { BRIEF_CACHE_TTL_MS } from "../../theme/aiTokens";
+import {
+    BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS,
+    BRIEF_CACHE_TTL_MS
+} from "../../theme/aiTokens";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
@@ -402,6 +405,26 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     const [cachedAt, setCachedAt] = useState<number | null>(null);
     const [now, setNow] = useState(() => Date.now());
     const lastFingerprintRef = useRef<string>("");
+    // R-A M3 — min-interval gate state for the fingerprint-driven refetch.
+    // `lastAutoRefreshAtRef` is the wall-clock ms of the last refetch we
+    // actually fired; `pendingTrailingTimerRef` is the trailing-edge
+    // setTimeout handle scheduled when a fingerprint change arrives mid
+    // gate (so the final-state refetch still lands after the window
+    // clears). Manual refreshes update `lastAutoRefreshAtRef` too so a
+    // user-driven refresh resets the gate window — no point burning a
+    // second auto-refetch 100ms later.
+    const lastAutoRefreshAtRef = useRef<number>(0);
+    const pendingTrailingTimerRef = useRef<number | null>(null);
+    // Always-current fingerprint snapshot for the trailing-edge timer
+    // (R-A M3 follow-up). The setTimeout callback otherwise closes over
+    // the fingerprint at SCHEDULE time, which goes stale if the user
+    // undoes a mid-gate change (B → C → B). When the trailing fires we
+    // re-read from this ref so the refetch reflects the LATEST state,
+    // and skip the refetch entirely when nothing actually changed.
+    const currentFingerprintRef = useRef<string>(fingerprint);
+    useEffect(() => {
+        currentFingerprintRef.current = fingerprint;
+    }, [fingerprint]);
 
     const runBrief = useCallback(
         async (options: { bypassCache?: boolean } = {}) => {
@@ -486,6 +509,15 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
             if (!dockOpen) {
                 lastFingerprintRef.current = "";
             }
+            // Cancel any in-flight trailing-refetch timer when we move
+            // off the brief surface — we never want a delayed refetch
+            // firing while the user is on Chat or the dock is closed.
+            // When they return, the effect re-runs and re-evaluates the
+            // gate against the current fingerprint.
+            if (pendingTrailingTimerRef.current !== null) {
+                window.clearTimeout(pendingTrailingTimerRef.current);
+                pendingTrailingTimerRef.current = null;
+            }
             return;
         }
         const prevFingerprint = lastFingerprintRef.current;
@@ -495,20 +527,83 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         // COPILOT_BRIEF_OPEN models a true open transition only. A
         // mid-session board mutation that triggers a refetch is a
         // separate signal (R-A H2) so the open-rate metric stays clean.
+        // First-open never goes through the gate — the user opened the
+        // brief to look at it, they should see data immediately.
         if (isFirstOpen) {
             track(ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN);
-        } else if (fingerprintChanged) {
-            track(ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE);
-        }
-        if (prevFingerprint !== fingerprint) {
             lastFingerprintRef.current = fingerprint;
+            // First-open does NOT consume the gate slot. The next
+            // fingerprint-driven refetch should still fire immediately
+            // (so the user sees an instant board-change refresh after
+            // their first edit). The gate kicks in once the auto path
+            // has actually fired — see `fireFingerprintRefetch` below.
+            if (!isRemote) {
+                void runBrief();
+            }
+            // Remote first-open is handled by the sibling effect above
+            // (gated on !isStreaming && !lastSuggestion) — don't double
+            // up the start call here.
+            return;
         }
-        if (!isRemote) {
+
+        // R-A M3 — performs the actual refetch + analytics for a
+        // fingerprint-driven refresh. Defined inline so it captures the
+        // current effect-scope closures (runBrief, etc.) and can be
+        // deferred via setTimeout for the trailing-edge path. The
+        // fingerprint is passed in by the caller so the trailing path
+        // can read it at FIRE time (from `currentFingerprintRef`) rather
+        // than at SCHEDULE time — closure-captured fingerprints go stale
+        // if the user undoes a mid-gate change.
+        const fireFingerprintRefetch = (fpAtFire: string) => {
+            track(ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE);
+            lastFingerprintRef.current = fpAtFire;
+            lastAutoRefreshAtRef.current = Date.now();
+            if (!isRemote) {
+                void runBrief();
+            } else {
+                abortRemoteBrief();
+                clearRemoteBriefSuggestion();
+                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+            }
+        };
+
+        if (fingerprintChanged) {
+            // Clear any prior trailing timer so we don't fire twice when
+            // a fresh change arrives — we always replace with the latest
+            // fingerprint's wait.
+            if (pendingTrailingTimerRef.current !== null) {
+                window.clearTimeout(pendingTrailingTimerRef.current);
+                pendingTrailingTimerRef.current = null;
+            }
+            const elapsed = Date.now() - lastAutoRefreshAtRef.current;
+            if (elapsed >= BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS) {
+                // Gate clear: refetch right away with the current
+                // effect-scope fingerprint (which is the latest by
+                // definition — the effect just re-ran for it).
+                fireFingerprintRefetch(fingerprint);
+            } else {
+                // Gate active: schedule a trailing-edge refetch for the
+                // remainder of the window. If the user keeps editing the
+                // board, each successive effect run replaces this timer
+                // with one keyed to the latest fingerprint — so at most
+                // one refetch lands when the dust settles. The callback
+                // re-reads the fingerprint at FIRE time so an undo
+                // landed in-between (B → C → B) becomes a no-op instead
+                // of corrupting `lastFingerprintRef` with the stale C.
+                const remaining = BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS - elapsed;
+                pendingTrailingTimerRef.current = window.setTimeout(() => {
+                    pendingTrailingTimerRef.current = null;
+                    const fpAtFire = currentFingerprintRef.current;
+                    if (fpAtFire === lastFingerprintRef.current) return;
+                    fireFingerprintRefetch(fpAtFire);
+                }, remaining);
+            }
+        } else if (!isRemote) {
+            // No fingerprint change but the local engine's effect ran
+            // (e.g. surfaceVisible just flipped true). Preserve the
+            // pre-M3 behavior of letting `runBrief` decide via its
+            // internal cache-freshness check — no analytics, no gate.
             void runBrief();
-        } else if (fingerprintChanged) {
-            abortRemoteBrief();
-            clearRemoteBriefSuggestion();
-            void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
         }
     }, [
         surfaceVisible,
@@ -520,6 +615,19 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         clearRemoteBriefSuggestion,
         startRemoteBrief
     ]);
+
+    useEffect(() => {
+        // R-A M3 — global teardown so a trailing-refetch timer can't
+        // fire after the component unmounts (would leak the start call
+        // into a torn-down agent hook). The effect above clears the
+        // timer on surfaceVisible flips; this covers the unmount case.
+        return () => {
+            if (pendingTrailingTimerRef.current !== null) {
+                window.clearTimeout(pendingTrailingTimerRef.current);
+                pendingTrailingTimerRef.current = null;
+            }
+        };
+    }, []);
 
     useEffect(() => {
         // Reset the local AI state only when the dock actually closes —
@@ -606,6 +714,16 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
 
     const handleRefresh = async () => {
         track(ANALYTICS_EVENTS.BRIEF_REFRESHED, { projectId });
+        // R-A M3 — a user-initiated refresh resets the auto-refresh
+        // gate baseline. Without this, an auto-trailing refetch could
+        // land seconds after the manual one and burn the same call
+        // twice. Also drop any pending trailing timer for the same
+        // reason — the user just got fresh data.
+        lastAutoRefreshAtRef.current = Date.now();
+        if (pendingTrailingTimerRef.current !== null) {
+            window.clearTimeout(pendingTrailingTimerRef.current);
+            pendingTrailingTimerRef.current = null;
+        }
         if (isRemote) {
             clearRemoteBriefSuggestion();
             await startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);

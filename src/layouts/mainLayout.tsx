@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import BottomTabBar from "../components/bottomTabBar";
+import CopilotDockHost from "../components/copilotDock/copilotDockHost";
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
 import { PageSpin } from "../components/status";
@@ -130,6 +131,23 @@ const MainLayout = () => {
                 </Suspense>
             </Main>
             <ProjectModal />
+            {/*
+             * R-A M1: persistent CopilotDock. Mounting the dock here
+             * (above the routed `<Outlet />`) means navigating between
+             * `/projects/p1/board` → `/projects/p2/board` no longer
+             * tears the dock down — chat history, the brief cache, the
+             * active tab, and the open/closed flag all survive the
+             * route change. The host is a no-op when
+             * `REACT_APP_COPILOT_DOCK_ENABLED` is unset, when AI is
+             * globally off, when the URL has no `projectId`, or when
+             * the current project has AI opted out per-project.
+             *
+             * The legacy `<AiChatDrawer>` / `<BoardBriefDrawer>` mounts
+             * in `pages/board.tsx` remain behind the
+             * `!copilotDockEnabled` branch for the rollback path; the
+             * two surfaces never co-exist for a given user.
+             */}
+            <CopilotDockHost />
             {showBottomNav ? <BottomTabBar /> : null}
         </Container>
     );

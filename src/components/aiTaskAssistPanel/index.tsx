@@ -22,6 +22,7 @@ import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
+import useAiLedger from "../../utils/hooks/useAiLedger";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useDebounce from "../../utils/hooks/useDebounce";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
@@ -233,10 +234,31 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(
         () => new Set()
     );
-    /** Most recently applied story-point value, captured for Undo. */
+    /**
+     * Most recently applied story-point value, captured for Undo.
+     *
+     * Issue #8 (A8 review) — deferred: when the user stacks applies
+     * (A → B → C), each ledger entry's `previous` captures the
+     * immediately-prior value, so reverting C restores B, then reverting
+     * B restores A. Reverting B *first* (skipping C) jumps the field to
+     * A but leaves C's stale entry in place; clicking C's revert then
+     * snaps the field back to B (already reverted). This is out of scope
+     * for the A8 PR — a proper fix needs a per-id snapshot store keyed
+     * by ledger id, which the parent task ticket tracks separately.
+     */
     const previousPointsRef = useRef<number | undefined>(values.storyPoints);
     const [showAlternative, setShowAlternative] = useState(false);
     const undoToast = useUndoToast();
+    /*
+     * Activity ledger (A8): each accepted suggestion logs an entry so the
+     * dock's session-level activity log can surface a one-click revert
+     * even after the 10-second toast window closes. We destructure the
+     * memoized callbacks so dependency arrays stay narrow — the parent
+     * `aiLedger` object is a fresh reference every render and would
+     * otherwise re-fire any effect/callback that listed it (issue #5 in
+     * the A8 review).
+     */
+    const { record: recordLedger, remove: removeLedger } = useAiLedger();
     const errorView = aiErrorView(estimateError);
     const readinessErrorView = aiErrorView(readinessError);
 
@@ -389,6 +411,40 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             storyPoints: next,
             confidence: estimateData.confidence
         });
+        /*
+         * A8 contract (issues #2 / #3): the ledger is the authoritative
+         * record. We record the entry FIRST so we have the id, then wire
+         * BOTH the 10 s toast Undo and the ledger entry's own undo
+         * closure to call back into the same path AND drop the ledger
+         * entry. Without this, clicking toast Undo reverted the value
+         * but left the ledger row in place — clicking ledger Revert
+         * later would then re-apply the same undo against state that
+         * already reverted, causing duplicate side effects.
+         *
+         * `removeLedger(id)` drops the entry without re-running the
+         * closure; `recordedRef`/guard via the early return below makes
+         * the closure idempotent so concurrent toast+ledger paths can't
+         * cause double reverts.
+         */
+        const performUndo = () => {
+            if (previous === undefined) return;
+            onApplyStoryPoints(previous as StoryPoints);
+            previousPointsRef.current = previous;
+        };
+        const ledgerId = recordLedger({
+            description: asMicrocopyString(
+                microcopy.aiActivityLog.descriptions.taskAssistPointsApplied
+            )
+                .replace("{points}", String(next))
+                .replace("{taskName}", values.taskName ?? ""),
+            surface: "task-assist",
+            undo:
+                previous === undefined
+                    ? undefined
+                    : () => {
+                          performUndo();
+                      }
+        });
         undoToast.show({
             description: asMicrocopyString(microcopy.ai.storyPointsSet).replace(
                 "{points}",
@@ -396,12 +452,25 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             ),
             analyticsTag: "copilot.estimate.apply",
             undo: () => {
-                if (previous === undefined) return;
-                onApplyStoryPoints(previous as StoryPoints);
-                previousPointsRef.current = previous;
+                performUndo();
+                /*
+                 * Synchronized contract: the toast Undo has already
+                 * performed the reversal, so drop the ledger entry
+                 * without firing the undo a second time. `remove(id)`
+                 * is a no-op if the user already clicked the ledger's
+                 * Revert button first.
+                 */
+                removeLedger(ledgerId);
             }
         });
-    }, [estimateData, onApplyStoryPoints, undoToast]);
+    }, [
+        estimateData,
+        onApplyStoryPoints,
+        recordLedger,
+        removeLedger,
+        undoToast,
+        values.taskName
+    ]);
 
     const handleApplyReadiness = useCallback(
         (issue: IReadinessIssue) => {
@@ -413,19 +482,52 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                 ...(projectId ? { projectId } : {}),
                 ...(excludeTaskId ? { taskId: excludeTaskId } : {})
             });
+            /*
+             * A8 contract (issues #2 / #3): record first to capture the
+             * ledger id, then wire BOTH the toast and the ledger's own
+             * undo closure to share a single `performUndo`. The toast
+             * Undo additionally calls `removeLedger(id)` so the activity
+             * log row is dropped immediately — without this, clicking
+             * the toast Undo for an append-style mutation (e.g. a
+             * suggestion that appended to the description) would revert
+             * the field but leave the ledger row, and clicking ledger
+             * Revert later would replay the same revert against state
+             * the user has likely edited in the meantime.
+             */
+            const performUndo = () => {
+                onApplySuggestion(issue.field, previous, { replace: true });
+            };
+            const ledgerId = recordLedger({
+                description: asMicrocopyString(
+                    microcopy.aiActivityLog.descriptions.taskAssistFieldApplied
+                )
+                    .replace("{taskName}", values.taskName ?? "")
+                    .replace("{field}", String(issue.field)),
+                surface: "task-assist",
+                undo: () => {
+                    performUndo();
+                }
+            });
             undoToast.show({
                 description: asMicrocopyString(
                     microcopy.ai.readinessFieldUpdated
                 ).replace("{field}", String(issue.field)),
                 analyticsTag: "copilot.readiness.apply",
                 undo: () => {
-                    onApplySuggestion(issue.field, previous, {
-                        replace: true
-                    });
+                    performUndo();
+                    removeLedger(ledgerId);
                 }
             });
         },
-        [excludeTaskId, onApplySuggestion, projectId, undoToast, values]
+        [
+            excludeTaskId,
+            onApplySuggestion,
+            projectId,
+            recordLedger,
+            removeLedger,
+            undoToast,
+            values
+        ]
     );
 
     const handleRegenerate = useCallback(() => {

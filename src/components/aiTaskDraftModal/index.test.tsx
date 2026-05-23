@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+import { store } from "../../store";
 
 import AiTaskDraftModal from ".";
 
@@ -49,22 +52,24 @@ const seedClient = () => {
 const mountModal = (onClose: () => void = jest.fn()) => {
     const queryClient = seedClient();
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <AiTaskDraftModal
-                                columnId="c1"
-                                onClose={onClose}
-                                open
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskDraftModal
+                                    columnId="c1"
+                                    onClose={onClose}
+                                    open
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
@@ -196,22 +201,24 @@ describe("AiTaskDraftModal", () => {
     it("resets draft state when the modal is closed from open", async () => {
         const queryClient = seedClient();
         const { rerender } = render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={jest.fn()}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={jest.fn()}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         fireEvent.change(screen.getByLabelText("Task prompt"), {
@@ -219,41 +226,45 @@ describe("AiTaskDraftModal", () => {
         });
 
         rerender(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={jest.fn()}
-                                    open={false}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={jest.fn()}
+                                        open={false}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         rerender(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <AiTaskDraftModal
-                                    columnId="c1"
-                                    onClose={jest.fn()}
-                                    open
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                        <Routes>
+                            <Route
+                                path="/projects/:projectId/board"
+                                element={
+                                    <AiTaskDraftModal
+                                        columnId="c1"
+                                        onClose={jest.fn()}
+                                        open
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </QueryClientProvider>
+            </Provider>
         );
 
         expect(screen.getByLabelText("Task prompt")).toHaveValue("");

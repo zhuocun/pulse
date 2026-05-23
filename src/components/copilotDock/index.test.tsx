@@ -656,4 +656,537 @@ describe("CopilotDock", () => {
             setAnalyticsSink(previous);
         }
     });
+
+    /*
+     * R-A M3 — the fingerprint-driven refetch used to fire on EVERY board
+     * change (drag, inline edit, task add) while the brief tab was open.
+     * In a hot edit session that meant 5+ provider calls per minute for
+     * no incremental insight. The min-interval guard collapses consecutive
+     * fingerprint bumps into a single refetch within the window, with a
+     * trailing-edge timer so the final state still lands once stable.
+     *
+     * Tests use fake timers + the BRIEF_REFRESHED_BY_BOARD_CHANGE analytics
+     * counter as a proxy for "refetch actually fired" — that event is the
+     * single emit point in the gated branch, so 1:1 with refetches.
+     */
+    describe("R-A M3 — fingerprint-driven refetch debounce", () => {
+        const countRefreshes = (
+            sink: jest.MockedFunction<AnalyticsSink>
+        ): number =>
+            sink.mock.calls.filter(
+                ([event]) =>
+                    event === ANALYTICS_EVENTS.BRIEF_REFRESHED_BY_BOARD_CHANGE
+            ).length;
+
+        const newTask = (suffix: string): ITask => ({
+            _id: `task-${suffix}`,
+            columnId: "column-1",
+            coordinatorId: "member-1",
+            epic: "x",
+            index: 0,
+            note: "",
+            projectId: "project-1",
+            storyPoints: 2,
+            taskName: `Mid-session ${suffix}`,
+            type: "Task"
+        });
+
+        beforeEach(() => {
+            // Fake timers must be installed BEFORE rendering so the brief
+            // body's setTimeout / setInterval calls bind to the mocked
+            // clock. Jest 30 also mocks `Date.now`, which is critical
+            // here — the gate compares `Date.now()` against the stored
+            // last-refresh timestamp, so real-clock leakage would let
+            // tiny elapsed times slip past the gate.
+            jest.useFakeTimers();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        /**
+         * Helper to mutate task state from outside React's tree, then
+         * flush microtasks so React commits the resulting effect/setState
+         * pairs before assertions land. Without the trailing `await
+         * Promise.resolve()`, the local engine's `run()` (which begins
+         * with `await Promise.resolve(...)`) leaks an "update not
+         * wrapped in act" warning into the test output.
+         */
+        const mutateTasks = async (
+            controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            },
+            tasks: ITask[]
+        ): Promise<void> => {
+            await act(async () => {
+                controls.setTasks(tasks);
+                await Promise.resolve();
+            });
+        };
+
+        const advanceBy = async (ms: number): Promise<void> => {
+            await act(async () => {
+                jest.advanceTimersByTime(ms);
+                await Promise.resolve();
+            });
+        };
+
+        it("collapses rapid fingerprint changes within MIN_INTERVAL into a single refetch + analytics event", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+
+                // Wait for the brief body to mount + fire the first-open
+                // analytics. After first-open, lastAutoRefreshAt is still
+                // the initial 0, so the FIRST subsequent fingerprint
+                // change fires immediately (instant feedback contract).
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+                expect(countRefreshes(sink)).toBe(0);
+
+                // First fingerprint change — fires immediately (uses up
+                // the "instant feedback" credit, sets the gate baseline).
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Four rapid follow-ups within 10s — each within the
+                // MIN_INTERVAL window, so the gate blocks the immediate
+                // refetch and replaces the trailing timer each time. No
+                // additional refetch fires until the gate clears.
+                await advanceBy(2_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                await advanceBy(2_000);
+                await mutateTasks(controls!, [
+                    newTask("1"),
+                    newTask("2"),
+                    newTask("3")
+                ]);
+                await advanceBy(2_000);
+                await mutateTasks(controls!, [
+                    newTask("1"),
+                    newTask("2"),
+                    newTask("3"),
+                    newTask("4")
+                ]);
+                await advanceBy(2_000);
+                await mutateTasks(controls!, [
+                    newTask("1"),
+                    newTask("2"),
+                    newTask("3"),
+                    newTask("4"),
+                    newTask("5")
+                ]);
+
+                // 8s elapsed since the first refetch — still inside the
+                // 30s gate, so the count is still exactly 1.
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        it("fires immediately when a fingerprint change arrives after the MIN_INTERVAL window clears", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // First fingerprint change fires immediately and sets
+                // the gate baseline.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Wait past the gate, with no intervening changes. No
+                // trailing timer should fire here — it was never armed.
+                await advanceBy(31_000);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // A change AFTER the gate fires immediately (not via a
+                // trailing timer). This proves the gate is non-sticky:
+                // a stable period followed by a fresh edit gets instant
+                // feedback again.
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(2);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        it("fires a trailing-edge refetch after the gate clears when a change landed mid-gate", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // First change — fires immediately, gate now armed.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Second change 5s into the gate — schedules a trailing
+                // refetch for the remaining 25s. NOT an immediate fire.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Advance to just before the trailing timer would fire
+                // (24s of the remaining 25s). Still 1 — proves the gate
+                // really is timer-driven and not "next change unblocks".
+                await advanceBy(24_000);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Cross the trailing-edge boundary. The deferred refetch
+                // now lands as the second analytics event of the run.
+                await advanceBy(2_000);
+                expect(countRefreshes(sink)).toBe(2);
+
+                // No further changes; advancing more time must NOT
+                // re-arm or re-fire the trailing timer.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(2);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * R-A M3 follow-up: the trailing setTimeout used to close over
+         * `fingerprint` at SCHEDULE time. Edge case: user changes
+         * B → C mid-gate (timer captures C); then undoes C → B before
+         * the timer fires. The trailing must NOT corrupt
+         * lastFingerprintRef with the stale C (a subsequent effect run
+         * would otherwise see a phantom fingerprintChanged and burn
+         * another refetch). The fix reads the live fingerprint via a
+         * ref at FIRE time and no-ops when nothing actually changed.
+         */
+        it("trailing timer reads the current fingerprint at fire time and no-ops on undo-within-gate", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // First change — fires immediately, arms the gate.
+                // Final state for "B" baseline is [task-1].
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Second change at T=5s (B → C, mid-gate). Schedules a
+                // trailing timer that — without the fix — closes over
+                // the fingerprint for [task-1, task-2].
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Third change at T=10s undoes C → B (back to [task-1]).
+                // The trailing timer is still armed. The current effect
+                // run sees fingerprint === lastFingerprintRef (B == B) so
+                // it goes through the no-change branch and the timer
+                // stays pending with its stale-C closure.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Cross the trailing-edge boundary (T=30s). The timer
+                // fires, reads the live fingerprint from the ref, sees
+                // it equals `lastFingerprintRef` (both B), and no-ops.
+                // Without the fix, the timer would track BRIEF_REFRESHED
+                // and stamp lastFingerprintRef with the stale C — a
+                // later effect run would then re-fire because
+                // current B !== stale C.
+                await advanceBy(20_000);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // Sanity: a subsequent real change (B → D) still fires
+                // immediately (the no-op trailing left the gate alone).
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("3")]);
+                expect(countRefreshes(sink)).toBe(2);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * Cleanup path: an armed trailing timer must be cancelled the
+         * moment a manual refresh fires. Without that, the trailing
+         * would land seconds after the user's explicit click, burning
+         * a redundant provider call on identical state.
+         *
+         * Setup: the FIRST fingerprint change fires immediately because
+         * lastAutoRefreshAt is still 0. That call consumes the
+         * "instant feedback" credit and arms the gate. We then schedule
+         * the trailing with a second change at T=5s, click refresh at
+         * T=10s, and verify no auto refetch lands when the trailing
+         * would otherwise fire.
+         */
+        it("trailing timer is cleared when the user clicks manual refresh while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change inside the gate schedules a
+                // trailing timer for T=30s.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — user clicks the regenerate button. Manual
+                // refresh resets lastAutoRefreshAt AND clears the
+                // pending trailing timer.
+                await advanceBy(5_000);
+                await act(async () => {
+                    fireEvent.click(
+                        screen.getByRole("button", {
+                            name: microcopy.ai.regenerateLabel as string
+                        })
+                    );
+                    await Promise.resolve();
+                });
+
+                // Advance well past where the trailing would have fired
+                // (T=30s mark relative to the first auto fire, plus
+                // headroom). No fingerprint-driven refetch should land —
+                // the manual click owned the surface.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * Cleanup path: switching to Chat while a trailing timer is
+         * armed must cancel it. We never want a delayed refetch firing
+         * while the user is reading chat — the existing surface-flip
+         * effect handles this; the test pins the contract so a refactor
+         * can't drop the clearTimeout silently.
+         */
+        it("trailing timer is cleared when the user switches tabs while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change schedules the trailing timer.
+                await advanceBy(5_000);
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — switch to Chat. surfaceVisible flips false on
+                // the brief body, which must drop the trailing timer.
+                await advanceBy(5_000);
+                await act(async () => {
+                    fireEvent.click(
+                        screen.getByRole("tab", {
+                            name: microcopy.copilotDock.tabChat as string
+                        })
+                    );
+                    await Promise.resolve();
+                });
+
+                // Advance past the trailing-fire boundary. No refetch
+                // should land while the user is on Chat.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        /*
+         * Cleanup path: unmounting the dock while a trailing timer is
+         * armed must not leave a phantom setTimeout that fires into a
+         * torn-down agent hook. The component's teardown effect handles
+         * this; the test pins the contract by spying clearTimeout and
+         * asserting the armed handle was cleared.
+         */
+        it("trailing timer is cleared on unmount while armed", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            const clearTimeoutSpy = jest.spyOn(window, "clearTimeout");
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                const { unmount } = renderControlled({
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                // T=0 — first change fires immediately, arms the gate.
+                await mutateTasks(controls!, [newTask("1")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=5s — second change schedules the trailing timer.
+                // Capture the IDs in flight at the time of the schedule
+                // so we can confirm the unmount path cleared one of
+                // them (jsdom assigns monotonic numeric handles).
+                await advanceBy(5_000);
+                const clearCallsBeforeUnmount =
+                    clearTimeoutSpy.mock.calls.length;
+                await mutateTasks(controls!, [newTask("1"), newTask("2")]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                // T=10s — unmount the dock. The teardown effect must
+                // call clearTimeout on the armed handle.
+                await advanceBy(5_000);
+                await act(async () => {
+                    unmount();
+                    await Promise.resolve();
+                });
+
+                // The teardown ran at least one clearTimeout that
+                // wasn't there before the schedule.
+                expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(
+                    clearCallsBeforeUnmount
+                );
+
+                // Belt-and-braces: even if some other clearTimeout had
+                // been queued, advancing past the trailing-fire
+                // boundary must NOT track another refresh — the brief
+                // body is unmounted, so no fingerprint-driven refetch
+                // can land.
+                await advanceBy(60_000);
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                clearTimeoutSpy.mockRestore();
+                setAnalyticsSink(previous);
+            }
+        });
+    });
 });

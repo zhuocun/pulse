@@ -7,6 +7,7 @@ import {
 import styled from "@emotion/styled";
 import {
     Alert,
+    Badge,
     Button,
     Dropdown,
     Popover,
@@ -25,7 +26,6 @@ import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import Column from "../components/column";
-import CopilotDock, { type CopilotDockTab } from "../components/copilotDock";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
@@ -55,6 +55,7 @@ import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
+import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -448,35 +449,37 @@ const BoardPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
-    // Phase 3 A1 — when `copilotDockEnabled` is on, both legacy overlay
-    // flags collapse into a single dock with `dockActiveTab` deciding
-    // which body is visible. The most recently opened surface wins so
-    // existing trigger callsites (CopilotMenu, palette hand-off, welcome
-    // banner CTA) open the dock on the right tab without bespoke wiring.
-    const [dockActiveTab, setDockActiveTab] = useState<CopilotDockTab>("chat");
-    useEffect(() => {
-        if (!environment.copilotDockEnabled) return;
-        if (chatOpen) setDockActiveTab("chat");
-        else if (briefOpen) setDockActiveTab("brief");
-    }, [chatOpen, briefOpen]);
-    const dockOpen = chatOpen || briefOpen;
-    const closeDock = useCallback(() => {
-        closeChatDrawer();
-        closeBriefDrawer();
-    }, [closeBriefDrawer, closeChatDrawer]);
-    const handleDockTabChange = useCallback(
-        (tab: CopilotDockTab) => {
-            setDockActiveTab(tab);
-            if (tab === "chat") {
-                openChatDrawer();
-                closeBriefDrawer();
-            } else {
-                openBriefDrawer();
-                closeChatDrawer();
-            }
-        },
-        [closeBriefDrawer, closeChatDrawer, openBriefDrawer, openChatDrawer]
-    );
+    /*
+     * Phase 4 A8 — launcher badge subscription. `inboxUnreadCount` is
+     * a pure projection of the triage agent's nudge buffer (owned by
+     * `CopilotDockHost`), so this Button doesn't mount the agent —
+     * it just reads the cached count. When the count is 0 the Badge
+     * collapses to nothing (AntD treats `count={0}` as no-badge).
+     */
+    const { inboxUnreadCount: copilotInboxUnread } = useCopilotDock();
+    // Pick the one/other locale key off the count and interpolate. The
+    // strings are plain placeholders (no ICU syntax); the .replace call
+    // is the entire formatter. Skip altogether when count is zero so the
+    // Badge collapses without an aria-label.
+    const copilotUnreadAriaLabel = copilotInboxUnread
+        ? (copilotInboxUnread === 1
+              ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOne
+              : microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOther
+          ).replace("{count}", String(copilotInboxUnread))
+        : undefined;
+    /*
+     * R-A M1: the CopilotDock is now mounted in `MainLayout` by
+     * `CopilotDockHost`, which bridges these legacy `chatDrawer` /
+     * `boardBriefOpen` flags onto the persistent dock state so the
+     * existing trigger callsites below (CopilotMenu, welcome banner
+     * CTA, palette hand-off) keep working unchanged. The board page no
+     * longer owns the dock's open/active-tab state — those moved to
+     * Redux to survive project-route navigations.
+     *
+     * The flags ARE still read here (`chatOpen` / `briefOpen` below)
+     * because the rollback path (`!copilotDockEnabled`) keeps
+     * mounting the legacy drawers from this file.
+     */
     /**
      * Background triage-agent mount (v2.1). Always call the hook
      * unconditionally to respect React's hook ordering rules. The agent
@@ -500,6 +503,16 @@ const BoardPage = () => {
     const triagedProjectsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
+        // R-A M1 Issue #2: when the CopilotDock flag is ON, the host
+        // owns the triage-agent mount and start-effect (see
+        // `copilotDockHost.tsx`). Without this guard, BOTH the host
+        // and the board page would call `startTriageAgent` for the
+        // same project, leading to two SSE stream POSTs and two
+        // independent `useAgent` instances writing to the same
+        // sessionStorage thread-id key. The legacy drawer mounts in
+        // this file are already flag-gated; we extend the same gate
+        // to the triage start-effect.
+        if (environment.copilotDockEnabled) return;
         if (!chatOpen) return;
         const pid = currentProject?._id;
         if (!pid) return;
@@ -562,8 +575,16 @@ const BoardPage = () => {
      * user submits a prompt in palette AI mode, the palette dispatches
      * a `boardCopilot:openChat` event with the prompt; we open the
      * drawer here so the chat hook can pick up the pre-populated value.
+     *
+     * R-A M1 Issue #2 follow-on: under the dock flag, `ProjectPage`'s
+     * mirror listener (or `CopilotDockHost`'s bridge if the user is
+     * already on board) handles the same event by dispatching the
+     * chat-drawer Redux action that the bridge forwards to the dock.
+     * Keeping this listener live with the flag on would dispatch the
+     * Redux action twice for the same palette submission.
      */
     useEffect(() => {
+        if (environment.copilotDockEnabled) return;
         if (!boardAiOn) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;
@@ -710,23 +731,47 @@ const BoardPage = () => {
                                                 placement="bottomRight"
                                                 trigger={["click"]}
                                             >
-                                                <Button
+                                                {/*
+                                                 * Phase 4 A8 — launcher badge
+                                                 * advertises unread Inbox
+                                                 * nudges produced by the
+                                                 * triage agent. The count
+                                                 * comes from Redux (owned by
+                                                 * `CopilotDockHost`) so the
+                                                 * Button doesn't need to
+                                                 * subscribe to the agent.
+                                                 * `count={0}` hides the dot
+                                                 * automatically — AntD's
+                                                 * Badge collapses to nothing
+                                                 * when count is falsy.
+                                                 */}
+                                                <Badge
                                                     aria-label={
-                                                        microcopy.a11y
-                                                            .boardCopilotMenu
+                                                        copilotUnreadAriaLabel
                                                     }
-                                                    icon={
-                                                        <AiSparkleIcon
-                                                            aria-hidden
-                                                        />
-                                                    }
-                                                    type="default"
+                                                    count={copilotInboxUnread}
+                                                    data-testid="copilot-launcher-badge"
+                                                    offset={[-4, 4]}
+                                                    size="small"
                                                 >
-                                                    {
-                                                        microcopy.labels
-                                                            .copilotShort
-                                                    }
-                                                </Button>
+                                                    <Button
+                                                        aria-label={
+                                                            microcopy.a11y
+                                                                .boardCopilotMenu
+                                                        }
+                                                        icon={
+                                                            <AiSparkleIcon
+                                                                aria-hidden
+                                                            />
+                                                        }
+                                                        type="default"
+                                                    >
+                                                        {
+                                                            microcopy.labels
+                                                                .copilotShort
+                                                        }
+                                                    </Button>
+                                                </Badge>
                                             </Dropdown>
                                         </>
                                     )}
@@ -974,10 +1019,25 @@ const BoardPage = () => {
                 {!environment.taskPanelRouted && (
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
-                {boardAiOn &&
-                    (environment.copilotDockEnabled ? (
-                        <CopilotDock
-                            activeTab={dockActiveTab}
+                {/*
+                 * When the CopilotDock flag is on, the dock is mounted
+                 * by `CopilotDockHost` inside `MainLayout` so it
+                 * survives project-route navigations (R-A M1). The
+                 * legacy drawers below only render under the rollback
+                 * branch; the two surfaces never co-exist for a given
+                 * user.
+                 */}
+                {boardAiOn && !environment.copilotDockEnabled && (
+                    <>
+                        <BoardBriefDrawer
+                            columns={board ?? []}
+                            members={members ?? []}
+                            onClose={closeBriefDrawer}
+                            open={briefOpen}
+                            project={currentProject}
+                            tasks={visibleTasks}
+                        />
+                        <AiChatDrawer
                             columns={board ?? []}
                             initialPrompt={chatInitialPrompt}
                             knownProjectIds={projectId ? [projectId] : []}
@@ -987,14 +1047,13 @@ const BoardPage = () => {
                                     ? handleTriageNudgeAction
                                     : undefined
                             }
-                            onClose={closeDock}
+                            onClose={closeChatDrawer}
                             onDismissNudge={
                                 !environment.aiUseLocalEngine
                                     ? handleTriageNudgeDismiss
                                     : undefined
                             }
-                            onTabChange={handleDockTabChange}
-                            open={dockOpen}
+                            open={chatOpen}
                             pendingNudges={
                                 !environment.aiUseLocalEngine
                                     ? triageAgent.nudges
@@ -1003,43 +1062,8 @@ const BoardPage = () => {
                             project={currentProject ?? null}
                             tasks={visibleTasks}
                         />
-                    ) : (
-                        <>
-                            <BoardBriefDrawer
-                                columns={board ?? []}
-                                members={members ?? []}
-                                onClose={closeBriefDrawer}
-                                open={briefOpen}
-                                project={currentProject}
-                                tasks={visibleTasks}
-                            />
-                            <AiChatDrawer
-                                columns={board ?? []}
-                                initialPrompt={chatInitialPrompt}
-                                knownProjectIds={projectId ? [projectId] : []}
-                                members={members ?? []}
-                                onActionNudge={
-                                    !environment.aiUseLocalEngine
-                                        ? handleTriageNudgeAction
-                                        : undefined
-                                }
-                                onClose={closeChatDrawer}
-                                onDismissNudge={
-                                    !environment.aiUseLocalEngine
-                                        ? handleTriageNudgeDismiss
-                                        : undefined
-                                }
-                                open={chatOpen}
-                                pendingNudges={
-                                    !environment.aiUseLocalEngine
-                                        ? triageAgent.nudges
-                                        : undefined
-                                }
-                                project={currentProject ?? null}
-                                tasks={visibleTasks}
-                            />
-                        </>
-                    ))}
+                    </>
+                )}
             </BoardShell>
         </DragDropContext>
     );

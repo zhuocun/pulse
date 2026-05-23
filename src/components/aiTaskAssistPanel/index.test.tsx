@@ -7,9 +7,11 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useEffect } from "react";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
+import { store } from "../../store";
 import AiTaskAssistPanel from ".";
 
 const installAntdMocks = () => {
@@ -95,37 +97,40 @@ const mountPanel = (
     const onApplySuggestion = jest.fn();
     const onOpenSimilarTask = jest.fn();
     render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={
-                            <AiTaskAssistPanel
-                                excludeTaskId={overrides.excludeTaskId}
-                                onApplyStoryPoints={
-                                    overrides.onApplyStoryPoints ??
-                                    onApplyStoryPoints
-                                }
-                                onApplySuggestion={
-                                    overrides.onApplySuggestion ??
-                                    onApplySuggestion
-                                }
-                                onOpenSimilarTask={
-                                    overrides.onOpenSimilarTask ??
-                                    onOpenSimilarTask
-                                }
-                                values={
-                                    overrides.values ?? {
-                                        taskName: "Investigate flaky login bug"
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <AiTaskAssistPanel
+                                    excludeTaskId={overrides.excludeTaskId}
+                                    onApplyStoryPoints={
+                                        overrides.onApplyStoryPoints ??
+                                        onApplyStoryPoints
                                     }
-                                }
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+                                    onApplySuggestion={
+                                        overrides.onApplySuggestion ??
+                                        onApplySuggestion
+                                    }
+                                    onOpenSimilarTask={
+                                        overrides.onOpenSimilarTask ??
+                                        onOpenSimilarTask
+                                    }
+                                    values={
+                                        overrides.values ?? {
+                                            taskName:
+                                                "Investigate flaky login bug"
+                                        }
+                                    }
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
     return { onApplyStoryPoints, onApplySuggestion, onOpenSimilarTask };
 };
@@ -137,13 +142,18 @@ const Harness = ({
     queryClient: QueryClient;
     children: ReactNode;
 }) => (
-    <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/projects/p1/board"]}>
-            <Routes>
-                <Route path="/projects/:projectId/board" element={children} />
-            </Routes>
-        </MemoryRouter>
-    </QueryClientProvider>
+    <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={children}
+                    />
+                </Routes>
+            </MemoryRouter>
+        </QueryClientProvider>
+    </Provider>
 );
 
 const advanceBy = (ms: number) => {

@@ -36,6 +36,13 @@ export const ANALYTICS_EVENTS = {
     COPILOT_CHAT_REGENERATE: "copilot.chat.regenerate",
     COPILOT_ESTIMATE_APPLY: "copilot.estimate.apply",
     COPILOT_BRIEF_OPEN: "copilot.brief.open",
+    /*
+     * Phase 4 A8 — fires when the dock's Inbox tab becomes the active
+     * surface (open dock + Inbox tab selected). Used as the proxy for
+     * "user read their inbox" — clears the unread-nudge badge in Redux
+     * via the dock host. Mirrors COPILOT_BRIEF_OPEN's open-rate model.
+     */
+    COPILOT_INBOX_OPEN: "copilot.inbox.open",
     COPILOT_DRAFT_SUBMIT: "copilot.draft.submit",
     COPILOT_PALETTE_INVOKE: "copilot.palette.invoke",
     COPILOT_REWRITE_ACCEPT: "copilot.rewrite.accept",

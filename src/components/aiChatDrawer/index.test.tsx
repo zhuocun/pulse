@@ -8,12 +8,14 @@ import {
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
+import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 
 import useAuth from "../../utils/hooks/useAuth";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 
 import { microcopy } from "../../constants/microcopy";
+import { store } from "../../store";
 
 import AiChatDrawer from ".";
 
@@ -121,22 +123,24 @@ const renderDrawer = (
     mockApi.mockResolvedValue([]);
 
     const utils = render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter>
-                <AntdApp component={false}>
-                    <AiChatDrawer
-                        columns={columns}
-                        knownProjectIds={["p1"]}
-                        members={members}
-                        onClose={onClose}
-                        open={open}
-                        project={project}
-                        tasks={tasks}
-                        {...extraProps}
-                    />
-                </AntdApp>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter>
+                    <AntdApp component={false}>
+                        <AiChatDrawer
+                            columns={columns}
+                            knownProjectIds={["p1"]}
+                            members={members}
+                            onClose={onClose}
+                            open={open}
+                            project={project}
+                            tasks={tasks}
+                            {...extraProps}
+                        />
+                    </AntdApp>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
     return { ...utils, onClose };
 };

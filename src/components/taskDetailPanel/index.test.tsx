@@ -904,16 +904,69 @@ describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
 });
 
 /*
- * Phase 3 A2 — swipe-between-tasks. The TaskDetailPanel attaches
- * touch handlers to the body surface; a left-swipe routes through
- * `goToNext` (which uses the same `navigate(...)` as every other
- * close path), and a right-swipe routes through `goToPrev`. The
- * dirty-state guard intercepts via `useBlocker`. Tests dispatch
- * native touch events at the panel surface so the handlers fire as
- * they would on a real device.
+ * Phase 3 A2 / R-B L — swipe-between-tasks. The TaskDetailPanel
+ * attaches PointerEvent handlers to the body surface; a left-swipe
+ * routes through `goToNext` (which uses the same `navigate(...)` as
+ * every other close path), and a right-swipe routes through
+ * `goToPrev`. The dirty-state guard intercepts via `useBlocker`.
+ * Tests dispatch native pointer events at the panel surface so the
+ * handlers fire as they would on a real device.
+ *
+ * jsdom does NOT ship `PointerEvent` (jest-environment-jsdom ≤30
+ * inherits the omission from upstream jsdom). `fireEvent.pointerDown`
+ * falls back to a base `Event` in that case, which drops `clientX` /
+ * `pointerType` / `pointerId` on the floor. The polyfill below
+ * subclasses `MouseEvent` and copies the pointer-specific props so
+ * `fireEvent.pointerDown` and friends construct events the panel
+ * handlers can read. The polyfill is scoped to this suite to avoid
+ * leaking into tests that rely on the absence of `PointerEvent`
+ * (none today, but future-proof).
+ *
+ * jsdom also lacks `setPointerCapture` / `releasePointerCapture` on
+ * `Element`; we stub them as no-ops on `HTMLElement.prototype` for
+ * the same scope so the panel's feature-detected calls succeed.
  */
-describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
+describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2 / R-B L)", () => {
     const fetchMock = jest.spyOn(global, "fetch");
+
+    type PointerEventInitLite = MouseEventInit & {
+        pointerId?: number;
+        pointerType?: string;
+        isPrimary?: boolean;
+    };
+
+    class TestPointerEvent extends MouseEvent {
+        readonly pointerId: number;
+
+        readonly pointerType: string;
+
+        readonly isPrimary: boolean;
+
+        constructor(type: string, params: PointerEventInitLite = {}) {
+            super(type, params);
+            this.pointerId = params.pointerId ?? 0;
+            this.pointerType = params.pointerType ?? "";
+            this.isPrimary = params.isPrimary ?? true;
+        }
+    }
+
+    type CaptureProto = HTMLElement & {
+        setPointerCapture?: (pointerId: number) => void;
+        releasePointerCapture?: (pointerId: number) => void;
+        hasPointerCapture?: (pointerId: number) => boolean;
+    };
+
+    const originalPointerEvent = (
+        globalThis as { PointerEvent?: typeof PointerEvent }
+    ).PointerEvent;
+    const proto = HTMLElement.prototype as unknown as CaptureProto;
+    const originalSetPointerCapture = proto.setPointerCapture;
+    const originalReleasePointerCapture = proto.releasePointerCapture;
+    const originalHasPointerCapture = proto.hasPointerCapture;
+    const originalInnerWidth = Object.getOwnPropertyDescriptor(
+        window,
+        "innerWidth"
+    );
 
     const columns = [
         {
@@ -938,6 +991,43 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
 
     beforeAll(() => {
         installAntdBrowserMocks();
+        // PointerEvent + capture polyfill — see suite header.
+        (globalThis as { PointerEvent?: typeof PointerEvent }).PointerEvent =
+            TestPointerEvent as unknown as typeof PointerEvent;
+        proto.setPointerCapture = function setPointerCapture() {
+            /* no-op for jsdom */
+        };
+        proto.releasePointerCapture = function releasePointerCapture() {
+            /* no-op for jsdom */
+        };
+        proto.hasPointerCapture = function hasPointerCapture() {
+            return false;
+        };
+        // jsdom defaults `innerWidth` to 1024; pin it so the edge
+        // guard tests don't drift if the upstream default changes.
+        Object.defineProperty(window, "innerWidth", {
+            configurable: true,
+            value: 1024,
+            writable: true
+        });
+    });
+
+    afterAll(() => {
+        if (originalPointerEvent === undefined) {
+            delete (globalThis as { PointerEvent?: typeof PointerEvent })
+                .PointerEvent;
+        } else {
+            (
+                globalThis as { PointerEvent?: typeof PointerEvent }
+            ).PointerEvent = originalPointerEvent;
+        }
+        proto.setPointerCapture = originalSetPointerCapture;
+        proto.releasePointerCapture = originalReleasePointerCapture;
+        proto.hasPointerCapture = originalHasPointerCapture;
+        if (originalInnerWidth) {
+            Object.defineProperty(window, "innerWidth", originalInnerWidth);
+        }
+        fetchMock.mockRestore();
     });
 
     beforeEach(() => {
@@ -959,29 +1049,39 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
         });
     });
 
-    afterAll(() => {
-        fetchMock.mockRestore();
-    });
-
     /*
      * Helper: dispatch a synthetic left/right swipe on the panel
-     * surface. `touches` on touchstart and `changedTouches` on
-     * touchend must carry the SAME identifier so the panel matches
-     * them up correctly.
+     * surface via PointerEvents. pointerdown sets the origin,
+     * pointerup carries the final delta. `pointerType` defaults to
+     * "touch" so the desktop-mouse filter doesn't reject the gesture;
+     * caller can override (e.g. `pointerType: "mouse"`) to assert
+     * the mouse-reject path.
      */
     const swipe = (
         element: HTMLElement,
         direction: "left" | "right",
-        distance = 80
+        distance = 80,
+        overrides: { pointerType?: string; startY?: number; endY?: number } = {}
     ) => {
         const startX = direction === "left" ? 200 : 100;
         const endX =
             direction === "left" ? startX - distance : startX + distance;
-        fireEvent.touchStart(element, {
-            touches: [{ clientX: startX, clientY: 100, identifier: 0 }]
+        const pointerType = overrides.pointerType ?? "touch";
+        const startY = overrides.startY ?? 100;
+        const endY = overrides.endY ?? startY;
+        fireEvent.pointerDown(element, {
+            button: 0,
+            clientX: startX,
+            clientY: startY,
+            pointerId: 1,
+            pointerType
         });
-        fireEvent.touchEnd(element, {
-            changedTouches: [{ clientX: endX, clientY: 100, identifier: 0 }]
+        fireEvent.pointerUp(element, {
+            button: 0,
+            clientX: endX,
+            clientY: endY,
+            pointerId: 1,
+            pointerType
         });
     };
 
@@ -1084,11 +1184,19 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
         // 80px horizontal + 200px vertical → the gesture is
         // scroll-dominant and the swipe handler bails.
         act(() => {
-            fireEvent.touchStart(swipeTarget, {
-                touches: [{ clientX: 200, clientY: 100, identifier: 0 }]
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 200,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
             });
-            fireEvent.touchEnd(swipeTarget, {
-                changedTouches: [{ clientX: 120, clientY: 300, identifier: 0 }]
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 120,
+                clientY: 300,
+                pointerId: 1,
+                pointerType: "touch"
             });
         });
 
@@ -1152,5 +1260,391 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2)", () => {
         expect(router.state.location.pathname).toBe(
             "/projects/project-1/board/task/task-3"
         );
+    });
+
+    /*
+     * R-B L: pointerdown that lands within the 20 px edge band on the
+     * LEFT side of the viewport is skipped entirely. On iOS Safari
+     * that band is reserved for the native swipe-back gesture; without
+     * the guard, every iOS back-swipe would also fire our right-swipe
+     * → previous-task and the user would navigate twice.
+     */
+    it("ignores pointerdown within the 20 px left-edge guard band (R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // Origin at clientX = 5 px (inside the 20 px guard band).
+        // Even with a clearly-horizontal 100 px delta the handler
+        // bails before recording the origin, so pointerup is a no-op.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 5,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 105,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        // Right-swipe from inside the left guard would normally route
+        // to task-1; the guard suppresses it.
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-2"
+        );
+    });
+
+    /*
+     * R-B L mirror: pointerdown within the 20 px band on the RIGHT
+     * side of the viewport (iOS forward-swipe territory) is also
+     * skipped. Window is pinned to innerWidth = 1024 in `beforeAll`,
+     * and the source uses strict `clientX > viewportWidth - GUARD`, so
+     * the right guard activates at clientX > 1004 (i.e. 1005 and
+     * above is guarded; 1004 is the last safe-side coordinate).
+     */
+    it("ignores pointerdown within the 20 px right-edge guard band (R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // Origin at clientX = 1020 px (inside the 20 px right guard
+        // — innerWidth is 1024). A 100 px leftward drag would
+        // normally fire goToNext → task-2; the guard suppresses it.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 1020,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 920,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    /*
+     * R-B L boundary tests: the edge-guard check uses STRICT inequality
+     * (`event.clientX < SWIPE_EDGE_GUARD_PX` and
+     * `event.clientX > viewportWidth - SWIPE_EDGE_GUARD_PX`). The four
+     * tests below pin the exact boundaries so a sloppy refactor that
+     * flips `<` to `<=` or `>` to `>=` would change the outcome at the
+     * edge coordinate and fail. Without the boundary cases, the broad
+     * 5px / 1020px tests would still pass against either operator and
+     * the regression would slip through.
+     */
+    it("guards a pointerdown at clientX=19 (last guarded pixel on the left edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 19 < 20 → strict `<` guards the gesture. A 100 px right-swipe
+        // from inside the band would otherwise navigate to task-1.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 19,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 119,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-2"
+        );
+    });
+
+    it("allows a pointerdown at clientX=20 (first safe pixel past the left edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-2",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns,
+                taskId: "task-2"
+            }
+        );
+
+        await screen.findByText(/edit task/i);
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 20 is NOT strict-less-than 20 → the guard does NOT fire, and
+        // the 100 px right-swipe routes to the previous task (task-1).
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 20,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 120,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-1"
+            );
+        });
+    });
+
+    it("guards a pointerdown at clientX=1005 (first guarded pixel on the right edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 1005 > 1004 (innerWidth 1024 - guard 20) → strict `>` guards
+        // the gesture. A 100 px left-swipe from inside the band would
+        // otherwise navigate to task-2.
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 1005,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 905,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    it("allows a pointerdown at clientX=1004 (last safe pixel before the right edge, R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        // 1004 is NOT strict-greater-than 1004 → the guard does NOT
+        // fire, and the 100 px left-swipe routes to the next task
+        // (task-2).
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 1004,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 904,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-2"
+            );
+        });
+    });
+
+    /*
+     * pointercancel fires when the OS or browser reclaims the
+     * gesture (multi-finger zoom promotion, system back-swipe
+     * committing, scroll inertia kicking in). The handler must drop
+     * the origin so the next pointerup — which may arrive moments
+     * later as the OS finishes cleanup — does NOT navigate.
+     */
+    it("does NOT navigate when the gesture is cancelled mid-swipe (R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            fireEvent.pointerDown(swipeTarget, {
+                button: 0,
+                clientX: 200,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            fireEvent.pointerCancel(swipeTarget, {
+                button: 0,
+                clientX: 120,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+            // Stale pointerup after cancel must be a no-op.
+            fireEvent.pointerUp(swipeTarget, {
+                button: 0,
+                clientX: 120,
+                clientY: 100,
+                pointerId: 1,
+                pointerType: "touch"
+            });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    /*
+     * Desktop mice share the pointer surface but should NOT trigger
+     * the swipe gesture — text selection inside the form, scrollbar
+     * drags, and link-clicks all fire pointerdown/up with horizontal
+     * deltas exceeding the threshold, and reading them as swipes
+     * would break the desktop UX entirely.
+     */
+    it("does NOT navigate when pointerType is 'mouse' (R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            // Same 80 px leftward drag that the touch path uses to
+            // advance — but with pointerType "mouse" it must NOT
+            // navigate.
+            swipe(swipeTarget, "left", 80, { pointerType: "mouse" });
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+    });
+
+    /*
+     * Pen pointer-type still triggers — the swipe is touch + pen
+     * inclusive. Guards against accidentally over-narrowing the
+     * pointerType filter to "touch" only.
+     */
+    it("allows pointerType 'pen' to trigger the swipe (R-B L)", async () => {
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            {
+                initialTasks: buildSiblingTasks(),
+                initialColumns: columns
+            }
+        );
+
+        await screen.findByDisplayValue("Build task");
+
+        const swipeTarget = await screen.findByTestId(
+            "task-detail-panel-swipe-target"
+        );
+        act(() => {
+            swipe(swipeTarget, "left", 80, { pointerType: "pen" });
+        });
+
+        await waitFor(() => {
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board/task/task-2"
+            );
+        });
     });
 });

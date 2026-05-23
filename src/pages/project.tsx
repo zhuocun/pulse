@@ -5,7 +5,7 @@ import {
     TeamOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Alert, Button, Typography } from "antd";
+import { Alert, Badge, Button, Typography } from "antd";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -15,6 +15,7 @@ import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
 import ProjectList from "../components/projectList";
 import ProjectSearchPanel from "../components/projectSearchPanel";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import {
     accent,
@@ -29,6 +30,7 @@ import {
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectModal from "../utils/hooks/useProjectModal";
@@ -248,12 +250,40 @@ const ProjectPage = () => {
         closeDrawer: closeChatDrawer,
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
+    /*
+     * Phase 4 A8 — launcher badge subscription mirrors the Board
+     * Copilot menu's badge on `pages/board.tsx`. We surface the same
+     * unread count on the project-list "Ask" Copilot launcher so the
+     * user sees the badge even when they're between boards (the dock
+     * itself is still hidden because there's no projectId yet; the
+     * badge tells them "something landed on a board you triaged
+     * earlier this session").
+     */
+    const { inboxUnreadCount: copilotInboxUnread } = useCopilotDock();
+    // Pick the one/other locale key off the count and interpolate. The
+    // strings are plain placeholders (no ICU syntax); the .replace call
+    // is the entire formatter. Skip altogether when count is zero so the
+    // Badge collapses without an aria-label.
+    const copilotUnreadAriaLabel = copilotInboxUnread
+        ? (copilotInboxUnread === 1
+              ? microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOne
+              : microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOther
+          ).replace("{count}", String(copilotInboxUnread))
+        : undefined;
     /**
      * Listen for `boardCopilot:openChat` from the command palette so the
      * project list (no board context) still surfaces AI mode submissions
      * (PRD CP-R6).
+     *
+     * R-A M1 Issue #2: under the dock flag, the host owns the listener
+     * so palette → dock works from any route. Keeping this listener
+     * live under the flag would dispatch `openChatDrawer` twice and
+     * cause Issue #4 (the project-page-mounted `<AiChatDrawer>` also
+     * consumes the prompt, then the dock body consumes it AGAIN after
+     * navigation to the board).
      */
     useEffect(() => {
+        if (environment.copilotDockEnabled) return;
         if (!aiEnabled) return;
         const onOpenChat = (event: Event) => {
             const detail = (event as CustomEvent<{ prompt?: string }>).detail;
@@ -376,14 +406,22 @@ const ProjectPage = () => {
                 </PageHeadingGroup>
                 <Toolbar>
                     {aiEnabled && (
-                        <Button
-                            aria-label={microcopy.ai.askCopilot}
-                            icon={<AiSparkleIcon aria-hidden />}
-                            onClick={() => openChatDrawer()}
-                            type="default"
+                        <Badge
+                            aria-label={copilotUnreadAriaLabel}
+                            count={copilotInboxUnread}
+                            data-testid="copilot-launcher-badge"
+                            offset={[-4, 4]}
+                            size="small"
                         >
-                            {microcopy.labels.askShort}
-                        </Button>
+                            <Button
+                                aria-label={microcopy.ai.askCopilot}
+                                icon={<AiSparkleIcon aria-hidden />}
+                                onClick={() => openChatDrawer()}
+                                type="default"
+                            >
+                                {microcopy.labels.askShort}
+                            </Button>
+                        </Badge>
                     )}
                     <Button
                         aria-label={microcopy.actions.createProject}
@@ -498,7 +536,19 @@ const ProjectPage = () => {
                 members={members ?? []}
                 loading={pLoading || mLoading}
             />
-            {aiEnabled && (
+            {aiEnabled && !environment.copilotDockEnabled && (
+                /*
+                 * R-A M1 Issue #4: when the dock flag is on, the host
+                 * mounts a single CopilotDock surface that survives
+                 * navigations and consumes any pending prompt through
+                 * the bridge. Keeping this drawer mounted alongside
+                 * caused the prompt to be dispatched TWICE: once by
+                 * this drawer's ChatTabBody on /projects, then again
+                 * by the host's ChatTabBody after the user navigated
+                 * to /projects/p1/board — because the new instance
+                 * still saw `chatDrawer.pendingPrompt` in Redux and
+                 * its own `initialPromptHandled.current` was null.
+                 */
                 <AiChatDrawer
                     columns={[]}
                     initialPrompt={chatInitialPrompt}

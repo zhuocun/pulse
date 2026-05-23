@@ -1,11 +1,12 @@
 import styled from "@emotion/styled";
 import { Button, Space, Table, Tag, Typography } from "antd";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
-import { microcopy } from "../../constants/microcopy";
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import type { MutationProposal, TaskUpdate } from "../../interfaces/agent";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import useAiLedger from "../../utils/hooks/useAiLedger";
 
 /**
  * Mutation preview card (PRD v3 §10.1, §7.4, C-R9). Renders the proposed
@@ -192,6 +193,22 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     title
 }) => {
     const rows = buildRows(proposal);
+    /*
+     * A8 activity ledger: each accepted proposal lands in the session
+     * log. When the proposal is `undoable` AND the surface wired a
+     * `onUndo` callback we forward that as the ledger's undo so the
+     * Revert button delegates to the same backend reversal path. When
+     * `onUndo` isn't wired (current production state — the BE reversal
+     * endpoint is still a GA blocker) we log the entry without an undo
+     * — the Revert button is hidden but the entry remains visible for
+     * traceability.
+     *
+     * We destructure `record` + `remove` to keep the commit effect's
+     * dependency array narrow — the full `aiLedger` object is a fresh
+     * reference on every render and would otherwise re-fire the
+     * countdown effect on each tick (issue #5 in the A8 review).
+     */
+    const { record: recordLedger, remove: removeLedger } = useAiLedger();
 
     /**
      * Three-phase lifecycle for the 10-second undo window:
@@ -203,6 +220,15 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
         "idle"
     );
     const [countdown, setCountdown] = useState(0);
+    /*
+     * Issue #2 (A8 review): hold the ledger id recorded at commit time
+     * AND an "already undone" guard so the in-card Undo button + the
+     * ledger Revert button can't fire `onUndo()` twice. The first path
+     * to fire clears the ref (so subsequent invocations are no-ops) and
+     * removes the ledger entry via `removeLedger(id)`.
+     */
+    const ledgerIdRef = useRef<string | null>(null);
+    const undoFiredRef = useRef(false);
 
     useEffect(() => {
         if (phase !== "countdown") return;
@@ -213,11 +239,45 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 risk: proposal.risk
             });
             onAccept();
+            const hasUndo =
+                proposal.undoable === true && typeof onUndo === "function";
+            ledgerIdRef.current = recordLedger({
+                description: microcopyString(
+                    microcopy.aiActivityLog.descriptions.mutationProposalApplied
+                ).replace("{description}", proposal.description),
+                surface: "mutation-proposal",
+                undo: hasUndo
+                    ? () => {
+                          /*
+                           * Ledger Revert path. If the in-card Undo
+                           * already fired we skip — the guard flag is
+                           * the synchronization between the two button
+                           * sites. Otherwise mark fired and delegate to
+                           * the parent's reversal flow. The ledger entry
+                           * removal is handled by `revert()` in the hook
+                           * after this closure resolves.
+                           */
+                          if (undoFiredRef.current) return;
+                          undoFiredRef.current = true;
+                          onUndo?.();
+                      }
+                    : undefined
+            });
             return;
         }
         const id = window.setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => window.clearTimeout(id);
-    }, [phase, countdown, onAccept, proposal]);
+    }, [
+        phase,
+        countdown,
+        onAccept,
+        onUndo,
+        proposal,
+        recordLedger
+        // `removeLedger` intentionally omitted: the closure only uses
+        // `recordLedger`; the in-card undo handler below captures
+        // `removeLedger` separately via the component scope.
+    ]);
 
     const handleAccept = () => {
         setPhase("countdown");
@@ -248,13 +308,25 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
     /**
      * Post-commit undo — delegates to the optional `onUndo` prop, which
      * wires to the BE reversal flow (still a GA-blocker as of v2.1).
+     *
+     * Issue #2 (A8 review): also drops the ledger entry via
+     * `removeLedger(id)` so the activity log doesn't keep a still-live
+     * closure that would fire `onUndo()` a second time if the user
+     * later opened the dock and clicked Revert. The guard flag makes the
+     * sequence idempotent — clicking the in-card Undo, then opening the
+     * dock to find no entry, then somehow re-triggering this path can't
+     * fire `onUndo` twice.
      */
     const handleCommittedUndo = () => {
         track(ANALYTICS_EVENTS.AGENT_PROPOSAL_UNDONE, {
             id: proposal.proposal_id,
             risk: proposal.risk
         });
+        if (undoFiredRef.current) return;
+        undoFiredRef.current = true;
         onUndo?.();
+        const ledgerId = ledgerIdRef.current;
+        if (ledgerId) removeLedger(ledgerId);
     };
 
     const showCommittedUndo =

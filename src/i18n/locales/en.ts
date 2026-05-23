@@ -422,7 +422,65 @@ export const enSource = {
         closeLabel: "Close Copilot",
         tabChat: "Chat",
         tabBrief: "Brief",
-        tabListLabel: "Copilot surfaces"
+        tabListLabel: "Copilot surfaces",
+        inboxTab: {
+            title: "Inbox",
+            emptyTitle: "You're all caught up",
+            emptyDescription:
+                "Copilot will surface triage nudges here as it spots issues on your board.",
+            seeAll: "See all in Inbox",
+            // Plural pair (one/other) follows the `counts.*` pattern in
+            // this file. Call sites pick the right key off the count
+            // and `.replace("{count}", String(count))` to interpolate.
+            // We intentionally do NOT embed ICU plural syntax in the
+            // value because this codebase has no ICU formatter; a
+            // single-string `{count, plural, one {nudge} other {nudges}}`
+            // would render literally to screen-reader users.
+            unreadBadgeAriaLabelOne: "{count} unread Copilot nudge",
+            unreadBadgeAriaLabelOther: "{count} unread Copilot nudges",
+            sectionLabel: "Triage nudges",
+            actionLabel: "Open task",
+            dismissLabel: "Dismiss"
+        }
+    },
+    aiActivityLog: {
+        pillLabel: "{count} AI change this session",
+        pillLabelPlural: "{count} AI changes this session",
+        pillAriaExpanded: "Hide AI activity log",
+        pillAriaCollapsed: "Show AI activity log",
+        listTitle: "AI activity this session",
+        revert: "Revert",
+        revertAriaLabel: "Revert: {description}",
+        revertUnavailable:
+            "Revert isn't available for this entry after reload.",
+        clearAll: "Clear all",
+        clearConfirmTitle: "Clear AI activity log?",
+        clearConfirmBody:
+            "Removes every entry in this session. Already-applied changes stay applied.",
+        clearConfirmOk: "Clear",
+        clearConfirmCancel: "Keep",
+        emptyState: "Nothing yet — accept an AI suggestion to see it here.",
+        undoFailedToast: "Couldn't undo: {error}",
+        relativeJustNow: "just now",
+        relativeOneMinute: "1 min ago",
+        relativeMinutes: "{count} min ago",
+        relativeOneHour: "1 hour ago",
+        relativeHours: "{count} hours ago",
+        relativeOneDay: "1 day ago",
+        relativeDays: "{count} days ago",
+        surfaceLabels: {
+            "task-assist": "Task assist",
+            "task-draft": "Task draft",
+            "mutation-proposal": "Mutation proposal"
+        },
+        descriptions: {
+            taskAssistPointsApplied:
+                "Applied {points} story points to “{taskName}”",
+            taskAssistFieldApplied:
+                "Applied AI suggestion to “{taskName}” {field}",
+            taskDraftCreated: "Created task “{taskName}” from AI draft",
+            mutationProposalApplied: "Applied mutation: {description}"
+        }
     },
     projectsPage: {
         title: "Projects",

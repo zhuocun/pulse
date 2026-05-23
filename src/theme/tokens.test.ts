@@ -219,6 +219,28 @@ describe("page/layout tokens", () => {
         expect(zIndex.dropdown).toBeGreaterThan(zIndex.sticky);
     });
 
+    it("sticky page chrome sits well below the @hello-pangea/dnd drag clone (5000)", () => {
+        // The DnD library mounts its drag clone via document.body portal
+        // with an inline z-index of 5000 (see zIndexOptions in
+        // node_modules/@hello-pangea/dnd/dist/dnd.esm.js, mirrored in
+        // tokens.dndDragClone). The sticky page chrome MUST stay below
+        // that value so a card-in-flight always paints above the header
+        // and projectDetail breadcrumb — even on iOS Safari where a
+        // transformed/filtered ancestor could otherwise trap it. We
+        // assert a generous margin (≥100) so a future small bump in
+        // `sticky` doesn't accidentally collide.
+        expect(zIndex.dndDragClone).toBe(5000);
+        expect(zIndex.dndDragClone - zIndex.sticky).toBeGreaterThanOrEqual(100);
+        expect(zIndex.dndDragClone - zIndex.navBar).toBeGreaterThanOrEqual(100);
+        // The drag layer paints above every authored chrome tier
+        // including drawers, modals, dropdowns, and toasts so the
+        // user can always see what they are dragging.
+        expect(zIndex.dndDragClone).toBeGreaterThan(zIndex.modal);
+        expect(zIndex.dndDragClone).toBeGreaterThan(zIndex.drawer);
+        expect(zIndex.dndDragClone).toBeGreaterThan(zIndex.dropdown);
+        expect(zIndex.dndDragClone).toBeGreaterThan(zIndex.toast);
+    });
+
     it("breakpoints are strictly increasing", () => {
         const ladder = [
             breakpoints.sm,

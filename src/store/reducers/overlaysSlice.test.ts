@@ -11,7 +11,13 @@ describe("overlaysSlice", () => {
             editingTaskId: null,
             chatDrawer: { open: false, pendingPrompt: null },
             boardBriefOpen: false,
-            aiDraftActiveColumnId: null
+            aiDraftActiveColumnId: null,
+            copilotDock: {
+                open: false,
+                activeTab: "chat",
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            }
         });
     });
 
@@ -97,7 +103,13 @@ describe("overlaysSlice", () => {
             editingTaskId: "t-1",
             chatDrawer: { open: true, pendingPrompt: "hi" },
             boardBriefOpen: true,
-            aiDraftActiveColumnId: "c-1"
+            aiDraftActiveColumnId: "c-1",
+            copilotDock: {
+                open: true,
+                activeTab: "chat" as const,
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            }
         };
         const next = overlaysSlice.reducer(
             populated,
@@ -106,6 +118,210 @@ describe("overlaysSlice", () => {
         expect(next.editingTaskId).toBe("t-1");
         expect(next.boardBriefOpen).toBe(true);
         expect(next.aiDraftActiveColumnId).toBe("c-1");
+        expect(next.copilotDock).toEqual({
+            open: true,
+            activeTab: "chat",
+            initialPrompt: null,
+            inboxUnreadCount: 0
+        });
         expect(next.chatDrawer).toEqual({ open: false, pendingPrompt: null });
+    });
+
+    describe("copilotDock actions", () => {
+        it("openCopilotDock with no payload opens on the previously-active tab without a prompt", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock()
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("openCopilotDock with a tab payload switches the active tab on open", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({ tab: "brief" })
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("openCopilotDock with a pendingPrompt stores the prompt for ChatTabBody to consume", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "Summarize the board"
+                })
+            );
+            expect(next.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: "Summarize the board",
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("closeCopilotDock flips open=false and clears the initialPrompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "hello"
+                })
+            );
+            const closed = overlaysSlice.reducer(
+                opened,
+                overlaysActions.closeCopilotDock()
+            );
+            expect(closed.copilotDock).toEqual({
+                open: false,
+                activeTab: "chat",
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("setCopilotDockTab switches the active tab without touching open/prompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "x"
+                })
+            );
+            const switched = overlaysSlice.reducer(
+                opened,
+                overlaysActions.setCopilotDockTab("brief")
+            );
+            expect(switched.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: "x",
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("clearCopilotDockInitialPrompt drops the prompt while leaving open/tab alone", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "brief",
+                    pendingPrompt: "x"
+                })
+            );
+            const cleared = overlaysSlice.reducer(
+                opened,
+                overlaysActions.clearCopilotDockInitialPrompt()
+            );
+            expect(cleared.copilotDock).toEqual({
+                open: true,
+                activeTab: "brief",
+                initialPrompt: null,
+                inboxUnreadCount: 0
+            });
+        });
+
+        /*
+         * R-A M1 review Issue #9 (MINOR): a payload-less
+         * `openCopilotDock()` call previously cleared any already-
+         * staged prompt because the reducer ran
+         * `payload?.pendingPrompt ?? null` unconditionally. The
+         * documented intent is that an open dispatched with no payload
+         * is a pure focus call — it must NOT destroy state staged by
+         * a prior explicit open. Only an explicit
+         * `{ pendingPrompt: null }` should clear it.
+         */
+        it("openCopilotDock with NO payload preserves any already-staged prompt (#9)", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "Summarize"
+                })
+            );
+            // A subsequent payload-less open (e.g. a focus / re-open
+            // from the bottom nav) must not zero the staged prompt.
+            const reopened = overlaysSlice.reducer(
+                opened,
+                overlaysActions.openCopilotDock()
+            );
+            expect(reopened.copilotDock).toEqual({
+                open: true,
+                activeTab: "chat",
+                initialPrompt: "Summarize",
+                inboxUnreadCount: 0
+            });
+        });
+
+        it("openCopilotDock with explicit pendingPrompt: null clears the staged prompt", () => {
+            const opened = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.openCopilotDock({
+                    tab: "chat",
+                    pendingPrompt: "x"
+                })
+            );
+            const cleared = overlaysSlice.reducer(
+                opened,
+                overlaysActions.openCopilotDock({ pendingPrompt: null })
+            );
+            expect(cleared.copilotDock.initialPrompt).toBeNull();
+        });
+
+        it("setCopilotDockTab accepts the inbox tab key (Phase 4 A8)", () => {
+            const next = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockTab("inbox")
+            );
+            expect(next.copilotDock.activeTab).toBe("inbox");
+        });
+
+        /*
+         * Phase 4 A8 — `markCopilotDockInboxRead` zeros the launcher-
+         * badge unread count so the badge collapses to nothing when the
+         * user opens the Inbox surface. The dock host dispatches this
+         * on every open transition (false → true on `inboxSurfaceVisible`).
+         * The projection-effect's `prevNudgeCountRef` is what stops the
+         * count from bouncing back up on the next tab-switch; this
+         * reducer just owns the surface-side "read" signal.
+         */
+        it("markCopilotDockInboxRead zeros the unread count without touching other dock keys", () => {
+            const seeded = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockInboxUnread(3)
+            );
+            expect(seeded.copilotDock.inboxUnreadCount).toBe(3);
+            const next = overlaysSlice.reducer(
+                seeded,
+                overlaysActions.markCopilotDockInboxRead()
+            );
+            expect(next.copilotDock.inboxUnreadCount).toBe(0);
+            // Doesn't touch the other dock keys — pure read signal.
+            expect(next.copilotDock.open).toBe(false);
+            expect(next.copilotDock.activeTab).toBe("chat");
+            expect(next.copilotDock.initialPrompt).toBeNull();
+        });
+
+        it("setCopilotDockInboxUnread clamps negative payloads at 0", () => {
+            const seeded = overlaysSlice.reducer(
+                initialState,
+                overlaysActions.setCopilotDockInboxUnread(5)
+            );
+            expect(seeded.copilotDock.inboxUnreadCount).toBe(5);
+            const clamped = overlaysSlice.reducer(
+                seeded,
+                overlaysActions.setCopilotDockInboxUnread(-2)
+            );
+            expect(clamped.copilotDock.inboxUnreadCount).toBe(0);
+        });
     });
 });

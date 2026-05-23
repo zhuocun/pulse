@@ -36,6 +36,18 @@ export const UNDO_WINDOW_MS = 10_000;
 export const BRIEF_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
+ * Minimum interval between fingerprint-driven brief refetches (R-A M3).
+ * Rapid board edits (drag-drop, inline rename, bulk add) all bump the
+ * board fingerprint and used to burn a fresh provider call each time.
+ * Gate the auto-refresh so consecutive changes within this window
+ * collapse into a single trailing-edge refetch — the user still gets
+ * up-to-date insight, the token bill stops bleeding.
+ *
+ * Manual refresh (the toolbar button) bypasses this gate entirely.
+ */
+export const BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS = 30_000;
+
+/**
  * Sparkle icon size scale (PRD S-R4). Maps to `width`/`height` in CSS px.
  */
 export const sparkleSize = {

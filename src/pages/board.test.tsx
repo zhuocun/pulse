@@ -381,6 +381,42 @@ describe("BoardPage", () => {
         ).toBeInTheDocument();
     });
 
+    /*
+     * Phase 4 A8 review M2 regression: the launcher-badge aria-label
+     * MUST render as a human-readable sentence, NOT raw template
+     * syntax. The original locale embedded ICU plural braces
+     * (`{count, plural, one {nudge} other {nudges}}`) but this codebase
+     * has no ICU formatter — call sites used plain `.replace("{count}", …)`
+     * which left the ICU syntax intact and exposed it to screen-reader
+     * users (e.g. "3 unread Copilot {count, plural, one {nudge} other {nudges}}").
+     * Replaced with two static one/other keys; the call site picks the
+     * right key off the count.
+     */
+    it("renders the launcher badge aria-label as a human-readable string (no ICU template syntax)", async () => {
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(3));
+        renderBoard();
+        await screen.findByText("Roadmap board");
+
+        const badge = screen.getByTestId("copilot-launcher-badge");
+        const ariaLabel = badge.getAttribute("aria-label") ?? "";
+        expect(ariaLabel).toBe("3 unread Copilot nudges");
+        expect(ariaLabel).not.toContain("{count");
+        expect(ariaLabel).not.toContain("plural");
+
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(0));
+    });
+
+    it("uses the singular badge aria-label when the unread count is exactly 1", async () => {
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(1));
+        renderBoard();
+        await screen.findByText("Roadmap board");
+
+        const badge = screen.getByTestId("copilot-launcher-badge");
+        expect(badge.getAttribute("aria-label")).toBe("1 unread Copilot nudge");
+
+        store.dispatch(overlaysActions.setCopilotDockInboxUnread(0));
+    });
+
     it("shows loading, then renders the project board, columns, tasks, and disabled mock drags", async () => {
         let resolveProject: (value: Response) => void = () => undefined;
         let resolveBoards: (value: Response) => void = () => undefined;
