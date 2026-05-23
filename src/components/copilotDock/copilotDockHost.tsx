@@ -287,15 +287,32 @@ const CopilotDockHost: React.FC = () => {
      * `copilotLanding.tsx` opens the chat drawer BEFORE navigating to
      * `/projects`, and the dock state snapshot needs to reflect that
      * by the time the user clicks into a board.
+     *
+     * Always render the bridge wrapped in a fragment so the tree shape
+     * stays stable across projectId transitions (null → value). React
+     * uses the wrapping element type to decide unmount/remount; folding
+     * the bridge into the conditional changed the type between a bare
+     * Element and a Fragment, which tore down `prevChatOpenRef` /
+     * `prevBriefOpenRef` and re-dispatched the bridge effects on the
+     * next render (Issue #6).
+     *
+     * `ProjectScopedDock` carries `key={projectId}` so it REMOUNTS on
+     * project switch. This is the cleanest fix for the cross-project
+     * leaks in #3 (triage agent nudges/threadId/messages) and #7
+     * (board-brief agent suggestion). It also resolves #1 (chat history
+     * stale across switch) because ChatTabBody — which lives inside
+     * ProjectScopedDock — is destroyed and reconstructed alongside it,
+     * so the chat hook's internal `messages` state is fresh for the
+     * new project's restore effect to seed from localStorage. The Redux
+     * dock state (open/activeTab/initialPrompt) lives in the store, not
+     * inside the dock subtree, so it survives the remount unchanged.
      */
-    if (!projectId || !boardAiOn) {
-        return <BridgeLegacyOverlayFlags />;
-    }
-
     return (
         <>
             <BridgeLegacyOverlayFlags />
-            <ProjectScopedDock projectId={projectId} />
+            {projectId && boardAiOn ? (
+                <ProjectScopedDock key={projectId} projectId={projectId} />
+            ) : null}
         </>
     );
 };

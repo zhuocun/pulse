@@ -365,16 +365,13 @@ describe("CopilotDockHost", () => {
         });
         expect(composer).toBeInTheDocument();
 
-        // Capture the actual DOM node so we can verify it does NOT
-        // get torn down and rebuilt on route change.
-        const composerNode = composer as HTMLTextAreaElement;
-        fireEvent.change(composerNode, {
-            target: { value: "remember me across projects" }
-        });
-        expect(composerNode.value).toBe("remember me across projects");
-
-        // Switch project routes via a real navigation. The dock lives
-        // ABOVE the routed Outlet so it must NOT unmount.
+        // Switch project routes via a real navigation. The dock chrome
+        // (Redux open/activeTab state) lives in the store and survives,
+        // but `ProjectScopedDock` carries `key={projectId}` so its
+        // per-project state (in-memory messages buffer, triage agent
+        // nudges/threadId, brief suggestion) resets cleanly on switch —
+        // see Issue #1/#3/#7 in the R-A M1 review. The dock surface
+        // remains visible across the navigation; only the body remounts.
         fireEvent.click(screen.getByText("Go to p2"));
 
         await waitFor(() => {
@@ -383,7 +380,9 @@ describe("CopilotDockHost", () => {
             expect(screen.getByText("Board page")).toBeInTheDocument();
         });
 
-        // The dock surface is still mounted.
+        // The dock surface is still mounted (Redux state preserved the
+        // open flag across the navigation; the new ProjectScopedDock
+        // instance reads the same Redux snapshot and renders Open).
         const dockAfter = document.querySelector(
             "[data-testid='copilot-dock']"
         );
@@ -394,13 +393,11 @@ describe("CopilotDockHost", () => {
         // Active tab is still "chat".
         expect(store.getState().overlays.copilotDock.activeTab).toBe("chat");
 
-        // Most importantly: the composer is the SAME DOM node — the
-        // body did not unmount. The textarea text must be intact.
+        // The composer is mounted for the new project too.
         const composerStill = document.querySelector(
             "textarea[aria-label='Message Board Copilot']"
         ) as HTMLTextAreaElement | null;
-        expect(composerStill).toBe(composerNode);
-        expect(composerStill?.value).toBe("remember me across projects");
+        expect(composerStill).not.toBeNull();
     });
 
     it("preserves the active tab when the user switched to Brief before navigating", async () => {
@@ -481,5 +478,137 @@ describe("CopilotDockHost", () => {
             "Summarize the board"
         );
         expect(store.getState().overlays.copilotDock.activeTab).toBe("chat");
+    });
+
+    /*
+     * Regression for R-A M1 review Issue #1 (CRITICAL): the dock
+     * stayed mounted across project switch BEFORE this fix, so the
+     * ChatTabBody's `messages` useState held p1's conversation when
+     * `project._id` flipped to p2. The chat hook's `seedMessages()`
+     * no-ops when `messages.length > 0` — so p2's saved history never
+     * loaded, and the save effect then wrote the STALE p1 messages
+     * into `saveChatHistory("p2", …)`, silently corrupting p2's
+     * stored history. The fix is `key={projectId}` on
+     * `ProjectScopedDock`, which remounts the body on project switch
+     * so the chat hook's internal state is fresh per project.
+     *
+     * This test simulates the messages-then-switch sequence and
+     * asserts:
+     *   1. p2's localStorage chat history is NOT overwritten with p1's
+     *      messages after the project switch
+     *   2. p2's pre-existing saved history is preserved
+     */
+    it("does NOT overwrite p2's stored chat history with p1's messages after a project switch (#1)", async () => {
+        // Seed p2's storage with its own history so we can verify it
+        // survives the switch from p1.
+        const p2History = [
+            { role: "user" as const, content: "p2 question" },
+            { role: "assistant" as const, content: "p2 answer" }
+        ];
+        window.localStorage.setItem(
+            "copilot_history_p2",
+            JSON.stringify(p2History)
+        );
+
+        // p1's chat hook returns a non-empty messages buffer to simulate
+        // a conversation that's already happened on p1.
+        const p1Messages = [
+            { role: "user" as const, content: "p1 question" },
+            { role: "assistant" as const, content: "p1 answer" }
+        ];
+        mockedUseAiChat.mockReturnValue(baseAiChat({ messages: p1Messages }));
+
+        renderHarness();
+
+        act(() => {
+            store.dispatch(overlaysActions.openChatDrawer());
+        });
+        await waitFor(() => {
+            expect(
+                document.querySelector("[data-testid='copilot-dock']")
+            ).not.toBeNull();
+        });
+
+        // Switch projects. With key={projectId} on ProjectScopedDock,
+        // the body unmounts and remounts; the new chat hook starts with
+        // an empty messages buffer; the save effect writes nothing
+        // (messages.length === 0) until p2 actually starts a turn.
+        fireEvent.click(screen.getByText("Go to p2"));
+        await waitFor(() => {
+            expect(screen.getByText("Board page")).toBeInTheDocument();
+        });
+
+        // p2's storage was NOT corrupted with p1's messages.
+        const storedRaw = window.localStorage.getItem("copilot_history_p2");
+        const stored = storedRaw ? JSON.parse(storedRaw) : [];
+        expect(stored).toEqual(p2History);
+        // Specifically, p1's content didn't bleed across.
+        expect(JSON.stringify(stored)).not.toContain("p1 question");
+        expect(JSON.stringify(stored)).not.toContain("p1 answer");
+    });
+
+    /*
+     * Regression for R-A M1 review Issue #3 + #7 (CRITICAL/MAJOR):
+     * useAgent never reset its internal state when the
+     * `options.projectId` changed, so on `p1 → p2` the triage agent's
+     * `.nudges` from p1 would flash on p2's board until p2's own
+     * stream completes. The fix is `key={projectId}` on
+     * `ProjectScopedDock` — the entire dock subtree (including its
+     * useAgent("triage-agent") call) is destroyed and a fresh
+     * useAgent instance mounts for p2 with empty state.
+     *
+     * We assert this at the React level: after navigation, the
+     * triage useAgent hook is called with the NEW project id and the
+     * previous instance is unmounted (mock cleanup → its returned
+     * state doesn't appear).
+     */
+    it("remounts ProjectScopedDock on projectId change so triage-agent state does NOT leak (#3/#7)", async () => {
+        const p1Nudges = [
+            {
+                nudge_id: "nudge-p1",
+                kind: "wip_overflow" as const,
+                target_ids: ["task-p1-a"],
+                summary: "p1 nudge summary",
+                severity: "warn" as const,
+                project_id: "p1"
+            }
+        ];
+        // The first call (p1) returns nudges from a triage run.
+        mockedUseAgent.mockReturnValueOnce(baseAgent({ nudges: p1Nudges }));
+        // Subsequent calls (p2) return empty nudges — that's a fresh
+        // useAgent instance after the remount.
+        mockedUseAgent.mockReturnValue(baseAgent({ nudges: [] }));
+
+        renderHarness();
+
+        act(() => {
+            store.dispatch(overlaysActions.openChatDrawer());
+        });
+        await waitFor(() => {
+            expect(
+                document.querySelector("[data-testid='copilot-dock']")
+            ).not.toBeNull();
+        });
+
+        // Track every useAgent call so we can verify the SECOND
+        // (post-switch) call carries the new projectId.
+        const callsBefore = mockedUseAgent.mock.calls.length;
+        expect(callsBefore).toBeGreaterThan(0);
+
+        fireEvent.click(screen.getByText("Go to p2"));
+        await waitFor(() => {
+            expect(screen.getByText("Board page")).toBeInTheDocument();
+        });
+
+        // After the switch, useAgent must have been re-invoked with
+        // projectId=p2 — proof the subtree remounted (a non-remount
+        // would just rerender the existing instance without calling
+        // useAgent with the new option). We look for a call whose
+        // options.projectId is "p2" specifically.
+        const sawP2 = mockedUseAgent.mock.calls.some((call) => {
+            const opts = call[1] as { projectId?: string } | undefined;
+            return opts?.projectId === "p2";
+        });
+        expect(sawP2).toBe(true);
     });
 });
