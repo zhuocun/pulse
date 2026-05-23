@@ -203,6 +203,84 @@ describe("TaskModal ghost-text integration", () => {
         });
     });
 
+    it("Tab-accepts the suggestion through AntD Form.Item and submits the merged value", async () => {
+        // Highest-risk wiring per the reviewer: the React value-setter +
+        // `input` event dispatch must round-trip through AntD's
+        // `Form.Item` binding so `form.getFieldValue("note")` updates
+        // and the saved payload carries the accepted suggestion. This
+        // test proves the end-to-end glue inside the real modal —
+        // unit tests in `aiGhostText/index.test.tsx` exercise the
+        // wrapper with a hand-rolled host, which cannot detect a
+        // Form.Item-binding regression.
+        setFlag(true);
+        window.localStorage.setItem("boardCopilot:privacyShown:task-note", "1");
+        const fetchMock = jest.spyOn(global, "fetch");
+        fetchMock.mockResolvedValue({
+            json: jest.fn().mockResolvedValue({ _id: "task-1" }),
+            ok: true,
+            status: 200
+        } as unknown as Response);
+
+        try {
+            renderModal();
+            await screen.findByText(/edit task · build task/i);
+
+            const noteFields = screen
+                .getAllByRole("textbox")
+                .filter((el) => el.tagName.toLowerCase() === "textarea");
+            const note = noteFields[0] as HTMLTextAreaElement;
+
+            // Type a partial value that the engine completes
+            // deterministically (the heading-seeded acceptance branch
+            // in `noteCompletion`).
+            await act(async () => {
+                fireEvent.change(note, {
+                    target: { value: "## Acceptance criteria" }
+                });
+            });
+            await act(async () => {
+                jest.advanceTimersByTime(600);
+            });
+            await waitFor(() => {
+                expect(
+                    screen.getByTestId("ai-ghost-text-overlay")
+                ).toBeInTheDocument();
+            });
+
+            const valueBeforeAccept = note.value;
+            // Tab to accept — this is the path the reviewer flagged.
+            await act(async () => {
+                fireEvent.keyDown(note, { key: "Tab", code: "Tab" });
+            });
+
+            // The textarea's own value must reflect the appended completion
+            // (the React value-setter / `input` event handoff worked).
+            expect(note.value.length).toBeGreaterThan(valueBeforeAccept.length);
+            expect(note.value.startsWith(valueBeforeAccept)).toBe(true);
+            const expectedNote = note.value;
+
+            // Submit and verify the AntD Form.Item picked up the value
+            // — the saved payload must include the accepted note.
+            await act(async () => {
+                fireEvent.click(
+                    screen.getByRole("button", { name: /^save$/i })
+                );
+            });
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+            const body = JSON.parse(
+                (fetchMock.mock.calls[0][1] as RequestInit)?.body as string
+            );
+            expect(body).toEqual(
+                expect.objectContaining({
+                    _id: "task-1",
+                    note: expectedNote
+                })
+            );
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
     it("activates the ghost-text surface after the user acknowledges the disclosure in the same tab", async () => {
         // Reviewer-flagged regression: `usePrivacyConsent` subscribed to
         // `storage` only, but the HTML spec withholds that event from the
