@@ -146,7 +146,8 @@ const zhCN: Dictionary = {
         lensComingSoon: "敬请期待",
         renameTask: "重命名任务",
         columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
-        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理"
+        columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理",
+        confidenceAriaLabel: "置信度 {band}，{percent}"
     },
     dragHints: {
         taskCardKeyboard:
