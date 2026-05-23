@@ -481,6 +481,56 @@ describe("CopilotDockHost", () => {
     });
 
     /*
+     * Regression for R-A M1 review Issue #5 (MAJOR): if the dock was
+     * already open and the user submitted a SECOND palette prompt, the
+     * bridge no-oped because `chatOpen` did not transition false→true.
+     * The new prompt never reached `copilotDock.initialPrompt`. Legacy
+     * `<AiChatDrawer>` passed `initialPrompt` as a prop so its body
+     * re-dispatched on prop change — this PR lost that behavior.
+     *
+     * The fix diffs the prompt against `prevChatPromptRef` and forwards
+     * any non-null change even when chatOpen stays true.
+     */
+    it("forwards a second palette prompt to the dock state while it is already open (#5)", async () => {
+        renderHarness();
+
+        act(() => {
+            store.dispatch(
+                overlaysActions.openChatDrawer({
+                    pendingPrompt: "first prompt"
+                })
+            );
+        });
+
+        await waitFor(() => {
+            expect(store.getState().overlays.copilotDock.open).toBe(true);
+        });
+        expect(store.getState().overlays.copilotDock.initialPrompt).toBe(
+            "first prompt"
+        );
+
+        // Second palette submission — dock is already open, so the
+        // bridge MUST diff the prompt and forward it. Before this fix
+        // the prevOpen short-circuit blocked the dispatch and the new
+        // prompt was silently dropped.
+        act(() => {
+            store.dispatch(
+                overlaysActions.openChatDrawer({
+                    pendingPrompt: "second prompt"
+                })
+            );
+        });
+
+        await waitFor(() => {
+            expect(store.getState().overlays.copilotDock.initialPrompt).toBe(
+                "second prompt"
+            );
+        });
+        // Dock stays open across the prompt update.
+        expect(store.getState().overlays.copilotDock.open).toBe(true);
+    });
+
+    /*
      * Regression for R-A M1 review Issue #1 (CRITICAL): the dock
      * stayed mounted across project switch BEFORE this fix, so the
      * ChatTabBody's `messages` useState held p1's conversation when

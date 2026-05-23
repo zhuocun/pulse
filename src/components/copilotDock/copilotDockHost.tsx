@@ -239,21 +239,36 @@ const BridgeLegacyOverlayFlags: React.FC = () => {
 
     const prevChatOpenRef = useRef(false);
     const prevBriefOpenRef = useRef(false);
+    const prevChatPromptRef = useRef<string | null>(null);
 
     /*
-     * Watch transitions, not absolute values: `chatOpen=true` only
-     * triggers `openDock({ tab: "chat" })` on the false→true edge so
-     * the bridge does not fight a user-initiated tab switch (the user
-     * clicks Brief while the legacy flag is still set true; the dock
-     * must respect the user's tab choice and not snap back to chat).
-     * The transition watcher means the close path — `closeDock()`
-     * fanning out to `closeChatDrawer()` / `closeBoardBrief()` — does
-     * not loop back here because the false→true edge never re-fires.
+     * Watch transitions, not absolute values: `chatOpen=true` triggers
+     * `openDock({ tab: "chat" })` on the false→true edge so the bridge
+     * does not fight a user-initiated tab switch (the user clicks Brief
+     * while the legacy flag is still set true; the dock must respect
+     * the user's tab choice and not snap back to chat).
+     *
+     * Prompt updates are forwarded EVEN when chatOpen stays true. The
+     * dock-open path is otherwise lossy (Issue #5): a second palette
+     * submission while the dock is already open would never reach the
+     * dock state because `chatOpen` did not transition false→true. We
+     * diff the prompt explicitly so the new prompt is dispatched
+     * without regressing the no-loop guarantee — the close path clears
+     * the prompt back to null, so a follow-up open with prompt = new
+     * lands diff null→new, which is the desired behavior.
      */
     useEffect(() => {
         const prevOpen = prevChatOpenRef.current;
+        const prevPrompt = prevChatPromptRef.current;
         prevChatOpenRef.current = chatOpen;
-        if (!chatOpen || prevOpen) return;
+        prevChatPromptRef.current = chatInitialPrompt ?? null;
+        if (!chatOpen) return;
+        const openedNow = !prevOpen;
+        const promptChanged =
+            (chatInitialPrompt ?? null) !== prevPrompt &&
+            chatInitialPrompt !== undefined &&
+            chatInitialPrompt !== null;
+        if (!openedNow && !promptChanged) return;
         openDock({
             tab: "chat",
             pendingPrompt: chatInitialPrompt ?? undefined
