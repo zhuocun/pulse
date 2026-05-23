@@ -738,7 +738,9 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                             </span>
                             <AiConfidenceIndicator
                                 confidence={estimateData.confidence}
-                                tooltip="Based on similar tasks on this board."
+                                tooltip={asMicrocopyString(
+                                    microcopy.ai.estimateConfidenceTooltip
+                                )}
                             />
                             <Button
                                 aria-label={asMicrocopyString(
