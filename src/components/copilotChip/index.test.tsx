@@ -184,6 +184,37 @@ describe("CopilotChip", () => {
         ).toHaveAttribute("data-copilot-chip-variant", "suggested");
     });
 
+    /*
+     * Followup A (PR #308 review): the `color` prop is Omitted from the
+     * underlying `HTMLAttributes<HTMLElement>` so callers can't smuggle
+     * a raw color through and silently fight the curated `tone` system.
+     * The contract is enforced at compile time — passing `color="cyan"`
+     * has to be a TypeScript error, otherwise the named-palette
+     * regression (AntD picks up the unsupported color and renders an
+     * inert chip) would only surface in QA.
+     */
+    it("rejects a raw `color` prop at the TypeScript layer (Followup A)", () => {
+        const node = (
+            <CopilotChip
+                // @ts-expect-error - `color` is intentionally Omitted from
+                // CopilotChipProps so the curated tone palette is the
+                // only valid color knob. If this line ever stops being a
+                // TS error the Omit drifted and the regression guard is
+                // no longer load-bearing.
+                color="cyan"
+                variant="match"
+            >
+                Strong match
+            </CopilotChip>
+        );
+        render(node);
+        // Runtime behaviour is incidental — the test's real assertion is
+        // the `@ts-expect-error` directive on the line above. We still
+        // render so a runtime regression (chip throws on the smuggled
+        // prop) would also fail loudly.
+        expect(screen.getByText("Strong match")).toBeInTheDocument();
+    });
+
     it("matches the variant snapshot for every supported variant", () => {
         // One snapshot per variant — future visual reviews can scan the
         // diff to spot accidental shape drift. The snapshot only covers
