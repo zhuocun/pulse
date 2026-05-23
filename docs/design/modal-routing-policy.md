@@ -40,9 +40,10 @@ Routing the surface buys six things that AntD `Modal` gives up:
    shift the AT already handles.
 5. **`viewTransition: true` works.** React Router 7 wraps any
    navigation marked `viewTransition` in `document.startViewTransition()`,
-   which we already lean on (see `src/App.css:328` and the per-component
-   `view-transition-name: pulse-header` / `pulse-tabbar` opt-outs).
-   Modal mount/unmount is invisible to that pipeline.
+   which we already lean on (see the view-transition rules block in
+   `src/App.css:329-358` and the per-component `view-transition-name:
+   pulse-header` / `pulse-tabbar` opt-outs). Modal mount/unmount is
+   invisible to that pipeline.
 6. **It scales to swipe-between.** Once a surface is keyed off
    `/.../task/:taskId`, "next task" is just another `navigate(...)` —
    no portal teardown, no Redux replay, no `useEffect` race.
@@ -79,12 +80,24 @@ pay that bill back.
 
 - **Delete column** — `src/components/column/index.tsx:425`.
 - **Delete project** — `src/components/projectList/index.tsx:201`.
-- **Discard unsaved edits** — `src/components/taskModal/index.tsx:227`
-  (and the equivalent on `<TaskDetailPanel />`). The dialog is
-  transient; there is no `/are-you-sure-delete-project-foo` URL worth
-  sharing.
+- **Delete task** — `src/components/taskModal/index.tsx:227`
+  (and the equivalent `src/components/taskDetailPanel/index.tsx:367`).
+  The dialog is transient; there is no `/are-you-sure-delete-task-foo`
+  URL worth sharing.
+- **Discard unsaved edits.** Today this only fires from the routed
+  `<TaskDetailPanel />` — see the `<Modal>` at
+  `src/components/taskDetailPanel/index.tsx:888-941`, driven by the
+  `useBlocker`-based dirty-form guard (around line 276). The legacy
+  `<TaskModal>` doesn't have a discard-edits dialog yet; its "Discard
+  edits" affordance (`src/components/taskModal/index.tsx:493`) is a
+  Button on the "removed by others" alert that closes the modal
+  directly. When `<TaskModal>` gains an inline-edits dirty guard, it
+  should reuse the same `<Modal>` shape rather than reaching for a
+  `Modal.confirm`.
 
-These should stay `Modal.confirm` — they're answer-and-go.
+These should stay `Modal.confirm` (or a plain `<Modal>` for the
+discard-edits case — same answer-and-go shape, just rendered with the
+declarative API so we can wire `useBlocker` into the open state).
 
 ## Decision matrix
 
