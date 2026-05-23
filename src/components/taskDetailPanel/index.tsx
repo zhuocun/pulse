@@ -210,6 +210,17 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * still wants the bottom-sheet (B-H1).
      */
     const isDesktopRail = !isPhone && screens.lg === true;
+    /*
+     * Rail focus management (R-B H1). The AntD Drawer used by the
+     * phone/tablet chassis handles focus trap + restore on its own; the
+     * desktop rail is a plain `<aside>` so we wire equivalent SR/keyboard
+     * affordances by hand. On mount we capture the previously-focused
+     * element, then move focus into the aside so screen readers announce
+     * the panel landmark; on unmount we restore focus to that element so
+     * keyboard users land back on the column card that opened the task.
+     */
+    const asideRef = useRef<HTMLElement | null>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
     const [appliedFieldOrigin, setAppliedFieldOrigin] = useState<
@@ -481,6 +492,24 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             closePanel();
         }
     }, [closePanel, dLoading, editingTask, form, taskId, tasks]);
+
+    /*
+     * Rail focus management (R-B H1). On mount in desktop-rail mode,
+     * remember whatever was focused (typically the column card the user
+     * activated), then move focus to the aside so screen readers
+     * announce the new landmark; on unmount, restore focus so keyboard
+     * users land back on the trigger. The drawer chassis (phone/tablet)
+     * gets focus trap + restore from AntD's Drawer, so this only fires
+     * for the bare `<aside>`.
+     */
+    useEffect(() => {
+        if (!isDesktopRail) return;
+        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        asideRef.current?.focus();
+        return () => {
+            previousFocusRef.current?.focus?.();
+        };
+    }, [isDesktopRail]);
 
     /*
      * Swipe-between-tasks handlers (Phase 3 A2 — Line 171 of the
@@ -1073,6 +1102,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     // rail (header, body, footer) advance the URL.
                     onTouchEnd={onTouchEnd}
                     onTouchStart={onTouchStart}
+                    ref={asideRef}
+                    // tabIndex=-1 so the rail mount effect can focus the
+                    // landmark for screen-reader announcement (R-B H1).
+                    tabIndex={-1}
                     style={{
                         background:
                             "var(--ant-color-bg-container, var(--pulse-bg-surface, #ffffff))",
