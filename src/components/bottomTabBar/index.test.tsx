@@ -3,8 +3,26 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
+import nativeNavigate from "../../utils/nativeNavigate";
 
 import BottomTabBar from ".";
+
+/*
+ * `nativeNavigate` calls `window.location.assign(...)` in production
+ * (no-op in jsdom). Mock to a spy so we can assert the URL the bar
+ * forwards to the document-navigation hatch. The BottomTabBar routes
+ * through `nativeNavigate` to bypass the iOS Safari WebKit / Chrome
+ * Android "URL changed, page didn't navigate" purgatory (see
+ * `src/utils/nativeNavigate.ts`).
+ */
+jest.mock("../../utils/nativeNavigate", () => ({
+    __esModule: true,
+    default: jest.fn()
+}));
+
+const mockedNativeNavigate = nativeNavigate as jest.MockedFunction<
+    typeof nativeNavigate
+>;
 
 const renderBar = (initialPath = "/projects") =>
     render(
@@ -24,6 +42,10 @@ const renderBar = (initialPath = "/projects") =>
     );
 
 describe("BottomTabBar", () => {
+    beforeEach(() => {
+        mockedNativeNavigate.mockReset();
+    });
+
     afterEach(() => {
         // Reset visualViewport mocks between tests so keyboard-state
         // assertions don't leak across cases. The cast widens window to
@@ -92,19 +114,76 @@ describe("BottomTabBar", () => {
         expect(profile).toHaveAttribute("aria-current", "page");
     });
 
-    it("clicking a tab navigates to the target route", async () => {
+    it("clicking a tab forces a real document navigation to the target route", async () => {
         const user = userEvent.setup();
         renderBar("/projects");
         const inbox = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.inbox, "i")
         });
         await user.click(inbox);
-        // After navigation, the Inbox link now carries aria-current.
-        expect(
-            screen.getByRole("link", {
-                name: new RegExp(microcopy.nav.tabs.inbox, "i")
-            })
-        ).toHaveAttribute("aria-current", "page");
+        expect(mockedNativeNavigate).toHaveBeenCalledWith("/inbox");
+        expect(mockedNativeNavigate).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not force a navigation when the user clicks the active tab", async () => {
+        const user = userEvent.setup();
+        renderBar("/inbox");
+        const inbox = screen.getByRole("link", {
+            name: new RegExp(microcopy.nav.tabs.inbox, "i")
+        });
+        await user.click(inbox);
+        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("treats nested /projects routes as the active Boards tab (no-op click)", async () => {
+        const user = userEvent.setup();
+        renderBar("/projects/p1/board");
+        const boards = screen.getByRole("link", {
+            name: new RegExp(microcopy.nav.tabs.boards, "i")
+        });
+        await user.click(boards);
+        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("forces navigation from a nested /projects route to a sibling tab (board page bug fix)", async () => {
+        const user = userEvent.setup();
+        // The reported bug: clicking a BottomTabBar tab from
+        // `/projects/:projectId/board` updated the URL but the page
+        // stayed on the board until refresh. The fix routes through
+        // `nativeNavigate` so the document reloads against the new URL.
+        renderBar("/projects/p1/board");
+        const inbox = screen.getByRole("link", {
+            name: new RegExp(microcopy.nav.tabs.inbox, "i")
+        });
+        await user.click(inbox);
+        expect(mockedNativeNavigate).toHaveBeenCalledWith("/inbox");
+    });
+
+    it("lets modifier-clicks fall through to the anchor href (new-tab affordance)", () => {
+        renderBar("/projects");
+        const inbox = screen.getByRole("link", {
+            name: new RegExp(microcopy.nav.tabs.inbox, "i")
+        });
+        // userEvent doesn't expose modifier-state on click, but
+        // fireEvent does. Cmd/Ctrl-click must not call nativeNavigate.
+        fireEvent.click(inbox, { metaKey: true });
+        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        fireEvent.click(inbox, { ctrlKey: true });
+        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        fireEvent.click(inbox, { shiftKey: true });
+        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the rendered anchor href so middle-click and copy-link still work", () => {
+        renderBar("/projects");
+        const inbox = screen.getByRole("link", {
+            name: new RegExp(microcopy.nav.tabs.inbox, "i")
+        });
+        // NavLink resolves `to` to an `href` attribute on the anchor.
+        // Verify it matches the tab's destination so right-click "Copy
+        // link" and middle-click "Open in new tab" work without
+        // round-tripping through `nativeNavigate`.
+        expect(inbox).toHaveAttribute("href", "/inbox");
     });
 
     it("supports arrow-key navigation between tabs", () => {

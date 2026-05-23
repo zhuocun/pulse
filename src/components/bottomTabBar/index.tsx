@@ -6,7 +6,7 @@ import {
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { useEffect, useRef, useState } from "react";
-import { NavLink } from "react-router";
+import { NavLink, useLocation } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import {
@@ -18,6 +18,7 @@ import {
     space,
     zIndex
 } from "../../theme/tokens";
+import nativeNavigate from "../../utils/nativeNavigate";
 
 /**
  * BottomTabBar — Phase 3 A3.
@@ -184,9 +185,30 @@ const TabLabel = styled.span`
     line-height: ${fontSize.xs * 1.1}px;
 `;
 
+/*
+ * Same iOS Safari WebKit / Chrome Android "URL changed, page didn't
+ * navigate" purgatory that bites `ProjectCard.TitleLink` and the brand
+ * logo (see `nativeNavigate.ts`). React Router's context propagation
+ * fails on those engines when the click originates from a subtree
+ * loaded under deep providers (board page, with the DnD context + AI
+ * drawers + multiple `useUrl` instances mounted). The address bar
+ * updates via `pushState` but `Routes` never re-renders — refreshing
+ * the page resolves it because the React tree mounts fresh against
+ * the new URL. We mirror the project-card pattern: keep the anchor
+ * `href` for accessibility + middle-/modifier-click, but intercept the
+ * primary click and force a real document navigation.
+ */
+const isPrimaryClick = (event: React.MouseEvent<HTMLAnchorElement>): boolean =>
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    !event.altKey &&
+    event.button === 0;
+
 const BottomTabBar: React.FC = () => {
     const tabsRef = useRef<HTMLAnchorElement[]>([]);
     const [keyboardOpen, setKeyboardOpen] = useState(false);
+    const location = useLocation();
 
     /*
      * Hide the bar while the soft keyboard is open. iOS Safari + Chrome
@@ -258,20 +280,36 @@ const BottomTabBar: React.FC = () => {
             data-testid="bottom-tab-bar"
             onKeyDown={onKeyDown}
         >
-            {TAB_DEFINITIONS.map((tab, idx) => (
-                <TabLink
-                    key={tab.to}
-                    end={tab.end}
-                    ref={(node: HTMLAnchorElement | null) => {
-                        tabsRef.current[idx] = node as HTMLAnchorElement;
-                    }}
-                    tabIndex={keyboardOpen ? -1 : 0}
-                    to={tab.to}
-                >
-                    <TabIcon>{tab.icon}</TabIcon>
-                    <TabLabel>{microcopy.nav.tabs[tab.labelKey]}</TabLabel>
-                </TabLink>
-            ))}
+            {TAB_DEFINITIONS.map((tab, idx) => {
+                // Same active-state predicate NavLink applies internally:
+                // exact match, or any prefix match when `end={false}`.
+                const isActive = tab.end
+                    ? location.pathname === tab.to
+                    : location.pathname === tab.to ||
+                      location.pathname.startsWith(`${tab.to}/`);
+                return (
+                    <TabLink
+                        key={tab.to}
+                        end={tab.end}
+                        onClick={(event) => {
+                            // Leave the active tab a no-op; let
+                            // modifier-clicks open in a new tab via the
+                            // anchor `href`.
+                            if (isActive || !isPrimaryClick(event)) return;
+                            event.preventDefault();
+                            nativeNavigate(tab.to);
+                        }}
+                        ref={(node: HTMLAnchorElement | null) => {
+                            tabsRef.current[idx] = node as HTMLAnchorElement;
+                        }}
+                        tabIndex={keyboardOpen ? -1 : 0}
+                        to={tab.to}
+                    >
+                        <TabIcon>{tab.icon}</TabIcon>
+                        <TabLabel>{microcopy.nav.tabs[tab.labelKey]}</TabLabel>
+                    </TabLink>
+                );
+            })}
         </Nav>
     );
 };
