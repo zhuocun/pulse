@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agents import AgentRuntime
-from app.agents.checkpointing import resolve_agent_postgres_uri
+from app.agents.checkpointing import resolve_agent_backend, resolve_agent_postgres_uri
 from app.agents.errors import AgentConfigurationError, AgentError, agent_app_error_content
 from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
 from app.agents.llm import assert_provider_available
@@ -87,16 +87,19 @@ def _validate_agent_postgres_backend(cfg: Settings) -> None:
     having to dig into the code.
     """
 
-    if (
-        cfg.agent_checkpoint_backend != "postgres"
-        and cfg.agent_store_backend != "postgres"
-    ):
+    checkpoint_resolved = resolve_agent_backend(
+        cfg.agent_checkpoint_backend, agent_postgres_uri=cfg.agent_postgres_uri
+    )
+    store_resolved = resolve_agent_backend(
+        cfg.agent_store_backend, agent_postgres_uri=cfg.agent_postgres_uri
+    )
+    if checkpoint_resolved != "postgres" and store_resolved != "postgres":
         return
 
     backends_to_check: list[str] = []
-    if cfg.agent_checkpoint_backend == "postgres":
+    if checkpoint_resolved == "postgres":
         backends_to_check.append("AGENT_CHECKPOINT_BACKEND")
-    if cfg.agent_store_backend == "postgres":
+    if store_resolved == "postgres":
         backends_to_check.append("AGENT_STORE_BACKEND")
 
     for backend_env in backends_to_check:
@@ -589,8 +592,14 @@ def _validate_memory_agent_backends(cfg: Settings) -> None:
     misconfiguration before interrupt-using agent runs dead-end.
     """
 
-    checkpoint_is_memory = cfg.agent_checkpoint_backend == "memory"
-    store_is_memory = cfg.agent_store_backend == "memory"
+    checkpoint_resolved = resolve_agent_backend(
+        cfg.agent_checkpoint_backend, agent_postgres_uri=cfg.agent_postgres_uri
+    )
+    store_resolved = resolve_agent_backend(
+        cfg.agent_store_backend, agent_postgres_uri=cfg.agent_postgres_uri
+    )
+    checkpoint_is_memory = checkpoint_resolved == "memory"
+    store_is_memory = store_resolved == "memory"
 
     if not (checkpoint_is_memory or store_is_memory):
         return
@@ -621,10 +630,10 @@ def _validate_memory_agent_backends(cfg: Settings) -> None:
         "(checkpoint=%s, store=%s). Interrupt-using agents (board-brief, "
         "task-drafting, task-estimation, triage) cannot resume across "
         "processes; production deployments should set "
-        "AGENT_CHECKPOINT_BACKEND=postgres and AGENT_STORE_BACKEND=postgres "
-        "with AGENT_POSTGRES_URI (or POSTGRES_URI) configured.",
-        cfg.agent_checkpoint_backend,
-        cfg.agent_store_backend,
+        "AGENT_POSTGRES_URI (the default `auto` then switches both "
+        "backends to postgres) or set the backends explicitly.",
+        checkpoint_resolved,
+        store_resolved,
     )
 
 

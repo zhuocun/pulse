@@ -29,10 +29,12 @@ from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 
 from app.agents.checkpointing import (
+    BACKEND_AUTO,
     BACKEND_MEMORY,
     BACKEND_NONE,
     BACKEND_POSTGRES,
     enter_agent_postgres_pool,
+    resolve_agent_backend,
     resolve_agent_postgres_uri,
 )
 from app.agents.errors import AgentConfigurationError
@@ -72,6 +74,14 @@ def build_store(
     """
 
     normalized = (backend or "").strip().lower()
+    if normalized == BACKEND_AUTO:
+        if settings is None:
+            from app.config import settings as default_settings
+
+            settings = default_settings
+        normalized = resolve_agent_backend(
+            normalized, agent_postgres_uri=settings.agent_postgres_uri
+        )
     if normalized in {"", BACKEND_NONE, "off", "disabled"}:
         return None
     if normalized == BACKEND_MEMORY:

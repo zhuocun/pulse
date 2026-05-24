@@ -98,6 +98,7 @@ def test_camelcase_and_snake_case_mirrors_match(client: TestClient) -> None:
         ("embeddingsStubMode", "embeddings_stub_mode"),
         ("checkpointerBackend", "checkpointer_backend"),
         ("storeBackend", "store_backend"),
+        ("agentPostgresUriConfigured", "agent_postgres_uri_configured"),
         ("rateLimitBackend", "rate_limit_backend"),
         ("budgetBackend", "budget_backend"),
         ("idempotencyBackend", "idempotency_backend"),
@@ -158,3 +159,100 @@ def test_agents_loaded_matches_runtime_registry(client: TestClient) -> None:
     body = response.json()
     assert body["agentsLoaded"] == expected
     assert body["agents_loaded"] == expected
+
+
+def test_auto_backend_with_uri_reports_postgres_resolved(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``auto`` + ``AGENT_POSTGRES_URI`` surfaces ``postgres`` in the payload.
+
+    The resolved backend is the user-meaningful value -- if it leaked
+    ``"auto"`` the operator dashboard would render a sentinel string
+    that does not match the docs or the lifespan log.
+    """
+
+    _patch_settings(
+        monkeypatch,
+        agent_checkpoint_backend="auto",
+        agent_store_backend="auto",
+        agent_postgres_uri="postgres://example.invalid/db",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert body["checkpointerBackend"] == "postgres"
+    assert body["storeBackend"] == "postgres"
+    assert body["checkpointer_backend"] == "postgres"
+    assert body["store_backend"] == "postgres"
+    assert body["agentPostgresUriConfigured"] is True
+    assert body["agent_postgres_uri_configured"] is True
+
+
+def test_auto_backend_without_uri_reports_memory_resolved(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``auto`` + empty URI falls back to ``memory`` in the readiness payload."""
+
+    _patch_settings(
+        monkeypatch,
+        agent_checkpoint_backend="auto",
+        agent_store_backend="auto",
+        agent_postgres_uri="",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert body["checkpointerBackend"] == "memory"
+    assert body["storeBackend"] == "memory"
+    assert body["agentPostgresUriConfigured"] is False
+    assert body["agent_postgres_uri_configured"] is False
+
+
+def test_agent_postgres_uri_never_appears_in_response(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Postgres DSN must never leak into the response body.
+
+    Only the boolean ``configured`` flag is safe to expose; the URI
+    itself includes credentials and is treated as a secret.
+    """
+
+    secret_uri = "postgres://leakcheck-user:leakcheck-pw@db.invalid:5432/leakcheck"
+    _patch_settings(
+        monkeypatch,
+        agent_checkpoint_backend="auto",
+        agent_store_backend="auto",
+        agent_postgres_uri=secret_uri,
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body_text = response.text
+
+    assert secret_uri not in body_text
+    assert "leakcheck-user" not in body_text
+    assert "leakcheck-pw" not in body_text
+    assert "db.invalid" not in body_text
+
+
+def test_hosted_memory_checkpointer_emits_uri_warning(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On a hosted deploy, memory checkpointer triggers an
+    ``AGENT_POSTGRES_URI`` warning.
+
+    The warning names the env var the operator should set (the new
+    auto-detect path), not the legacy three-var combination.
+    """
+
+    monkeypatch.setenv("VERCEL", "1")
+    _patch_settings(
+        monkeypatch,
+        agent_checkpoint_backend="auto",
+        agent_store_backend="auto",
+        agent_postgres_uri="",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert body["hostedPlatform"] is not None
+    assert any("AGENT_POSTGRES_URI" in w for w in body["warnings"])

@@ -19,6 +19,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Request, status
 
 from app.agents import AgentRuntime
+from app.agents.checkpointing import resolve_agent_backend
 from app.agents.embeddings import resolve_embeddings_spec
 from app.agents.llm import (
     PROVIDER_STUB,
@@ -57,7 +58,10 @@ def _agent_persistence_ok(runtime: AgentRuntime) -> bool:
     request path.
     """
 
-    backend = settings.agent_checkpoint_backend
+    backend = resolve_agent_backend(
+        settings.agent_checkpoint_backend,
+        agent_postgres_uri=settings.agent_postgres_uri,
+    )
     if backend == "postgres":
         return runtime.checkpointer is not None
     # ``none`` / ``memory`` / unknown future backends: trust that boot
@@ -95,7 +99,18 @@ def health(runtime: AgentRuntime) -> Dict[str, Any]:
     latency_ms = round((time.perf_counter() - started) * 1000.0, 2)
 
     persistence_ok = _agent_persistence_ok(runtime)
-    persistence_backend = settings.agent_checkpoint_backend
+    # Surface the resolved value (post-``auto``) so the operator dashboard
+    # and the FE banner see ``"postgres"`` / ``"memory"`` rather than the
+    # ``"auto"`` sentinel. The raw config value is never user-meaningful.
+    checkpointer_resolved = resolve_agent_backend(
+        settings.agent_checkpoint_backend,
+        agent_postgres_uri=settings.agent_postgres_uri,
+    )
+    store_resolved = resolve_agent_backend(
+        settings.agent_store_backend,
+        agent_postgres_uri=settings.agent_postgres_uri,
+    )
+    persistence_backend = checkpointer_resolved
     agents_loaded = len(runtime.registry)
     overall_ok = db_ok and persistence_ok
     return {
@@ -106,8 +121,8 @@ def health(runtime: AgentRuntime) -> Dict[str, Any]:
         "agentsLoaded": agents_loaded,
         "latency_ms": latency_ms,
         "latencyMs": latency_ms,
-        "checkpointer": settings.agent_checkpoint_backend,
-        "store": settings.agent_store_backend,
+        "checkpointer": checkpointer_resolved,
+        "store": store_resolved,
         "agent_persistence": persistence_backend,
         "agentPersistence": persistence_backend,
         "agent_persistence_ok": persistence_ok,
@@ -166,6 +181,23 @@ def _ai_readiness_payload(
     multi_instance, _multi_reason = _is_multi_instance()
     hosted_platform = detected_hosted_platform()
 
+    # Auto-detect: ``AGENT_CHECKPOINT_BACKEND`` / ``AGENT_STORE_BACKEND``
+    # default to ``"auto"`` and resolve to ``"postgres"`` when
+    # ``AGENT_POSTGRES_URI`` is set. Both the readiness payload and the
+    # downstream guard logic must read the resolved value so the
+    # operator sees the same backend name everywhere.
+    checkpointer_resolved = resolve_agent_backend(
+        settings.agent_checkpoint_backend,
+        agent_postgres_uri=settings.agent_postgres_uri,
+    )
+    store_resolved = resolve_agent_backend(
+        settings.agent_store_backend,
+        agent_postgres_uri=settings.agent_postgres_uri,
+    )
+    agent_postgres_uri_configured = bool(
+        (settings.agent_postgres_uri or "").strip()
+    )
+
     issues: List[str] = []
     warnings: List[str] = []
 
@@ -191,20 +223,19 @@ def _ai_readiness_payload(
             "Running in stub mode -- no real LLM provider configured"
         )
 
-    # Backend-shape issues.
-    if (
-        settings.agent_checkpoint_backend == "postgres"
-        and runtime.checkpointer is None
-    ):
+    # Backend-shape issues. Read the resolved values so an operator who
+    # only set ``AGENT_POSTGRES_URI`` (and left the backends on ``auto``)
+    # still gets the right diagnostic.
+    if checkpointer_resolved == "postgres" and runtime.checkpointer is None:
         issues.append(
             "AGENT_CHECKPOINT_BACKEND=postgres but the runtime checkpointer "
             "is None"
         )
 
     memory_backends = []
-    if settings.agent_checkpoint_backend == "memory":
+    if checkpointer_resolved == "memory":
         memory_backends.append("AGENT_CHECKPOINT_BACKEND=memory")
-    if settings.agent_store_backend == "memory":
+    if store_resolved == "memory":
         memory_backends.append("AGENT_STORE_BACKEND=memory")
     if settings.rate_limit_backend.strip().lower() == "memory":
         memory_backends.append("RATE_LIMIT_BACKEND=memory")
@@ -218,6 +249,20 @@ def _ai_readiness_payload(
         warnings.append(
             "Memory backend(s) on a multi-instance deploy: "
             + ", ".join(memory_backends)
+        )
+
+    # Surfacing the auto-detect path: a hosted deploy with the memory
+    # checkpointer (because no ``AGENT_POSTGRES_URI`` was provided)
+    # cannot resume interrupt-using agents across cold starts. Point
+    # the operator at the one env var that fixes it.
+    if (
+        hosted_platform is not None
+        and checkpointer_resolved == "memory"
+    ):
+        warnings.append(
+            "Agent checkpointer is in-memory on a hosted deploy "
+            f"({hosted_platform}); set AGENT_POSTGRES_URI to a managed "
+            "Postgres so the interrupt-using agents survive cold starts."
         )
 
     if hosted_platform is not None and not settings.cors_origin_regex:
@@ -246,8 +291,9 @@ def _ai_readiness_payload(
         "failoverConfigured": failover_spec is not None,
         "embeddingsProvider": embeddings_spec.provider,
         "embeddingsStubMode": embeddings_spec.is_stub,
-        "checkpointerBackend": settings.agent_checkpoint_backend,
-        "storeBackend": settings.agent_store_backend,
+        "checkpointerBackend": checkpointer_resolved,
+        "storeBackend": store_resolved,
+        "agentPostgresUriConfigured": agent_postgres_uri_configured,
         "rateLimitBackend": settings.rate_limit_backend,
         "budgetBackend": settings.budget_backend,
         "idempotencyBackend": settings.idempotency_backend,
@@ -290,6 +336,7 @@ def _ai_readiness_payload(
         "embeddings_stub_mode": payload["embeddingsStubMode"],
         "checkpointer_backend": payload["checkpointerBackend"],
         "store_backend": payload["storeBackend"],
+        "agent_postgres_uri_configured": payload["agentPostgresUriConfigured"],
         "rate_limit_backend": payload["rateLimitBackend"],
         "budget_backend": payload["budgetBackend"],
         "idempotency_backend": payload["idempotencyBackend"],
