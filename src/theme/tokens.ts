@@ -426,7 +426,9 @@ export const viewTransition = {
     /** Lens (filter) chip — for chip-to-detail morphing. */
     lensChip: "pulse-lens-chip",
     /** Copilot suggestion chip — for chip-to-message morphing. */
-    copilotChip: "pulse-copilot-chip"
+    copilotChip: "pulse-copilot-chip",
+    /** Phone-chassis tab-bar accessory slot — pinned across navigations. */
+    tabAccessory: "pulse-tab-accessory"
 } as const;
 
 /*
