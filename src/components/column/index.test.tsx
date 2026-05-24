@@ -680,6 +680,72 @@ describe("Column", () => {
     });
 
     /*
+     * Phase 5 "Liquid Glass" Wave 2 T3 — Liquid chrome recipe upgrade.
+     * The ColumnHeader gains:
+     *   1. Specular rim (::before / ::after gradient layers).
+     *   2. data-glass-context="true" marker.
+     *
+     * Deliberately omitted:
+     *   - Gel-flex on children: the column-name (inline-edit) and the
+     *     more-actions trigger don't follow the press-flex interaction
+     *     model. The ColumnDragHandleButton lives inside @hello-pangea/dnd's
+     *     transform tree; a scale-on-press would fight the drag transform.
+     *   - Scroll-edge dissolve: the parent TaskContainer scroll port
+     *     already carries its own edge fade in board.tsx — adding a
+     *     second one would double-feather the boundary.
+     */
+    describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it('marks the ColumnHeader root with data-glass-context="true"', () => {
+            renderColumn();
+            const header = screen.getByTestId("column-header");
+            expect(header.getAttribute("data-glass-context")).toBe("true");
+        });
+
+        it("emits a ::before specular-rim layer with --glass-specular-top", () => {
+            renderColumn();
+            const css = sheetText();
+            expect(css).toMatch(
+                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            );
+        });
+
+        it("emits a ::after companion shadow layer with --glass-specular-bottom", () => {
+            renderColumn();
+            const css = sheetText();
+            expect(css).toMatch(
+                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            );
+        });
+
+        it("respects prefers-reduced-transparency by dropping the rim backgrounds", () => {
+            renderColumn();
+            const css = sheetText();
+            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+
+        it("respects forced-colors mode (Windows high-contrast) by dropping the rim layers", () => {
+            renderColumn();
+            const css = sheetText();
+            expect(css).toMatch(/forced-colors[^}]*active/);
+        });
+    });
+
+    /*
      * Part B — inline-edit task card title (Phase 4.5 of `ui-todo.md`).
      */
     describe("inline-edit task title", () => {

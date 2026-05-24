@@ -456,28 +456,86 @@ const ColumnHeader = styled(Row)`
     z-index: ${zIndex.sticky};
 
     /*
+     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim. The
+     * column header is sticky inside the column's scroll port, so the
+     * highlight rides with the pinned pane and reads as the same
+     * tilted glass edge whether the column is scrolled or at rest.
+     * No scroll-edge dissolve here — the column scroll port already
+     * carries its own edge fade in board.tsx, so adding one here
+     * would double-feather the boundary.
+     *
+     * No gel-flex on the children either: the column-name (inline
+     * edit) and more-actions trigger don't follow the press-flex
+     * interaction model — they're editing / popover triggers — and
+     * the ColumnDragHandleButton lives inside @hello-pangea/dnd's
+     * transform tree, so a scale-on-press would fight the drag
+     * transform.
+     */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-top);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-bottom);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Children sit above the rim pseudo-elements. The header's two
+     * direct children (the title cluster span + DeleteDropDown) lift
+     * onto z-index 1 so the rim paints behind, not over.
+     */
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    /*
      * Honour the user's reduced-transparency preference: collapse the
      * frosted backdrop to a solid surface so the column doesn't look
      * smeared in environments that disable transparency (Windows
      * high-contrast, macOS "Reduce Transparency"). Mirrors the recipe
-     * the main page header uses.
+     * the main page header uses. Drop the rim too — the achromatic
+     * highlight reads as noise on an opaque body.
      */
     @media (prefers-reduced-transparency: reduce) {
         background: var(--ant-color-bg-container, #ffffff);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+
+        &::before,
+        &::after {
+            background: none;
+        }
     }
 
     /*
      * Forced-colors mode (Windows high-contrast) replaces every author
      * colour with system tokens. Drop the translucent background so the
      * system colour wins; keep the sticky positioning intact because
-     * pinning the header is still useful in high-contrast.
+     * pinning the header is still useful in high-contrast. Drop the
+     * rim layers so they don't compete with Canvas / CanvasText.
      */
     @media (forced-colors: active) {
         background: Canvas;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+
+        &::before,
+        &::after {
+            background: none;
+        }
     }
 
     /*
@@ -1059,7 +1117,11 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                  * ancestor) and not stuck at all.
                  */}
                 <TaskContainer data-testid="column-task-container">
-                    <ColumnHeader between data-testid="column-header">
+                    <ColumnHeader
+                        between
+                        data-glass-context="true"
+                        data-testid="column-header"
+                    >
                         <span
                             style={{
                                 alignItems: "center",

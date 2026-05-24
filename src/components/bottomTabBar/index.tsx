@@ -110,6 +110,44 @@ const Nav = styled.nav<{ $hidden: boolean }>`
         props.$hidden ? "translateY(100%)" : "translateY(0)"};
     transition: transform ${motion.short}ms ease-out;
 
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim. The
+     * 135deg axis catches the highlight on the bar's upper edge,
+     * which is the edge the user sees against scrolling content
+     * directly above the bar. No scroll-edge dissolve here — the bar
+     * is pinned to the viewport bottom rather than sitting over
+     * content scrolled past it.
+     */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-top);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Companion bottom-trailing shadow trough. Same recipe the header
+     * uses, sans the mask-image edge dissolve.
+     */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-bottom);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* Children sit above the rim pseudo-elements. */
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
     @media (prefers-reduced-motion: reduce) {
         transition: none;
     }
@@ -119,6 +157,18 @@ const Nav = styled.nav<{ $hidden: boolean }>`
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+
+        &::before,
+        &::after {
+            background: none;
+        }
+    }
+
+    @media (forced-colors: active) {
+        &::before,
+        &::after {
+            background: none;
+        }
     }
 `;
 
@@ -139,7 +189,17 @@ const TabLink = styled(NavLink)`
     padding: ${space.xxs}px ${space.xs}px;
     position: relative;
     text-decoration: none;
-    transition: color ${motion.short}ms ease-out;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex on bottom-tab taps.
+     * Each NavLink yields on press for tactile parity with the
+     * header's IconButton / PillTrigger. transform-only; layout box
+     * stays 56 px tall so the min-height invariant is preserved.
+     */
+    transition:
+        color ${motion.short}ms ease-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
+    will-change: transform;
 
     /* The active-state indicator is a hairline top stripe + colored
      * label + heavier weight. NavLink emits aria-current=page on the
@@ -171,8 +231,16 @@ const TabLink = styled(NavLink)`
         outline-offset: -2px;
     }
 
+    &:active {
+        transform: scale(0.97);
+    }
+
     @media (prefers-reduced-motion: reduce) {
         transition: none;
+
+        &:active {
+            transform: none;
+        }
     }
 `;
 
@@ -284,6 +352,7 @@ const BottomTabBar: React.FC = () => {
             // legacy aria-hidden+tabIndex=-1 hand-rolled pattern.
             inert={keyboardOpen || undefined}
             aria-label={microcopy.nav.primaryLandmarkLabel}
+            data-glass-context="true"
             data-testid="bottom-tab-bar"
             onKeyDown={onKeyDown}
         >

@@ -72,20 +72,110 @@ const PageHeader = styled.header`
     padding-block-start: max(2px, env(safe-area-inset-top));
     padding-inline-start: max(${space.sm}px, env(safe-area-inset-left));
     padding-inline-end: max(${space.sm}px, env(safe-area-inset-right));
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — position the chrome as a
+     * relative containing block so the ::before / ::after specular
+     * rim layers and the scroll-edge dissolve gradient anchor to the
+     * header's box. position:sticky already creates a stacking context,
+     * but the rim recipe below depends on this containment regardless.
+     */
     position: sticky;
     top: 0;
     z-index: 10;
 
     /*
+     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim. A
+     * tilted achromatic highlight that models a light source at the
+     * top-leading corner catching the glass edge. The 135deg axis is
+     * fixed (light-source-conventional per Apple HIG); the gradient
+     * fades by 40% so the highlight pins to the rim rather than
+     * washing the centre of the chrome.
+     */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-top);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — bottom-trailing companion
+     * shadow + scroll-edge dissolve. The ::after layer paints a soft
+     * trough on the opposite corner from the highlight AND fades
+     * the bottom 12px into transparent so content scrolling under
+     * the sticky header dissolves through the chrome edge rather
+     * than terminating in a hard cut. The mask-image gradient keeps
+     * the highlight + companion painted on the top 88% of the bar
+     * and tapers them out into the 12px scroll-edge trim.
+     */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-bottom);
+        pointer-events: none;
+        z-index: 0;
+        mask-image: linear-gradient(
+            to bottom,
+            black calc(100% - 12px),
+            transparent 100%
+        );
+        -webkit-mask-image: linear-gradient(
+            to bottom,
+            black calc(100% - 12px),
+            transparent 100%
+        );
+    }
+
+    /*
+     * Children sit above the rim pseudo-elements. The two flex
+     * clusters (LeftCluster, RightCluster) are direct children — lift
+     * them so the rim layers paint *behind* the icons / brand link
+     * rather than over them.
+     */
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    /*
      * Honor the user's reduced-transparency preference: collapse the
      * glass surface to the solid page background and drop the blur.
      * Same recipe App.css uses on the body and on AntD modals/drawers.
+     * Drop the rim + dissolve too — the achromatic highlight reads as
+     * noise once the body becomes opaque.
      */
     @media (prefers-reduced-transparency: reduce) {
         background: var(--page-background);
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+
+        &::before,
+        &::after {
+            background: none;
+            mask-image: none;
+            -webkit-mask-image: none;
+        }
+    }
+
+    /*
+     * Forced-colors mode (Windows high-contrast) replaces every author
+     * colour with system tokens. Drop the rim layers so Canvas /
+     * CanvasText win without competing achromatic gradients painted
+     * on top.
+     */
+    @media (forced-colors: active) {
+        &::before,
+        &::after {
+            background: none;
+            mask-image: none;
+            -webkit-mask-image: none;
+        }
     }
 
     @media (min-width: ${breakpoints.sm}px) {
@@ -162,13 +252,37 @@ const PillTrigger = styled.button`
     max-width: 100%;
     min-width: 0;
     padding: 0 ${space.xs}px;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex micro-animation. The
+     * pill yields ~3 % under press then springs back via the snap
+     * easing curve. transform-only so the hit area (computed from
+     * layout, not paint) is unaffected and WCAG 2.5.5 stays intact
+     * on coarse pointers. will-change keeps the GPU layer hot.
+     */
     transition:
         background-color 120ms ease-out,
-        color 120ms ease-out;
+        color 120ms ease-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
+    will-change: transform;
 
     &:hover,
     &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition:
+            background-color 120ms ease-out,
+            color 120ms ease-out;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (min-width: ${breakpoints.sm}px) {
@@ -211,15 +325,37 @@ const IconButton = styled.button`
     height: 36px;
     justify-content: center;
     padding: 0;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex press recovery, same
+     * recipe as PillTrigger. Layout box stays intact under transform
+     * so the 44 × 44 coarse-pointer hit area is preserved.
+     */
     transition:
         background-color 120ms ease-out,
-        color 120ms ease-out;
+        color 120ms ease-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
     width: 36px;
+    will-change: transform;
 
     &:hover,
     &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
         color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition:
+            background-color 120ms ease-out,
+            color 120ms ease-out;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (pointer: coarse) {
@@ -318,10 +454,32 @@ const BrandLink = styled(NoPaddingButton)`
     display: inline-flex;
     flex: 0 1 auto;
     min-width: 0;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex on the brand pill.
+     * Yields under press for the same tactile feedback the IconButton
+     * + PillTrigger get. AntD Button already paints its own
+     * transitions; layer the transform onto whatever it ships rather
+     * than overriding the whole rule.
+     */
+    transition: transform var(--motion-gel-flex, 220ms)
+        var(--easing-spring-snap, ease-out);
+    will-change: transform;
 
     && {
         height: 36px;
         padding: 0;
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (pointer: coarse) {
@@ -453,7 +611,7 @@ const Header: React.FC = () => {
     ];
 
     return (
-        <PageHeader ref={headerRef}>
+        <PageHeader data-glass-context="true" ref={headerRef}>
             <LeftCluster>
                 <BrandLink
                     aria-label={microcopy.header.logoLabel}

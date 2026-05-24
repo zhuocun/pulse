@@ -66,6 +66,53 @@ const TopBar = styled.div`
     top: var(--header-height, 44px);
     z-index: 10;
 
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim.
+     * Mirrors the main header recipe so the two chrome layers
+     * (header + project breadcrumb) read as cut from the same cloth.
+     */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-top);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Bottom-trailing companion + scroll-edge dissolve. Same recipe
+     * the main header ships — fades the bottom 12 px of the chrome
+     * into transparency so content scrolling under the sticky bar
+     * dissolves through the edge rather than terminating in a cut.
+     */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-bottom);
+        pointer-events: none;
+        z-index: 0;
+        mask-image: linear-gradient(
+            to bottom,
+            black calc(100% - 12px),
+            transparent 100%
+        );
+        -webkit-mask-image: linear-gradient(
+            to bottom,
+            black calc(100% - 12px),
+            transparent 100%
+        );
+    }
+
+    /* Children sit above the rim pseudo-elements. */
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
     @media (min-width: ${breakpoints.sm}px) {
         gap: ${space.xs}px;
         padding: ${space.xs}px ${space.md}px;
@@ -84,12 +131,35 @@ const TopBar = styled.div`
      * Honor the user's reduced-transparency preference: collapse the
      * glass surface to the solid page background and drop the blur.
      * Same recipe App.css uses on the body and on AntD modals/drawers.
+     * Drop the rim + dissolve too so the opaque body doesn't compete
+     * with achromatic gradients painted on top.
      */
     @media (prefers-reduced-transparency: reduce) {
         background: var(--page-background);
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+
+        &::before,
+        &::after {
+            background: none;
+            mask-image: none;
+            -webkit-mask-image: none;
+        }
+    }
+
+    /*
+     * Forced-colors mode (Windows high-contrast) replaces every author
+     * colour with system tokens. Drop the rim layers so Canvas /
+     * CanvasText win.
+     */
+    @media (forced-colors: active) {
+        &::before,
+        &::after {
+            background: none;
+            mask-image: none;
+            -webkit-mask-image: none;
+        }
     }
 
     box-shadow: ${shadow.sm};
@@ -167,6 +237,15 @@ const ChildNavLink = styled(NavLink)`
     padding: ${space.xs}px ${space.sm}px;
     text-decoration: none;
     /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex on breadcrumb tabs.
+     * Mirrors the header / bottom-tab gel-flex so every interactive
+     * chrome surface in the app yields under press with the same
+     * cadence. transform-only; the 36 px min-height stays intact.
+     */
+    transition: transform var(--motion-gel-flex, 220ms)
+        var(--easing-spring-snap, ease-out);
+    will-change: transform;
+    /*
      * 44 px minimum tap target on the link row. WCAG 2.5.5 — the
      * link row is one of the first interactive surfaces a touch
      * user reaches when entering a project, so the floor is on
@@ -183,6 +262,18 @@ const ChildNavLink = styled(NavLink)`
     &:focus-visible {
         outline: 2px solid var(--ant-color-primary, #ea580c);
         outline-offset: 1px;
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+
+        &:active {
+            transform: none;
+        }
     }
 
     /* React Router's NavLink toggles an aria-current attribute when
@@ -296,7 +387,10 @@ const ProjectDetailPage = () => {
 
     return (
         <Container>
-            <TopBar data-testid="project-detail-chrome">
+            <TopBar
+                data-glass-context="true"
+                data-testid="project-detail-chrome"
+            >
                 <BreadcrumbWrapper>
                     <Breadcrumb items={breadcrumbItems} />
                 </BreadcrumbWrapper>

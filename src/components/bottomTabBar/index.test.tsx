@@ -299,4 +299,90 @@ describe("BottomTabBar", () => {
         const nav = screen.getByTestId("bottom-tab-bar");
         expect(nav).not.toHaveAttribute("inert");
     });
+
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 T3 — Liquid chrome recipe upgrade.
+     * The bottom-tab bar gains:
+     *   1. Specular rim (::before / ::after gradient layers).
+     *   2. Gel-flex micro-press on TabLink (each NavLink tab yields
+     *      under press; mirrors the header IconButton / PillTrigger
+     *      gel-flex so every interactive chrome surface has parity).
+     *   3. data-glass-context="true" marker.
+     *
+     * No scroll-edge dissolve here — the bar is pinned to the
+     * viewport bottom rather than sitting over content scrolled past
+     * it. The pseudo-element / transition assertions walk the
+     * styled-component sheet directly because jsdom does not
+     * introspect ::before / ::after via getComputedStyle.
+     */
+    describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it('marks the nav root with data-glass-context="true"', () => {
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            expect(nav.getAttribute("data-glass-context")).toBe("true");
+        });
+
+        it("emits a ::before specular-rim layer with --glass-specular-top", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(
+                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            );
+        });
+
+        it("emits a ::after companion shadow layer with --glass-specular-bottom", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(
+                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            );
+        });
+
+        it("does NOT ship a scroll-edge mask on the bottom-tab bar (pinned to viewport bottom, not over scrolling content)", () => {
+            renderBar();
+            const css = sheetText();
+            // The header / projectDetail TopBar carry a 12px scroll-edge
+            // dissolve mask; the bar is fixed at viewport bottom so the
+            // mask would have no semantic meaning. Assert it is absent
+            // so a future refactor doesn't accidentally add one.
+            expect(css).not.toMatch(
+                /pulse-tabbar[^}]*mask-image:\s*linear-gradient/
+            );
+        });
+
+        it("applies gel-flex transform recipe to TabLink", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
+            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+        });
+
+        it("respects prefers-reduced-motion by neutralizing the transition + active scale", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
+            expect(css).toMatch(/transform:\s*none/);
+        });
+
+        it("respects prefers-reduced-transparency by dropping the rim backgrounds", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+    });
 });
