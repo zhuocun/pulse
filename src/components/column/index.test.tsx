@@ -279,7 +279,10 @@ describe("Column", () => {
             }
         });
 
-        expect(screen.getByRole("heading", { name: "Todo" })).toHaveStyle({
+        // iOS 26 sentence-case sweep (Phase 6 W1 T2.7): the column title
+        // dropped its text-transform: uppercase. The microcopy source
+        // ("Todo") is already sentence case so the heading reads as-is.
+        expect(screen.getByRole("heading", { name: "Todo" })).not.toHaveStyle({
             textTransform: "uppercase"
         });
         expect(screen.getByText("Fix bug")).toBeInTheDocument();

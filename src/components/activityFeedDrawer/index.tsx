@@ -74,8 +74,6 @@ const GroupHeading = styled(Typography.Text)`
         color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
         font-size: ${fontSize.xs}px;
         font-weight: ${fontWeight.semibold};
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
     }
 `;
 

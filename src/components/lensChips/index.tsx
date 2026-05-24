@@ -141,10 +141,8 @@ const ComingSoonBadge = styled.span<ChipButtonProps>`
     color: inherit;
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.semibold};
-    letter-spacing: 0.04em;
     line-height: 1;
     padding: 2px ${space.xs}px;
-    text-transform: uppercase;
 `;
 
 interface LensChipsProps {

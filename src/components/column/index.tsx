@@ -437,9 +437,18 @@ const ColumnHeader = styled(Row)`
      * support backdrop-filter (no blur, no shimmer — still readable).
      */
     background: var(--ant-color-bg-container, rgba(255, 255, 255, 0.86));
-    /* Pull the sticky bg inside the column's own rounded corner so the
-     * header doesn't paint past the column's radius when pinned. */
-    border-radius: ${radius.sm}px;
+    /*
+     * Phase 6 W1 — iOS 26 concentricity: the sticky header sits flush
+     * against the ColumnContainer's inner padding edge (top: 0 inside
+     * TaskContainer, which itself sits inside ColumnContainer's
+     * padding: space.sm = 12 px). The container's outer corner is
+     * radius.lg (14 px); the concentric inner radius is therefore
+     * 14 − 12 = 2 px so the header's rounded corners trace the
+     * ColumnContainer's inner curve instead of pinching it. Previously
+     * shipped at radius.sm (6 px), which read as a 4 px flared corner
+     * against the container's rounded edge.
+     */
+    border-radius: 2px;
     /* Wave 2 T4 — consume the SUBTLE intensity-toggle var. The column
      * header is sticky over dense scrolling tasks; the original 12 px
      * blur kept text legible underneath. The subtle var defaults to
@@ -597,9 +606,8 @@ const ColumnTitle = styled(Typography.Title)`
         color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
         font-size: ${fontSize.xs}px;
         font-weight: ${fontWeight.semibold};
-        letter-spacing: ${letterSpacing.wider};
+        letter-spacing: ${letterSpacing.wide};
         margin: 0;
-        text-transform: uppercase;
     }
 `;
 

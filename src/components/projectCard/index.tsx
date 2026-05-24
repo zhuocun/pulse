@@ -165,8 +165,7 @@ const Organization = styled.span`
     color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.medium};
-    letter-spacing: ${letterSpacing.wide};
-    text-transform: uppercase;
+    letter-spacing: ${letterSpacing.normal};
 `;
 
 /*

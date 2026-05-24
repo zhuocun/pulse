@@ -81,7 +81,7 @@ const ResultCount = styled.span`
 `;
 
 /*
- * Was previously `styled.label` so the visible "SORT BY" caption read as
+ * Was previously `styled.label` so the visible "Sort" caption read as
  * the field label. AntD's `<Select>` renders a `<div role="combobox">`
  * rather than a labelable form element, so the implicit label
  * association never fires — screen readers only get the explicit
@@ -96,8 +96,6 @@ const SortRow = styled.span`
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.medium};
     gap: ${space.xs}px;
-    letter-spacing: ${letterSpacing.wide};
-    text-transform: uppercase;
 `;
 
 const Grid = styled.div`

@@ -37,9 +37,7 @@ const SectionLabel = styled(Typography.Text)`
         display: block;
         font-size: ${fontSize.xs}px;
         font-weight: ${fontWeight.semibold};
-        letter-spacing: 0.06em;
         margin-bottom: ${space.xs}px;
-        text-transform: uppercase;
     }
 `;
 
