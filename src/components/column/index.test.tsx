@@ -191,7 +191,8 @@ const makeTestStore = (density: "comfortable" | "compact" = "comfortable") =>
         preloadedState: {
             userPreferences: {
                 boardDensity: density,
-                savedFilterPresets: []
+                savedFilterPresets: [],
+                projectListDefaults: null
             }
         }
     });

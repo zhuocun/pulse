@@ -104,7 +104,8 @@ const makePanelStore = (preset?: SavedFilterPresetState[]) =>
         preloadedState: {
             userPreferences: {
                 boardDensity: "comfortable" as const,
-                savedFilterPresets: preset ?? []
+                savedFilterPresets: preset ?? [],
+                projectListDefaults: null
             }
         }
     });
