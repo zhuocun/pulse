@@ -38,6 +38,15 @@ export interface SavedFilterPresetState {
         taskName: string;
         coordinatorId: string;
         type: string;
+        /**
+         * Active lens id at save time. Empty string when no lens was
+         * selected. Stored as a plain string (not the `LensId` union)
+         * so the slice stays decoupled from the lens-chip component
+         * — the apply path narrows the value back through
+         * `parseLensId` and silently drops anything that doesn't
+         * map to a known lens.
+         */
+        lens: string;
     };
     createdAt: number;
 }
@@ -83,11 +92,20 @@ const isSavedPreset = (value: unknown): value is SavedFilterPresetState => {
         return false;
     }
     const fs = candidate.filterState as Record<string, unknown>;
-    return (
-        isStringField(fs.taskName) &&
-        isStringField(fs.coordinatorId) &&
-        isStringField(fs.type)
-    );
+    if (
+        !isStringField(fs.taskName) ||
+        !isStringField(fs.coordinatorId) ||
+        !isStringField(fs.type)
+    ) {
+        return false;
+    }
+    // `lens` was added after the initial 4.2 ship; legacy persisted
+    // presets are missing the field and would otherwise fail the
+    // guard. Coerce undefined to `""` on the way in so the schema
+    // stays append-only.
+    if (fs.lens !== undefined && !isStringField(fs.lens)) return false;
+    if (fs.lens === undefined) fs.lens = "";
+    return true;
 };
 
 /**

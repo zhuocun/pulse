@@ -420,7 +420,8 @@ describe("TaskSearchPanel", () => {
                 expect(presets[0].filterState).toEqual({
                     coordinatorId: "u1",
                     taskName: "checkout",
-                    type: ""
+                    type: "",
+                    lens: ""
                 });
             });
         });
@@ -442,7 +443,8 @@ describe("TaskSearchPanel", () => {
                 filterState: {
                     taskName: "checkout",
                     coordinatorId: "u1",
-                    type: "Bug"
+                    type: "Bug",
+                    lens: ""
                 },
                 createdAt: 1
             };
@@ -465,8 +467,69 @@ describe("TaskSearchPanel", () => {
                 coordinatorId: "u1",
                 taskName: "checkout",
                 type: "Bug",
-                semanticIds: undefined
+                semanticIds: undefined,
+                lens: undefined
             });
+        });
+
+        it("captures and rehydrates the lens param", async () => {
+            const rtlUser = userEvent.setup();
+            const setParam = jest.fn();
+            const preset: SavedFilterPresetState = {
+                id: "preset-lens",
+                name: "Open mine",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "",
+                    coordinatorId: "",
+                    type: "",
+                    lens: "mine"
+                },
+                createdAt: 1
+            };
+            renderPanel({ setParam, initialPresets: [preset] });
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            await rtlUser.click(await screen.findByText("Open mine"));
+            expect(setParam).toHaveBeenCalledWith(
+                expect.objectContaining({ lens: "mine" })
+            );
+        });
+
+        it("drops an unknown lens value with the stale warning", async () => {
+            const rtlUser = userEvent.setup();
+            const setParam = jest.fn();
+            const preset: SavedFilterPresetState = {
+                id: "preset-bad-lens",
+                name: "Retired lens",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "",
+                    coordinatorId: "",
+                    type: "",
+                    lens: "retired-lens-id"
+                },
+                createdAt: 1
+            };
+            renderPanel({ setParam, initialPresets: [preset] });
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            await rtlUser.click(await screen.findByText("Retired lens"));
+            expect(setParam).toHaveBeenCalledWith(
+                expect.objectContaining({ lens: undefined })
+            );
         });
 
         it("loading a preset omits stale values and warns the user", async () => {
@@ -479,7 +542,8 @@ describe("TaskSearchPanel", () => {
                 filterState: {
                     taskName: "checkout",
                     coordinatorId: "deleted-user-id",
-                    type: "Story"
+                    type: "Story",
+                    lens: ""
                 },
                 createdAt: 1
             };
@@ -518,7 +582,8 @@ describe("TaskSearchPanel", () => {
                 filterState: {
                     taskName: "",
                     coordinatorId: "",
-                    type: ""
+                    type: "",
+                    lens: ""
                 },
                 createdAt: 1
             };
@@ -556,7 +621,8 @@ describe("TaskSearchPanel", () => {
                     filterState: {
                         taskName: "",
                         coordinatorId: "",
-                        type: ""
+                        type: "",
+                        lens: ""
                     },
                     createdAt: 1
                 },
@@ -567,7 +633,8 @@ describe("TaskSearchPanel", () => {
                     filterState: {
                         taskName: "",
                         coordinatorId: "",
-                        type: ""
+                        type: "",
+                        lens: ""
                     },
                     createdAt: 2
                 },
@@ -578,7 +645,8 @@ describe("TaskSearchPanel", () => {
                     filterState: {
                         taskName: "",
                         coordinatorId: "",
-                        type: ""
+                        type: "",
+                        lens: ""
                     },
                     createdAt: 3
                 }

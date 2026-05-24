@@ -19,7 +19,7 @@ const makePreset = (
     id,
     name: `Preset ${id}`,
     boardId: null,
-    filterState: { taskName: "", coordinatorId: "", type: "" },
+    filterState: { taskName: "", coordinatorId: "", type: "", lens: "" },
     createdAt: 1_700_000_000_000 + Number(id.replace(/[^0-9]/g, "") || "0"),
     ...overrides
 });
