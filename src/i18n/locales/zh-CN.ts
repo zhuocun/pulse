@@ -43,6 +43,10 @@ const zhCN: Dictionary = {
         resetFilters: "重置筛选",
         retry: "重试",
         save: "保存",
+        saveAsDefault: "保存为默认",
+        resetToDefault: "恢复为默认",
+        savedAsDefault: "已保存为默认",
+        defaultApplied: "已应用默认",
         search: "搜索",
         send: "发送",
         showPassword: "显示密码",
@@ -95,6 +99,9 @@ const zhCN: Dictionary = {
         activeFilters: "当前筛选条件",
         removeFilter: "移除 {label} 筛选",
         sortProjects: "项目排序",
+        favoritedOnlyToggle: "仅显示已收藏的项目",
+        saveCurrentAsDefault: "将当前筛选保存为默认",
+        resetToSavedDefault: "重置筛选为已保存的默认",
         loadingProjects: "正在加载项目",
         loadingPage: "正在加载页面",
         projects: "项目",
@@ -266,6 +273,13 @@ const zhCN: Dictionary = {
             newest: "最新优先",
             oldest: "最旧优先"
         },
+        projectListSort: {
+            createdAtDesc: "最新优先",
+            createdAtAsc: "最旧优先",
+            nameAsc: "名称(A → Z)",
+            nameDesc: "名称(Z → A)",
+            favoritedFirst: "收藏优先"
+        },
         taskTypes: {
             task: "任务",
             bug: "缺陷"
@@ -309,7 +323,9 @@ const zhCN: Dictionary = {
         coordinator: "协调人",
         type: "类型",
         ai: "AI",
-        smartMatch: "智能匹配"
+        smartMatch: "智能匹配",
+        favoritedOnly: "已收藏",
+        favoritedOnlyOn: "是"
     },
     /**
      * Phase 3 A7 — 看板筛选视图。`comingSoonBadge` 出现在依赖 ITask 的
