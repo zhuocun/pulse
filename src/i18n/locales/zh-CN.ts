@@ -159,6 +159,7 @@ const zhCN: Dictionary = {
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
+        projectSections: "项目分区",
         reports: "报告",
         briefShort: "简报",
         copilotShort: "Copilot",
@@ -406,7 +407,6 @@ const zhCN: Dictionary = {
             loadAriaLabel: "加载已保存的筛选预设",
             loadPlaceholder: "已保存的预设",
             deleteAriaLabel: "删除预设 {name}",
-            limitReachedTitle: "已达到预设上限",
             limitReachedBody:
                 "最多可保存 {limit} 个预设。请先删除一个再保存新预设。",
             saved: "预设已保存",

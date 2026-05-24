@@ -228,6 +228,7 @@ export const enSource = {
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
+        projectSections: "Project sections",
         reports: "Reports",
         briefShort: "Brief",
         copilotShort: "Copilot",
@@ -449,7 +450,6 @@ export const enSource = {
             loadAriaLabel: "Load saved filter preset",
             loadPlaceholder: "Saved presets",
             deleteAriaLabel: "Delete preset {name}",
-            limitReachedTitle: "Preset limit reached",
             limitReachedBody:
                 "You can save up to {limit} presets. Delete one before saving another.",
             saved: "Preset saved",
