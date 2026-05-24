@@ -21,7 +21,8 @@ const makeTestStore = () =>
         preloadedState: {
             userPreferences: {
                 boardDensity: "comfortable" as const,
-                savedFilterPresets: []
+                savedFilterPresets: [],
+                projectListDefaults: null
             }
         }
     });
