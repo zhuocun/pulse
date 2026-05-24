@@ -8,6 +8,8 @@ short-term state on the heap (rate limiter, budget tracker, default
 LangGraph checkpointer). That rules out short-window serverless
 runtimes for the AI endpoints and shapes every recommendation below.
 
+> If you just need ~5 users on the AI features, jump to [`small-group-quickstart.md`](./small-group-quickstart.md) — this doc is the full production matrix.
+
 ---
 
 ## Vercel: where it works and where it doesn't
@@ -31,9 +33,10 @@ deployed elsewhere:
 - The five interrupt-using agents (`board-brief-agent`,
   `task-drafting-agent`, `task-estimation-agent`, `triage-agent`,
   `search-agent`). They pause on `langgraph.types.interrupt(...)`
-  and resume on a follow-up request. The default `AGENT_CHECKPOINT_BACKEND=memory`
-  cannot survive a Vercel cold start, and even with
-  `AGENT_CHECKPOINT_BACKEND=postgres` the in-process budget tracker
+  and resume on a follow-up request. The default `AGENT_CHECKPOINT_BACKEND=auto`
+  resolves to memory when no `AGENT_POSTGRES_URI` is set, and memory
+  cannot survive a Vercel cold start. Even with `AGENT_POSTGRES_URI`
+  set (auto-switching to postgres), the in-process budget tracker
   and rate limiter are still per-invocation — they reset to zero on
   every cold container, so quotas are not enforced.
 
@@ -55,10 +58,12 @@ in that file (or pass `--app`) so deploys never target another team's Fly app.
 ```bash
 fly launch --copy-config --no-deploy
 fly secrets set \
-    UUID="$(openssl rand -hex 32)" \
     ANTHROPIC_API_KEY=... \
-    POSTGRES_URI="postgresql://..." \
+    AGENT_POSTGRES_URI="postgresql://..." \
     MONGO_URI="mongodb+srv://..."
+# Optional: set UUID="$(openssl rand -hex 32)" only if you want a stable
+# JWT secret pinned outside Mongo. Otherwise the lifespan persists one
+# into system_config on first boot.
 fly deploy
 ```
 
@@ -100,17 +105,14 @@ services:
     envVars:
       - key: PORT
         value: 8000
-      - key: AGENT_CHECKPOINT_BACKEND
-        value: postgres
-      - key: AGENT_STORE_BACKEND
-        value: postgres
       - key: AGENT_REQUEST_TIMEOUT_SECONDS
         value: "120"
+      # UUID is optional; the lifespan persists a bootstrap secret in Mongo when unset.
       - key: UUID
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: POSTGRES_URI
+      - key: AGENT_POSTGRES_URI
         sync: false
       - key: MONGO_URI
         sync: false
@@ -192,11 +194,11 @@ and `proxy_read_timeout` must exceed `AGENT_REQUEST_TIMEOUT_SECONDS`.
 Tier-1 readiness: every box must be ticked before the AI surface goes
 live.
 
-- [ ] `AGENT_CHECKPOINT_BACKEND=postgres` and `AGENT_STORE_BACKEND=postgres`.
+- [ ] `AGENT_POSTGRES_URI` is set; with the default `AGENT_CHECKPOINT_BACKEND=auto` and `AGENT_STORE_BACKEND=auto`, both backends switch to `postgres` automatically. Explicit `=postgres` is still accepted as an override; explicit `=memory` opts out.
 - [ ] `AGENT_POSTGRES_URI` (or `POSTGRES_URI`, or the discrete `POSTGRES_HOST` / `_USER` / `_DATABASE` / `_PASSWORD` / `_PORT` fields) reachable from the deployment.
 - [ ] `python -m pip install ".[postgres-agents]"` (or `".[ai]"`) baked into the image — the published `requirements.txt` already includes `langgraph-checkpoint-postgres` so the production Dockerfile picks it up automatically.
 - [ ] `CORS_ORIGINS` set to the deployed FE origin (the `localhost` defaults will block every browser request from the real FE; the server logs a WARNING when it detects that case on a production-shaped host, see below).
-- [ ] `UUID` is at least 32 bytes of entropy. The server raises `RuntimeError` at startup when this is shorter; do not work around it by lowering the floor.
+- [ ] EITHER `UUID` is set (≥32 chars; the server raises `RuntimeError` on shorter values), OR `MONGO_URI` is reachable so the lifespan can persist a bootstrapped secret in the `system_config` collection. On a hosted deploy (Vercel / Render / Fly / Railway / Kubernetes) the boot hard-fails with a platform-named error when BOTH are missing. Explicit `UUID` is recommended when you want a stable secret outside Mongo (e.g. to share with a legacy signer).
 - [ ] `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set. `langchain-anthropic` and `langchain-openai` are base dependencies; no extra install step is required. Without a key the catalog stays on the deterministic stub.
 - [ ] `AGENT_BUDGET_MONTHLY_TOKEN_CAP` reviewed for the deployed tier. The default `1000000` is a placeholder.
 - [ ] `RATE_LIMIT_BACKEND=redis` and `BUDGET_BACKEND=redis` with a reachable `REDIS_URI`. The default `memory` backends keep their state per-process, so multi-worker / serverless deploys enforce `workers × cap` rather than `cap`, and a cold start zeroes the running tally. The Redis backends use server-side Lua scripts so check-and-mutate stays atomic across workers without a separate distributed lock. The published `requirements.txt` includes `redis>=5.0` so the production Dockerfile already has the integration; flip the env vars and provide a connection string.
@@ -223,6 +225,7 @@ Set these in the Vercel FE project (or whichever host serves the SPA):
 | `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`true`**. Set to `false` only as an operator rollback to suppress `MutationProposalCard` even if an agent emits a `pendingProposal`. The BE `MutationProposal` lifecycle is closed in code; see [`../todo/release-todo.md`](../todo/release-todo.md) §1.                                                                                                   |
 | `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
 | `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
+| `BACKEND_URL`                             | Vercel-serverless env var (NOT a Vite/CRA var) read by `api/_proxy.ts` at request time. Defaults to `https://pulse-python-server.vercel.app` when unset. Override when the BE is deployed under a different host (e.g. `https://<your-be>.fly.dev`) — no source edits required.                                                                                              |
 
 ### CDN cache-purge — required for the deploy that landed `a59539f`
 
@@ -262,6 +265,13 @@ on login — see Beta §3 closure in
 
 Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`:
 
+- `GET /api/v1/health/ai?probe=true` (no auth required — operator-debugging probe). Confirm:
+  - `"ready": true`
+  - `"providerConnectivity": { "reachable": true }`
+  - `"checkpointerBackend"` and `"storeBackend"` show `"postgres"` (the `auto` default flipped because `AGENT_POSTGRES_URI` is set)
+  - `"jwtSecretSource"` is `"env"` (explicit UUID) or `"persisted"` (Mongo-bootstrapped) — never `"ephemeral"` in production
+  - `"issues": []` is empty
+  Example: `curl -s https://<your-be>/api/v1/health/ai?probe=true | jq .`
 - `POST /api/ai/readiness` with at least one issue → response must contain no `suggestion: null` keys (the key must be omitted entirely when there is no suggestion).
 - `POST /api/v1/agents/board-brief-agent/stream` → SSE citation objects must carry `source: "task"` or `source: "column"`, not `"fe.boardSnapshot"`.
 - Idempotency dedupe: send the same `Idempotency-Key` twice within the dedup window → the second call must return the cached result without re-invoking the LLM (confirm by checking that `/health` budget metrics did not increment twice).
@@ -288,13 +298,13 @@ the deploy logs for these strings on every release:
 On a single-worker dev / test process, the helper logs the memory-backend note at DEBUG to avoid noisy local boots:
 
 ```
-Agent persistence is using the in-process memory backend (checkpoint=%s, store=%s). Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes; production deployments should set AGENT_CHECKPOINT_BACKEND=postgres and AGENT_STORE_BACKEND=postgres with AGENT_POSTGRES_URI (or POSTGRES_URI) configured.
+Agent persistence is using the in-process memory backend (checkpoint=%s, store=%s). Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes; production deployments should set AGENT_POSTGRES_URI (the default `auto` then switches both backends to postgres) or set the backends explicitly.
 ```
 
 On a production-shaped host (any of `VERCEL`, `VERCEL_URL`, `RENDER_EXTERNAL_HOSTNAME`, `RENDER`, `KUBERNETES_SERVICE_HOST`, `FLY_APP_NAME`, `RAILWAY_PROJECT_ID` is set, or `WEB_CONCURRENCY` / `UVICORN_WORKERS` parses to an integer > 1), the helper logs this WARNING:
 
 ```
-Unsafe memory backend(s) detected in a multi-worker / multi-instance environment (production-shaped env var <VAR> is set | WEB_CONCURRENCY=<N> indicates multiple workers): AGENT_CHECKPOINT_BACKEND=memory[, AGENT_STORE_BACKEND=memory]. Interrupt-using agents (board-brief, task-drafting, task-estimation, triage) cannot resume across processes. Fix: set AGENT_CHECKPOINT_BACKEND=postgres, AGENT_STORE_BACKEND=postgres, and AGENT_POSTGRES_URI=<dsn>. Install the required extras: pip install ".[postgres-agents]" (or ".[ai]").
+Unsafe memory backend(s) detected in a multi-worker / multi-instance environment (%s): %s. Interrupt-using agents cannot resume across processes. Set AGENT_CHECKPOINT_BACKEND=postgres, AGENT_STORE_BACKEND=postgres, and AGENT_POSTGRES_URI=<dsn> for production.
 ```
 
 A parallel guard in `_configure_middleware_backends` **raises**
@@ -317,12 +327,55 @@ checkpointer, is the misconfigured one.)
 **Localhost-only CORS on a production host** (`_warn_about_localhost_only_cors`):
 
 ```
-CORS is configured with localhost-only origins (...) on a production-shaped deploy; browser requests from the real FE origin will be blocked at the CORS preflight, so the AI features will not load. Set CORS_ORIGINS to the deployed FE origin (or CORS_ORIGIN_REGEX for multi-origin matches).
+CORS is configured with localhost-only origins (%s) on a %s deploy; browser requests from the real FE origin will be blocked at the CORS preflight, so the AI features will not load. Set CORS_ORIGINS to the deployed FE origin (or CORS_ORIGIN_REGEX for multi-origin matches).
 ```
+
+The first `%s` is the comma-joined list of configured origins; the
+second `%s` is the detected platform name (capitalized: `Vercel`,
+`Render`, `Fly`, `Railway`, `Kubernetes`) or the fallback string
+`"this hosted"` when no platform marker resolves cleanly.
 
 The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 `RENDER_EXTERNAL_HOSTNAME`, `RENDER`, `KUBERNETES_SERVICE_HOST`,
 `FLY_APP_NAME`, or `RAILWAY_PROJECT_ID` being set in the environment.
+
+**Missing provider API key on a production host** (`assert_provider_available` in `app/agents/llm.py`, raises `RuntimeError`, deploy never finishes booting):
+
+```
+<ENV_VAR> is empty on <Platform>; set it in <platform-specific location>. Without it, every AI call will fail mid-SSE.
+```
+
+`<ENV_VAR>` is `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` depending on
+the resolved provider; `<Platform>` is the detected hosted platform
+capitalized; `<platform-specific location>` is one of:
+
+- `your Vercel project settings → Environment Variables`
+- `your Render service → Environment`
+- `` your Fly app secrets (`fly secrets set`) ``
+- `your Railway service → Variables`
+- `your Deployment env or Secret manifest`
+- `your hosting platform's environment settings` (fallback)
+
+When the deploy is production-shaped but the platform marker is not
+one of the recognised values, the generic fallback message is raised:
+
+```
+AGENT_CHAT_MODEL_PROVIDER resolved to '<provider>' but <ENV_VAR> is empty on a production-shaped deploy; the first agent run would fail mid-SSE. Set <ENV_VAR> or switch the provider to 'auto' / 'stub'.
+```
+
+**JWT-secret bootstrap failure** (`_resolve_and_install_jwt_secret` in `app/main.py`, raises `RuntimeError`, deploy never finishes booting):
+
+```
+MONGO_URI is unreachable on <Platform> and no UUID env var was set; the persisted JWT-secret bootstrap requires Mongo. Set MONGO_URI to a reachable cluster (Mongo Atlas serverless is the canonical option for Vercel) or set UUID to a stable secret of at least 32 characters.
+```
+
+`<Platform>` is the detected hosted platform capitalized (or the
+fallback string `this hosted platform`). A separate guard raises a
+shorter error when `UUID` is set but shorter than the minimum length:
+
+```
+UUID must be at least 32 characters; token-issuing endpoints would fail at first request.
+```
 
 ---
 

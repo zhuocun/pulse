@@ -152,10 +152,15 @@ class Settings:
         r"^https://pulse-react-app(-[a-z0-9-]+)?\.vercel\.app$",
     )
     port: int = _env_int_field("PORT", "8000")
+    # ``auto`` resolves to ``postgres`` when ``AGENT_POSTGRES_URI`` is set
+    # and to ``memory`` otherwise, so a 5-person operator only needs the
+    # one DSN to flip both LangGraph persistence layers on. Explicit
+    # ``memory`` / ``postgres`` / ``none`` values keep working unchanged
+    # -- see :func:`app.agents.checkpointing.resolve_agent_backend`.
     agent_checkpoint_backend: str = _env_str_field(
-        "AGENT_CHECKPOINT_BACKEND", "memory"
+        "AGENT_CHECKPOINT_BACKEND", "auto"
     )
-    agent_store_backend: str = _env_str_field("AGENT_STORE_BACKEND", "memory")
+    agent_store_backend: str = _env_str_field("AGENT_STORE_BACKEND", "auto")
     agent_default_thread_id: str = _env_str_field("AGENT_DEFAULT_THREAD_ID", "default")
     agent_recursion_limit: int = _env_positive_int_field(
         "AGENT_RECURSION_LIMIT", "25"

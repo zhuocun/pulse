@@ -1913,17 +1913,26 @@ def test_legacy_health_serves_directly_without_redirect(client: TestClient) -> N
     assert response.json()["status"] == "ok"
 
 
-def test_lifespan_fails_fast_when_jwt_secret_is_short(monkeypatch) -> None:
+def test_lifespan_fails_fast_when_uuid_env_is_short(monkeypatch) -> None:
+    """A too-short ``UUID`` env var is an operator typo and must surface at boot.
+
+    With the new persisted JWT-secret bootstrap, an ephemeral
+    ``settings.jwt_secret`` is no longer the failure vector (the
+    bootstrap overwrites it with a persisted or generated value).
+    But ``UUID``, the explicit operator override, still trumps the
+    bootstrap and must be validated.
+    """
+
     from app import main as main_module
     from app import security
 
-    object.__setattr__(security.settings, "jwt_secret", "too-short")
+    monkeypatch.setenv("UUID", "short")
 
     fake = FakeStore()
     monkeypatch.setattr(main_module, "repository", fake)
 
     try:
-        with pytest.raises(RuntimeError, match="JWT secret must be at least"):
+        with pytest.raises(RuntimeError, match="UUID must be at least"):
             with TestClient(main_module.app):
                 pass
     finally:

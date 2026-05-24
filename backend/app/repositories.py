@@ -83,6 +83,10 @@ class Repository(Protocol):
         self, documents: Iterable[Dict[str, Any]]
     ) -> List[Dict[str, Any]]: ...
 
+    def upsert_system_config(
+        self, doc_id: str, document: Dict[str, Any]
+    ) -> None: ...
+
 
 def validate_table(name: str) -> None:
     if name not in TABLE_FIELDS:
@@ -130,10 +134,20 @@ class MongoRepository:
         database.ensure_indexes()
 
     def insert_one(self, name: str, data: Dict[str, Any]) -> Any:
+        # ``system_config`` is owned by :mod:`app.system_config` and uses
+        # a sentinel string ``_id`` (e.g. ``"jwt_secret"``) plus arbitrary
+        # value fields, so the per-table field allowlist does not apply.
+        if name == "system_config":
+            return database.insert_one(name, data)
         validate_fields(name, data)
         return database.insert_one(name, data)
 
     def find_one(self, name: str, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        # See ``insert_one`` -- ``system_config`` documents are queried
+        # by their sentinel ``_id`` and the schema-less collection skips
+        # the allowlist entirely.
+        if name == "system_config":
+            return database.find_one(name, query)
         validate_fields(name, query)
         return database.find_one(name, query)
 
@@ -166,6 +180,24 @@ class MongoRepository:
         self, documents: Iterable[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         return database.serialize_documents(documents)
+
+    def upsert_system_config(
+        self, doc_id: str, document: Dict[str, Any]
+    ) -> None:
+        """Idempotent insert of a ``system_config`` row.
+
+        Uses Mongo's ``$setOnInsert`` so a concurrent insert from
+        another worker is a no-op rather than an overwrite; the caller
+        re-reads after this returns to converge on the row that won
+        the race.
+        """
+
+        payload = {key: value for key, value in document.items() if key != "_id"}
+        database.collection("system_config").update_one(
+            {"_id": doc_id},
+            {"$setOnInsert": payload},
+            upsert=True,
+        )
 
 
 def build_repository(app_settings: Settings = settings) -> Repository:

@@ -68,9 +68,11 @@ hitting the port.
 
 ### Backend `.env`
 
-`backend/.env` needs `MONGO_URI=mongodb://localhost:27017/jira` and a
-`UUID` of ≥32 characters. Copy from `.env.example` and update those
-two values (e.g. `dev-only-jwt-secret-change-me-32-bytes-long`).
+`backend/.env` needs `MONGO_URI=mongodb://localhost:27017/jira`. `UUID`
+is **optional** — when unset, the lifespan mints a 32-byte random secret
+on first boot and persists it to the Mongo `system_config` collection.
+Set `UUID=<32+char hex>` only if you want to pin a known value (e.g. to
+share with a legacy Express signer).
 
 ### Lint
 
@@ -107,8 +109,14 @@ Backend tests use in-memory fakes and do **not** require MongoDB.
 - **Trailing slashes** matter for FastAPI routes: POST to
   `/api/v1/projects/` (with slash), not `/api/v1/projects`. Without
   the slash you get a 307 redirect that drops the POST body.
-- **`UUID` env var** is the JWT signing secret. If it's shorter than
-  32 characters the server refuses to start.
+- **`UUID` env var** is the JWT signing secret. It is **optional**; the
+  lifespan bootstraps and persists a random secret in Mongo when unset.
+  A `UUID` that is *set but shorter than 32 chars* still refuses
+  startup.
+- Run `curl -s localhost:8000/api/v1/health/ai | jq .` after boot to
+  see resolved provider, checkpointer backend, and warnings.
+  `?probe=true` adds a free `models.list()` LLM connectivity check
+  (cached 30s).
 - All AI agents fall back to **deterministic stubs** without
   `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, so the app is fully
   functional for CRUD and agent-endpoint testing without any LLM keys.

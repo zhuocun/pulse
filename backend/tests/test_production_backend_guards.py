@@ -223,21 +223,35 @@ def test_validate_memory_agent_backends_no_op_when_both_postgres(
     main._validate_memory_agent_backends(cfg)
 
 
-def test_validate_settings_fails_on_hosted_env_without_uuid(
+def test_validate_settings_fails_on_hosted_env_without_uuid_or_mongo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Hosted deploys without ``UUID`` now require a reachable Mongo cluster.
+
+    The persisted JWT-secret bootstrap drops the previous hard-require on
+    ``UUID`` -- but only when Mongo can actually supply the secret. With
+    neither ``UUID`` nor a reachable Mongo the bootstrap can't complete
+    and the error message points the operator at the new root cause.
+    """
+
     monkeypatch.setenv("VERCEL", "1")
     monkeypatch.delenv("UUID", raising=False)
     monkeypatch.setattr(main, "assert_provider_available", lambda settings: None)
     monkeypatch.setattr(
         main, "assert_embeddings_provider_available", lambda settings: None
     )
+
+    class _UnreachableRepo:
+        def ping(self) -> None:
+            raise RuntimeError("mongo down")
+
+    monkeypatch.setattr(main, "repository", _UnreachableRepo())
     cfg = replace(
         app_settings,
         jwt_secret="ephemeral-but-long-enough-for-local-tests",
     )
 
-    with pytest.raises(RuntimeError, match="UUID env var must be set"):
+    with pytest.raises(RuntimeError, match="MONGO_URI is unreachable"):
         main._validate_settings(cfg)
 
 

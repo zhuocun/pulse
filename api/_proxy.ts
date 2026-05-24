@@ -27,7 +27,9 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-export const BACKEND_URL = "https://pulse-python-server.vercel.app";
+const ENV_BACKEND_URL = (process.env.BACKEND_URL ?? "").trim();
+export const BACKEND_URL =
+    ENV_BACKEND_URL || "https://pulse-python-server.vercel.app";
 
 // Request headers a forwarder must NOT pass through. ``host`` belongs
 // to the FE edge; ``content-length`` is recomputed from the body that

@@ -41,6 +41,7 @@ import importlib
 import itertools
 import json
 import logging
+import time
 from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
@@ -48,7 +49,11 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from app.config import Settings, settings as default_settings
-from app.deploy_env import HOSTED_PLATFORM_ENV_MARKERS, has_hosted_platform_env
+from app.deploy_env import (
+    HOSTED_PLATFORM_ENV_MARKERS,
+    detected_hosted_platform,
+    has_hosted_platform_env,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -484,6 +489,23 @@ def assert_provider_available(
             if resolved.provider == PROVIDER_ANTHROPIC
             else "OPENAI_API_KEY"
         )
+        platform = detected_hosted_platform()
+        # Name the platform when we recognise it so the operator sees
+        # an actionable pointer (e.g. "set it in your Vercel project
+        # settings") rather than the generic "production-shaped deploy"
+        # framing that requires them to know which marker fired.
+        if platform is not None:
+            location = {
+                "vercel": "your Vercel project settings → Environment Variables",
+                "render": "your Render service → Environment",
+                "fly": "your Fly app secrets (`fly secrets set`)",
+                "railway": "your Railway service → Variables",
+                "kubernetes": "your Deployment env or Secret manifest",
+            }.get(platform, "your hosting platform's environment settings")
+            raise RuntimeError(
+                f"{env_var} is empty on {platform.capitalize()}; set it in "
+                f"{location}. Without it, every AI call will fail mid-SSE."
+            )
         raise RuntimeError(
             f"AGENT_CHAT_MODEL_PROVIDER resolved to '{resolved.provider}' but "
             f"{env_var} is empty on a production-shaped deploy; the first "
@@ -610,3 +632,222 @@ def estimate_text_tokens(text: str) -> int:
         # Approximate worst-case BPE expansion for non-ASCII content.
         return max(1, len(text) // 2)
     return max(1, len(text) // 4)
+
+
+# ---------------------------------------------------------------------------
+# Provider connectivity probe -- consumed by the AI readiness endpoint.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProviderConnectivityResult:
+    """Outcome of a cheap connectivity probe against a chat provider.
+
+    ``detail`` carries an operator-facing summary string (e.g.
+    ``"authentication failed"``); it MUST NOT include the API key,
+    key prefix, or key length -- the readiness endpoint emits it
+    verbatim and the response is callable without auth.
+    """
+
+    provider: str
+    reachable: bool
+    detail: str = ""
+    checked_at: float = 0.0
+
+
+# Bound the cache so a misbehaving caller cannot grow it unboundedly;
+# 30s matches the FE health-poll cadence, so back-to-back readiness
+# pokes collapse onto one upstream request.
+_PROBE_CACHE_TTL_SECONDS = 30.0
+_probe_cache: dict[tuple[str, int], tuple[float, ProviderConnectivityResult]] = {}
+
+
+def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, int]:
+    """Stable cache key that does NOT leak the API key value.
+
+    We hash the key with the built-in :func:`hash` (process-local
+    randomized salt) so the cached entry stays unique per
+    (provider, key) pair without ever surfacing the key itself.
+    """
+
+    return (spec.provider, hash(spec.api_key))
+
+
+def _cached_probe_result(spec: "ChatModelSpec") -> ProviderConnectivityResult | None:
+    """Return a still-fresh cached result for ``spec``, else ``None``."""
+
+    cached = _probe_cache.get(_probe_cache_key(spec))
+    if cached is None:
+        return None
+    cached_at, result = cached
+    if (time.monotonic() - cached_at) > _PROBE_CACHE_TTL_SECONDS:
+        return None
+    return result
+
+
+def _store_probe_result(
+    spec: "ChatModelSpec", result: ProviderConnectivityResult
+) -> None:
+    _probe_cache[_probe_cache_key(spec)] = (time.monotonic(), result)
+
+
+def _reset_probe_cache_for_tests() -> None:
+    """Clear the connectivity-probe cache.
+
+    Exists so the test suite can isolate cache-hit / cache-miss runs
+    without sleeping for the full TTL.
+    """
+
+    _probe_cache.clear()
+
+
+async def probe_provider_connectivity(
+    spec: Optional["ChatModelSpec"] = None,
+    *,
+    timeout_seconds: float = 5.0,
+) -> ProviderConnectivityResult:
+    """Cheap connectivity probe -- no token cost.
+
+    Issues a ``models.list()`` call (which is free / quota-light on
+    both Anthropic and OpenAI) to confirm the configured key reaches
+    the provider. Stub provider always returns reachable. Results are
+    cached for 30s keyed by (provider, hashed-api-key) so the
+    readiness endpoint cannot be turned into a DoS amplifier.
+
+    Imports are lazy so an install without the ``[ai]`` extra still
+    imports this module (the probe just returns ``reachable=False`` for
+    the real-provider branches).
+    """
+
+    resolved = spec if spec is not None else resolve_chat_model_spec()
+    cached = _cached_probe_result(resolved)
+    if cached is not None:
+        return cached
+
+    if resolved.provider == PROVIDER_STUB:
+        result = ProviderConnectivityResult(
+            provider=resolved.provider,
+            reachable=True,
+            detail="stub provider always reachable",
+            checked_at=time.time(),
+        )
+        _store_probe_result(resolved, result)
+        return result
+
+    if resolved.provider == PROVIDER_OPENAI:
+        result = await _probe_openai(resolved, timeout_seconds=timeout_seconds)
+    elif resolved.provider == PROVIDER_ANTHROPIC:
+        result = await _probe_anthropic(resolved, timeout_seconds=timeout_seconds)
+    else:
+        result = ProviderConnectivityResult(
+            provider=resolved.provider,
+            reachable=False,
+            detail=f"unsupported provider {resolved.provider!r}",
+            checked_at=time.time(),
+        )
+    _store_probe_result(resolved, result)
+    return result
+
+
+async def _probe_openai(
+    spec: ChatModelSpec, *, timeout_seconds: float
+) -> ProviderConnectivityResult:
+    """Connectivity probe against the OpenAI HTTP API.
+
+    Wrapped in a try/except around the import so an install without
+    the ``openai`` SDK still gets a sensible structured response
+    instead of a 500.
+    """
+
+    try:
+        import openai  # type: ignore[import-not-found]
+    except ImportError:
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="openai SDK not installed",
+            checked_at=time.time(),
+        )
+    try:
+        client = openai.AsyncOpenAI(
+            api_key=spec.api_key or None, timeout=timeout_seconds
+        )
+        await client.models.list()
+    except openai.AuthenticationError:
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="authentication failed",
+            checked_at=time.time(),
+        )
+    except (openai.APIConnectionError, openai.APITimeoutError):
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="network error",
+            checked_at=time.time(),
+        )
+    except Exception as exc:  # noqa: BLE001 -- surface as structured failure
+        # Strip exception details that could carry the key (the OpenAI
+        # SDK has historically reflected the masked key in some error
+        # bodies); we keep only the exception class name.
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail=f"unexpected error: {exc.__class__.__name__}",
+            checked_at=time.time(),
+        )
+    return ProviderConnectivityResult(
+        provider=spec.provider,
+        reachable=True,
+        detail="",
+        checked_at=time.time(),
+    )
+
+
+async def _probe_anthropic(
+    spec: ChatModelSpec, *, timeout_seconds: float
+) -> ProviderConnectivityResult:
+    """Connectivity probe against the Anthropic HTTP API."""
+
+    try:
+        import anthropic  # type: ignore[import-not-found]
+    except ImportError:
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="anthropic SDK not installed",
+            checked_at=time.time(),
+        )
+    try:
+        client = anthropic.AsyncAnthropic(
+            api_key=spec.api_key or None, timeout=timeout_seconds
+        )
+        await client.models.list()
+    except anthropic.AuthenticationError:
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="authentication failed",
+            checked_at=time.time(),
+        )
+    except (anthropic.APIConnectionError, anthropic.APITimeoutError):
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail="network error",
+            checked_at=time.time(),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return ProviderConnectivityResult(
+            provider=spec.provider,
+            reachable=False,
+            detail=f"unexpected error: {exc.__class__.__name__}",
+            checked_at=time.time(),
+        )
+    return ProviderConnectivityResult(
+        provider=spec.provider,
+        reachable=True,
+        detail="",
+        checked_at=time.time(),
+    )

@@ -15,6 +15,11 @@ PROJECTS = "projects"
 COLUMNS = "columns"
 TASKS = "tasks"
 AGENT_MUTATION_JOURNAL = "agent_mutation_journal"
+# Schema-less collection owned by :mod:`app.system_config` -- the
+# canonical row today is ``{_id: "jwt_secret", value: <hex>}``; Mongo's
+# implicit primary-key uniqueness on ``_id`` is the only index needed
+# (no explicit ``create_index`` call required in :func:`ensure_indexes`).
+SYSTEM_CONFIG = "system_config"
 
 
 client: MongoClient = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=5000)

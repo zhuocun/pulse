@@ -35,6 +35,12 @@ Last updated: 2026-05-22 (GA §1 closed in code: real-provider chat tool calls n
   shipped behind env flags — production embeddings **backfill** and tuning
   remain operator readiness work (see §4 body), not an additional numbered
   blocker in this file.
+  - Operator-readiness floor is now `MONGO_URI` + one LLM key for ≤5
+    users (Postgres optional; needed only for the four interrupt-using
+    agents to survive cold starts) — see
+    [`../operations/small-group-quickstart.md`](../operations/small-group-quickstart.md).
+    `UUID` is no longer required; the lifespan bootstraps a persisted
+    JWT secret into the Mongo `system_config` collection on first boot.
 
 ## ⚠️ Blocker urgency — resolve before each tier
 
@@ -322,7 +328,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Rate limiting (per-agent, from metadata) | ✅ | |
 | Monthly token budget (per-project) | ✅ | `AGENT_BUDGET_MONTHLY_TOKEN_CAP` |
 | Idempotency (Redis-backed) | ✅ | Now also enforced on the SSE `/stream` initial POST (2026-05-05) |
-| Durable checkpointing (Postgres when configured) | ✅ | Local/dev default remains `memory`; production resume durability needs `AGENT_CHECKPOINT_BACKEND=postgres` |
+| Durable checkpointing (Postgres when configured) | ✅ | Local/dev default resolves to `memory`; setting `AGENT_POSTGRES_URI` flips the `auto` default (both `AGENT_CHECKPOINT_BACKEND` and `AGENT_STORE_BACKEND`) to `postgres` automatically. Explicit `postgres` / `memory` still works as an override. |
 | OpenTelemetry tracing + Prometheus metrics + LangSmith | ✅ | |
 | Boot-time prod guard (warns on `memory` backends) | ⚠️ | `_validate_memory_agent_backends` logs or warns on checkpoint/store memory. **Multi-worker:** `_configure_middleware_backends` **raises** when `UVICORN_WORKERS` / `WEB_CONCURRENCY` > 1 unless rate + budget + idempotency are Redis-backed with `REDIS_URI` (§16d). Memory-backed middleware still **warns** under multi-instance heuristics. |
 | Boot-time prod guard (explicit provider without API key) | ✅ | `assert_provider_available` raises `RuntimeError` when `AGENT_CHAT_MODEL_PROVIDER` resolves to `anthropic` / `openai` without an API key on a production-shaped deploy (`backend/app/agents/llm.py:324–339`). Added 2026-05-05. |

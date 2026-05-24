@@ -39,10 +39,58 @@ if TYPE_CHECKING:  # pragma: no cover - import-time only
 BACKEND_NONE = "none"
 BACKEND_MEMORY = "memory"
 BACKEND_POSTGRES = "postgres"
+BACKEND_AUTO = "auto"
 
 SUPPORTED_BACKENDS: frozenset[str] = frozenset(
     {BACKEND_NONE, BACKEND_MEMORY, BACKEND_POSTGRES}
 )
+
+
+def resolve_agent_backend(raw: str, *, agent_postgres_uri: str) -> str:
+    """Resolve the ``auto`` agent-backend sentinel to a concrete value.
+
+    The 5-person quickstart path lets an operator drop both
+    ``AGENT_CHECKPOINT_BACKEND`` and ``AGENT_STORE_BACKEND`` -- the
+    dataclass default is now ``"auto"`` -- and only set
+    ``AGENT_POSTGRES_URI`` to get persistent agent state. This helper
+    centralises the auto-detect rule so every call site (the lifespan
+    guards, the factories, the readiness payload) sees the same answer.
+
+    Rules:
+        * ``"auto"`` (case-insensitive, leading / trailing whitespace
+          tolerated) + non-empty stripped ``agent_postgres_uri`` →
+          ``"postgres"``.
+        * ``"auto"`` + empty / whitespace-only ``agent_postgres_uri`` →
+          ``"memory"``.
+        * Any other value is returned unchanged (with its original
+          spelling preserved) so explicit ``"memory"`` / ``"postgres"``
+          / ``"none"`` (and any future backend name) keep their
+          semantics for downstream consumers that match them verbatim.
+
+    Only the ``auto`` sentinel is normalized here; the factories
+    (:func:`build_checkpointer` / :func:`build_store`) still apply
+    ``.strip().lower()`` before dispatching on the concrete backend
+    name, so case / whitespace tolerance for explicit values stays in
+    one place. This split keeps the resolver's contract narrow: it
+    only translates the sentinel, never silently rewrites values that
+    callers may want to compare against verbatim.
+
+    Only ``AGENT_POSTGRES_URI`` participates in the auto-detect.
+    ``POSTGRES_URI`` is intentionally excluded -- it may exist for an
+    unrelated application Postgres that should not be claimed by
+    LangGraph behind the operator's back.
+    """
+
+    normalized = (raw or "").strip().lower()
+    if normalized != BACKEND_AUTO:
+        # Preserve the caller's exact spelling for explicit values so
+        # downstream code that matches against the raw string (e.g.
+        # ``runtime.checkpointer is None`` only when ``"postgres"``)
+        # still sees what the operator configured.
+        return raw
+    if agent_postgres_uri and agent_postgres_uri.strip():
+        return BACKEND_POSTGRES
+    return BACKEND_MEMORY
 
 
 @dataclass(frozen=True)
@@ -135,6 +183,14 @@ def build_checkpointer(
     """
 
     normalized = (backend or "").strip().lower()
+    if normalized == BACKEND_AUTO:
+        if settings is None:
+            from app.config import settings as default_settings
+
+            settings = default_settings
+        normalized = resolve_agent_backend(
+            normalized, agent_postgres_uri=settings.agent_postgres_uri
+        )
     if normalized in {"", BACKEND_NONE, "off", "disabled"}:
         return None
     if normalized == BACKEND_MEMORY:

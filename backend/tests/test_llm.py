@@ -304,3 +304,29 @@ def test_chat_model_spec_defaults_are_backward_compatible() -> None:
     spec = ChatModelSpec(provider=PROVIDER_STUB, model="stub")
     assert spec.max_retries == 2
     assert spec.timeout_seconds == 30.0
+
+
+# ---------------------------------------------------------------------------
+# probe_provider_connectivity -- stub branch is hermetic
+# ---------------------------------------------------------------------------
+
+
+def test_probe_provider_connectivity_stub_branch() -> None:
+    """The stub branch never touches the network and is always reachable."""
+
+    import asyncio
+
+    from app.agents.llm import (
+        ChatModelSpec,
+        ProviderConnectivityResult,
+        probe_provider_connectivity,
+    )
+
+    llm_module._reset_probe_cache_for_tests()
+    spec = ChatModelSpec(provider=PROVIDER_STUB, model="stub", api_key="")
+    result = asyncio.run(probe_provider_connectivity(spec))
+
+    assert isinstance(result, ProviderConnectivityResult)
+    assert result.provider == PROVIDER_STUB
+    assert result.reachable is True
+    assert result.checked_at > 0
