@@ -1,14 +1,5 @@
 import styled from "@emotion/styled";
-import {
-    Alert,
-    App,
-    Button,
-    Card,
-    Input,
-    Select,
-    Space,
-    Typography
-} from "antd";
+import { Alert, Button, Card, Input, Select, Space, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -25,6 +16,7 @@ import {
     radius,
     space
 } from "../theme/tokens";
+import useAppMessage from "../utils/hooks/useAppMessage";
 import useAuth from "../utils/hooks/useAuth";
 import useReactMutation from "../utils/hooks/useReactMutation";
 import useReactQuery from "../utils/hooks/useReactQuery";
@@ -231,8 +223,9 @@ const composeNote = (params: {
 
 const SharePage = () => {
     // AntD v6: static `message` warns about dynamic theme;
-    // `App.useApp()` returns a theme-aware instance.
-    const { message } = App.useApp();
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     // `keepOnMount=false` restores the previous `document.title` on
     // unmount so the share-target page doesn't leak its title into the
     // next route. Mirrors the Phase 2 Bug 7 fix on every other branded

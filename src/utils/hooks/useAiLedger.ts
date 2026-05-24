@@ -1,4 +1,3 @@
-import { App } from "antd";
 import { useCallback } from "react";
 import { useStore } from "react-redux";
 
@@ -10,6 +9,7 @@ import {
     type AiLedgerSurface
 } from "../../store/reducers/aiLedgerSlice";
 
+import useAppMessage from "./useAppMessage";
 import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
@@ -132,9 +132,9 @@ export const __resetAiLedgerUndoCallbacksForTests = (): void => {
 
 const useAiLedger = (): UseAiLedger => {
     // AntD v6: the static `message` import warns it can't read dynamic
-    // theme. `App.useApp()` returns a theme-aware instance scoped to
-    // the nearest `<App>` provider (mounted in `AppProviders`).
-    const { message } = App.useApp();
+    // theme. `useAppMessage()` returns a theme-aware instance (with a
+    // static fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const dispatch = useReduxDispatch();
     const store = useStore<RootState>();
     const stateEntries = useReduxSelector((s) => s.aiLedger.entries);

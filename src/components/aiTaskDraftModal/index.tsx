@@ -1,7 +1,6 @@
 import { ReloadOutlined } from "@ant-design/icons";
 import {
     Alert,
-    App,
     Button,
     Checkbox,
     Form,
@@ -31,6 +30,7 @@ import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useAiLedger from "../../utils/hooks/useAiLedger";
 import useApi from "../../utils/hooks/useApi";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -79,8 +79,9 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     columnId
 }) => {
     // AntD v6: static `message` warns about dynamic theme;
-    // `App.useApp()` returns a theme-aware instance.
-    const { message } = App.useApp();
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const { user } = useAuth();
     const { projectId } = useParams<{ projectId: string }>();
     const columns =

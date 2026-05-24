@@ -1,6 +1,5 @@
 import {
     Alert,
-    App,
     Button,
     Form,
     Grid,
@@ -20,6 +19,7 @@ import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -147,8 +147,9 @@ const TaskModal: React.FC<{
     boardAiOn?: boolean;
 }> = ({ tasks, boardAiOn = true }) => {
     // AntD v6: static `message` warns about dynamic theme;
-    // `App.useApp()` returns a theme-aware instance.
-    const { message } = App.useApp();
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const [form] = useForm();
     const { projectId } = useParams<{ projectId: string }>();
     const { editingTaskId, startEditing, closeModal } = useTaskModal();

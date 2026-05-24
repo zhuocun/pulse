@@ -1,9 +1,10 @@
-import { App } from "antd";
 import { useCallback, useEffect, useRef } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import { UNDO_WINDOW_MS } from "../../theme/aiTokens";
+
+import useAppMessage from "./useAppMessage";
 
 /**
  * Toast Undo (PRD v3 §7.3, T-R1, T-R4, D-R5). Shows an AntD `message` with
@@ -41,9 +42,9 @@ const useUndoToast = (): {
     show: (options: UndoToastOptions) => ShowResult;
 } => {
     // AntD v6: the static `message` import warns it can't read dynamic
-    // theme. `App.useApp()` resolves a theme-aware instance from the
-    // nearest `<App>` provider in the tree (mounted by `AppProviders`).
-    const { message } = App.useApp();
+    // theme. `useAppMessage()` returns a theme-aware instance (with a
+    // static fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const dismissRef = useRef<(() => void) | null>(null);
 
     useEffect(

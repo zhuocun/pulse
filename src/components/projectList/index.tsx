@@ -1,6 +1,6 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { App, Button, Modal, Select } from "antd";
+import { Button, Modal, Select } from "antd";
 import { useCallback, useMemo, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
@@ -14,6 +14,7 @@ import {
     space
 } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -198,8 +199,9 @@ const ProjectList: React.FC<Props> = ({
     onSortOrderChange
 }) => {
     // AntD v6: static `message` warns about dynamic theme;
-    // `App.useApp()` returns a theme-aware instance.
-    const { message } = App.useApp();
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const { user } = useAuth();
     const [pendingLikeId, setPendingLikeId] = useState("");
     /*

@@ -7,7 +7,6 @@ import {
 } from "@ant-design/icons";
 import {
     Alert,
-    App,
     Button,
     Grid,
     Modal,
@@ -49,6 +48,7 @@ import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import type {
@@ -295,7 +295,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const historyRestoredForRef = useRef<string | null>(null);
     const screens = Grid.useBreakpoint();
     const initialPromptHandled = useRef<string | null>(null);
-    const { message } = App.useApp();
+    const message = useAppMessage();
 
     useEffect(() => {
         if (!surfaceVisible) {

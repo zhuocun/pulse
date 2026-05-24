@@ -6,7 +6,6 @@ import {
 import styled from "@emotion/styled";
 import {
     Alert,
-    App,
     Button,
     List,
     Skeleton,
@@ -31,6 +30,7 @@ import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -353,8 +353,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     members
 }) => {
     // AntD v6: static `message` warns about dynamic theme;
-    // `App.useApp()` returns a theme-aware instance.
-    const { message } = App.useApp();
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     // `tabActive` defaults to `dockOpen` so a legacy single-surface caller
     // (drawer wrapper) inherits the original semantics. Inside this body:
     //   - `dockOpen`        gates close-side teardown only.
