@@ -193,7 +193,10 @@ const makeTestStore = (density: "comfortable" | "compact" = "comfortable") =>
                 boardDensity: density,
                 savedFilterPresets: [],
                 projectListDefaults: null,
-                glassIntensity: "auto" as const
+                glassIntensity: "auto" as const,
+                // Phase 6 Wave 1 — preloadedState must carry the
+                // current migration sentinel.
+                glassIntensityVersion: 1
             }
         }
     });

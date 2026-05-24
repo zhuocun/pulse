@@ -38,8 +38,13 @@ describe("userPreferencesSlice", () => {
             projectListDefaults: null,
             // Phase 5 Wave 2 T4 — default to "auto" so brand-new
             // installs get the per-device ladder (no user-visible UI
-            // nag for "pick a glass setting").
-            glassIntensity: "auto"
+            // nag for "pick a glass setting"). Phase 6 Wave 1 — the
+            // coarse-pointer branch of the auto ladder now resolves
+            // to "regular" (was "solid"); new installs persist
+            // glassIntensityVersion at the current sentinel so the
+            // load-path migration is a no-op for them.
+            glassIntensity: "auto",
+            glassIntensityVersion: 1
         });
     });
 
@@ -124,7 +129,11 @@ describe("userPreferences persistence", () => {
             boardDensity: "comfortable",
             savedFilterPresets: [],
             projectListDefaults: null,
-            glassIntensity: "auto"
+            glassIntensity: "auto",
+            // Phase 6 Wave 1 — brand-new installs get the current
+            // migration sentinel so the load-path migration is a
+            // no-op for them (they receive the post-flip default).
+            glassIntensityVersion: 1
         });
     });
 
@@ -150,7 +159,8 @@ describe("userPreferences persistence", () => {
             boardDensity: "comfortable",
             savedFilterPresets: [],
             projectListDefaults: null,
-            glassIntensity: "auto"
+            glassIntensity: "auto",
+            glassIntensityVersion: 1
         });
     });
 
@@ -209,10 +219,13 @@ describe("userPreferences persistence", () => {
         expect(loadPersistedUserPreferences().glassIntensity).toBe("clear");
     });
 
-    it("falls back to auto for a legacy v1 blob with no glassIntensity field", () => {
-        // A v1 envelope persisted BEFORE Wave 2 T4 shipped — proves
-        // the append-only contract: the new field's default fills in
-        // and we don't need a schema version bump.
+    it("migrates a legacy v1 blob with no glassIntensity field to solid (Phase 6 Wave 1)", () => {
+        // A v1 envelope persisted BEFORE Wave 2 T4 shipped — the
+        // append-only guard fills `glassIntensity` with the default
+        // ("auto"), but the Phase 6 Wave 1 migration then rewrites
+        // "auto" to "solid" because the blob carries no
+        // `glassIntensityVersion` sentinel. The user is treated as a
+        // pre-Phase-6 install with no explicit preference.
         const stored = {
             version: 1,
             state: {
@@ -226,13 +239,18 @@ describe("userPreferences persistence", () => {
             JSON.stringify(stored)
         );
         const loaded = loadPersistedUserPreferences();
-        expect(loaded.glassIntensity).toBe("auto");
+        expect(loaded.glassIntensity).toBe("solid");
+        expect(loaded.glassIntensityVersion).toBe(1);
         // Existing fields survive — the additive field doesn't poison
         // the legacy read.
         expect(loaded.boardDensity).toBe("compact");
     });
 
-    it("rejects an unknown glassIntensity value and falls back to auto", () => {
+    it("rejects an unknown glassIntensity value and falls back to auto (then migrates to solid)", () => {
+        // Type-guard rejection: the bad value reads as `undefined`,
+        // falls through to the default `"auto"`. The Phase 6 Wave 1
+        // migration then rewrites that `"auto"` to `"solid"` because
+        // the blob doesn't carry a `glassIntensityVersion` sentinel.
         const stored = {
             version: 1,
             state: {
@@ -246,7 +264,9 @@ describe("userPreferences persistence", () => {
             USER_PREFERENCES_STORAGE_KEY,
             JSON.stringify(stored)
         );
-        expect(loadPersistedUserPreferences().glassIntensity).toBe("auto");
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("solid");
+        expect(loaded.glassIntensityVersion).toBe(1);
     });
 
     it("setGlassIntensity flips through every option", () => {
@@ -291,7 +311,8 @@ describe("userPreferences persistence", () => {
             boardDensity: "compact",
             savedFilterPresets: [makePreset("p1")],
             projectListDefaults: null,
-            glassIntensity: "auto"
+            glassIntensity: "auto",
+            glassIntensityVersion: 1
         });
         const stored = window.localStorage.getItem(
             USER_PREFERENCES_STORAGE_KEY
@@ -335,6 +356,217 @@ describe("userPreferences persistence", () => {
         expect(stored).not.toBeNull();
         // Wrapped envelope — `state` carries the slice fields.
         expect(JSON.parse(stored ?? "{}").state.boardDensity).toBe("compact");
+    });
+});
+
+/**
+ * Phase 6 Wave 1 — one-shot `glassIntensity` runtime-default migration.
+ * The Phase 5 resolver collapsed `glassIntensity: "auto"` to `"solid"` on
+ * coarse-pointer surfaces; Phase 6 collapses it to `"regular"`. To avoid
+ * surprising existing mobile users by suddenly enabling Liquid Glass on
+ * their phones, the load path rewrites their stored `"auto"` to `"solid"`
+ * once — gated by `glassIntensityVersion` so the rewrite only ever runs
+ * once per user. Explicit picks (`"clear"`, `"regular"`, `"solid"`) are
+ * preserved unchanged.
+ */
+describe("userPreferences glassIntensityVersion migration", () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+    });
+
+    it("migrates a pre-Phase-6 v1 blob with glassIntensity=auto to solid (and bumps version to 1)", () => {
+        // The canonical existing-user migration case. A v1 envelope
+        // persisted before Phase 6 Wave 1 carried no
+        // `glassIntensityVersion` sibling and a default-of-auto
+        // `glassIntensity`. The Phase 6 load path detects the missing
+        // sentinel and rewrites to "solid" so the user keeps the
+        // legacy mobile experience after the resolver default flip.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto"
+                // glassIntensityVersion deliberately absent
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("solid");
+        expect(loaded.glassIntensityVersion).toBe(1);
+    });
+
+    it("persists the migrated shape back so the next load is a no-op", () => {
+        // The migration writes the post-migration state back to
+        // localStorage so the next boot reads the value directly
+        // (no repeated rewriting of the stored bytes). This is the
+        // idempotency contract — calling loadPersistedUserPreferences
+        // twice yields the same result on both calls.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        loadPersistedUserPreferences();
+        // Inspect the persisted bytes — the post-migration state
+        // should now be present so the next boot skips the
+        // migration branch entirely.
+        const after = JSON.parse(
+            window.localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? "{}"
+        );
+        expect(after.state.glassIntensity).toBe("solid");
+        expect(after.state.glassIntensityVersion).toBe(1);
+        // Second load: idempotent — same result, no further rewrite.
+        const second = loadPersistedUserPreferences();
+        expect(second.glassIntensity).toBe("solid");
+        expect(second.glassIntensityVersion).toBe(1);
+    });
+
+    it("preserves an explicit regular pick across the migration (no auto→solid rewrite)", () => {
+        // The migration only rewrites `"auto"` users — anyone who
+        // explicitly picked `"regular"` (or "clear" / "solid")
+        // already opted into a specific intensity. The version
+        // sentinel is still bumped so the next load skips the
+        // check.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "regular"
+                // glassIntensityVersion deliberately absent
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("regular");
+        expect(loaded.glassIntensityVersion).toBe(1);
+    });
+
+    it("preserves an explicit clear pick across the migration", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "clear"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("clear");
+        expect(loaded.glassIntensityVersion).toBe(1);
+    });
+
+    it("preserves an explicit solid pick across the migration", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "solid"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("solid");
+        expect(loaded.glassIntensityVersion).toBe(1);
+    });
+
+    it("does not re-migrate when glassIntensityVersion is already at the current value", () => {
+        // A user who already ran the Phase 6 migration once and
+        // subsequently re-picked "auto" (deliberately, from the
+        // settings UI) should be left alone — their "auto" is the
+        // post-flip "auto" which resolves to Regular on mobile, and
+        // that's the experience they asked for.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto",
+                glassIntensityVersion: 1
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("auto");
+        expect(loaded.glassIntensityVersion).toBe(1);
+        // The stored bytes should be unchanged (no rewrite — the
+        // migration branch was skipped).
+        const after = JSON.parse(
+            window.localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? "{}"
+        );
+        expect(after.state.glassIntensity).toBe("auto");
+        expect(after.state.glassIntensityVersion).toBe(1);
+    });
+
+    it("new install (no persisted state) gets the post-flip default + current version", () => {
+        // No persisted state at all — the initialState seed kicks
+        // in. Brand-new users get the Phase 6 default ("auto" which
+        // resolves to Regular on mobile) and the current version
+        // sentinel so the load path migration is a no-op on the
+        // next boot.
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("auto");
+        expect(loaded.glassIntensityVersion).toBe(1);
+    });
+
+    it("migrates a legacy UNVERSIONED blob with glassIntensity=auto to solid", () => {
+        // The legacy unversioned path also runs through the
+        // glassIntensity migration — a user who never updated past
+        // the pre-v1-envelope shape still gets the auto→solid
+        // rewrite so they keep their mobile Solid.
+        const legacy = {
+            // No `version` sibling — legacy pre-envelope shape.
+            boardDensity: "compact",
+            savedFilterPresets: [],
+            glassIntensity: "auto"
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(legacy)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("solid");
+        expect(loaded.glassIntensityVersion).toBe(1);
+        // Legacy migration also persists the wrapped envelope —
+        // verify the bytes carry both the v1 envelope AND the
+        // post-migration glassIntensity state.
+        const after = JSON.parse(
+            window.localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? "{}"
+        );
+        expect(after.version).toBe(1);
+        expect(after.state.glassIntensity).toBe("solid");
+        expect(after.state.glassIntensityVersion).toBe(1);
     });
 });
 
@@ -437,7 +669,8 @@ describe("userPreferences schema versioning", () => {
                 boardDensity: "comfortable",
                 savedFilterPresets: [],
                 projectListDefaults: null,
-                glassIntensity: "auto"
+                glassIntensity: "auto",
+                glassIntensityVersion: 1
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 99/);
@@ -477,7 +710,8 @@ describe("userPreferences schema versioning", () => {
                 boardDensity: "comfortable",
                 savedFilterPresets: [],
                 projectListDefaults: null,
-                glassIntensity: "auto"
+                glassIntensity: "auto",
+                glassIntensityVersion: 1
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 0/);

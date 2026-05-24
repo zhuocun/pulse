@@ -58,6 +58,19 @@ const REQUIRED_LIGHT_VARS = [
     // a uniform-blur compromise.
     "--ant-backdrop-filter-glass-subtle",
     "--ant-backdrop-filter-glass-strong",
+    // Phase 6 Wave 1 — iOS-26 foundation tokens: mobile chrome inset,
+    // sheet detent ladder (peek/medium/large), additional motion +
+    // easing curves for the Sheet snap and tab-bar minimize. Defined
+    // in both palette blocks for symmetry (these are geometry/timing,
+    // not color-mode dependent — but shipping in both keeps "every var
+    // defined for one mode is defined for both" enforceable).
+    "--ant-chrome-inset-mobile",
+    "--ant-detent-peek",
+    "--ant-detent-medium",
+    "--ant-detent-large",
+    "--ant-motion-detent-snap",
+    "--ant-motion-tab-bar-minimize",
+    "--ant-easing-detent",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -441,6 +454,99 @@ describe("paletteToCss", () => {
             expect(css).toMatch(
                 /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
             );
+        });
+    });
+
+    /*
+     * Phase 6 Wave 1 — iOS-26 mobile foundation tokens. Geometry and
+     * timing values (NOT palette-dependent) that Wave 2's BottomTabBar
+     * geometry refactor and Wave 3's Sheet primitive both consume. The
+     * tests below pin the concrete values so a future refactor that
+     * rewrites the cssVars renderer to skip a var trips a conscious
+     * review — these are load-bearing for the mobile chrome contract.
+     */
+    describe("Phase 6 Wave 1 mobile foundation vars", () => {
+        it("emits --ant-chrome-inset-mobile at 16px in both blocks", () => {
+            // 16 px = iOS 26 ~21pt mapped to web density. Mirrors
+            // `space.md` so the chrome floats with the same gutter the
+            // rest of the layout uses, but stays named for the
+            // BottomTabBar / Sheet consumers in Waves 2 and 3.
+            const css = paletteToCss(orangePalette);
+            expect(lightBlockOf(css)).toContain(
+                "--ant-chrome-inset-mobile: 16px;"
+            );
+            expect(darkBlockOf(css)).toContain(
+                "--ant-chrome-inset-mobile: 16px;"
+            );
+        });
+
+        it("emits the sheet-detent ladder (peek/medium/large) in both blocks", () => {
+            // `peek` in px (fixed offset above safe-area-inset-bottom),
+            // `medium` and `large` in dvh so iOS Safari URL-bar
+            // collapse doesn't trip a mid-gesture snap. The Wave 3
+            // Sheet primitive consumes these directly as snap points.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const dark = darkBlockOf(css);
+            expect(light).toContain("--ant-detent-peek: 96px;");
+            expect(light).toContain("--ant-detent-medium: 50dvh;");
+            expect(light).toContain("--ant-detent-large: 92dvh;");
+            expect(dark).toContain("--ant-detent-peek: 96px;");
+            expect(dark).toContain("--ant-detent-medium: 50dvh;");
+            expect(dark).toContain("--ant-detent-large: 92dvh;");
+        });
+
+        it("emits the new motion + easing tokens (detent snap, tab-bar minimize, detent curve)", () => {
+            // Wave 2 (tab-bar minimize) and Wave 3 (Sheet snap +
+            // detent curve) consume these triplet vars. Pin the
+            // literal values here so a token refactor in tokens.ts
+            // without a matching cssVars update fails this guard
+            // before drifting downstream.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const dark = darkBlockOf(css);
+            expect(light).toContain("--ant-motion-detent-snap: 360ms;");
+            expect(light).toContain("--ant-motion-tab-bar-minimize: 280ms;");
+            expect(light).toContain(
+                "--ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
+            );
+            expect(dark).toContain("--ant-motion-detent-snap: 360ms;");
+            expect(dark).toContain("--ant-motion-tab-bar-minimize: 280ms;");
+            expect(dark).toContain(
+                "--ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
+            );
+        });
+
+        it("foundation vars are identical between light and dark blocks (palette-independent)", () => {
+            // The Phase 6 Wave 1 foundation vars are geometry/timing
+            // (not color-mode dependent). They ship in both blocks for
+            // symmetry with the rest of the surface; a regression
+            // where one mode picks up a different value (e.g.
+            // accidentally swapping to a palette-derived expression)
+            // would silently differ between light and dark.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const dark = darkBlockOf(css);
+            const foundationVars = [
+                "--ant-chrome-inset-mobile",
+                "--ant-detent-peek",
+                "--ant-detent-medium",
+                "--ant-detent-large",
+                "--ant-motion-detent-snap",
+                "--ant-motion-tab-bar-minimize",
+                "--ant-easing-detent"
+            ];
+            for (const name of foundationVars) {
+                const lightMatch = light.match(
+                    new RegExp(`${name}:\\s*([^;]+);`)
+                );
+                const darkMatch = dark.match(
+                    new RegExp(`${name}:\\s*([^;]+);`)
+                );
+                expect(lightMatch).not.toBeNull();
+                expect(darkMatch).not.toBeNull();
+                expect(lightMatch![1].trim()).toBe(darkMatch![1].trim());
+            }
         });
     });
 });

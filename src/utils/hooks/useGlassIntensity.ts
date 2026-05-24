@@ -20,21 +20,37 @@ import type { GlassIntensityPreference } from "../../store/reducers/userPreferen
  *
  *   - `"auto"` → defer to the runtime ladder below
  *
- * `"auto"` ladder (highest priority first):
+ * Phase 6 Wave 1 — the resolver ladder was tightened in two ways from
+ * the Phase 5 Wave 2 T4 baseline:
  *
- *   1. `prefers-reduced-transparency: reduce` is set at the OS level →
- *      `"solid"`. Belt-and-suspenders — `cssVars.ts` ALSO emits a
- *      media-query override that forces the var to `none`, but the
- *      data attribute keeps the global override rule in App.css active
- *      so any GlassPanel prop-driven blur is also wiped.
- *   2. `pointer: coarse` (the existing `usePointerCoarse` predicate
- *      consumed by `appProviders`) → `"solid"`. Mobile GPUs pay a
- *      noticeable cost for `backdrop-filter`; the product
- *      recommendation in the Wave 2 proposal is to default-off glass
- *      on coarse-pointer surfaces. Users on tablets with a stylus or
- *      magic-mouse setup can opt back in with an explicit `"clear"` /
- *      `"regular"` choice.
- *   3. Otherwise → `"regular"`.
+ *   1. The coarse-pointer "auto" default flipped from `"solid"` to
+ *      `"regular"`. iOS 26 chrome upgrades are invisible on mobile when
+ *      the default is solid; flipping to regular makes the Liquid Glass
+ *      treatment the default mobile experience. Existing users keep
+ *      Solid via a one-shot migration in `userPreferencesSlice` keyed
+ *      on `glassIntensityVersion`, so nobody is surprised by the flip.
+ *   2. `forced-colors: active` (Windows high-contrast) and
+ *      `prefers-reduced-transparency: reduce` now step down EXPLICIT
+ *      user picks (`"clear"` / `"regular"`) to `"solid"`, not just the
+ *      `"auto"` ladder. Accessibility signals from the OS must win
+ *      regardless of the user's stored choice — a user who picked
+ *      `"clear"` for desktop and then switched to a high-contrast
+ *      profile should not be stranded with translucent chrome.
+ *
+ * Resolution priority (highest first):
+ *
+ *   1. `forced-colors: active` → `"solid"` (regardless of preference).
+ *      Previously a CSS-only fallback at `glassPanel/index.tsx:194` —
+ *      now centralized in the resolver so every consumer of
+ *      `useGlassIntensity` sees the same value.
+ *   2. `prefers-reduced-transparency: reduce` → `"solid"` (regardless of
+ *      preference). Belt-and-suspenders with the media-query override
+ *      in `cssVars.ts` that pins the chrome CSS-var to `none`.
+ *   3. User explicit pick (`"clear"` | `"regular"` | `"solid"`) → that
+ *      value. The toggle is the user's deliberate per-session override.
+ *   4. `"auto"` + `(pointer: coarse)` → `"regular"`. Phase 6 default;
+ *      iOS 26 chrome is the default mobile experience.
+ *   5. `"auto"` + fine pointer (desktop) → `"regular"`.
  *
  * The hook uses `useLayoutEffect` to write the data attribute before
  * the browser paints — without it, the first frame would render at the
@@ -52,6 +68,7 @@ export type GlassIntensity = "clear" | "regular" | "solid";
 
 const REDUCED_TRANSPARENCY_QUERY = "(prefers-reduced-transparency: reduce)";
 const POINTER_COARSE_QUERY = "(pointer: coarse)";
+const FORCED_COLORS_QUERY = "(forced-colors: active)";
 
 const isBrowser = (): boolean => typeof window !== "undefined";
 
@@ -61,26 +78,62 @@ const queryMatches = (query: string): boolean => {
 };
 
 /**
- * Picks an effective intensity from a stored preference plus the two
+ * Picks an effective intensity from a stored preference plus the three
  * runtime media-query signals. Exposed (and exported) so the resolver
  * can be unit-tested without mounting a hook tree.
+ *
+ * Phase 6 Wave 1 ladder (highest priority first):
+ *
+ *   1. `forced-colors: active` → `"solid"` (regardless of preference).
+ *      Windows high-contrast mode replaces every author colour with
+ *      system tokens; translucent surfaces paint the system Canvas
+ *      through them and become invisible. Centralizes the CSS-only
+ *      fallback that previously lived only in `glassPanel`.
+ *   2. `prefers-reduced-transparency: reduce` → `"solid"` (regardless
+ *      of preference). Belt-and-suspenders with the media-query
+ *      override in `cssVars.ts`. A user who picked `"clear"` for
+ *      desktop and switched into a reduced-transparency profile must
+ *      not be stranded with translucent chrome.
+ *   3. User explicit pick (`"clear"` | `"regular"` | `"solid"`) → that
+ *      value. The toggle is the user's deliberate per-session
+ *      override of the heuristic auto ladder.
+ *   4. `"auto"` + `(pointer: coarse)` → `"regular"`. Phase 6 default
+ *      flip; iOS-26 chrome is the default mobile experience. Existing
+ *      users keep Solid via the `glassIntensityVersion` migration in
+ *      `userPreferencesSlice`.
+ *   5. `"auto"` + fine pointer (desktop) → `"regular"`.
+ *
+ * `forcedColors` is the fourth parameter and defaults to `false` so
+ * existing call-sites that pass only three arguments (legacy code,
+ * analytics, screenshot harnesses) keep working unchanged.
  */
 export const resolveGlassIntensity = (
     preference: GlassIntensityPreference,
     reducedTransparency: boolean,
-    pointerCoarse: boolean
+    pointerCoarse: boolean,
+    forcedColors: boolean = false
 ): GlassIntensity => {
-    // Explicit user choice wins — the toggle is the user's deliberate
-    // override of the per-device default. "auto" is the only preference
-    // that triggers the ladder.
-    if (preference !== "auto") return preference;
-    // OS-level reduced-transparency is an accessibility signal; respect
-    // it even on desktop fine-pointer surfaces.
+    // Forced-colors mode (Windows high-contrast) replaces every author
+    // colour with system tokens; a translucent surface paints the
+    // system Canvas through it and becomes invisible. Step down to
+    // solid regardless of the user's stored pick — the OS signal wins.
+    if (forcedColors) return "solid";
+    // OS-level reduced-transparency is an accessibility signal that
+    // must beat the user's explicit choice. A user who picked "clear"
+    // for desktop and then switched into a reduced-transparency
+    // profile (cognitive accessibility, motion sensitivity) should
+    // not be left with translucent chrome.
     if (reducedTransparency) return "solid";
-    // Coarse pointer ≈ mobile / touch tablet; the GPU budget for
-    // backdrop-filter is tight enough that the product recommendation
-    // is to ship "solid" by default.
-    if (pointerCoarse) return "solid";
+    // Explicit user choice wins over the heuristic auto ladder.
+    // "auto" is the only preference that triggers the pointer/density
+    // branch below.
+    if (preference !== "auto") return preference;
+    // Coarse pointer ≈ mobile / touch tablet. Phase 6 Wave 1 flipped
+    // this from "solid" to "regular": iOS-26 chrome upgrades were
+    // invisible on mobile under the old default. Existing users keep
+    // Solid via the glassIntensityVersion migration in the slice, so
+    // nobody is surprised by the flip.
+    if (pointerCoarse) return "regular";
     return "regular";
 };
 
@@ -100,6 +153,9 @@ const useGlassIntensity = (): GlassIntensity => {
     const [pointerCoarse, setPointerCoarse] = useState<boolean>(() =>
         queryMatches(POINTER_COARSE_QUERY)
     );
+    const [forcedColors, setForcedColors] = useState<boolean>(() =>
+        queryMatches(FORCED_COLORS_QUERY)
+    );
 
     // Subscribe to live media-query changes so flipping a system
     // preference (or rotating a 2-in-1 between touch and trackpad)
@@ -111,10 +167,13 @@ const useGlassIntensity = (): GlassIntensity => {
         if (!isBrowser() || typeof window.matchMedia !== "function") return;
         const reducedMedia = window.matchMedia(REDUCED_TRANSPARENCY_QUERY);
         const coarseMedia = window.matchMedia(POINTER_COARSE_QUERY);
+        const forcedColorsMedia = window.matchMedia(FORCED_COLORS_QUERY);
         const onReduced = (event: MediaQueryListEvent) =>
             setReducedTransparency(event.matches);
         const onCoarse = (event: MediaQueryListEvent) =>
             setPointerCoarse(event.matches);
+        const onForced = (event: MediaQueryListEvent) =>
+            setForcedColors(event.matches);
         const addReduced =
             typeof reducedMedia.addEventListener === "function"
                 ? () => reducedMedia.addEventListener("change", onReduced)
@@ -131,18 +190,30 @@ const useGlassIntensity = (): GlassIntensity => {
             typeof coarseMedia.removeEventListener === "function"
                 ? () => coarseMedia.removeEventListener("change", onCoarse)
                 : () => coarseMedia.removeListener(onCoarse);
+        const addForced =
+            typeof forcedColorsMedia.addEventListener === "function"
+                ? () => forcedColorsMedia.addEventListener("change", onForced)
+                : () => forcedColorsMedia.addListener(onForced);
+        const removeForced =
+            typeof forcedColorsMedia.removeEventListener === "function"
+                ? () =>
+                      forcedColorsMedia.removeEventListener("change", onForced)
+                : () => forcedColorsMedia.removeListener(onForced);
         addReduced();
         addCoarse();
+        addForced();
         return () => {
             removeReduced();
             removeCoarse();
+            removeForced();
         };
     }, []);
 
     const effective = resolveGlassIntensity(
         preference,
         reducedTransparency,
-        pointerCoarse
+        pointerCoarse,
+        forcedColors
     );
 
     // useLayoutEffect so the attribute is in place BEFORE the browser

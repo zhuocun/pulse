@@ -5,7 +5,7 @@ import {
     UserOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
@@ -17,6 +17,7 @@ import {
     space,
     zIndex
 } from "../../theme/tokens";
+import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
 import nativeNavigate from "../../utils/nativeNavigate";
 
 /**
@@ -33,16 +34,16 @@ import nativeNavigate from "../../utils/nativeNavigate";
  * `<NavLink>` itself emits the active state via `aria-current="page"`,
  * which AT consumers already recognize.
  *
- * Keyboard hide — we listen to `visualViewport.resize` AND `scroll` and
- * hide the bar when `visualViewport.height < window.innerHeight * 0.75`
- * AND a text input is focused. The ratio threshold tolerates Chrome
- * Android's URL-bar collapse (~56–100 px) without false-firing, and the
- * activeElement gate keeps us from hiding the bar when only the page
- * scrolls. A graceful fallback keeps the bar visible if `visualViewport`
- * is undefined.
+ * Keyboard hide — driven by `useKeyboardOpen()`, the single source of
+ * truth for the keyboard-open predicate (extracted in Phase 6 Wave 1 so
+ * Wave 3's Sheet primitive can share the same detection without
+ * duplicating the inline listener block). The hook returns `true` when
+ * `visualViewport.height < window.innerHeight * 0.75` AND a text input
+ * is focused. The ratio tolerates Chrome Android's URL-bar collapse
+ * (~56–100 px) without false-firing, and the activeElement gate keeps
+ * us from hiding the bar when only the page scrolls. The bar stays
+ * visible as a graceful fallback when `visualViewport` is undefined.
  */
-
-const KEYBOARD_HEIGHT_RATIO = 0.75;
 
 /* `end={false}` on /projects keeps the Boards tab active on nested
  * routes ('/projects/:id/board'); the others require an exact match. */
@@ -283,42 +284,15 @@ const isPrimaryClick = (event: React.MouseEvent<HTMLAnchorElement>): boolean =>
 
 const BottomTabBar: React.FC = () => {
     const tabsRef = useRef<HTMLAnchorElement[]>([]);
-    const [keyboardOpen, setKeyboardOpen] = useState(false);
     const location = useLocation();
-
     /*
-     * Hide the bar while the soft keyboard is open. iOS Safari + Chrome
-     * Android shrink `window.visualViewport.height` when the keyboard
-     * raises. We use a ratio threshold (visualViewport < 75% of
-     * window.innerHeight) so Chrome Android's URL-bar collapse — which
-     * is ~56–100 px and trips a flat 150 px threshold on landscape
-     * phones — does not false-hide the bar. We also gate on an input
-     * actually being focused so a scroll-driven viewport shrink without
-     * a keyboard does not trigger the hide. Listen for both `resize`
-     * and `scroll` because Chrome Android emits the URL-bar / keyboard
-     * height delta on scroll, not resize.
+     * Hide the bar while the soft keyboard is open. The detection
+     * predicate (visualViewport ratio + input-focused gate, with
+     * graceful fallback when the API is missing) lives in
+     * `useKeyboardOpen` so Wave 3's Sheet primitive can share the
+     * same source of truth without duplicating the listener block.
      */
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const vv = window.visualViewport;
-        if (!vv) return;
-        const handler = () => {
-            const active = document.activeElement;
-            const inputFocused =
-                active instanceof HTMLInputElement ||
-                active instanceof HTMLTextAreaElement;
-            const shrunk =
-                vv.height < window.innerHeight * KEYBOARD_HEIGHT_RATIO;
-            setKeyboardOpen(inputFocused && shrunk);
-        };
-        handler();
-        vv.addEventListener("resize", handler);
-        vv.addEventListener("scroll", handler);
-        return () => {
-            vv.removeEventListener("resize", handler);
-            vv.removeEventListener("scroll", handler);
-        };
-    }, []);
+    const keyboardOpen = useKeyboardOpen();
 
     /*
      * Arrow-key navigation as a convenience. We use a <nav> landmark

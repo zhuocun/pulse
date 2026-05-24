@@ -21,7 +21,10 @@ const makeStore = (preference: GlassIntensityPreference = "auto") =>
                 boardDensity: "comfortable" as const,
                 savedFilterPresets: [],
                 projectListDefaults: null,
-                glassIntensity: preference
+                glassIntensity: preference,
+                // Phase 6 Wave 1 — preloadedState must carry the
+                // current migration sentinel.
+                glassIntensityVersion: 1
             }
         }
     });
