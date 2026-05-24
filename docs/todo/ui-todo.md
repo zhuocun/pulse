@@ -1,5 +1,7 @@
 # UI todo — phased UI / UX plan
 
+**Status as of 2026-05-24:** Phase 6 Wave 1 + 2 (iOS 26 mobile — floating capsule `BottomTabBar`, glass intensity ladder, foundation tokens) plus a UI/UX polish sweep shipped via PRs #315 / #316 / #317. Phase 5 (Liquid Glass desktop + tablet chrome) shipped via PR #313 in the 2026-05 series. Phase 6 Waves 3 – 8 and three small deferred polish items are documented under **Phase 6 — iOS 26 mobile** below. Remaining UI work in this doc is product/UX polish unless a row says otherwise.
+
 **Status as of 2026-05-22:** Reconciled against `main` after GA §1 closure. The AI mutation proposal / accept / apply / undo loop is code-ready; `MutationProposalCard` defaults on with an operator rollback flag. Remaining UI work below is product/UX polish unless a row says otherwise.
 
 **Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
@@ -306,6 +308,38 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 
 7. **Reporting page (placeholder route).**
    Once the project detail tabs exist (Phase 2.5), reserve `/projects/:id/reports` for a future velocity / burndown chart.
+
+### Phase 5 — Liquid Glass surface chrome
+
+**Status: shipped on `main` via PR #313 (2026-05 series).** Phase 5 introduced the iOS 26 "Liquid Glass" idiom (translucent surfaces, specular highlights, concentric corner radii, sentence-case labels) as the default desktop + tablet chrome. Token bundle (`src/theme/tokens.ts`), `palettes/cssVars` glass variables, `data-glass-context` opt-in, gel-flex chrome recipe, intensity toggle (`src/components/glassIntensitySelect/index.tsx`), sentence-case sweep across 10 components, and the column-header concentricity fix all live on main. No open items inside Phase 5 itself — mobile follow-through lives in Phase 6.
+
+### Phase 6 — iOS 26 mobile (Liquid Glass on phone)
+
+**Goal: lift the mobile chrome to iOS 26 / WWDC25 standards — floating chrome, multi-detent sheets, bottom-anchored search, motion polish, grouped table view, pull-to-refresh, swipe-to-action — anchored to the Phase 5 token foundation. Waves 1 + 2 + polish are shipped (PRs #315 / #316 / #317); Waves 3 – 8 are scoped below.**
+
+1. ~~**Wave 1 — foundation tokens + intensity ladder.**~~ **[Shipped (PR #315): `src/store/reducers/userPreferencesSlice.ts` ships `glassIntensityVersion` migration — existing mobile users → `solid`, new installs → `auto`. `src/utils/hooks/useGlassIntensity.ts` resolver ladder: `forced-colors: active` → `solid`; `prefers-reduced-transparency: reduce` → `solid`; explicit pick → that; `auto` + coarse → `regular`; `auto` + fine → `regular`. New hooks `src/utils/hooks/useKeyboardOpen.ts`, new tokens `chromeInset.mobile`, `detent.{peek, medium, large}`, `motion.{tabBarMinimize, detentSnap}`, `easing.detent` in `src/theme/tokens.ts` + `src/theme/palettes/cssVars.ts`.]**
+
+2. ~~**Wave 2 — floating capsule `BottomTabBar` + `TabBarAccessory` primitive.**~~ **[Shipped (PR #315): `src/components/bottomTabBar/index.tsx` (pill via `radius.pill`, `position: fixed`, `bottom: max(${space.lg}px, calc(env(safe-area-inset-bottom) + ${space.sm}px))`, `width: min(calc(100% - 32px), 480px)`, scroll-direction minimize via `src/utils/hooks/useScrollDirection.ts` with 50 px hysteresis + 300 ms min-state, keyboard-hide retarget via `useKeyboardOpen`, morphing pill indicator via `view-transition-name: pulse-tab-indicator`, haptic on activation via `src/utils/hooks/useHaptic.ts`). `src/components/tabBarAccessory/index.tsx` is a LIFO-stack portal primitive for persistent overlays above the tab bar (active call, mini-player) using a module-singleton + pub/sub.]**
+
+3. ~~**Wave 2 polish — visibility, clipping, AntD v6 chores.**~~ **[Shipped (PR #317): new `--ant-shadow-glass-lifted` CSS var so the light-mode capsule reads against the page bg (was washing out white-on-white); `TabLink min-width: 0` so the rightmost "Profile" tab no longer overflows the rim at 393 px; `/settings` rows stack label-above-control below `breakpoints.sm`; inline style prop `viewTransitionName` is camelCase (was firing React "Unsupported style property" 5× in console); `useCachedQueryData` filters subscriber events by `event.query.queryHash` (kills `setState while rendering ProjectModal` warning 13× in console); AntD v6 deprecations cleared (`<Drawer height>` → `styles.wrapper.height` in `commandPalette`; static `message.x()` → `App.useApp()` via new `src/utils/hooks/useAppMessage.ts` hook, 17 callsites migrated; `<AntdApp>` no longer suppresses `component` so cssVar block can scope to it).]**
+
+4. **Wave 3 — multi-detent sheet primitive.** Add Framer Motion as a dep (~50 KB gz, broader animation needs beyond `<Sheet>`); build `<Sheet>` at `src/components/sheet/index.tsx` with peek / medium / large detents (per `detent.*` token), pull-to-dismiss with snap-back, grabber affordance, focus trap, `prefers-reduced-motion` fallback to AntD Drawer; migrate `taskDetailPanel`, `copilotDock`, `activityFeedDrawer` to `<Sheet>` on mobile only (keep desktop AntD Drawer).
+
+5. **Wave 4 — half-sheet modals + bottom-anchored search + toolbar pill clusters.** Mobile modals collapse to medium-detent sheets instead of full overlays (preserve focus trap); `commandPalette` + `taskSearchPanel` move to a bottom-anchored search row (Mail / Messages / Notes / Music / Settings pattern); cluster `/board` toolbar buttons (Brief / Ask / Project AI) into shared glass capsules per the iOS 26 toolbar spec.
+
+6. **Wave 5 — iOS grouped table view for `/settings`.** **[Partially shipped (PR #317): rows stack label-above-control on phone.]** Remaining: section headers + footers (uppercase context label, gloss copy explaining the section); grouped-row chrome (outer-only rounded corners, hairline dividers between rows, left/right inset); disclosure indicators (right-chevron) on rows that navigate (e.g. "Manage account") vs. rows that toggle (Switch, Segmented).
+
+7. **Wave 6 — pull-to-refresh + swipe-to-action.** Pull-to-refresh on `/projects`, `/inbox`, `/board` (thin abstraction over native touch or a small dep such as `react-simple-pull-to-refresh`); swipe-to-archive / swipe-to-complete on inbox rows and task cards (left + right swipe with distinct color + icon per direction); both honor `prefers-reduced-motion` with non-motion fallbacks (pull threshold → button; swipe → context menu).
+
+8. **Wave 7 — inbox content + dedicated 5th Search tab.** Build inbox content (triage / mentions / AI activity feed) per v3 PRD §11 (memory namespaces); add Search as the 5th `BottomTabBar` slot — bottom-anchored search input + recent searches + scoped filters. Note: `bottomTabBar/index.tsx` is currently 4 tabs (Boards / Inbox / Copilot / Profile); the 5th slot was scoped in the prior session as the command-palette mobile entry point.
+
+9. **Wave 8 — motion polish + zoom / matched-geometry transitions.** View Transitions API: zoom transitions on `TabBarAccessory` open / close; matched-geometry transitions on card → modal openings (project card → project detail, task card → task detail panel); SF Symbols 7 Draw On/Off animations on tab bar + status icons; sparkle-on-success on mutation accept.
+
+**Deferred from the 2026-05-24 polish sweep (small, batchable into the next Phase 6 PR):**
+
+- **Dark-mode `/login` error inline-alert orange text contrast borderline.** `src/components/loginForm/index.tsx` uses `--ant-color-error` for the inline list items inside the "There is a problem" alert; against the alert background that lands near the WCAG AA threshold. Use `--ant-color-error-text` instead.
+- **`BottomTabBar` scroll-minimize visual subtlety.** The audit Playwright captures couldn't distinguish minimized from idle states. Verify interactively on a real device; if the minimized state is not visibly different enough, tweak `data-minimized` styling (e.g. reduce capsule height + hide labels in addition to the current label fade).
+- **`userPreferences` "Persisted blob has unsupported version 4 (max known: 1)" console warning** fires 20× in the audit Playwright environment. Either an audit-env localStorage artifact or a real corruption path — verify whether a fresh real-user browser session trips it; if yes, find where `version: 4` enters `localStorage`. `src/store/reducers/userPreferencesSlice.ts` line ~468.
 
 ---
 
