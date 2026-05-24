@@ -17,7 +17,6 @@ import {
     motion,
     radius,
     radiusConcentric,
-    shadow,
     space,
     zIndex
 } from "../../theme/tokens";
@@ -137,7 +136,16 @@ const Nav = styled.nav<{ $hidden: boolean; $minimized: boolean }>`
         ${space.lg}px,
         calc(env(safe-area-inset-bottom) + ${space.sm}px)
     );
-    box-shadow: ${shadow.lg};
+    /*
+     * Phase 6 Wave 2 — lifted glass shadow. Per-mode value lives in
+     * cssVars (--ant-shadow-glass-lifted) so the same recipe can scale
+     * with any future floating glass surface. Light mode ships a
+     * stronger ink than the achromatic shadow.lg token because the
+     * cream page background (#fffaf5) drowns out the 6% inks
+     * shadow.lg uses; dark mode keeps a softer recipe since the dark
+     * glass already pops against the dark page chrome.
+     */
+    box-shadow: var(--ant-shadow-glass-lifted);
     display: flex;
     left: 50%;
     /*
