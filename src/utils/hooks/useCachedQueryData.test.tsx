@@ -69,6 +69,67 @@ describe("useCachedQueryData", () => {
         });
         expect(result.current?.[0]._id).toBe("p1");
     });
+
+    /*
+     * Regression: the v2 mobile UI audit caught
+     *   "Cannot update a component (AuthProvider) while rendering a
+     *    different component (ProjectModal)"
+     * fired 13× across /projects, /share, /inbox. Root cause: the cache
+     * `subscribe` listener was forwarding EVERY cache event (incl.
+     * `observerAdded` from unrelated keys) to its caller's
+     * `useSyncExternalStore`, which then scheduled a re-render on the
+     * subscribing component (here: `AuthProvider`, watching `["users"]`)
+     * mid-render of whatever just mounted (`ProjectModal`, which calls
+     * `useReactQuery` for `["projects",{…}]` + `["users/members"]`). React's
+     * setState-in-render guard warned on the cross-component update.
+     *
+     * The fix scopes the subscribe listener to the watched key's hash, so
+     * a cache event for a different key never wakes this subscriber. This
+     * test pins the contract: mounting a NEW query under a different key
+     * must not trigger the subscriber's `getSnapshot` re-evaluation /
+     * re-render path.
+     */
+    it("does not wake the subscriber when an unrelated cache key changes", () => {
+        const qc = new QueryClient();
+        let renderCount = 0;
+        const { result } = renderHook(
+            () => {
+                renderCount += 1;
+                return useCachedQueryData<IProject[]>(["projects"]);
+            },
+            {
+                wrapper: createWrapper(qc)
+            }
+        );
+        const baselineRenders = renderCount;
+        expect(result.current).toBeUndefined();
+
+        // Mutate an UNRELATED key — should be ignored by this subscriber.
+        act(() => {
+            qc.setQueryData(["users"], { _id: "u1", username: "Alice" });
+            qc.setQueryData(["users/members"], [{ _id: "m1" }]);
+        });
+        expect(renderCount).toBe(baselineRenders);
+        expect(result.current).toBeUndefined();
+
+        // Sanity-check the positive path still wakes the subscriber.
+        act(() => {
+            qc.setQueryData<IProject[]>(
+                ["projects"],
+                [
+                    {
+                        _id: "p1",
+                        createdAt: "0",
+                        managerId: "m1",
+                        organization: "Acme",
+                        projectName: "Later"
+                    }
+                ]
+            );
+        });
+        expect(renderCount).toBeGreaterThan(baselineRenders);
+        expect(result.current?.[0]._id).toBe("p1");
+    });
 });
 
 describe("gatherCachedList", () => {

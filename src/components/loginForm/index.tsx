@@ -1,7 +1,7 @@
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { QueryClientContext } from "@tanstack/react-query";
-import { Form, Input, message } from "antd";
+import { Form, Input } from "antd";
 import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -9,6 +9,7 @@ import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
 import { lineHeight } from "../../theme/tokens";
 import useApi from "../../utils/hooks/useApi";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import { writeAiProxyToken } from "../../utils/tokenStorage";
 
@@ -62,6 +63,10 @@ const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
+    // AntD v6: static `message` import warns about dynamic theme;
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const navigate = useNavigate();
     const location = useLocation();
     const api = useApi();

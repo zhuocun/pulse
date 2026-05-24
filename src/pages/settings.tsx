@@ -12,6 +12,7 @@ import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
 import { useLocale, type LocaleCode } from "../i18n";
 import {
+    breakpoints,
     fontSize,
     fontWeight,
     lineHeight,
@@ -62,16 +63,39 @@ const SettingsList = styled.div`
     gap: ${space.md}px;
 `;
 
+/*
+ * Settings row layout follows the iOS 26 "grouped table view" idiom:
+ * on roomy viewports (>=sm) the label sits inline with the control on
+ * the right, separated by `space-between`. Below `sm` the row stacks
+ * — label on top, control stretched full-width below — because at
+ * iPhone-width (393 px) the Theme row's 3-state Segmented (and to a
+ * lesser extent the Language row's Segmented) couldn't fit alongside
+ * the label and was forcing the label ("Them\ne") and the option
+ * pills ("Li…", "D…", "Syst…") to ellipsize. Stacking is applied
+ * uniformly to every row so the four controls feel cut from the same
+ * cloth on phone, not three-cards-aligned-one-stacked. The inner
+ * `RowLabel` keeps `flex: 1 1 auto` so the desktop branch still
+ * pushes the control to the trailing edge; the stacked branch
+ * stretches both children full-width via `align-items: stretch`.
+ */
 const Row = styled(Card)`
     && {
         border-radius: ${radius.lg}px;
     }
     && .ant-card-body {
-        align-items: center;
+        align-items: stretch;
         display: flex;
-        gap: ${space.md}px;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: ${space.sm}px;
         padding: ${space.md}px ${space.lg}px;
+    }
+    @media (min-width: ${breakpoints.sm}px) {
+        && .ant-card-body {
+            align-items: center;
+            flex-direction: row;
+            gap: ${space.md}px;
+            justify-content: space-between;
+        }
     }
 `;
 

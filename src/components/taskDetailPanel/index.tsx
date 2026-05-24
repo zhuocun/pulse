@@ -5,7 +5,6 @@ import {
     Form,
     Grid,
     Input,
-    message,
     Modal,
     Select,
     Space,
@@ -35,6 +34,7 @@ import {
     space
 } from "../../theme/tokens";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -208,6 +208,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     taskId,
     boardAiOn = true
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const [form] = useForm();
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
