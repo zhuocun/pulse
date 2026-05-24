@@ -564,7 +564,19 @@ const BottomTabBar: React.FC = () => {
                             tabsRef.current[idx] = node as HTMLAnchorElement;
                         }}
                         style={{
-                            ["view-transition-name" as string]: `pulse-tab-${tab.labelKey}`
+                            /*
+                             * React's inline `style` prop expects CSS
+                             * properties in camelCase — kebab-case
+                             * `view-transition-name` triggers a console
+                             * "Unsupported style property" warning on
+                             * every render. The cast keeps the key
+                             * tolerant of `CSSProperties` typings that
+                             * predate `viewTransitionName` (relatively
+                             * recent addition). The styled-components
+                             * CSS strings above can keep kebab-case
+                             * since they're plain CSS, not React props.
+                             */
+                            ["viewTransitionName" as string]: `pulse-tab-${tab.labelKey}`
                         }}
                         to={tab.to}
                     >
