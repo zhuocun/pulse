@@ -1,11 +1,11 @@
-import { Drawer, Space, Tabs, Tag, Typography } from "antd";
+import { Space, Tabs, Tag, Typography } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontWeight, space } from "../../theme/tokens";
-import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiSparkleIcon from "../aiSparkleIcon";
 import GlassPanel from "../glassPanel";
+import Sheet from "../sheet";
 
 import BriefTabBody from "./BriefTabBody";
 import ChatTabBody from "./ChatTabBody";
@@ -199,11 +199,18 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
 };
 
 /**
- * Phase 4 A8 — Drawer shell separated from the body so the host can
- * keep it mounted across `projectId` changes. Owns the placement,
- * title chrome, accessible name, and close handling. Renders its
- * children inside the Drawer body — those children are the project-
- * scoped tab content keyed on `projectId` in the host.
+ * Phase 4 A8 — dock shell separated from the body so the host can keep
+ * it mounted across `projectId` changes. Owns the placement, title
+ * chrome, accessible name, and close handling. Renders its children
+ * inside the surface body — those children are the project-scoped tab
+ * content keyed on `projectId` in the host.
+ *
+ * Phase 6 Wave 3 — the placement / chrome split previously inlined here
+ * (phone bottom Drawer vs desktop right Drawer) now ships via the shared
+ * `<Sheet>` primitive. On phone the Sheet renders a multi-detent
+ * animated surface; on desktop / tablet / reduced-motion it falls back
+ * to the AntD `<Drawer>` with `desktopPlacement="right"` and a 420 px
+ * shelf so the dock keeps its prior visual footprint.
  */
 export interface CopilotDockShellProps {
     open: boolean;
@@ -216,38 +223,44 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
     onClose,
     children
 }) => {
-    const isPhone = useIsPhoneChrome();
-
-    // Phase 3 A1 — phone gets a full-height bottom sheet, desktop/tablet
-    // gets the 420 px right shelf the doc specifies (§A1 lines 153-166).
-    // `size` accepts a number/percentage for finer control than the
-    // "default" | "large" literals.
-    const drawerProps = isPhone
-        ? { placement: "bottom" as const, size: "100%" as const }
-        : { placement: "right" as const, size: 420 };
-
     return (
-        <Drawer
-            {...drawerProps}
+        <Sheet
+            closable
             // The dialog's accessible name is the visible "Copilot" title.
             // Linking via `aria-labelledby` (the actual heading element)
             // is stronger than `aria-label` because it stays in sync with
             // any future copy change and announces the same string the
-            // user sees (R1-M3).
-            aria-labelledby="copilot-dock-title"
-            data-placement={drawerProps.placement}
+            // user sees (R1-M3). Sheet's P1.2 fix means the consumer's
+            // <Typography.Title id="copilot-dock-title"> below is the
+            // sole carrier of this id in the DOM — Sheet does NOT stamp
+            // its own duplicate id on the title slot when we supply
+            // `ariaLabelledBy` here.
+            ariaLabelledBy="copilot-dock-title"
             data-testid="copilot-dock"
+            // Phase 6 Wave 3 — the dock opens at its full visible height
+            // on phone (matches the prior `size: "100%"` Drawer). Allow
+            // medium as a secondary detent so the user can shrink the
+            // surface back down without dismissing the chat thread.
+            defaultDetent="large"
+            detents={["medium", "large"]}
+            // Desktop / tablet / reduced-motion path: the dock keeps its
+            // 420 px right shelf (Phase 3 A1, doc §A1 lines 153-166).
+            desktopPlacement="right"
+            desktopSize={420}
+            mask
+            maskClosable
             onClose={onClose}
             open={open}
             styles={{
                 /*
                  * Wave 1 T2: the radial aurora wash that used to live
-                 * inline here now ships via the shared `<GlassPanel>`
-                 * mounted directly under the Drawer body. The body slot
-                 * keeps the layout-only props (flex column + padding /
-                 * safe-area math) so the Drawer chrome continues to
-                 * size correctly across phone bottom-sheet + desktop
-                 * right-shelf placements.
+                 * inline here ships via the shared `<GlassPanel>` mounted
+                 * directly inside the dock body. The Sheet body slot
+                 * keeps the layout-only props (flex column + zero
+                 * padding) so the GlassPanel inside still owns the
+                 * padding budget (including the
+                 * `env(keyboard-inset-height)` / safe-area math the
+                 * legacy Drawer body used to consume).
                  */
                 body: {
                     display: "flex",
@@ -278,16 +291,16 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                 tone="aurora"
                 /*
                  * Dock body wash, NOT a full glass card: the surrounding
-                 * AntD Drawer already owns the chrome, so we strip the
-                 * panel's own border + radius so it reads as a wash
-                 * rather than an inset card. The aurora dome (radial
-                 * gradient anchored at top-centre) is preserved via the
-                 * background override so the migration is pixel-stable;
-                 * Wave 2+ will lift the dome shape into a GlassPanel
-                 * tone variant when more surfaces share it. The flex
-                 * layout the Drawer body used to own moves onto this
-                 * wrapper so the inner tabs + footer slot stay
-                 * full-bleed.
+                 * Sheet (whether animated or AntD-Drawer fallback)
+                 * already owns the chrome, so we strip the panel's own
+                 * border + radius so it reads as a wash rather than an
+                 * inset card. The aurora dome (radial gradient anchored
+                 * at top-centre) is preserved via the background override
+                 * so the migration is pixel-stable; Wave 2+ will lift
+                 * the dome shape into a GlassPanel tone variant when
+                 * more surfaces share it. The flex layout the Drawer
+                 * body used to own moves onto this wrapper so the inner
+                 * tabs + footer slot stay full-bleed.
                  */
                 style={{
                     background:
@@ -306,7 +319,7 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
             >
                 {children}
             </GlassPanel>
-        </Drawer>
+        </Sheet>
     );
 };
 
