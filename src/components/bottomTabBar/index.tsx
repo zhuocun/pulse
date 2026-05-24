@@ -10,7 +10,6 @@ import { NavLink, useLocation } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import {
-    blur,
     brand,
     fontSize,
     fontWeight,
@@ -78,8 +77,13 @@ const Nav = styled.nav<{ $hidden: boolean }>`
     align-items: stretch;
     /* Glass surface mirrors the header chrome. */
     background: var(--glass-surface);
-    backdrop-filter: blur(${blur.md}px) saturate(180%);
-    -webkit-backdrop-filter: blur(${blur.md}px) saturate(180%);
+    /* Wave 2 T4 — consume the global intensity lever so the
+     * user-facing toggle (Clear / Regular / Solid) re-tunes this bar
+     * along with the rest of the chrome. Pixel-identical to the prior
+     * blur(20px) saturate(180%) recipe at the default "regular"
+     * intensity. */
+    backdrop-filter: var(--ant-backdrop-filter-glass);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
     border-top: 1px solid var(--glass-border);
     bottom: 0;
     display: flex;

@@ -13,7 +13,6 @@ import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
 import {
     aurora,
-    blur,
     breakpoints,
     fontSize,
     fontWeight,
@@ -289,8 +288,17 @@ const FormCard = styled(Card)`
          * reading as crisp white rather than tinted; the emerald only
          * appears as a 1 px hairline at the border. */
         background: var(--glass-surface-strong);
-        backdrop-filter: blur(${blur.lg}px) saturate(180%);
-        -webkit-backdrop-filter: blur(${blur.lg}px) saturate(180%);
+        /* Wave 2 T4 — consume the global intensity lever so the
+         * user-facing toggle (Clear / Regular / Solid) re-tunes the
+         * auth form card along with the rest of the chrome. NOTE:
+         * this drops the blur from the prior blur.lg (28 px) recipe
+         * to the shared blur.md (20 px) default. The auth card is
+         * the most heavily blurred surface in the app; lifting it to
+         * the standard chrome recipe trades a touch of show-through
+         * legibility for a uniform Liquid Glass identity across every
+         * surface the user encounters. */
+        backdrop-filter: var(--ant-backdrop-filter-glass);
+        -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
         border: 1px solid var(--glass-border-strong);
         border-radius: ${radius.lg}px;
         box-shadow:

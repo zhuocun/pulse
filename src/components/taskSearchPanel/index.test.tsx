@@ -105,7 +105,8 @@ const makePanelStore = (preset?: SavedFilterPresetState[]) =>
             userPreferences: {
                 boardDensity: "comfortable" as const,
                 savedFilterPresets: preset ?? [],
-                projectListDefaults: null
+                projectListDefaults: null,
+                glassIntensity: "auto" as const
             }
         }
     });

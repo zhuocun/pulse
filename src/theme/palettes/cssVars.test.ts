@@ -11,6 +11,8 @@
  * format is tolerant (whitespace / ordering) but the variable set is
  * not.
  */
+import { glass } from "../tokens";
+
 import { paletteToCss } from "./cssVars";
 import { emeraldPalette } from "./emerald";
 import { orangePalette } from "./orange";
@@ -198,15 +200,24 @@ describe("paletteToCss", () => {
         });
 
         it("--ant-backdrop-filter-glass defaults to the regular blur+saturate combo", () => {
-            // Wave 2's user-intensity toggle overrides this var to `none`
-            // when the user picks the Solid preset. The default value
-            // here is what Clear and Regular intensities consume.
+            // The default (:root) value is the Regular preset
+            // recipe — `blur(20px) saturate(180%)` — and is what the
+            // unmodified chrome consumes after the Wave 2 T4 line
+            // migration (`backdrop-filter: var(--ant-backdrop-filter-
+            // glass)`). The user-intensity toggle in Wave 2 T4 ships
+            // `html[data-glass-intensity="clear" | "solid"]` overrides
+            // that swap this default; tests for those overrides live
+            // in the dedicated `glass-intensity overrides` describe
+            // block below.
             const css = paletteToCss(orangePalette);
-            expect(lightBlockOf(css)).toContain(
-                "--ant-backdrop-filter-glass: blur(20px) saturate(180%);"
+            // Use a regex anchored to the `:root,` declaration so we
+            // don't accidentally match the override block's value.
+            const rootBlock = lightBlockOf(css);
+            expect(rootBlock).toMatch(
+                /--ant-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
             );
-            expect(darkBlockOf(css)).toContain(
-                "--ant-backdrop-filter-glass: blur(20px) saturate(180%);"
+            expect(darkBlockOf(css)).toMatch(
+                /--ant-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
             );
         });
 
@@ -258,6 +269,114 @@ describe("paletteToCss", () => {
             const strongA = Number(strong![1]);
             expect(midA).toBeGreaterThan(subtleA);
             expect(strongA).toBeGreaterThan(midA);
+        });
+    });
+
+    /*
+     * Phase 5 Wave 2 T4 — user-facing glass-intensity toggle. The
+     * cssVars renderer emits `html[data-glass-intensity="clear" |
+     * "solid"]` selectors that override `--ant-backdrop-filter-glass`,
+     * plus a `prefers-reduced-transparency` belt-and-suspenders block
+     * that pins the var to `none` regardless of the user choice.
+     * "regular" inherits the :root default and intentionally has no
+     * override block (lean CSS).
+     */
+    describe("Phase 5 Wave 2 T4 glass-intensity overrides", () => {
+        it("emits a clear-intensity override block", () => {
+            const css = paletteToCss(orangePalette);
+            expect(css).toContain('html[data-glass-intensity="clear"]');
+            // The clear preset composes from `glass.intensityClear` —
+            // blur 14, saturation 170%. Pinning the literal here
+            // catches a regression where the token shape diverges
+            // from the cssVars renderer.
+            expect(css).toMatch(
+                /html\[data-glass-intensity="clear"\]\s*\{\s*--ant-backdrop-filter-glass:\s*blur\(14px\)\s*saturate\(170%\);/
+            );
+        });
+
+        it("emits a solid-intensity override block that wipes the filter (blur=0 → none)", () => {
+            const css = paletteToCss(orangePalette);
+            expect(css).toContain('html[data-glass-intensity="solid"]');
+            // The solid preset has `blur: 0` which composes to the
+            // literal `none` (the property-cancelling value), NOT
+            // `blur(0px) saturate(180%)`. The `none` form lets
+            // `-webkit-backdrop-filter` polyfills opt the property
+            // out entirely on platforms that interpret blur(0px) as
+            // "the filter is still active".
+            expect(css).toMatch(
+                /html\[data-glass-intensity="solid"\]\s*\{\s*--ant-backdrop-filter-glass:\s*none;/
+            );
+        });
+
+        it("does NOT emit a regular-intensity override block (inherits the :root default)", () => {
+            // The Regular preset matches the :root default value, so
+            // emitting an override would be dead bytes. Pin that the
+            // selector doesn't appear so a future refactor that adds
+            // a per-intensity rule for "regular" trips a conscious
+            // review.
+            const css = paletteToCss(orangePalette);
+            expect(css).not.toContain('html[data-glass-intensity="regular"]');
+        });
+
+        it("ships a prefers-reduced-transparency override that pins the var to none (OS wins)", () => {
+            // Belt-and-suspenders: even when the user picked "clear"
+            // we still respect the OS-level accessibility signal.
+            // Mirrors the App.css [data-glass-context] override that
+            // wipes GlassPanel's prop-driven blur on the same query.
+            const css = paletteToCss(orangePalette);
+            expect(css).toMatch(
+                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*--ant-backdrop-filter-glass:\s*none;/
+            );
+        });
+
+        it("derives the override values from glass.intensity tokens (palette-independent)", () => {
+            // The override blocks should produce the SAME var values
+            // for any palette — they're driven by glass.intensity*
+            // tokens which don't reference the active palette. A
+            // regression where the override picks up a palette-
+            // specific value would silently differ between brand
+            // swaps.
+            const orangeCss = paletteToCss(orangePalette);
+            const emeraldCss = paletteToCss(emeraldPalette);
+            const extractClearOverride = (css: string) =>
+                css.match(
+                    /html\[data-glass-intensity="clear"\]\s*\{\s*--ant-backdrop-filter-glass:\s*([^;]+);/
+                )?.[1];
+            expect(extractClearOverride(orangeCss)).toBe(
+                extractClearOverride(emeraldCss)
+            );
+        });
+
+        /*
+         * cssVars.ts mirrors `glass.intensity*` `{blur, saturation}`
+         * fields as in-file constants because importing the `glass`
+         * token from `../tokens` would create a load-time cycle
+         * (tokens → palettes/index → cssVars). This test pins that
+         * the mirror stays in sync with the token source — a future
+         * edit to the intensity values in `tokens.ts` without
+         * mirroring here would fail the assertion before drifting
+         * downstream into either the chrome var override or the
+         * GlassPanel prop-driven recipe.
+         */
+        it("intensity constants stay in sync with glass.intensity tokens (mirror parity)", () => {
+            const css = paletteToCss(orangePalette);
+            // Clear override → uses glass.intensityClear.{blur, saturation}.
+            expect(css).toContain(
+                `html[data-glass-intensity="clear"] {
+    --ant-backdrop-filter-glass: blur(${glass.intensityClear.blur}px) saturate(${glass.intensityClear.saturation}%);
+}`
+            );
+            // Solid override → blur === 0 composes to "none".
+            expect(glass.intensitySolid.blur).toBe(0);
+            expect(css).toContain(
+                `html[data-glass-intensity="solid"] {
+    --ant-backdrop-filter-glass: none;
+}`
+            );
+            // Regular default at :root → uses glass.intensityRegular.
+            expect(css).toContain(
+                `--ant-backdrop-filter-glass: blur(${glass.intensityRegular.blur}px) saturate(${glass.intensityRegular.saturation}%);`
+            );
         });
     });
 });

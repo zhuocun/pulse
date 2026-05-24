@@ -186,7 +186,21 @@ export const enSource = {
         themeSystem: "System",
         aiEnabled: "Board Copilot",
         pageTitle: "Settings",
-        pageSubtitle: "Choose your theme, language, and Copilot preferences."
+        pageSubtitle: "Choose your theme, language, and Copilot preferences.",
+        /*
+         * Phase 5 Wave 2 T4 — user-facing glass-intensity toggle. The
+         * label sits beside a 4-option Segmented control in the account
+         * dropdown. "Auto" defers to the per-device ladder (the default);
+         * the other three are explicit overrides. Labels intentionally
+         * short so they fit a single-line Segmented row inside the
+         * narrow dropdown column.
+         */
+        glassIntensity: "Glass",
+        changeGlassIntensity: "Change glass intensity",
+        glassIntensityAuto: "Auto",
+        glassIntensityClear: "Clear",
+        glassIntensityRegular: "Regular",
+        glassIntensitySolid: "Solid"
     },
     /**
      * Bottom tab bar (Phase 3 A3). Surfaces the four primary destinations

@@ -17,6 +17,33 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export type BoardDensity = "comfortable" | "compact";
 
 /**
+ * Phase 5 "Liquid Glass" Wave 2 T4 — user-facing glass intensity toggle.
+ *
+ * Four exposed options, three resolved targets:
+ *
+ *   - `"auto"`    — defer to the runtime ladder in `useGlassIntensity`
+ *                    (OS `prefers-reduced-transparency` → `"solid"`,
+ *                    `pointer: coarse` → `"solid"`, otherwise
+ *                    `"regular"`). This is the default; users who never
+ *                    touch the setting get the sensible per-device
+ *                    behaviour with no further action.
+ *   - `"clear"`   — most translucent. Highest show-through, modest blur.
+ *   - `"regular"` — balanced default (the recipe the chrome ships today).
+ *   - `"solid"`   — opaque opt-out. Blur disabled, glass surfaces collapse
+ *                    to the page background. Critical for users with
+ *                    motion / transparency sensitivity AND for Firefox
+ *                    users (no `prefers-reduced-transparency` support
+ *                    today).
+ *
+ * The slice stores the user's CHOICE (which may be `"auto"`); the hook
+ * resolves `"auto"` to the effective intensity at render time. Storing
+ * `"auto"` as a first-class enum option (vs. a null sentinel) keeps the
+ * settings UI honest — the user can deliberately re-pick "Auto" after
+ * trying a manual override.
+ */
+export type GlassIntensityPreference = "auto" | "clear" | "regular" | "solid";
+
+/**
  * Phase 4.2 — defaults the project list applies when loaded with no
  * filter / sort params in the URL. `sort` is one of the five sort modes
  * surfaced in the list toolbar; `managerId` is the persisted manager
@@ -92,6 +119,14 @@ export interface UserPreferencesState {
      * when this is null so the button has a sensible no-op target.
      */
     projectListDefaults: ProjectListDefaults | null;
+    /**
+     * Phase 5 Liquid Glass Wave 2 T4 — the user's chosen glass intensity.
+     * `"auto"` (the default) defers to the runtime ladder in
+     * `useGlassIntensity`; the other values are explicit overrides that
+     * always win. See `GlassIntensityPreference` for the resolution
+     * contract.
+     */
+    glassIntensity: GlassIntensityPreference;
 }
 
 /**
@@ -112,17 +147,42 @@ export const USER_PREFERENCES_STORAGE_KEY = "pulse:userPreferences";
  * → current) or fall back to defaults (forward-incompat) instead of
  * silently dropping fields. See `loadPersistedUserPreferences` for the
  * three branches this drives (legacy missing-version, current, future).
+ *
+ * Bump policy: only when a field is REMOVED or its semantic meaning
+ * CHANGES. Adding an optional field with a default value (e.g.
+ * Phase 5 Wave 2 T4's `glassIntensity`) does NOT need a bump — the
+ * `readSlice` guard falls through to the default for any field missing
+ * from a legacy v1 blob, and a fresh write back persists the upgraded
+ * shape on the next dispatch tick. The append-only contract keeps the
+ * load path simple and the migration cost zero for the common case.
  */
 export const USER_PREFERENCES_SCHEMA_VERSION = 1;
 
 const initialState: UserPreferencesState = {
     boardDensity: "comfortable",
     savedFilterPresets: [],
-    projectListDefaults: null
+    projectListDefaults: null,
+    /*
+     * Default to `"auto"` so brand-new installs get the per-device
+     * ladder behaviour without nagging the user to pick something. The
+     * ladder collapses to `"solid"` on coarse-pointer surfaces (mobile
+     * GPU budget) and when the OS reports `prefers-reduced-transparency:
+     * reduce`, leaving the regular Liquid Glass treatment for desktop
+     * fine-pointer users on systems that haven't opted out.
+     */
+    glassIntensity: "auto"
 };
 
 const isBoardDensity = (value: unknown): value is BoardDensity =>
     value === "comfortable" || value === "compact";
+
+const isGlassIntensityPreference = (
+    value: unknown
+): value is GlassIntensityPreference =>
+    value === "auto" ||
+    value === "clear" ||
+    value === "regular" ||
+    value === "solid";
 
 const isProjectListSort = (value: unknown): value is ProjectListSort =>
     value === "createdAt-desc" ||
@@ -204,7 +264,18 @@ const readSlice = (
             candidate.projectListDefaults
         )
             ? candidate.projectListDefaults
-            : null
+            : null,
+        /*
+         * `glassIntensity` was added in Phase 5 Wave 2 T4. Legacy v1
+         * blobs persisted before this field shipped do not carry it;
+         * the guard's `undefined` fall-through fills in the default
+         * (`"auto"`) so we don't need a schema version bump. This is
+         * the standard append-only pattern the slice already uses for
+         * `filterState.lens` (see `isSavedPreset` above).
+         */
+        glassIntensity: isGlassIntensityPreference(candidate.glassIntensity)
+            ? candidate.glassIntensity
+            : initialState.glassIntensity
     };
 };
 
@@ -364,6 +435,20 @@ export const userPreferencesSlice = createSlice({
             action: PayloadAction<ProjectListDefaults | null>
         ) {
             state.projectListDefaults = action.payload;
+        },
+        /**
+         * Phase 5 Wave 2 T4 — sets the user's glass intensity choice.
+         * `"auto"` re-enables the runtime ladder (defer to OS / device
+         * cues); `"clear" | "regular" | "solid"` are explicit overrides
+         * that always win. `useGlassIntensity` writes the resolved value
+         * to `html[data-glass-intensity="…"]` on the next layout effect,
+         * which flips every glass surface in one shot.
+         */
+        setGlassIntensity(
+            state,
+            action: PayloadAction<GlassIntensityPreference>
+        ) {
+            state.glassIntensity = action.payload;
         }
     }
 });

@@ -1,6 +1,46 @@
 import type { Palette } from "./types";
 
 /**
+ * Compose a `backdrop-filter` value string from an intensity preset's
+ * `{ blur, saturation }` fields. `blur === 0` shorts to `none` so the
+ * Solid preset emits the property-cancelling value rather than
+ * `blur(0px) saturate(180%)` — both are pixel-equivalent at the GPU,
+ * but the literal `none` lets every consumer (including
+ * `-webkit-backdrop-filter` polyfills) opt the property out entirely.
+ *
+ * The intensity values that feed this helper are mirrored from
+ * `glass.intensityClear/Regular/Solid` in `../tokens.ts`. The two
+ * declarations must stay in sync; the cssVars test suite pins parity
+ * (see "derives the override values from glass.intensity tokens"
+ * — also asserts the structural match against the token literal).
+ * We deliberately do NOT `import { glass } from "../tokens"` here
+ * because the import chain `tokens → palettes/index → cssVars` would
+ * loop back through the palette re-export and partially-initialise
+ * the `palette` const at module-load time (silent breakage in every
+ * downstream consumer). The mirrored constants below keep this file
+ * cycle-free.
+ */
+const composeBackdropFilter = (preset: {
+    blur: number;
+    saturation: number;
+}): string =>
+    preset.blur === 0
+        ? "none"
+        : `blur(${preset.blur}px) saturate(${preset.saturation}%)`;
+
+/*
+ * Mirrors of `glass.intensityClear/Regular/Solid` `{blur, saturation}`
+ * fields from `../tokens.ts`. Kept here as a tiny in-file constants
+ * table so the file stays cycle-free; the cssVars test suite
+ * enforces parity with the token source (see the "intensity
+ * constants stay in sync with glass.intensity tokens" assertion in
+ * cssVars.test.ts).
+ */
+const INTENSITY_CLEAR = { blur: 14, saturation: 170 } as const;
+const INTENSITY_REGULAR = { blur: 20, saturation: 180 } as const;
+const INTENSITY_SOLID = { blur: 0, saturation: 180 } as const;
+
+/**
  * Render the runtime CSS custom properties for a palette. The output is a
  * complete CSS string with `:root` / `html[data-color-scheme="light"]` and
  * `html[data-color-scheme="dark"]` blocks. Mounted synchronously in
@@ -29,11 +69,26 @@ import type { Palette } from "./types";
  *   - `--easing-spring-soft` / `--easing-spring-snap` — overshoot
  *     curves for materialize and gel-flex
  *   - `--ant-backdrop-filter-glass` — the global intensity lever.
- *     Default `blur(20px) saturate(180%)`. Wave 2's user-intensity
- *     toggle overrides this to `none` for the Solid preset. The
- *     `--ant-` prefix is intentional: it lives in the AntD CSS-var
- *     namespace so AntD-overriding selectors in App.css can pick it
- *     up uniformly.
+ *     Default `blur(20px) saturate(180%)` (regular preset). Wave 2 T4
+ *     adds `html[data-glass-intensity="clear" | "solid"]` overrides
+ *     that swap the value globally — the user's chosen intensity
+ *     re-tunes every chrome surface that consumes
+ *     `var(--ant-backdrop-filter-glass)`. The `--ant-` prefix is
+ *     intentional: it lives in the AntD CSS-var namespace so AntD-
+ *     overriding selectors in App.css can pick it up uniformly.
+ *
+ * Phase 5 Wave 2 T4 additions — the user-facing glass-intensity toggle:
+ *   - `html[data-glass-intensity="clear"]` block — overrides
+ *     `--ant-backdrop-filter-glass` to the Clear preset's recipe.
+ *   - `html[data-glass-intensity="solid"]` block — overrides the var
+ *     to `none` (the Solid preset wipes blur entirely).
+ *   - `@media (prefers-reduced-transparency: reduce)` block — pins
+ *     the var to `none` regardless of the user's stored preference
+ *     because the OS-level signal must always win (belt-and-
+ *     suspenders pairing with the App.css opt-out rule).
+ *
+ * Note: `data-glass-intensity="regular"` inherits the `:root` default,
+ * so no override block is needed for it — keeps the rendered CSS lean.
  */
 export const paletteToCss = (p: Palette): string => `
 :root,
@@ -72,7 +127,7 @@ html[data-color-scheme="light"] {
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
 
-    --ant-backdrop-filter-glass: blur(20px) saturate(180%);
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
 
     --aurora-blob: rgba(${p.accent.rgb}, 0.10);
     --aurora-blob-strong: rgba(${p.accent.rgb}, 0.20);
@@ -114,10 +169,51 @@ html[data-color-scheme="dark"] {
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
 
-    --ant-backdrop-filter-glass: blur(20px) saturate(180%);
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
 
     --aurora-blob: rgba(${p.accent.rgbDark}, 0.14);
     --aurora-blob-strong: rgba(${p.accent.rgbDark}, 0.24);
     --aurora-blob-faint: rgba(${p.accent.rgbDark}, 0.08);
+}
+
+/*
+ * Phase 5 Wave 2 T4 — user-facing glass intensity toggle. The
+ * useGlassIntensity hook writes the resolved intensity to
+ * html[data-glass-intensity="…"]; these selectors override
+ * --ant-backdrop-filter-glass so every chrome surface that consumes
+ * the var flips in one shot. "regular" inherits the :root default
+ * above — no override needed.
+ *
+ * Light + dark blocks both honour the user's choice; the data
+ * attribute lives on <html> which is the same ancestor for both
+ * data-color-scheme="light" and data-color-scheme="dark". AntD's
+ * cssVar scoping (:where(.ant)) doesn't apply here — we're writing
+ * the var on the html selector itself, which has higher specificity
+ * than :where() ever produces.
+ */
+html[data-glass-intensity="clear"] {
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_CLEAR)};
+}
+
+html[data-glass-intensity="solid"] {
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+}
+
+/*
+ * Belt-and-suspenders: the OS-level reduced-transparency signal always
+ * wins, regardless of the user's stored choice. Pins the var to the
+ * Solid preset (which composes to "none") so even a user who
+ * deliberately picked "clear" gets the opt-out treatment when the OS
+ * tells us their accessibility needs differ. App.css ships the
+ * matching [data-glass-context="true"] override that wipes
+ * GlassPanel's prop-driven blur on the same media query — that's the
+ * Wave 2 T4 "deliberate accessibility choice" contract.
+ */
+@media (prefers-reduced-transparency: reduce) {
+    :root,
+    html[data-color-scheme="light"],
+    html[data-color-scheme="dark"] {
+        --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+    }
 }
 `;

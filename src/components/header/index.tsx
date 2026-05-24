@@ -12,7 +12,7 @@ import { useLocation } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { blur, breakpoints, radius, space } from "../../theme/tokens";
+import { breakpoints, radius, space } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -23,6 +23,7 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import ActivityFeedDrawer, { ActivityFeedBell } from "../activityFeedDrawer";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
+import GlassIntensitySelect from "../glassIntensitySelect";
 import LanguageSwitcher from "../languageSwitcher";
 import { NoPaddingButton } from "../projectList";
 import UserAvatar from "../userAvatar";
@@ -55,8 +56,14 @@ const PageHeader = styled.header`
      * rest, when there is nothing scrolled under it yet.
      */
     background: var(--glass-surface-subtle);
-    backdrop-filter: blur(${blur.md}px) saturate(180%);
-    -webkit-backdrop-filter: blur(${blur.md}px) saturate(180%);
+    /* Wave 2 T4 — read the global intensity lever instead of the
+     * literal blur recipe so the user-facing toggle (Clear / Regular /
+     * Solid) flips this chrome along with every other glass surface.
+     * Default value at "regular" intensity is the previous
+     * blur(20px) saturate(180%) recipe — pixel-identical to the
+     * pre-migration shipping value. */
+    backdrop-filter: var(--ant-backdrop-filter-glass);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
     border-bottom: 1px solid var(--glass-border);
     /*
      * Opt the sticky header out of the route cross-fade. With its own
@@ -591,6 +598,19 @@ const Header: React.FC = () => {
         {
             key: "language",
             label: <LanguageSwitcher />
+        },
+        /*
+         * Phase 5 Wave 2 T4 — user-facing glass-intensity toggle.
+         * Renders the four-option Segmented picker inline inside the
+         * dropdown, mirroring the LanguageSwitcher row above. The
+         * setting persists through the userPreferences slice's
+         * persistence middleware on every dispatch, so the choice
+         * round-trips through localStorage without further
+         * orchestration.
+         */
+        {
+            key: "glass-intensity",
+            label: <GlassIntensitySelect />
         },
         { type: "divider" as const },
         {

@@ -370,6 +370,59 @@ select {
 }
 
 /*
+ * Phase 5 Wave 2 T4 — user-facing glass intensity opt-out. The
+ * `useGlassIntensity` hook writes the resolved intensity to
+ * `html[data-glass-intensity="solid"]` when the user picks "Solid"
+ * (or the auto ladder elects it). This selector then wipes every
+ * `data-glass-context="true"` surface — GlassPanel callsites
+ * (AiTaskAssistPanel, CopilotWelcomeBanner, CopilotDock) plus any
+ * future glass surface that adopts the marker — back to opaque.
+ *
+ * The `!important` is intentional and load-bearing: this is the
+ * user's deliberate accessibility / perf choice, and it MUST
+ * override component-level styled-component declarations including
+ * GlassPanel's prop-driven `backdrop-filter: blur(${INTENSITY_BLUR_PX[
+ * $intensity]}px)` recipe. Without `!important` the prop-driven
+ * blur wins the specificity battle, leaving the user's "solid"
+ * choice silently broken on every glass surface that took the
+ * GlassPanel migration in Wave 1.
+ *
+ * The chrome surfaces (Header, BottomTabBar, ColumnHeader, FormCard,
+ * TopBar) consume `var(--ant-backdrop-filter-glass)`, which the
+ * cssVars renderer already swaps to `none` at this intensity — they
+ * don't need a `data-glass-context` marker because the CSS var
+ * override handles them directly. The rule below is specifically the
+ * GlassPanel safety net.
+ */
+html[data-glass-intensity="solid"] [data-glass-context="true"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--page-background) !important;
+    box-shadow: none !important;
+}
+
+/*
+ * Belt-and-suspenders: the OS-level `prefers-reduced-transparency`
+ * signal always wins regardless of the user's stored choice. Mirrors
+ * the cssVars.ts `--ant-backdrop-filter-glass: none` override on the
+ * same query — the chrome flips via the var, the GlassPanel surfaces
+ * flip via this selector, and both together leave no glass
+ * unaccounted for. Required because Firefox does not currently ship
+ * `prefers-reduced-transparency`, so the user-facing toggle is the
+ * Firefox user's only path to opting out; this OS-level override is
+ * the Safari / Chrome / Edge path for users who flipped the
+ * accessibility preference at the OS level.
+ */
+@media (prefers-reduced-transparency: reduce) {
+    [data-glass-context="true"] {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: var(--page-background) !important;
+        box-shadow: none !important;
+    }
+}
+
+/*
  * Forced-colors / High-contrast mode (Windows). Ensure interactive
  * surfaces still have visible borders rather than relying on subtle
  * tints that get filtered out. Also collapse glass surfaces to a solid

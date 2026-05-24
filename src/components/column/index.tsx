@@ -19,7 +19,6 @@ import taskIcon from "../../assets/task.svg";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import {
-    blur,
     brand,
     breakpoints,
     columnMinWidthRem,
@@ -420,8 +419,10 @@ const EpicTag = styled(Tag)`
  * React's createPortal (see `tokens.ts` § dndDragClone), so a card in
  * flight always paints over this header on every browser including iOS.
  *
- * `backdrop-filter: blur(${blur.sm}px)` adds a soft frost so task text
- * scrolling underneath gets a subtle smear instead of a hard crop;
+ * backdrop-filter: var(--ant-backdrop-filter-glass) adds a soft
+ * frost so task text scrolling underneath gets a subtle smear
+ * instead of a hard crop (Wave 2 T4 — was the literal blur.sm
+ * recipe before the global intensity migration);
  * paired with a translucent background tint so the header reads as a
  * pane, not a hole. Both fall back gracefully on `forced-colors` /
  * `prefers-reduced-transparency` (the browser drops backdrop-filter
@@ -439,8 +440,17 @@ const ColumnHeader = styled(Row)`
     /* Pull the sticky bg inside the column's own rounded corner so the
      * header doesn't paint past the column's radius when pinned. */
     border-radius: ${radius.sm}px;
-    backdrop-filter: saturate(180%) blur(${blur.sm}px);
-    -webkit-backdrop-filter: saturate(180%) blur(${blur.sm}px);
+    /* Wave 2 T4 — consume the global intensity lever so the
+     * user-facing toggle (Clear / Regular / Solid) re-tunes the
+     * column header along with the rest of the chrome. NOTE: this
+     * lifts the blur from the prior blur.sm (12 px) recipe to the
+     * shared blur.md (20 px) default, the same recipe the page
+     * header / bottom-tab bar / topbar already use. The sticky
+     * column header now feels cut from the same cloth as the page
+     * chrome — minor pixel change at default intensity, but
+     * intentional for the chrome-consistency rationale. */
+    backdrop-filter: var(--ant-backdrop-filter-glass);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
     padding: ${space.xxs}px ${space.xs}px;
     position: sticky;
     top: 0;

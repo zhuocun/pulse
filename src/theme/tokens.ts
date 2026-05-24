@@ -255,6 +255,16 @@ export const glass = {
     intensityClear: {
         surface: "rgba(255, 255, 255, 0.42)",
         blur: 14,
+        /*
+         * Wave 2 T4 — `saturation` is the AntD `backdrop-filter` ladder
+         * value that pairs with `blur`. Clear gets 170% (a notch below
+         * the regular 180%) so the show-through reads as crisp rather
+         * than oversaturated when paired with the lower surface
+         * opacity. The cssVars renderer composes
+         * `blur(${blur}px) saturate(${saturation}%)` for the
+         * `--ant-backdrop-filter-glass` var override at this intensity.
+         */
+        saturation: 170,
         border: "rgba(15, 23, 42, 0.04)",
         specular:
             "linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 40%)"
@@ -262,6 +272,7 @@ export const glass = {
     intensityRegular: {
         surface: "rgba(255, 255, 255, 0.68)",
         blur: 20,
+        saturation: 180,
         border: "rgba(15, 23, 42, 0.06)",
         specular:
             "linear-gradient(135deg, rgba(255, 255, 255, 0.30), transparent 40%)"
@@ -269,6 +280,12 @@ export const glass = {
     intensitySolid: {
         surface: "rgba(255, 255, 255, 1)",
         blur: 0,
+        // Solid intensity opts OUT of backdrop-filter entirely (the
+        // var override at this intensity emits `none`), so the
+        // saturation value is academic — kept at the regular 180%
+        // so the token shape stays uniform for consumers that
+        // iterate the three intensities.
+        saturation: 180,
         border: "rgba(15, 23, 42, 0.08)",
         specular: "none"
     }

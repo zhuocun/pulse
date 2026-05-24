@@ -13,7 +13,6 @@ import {
 import EmptyState from "../components/emptyState";
 import { microcopy } from "../constants/microcopy";
 import {
-    blur,
     breakpoints,
     fontSize,
     fontWeight,
@@ -51,8 +50,13 @@ const TopBar = styled.div`
      * two chrome layers feel cut from the same cloth.
      */
     background: var(--glass-surface-subtle);
-    backdrop-filter: blur(${blur.md}px) saturate(180%);
-    -webkit-backdrop-filter: blur(${blur.md}px) saturate(180%);
+    /* Wave 2 T4 — consume the global intensity lever so the
+     * user-facing toggle (Clear / Regular / Solid) re-tunes the
+     * secondary topbar along with the rest of the chrome. Pixel-
+     * identical to the prior blur(20px) saturate(180%) recipe at
+     * the default "regular" intensity. */
+    backdrop-filter: var(--ant-backdrop-filter-glass);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
     border-bottom: 1px solid var(--glass-border);
     display: flex;
     flex-wrap: wrap;

@@ -192,7 +192,8 @@ const makeTestStore = (density: "comfortable" | "compact" = "comfortable") =>
             userPreferences: {
                 boardDensity: density,
                 savedFilterPresets: [],
-                projectListDefaults: null
+                projectListDefaults: null,
+                glassIntensity: "auto" as const
             }
         }
     });
