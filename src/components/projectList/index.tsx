@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
+import type { ProjectListSort } from "../../store/reducers/userPreferencesSlice";
 import {
     breakpoints,
     fontSize,
@@ -31,6 +32,17 @@ interface Props {
      */
     error?: boolean;
     loading?: boolean;
+    /**
+     * Phase 4.2 — sort order is now URL-state (owned by the project
+     * page) so the page can apply the user's saved default on first
+     * load. Both props are optional so the legacy callers that only
+     * mount the list (project-detail, etc.) keep working — the
+     * component falls back to an internal `useState` then. New
+     * callers should always supply both so back/forward navigation
+     * preserves the sort.
+     */
+    sortOrder?: ProjectListSort;
+    onSortOrderChange?: (next: ProjectListSort) => void;
 }
 
 /**
@@ -102,13 +114,27 @@ const Grid = styled.div`
 const SKELETON_KEY_PREFIX = "__skeleton__";
 const SKELETON_COUNT = 6;
 
-type SortOrder = "name-asc" | "name-desc" | "newest" | "oldest";
-
-const buildSortOptions = (): { label: string; value: SortOrder }[] => [
-    { label: microcopy.options.sort.nameAsc, value: "name-asc" },
-    { label: microcopy.options.sort.nameDesc, value: "name-desc" },
-    { label: microcopy.options.sort.newest, value: "newest" },
-    { label: microcopy.options.sort.oldest, value: "oldest" }
+const buildSortOptions = (): { label: string; value: ProjectListSort }[] => [
+    {
+        label: microcopy.options.projectListSort.createdAtDesc,
+        value: "createdAt-desc"
+    },
+    {
+        label: microcopy.options.projectListSort.createdAtAsc,
+        value: "createdAt-asc"
+    },
+    {
+        label: microcopy.options.projectListSort.nameAsc,
+        value: "name-asc"
+    },
+    {
+        label: microcopy.options.projectListSort.nameDesc,
+        value: "name-desc"
+    },
+    {
+        label: microcopy.options.projectListSort.favoritedFirst,
+        value: "favorited-first"
+    }
 ];
 
 const projectCreatedAtTime = (raw?: string): number => {
@@ -117,7 +143,11 @@ const projectCreatedAtTime = (raw?: string): number => {
     return Number.isNaN(time) ? 0 : time;
 };
 
-const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
+const sortProjects = (
+    projects: IProject[],
+    order: ProjectListSort,
+    likedSet: ReadonlySet<string>
+): IProject[] => {
     const out = [...projects];
     const locale = getActiveLocaleCode();
     switch (order) {
@@ -126,24 +156,36 @@ const sortProjects = (projects: IProject[], order: SortOrder): IProject[] => {
                 b.projectName.localeCompare(a.projectName, locale)
             );
             break;
-        case "newest":
-            out.sort(
-                (a, b) =>
-                    projectCreatedAtTime(b.createdAt) -
-                    projectCreatedAtTime(a.createdAt)
+        case "name-asc":
+            out.sort((a, b) =>
+                a.projectName.localeCompare(b.projectName, locale)
             );
             break;
-        case "oldest":
+        case "createdAt-asc":
             out.sort(
                 (a, b) =>
                     projectCreatedAtTime(a.createdAt) -
                     projectCreatedAtTime(b.createdAt)
             );
             break;
-        case "name-asc":
+        case "favorited-first":
+            // Favorited projects float to the top; tie-broken by name
+            // ascending (locale-aware) so the favorited slice is itself
+            // ordered, and the unfavorited tail keeps the same name-asc
+            // arrangement as the default surface.
+            out.sort((a, b) => {
+                const aLiked = likedSet.has(a._id);
+                const bLiked = likedSet.has(b._id);
+                if (aLiked !== bLiked) return aLiked ? -1 : 1;
+                return a.projectName.localeCompare(b.projectName, locale);
+            });
+            break;
+        case "createdAt-desc":
         default:
-            out.sort((a, b) =>
-                a.projectName.localeCompare(b.projectName, locale)
+            out.sort(
+                (a, b) =>
+                    projectCreatedAtTime(b.createdAt) -
+                    projectCreatedAtTime(a.createdAt)
             );
     }
     return out;
@@ -153,11 +195,34 @@ const ProjectList: React.FC<Props> = ({
     dataSource,
     members,
     error,
-    loading
+    loading,
+    sortOrder: sortOrderProp,
+    onSortOrderChange
 }) => {
     const { user } = useAuth();
     const [pendingLikeId, setPendingLikeId] = useState("");
-    const [sortOrder, setSortOrder] = useState<SortOrder>("name-asc");
+    /*
+     * Phase 4.2 — `sortOrder` is now URL-state when the page wires the
+     * controlled prop pair. Falling back to local state keeps the legacy
+     * mount surfaces (e.g. project-detail summaries) working without
+     * forcing them to plumb the URL hook.
+     *
+     * The fallback default is `createdAt-desc` (newest first) to match
+     * the page-level `PROJECT_LIST_DEFAULTS_FALLBACK`. The legacy local
+     * default used to be `name-asc`; we updated it to keep the two
+     * code paths in lock-step so a refactor that drops the props won't
+     * silently change the visible order.
+     */
+    const [internalSort, setInternalSort] =
+        useState<ProjectListSort>("createdAt-desc");
+    const sortOrder = sortOrderProp ?? internalSort;
+    const setSortOrder = (next: ProjectListSort) => {
+        if (onSortOrderChange) {
+            onSortOrderChange(next);
+        } else {
+            setInternalSort(next);
+        }
+    };
     const showSkeleton = Boolean(loading) && !error;
     const { mutateAsync: update } = useReactMutation(
         "users/likes",
@@ -188,9 +253,13 @@ const ProjectList: React.FC<Props> = ({
     const { record: recordActivity } = useActivityFeed();
     const { startEditing, openModal } = useProjectModal();
 
+    const likedSet = useMemo(
+        () => new Set(user?.likedProjects ?? []),
+        [user?.likedProjects]
+    );
     const sortedProjects = useMemo(
-        () => sortProjects(dataSource ?? [], sortOrder),
-        [dataSource, sortOrder]
+        () => sortProjects(dataSource ?? [], sortOrder, likedSet),
+        [dataSource, sortOrder, likedSet]
     );
 
     const onLike = useCallback(
@@ -332,7 +401,7 @@ const ProjectList: React.FC<Props> = ({
                 </ResultCount>
                 <SortRow>
                     {microcopy.actions.sort}
-                    <Select<SortOrder>
+                    <Select<ProjectListSort>
                         aria-label={microcopy.a11y.sortProjects}
                         onChange={setSortOrder}
                         options={buildSortOptions()}

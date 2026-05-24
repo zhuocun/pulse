@@ -138,4 +138,142 @@ describe("ProjectSearchPanel", () => {
             container.querySelector(".ant-select-loading")
         ).toBeInTheDocument();
     });
+
+    /*
+     * Phase 4.2 — favorited toggle + saved-default management. The
+     * `onFavoritedOnlyChange` prop drives the toggle render; the
+     * `onSaveDefault` / `onResetToDefault` / `hasSavedDefaults` props
+     * gate the defaults toolbar below the filter chips. Legacy
+     * callers that pass none of these get the original panel shape.
+     */
+    it("renders the favorited-only toggle and calls onFavoritedOnlyChange when clicked", () => {
+        const onFavoritedOnlyChange = jest.fn();
+        render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "", managerId: "" }}
+                setParam={jest.fn()}
+                favoritedOnly={false}
+                onFavoritedOnlyChange={onFavoritedOnlyChange}
+            />
+        );
+
+        const toggle = screen.getByRole("button", {
+            name: /show only favorited projects/i
+        });
+        expect(toggle).toHaveAttribute("aria-pressed", "false");
+        fireEvent.click(toggle);
+        expect(onFavoritedOnlyChange).toHaveBeenCalledWith(true);
+    });
+
+    it("renders a favorited chip when favoritedOnly is true and dismissing it clears the toggle", () => {
+        const onFavoritedOnlyChange = jest.fn();
+        render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "", managerId: "" }}
+                setParam={jest.fn()}
+                favoritedOnly
+                onFavoritedOnlyChange={onFavoritedOnlyChange}
+            />
+        );
+
+        // The chip surfaces "Favorited" as the dimension label with
+        // "Yes" as the value (boolean dimensions don't carry a
+        // distinct value beyond on/off).
+        expect(screen.getByText("Favorited:")).toBeInTheDocument();
+        expect(screen.getByText("Yes")).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /remove favorited filter/i })
+        );
+        expect(onFavoritedOnlyChange).toHaveBeenCalledWith(false);
+    });
+
+    it("calls onSaveDefault when 'Save as default' is clicked", () => {
+        const onSaveDefault = jest.fn();
+        render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "Road", managerId: "u1" }}
+                setParam={jest.fn()}
+                favoritedOnly
+                onFavoritedOnlyChange={jest.fn()}
+                onSaveDefault={onSaveDefault}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /save current filters as default/i
+            })
+        );
+        expect(onSaveDefault).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders 'Reset to default' only when hasSavedDefaults is true", () => {
+        const onResetToDefault = jest.fn();
+        const { rerender } = render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "", managerId: "" }}
+                setParam={jest.fn()}
+                onSaveDefault={jest.fn()}
+                onResetToDefault={onResetToDefault}
+                hasSavedDefaults={false}
+            />
+        );
+
+        // No saved default → reset button must be hidden.
+        expect(
+            screen.queryByRole("button", {
+                name: /reset filters to saved default/i
+            })
+        ).not.toBeInTheDocument();
+
+        // Flip the prop — reset button must now appear.
+        rerender(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "", managerId: "" }}
+                setParam={jest.fn()}
+                onSaveDefault={jest.fn()}
+                onResetToDefault={onResetToDefault}
+                hasSavedDefaults
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /reset filters to saved default/i
+            })
+        );
+        expect(onResetToDefault).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not render the defaults toolbar when no save/reset callbacks are wired", () => {
+        render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "Road", managerId: "u1" }}
+                setParam={jest.fn()}
+            />
+        );
+
+        expect(
+            screen.queryByRole("button", {
+                name: /save current filters as default/i
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", {
+                name: /reset filters to saved default/i
+            })
+        ).not.toBeInTheDocument();
+    });
 });

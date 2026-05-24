@@ -17,6 +17,7 @@ import ProjectList from "../components/projectList";
 import ProjectSearchPanel from "../components/projectSearchPanel";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
+import type { ProjectListSort } from "../store/reducers/userPreferencesSlice";
 import {
     accent,
     breakpoints,
@@ -30,13 +31,38 @@ import {
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
+import useAuth from "../utils/hooks/useAuth";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDebounce from "../utils/hooks/useDebounce";
 import useMembersList from "../utils/hooks/useMembersList";
+import useProjectListDefaults from "../utils/hooks/useProjectListDefaults";
 import useProjectModal from "../utils/hooks/useProjectModal";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 import useUrl from "../utils/hooks/useUrl";
+
+/*
+ * Phase 4.2 — narrowing helper for the URL-shaped sort param. The URL
+ * surface is `string | null`; the project-list sort selector accepts
+ * the five-mode `ProjectListSort` union. Unknown / missing values fall
+ * back to the caller-supplied default (typically the saved default
+ * sort, or the fallback `createdAt-desc`).
+ */
+const PROJECT_LIST_SORT_VALUES: readonly ProjectListSort[] = [
+    "createdAt-desc",
+    "createdAt-asc",
+    "name-asc",
+    "name-desc",
+    "favorited-first"
+] as const;
+
+const narrowSort = (
+    value: string | null,
+    fallback: ProjectListSort
+): ProjectListSort =>
+    (PROJECT_LIST_SORT_VALUES as readonly string[]).includes(value ?? "")
+        ? (value as ProjectListSort)
+        : fallback;
 
 const PageHeader = styled.header`
     align-items: flex-end;
@@ -335,8 +361,73 @@ const ProjectPage = () => {
     const [param, setParam] = useUrl([
         "projectName",
         "managerId",
-        "semanticIds"
+        "semanticIds",
+        "sort",
+        "favoritedOnly"
     ]);
+    /*
+     * Phase 4.2 — saved project-list defaults. On first load (no filter
+     * / sort params in the URL) push the saved defaults (or the
+     * `PROJECT_LIST_DEFAULTS_FALLBACK` baseline of `createdAt-desc` +
+     * no manager + unfavorited) into the URL so the user lands on
+     * their preferred view. After first apply the page yields to the
+     * URL — explicit filter changes do NOT update the saved default;
+     * the user must click "Save as default" in the search panel.
+     */
+    const {
+        defaults: projectListDefaults,
+        savedDefaults: savedProjectListDefaults,
+        saveDefaults: saveProjectListDefaults,
+        clearDefaults: clearProjectListDefaults
+    } = useProjectListDefaults();
+    const defaultsAppliedRef = useRef(false);
+    useEffect(() => {
+        if (defaultsAppliedRef.current) return;
+        // Treat first-load as the moment when EVERY filter/sort param is
+        // missing from the URL. Any non-empty value (deep-linked share,
+        // back/forward from another route) means the user has explicit
+        // intent — leave them alone.
+        const isEmpty =
+            !param.projectName &&
+            !param.managerId &&
+            !param.semanticIds &&
+            !param.sort &&
+            !param.favoritedOnly;
+        if (!isEmpty) {
+            defaultsAppliedRef.current = true;
+            return;
+        }
+        /*
+         * PWA-shortcut params (`openTaskCreator`, `openCopilot`) get
+         * stripped by the effect above on the same render. Both effects
+         * call into `setSearchParams` on mount; the PWA strip uses a
+         * non-functional setter and mine uses a functional one. React
+         * Router applies them sequentially, but if mine fires before
+         * the PWA strip lands, my functional `prev` still sees the
+         * shortcut param and merges it into the next URL — the test
+         * harness then observes `?openTaskCreator=1&sort=createdAt-desc`
+         * instead of just `?sort=createdAt-desc`. Defer to the NEXT
+         * render in that case so the PWA strip has cleared the URL by
+         * the time we apply defaults.
+         */
+        const hasShortcutParam =
+            shortcutSearchParams.get("openTaskCreator") === "1" ||
+            shortcutSearchParams.get("openCopilot") === "1";
+        if (hasShortcutParam) return;
+        defaultsAppliedRef.current = true;
+        setParam({
+            sort: projectListDefaults.sort,
+            managerId: projectListDefaults.managerId ?? "",
+            favoritedOnly: projectListDefaults.favoritedOnly ? "1" : ""
+        });
+        // Re-run when the shortcut params change so the deferred branch
+        // above eventually fires on the post-strip render. The
+        // `defaultsAppliedRef` guard keeps the write to a single
+        // dispatch across the page's lifetime. `param`, `setParam`,
+        // and `projectListDefaults` are intentionally omitted: each
+        // change to those is what the user is reacting to and we
+        // want a one-shot apply on the initial render flow.
+    }, [shortcutSearchParams]);
     /*
      * Only the API-triggering params (projectName, managerId) are debounced;
      * the client-side semanticIds filter applies immediately so users see
@@ -346,6 +437,10 @@ const ProjectPage = () => {
     const debouncedParam = useDebounce(param, 300);
     const { projectName, managerId } = debouncedParam;
     const fetchParam = { projectName, managerId };
+    const { user } = useAuth();
+    const favoritedOnly = Boolean(param.favoritedOnly);
+    const sortOrder = narrowSort(param.sort, projectListDefaults.sort);
+    const setSortOrder = (next: ProjectListSort) => setParam({ sort: next });
     const {
         isLoading: pLoading,
         error: pError,
@@ -387,11 +482,46 @@ const ProjectPage = () => {
               .replace("{organizations}", String(stats.organizations))
               .replace("{members}", String(members?.length ?? 0));
 
-    const filteredProjects = param.semanticIds
-        ? (projects ?? []).filter((p) =>
-              param.semanticIds!.split(",").filter(Boolean).includes(p._id)
-          )
-        : (projects ?? []);
+    const filteredProjects = useMemo(() => {
+        const semanticPool = param.semanticIds
+            ? (projects ?? []).filter((p) =>
+                  param.semanticIds!.split(",").filter(Boolean).includes(p._id)
+              )
+            : (projects ?? []);
+        if (!favoritedOnly) return semanticPool;
+        const liked = new Set(user?.likedProjects ?? []);
+        return semanticPool.filter((p) => liked.has(p._id));
+    }, [favoritedOnly, param.semanticIds, projects, user?.likedProjects]);
+
+    /*
+     * Phase 4.2 — saved-default handlers passed to the search panel.
+     * "Save as default" persists the CURRENT filter + sort state to the
+     * `userPreferences` slice; "Reset to default" rewrites the URL
+     * back to the saved default (or the fallback) without touching
+     * `semanticIds`, which is the AI-search slot owned by a different
+     * code path.
+     */
+    const handleSaveDefault = () => {
+        saveProjectListDefaults({
+            sort: sortOrder,
+            managerId: param.managerId || null,
+            favoritedOnly
+        });
+    };
+    const handleResetToDefault = () => {
+        setParam({
+            sort: projectListDefaults.sort,
+            managerId: projectListDefaults.managerId ?? "",
+            favoritedOnly: projectListDefaults.favoritedOnly ? "1" : "",
+            // Clear the free-text search and any in-flight semantic
+            // filter — "Reset to default" is a stronger version of
+            // "Clear all" that also re-establishes the saved sort /
+            // favorited toggle, so the projectName + semanticIds
+            // values get dropped along with the explicit filters.
+            projectName: "",
+            semanticIds: ""
+        });
+    };
 
     return (
         <PageContainer>
@@ -486,6 +616,14 @@ const ProjectPage = () => {
                 setParam={setParam}
                 members={members ?? []}
                 loading={mLoading}
+                favoritedOnly={favoritedOnly}
+                onFavoritedOnlyChange={(next) =>
+                    setParam({ favoritedOnly: next ? "1" : "" })
+                }
+                hasSavedDefaults={savedProjectListDefaults !== null}
+                onSaveDefault={handleSaveDefault}
+                onResetToDefault={handleResetToDefault}
+                onClearSavedDefault={clearProjectListDefaults}
                 aiSearchSlot={
                     aiEnabled ? (
                         <div
@@ -535,6 +673,8 @@ const ProjectPage = () => {
                 error={Boolean(pError || mError)}
                 members={members ?? []}
                 loading={pLoading || mLoading}
+                sortOrder={sortOrder}
+                onSortOrderChange={setSortOrder}
             />
             {aiEnabled && !environment.copilotDockEnabled && (
                 /*

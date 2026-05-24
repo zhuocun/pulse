@@ -16,12 +16,19 @@ import { breakpoints, radius, space } from "../../theme/tokens";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import FilterChips, { FilterChip } from "../filterChips";
+import { parseLensId } from "../lensChips";
 
 export interface TaskSearchParam {
     taskName: string | null;
     coordinatorId: string | null;
     type: string | null;
     semanticIds?: string | null;
+    /**
+     * Active board lens at the URL layer. Optional because earlier
+     * `useUrl` keys did not include it and existing callers that
+     * compose the panel without lens routing still satisfy the shape.
+     */
+    lens?: string | null;
 }
 
 interface Props {
@@ -343,7 +350,8 @@ const TaskSearchPanel: React.FC<Props> = ({
             filterState: {
                 taskName: param.taskName ?? "",
                 coordinatorId: param.coordinatorId ?? "",
-                type: param.type ?? ""
+                type: param.type ?? "",
+                lens: param.lens ?? ""
             },
             createdAt: Date.now()
         };
@@ -375,19 +383,26 @@ const TaskSearchPanel: React.FC<Props> = ({
         let staleDetected = false;
         const nextCoordinator = preset.filterState.coordinatorId;
         const nextType = preset.filterState.type;
+        const nextLens = preset.filterState.lens ?? "";
         const applyCoordinator =
             nextCoordinator && liveCoordinatorIds.has(nextCoordinator)
                 ? nextCoordinator
                 : "";
         const applyType = nextType && liveTypes.has(nextType) ? nextType : "";
+        // `parseLensId` returns `null` for any unknown / removed lens id,
+        // so a preset captured under a future lens that has since been
+        // retired silently drops its lens instead of poisoning the URL.
+        const applyLens = nextLens && parseLensId(nextLens) ? nextLens : "";
         if (nextCoordinator && applyCoordinator === "") staleDetected = true;
         if (nextType && applyType === "") staleDetected = true;
+        if (nextLens && applyLens === "") staleDetected = true;
 
         setParam({
             taskName: preset.filterState.taskName || undefined,
             coordinatorId: applyCoordinator || undefined,
             type: applyType || undefined,
-            semanticIds: undefined
+            semanticIds: undefined,
+            lens: applyLens || undefined
         });
         message.info({
             content: formatTemplate(microcopy.board.presets.applied, {

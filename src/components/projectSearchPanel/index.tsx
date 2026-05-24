@@ -1,16 +1,32 @@
-import { SearchOutlined } from "@ant-design/icons";
+import { SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Input, Select } from "antd";
+import { Button, Input, Select, Tooltip, message } from "antd";
 import React, { useMemo } from "react";
 
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, radius, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    fontSize,
+    fontWeight,
+    radius,
+    space
+} from "../../theme/tokens";
 import FilterChips, { FilterChip } from "../filterChips";
 
 export interface ProjectSearchParam {
     projectName: string | null;
     managerId: string | null;
     semanticIds?: string | null;
+    /*
+     * Phase 4.2 — `sort` + `favoritedOnly` are URL params owned by the
+     * project page (`useUrl` keys); the panel only consumes them
+     * through the props plumbed from the page (`favoritedOnly`,
+     * `onFavoritedOnlyChange`) — it does NOT write them through
+     * `setParam` directly. They're still listed here so callers that
+     * spread `param` get the right shape.
+     */
+    sort?: string | null;
+    favoritedOnly?: string | null;
 }
 
 interface Props {
@@ -19,6 +35,21 @@ interface Props {
     members: IMember[];
     loading: boolean;
     aiSearchSlot?: React.ReactNode;
+    /*
+     * Phase 4.2 — favorited-only filter + saved-default management.
+     * All five props are optional so legacy callers (none today, but
+     * the panel surface is otherwise generic) keep working. When ALL
+     * five are absent, the favorited toggle + save/reset row collapses
+     * to nothing.
+     */
+    favoritedOnly?: boolean;
+    onFavoritedOnlyChange?: (next: boolean) => void;
+    /** True when the user has saved a default; controls whether
+     * "Reset to default" + "Clear saved default" render. */
+    hasSavedDefaults?: boolean;
+    onSaveDefault?: () => void;
+    onResetToDefault?: () => void;
+    onClearSavedDefault?: () => void;
 }
 
 const FilterShell = styled.div`
@@ -77,12 +108,67 @@ const FlexSelect = styled.div`
     }
 `;
 
+/*
+ * Phase 4.2 — saved-default toolbar that lives BELOW the filter row +
+ * filter chips. The row is dense on purpose so it doesn't pull focus
+ * away from the actual filter inputs above; the buttons render as
+ * borderless text-only links until the user hovers / focuses them.
+ *
+ * The row is omitted entirely when no saved-default callbacks are
+ * wired, so legacy callers (or any future caller that wants the panel
+ * without persistence) don't get an empty toolbar shell.
+ */
+const DefaultsToolbar = styled.div`
+    align-items: center;
+    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55));
+    display: flex;
+    flex-wrap: wrap;
+    font-size: ${fontSize.xs}px;
+    font-weight: ${fontWeight.medium};
+    gap: ${space.xs}px;
+    padding-top: ${space.xs}px;
+`;
+
+const FavoritedToggleButton = styled(Button, {
+    /*
+     * Drop the transient `$active` prop before forwarding to the
+     * underlying AntD Button (which forwards unknown props to the
+     * native button element). React 19 warns on unknown DOM
+     * attributes; without this filter the prop reaches the
+     * `<button>` and trips a console.error in tests.
+     */
+    shouldForwardProp: (prop) => prop !== "$active"
+})<{ $active: boolean }>`
+    && {
+        background: ${(props) =>
+            props.$active
+                ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.12))"
+                : "transparent"};
+        border: 1px solid
+            ${(props) =>
+                props.$active
+                    ? "var(--ant-color-primary-border, rgba(234, 88, 12, 0.3))"
+                    : "var(--ant-color-border-secondary, rgba(15, 23, 42, 0.12))"};
+        color: ${(props) =>
+            props.$active
+                ? "var(--ant-color-primary, #ea580c)"
+                : "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65))"};
+        font-weight: ${fontWeight.medium};
+    }
+`;
+
 const ProjectSearchPanel: React.FC<Props> = ({
     param,
     setParam,
     members,
     loading,
-    aiSearchSlot
+    aiSearchSlot,
+    favoritedOnly = false,
+    onFavoritedOnlyChange,
+    hasSavedDefaults = false,
+    onSaveDefault,
+    onResetToDefault,
+    onClearSavedDefault
 }) => {
     const managerName = members.find(
         (u) => u._id === param.managerId
@@ -111,8 +197,21 @@ const ProjectSearchPanel: React.FC<Props> = ({
                 value: microcopy.chips.smartMatch
             });
         }
+        if (favoritedOnly) {
+            active.push({
+                key: "favoritedOnly",
+                label: microcopy.chips.favoritedOnly,
+                value: microcopy.chips.favoritedOnlyOn
+            });
+        }
         return active;
-    }, [param.projectName, param.managerId, param.semanticIds, managerName]);
+    }, [
+        param.projectName,
+        param.managerId,
+        param.semanticIds,
+        managerName,
+        favoritedOnly
+    ]);
 
     const dismiss = (key: string) => {
         if (key === "projectName") {
@@ -121,6 +220,8 @@ const ProjectSearchPanel: React.FC<Props> = ({
             setParam({ ...param, managerId: "" });
         } else if (key === "semanticIds") {
             setParam({ ...param, semanticIds: undefined });
+        } else if (key === "favoritedOnly") {
+            onFavoritedOnlyChange?.(false);
         }
     };
 
@@ -130,7 +231,27 @@ const ProjectSearchPanel: React.FC<Props> = ({
             managerId: "",
             semanticIds: undefined
         });
+        if (favoritedOnly) onFavoritedOnlyChange?.(false);
     };
+
+    const handleSaveDefault = () => {
+        onSaveDefault?.();
+        // Tiny ack toast — the button is a stateless action without
+        // its own visible state change, so without the toast the user
+        // can't tell whether the click landed.
+        message.success(microcopy.actions.savedAsDefault);
+    };
+
+    const handleResetToDefault = () => {
+        onResetToDefault?.();
+        message.success(microcopy.actions.defaultApplied);
+    };
+
+    // The defaults toolbar is only rendered when the page wires the
+    // callbacks. Either of "save" / "reset" being absent collapses the
+    // row entirely so the legacy panel surface keeps its old shape.
+    const showDefaultsToolbar =
+        Boolean(onSaveDefault) || Boolean(onResetToDefault);
 
     return (
         <FilterShell>
@@ -188,12 +309,72 @@ const ProjectSearchPanel: React.FC<Props> = ({
                         value={loading ? undefined : (managerName ?? undefined)}
                     />
                 </FlexSelect>
+                {onFavoritedOnlyChange ? (
+                    <FavoritedToggleButton
+                        $active={favoritedOnly}
+                        aria-label={microcopy.a11y.favoritedOnlyToggle}
+                        aria-pressed={favoritedOnly}
+                        icon={
+                            favoritedOnly ? (
+                                <StarFilled aria-hidden />
+                            ) : (
+                                <StarOutlined aria-hidden />
+                            )
+                        }
+                        onClick={() => onFavoritedOnlyChange(!favoritedOnly)}
+                        size="middle"
+                        type="default"
+                    >
+                        {microcopy.chips.favoritedOnly}
+                    </FavoritedToggleButton>
+                ) : null}
             </FilterRow>
             <FilterChips
                 chips={chips}
                 onClearAll={clearAll}
                 onDismiss={dismiss}
             />
+            {showDefaultsToolbar ? (
+                <DefaultsToolbar
+                    role="group"
+                    aria-label={microcopy.a11y.saveCurrentAsDefault}
+                >
+                    {onSaveDefault ? (
+                        <Tooltip title={microcopy.a11y.saveCurrentAsDefault}>
+                            <Button
+                                aria-label={microcopy.a11y.saveCurrentAsDefault}
+                                onClick={handleSaveDefault}
+                                size="small"
+                                type="link"
+                            >
+                                {microcopy.actions.saveAsDefault}
+                            </Button>
+                        </Tooltip>
+                    ) : null}
+                    {onResetToDefault && hasSavedDefaults ? (
+                        <Tooltip title={microcopy.a11y.resetToSavedDefault}>
+                            <Button
+                                aria-label={microcopy.a11y.resetToSavedDefault}
+                                onClick={handleResetToDefault}
+                                size="small"
+                                type="link"
+                            >
+                                {microcopy.actions.resetToDefault}
+                            </Button>
+                        </Tooltip>
+                    ) : null}
+                    {onClearSavedDefault && hasSavedDefaults ? (
+                        <Button
+                            aria-label={microcopy.actions.clear}
+                            onClick={onClearSavedDefault}
+                            size="small"
+                            type="link"
+                        >
+                            {microcopy.actions.clear}
+                        </Button>
+                    ) : null}
+                </DefaultsToolbar>
+            ) : null}
         </FilterShell>
     );
 };

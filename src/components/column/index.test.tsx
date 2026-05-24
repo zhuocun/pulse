@@ -191,7 +191,8 @@ const makeTestStore = (density: "comfortable" | "compact" = "comfortable") =>
         preloadedState: {
             userPreferences: {
                 boardDensity: density,
-                savedFilterPresets: []
+                savedFilterPresets: [],
+                projectListDefaults: null
             }
         }
     });
@@ -870,6 +871,38 @@ describe("Column", () => {
             ) as HTMLElement | null;
             expect(columnContainer).not.toBeNull();
             expect(columnContainer).toHaveAttribute("data-density", "compact");
+        });
+
+        it("inline-edit Input inherits the compact title font", async () => {
+            const rtlUser = userEvent.setup();
+            renderColumn({ boardDensity: "compact" });
+            const title = screen.getAllByTestId("task-card-title")[0];
+            await rtlUser.dblClick(title);
+            const input = await screen.findByTestId("task-card-title-input");
+            // The styled CardTitle scopes `.ant-input { font-size: var(...) }`
+            // to keep the rename affordance in lockstep with the title's
+            // compact font size. A failing assertion here flags that the
+            // override CSS rule was dropped or its selector drifted.
+            const ancestor = input
+                .closest('[data-testid="task-card-title-input"]')
+                ?.closest("div");
+            expect(ancestor?.parentElement).not.toBeNull();
+            // The rule lives on a styled-component class that wraps the
+            // editing CardTitle; assert by querying for the descendant
+            // selector pattern via the stylesheet rule presence.
+            const styleSheets = Array.from(document.styleSheets);
+            const hasDensityInputRule = styleSheets.some((sheet) => {
+                try {
+                    return Array.from(sheet.cssRules ?? []).some(
+                        (rule) =>
+                            rule.cssText.includes("--density-card-title-fs") &&
+                            rule.cssText.includes(".ant-input")
+                    );
+                } catch {
+                    return false;
+                }
+            });
+            expect(hasDensityInputRule).toBe(true);
         });
     });
 });

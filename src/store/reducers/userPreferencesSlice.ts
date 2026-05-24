@@ -17,6 +17,36 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export type BoardDensity = "comfortable" | "compact";
 
 /**
+ * Phase 4.2 — defaults the project list applies when loaded with no
+ * filter / sort params in the URL. `sort` is one of the five sort modes
+ * surfaced in the list toolbar; `managerId` is the persisted manager
+ * filter (or `null` to leave the filter unset); `favoritedOnly` toggles
+ * the "favorited projects only" view (mirrors the user's `likedProjects`
+ * list — projects the user has hearted on a card). The user explicitly
+ * saves the current filter state as the default via a button in the
+ * project search panel; ad-hoc filter changes do NOT mutate the saved
+ * default.
+ */
+export type ProjectListSort =
+    | "createdAt-desc"
+    | "createdAt-asc"
+    | "name-asc"
+    | "name-desc"
+    | "favorited-first";
+
+export interface ProjectListDefaults {
+    sort: ProjectListSort;
+    managerId: string | null;
+    favoritedOnly: boolean;
+}
+
+export const PROJECT_LIST_DEFAULTS_FALLBACK: ProjectListDefaults = {
+    sort: "createdAt-desc",
+    managerId: null,
+    favoritedOnly: false
+};
+
+/**
  * The serialized shape of a single filter preset. `filterState` mirrors
  * the URL-state surface owned by `taskSearchPanel`: `taskName`,
  * `coordinatorId`, `type`. We deliberately store empty strings instead of
@@ -38,6 +68,15 @@ export interface SavedFilterPresetState {
         taskName: string;
         coordinatorId: string;
         type: string;
+        /**
+         * Active lens id at save time. Empty string when no lens was
+         * selected. Stored as a plain string (not the `LensId` union)
+         * so the slice stays decoupled from the lens-chip component
+         * — the apply path narrows the value back through
+         * `parseLensId` and silently drops anything that doesn't
+         * map to a known lens.
+         */
+        lens: string;
     };
     createdAt: number;
 }
@@ -45,6 +84,14 @@ export interface SavedFilterPresetState {
 export interface UserPreferencesState {
     boardDensity: BoardDensity;
     savedFilterPresets: SavedFilterPresetState[];
+    /**
+     * Saved project-list defaults. `null` means the user has not yet
+     * clicked "Save as default" — first load falls through to
+     * `PROJECT_LIST_DEFAULTS_FALLBACK` (`createdAt-desc`, no manager,
+     * unfavorited). Reset-to-default also reads through to the fallback
+     * when this is null so the button has a sensible no-op target.
+     */
+    projectListDefaults: ProjectListDefaults | null;
 }
 
 /**
@@ -58,13 +105,47 @@ export const SAVED_FILTER_PRESET_LIMIT = 10;
 
 export const USER_PREFERENCES_STORAGE_KEY = "pulse:userPreferences";
 
+/**
+ * Phase 4.2 — persisted-blob schema version. The serialized localStorage
+ * payload wraps the slice state under a `{ version, state }` envelope so
+ * future shape migrations can be detected and either upgraded (legacy
+ * → current) or fall back to defaults (forward-incompat) instead of
+ * silently dropping fields. See `loadPersistedUserPreferences` for the
+ * three branches this drives (legacy missing-version, current, future).
+ */
+export const USER_PREFERENCES_SCHEMA_VERSION = 1;
+
 const initialState: UserPreferencesState = {
     boardDensity: "comfortable",
-    savedFilterPresets: []
+    savedFilterPresets: [],
+    projectListDefaults: null
 };
 
 const isBoardDensity = (value: unknown): value is BoardDensity =>
     value === "comfortable" || value === "compact";
+
+const isProjectListSort = (value: unknown): value is ProjectListSort =>
+    value === "createdAt-desc" ||
+    value === "createdAt-asc" ||
+    value === "name-asc" ||
+    value === "name-desc" ||
+    value === "favorited-first";
+
+const isProjectListDefaults = (
+    value: unknown
+): value is ProjectListDefaults => {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as Record<string, unknown>;
+    if (!isProjectListSort(candidate.sort)) return false;
+    if (
+        candidate.managerId !== null &&
+        typeof candidate.managerId !== "string"
+    ) {
+        return false;
+    }
+    if (typeof candidate.favoritedOnly !== "boolean") return false;
+    return true;
+};
 
 const isStringField = (value: unknown): value is string =>
     typeof value === "string";
@@ -83,11 +164,71 @@ const isSavedPreset = (value: unknown): value is SavedFilterPresetState => {
         return false;
     }
     const fs = candidate.filterState as Record<string, unknown>;
-    return (
-        isStringField(fs.taskName) &&
-        isStringField(fs.coordinatorId) &&
-        isStringField(fs.type)
-    );
+    if (
+        !isStringField(fs.taskName) ||
+        !isStringField(fs.coordinatorId) ||
+        !isStringField(fs.type)
+    ) {
+        return false;
+    }
+    // `lens` was added after the initial 4.2 ship; legacy persisted
+    // presets are missing the field and would otherwise fail the
+    // guard. Coerce undefined to `""` on the way in so the schema
+    // stays append-only.
+    if (fs.lens !== undefined && !isStringField(fs.lens)) return false;
+    if (fs.lens === undefined) fs.lens = "";
+    return true;
+};
+
+/**
+ * Reads the slice fields out of a candidate `Record<string, unknown>`
+ * (either the persisted v1 `state` sub-object, or — for legacy
+ * unversioned blobs — the persisted top-level object) and returns a
+ * cleaned-up state value. Each field is type-guarded individually so a
+ * single malformed entry never poisons the rest of the slice. Used by
+ * both the `v1` branch and the legacy-migration branch of
+ * `loadPersistedUserPreferences`.
+ */
+const readSlice = (
+    candidate: Record<string, unknown>
+): UserPreferencesState => {
+    const presets = Array.isArray(candidate.savedFilterPresets)
+        ? candidate.savedFilterPresets.filter(isSavedPreset)
+        : [];
+    return {
+        boardDensity: isBoardDensity(candidate.boardDensity)
+            ? candidate.boardDensity
+            : initialState.boardDensity,
+        savedFilterPresets: presets.slice(-SAVED_FILTER_PRESET_LIMIT),
+        projectListDefaults: isProjectListDefaults(
+            candidate.projectListDefaults
+        )
+            ? candidate.projectListDefaults
+            : null
+    };
+};
+
+/**
+ * Writes the slice's current state back to `localStorage` wrapped in the
+ * current schema envelope (`{ version, state }`). Wrapped in try/catch
+ * so a `QuotaExceededError` (Safari private browsing, locked down
+ * environment) never throws into the dispatch loop.
+ */
+export const persistUserPreferences = (state: UserPreferencesState): void => {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify({
+                version: USER_PREFERENCES_SCHEMA_VERSION,
+                state
+            })
+        );
+    } catch {
+        // Persistence is best-effort; the in-memory slice is the source
+        // of truth for the current session even when localStorage is
+        // unavailable.
+    }
 };
 
 /**
@@ -97,6 +238,19 @@ const isSavedPreset = (value: unknown): value is SavedFilterPresetState => {
  * path. Called by the store builder in `src/store/index.ts` as the
  * `preloadedState` seed; also safe to call from tests that need to
  * stage a specific persisted shape.
+ *
+ * Schema-version handling (Phase 4.2 — userPreferences v1 envelope):
+ *
+ * - `version === USER_PREFERENCES_SCHEMA_VERSION` (currently 1) → read
+ *   the wrapped `state` sub-object as-is.
+ * - `version === undefined` → legacy pre-versioning blob. Best-effort
+ *   read of the top-level object (the previous shape WAS the state
+ *   shape), then write back wrapped in the current envelope to migrate
+ *   forward on the next boot.
+ * - `version > USER_PREFERENCES_SCHEMA_VERSION` → assume the user has
+ *   downgraded the app after writing a future-shape blob. Fall back to
+ *   `initialState` so the boot path stays clean, and log a console
+ *   warning so the rollback is at least visible in the devtools.
  */
 export const loadPersistedUserPreferences = (): UserPreferencesState => {
     if (typeof window === "undefined") return initialState;
@@ -105,37 +259,42 @@ export const loadPersistedUserPreferences = (): UserPreferencesState => {
         if (!raw) return initialState;
         const parsed = JSON.parse(raw) as unknown;
         if (!parsed || typeof parsed !== "object") return initialState;
-        const candidate = parsed as Record<string, unknown>;
-        const presets = Array.isArray(candidate.savedFilterPresets)
-            ? candidate.savedFilterPresets.filter(isSavedPreset)
-            : [];
-        return {
-            boardDensity: isBoardDensity(candidate.boardDensity)
-                ? candidate.boardDensity
-                : initialState.boardDensity,
-            savedFilterPresets: presets.slice(-SAVED_FILTER_PRESET_LIMIT)
-        };
+        const top = parsed as Record<string, unknown>;
+        const version = top.version;
+        if (typeof version === "number") {
+            if (version === USER_PREFERENCES_SCHEMA_VERSION) {
+                const wrappedState =
+                    top.state && typeof top.state === "object"
+                        ? (top.state as Record<string, unknown>)
+                        : null;
+                return wrappedState ? readSlice(wrappedState) : initialState;
+            }
+            if (version > USER_PREFERENCES_SCHEMA_VERSION) {
+                // Forward-incompat: a newer app version wrote a shape
+                // we don't know how to read. Drop to defaults rather
+                // than silently coerce — the user opted into the
+                // downgrade, so blanking their preferences is the
+                // safest behavior. Surface a console warning so the
+                // rollback is debuggable.
+                // eslint-disable-next-line no-console
+                console.warn(
+                    `[userPreferences] Persisted blob has unsupported version ${version} (max known: ${USER_PREFERENCES_SCHEMA_VERSION}); falling back to defaults.`
+                );
+                return initialState;
+            }
+            // version < current schema — would belong here once we
+            // grow a v2. For now there's only v1, so any numeric
+            // version below 1 falls through to the legacy migration
+            // branch below.
+        }
+        // Legacy unversioned blob: the prior shape WAS the state shape.
+        // Migrate forward by reading + persisting under the current
+        // envelope so the next boot takes the fast v1 path.
+        const migrated = readSlice(top);
+        persistUserPreferences(migrated);
+        return migrated;
     } catch {
         return initialState;
-    }
-};
-
-/**
- * Writes the slice's current state back to `localStorage`. Wrapped in
- * try/catch so a `QuotaExceededError` (Safari private browsing, locked
- * down environment) never throws into the dispatch loop.
- */
-export const persistUserPreferences = (state: UserPreferencesState): void => {
-    if (typeof window === "undefined") return;
-    try {
-        window.localStorage.setItem(
-            USER_PREFERENCES_STORAGE_KEY,
-            JSON.stringify(state)
-        );
-    } catch {
-        // Persistence is best-effort; the in-memory slice is the source
-        // of truth for the current session even when localStorage is
-        // unavailable.
     }
 };
 
@@ -170,6 +329,18 @@ export const userPreferencesSlice = createSlice({
                 (p) => p.id === action.payload
             );
             if (idx >= 0) state.savedFilterPresets.splice(idx, 1);
+        },
+        /**
+         * Persists the user's chosen project-list defaults. Pass `null`
+         * to clear the saved default (the list falls back to
+         * `PROJECT_LIST_DEFAULTS_FALLBACK` — `createdAt-desc`, no
+         * manager filter, unfavorited).
+         */
+        setProjectListDefaults(
+            state,
+            action: PayloadAction<ProjectListDefaults | null>
+        ) {
+            state.projectListDefaults = action.payload;
         }
     }
 });

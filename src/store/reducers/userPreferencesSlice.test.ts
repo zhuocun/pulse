@@ -19,7 +19,7 @@ const makePreset = (
     id,
     name: `Preset ${id}`,
     boardId: null,
-    filterState: { taskName: "", coordinatorId: "", type: "" },
+    filterState: { taskName: "", coordinatorId: "", type: "", lens: "" },
     createdAt: 1_700_000_000_000 + Number(id.replace(/[^0-9]/g, "") || "0"),
     ...overrides
 });
@@ -29,12 +29,13 @@ describe("userPreferencesSlice", () => {
         window.localStorage.clear();
     });
 
-    it("seeds with comfortable density and an empty preset list", () => {
+    it("seeds with comfortable density, an empty preset list, and no saved project-list defaults", () => {
         expect(
             userPreferencesSlice.reducer(undefined, { type: "@@INIT" })
         ).toEqual({
             boardDensity: "comfortable",
-            savedFilterPresets: []
+            savedFilterPresets: [],
+            projectListDefaults: null
         });
     });
 
@@ -117,11 +118,12 @@ describe("userPreferences persistence", () => {
     it("loadPersistedUserPreferences returns initial state when nothing is stored", () => {
         expect(loadPersistedUserPreferences()).toEqual({
             boardDensity: "comfortable",
-            savedFilterPresets: []
+            savedFilterPresets: [],
+            projectListDefaults: null
         });
     });
 
-    it("loadPersistedUserPreferences round-trips a persisted shape", () => {
+    it("loadPersistedUserPreferences round-trips a persisted shape (legacy unversioned)", () => {
         const stored = {
             boardDensity: "compact",
             savedFilterPresets: [makePreset("p1", { boardId: "board-1" })]
@@ -141,7 +143,8 @@ describe("userPreferences persistence", () => {
         window.localStorage.setItem(USER_PREFERENCES_STORAGE_KEY, "not-json");
         expect(loadPersistedUserPreferences()).toEqual({
             boardDensity: "comfortable",
-            savedFilterPresets: []
+            savedFilterPresets: [],
+            projectListDefaults: null
         });
     });
 
@@ -177,18 +180,24 @@ describe("userPreferences persistence", () => {
         expect(loadPersistedUserPreferences().boardDensity).toBe("comfortable");
     });
 
-    it("persistUserPreferences writes the slice JSON under the canonical key", () => {
+    it("persistUserPreferences writes the wrapped {version, state} envelope", () => {
         persistUserPreferences({
             boardDensity: "compact",
-            savedFilterPresets: [makePreset("p1")]
+            savedFilterPresets: [makePreset("p1")],
+            projectListDefaults: null
         });
         const stored = window.localStorage.getItem(
             USER_PREFERENCES_STORAGE_KEY
         );
         expect(stored).not.toBeNull();
         const parsed = JSON.parse(stored ?? "{}");
-        expect(parsed.boardDensity).toBe("compact");
-        expect(parsed.savedFilterPresets[0].id).toBe("p1");
+        // The new envelope wraps the slice under `state` with the
+        // schema `version` sibling. The legacy top-level shape would
+        // have exposed `boardDensity` directly off `parsed`.
+        expect(parsed.version).toBe(1);
+        expect(parsed.state.boardDensity).toBe("compact");
+        expect(parsed.state.savedFilterPresets[0].id).toBe("p1");
+        expect(parsed.state.projectListDefaults).toBeNull();
     });
 
     it("persists through the store middleware after a dispatched action", () => {
@@ -216,6 +225,156 @@ describe("userPreferences persistence", () => {
             USER_PREFERENCES_STORAGE_KEY
         );
         expect(stored).not.toBeNull();
-        expect(JSON.parse(stored ?? "{}").boardDensity).toBe("compact");
+        // Wrapped envelope — `state` carries the slice fields.
+        expect(JSON.parse(stored ?? "{}").state.boardDensity).toBe("compact");
+    });
+});
+
+/**
+ * Phase 4.2 — schema versioning. The persisted blob wraps the slice
+ * state under a `{ version, state }` envelope so the load path can
+ * detect three migration branches: a current-version blob (`v1`), a
+ * legacy unversioned blob (migrate forward), and a future-version blob
+ * (forward-incompat — drop to defaults + warn).
+ */
+describe("userPreferences schema versioning", () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+    });
+
+    it("loads a v1 envelope round-trip without mutation", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "compact",
+                savedFilterPresets: [makePreset("p1", { boardId: "board-1" })],
+                projectListDefaults: {
+                    sort: "createdAt-asc",
+                    managerId: "member-1",
+                    favoritedOnly: true
+                }
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.boardDensity).toBe("compact");
+        expect(loaded.savedFilterPresets[0].id).toBe("p1");
+        expect(loaded.projectListDefaults).toEqual({
+            sort: "createdAt-asc",
+            managerId: "member-1",
+            favoritedOnly: true
+        });
+        // v1 reads must not rewrite the blob (the bytes the user wrote
+        // stay verbatim — the round-trip test above expects this).
+        const after = JSON.parse(
+            window.localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? "{}"
+        );
+        expect(after.version).toBe(1);
+    });
+
+    it("migrates a legacy unversioned blob forward and writes back as v1", () => {
+        // Legacy shape: the slice fields lived at the top level, no
+        // `version` sibling. This was the on-disk shape pre-versioning.
+        const legacy = {
+            boardDensity: "compact",
+            savedFilterPresets: [makePreset("legacy-1")]
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(legacy)
+        );
+        const loaded = loadPersistedUserPreferences();
+        // Best-effort read of the legacy shape — boardDensity and the
+        // preset list survive; the new projectListDefaults field gets
+        // its null default.
+        expect(loaded.boardDensity).toBe("compact");
+        expect(loaded.savedFilterPresets[0].id).toBe("legacy-1");
+        expect(loaded.projectListDefaults).toBeNull();
+        // The load path writes the migrated shape back so the next boot
+        // takes the fast v1 read path.
+        const after = JSON.parse(
+            window.localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? "{}"
+        );
+        expect(after.version).toBe(1);
+        expect(after.state.boardDensity).toBe("compact");
+        expect(after.state.savedFilterPresets[0].id).toBe("legacy-1");
+    });
+
+    it("falls back to defaults and warns when the blob is a future version", () => {
+        const future = {
+            version: 99,
+            state: {
+                boardDensity: "compact",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                // Hypothetical future field — proves the load path
+                // doesn't try to munge unknown shapes.
+                somethingFromV99: { whoKnows: true }
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(future)
+        );
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {
+            // silence the expected warning so the test runner doesn't
+            // surface it as noise.
+        });
+        try {
+            const loaded = loadPersistedUserPreferences();
+            expect(loaded).toEqual({
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null
+            });
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 99/);
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
+    it("setProjectListDefaults stores the payload and reset to null clears it", () => {
+        const next = userPreferencesSlice.reducer(
+            initialState,
+            userPreferencesActions.setProjectListDefaults({
+                sort: "favorited-first",
+                managerId: "member-9",
+                favoritedOnly: true
+            })
+        );
+        expect(next.projectListDefaults).toEqual({
+            sort: "favorited-first",
+            managerId: "member-9",
+            favoritedOnly: true
+        });
+        const cleared = userPreferencesSlice.reducer(
+            next,
+            userPreferencesActions.setProjectListDefaults(null)
+        );
+        expect(cleared.projectListDefaults).toBeNull();
+    });
+
+    it("drops a malformed projectListDefaults field without dropping the rest of the slice", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "compact",
+                savedFilterPresets: [],
+                // Missing favoritedOnly + bad sort → guard rejects the
+                // whole object and falls back to null.
+                projectListDefaults: { sort: "nope" }
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.boardDensity).toBe("compact");
+        expect(loaded.projectListDefaults).toBeNull();
     });
 });

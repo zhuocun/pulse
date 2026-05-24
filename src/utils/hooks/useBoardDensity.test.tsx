@@ -14,7 +14,11 @@ const makeStore = (density: "comfortable" | "compact" = "comfortable") =>
     configureStore({
         reducer: { userPreferences: userPreferencesSlice.reducer },
         preloadedState: {
-            userPreferences: { boardDensity: density, savedFilterPresets: [] }
+            userPreferences: {
+                boardDensity: density,
+                savedFilterPresets: [],
+                projectListDefaults: null
+            }
         }
     });
 

@@ -40,6 +40,17 @@ export const enSource = {
         resetFilters: "Reset filters",
         retry: "Retry",
         save: "Save",
+        /*
+         * Phase 4.2 — project-list saved defaults. "Save as default"
+         * persists the current sort/filter as the user's preferred
+         * project-list state (applied on first load when the URL is
+         * empty). "Reset to default" restores the saved default;
+         * separate from "Clear all" (which empties the URL state).
+         */
+        saveAsDefault: "Save as default",
+        resetToDefault: "Reset to default",
+        savedAsDefault: "Saved as default",
+        defaultApplied: "Default applied",
         search: "Search",
         send: "Send",
         showPassword: "Show password",
@@ -92,6 +103,9 @@ export const enSource = {
         activeFilters: "Active filters",
         removeFilter: "Remove {label} filter",
         sortProjects: "Sort projects",
+        favoritedOnlyToggle: "Show only favorited projects",
+        saveCurrentAsDefault: "Save current filters as default",
+        resetToSavedDefault: "Reset filters to saved default",
         loadingProjects: "Loading projects",
         loadingPage: "Loading page",
         projects: "Projects",
@@ -228,6 +242,7 @@ export const enSource = {
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
+        projectSections: "Project sections",
         reports: "Reports",
         briefShort: "Brief",
         copilotShort: "Copilot",
@@ -280,6 +295,22 @@ export const enSource = {
             newest: "Newest first",
             oldest: "Oldest first"
         },
+        /*
+         * Phase 4.2 — project-list sort options. The legacy
+         * `options.sort` block above stays in place because the
+         * `ProjectList` component used to read those keys directly;
+         * the new project-list surface points at this separate block
+         * so the five-mode union (with `createdAt-desc` + a
+         * favorited-first mode) is independent of any future board /
+         * other-list-surface sort changes.
+         */
+        projectListSort: {
+            createdAtDesc: "Newest first",
+            createdAtAsc: "Oldest first",
+            nameAsc: "Name (A → Z)",
+            nameDesc: "Name (Z → A)",
+            favoritedFirst: "Favorited first"
+        },
         taskTypes: {
             task: "Task",
             bug: "Bug"
@@ -324,7 +355,15 @@ export const enSource = {
         coordinator: "Coordinator",
         type: "Type",
         ai: "AI",
-        smartMatch: "Smart match"
+        smartMatch: "Smart match",
+        /*
+         * Phase 4.2 — favorited-only project filter chip. Pairs with
+         * the toggle in the project search panel; the chip's value is
+         * the static "Yes" since the dimension is boolean and the
+         * label ("Favorited") already names the filter.
+         */
+        favoritedOnly: "Favorited",
+        favoritedOnlyOn: "Yes"
     },
     /**
      * Phase 3 A7 — Lens chip row above the board filter rail. The
@@ -449,7 +488,6 @@ export const enSource = {
             loadAriaLabel: "Load saved filter preset",
             loadPlaceholder: "Saved presets",
             deleteAriaLabel: "Delete preset {name}",
-            limitReachedTitle: "Preset limit reached",
             limitReachedBody:
                 "You can save up to {limit} presets. Delete one before saving another.",
             saved: "Preset saved",
@@ -578,7 +616,7 @@ export const enSource = {
             taskUpdated: "Updated task “{name}”",
             taskDeleted: "Deleted task “{name}”",
             taskRenamed: "Renamed task to “{name}”",
-            taskMoved: "Moved task “{name}”",
+            taskMoved: "Moved “{taskName}” from {fromColumn} to {toColumn}",
             columnCreated: "Created column “{name}”",
             columnUpdated: "Updated column “{name}”",
             columnDeleted: "Deleted column “{name}”",

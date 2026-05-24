@@ -308,7 +308,7 @@ const ProjectDetailPage = () => {
                  */}
                 {project && projectId ? (
                     <ChildNav
-                        aria-label={microcopy.labels.project}
+                        aria-label={microcopy.labels.projectSections}
                         data-testid="project-detail-child-nav"
                     >
                         <ChildNavLink
