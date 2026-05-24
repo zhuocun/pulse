@@ -374,7 +374,9 @@ const ProjectSearchPanel: React.FC<Props> = ({
                 >
                     {onSaveDefault ? (
                         <TouchTargetSlot data-touch-hit-area="44">
-                            <Tooltip title={microcopy.a11y.saveCurrentAsDefault}>
+                            <Tooltip
+                                title={microcopy.a11y.saveCurrentAsDefault}
+                            >
                                 <Button
                                     aria-label={
                                         microcopy.a11y.saveCurrentAsDefault

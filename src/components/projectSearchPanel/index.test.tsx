@@ -310,9 +310,7 @@ describe("ProjectSearchPanel", () => {
         // their callback + visibility gate is satisfied. The slot is
         // the styled `<span>` that immediately wraps the AntD
         // Tooltip / Button.
-        const slots = document.querySelectorAll(
-            '[data-touch-hit-area="44"]'
-        );
+        const slots = document.querySelectorAll('[data-touch-hit-area="44"]');
         expect(slots.length).toBe(3);
 
         // Each slot must wrap an actual interactive button — otherwise

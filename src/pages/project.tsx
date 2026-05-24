@@ -441,9 +441,11 @@ const ProjectPage = () => {
         // tweak (and on the save-default click that mutates the slice
         // from inside the panel), racing the PWA-shortcut strip
         // documented above. The one-shot contract is enforced by the
-        // ref guard, not by the dep array, so the exhaustive-deps
-        // suppression below is load-bearing rather than incidental.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // ref guard, not by the dep array — this is a load-bearing
+        // dep-array omission, not an oversight. The repo doesn't have
+        // `react-hooks/exhaustive-deps` enabled today so a disable
+        // comment would dangle; we rely on this comment block to keep
+        // future maintainers from "fixing" the deps.
     }, [shortcutSearchParams]);
     /*
      * Only the API-triggering params (projectName, managerId) are debounced;
