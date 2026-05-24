@@ -436,9 +436,14 @@ const ProjectPage = () => {
         // above eventually fires on the post-strip render. The
         // `defaultsAppliedRef` guard keeps the write to a single
         // dispatch across the page's lifetime. `param`, `setParam`,
-        // and `projectListDefaults` are intentionally omitted: each
-        // change to those is what the user is reacting to and we
-        // want a one-shot apply on the initial render flow.
+        // and `savedProjectListDefaults` are intentionally omitted:
+        // adding them would re-fire the effect on every user filter
+        // tweak (and on the save-default click that mutates the slice
+        // from inside the panel), racing the PWA-shortcut strip
+        // documented above. The one-shot contract is enforced by the
+        // ref guard, not by the dep array, so the exhaustive-deps
+        // suppression below is load-bearing rather than incidental.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shortcutSearchParams]);
     /*
      * Only the API-triggering params (projectName, managerId) are debounced;
