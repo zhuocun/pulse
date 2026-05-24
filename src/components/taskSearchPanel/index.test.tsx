@@ -106,7 +106,10 @@ const makePanelStore = (preset?: SavedFilterPresetState[]) =>
                 boardDensity: "comfortable" as const,
                 savedFilterPresets: preset ?? [],
                 projectListDefaults: null,
-                glassIntensity: "auto" as const
+                glassIntensity: "auto" as const,
+                // Phase 6 Wave 1 — preloadedState must carry the
+                // current migration sentinel.
+                glassIntensityVersion: 1
             }
         }
     });

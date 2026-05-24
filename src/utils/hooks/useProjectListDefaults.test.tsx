@@ -19,7 +19,10 @@ const makeStore = (saved: ProjectListDefaults | null = null) =>
                 boardDensity: "comfortable" as const,
                 savedFilterPresets: [],
                 projectListDefaults: saved,
-                glassIntensity: "auto" as const
+                glassIntensity: "auto" as const,
+                // Phase 6 Wave 1 — preloadedState must carry the
+                // current migration sentinel.
+                glassIntensityVersion: 1
             }
         }
     });

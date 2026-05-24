@@ -385,4 +385,311 @@ describe("BottomTabBar", () => {
             expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
         });
     });
+
+    /*
+     * Phase 6 Wave 2 — floating capsule geometry, haptic feedback,
+     * minimize-on-scroll, selection morph indicator. The sheet-text
+     * inspection pattern matches the Wave 2 T3 block above: jsdom
+     * doesn't introspect computed styles for styled-components, so
+     * we walk the styled-component stylesheet directly.
+     */
+    describe("Phase 6 Wave 2 — floating capsule, haptic, minimize-on-scroll", () => {
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        type VibrateFn = Navigator["vibrate"];
+        type VibrateSurface = { vibrate?: VibrateFn };
+
+        const installVibrate = (): jest.Mock<boolean, [number | number[]]> => {
+            const spy = jest.fn().mockReturnValue(true) as jest.Mock<
+                boolean,
+                [number | number[]]
+            >;
+            (navigator as unknown as VibrateSurface).vibrate =
+                spy as unknown as VibrateFn;
+            return spy;
+        };
+
+        const uninstallVibrate = (): void => {
+            delete (navigator as unknown as VibrateSurface).vibrate;
+        };
+
+        const fireScroll = () => {
+            window.dispatchEvent(new Event("scroll"));
+        };
+
+        const setScrollY = (y: number) => {
+            Object.defineProperty(window, "scrollY", {
+                configurable: true,
+                value: y
+            });
+        };
+
+        let nowSpy: jest.SpyInstance<number, []>;
+        let nowMs = 0;
+
+        beforeEach(() => {
+            setScrollY(0);
+            nowMs = 1_000_000;
+            nowSpy = jest.spyOn(Date, "now").mockImplementation(() => nowMs);
+        });
+
+        afterEach(() => {
+            nowSpy.mockRestore();
+            uninstallVibrate();
+            delete (document as Partial<Document>).startViewTransition;
+            setScrollY(0);
+        });
+
+        it("renders at floating geometry (pill border-radius, fixed, centred via translateX)", () => {
+            renderBar();
+            const css = sheetText();
+            // Pill corners — radius.pill resolves to 999px.
+            expect(css).toMatch(/border-radius:\s*999px/);
+            // Centred horizontally and detached from viewport bottom
+            // via `bottom: max(...)`.
+            expect(css).toMatch(/left:\s*50%/);
+            expect(css).toMatch(/translateX\(-50%\)/);
+            expect(css).toMatch(/bottom:\s*max\(/);
+            // Width clamp — uses `min(calc(100% - 32px), 480px)` so the
+            // bar caps at 480 px on tablets in portrait.
+            expect(css).toMatch(/width:\s*min\(/);
+            expect(css).toMatch(/480px/);
+        });
+
+        it("emits the new opacity+over-translate hide pattern when keyboard is open (not plain translateY(100%))", () => {
+            renderBar();
+            const css = sheetText();
+            // Hide pattern over-translates beyond safe-area inset and
+            // drops opacity. The old translateY(100%) literal must
+            // not appear because the floating geometry leaves the bar
+            // peeking above the safe-area inset.
+            expect(css).toMatch(
+                /translateY\(calc\(100% \+ env\(safe-area-inset-bottom\)/
+            );
+            expect(css).toMatch(/opacity:\s*0/);
+            expect(css).toMatch(/pointer-events:\s*none/);
+        });
+
+        it("renders the selection morph indicator with a stable view-transition-name", () => {
+            renderBar();
+            const css = sheetText();
+            expect(css).toMatch(/view-transition-name:\s*pulse-tab-indicator/);
+        });
+
+        it("tags each tab with a per-tab view-transition-name so the indicator can morph between them", () => {
+            renderBar();
+            const tabs = screen.getAllByRole("link");
+            // Each tab carries an inline style with its
+            // `view-transition-name: pulse-tab-<labelKey>`.
+            const names = tabs.map(
+                (tab) =>
+                    (tab as HTMLElement).style.getPropertyValue(
+                        "view-transition-name"
+                    ) || ""
+            );
+            expect(names).toEqual(
+                expect.arrayContaining([
+                    "pulse-tab-boards",
+                    "pulse-tab-inbox",
+                    "pulse-tab-copilot",
+                    "pulse-tab-profile"
+                ])
+            );
+        });
+
+        it("fires haptic vibrate('tap') when activating a NEW tab", async () => {
+            const vibrate = installVibrate();
+            const user = userEvent.setup();
+            renderBar("/projects");
+            const inbox = screen.getByRole("link", {
+                name: new RegExp(microcopy.nav.tabs.inbox, "i")
+            });
+            await user.click(inbox);
+            // useHaptic maps "tap" → 10ms single pulse.
+            expect(vibrate).toHaveBeenCalledWith(10);
+            expect(vibrate).toHaveBeenCalledTimes(1);
+        });
+
+        it("does NOT fire haptic when re-tapping the active tab", async () => {
+            const vibrate = installVibrate();
+            const user = userEvent.setup();
+            renderBar("/inbox");
+            const inbox = screen.getByRole("link", {
+                name: new RegExp(microcopy.nav.tabs.inbox, "i")
+            });
+            await user.click(inbox);
+            // Same-tab click is a no-op — no haptic, no navigation.
+            expect(vibrate).not.toHaveBeenCalled();
+            expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        });
+
+        it("does NOT fire haptic on modifier-clicks (new-tab affordance)", () => {
+            const vibrate = installVibrate();
+            renderBar("/projects");
+            const inbox = screen.getByRole("link", {
+                name: new RegExp(microcopy.nav.tabs.inbox, "i")
+            });
+            fireEvent.click(inbox, { metaKey: true });
+            expect(vibrate).not.toHaveBeenCalled();
+        });
+
+        it("sets data-minimized='true' on the bar when scrolling DOWN past the threshold", () => {
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            // Initial state — not minimized.
+            expect(nav.getAttribute("data-minimized")).toBe("false");
+            // Scroll past the threshold (50 px).
+            act(() => {
+                setScrollY(80);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("true");
+        });
+
+        it("restores data-minimized='false' on the bar when scrolling UP", () => {
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            // Scroll down to minimize.
+            act(() => {
+                setScrollY(120);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("true");
+            // Wait past the min-state-duration lockout, then scroll up.
+            act(() => {
+                nowMs += 400;
+                setScrollY(20);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("false");
+        });
+
+        it("does NOT toggle on small scroll deltas below the threshold (hysteresis)", () => {
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            // 30 px is below the 50 px threshold.
+            act(() => {
+                setScrollY(30);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("false");
+        });
+
+        it("respects prefers-reduced-motion by neutralizing the label-fade transition while still toggling the state", () => {
+            renderBar();
+            const css = sheetText();
+            // The TabLabel rule carries a transition: opacity ... clause
+            // that the reduced-motion media query neutralizes; this
+            // assertion checks the rule exists in the sheet so a future
+            // refactor doesn't accidentally drop the safety net.
+            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
+            // The state-toggle remains observable — minimizing still
+            // sets data-minimized="true" so the layout change is
+            // discoverable to AT users.
+            const nav = screen.getByTestId("bottom-tab-bar");
+            act(() => {
+                setScrollY(80);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("true");
+        });
+
+        it("pauses minimize state updates while a view transition is in flight (no flicker)", () => {
+            // Mock startViewTransition with a never-resolving `finished`
+            // so the gate stays closed; a scroll during that window
+            // must NOT flip the minimize state.
+            //
+            // The promise-resolver capture uses an explicit type
+            // annotation on the IIFE result rather than `let
+            // resolveFinished: ... = null` because TypeScript can't
+            // see through the Promise constructor's synchronous
+            // callback and narrows the captured ref to `null` (which
+            // would block the optional-chain call at end of test).
+            const resolverCapture = {
+                resolve: (() => undefined) as () => void
+            };
+            const finished = new Promise<void>((resolve) => {
+                resolverCapture.resolve = resolve;
+            });
+            const startSpy = jest.fn().mockReturnValue({ finished });
+            (
+                document as unknown as {
+                    startViewTransition?: typeof startSpy;
+                }
+            ).startViewTransition = startSpy;
+
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            // Trigger a transition.
+            act(() => {
+                (
+                    document as unknown as {
+                        startViewTransition?: typeof startSpy;
+                    }
+                ).startViewTransition?.(() => undefined);
+            });
+            // Scroll past the threshold during the transition.
+            act(() => {
+                setScrollY(200);
+                fireScroll();
+            });
+            // The gate should suppress the minimize flip.
+            expect(nav.getAttribute("data-minimized")).toBe("false");
+
+            // Cleanup the never-resolving promise so jest doesn't
+            // complain about an open handle.
+            resolverCapture.resolve();
+        });
+
+        it("hides the bar with the new opacity+over-translate pattern when useKeyboardOpen() returns true", () => {
+            // Drive useKeyboardOpen → true by mocking visualViewport
+            // and focusing an input (the canonical keyboard-up state).
+            const listeners: Array<() => void> = [];
+            const mockViewport = {
+                height: 700,
+                width: 375,
+                addEventListener: (event: string, cb: () => void) => {
+                    if (event === "resize" || event === "scroll")
+                        listeners.push(cb);
+                },
+                removeEventListener: jest.fn()
+            };
+            Object.defineProperty(window, "visualViewport", {
+                configurable: true,
+                value: mockViewport
+            });
+            Object.defineProperty(window, "innerHeight", {
+                configurable: true,
+                value: 700
+            });
+            renderBar();
+            const nav = screen.getByTestId("bottom-tab-bar");
+            const input = document.createElement("input");
+            document.body.appendChild(input);
+            input.focus();
+            mockViewport.height = 300;
+            act(() => {
+                listeners.forEach((cb) => cb());
+            });
+            // The bar is gated `inert` — confirms the keyboard-open
+            // path is live and the bar is hidden via the new pattern.
+            expect(nav).toHaveAttribute("inert");
+            // The over-translate hide pattern is asserted in CSS above;
+            // here we just confirm the prop wiring fires.
+            document.body.removeChild(input);
+        });
+    });
 });

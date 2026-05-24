@@ -1132,10 +1132,10 @@ export const enSource = {
             member: "Members"
         },
         kindTags: {
-            project: "project",
-            task: "task",
-            column: "column",
-            member: "member"
+            project: "Project",
+            task: "Task",
+            column: "Column",
+            member: "Member"
         },
         sublabelColumn: "Column",
         navigateInstructions:

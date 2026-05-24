@@ -104,6 +104,22 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  *
  * Note: `data-glass-intensity="regular"` inherits the `:root` default,
  * so no override block is needed for it — keeps the rendered CSS lean.
+ *
+ * Phase 6 Wave 1 additions — foundation tokens for the iOS-26 mobile
+ * adoption. These are geometry / timing values (not light/dark-dependent),
+ * but ship in BOTH palette blocks for symmetry with the rest of the
+ * surface — keeps the contract "every var defined for one mode is defined
+ * for both" simple to enforce in tests.
+ *   - `--ant-chrome-inset-mobile` — outset for floating mobile chrome
+ *     (BottomTabBar, Sheet). 16 px = iOS 26 ~21pt mapped to web density.
+ *   - `--ant-detent-peek` / `--ant-detent-medium` / `--ant-detent-large`
+ *     — Wave 3 Sheet primitive's snap-detent ladder (px peek above safe
+ *     area, dvh for medium and large so iOS URL-bar collapse doesn't
+ *     mid-gesture snap).
+ *   - `--ant-motion-detent-snap` / `--ant-motion-tab-bar-minimize` —
+ *     durations for Wave 3 sheet snapping and Wave 2 tab-bar minimize.
+ *   - `--ant-easing-detent` — the iOS sheet curve (slow in/out, no
+ *     overshoot). Pairs with `--ant-motion-detent-snap` for Wave 3.
  */
 export const paletteToCss = (p: Palette): string => `
 :root,
@@ -138,13 +154,21 @@ html[data-color-scheme="light"] {
 
     --motion-morph: 450ms;
     --motion-gel-flex: 220ms;
+    --ant-motion-detent-snap: 360ms;
+    --ant-motion-tab-bar-minimize: 280ms;
 
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
+    --ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
 
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
     --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
     --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
+
+    --ant-chrome-inset-mobile: 16px;
+    --ant-detent-peek: 96px;
+    --ant-detent-medium: 50dvh;
+    --ant-detent-large: 92dvh;
 
     --aurora-blob: rgba(${p.accent.rgb}, 0.10);
     --aurora-blob-strong: rgba(${p.accent.rgb}, 0.20);
@@ -182,13 +206,21 @@ html[data-color-scheme="dark"] {
 
     --motion-morph: 450ms;
     --motion-gel-flex: 220ms;
+    --ant-motion-detent-snap: 360ms;
+    --ant-motion-tab-bar-minimize: 280ms;
 
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
+    --ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
 
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
     --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
     --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
+
+    --ant-chrome-inset-mobile: 16px;
+    --ant-detent-peek: 96px;
+    --ant-detent-medium: 50dvh;
+    --ant-detent-large: 92dvh;
 
     --aurora-blob: rgba(${p.accent.rgbDark}, 0.14);
     --aurora-blob-strong: rgba(${p.accent.rgbDark}, 0.24);

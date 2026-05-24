@@ -22,11 +22,14 @@ export type BoardDensity = "comfortable" | "compact";
  * Four exposed options, three resolved targets:
  *
  *   - `"auto"`    — defer to the runtime ladder in `useGlassIntensity`
- *                    (OS `prefers-reduced-transparency` → `"solid"`,
- *                    `pointer: coarse` → `"solid"`, otherwise
- *                    `"regular"`). This is the default; users who never
- *                    touch the setting get the sensible per-device
- *                    behaviour with no further action.
+ *                    (Phase 6 Wave 1 ladder: `forced-colors: active` →
+ *                    `"solid"`, `prefers-reduced-transparency: reduce` →
+ *                    `"solid"`, `pointer: coarse` → `"regular"`, fine
+ *                    pointer → `"regular"`). The default for new users.
+ *                    Existing pre-Phase-6 users are migrated to explicit
+ *                    `"solid"` via `glassIntensityVersion` so the
+ *                    mobile-default flip from `"solid"` to `"regular"`
+ *                    doesn't surprise installed bases.
  *   - `"clear"`   — most translucent. Highest show-through, modest blur.
  *   - `"regular"` — balanced default (the recipe the chrome ships today).
  *   - `"solid"`   — opaque opt-out. Blur disabled, glass surfaces collapse
@@ -127,6 +130,29 @@ export interface UserPreferencesState {
      * contract.
      */
     glassIntensity: GlassIntensityPreference;
+    /**
+     * Phase 6 Wave 1 — migration counter for the glassIntensity field.
+     * Bumped each time the runtime resolver's defaults change in a way
+     * that would surprise an existing user.
+     *
+     * Versions:
+     *   - `0` (or `undefined`) — pre-Phase-6 blobs. The coarse-pointer
+     *     default in `useGlassIntensity` resolved `"auto"` to `"solid"`
+     *     on mobile, so anyone with `glassIntensity: "auto"` was
+     *     effectively using Solid on phones.
+     *   - `1` — Phase 6 Wave 1. The coarse-pointer default flips to
+     *     `"regular"`. To preserve the legacy mobile experience for
+     *     users who never picked anything, the load path migrates
+     *     `auto → solid` on the first read so existing mobile users
+     *     keep Solid. New installs default to `"auto"` + version 1 and
+     *     get Regular on mobile per the new ladder.
+     *
+     * The migration only runs ONCE — once the version is at the current
+     * value the load path skips the migration regardless of the field
+     * value (so a user who explicitly picked `"auto"` later still gets
+     * the post-migration ladder).
+     */
+    glassIntensityVersion: number;
 }
 
 /**
@@ -158,19 +184,32 @@ export const USER_PREFERENCES_STORAGE_KEY = "pulse:userPreferences";
  */
 export const USER_PREFERENCES_SCHEMA_VERSION = 1;
 
+/**
+ * Phase 6 Wave 1 — current `glassIntensity` migration version. New
+ * installs persist this on first write; existing users with an older
+ * (or missing) version are migrated forward by
+ * `loadPersistedUserPreferences`. See
+ * `UserPreferencesState.glassIntensityVersion` for the migration
+ * ladder.
+ */
+export const GLASS_INTENSITY_CURRENT_VERSION = 1;
+
 const initialState: UserPreferencesState = {
     boardDensity: "comfortable",
     savedFilterPresets: [],
     projectListDefaults: null,
     /*
      * Default to `"auto"` so brand-new installs get the per-device
-     * ladder behaviour without nagging the user to pick something. The
-     * ladder collapses to `"solid"` on coarse-pointer surfaces (mobile
-     * GPU budget) and when the OS reports `prefers-reduced-transparency:
-     * reduce`, leaving the regular Liquid Glass treatment for desktop
-     * fine-pointer users on systems that haven't opted out.
+     * ladder behaviour without nagging the user to pick something.
+     * Phase 6 Wave 1 — the ladder now resolves `"auto"` to `"regular"`
+     * on coarse-pointer surfaces (the iOS-26 chrome upgrades land on
+     * mobile by default); the OS-level `prefers-reduced-transparency`
+     * and `forced-colors` signals still step down to `"solid"`. New
+     * installs pair this with `glassIntensityVersion: 1` (the current
+     * version) so the load-path migration skips them.
      */
-    glassIntensity: "auto"
+    glassIntensity: "auto",
+    glassIntensityVersion: GLASS_INTENSITY_CURRENT_VERSION
 };
 
 const isBoardDensity = (value: unknown): value is BoardDensity =>
@@ -275,7 +314,58 @@ const readSlice = (
          */
         glassIntensity: isGlassIntensityPreference(candidate.glassIntensity)
             ? candidate.glassIntensity
-            : initialState.glassIntensity
+            : initialState.glassIntensity,
+        /*
+         * `glassIntensityVersion` was added in Phase 6 Wave 1 to gate
+         * the runtime-resolver default flip. A missing field reads as
+         * `0` (the pre-migration sentinel) so the load path can
+         * detect existing blobs and migrate them forward — see the
+         * `migrateGlassIntensity` block in
+         * `loadPersistedUserPreferences` below. Brand-new installs
+         * persist the current version on first write.
+         */
+        glassIntensityVersion:
+            typeof candidate.glassIntensityVersion === "number"
+                ? candidate.glassIntensityVersion
+                : 0
+    };
+};
+
+/**
+ * Phase 6 Wave 1 — one-shot migration for the `glassIntensity` field.
+ * The Phase 5 runtime resolver collapsed `glassIntensity: "auto"` to
+ * `"solid"` on coarse-pointer surfaces; the Phase 6 resolver collapses
+ * it to `"regular"`. To avoid surprising existing mobile users by
+ * suddenly enabling Liquid Glass on their phones, we rewrite their
+ * stored preference from `"auto"` to an explicit `"solid"` on the
+ * first load after the upgrade — pinned to a `glassIntensityVersion`
+ * sentinel so the migration only ever runs once per user.
+ *
+ * Pre-migration: any blob with `glassIntensityVersion === undefined`
+ * OR `< GLASS_INTENSITY_CURRENT_VERSION` AND
+ * `glassIntensity === "auto"`. Post-migration: that user's stored
+ * choice is rewritten to `"solid"` and `glassIntensityVersion` is
+ * bumped to the current version.
+ *
+ * Explicit picks (`"clear"`, `"regular"`, `"solid"`) are NOT migrated
+ * — the user already opted into a specific intensity, so the runtime
+ * default flip has no effect on them. The version bump still happens
+ * so the next load skips the check.
+ *
+ * Returns the (possibly mutated) state. Idempotent: calling it again
+ * after the version has been bumped is a no-op.
+ */
+const migrateGlassIntensity = (
+    state: UserPreferencesState
+): UserPreferencesState => {
+    if (state.glassIntensityVersion >= GLASS_INTENSITY_CURRENT_VERSION) {
+        return state;
+    }
+    const needsAutoToSolid = state.glassIntensity === "auto";
+    return {
+        ...state,
+        glassIntensity: needsAutoToSolid ? "solid" : state.glassIntensity,
+        glassIntensityVersion: GLASS_INTENSITY_CURRENT_VERSION
     };
 };
 
@@ -346,7 +436,25 @@ export const loadPersistedUserPreferences = (): UserPreferencesState => {
                     top.state && typeof top.state === "object"
                         ? (top.state as Record<string, unknown>)
                         : null;
-                return wrappedState ? readSlice(wrappedState) : initialState;
+                if (!wrappedState) return initialState;
+                const slice = readSlice(wrappedState);
+                /*
+                 * Phase 6 Wave 1 — `glassIntensity` runtime-default
+                 * migration. The slice-level version field gates a
+                 * one-shot rewrite of `auto → solid` for pre-Phase-6
+                 * blobs so existing mobile users keep the prior
+                 * (solid) glass on their phones. The rewrite is
+                 * idempotent — once `glassIntensityVersion` is at
+                 * the current value, subsequent loads skip the
+                 * branch entirely. We persist the migrated shape
+                 * back so the next boot reads the post-migration
+                 * value directly.
+                 */
+                const migrated = migrateGlassIntensity(slice);
+                if (migrated !== slice) {
+                    persistUserPreferences(migrated);
+                }
+                return migrated;
             }
             if (version > USER_PREFERENCES_SCHEMA_VERSION) {
                 // Forward-incompat: a newer app version wrote a shape
@@ -383,8 +491,12 @@ export const loadPersistedUserPreferences = (): UserPreferencesState => {
         }
         // Legacy unversioned blob: the prior shape WAS the state shape.
         // Migrate forward by reading + persisting under the current
-        // envelope so the next boot takes the fast v1 path.
-        const migrated = readSlice(top);
+        // envelope so the next boot takes the fast v1 path. The
+        // glassIntensity migration also fires here so a pre-Phase-6
+        // unversioned blob's "auto" preference is rewritten to
+        // "solid" before being persisted.
+        const slice = readSlice(top);
+        const migrated = migrateGlassIntensity(slice);
         persistUserPreferences(migrated);
         return migrated;
     } catch {

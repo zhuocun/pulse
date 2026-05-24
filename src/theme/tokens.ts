@@ -26,6 +26,47 @@ export const space = {
     xxxl: 64
 } as const;
 
+/**
+ * Mobile chrome inset — the breathing room between the viewport edge and
+ * floating chrome surfaces (BottomTabBar, Sheet rim) on coarse-pointer
+ * surfaces. iOS 26 uses ~21pt mapped to web density gives us 16 px, which
+ * also matches our `space.md` standard gutter; keeping the named token
+ * here lets Wave 2's BottomTabBar geometry refactor and Wave 3's Sheet
+ * primitive both thread the same value through their floating-chrome
+ * outset math without a sprinkle of `16` literals across the codebase.
+ *
+ * Phase 6 Wave 1 addition.
+ */
+export const chromeInset = {
+    mobile: 16
+} as const;
+
+/**
+ * Sheet detent ladder — the three snap heights the Wave 3 Sheet primitive
+ * exposes (peek above the tab bar, half-height medium, near-full large).
+ *
+ *   - `peek`   — a hint of the sheet hovering above the keyboard / system
+ *                gesture area, just enough to read the title and grab the
+ *                drag handle. Expressed in pixels so the height is a
+ *                fixed offset above the bottom safe-area inset.
+ *   - `medium` — half-viewport height. Expressed in `dvh` (dynamic
+ *                viewport height) so the iOS Safari URL-bar collapse
+ *                doesn't shrink the sheet mid-gesture; `vh` would jump
+ *                with the URL bar and trip the spring back into a snap.
+ *   - `large`  — near-full sheet, leaving 8% peek of the presenting
+ *                content above the rim so the user can tell what's
+ *                underneath (and tap-out to dismiss without hunting for
+ *                the close affordance).
+ *
+ * Phase 6 Wave 1 addition — Wave 3's Sheet primitive consumes these
+ * three keyed strings as snap points.
+ */
+export const detent = {
+    peek: "96px",
+    medium: "50dvh",
+    large: "92dvh"
+} as const;
+
 export const radius = {
     xs: 4,
     sm: 6,
@@ -34,6 +75,28 @@ export const radius = {
     xl: 20,
     pill: 999
 } as const;
+
+/**
+ * Concentric corner-radius helper. Given an outer container's radius and
+ * the padding between the outer rim and an inner element, returns the
+ * radius the inner element must use so its corner curve is concentric
+ * with the outer curve (i.e. the radial gap between the two arcs stays
+ * constant). This mirrors iOS / SwiftUI's `RoundedRectangle` concentric
+ * ring behavior so nested glass surfaces (e.g. a button inside a tab
+ * bar, or a sheet inside the chrome frame) stay visually nested rather
+ * than wonky-curved.
+ *
+ * `Math.max(0, ...)` guards against a padding larger than the outer
+ * radius (the inner element would otherwise want a negative radius,
+ * which CSS silently clamps to 0 anyway — making the clamp explicit
+ * keeps the returned value type-safe and predictable).
+ *
+ * Phase 6 Wave 1 addition — Wave 2's BottomTabBar refactor and Wave 3's
+ * Sheet primitive both consume this to thread their inner-element radii
+ * through a single computed source.
+ */
+export const radiusConcentric = (outer: number, padding: number): number =>
+    Math.max(0, outer - padding);
 
 export const fontSize = {
     xs: 12,
@@ -374,7 +437,22 @@ export const motion = {
     medium: 200,
     long: 320,
     morph: 450,
-    gelFlex: 220
+    gelFlex: 220,
+    /*
+     * Phase 6 Wave 1 additions — durations for the iOS-26 sheet snap and
+     * the tab-bar minimize-on-scroll animation Wave 2 will adopt.
+     *
+     *   - `detentSnap` (360ms): the spring-feel duration for the Sheet
+     *     snapping between peek / medium / large detents. Long enough to
+     *     read as a deliberate transition (vs. a yank), short enough to
+     *     not feel laggy on a flick. Pairs with `easing.detent`.
+     *   - `tabBarMinimize` (280ms): the duration for the bottom-tab
+     *     bar shrinking to a pill on downward scroll. Sits between
+     *     `medium` and `long` so the minimize reads as confident
+     *     without snapping rudely out of the way.
+     */
+    detentSnap: 360,
+    tabBarMinimize: 280
 } as const;
 
 /**
@@ -395,7 +473,15 @@ export const easing = {
     emphasized: "cubic-bezier(0.3, 0, 0, 1)",
     decelerate: "cubic-bezier(0, 0, 0, 1)",
     springSoft: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-    springSnap: "cubic-bezier(0.16, 1.05, 0.36, 1)"
+    springSnap: "cubic-bezier(0.16, 1.05, 0.36, 1)",
+    /*
+     * Phase 6 Wave 1 addition — the iOS-26 sheet curve. Slower in / out
+     * with no overshoot, which reads as a heavy-but-fluid pane being
+     * dragged into position. Wave 3's Sheet primitive pairs this with
+     * `motion.detentSnap` for the snap transition between peek /
+     * medium / large detents.
+     */
+    detent: "cubic-bezier(0.32, 0.72, 0, 1)"
 } as const;
 
 /**
@@ -426,7 +512,9 @@ export const viewTransition = {
     /** Lens (filter) chip — for chip-to-detail morphing. */
     lensChip: "pulse-lens-chip",
     /** Copilot suggestion chip — for chip-to-message morphing. */
-    copilotChip: "pulse-copilot-chip"
+    copilotChip: "pulse-copilot-chip",
+    /** Phone-chassis tab-bar accessory slot — pinned across navigations. */
+    tabAccessory: "pulse-tab-accessory"
 } as const;
 
 /*

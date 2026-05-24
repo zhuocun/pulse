@@ -7,6 +7,7 @@ import CopilotDockHost from "../components/copilotDock/copilotDockHost";
 import Header from "../components/header";
 import ProjectModal from "../components/projectModal";
 import { PageSpin } from "../components/status";
+import { TabBarAccessoryMount } from "../components/tabBarAccessory";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../theme/tokens";
@@ -46,16 +47,21 @@ const Main = styled.main<{ $hasBottomNav: boolean }>`
     scroll-padding-top: var(--header-height, 64px);
     /*
      * When the bottom tab bar mounts (phone + flag on), reserve space so
-     * the fixed-position bar doesn't occlude the routed content. The
-     * 64 px figure matches the bar's 56 px touch target + 8 px top
-     * padding; safe-area-inset-bottom is added on top so iOS home
-     * indicator devices clear the gesture area. The bar itself owns the
-     * safe-area inset in its own padding-block-end so the icons stay
-     * within the visible band; this offset on the main region is the
-     * scroll-content clearance.
+     * the floating-position bar doesn't occlude the routed content. The
+     * 64 px figure matches the bar's 56 px touch target + 8 px inner
+     * padding. With the Phase 6 Wave 2 floating capsule geometry, the
+     * bar sits OFFSET above the safe-area inset by space.lg (24 px) +
+     * a touch (space.sm 12 px) for safety so scroll content never tucks
+     * under the floating pill. The TabBarAccessoryMount is
+     * position: fixed and reserves no additional layout space; if it
+     * mounts content, the slot floats above the bar without pushing
+     * scroll content down (the Wave 3 detent sheets will revisit this
+     * with their own clearance math).
      */
     padding-bottom: ${(props) =>
-        props.$hasBottomNav ? "calc(64px + env(safe-area-inset-bottom))" : "0"};
+        props.$hasBottomNav
+            ? `calc(64px + env(safe-area-inset-bottom) + ${space.lg}px + ${space.sm}px)`
+            : "0"};
 `;
 
 /**
@@ -148,7 +154,22 @@ const MainLayout = () => {
              * two surfaces never co-exist for a given user.
              */}
             <CopilotDockHost />
-            {showBottomNav ? <BottomTabBar /> : null}
+            {showBottomNav ? (
+                <>
+                    {/*
+                     * Phase 6 Wave 2 — TabBarAccessory slot. Mount the
+                     * portal host above the BottomTabBar in render
+                     * order so the DOM order matches the visual order
+                     * (accessory chrome sits above the bar). The slot
+                     * is a portal-rendered fixed-position chrome that
+                     * any subtree can opt into via <TabBarAccessory>.
+                     * The primitive warns on duplicate mounts — this
+                     * is the single canonical site.
+                     */}
+                    <TabBarAccessoryMount />
+                    <BottomTabBar />
+                </>
+            ) : null}
         </Container>
     );
 };

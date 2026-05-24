@@ -183,9 +183,9 @@ const StatHeader = styled.div`
     /*
      * Stack the icon above the label on phone-sized viewports so the
      * label claims the full card width (~80–100 px) instead of sharing
-     * it with the icon + gap (which left ~55 px and forced
-     * "ORGANIZATIONS" to break mid-word as "ORGANIZATI / ONS"). On sm+
-     * the inline row returns since the cards are wide enough.
+     * it with the icon + gap (which previously left ~55 px and forced
+     * the longest label to break mid-word). On sm+ the inline row
+     * returns since the cards are wide enough.
      */
     @media (max-width: ${breakpoints.sm - 1}px) {
         flex-direction: column;
@@ -223,31 +223,28 @@ const StatLabel = styled.span`
     color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55));
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.medium};
-    letter-spacing: ${letterSpacing.wide};
     /* The card uses align-items: flex-start (so values don't stretch),
      * which sizes children to their content on the cross axis. Without
-     * this cap, "TEAM MEMBERS" sizes to its 103 px max-content and
+     * this cap, "Team members" sizes to its max-content and
      * spills past the card on narrow viewports — the
      * text-overflow: ellipsis below only fires when the element is
      * actually narrower than its content. */
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-transform: uppercase;
     white-space: nowrap;
 
     /* Below sm (480 px) three columns leave ~80–100 px per card. With
      * the icon stacked above (see StatHeader) the label gets the whole
-     * card width. Drop the wide tracking, shrink the size a notch, and
-     * use word-break: keep-all + white-space: normal so two-word
-     * labels wrap at their space ("TEAM" / "MEMBERS") and the
-     * single-token "ORGANIZATIONS" stays on one line instead of
-     * splitting mid-character ("ORGANIZATI / ONS"). The clamp scales the
+     * card width. Shrink the size a notch and use
+     * word-break: keep-all + white-space: normal so two-word
+     * labels wrap at their space ("Team" / "members") and the
+     * single-token "Organizations" stays on one line instead of
+     * splitting mid-character ("Organizati / ons"). The clamp scales the
      * font down to 10 px on iPhone-SE-class viewports (≤ 360 px wide)
      * so even the longest label fits. */
     @media (max-width: ${breakpoints.sm - 1}px) {
         font-size: clamp(10px, 2.9vw, 11px);
-        letter-spacing: ${letterSpacing.normal};
         line-height: ${lineHeight.tight};
         text-align: center;
         white-space: normal;

@@ -35,6 +35,26 @@ jest.mock("../components/bottomTabBar", () => {
             )
     };
 });
+/*
+ * Mock TabBarAccessoryMount as a sentinel marker so we can assert it's
+ * mounted exactly once (the underlying primitive warns + replaces on
+ * duplicate mounts, but the cleaner contract is "the layout reserves
+ * one and only one slot"). We mock the named export shape because the
+ * layout imports `{ TabBarAccessoryMount }` from the module barrel.
+ */
+jest.mock("../components/tabBarAccessory", () => {
+    const React = require("react");
+    return {
+        __esModule: true,
+        TabBarAccessoryMount: () =>
+            React.createElement(
+                "div",
+                { "data-testid": "tab-bar-accessory-mount-mock" },
+                "TabBarAccessoryMount"
+            ),
+        default: ({ children }: { children: React.ReactNode }) => children
+    };
+});
 
 // Mock the environment module so individual tests can flip the
 // bottomNavEnabled flag and matchMedia so AntD's Grid.useBreakpoint can
@@ -226,6 +246,136 @@ describe("MainLayout", () => {
             );
             expect(
                 screen.queryByTestId("bottom-tab-bar-mock")
+            ).not.toBeInTheDocument();
+        });
+    });
+
+    /*
+     * Phase 6 Wave 2 — TabBarAccessoryMount wiring. The slot must
+     * mount exactly once on phone chassis (no double-mount, which the
+     * primitive warns about), it must NOT mount on desktop / fine-
+     * pointer surfaces (no accessory chrome without the bar), and the
+     * Main region must reserve clearance for the floating bar +
+     * bottom gap so scroll content never tucks underneath the
+     * floating pill.
+     */
+    describe("TabBarAccessoryMount + body padding (Phase 6 Wave 2)", () => {
+        it("mounts the TabBarAccessoryMount exactly once on phone chassis", () => {
+            installMatchMediaPhone();
+            envMod.default.bottomNavEnabled = true;
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            const mounts = screen.getAllByTestId(
+                "tab-bar-accessory-mount-mock"
+            );
+            expect(mounts).toHaveLength(1);
+        });
+
+        it("mounts the accessory slot BEFORE the BottomTabBar in render order (DOM order matches visual order)", () => {
+            installMatchMediaPhone();
+            envMod.default.bottomNavEnabled = true;
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            const accessory = screen.getByTestId(
+                "tab-bar-accessory-mount-mock"
+            );
+            const bar = screen.getByTestId("bottom-tab-bar-mock");
+            // The accessory chrome must paint visually ABOVE the bar.
+            // Both are position: fixed, so DOM order alone doesn't
+            // control stacking (z-index does); but our render order
+            // matches the visual contract so future stacking changes
+            // stay self-documenting.
+            const position = accessory.compareDocumentPosition(bar);
+            // Node.DOCUMENT_POSITION_FOLLOWING === 4 — accessory comes
+            // first, bar comes after.
+            expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+                Node.DOCUMENT_POSITION_FOLLOWING
+            );
+        });
+
+        it("does NOT mount the accessory slot on desktop (no accessory chrome without the bar)", () => {
+            installMatchMediaDesktop();
+            envMod.default.bottomNavEnabled = true;
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(
+                screen.queryByTestId("tab-bar-accessory-mount-mock")
+            ).not.toBeInTheDocument();
+        });
+
+        it("reserves body padding for the floating bar + bottom gap (no content tucking underneath)", () => {
+            installMatchMediaPhone();
+            envMod.default.bottomNavEnabled = true;
+            const { container } = render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            const main = container.querySelector("main");
+            // The padding-bottom token references env(safe-area-inset-
+            // bottom) which jsdom resolves to 0px, so we inspect the
+            // styled-component sheet for the formula instead of
+            // getComputedStyle. The Wave 2 padding adds the bar height
+            // (64) + the bottom gap (space.lg = 24) + breathing room
+            // (space.sm = 12) on top of the safe-area inset.
+            const sheets = Array.from(document.styleSheets)
+                .map((sheet) => {
+                    try {
+                        return Array.from(sheet.cssRules)
+                            .map((rule) => rule.cssText)
+                            .join("\n");
+                    } catch {
+                        return "";
+                    }
+                })
+                .join("\n");
+            expect(main).not.toBeNull();
+            // The Wave 2 formula includes env(safe-area-inset-bottom)
+            // AND the additional 24+12 px gap.
+            expect(sheets).toMatch(
+                /calc\(64px \+ env\(safe-area-inset-bottom\) \+ 24px \+ 12px\)/
+            );
+        });
+
+        it("does NOT mount the accessory slot when the env flag is off (rollback path)", () => {
+            installMatchMediaPhone();
+            envMod.default.bottomNavEnabled = false;
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(
+                screen.queryByTestId("tab-bar-accessory-mount-mock")
             ).not.toBeInTheDocument();
         });
     });

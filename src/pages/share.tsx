@@ -96,9 +96,7 @@ const SummaryLabel = styled.div`
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.medium};
-    letter-spacing: ${letterSpacing.wide};
     margin-bottom: ${space.xxs}px;
-    text-transform: uppercase;
 `;
 
 const SummaryValue = styled.div`

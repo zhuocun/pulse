@@ -62,10 +62,8 @@ const KindGroup = styled.li`
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.semibold};
-    letter-spacing: 0.04em;
     margin: ${space.xs}px 0 ${space.xxs}px;
     padding: 0 ${space.sm}px;
-    text-transform: uppercase;
 `;
 
 const Row = styled.li<{ active: boolean }>`
@@ -85,7 +83,6 @@ const KindTag = styled(Tag)`
     && {
         font-size: ${fontSize.xs}px;
         margin-inline-end: 0;
-        text-transform: capitalize;
     }
 `;
 
