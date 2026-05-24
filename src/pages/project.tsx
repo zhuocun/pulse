@@ -415,10 +415,22 @@ const ProjectPage = () => {
             shortcutSearchParams.get("openCopilot") === "1";
         if (hasShortcutParam) return;
         defaultsAppliedRef.current = true;
+        /*
+         * Phase 4.2 review follow-up — only write defaults into the URL
+         * when the user has explicitly saved one. Without this guard
+         * every fresh mount with no saved default would push the
+         * fallback `sort=createdAt-desc` into the URL, polluting the
+         * address bar for users who never opted in. When `savedDefaults`
+         * is null the list still renders correctly: `narrowSort` (and
+         * the rest of the page) falls through to the same
+         * `PROJECT_LIST_DEFAULTS_FALLBACK` baseline, the URL just stays
+         * clean.
+         */
+        if (savedProjectListDefaults === null) return;
         setParam({
-            sort: projectListDefaults.sort,
-            managerId: projectListDefaults.managerId ?? "",
-            favoritedOnly: projectListDefaults.favoritedOnly ? "1" : ""
+            sort: savedProjectListDefaults.sort,
+            managerId: savedProjectListDefaults.managerId ?? "",
+            favoritedOnly: savedProjectListDefaults.favoritedOnly ? "1" : ""
         });
         // Re-run when the shortcut params change so the deferred branch
         // above eventually fires on the post-strip render. The

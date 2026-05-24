@@ -545,16 +545,25 @@ describe("ProjectPage", () => {
             });
         });
 
-        it("applies the fallback default sort on first load with no URL params", async () => {
+        it("does NOT write the fallback default into the URL when no saved default exists", async () => {
+            // Phase 4.2 review follow-up — the first-load effect now
+            // gates the URL write on `savedDefaults !== null`. With no
+            // saved default the page renders with the implicit
+            // `PROJECT_LIST_DEFAULTS_FALLBACK` baseline (same
+            // `createdAt-desc` sort) but leaves the address bar alone.
+            // This prevents URL pollution for users who never opted in
+            // to defaults.
             renderPage();
 
-            // The fallback default sort is `createdAt-desc` — the
-            // first-load effect writes it to the URL once the page
-            // mounts, so the LocationProbe should reflect it.
-            await waitFor(() => {
-                const search = screen.getByTestId("location").textContent ?? "";
-                expect(search).toContain("sort=createdAt-desc");
-            });
+            // The page must finish booting before we sample the URL —
+            // wait for the first project row so we know the defaults
+            // effect has had a render cycle to fire (or not).
+            await screen.findByText("Roadmap");
+
+            const search = screen.getByTestId("location").textContent ?? "";
+            expect(search).not.toContain("sort=");
+            expect(search).not.toContain("managerId=");
+            expect(search).not.toContain("favoritedOnly=");
         });
 
         it("applies the saved default sort + favoritedOnly on first load", async () => {
