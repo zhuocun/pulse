@@ -22,11 +22,14 @@ export type BoardDensity = "comfortable" | "compact";
  * Four exposed options, three resolved targets:
  *
  *   - `"auto"`    — defer to the runtime ladder in `useGlassIntensity`
- *                    (OS `prefers-reduced-transparency` → `"solid"`,
- *                    `pointer: coarse` → `"solid"`, otherwise
- *                    `"regular"`). This is the default; users who never
- *                    touch the setting get the sensible per-device
- *                    behaviour with no further action.
+ *                    (Phase 6 Wave 1 ladder: `forced-colors: active` →
+ *                    `"solid"`, `prefers-reduced-transparency: reduce` →
+ *                    `"solid"`, `pointer: coarse` → `"regular"`, fine
+ *                    pointer → `"regular"`). The default for new users.
+ *                    Existing pre-Phase-6 users are migrated to explicit
+ *                    `"solid"` via `glassIntensityVersion` so the
+ *                    mobile-default flip from `"solid"` to `"regular"`
+ *                    doesn't surprise installed bases.
  *   - `"clear"`   — most translucent. Highest show-through, modest blur.
  *   - `"regular"` — balanced default (the recipe the chrome ships today).
  *   - `"solid"`   — opaque opt-out. Blur disabled, glass surfaces collapse

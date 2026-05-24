@@ -19,9 +19,13 @@ import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
  * settings rows feel cut from the same cloth.
  *
  *   - Auto    — defer to the runtime ladder in `useGlassIntensity`
- *               (OS `prefers-reduced-transparency` → solid,
- *               `pointer: coarse` → solid, otherwise regular). The
- *               default; brand-new users land here.
+ *               (Phase 6 Wave 1 ladder: `forced-colors: active` → solid,
+ *               `prefers-reduced-transparency: reduce` → solid,
+ *               `pointer: coarse` → regular, fine pointer → regular).
+ *               The default for new users; existing pre-Phase-6 users
+ *               are migrated to explicit "solid" via
+ *               `glassIntensityVersion` so the flip doesn't surprise
+ *               them.
  *   - Clear   — maximum show-through, modest blur.
  *   - Regular — balanced default (the shipping recipe).
  *   - Solid   — opt out of glass entirely. Critical for accessibility
