@@ -1,11 +1,11 @@
 import {
     Alert,
+    App,
     Button,
     Drawer,
     Form,
     Grid,
     Input,
-    message,
     Modal,
     Select,
     Space,
@@ -208,6 +208,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     taskId,
     boardAiOn = true
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const [form] = useForm();
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();

@@ -6,9 +6,9 @@ import {
 import styled from "@emotion/styled";
 import {
     Alert,
+    App,
     Button,
     List,
-    message,
     Skeleton,
     Space,
     Table,
@@ -352,6 +352,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     tasks,
     members
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     // `tabActive` defaults to `dockOpen` so a legacy single-surface caller
     // (drawer wrapper) inherits the original semantics. Inside this body:
     //   - `dockOpen`        gates close-side teardown only.

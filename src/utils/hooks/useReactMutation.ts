@@ -1,5 +1,5 @@
 import { QueryKey, useMutation, useQueryClient } from "@tanstack/react-query";
-import { message } from "antd";
+import { App } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import filterRequest from "../filterRequest";
@@ -35,6 +35,10 @@ const useReactMutation = <D>(
     onError?: (err: Error) => void,
     setCache?: boolean
 ) => {
+    // AntD v6: the static `message` import warns it can't read dynamic
+    // theme. `App.useApp()` returns a theme-aware instance scoped to
+    // the nearest `<App>` provider (mounted in `AppProviders`).
+    const { message } = App.useApp();
     const api = useApi();
     const queryClient = useQueryClient();
     const cacheKey = getQueryKey(queryKey, endPoint);

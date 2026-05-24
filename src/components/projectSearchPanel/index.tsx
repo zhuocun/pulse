@@ -1,6 +1,6 @@
 import { SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Select, Tooltip, message } from "antd";
+import { App, Button, Input, Select, Tooltip } from "antd";
 import React, { useMemo } from "react";
 
 import { microcopy } from "../../constants/microcopy";
@@ -203,6 +203,10 @@ const ProjectSearchPanel: React.FC<Props> = ({
     onResetToDefault,
     onClearSavedDefault
 }) => {
+    // AntD v6: the static `message` import warns that it can't consume
+    // dynamic theme context. `App.useApp()` returns a theme-aware
+    // message instance scoped to the nearest `<App>` provider.
+    const { message } = App.useApp();
     const managerName = members.find(
         (u) => u._id === param.managerId
     )?.username;

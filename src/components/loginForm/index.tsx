@@ -1,7 +1,7 @@
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { QueryClientContext } from "@tanstack/react-query";
-import { Form, Input, message } from "antd";
+import { App, Form, Input } from "antd";
 import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -62,6 +62,9 @@ const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
+    // AntD v6: static `message` import warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const navigate = useNavigate();
     const location = useLocation();
     const api = useApi();

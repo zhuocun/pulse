@@ -1,10 +1,10 @@
 import {
     Alert,
+    App,
     Button,
     Form,
     Grid,
     Input,
-    message,
     Modal,
     Select,
     Spin,
@@ -146,6 +146,9 @@ const TaskModal: React.FC<{
     tasks: ITask[] | undefined;
     boardAiOn?: boolean;
 }> = ({ tasks, boardAiOn = true }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const [form] = useForm();
     const { projectId } = useParams<{ projectId: string }>();
     const { editingTaskId, startEditing, closeModal } = useTaskModal();

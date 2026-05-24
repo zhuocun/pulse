@@ -1,10 +1,10 @@
 import styled from "@emotion/styled";
 import {
     Alert,
+    App,
     Button,
     Card,
     Input,
-    message,
     Select,
     Space,
     Typography
@@ -230,6 +230,9 @@ const composeNote = (params: {
 };
 
 const SharePage = () => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     // `keepOnMount=false` restores the previous `document.title` on
     // unmount so the share-target page doesn't leak its title into the
     // next route. Mirrors the Phase 2 Bug 7 fix on every other branded

@@ -1,4 +1,4 @@
-import { Button, message } from "antd";
+import { App, Button } from "antd";
 import React, { useCallback, useEffect, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
@@ -28,6 +28,10 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
 }) => {
     const [value, setValue] = useState<"up" | "down" | null>(null);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
+    // AntD v6: static `message` import warns it can't read dynamic
+    // theme. `App.useApp()` returns a theme-aware instance scoped to
+    // the nearest `<App>` provider.
+    const { message } = App.useApp();
 
     useEffect(() => {
         setValue(null);
@@ -55,7 +59,7 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
         if (value === "up") return;
         recordFeedback("up");
         message.success(microcopy.ai.feedbackThanks);
-    }, [recordFeedback, value]);
+    }, [message, recordFeedback, value]);
 
     const handleSubmitFeedbackDown = useCallback(
         (submission: AiFeedbackSubmission) => {
@@ -66,7 +70,7 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
             setFeedbackOpen(false);
             message.success(microcopy.ai.feedbackThanks);
         },
-        [recordFeedback]
+        [message, recordFeedback]
     );
 
     const handleSkipFeedbackDown = useCallback(() => {

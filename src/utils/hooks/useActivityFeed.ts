@@ -1,4 +1,4 @@
-import { message } from "antd";
+import { App } from "antd";
 import { useCallback, useEffect } from "react";
 import { useStore } from "react-redux";
 
@@ -212,6 +212,10 @@ const useAiLedgerBridge = (): void => {
 };
 
 const useActivityFeed = (): UseActivityFeed => {
+    // AntD v6: the static `message` import warns it can't read dynamic
+    // theme. `App.useApp()` returns a theme-aware instance scoped to
+    // the nearest `<App>` provider (mounted in `AppProviders`).
+    const { message } = App.useApp();
     const dispatch = useReduxDispatch();
     const store = useStore<RootState>();
     const stateEvents = useReduxSelector((s) => s.activityFeed.events);
@@ -343,7 +347,7 @@ const useActivityFeed = (): UseActivityFeed => {
                 );
             }
         },
-        [aiLedger, dispatch, store]
+        [aiLedger, dispatch, message, store]
     );
 
     const isUndoable = useCallback(

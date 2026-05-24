@@ -1,6 +1,6 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, message, Modal, Select } from "antd";
+import { App, Button, Modal, Select } from "antd";
 import { useCallback, useMemo, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
@@ -197,6 +197,9 @@ const ProjectList: React.FC<Props> = ({
     sortOrder: sortOrderProp,
     onSortOrderChange
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const { user } = useAuth();
     const [pendingLikeId, setPendingLikeId] = useState("");
     /*
@@ -274,7 +277,7 @@ const ProjectList: React.FC<Props> = ({
                     setPendingLikeId("");
                 });
         },
-        [update]
+        [message, update]
     );
 
     const onDelete = (projectId: string) => {

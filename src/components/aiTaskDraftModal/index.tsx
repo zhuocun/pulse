@@ -1,11 +1,11 @@
 import { ReloadOutlined } from "@ant-design/icons";
 import {
     Alert,
+    App,
     Button,
     Checkbox,
     Form,
     Input,
-    message,
     Modal,
     Progress,
     Select,
@@ -78,6 +78,9 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     onClose,
     columnId
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const { user } = useAuth();
     const { projectId } = useParams<{ projectId: string }>();
     const columns =

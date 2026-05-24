@@ -1,6 +1,6 @@
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Form, Input, message } from "antd";
+import { App, Form, Input } from "antd";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -25,6 +25,9 @@ const RegisterForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | null | IError>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
+    // AntD v6: static `message` import warns about dynamic theme;
+    // `App.useApp()` returns a theme-aware instance.
+    const { message } = App.useApp();
     const navigate = useNavigate();
     const location = useLocation();
     const [form] = Form.useForm<{
