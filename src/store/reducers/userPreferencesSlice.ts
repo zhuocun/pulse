@@ -251,6 +251,14 @@ export const persistUserPreferences = (state: UserPreferencesState): void => {
  *   downgraded the app after writing a future-shape blob. Fall back to
  *   `initialState` so the boot path stays clean, and log a console
  *   warning so the rollback is at least visible in the devtools.
+ * - `version < USER_PREFERENCES_SCHEMA_VERSION` → a hand-edited or
+ *   third-party-written blob carrying an explicit past-version sentinel
+ *   (e.g. `version: 0`). Treat as unsupported — fall back to
+ *   `initialState` + console warning. This is distinct from the
+ *   `undefined` branch above: legacy blobs have no `version` sibling at
+ *   all, so they take the migration path on faith. A blob that DOES
+ *   carry a numeric version below the current schema is by definition a
+ *   shape we don't know how to read.
  */
 export const loadPersistedUserPreferences = (): UserPreferencesState => {
     if (typeof window === "undefined") return initialState;
@@ -282,10 +290,25 @@ export const loadPersistedUserPreferences = (): UserPreferencesState => {
                 );
                 return initialState;
             }
-            // version < current schema — would belong here once we
-            // grow a v2. For now there's only v1, so any numeric
-            // version below 1 falls through to the legacy migration
-            // branch below.
+            if (version < USER_PREFERENCES_SCHEMA_VERSION) {
+                // Past-version numeric (e.g. someone hand-edited the
+                // blob to `version: 0`). Distinct from the legacy
+                // unversioned branch — those blobs HAVE no `version`
+                // sibling, so they take the v1 envelope contract on
+                // faith and read top-level fields. A blob that *does*
+                // carry an explicit `version` below the current
+                // schema would otherwise fall through to the legacy
+                // migration path, which reads top-level fields that
+                // aren't there and silently drops to defaults without
+                // a warning. Mirror the future-version branch's
+                // shape so the rollback is at least visible in the
+                // devtools.
+                // eslint-disable-next-line no-console
+                console.warn(
+                    `[userPreferences] Persisted blob has unsupported version ${version} (current schema: ${USER_PREFERENCES_SCHEMA_VERSION}); falling back to defaults.`
+                );
+                return initialState;
+            }
         }
         // Legacy unversioned blob: the prior shape WAS the state shape.
         // Migrate forward by reading + persisting under the current

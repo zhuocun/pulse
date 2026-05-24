@@ -337,6 +337,45 @@ describe("userPreferences schema versioning", () => {
         }
     });
 
+    it("falls back to defaults and warns when the blob carries a past-version numeric sentinel", () => {
+        // Phase 4.2 review follow-up — a blob with an explicit numeric
+        // `version` below the current schema (e.g. someone hand-edited
+        // to `version: 0`) used to silently drop through to the legacy
+        // unversioned branch. That branch reads top-level fields that
+        // aren't there on a v1-shaped envelope and returns defaults
+        // with NO warning, masking the corruption. The load path now
+        // mirrors the future-version branch and warns on this case
+        // too.
+        const past = {
+            version: 0,
+            state: {
+                boardDensity: "compact",
+                savedFilterPresets: [],
+                projectListDefaults: null
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(past)
+        );
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {
+            // silence the expected warning so the test runner doesn't
+            // surface it as noise.
+        });
+        try {
+            const loaded = loadPersistedUserPreferences();
+            expect(loaded).toEqual({
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null
+            });
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 0/);
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
     it("setProjectListDefaults stores the payload and reset to null clears it", () => {
         const next = userPreferencesSlice.reducer(
             initialState,
