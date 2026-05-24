@@ -418,19 +418,6 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
         measurementsRef.current = next;
     }, [columns, viewport, scrollContainerRef, shouldRender]);
 
-    if (!shouldRender) return null;
-
-    /*
-     * Total measured width across all columns we found. Used to set
-     * each segment's `flex-grow` so the minimap visually mirrors the
-     * proportion each column occupies of the board's content width
-     * (columns are uniform today but a future variable-width column
-     * would be reflected correctly without code changes).
-     */
-    const totalMeasuredWidth = Array.from(
-        measurementsRef.current.values()
-    ).reduce((acc, m) => acc + m.width, 0);
-
     const isColumnInView = useCallback(
         (id: string): boolean => {
             if (!viewport) return false;
@@ -495,6 +482,19 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
         },
         [reducedMotion, scrollContainerRef]
     );
+
+    if (!shouldRender) return null;
+
+    /*
+     * Total measured width across all columns we found. Used to set
+     * each segment's `flex-grow` so the minimap visually mirrors the
+     * proportion each column occupies of the board's content width
+     * (columns are uniform today but a future variable-width column
+     * would be reflected correctly without code changes).
+     */
+    const totalMeasuredWidth = Array.from(
+        measurementsRef.current.values()
+    ).reduce((acc, m) => acc + m.width, 0);
 
     const inViewLabel = microcopyString(microcopy.board.minimap.inViewStatus);
     const offScreenLabel = microcopyString(
