@@ -289,20 +289,15 @@ export const enSource = {
         describeWork: "Describe the work in your own words"
     },
     options: {
-        sort: {
-            nameAsc: "Name (A → Z)",
-            nameDesc: "Name (Z → A)",
-            newest: "Newest first",
-            oldest: "Oldest first"
-        },
         /*
          * Phase 4.2 — project-list sort options. The legacy
-         * `options.sort` block above stays in place because the
-         * `ProjectList` component used to read those keys directly;
-         * the new project-list surface points at this separate block
-         * so the five-mode union (with `createdAt-desc` + a
-         * favorited-first mode) is independent of any future board /
-         * other-list-surface sort changes.
+         * `options.sort.*` block (removed in Wave 6 cleanup) used to
+         * live alongside this one; it had zero consumers after the
+         * project-list migration, so the block was dropped to keep
+         * the dictionary honest. The five-mode union here (with
+         * `createdAt-desc` + a favorited-first mode) stays in its
+         * own namespace so future board / other-list-surface sort
+         * changes don't churn this key.
          */
         projectListSort: {
             createdAtDesc: "Newest first",
