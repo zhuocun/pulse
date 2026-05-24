@@ -5,6 +5,7 @@ import { fontWeight, space } from "../../theme/tokens";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiSparkleIcon from "../aiSparkleIcon";
+import GlassPanel from "../glassPanel";
 
 import BriefTabBody from "./BriefTabBody";
 import ChatTabBody from "./ChatTabBody";
@@ -239,14 +240,19 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
             onClose={onClose}
             open={open}
             styles={{
+                /*
+                 * Wave 1 T2: the radial aurora wash that used to live
+                 * inline here now ships via the shared `<GlassPanel>`
+                 * mounted directly under the Drawer body. The body slot
+                 * keeps the layout-only props (flex column + padding /
+                 * safe-area math) so the Drawer chrome continues to
+                 * size correctly across phone bottom-sheet + desktop
+                 * right-shelf placements.
+                 */
                 body: {
-                    background:
-                        "radial-gradient(60% 30% at 50% 0%, var(--aurora-blob-faint) 0%, transparent 70%), transparent",
                     display: "flex",
                     flexDirection: "column",
-                    paddingBottom: `max(${space.md}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`,
-                    paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
-                    paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`
+                    padding: 0
                 }
             }}
             title={
@@ -267,7 +273,39 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                 </Space>
             }
         >
-            {children}
+            <GlassPanel
+                intensity="subtle"
+                tone="aurora"
+                /*
+                 * Dock body wash, NOT a full glass card: the surrounding
+                 * AntD Drawer already owns the chrome, so we strip the
+                 * panel's own border + radius so it reads as a wash
+                 * rather than an inset card. The aurora dome (radial
+                 * gradient anchored at top-centre) is preserved via the
+                 * background override so the migration is pixel-stable;
+                 * Wave 2+ will lift the dome shape into a GlassPanel
+                 * tone variant when more surfaces share it. The flex
+                 * layout the Drawer body used to own moves onto this
+                 * wrapper so the inner tabs + footer slot stay
+                 * full-bleed.
+                 */
+                style={{
+                    background:
+                        "radial-gradient(60% 30% at 50% 0%, var(--aurora-blob-faint) 0%, transparent 70%), transparent",
+                    border: "none",
+                    borderRadius: 0,
+                    display: "flex",
+                    flex: "1 1 auto",
+                    flexDirection: "column",
+                    minHeight: 0,
+                    paddingBottom: `max(${space.md}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`,
+                    paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
+                    paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`,
+                    paddingTop: space.lg
+                }}
+            >
+                {children}
+            </GlassPanel>
         </Drawer>
     );
 };
