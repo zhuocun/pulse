@@ -1,7 +1,6 @@
 import {
     Alert,
     Button,
-    Drawer,
     Form,
     Grid,
     Input,
@@ -45,6 +44,7 @@ import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import ErrorBox from "../errorBox";
+import Sheet from "../sheet";
 
 /*
  * Routed inline task panel — Phase 3 A2. Mirrors the form body of
@@ -60,8 +60,10 @@ import ErrorBox from "../errorBox";
  * are about to merge anyway.
  *
  * Three chassis modes:
- *   - Phone (coarse pointer): bottom-sheet via AntD `Drawer`.
- *   - Tablet (md/lg-but-fine-pointer): right-overlay via AntD `Drawer`.
+ *   - Phone (coarse pointer): animated multi-detent bottom Sheet via
+ *     the shared `<Sheet>` primitive (Phase 6 Wave 3 Phase 2).
+ *   - Tablet (md/lg-but-fine-pointer): right-overlay via Sheet's
+ *     AntD `<Drawer>` fallback (`desktopPlacement="right"`).
  *   - Desktop (>= lg + fine pointer): docked 480px right rail with no
  *     mask, no overlay, no Drawer chrome. The kanban columns reflow
  *     because `BoardRouteShell` (`src/routes/index.tsx`) renders this
@@ -161,15 +163,14 @@ interface TaskDetailPanelProps {
 }
 
 /**
- * Honors `prefers-reduced-motion: reduce` for the drawer entry. AntD
- * Drawer's motion is driven by `rc-motion`; passing `motion={null}` and
- * `maskMotion={null}` removes the transition entirely. We don't import
- * `rc-motion` types here — `motion={null}` is a documented escape
- * hatch.
- *
- * Also gates the swipe-to-next animation. When the user has reduced
- * motion enabled, the swipe still navigates but skips any cosmetic
- * easing.
+ * Honors `prefers-reduced-motion: reduce`. Phase 6 Wave 3 Phase 2 moved
+ * the chassis motion gating into the shared `<Sheet>` primitive (which
+ * carries its own `useReducedMotion`), so this hook is no longer wired
+ * to chassis chrome. Kept in place pending the follow-up consolidation
+ * task that dedupes the project's `prefers-reduced-motion` listeners
+ * onto `utils/hooks/useReducedMotion`. Future callers (e.g. the
+ * swipe-to-next ornament if it ever gains animated easing) can keep
+ * reading from here without rewiring once the dedup lands.
  */
 const usePrefersReducedMotion = (): boolean => {
     const [reduced, setReduced] = useState<boolean>(() => {
@@ -216,7 +217,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
     const isPhone = useIsPhoneChrome();
-    const prefersReducedMotion = usePrefersReducedMotion();
     const screens = Grid.useBreakpoint();
     /*
      * Three chassis modes — see the file header. Desktop docked rail
@@ -1283,71 +1283,79 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         );
     }
 
-    // Phone (bottom-sheet) and tablet (right-overlay) both use the
-    // AntD Drawer chassis. Placement matches the chassis
-    // `useIsPhoneChrome` signal so the bottom-tab bar and the panel
-    // never collide on touchscreen laptops / tablets (B-H1).
-    const drawerProps = isPhone
-        ? { placement: "bottom" as const, size: "large" as const }
-        : { placement: "right" as const, size: "large" as const };
-
+    /*
+     * Phone (animated bottom-sheet) and tablet (right-overlay) both
+     * flow through the shared `<Sheet>` primitive. Sheet's internal
+     * `useIsPhoneChrome` / `useReducedMotion` check picks the branch:
+     *
+     *   - Coarse pointer + motion-enabled → portal'd animated surface
+     *     with `medium ↔ large` detents, grabber drag-to-dismiss, and
+     *     glass-tinted scrim.
+     *   - Anything else (mouse, narrow-desktop, reduced-motion) →
+     *     AntD `<Drawer>` at `desktopPlacement="right"` / `size="large"`.
+     *
+     * Sheet also owns the `prefers-reduced-motion` gating, so the
+     * local `usePrefersReducedMotion` hook is no longer wired through
+     * here. (It survives in the file pending the cross-project
+     * `useReducedMotion` consolidation task.)
+     *
+     * The bottom-tab bar collision guard from the previous Drawer
+     * config (B-H1) is preserved because Sheet treats phone chrome the
+     * same way — coarse pointer always wins, regardless of viewport
+     * width, so a touchscreen laptop still gets the animated bottom
+     * sheet instead of the right shelf.
+     */
     return (
-        <Drawer
-            {...drawerProps}
-            mask
-            maskClosable
-            onClose={requestClose}
-            open={true}
-            title={titleNode}
-            footer={footerNode}
-            // Honor prefers-reduced-motion. AntD's `motion={null}` and
-            // `maskMotion={null}` disable the drawer's open/close
-            // transition; passing `undefined` (the default) keeps the
-            // motion. Drawer accepts both shapes per `rc-motion`.
-            motion={
-                prefersReducedMotion
-                    ? (null as unknown as undefined)
-                    : undefined
-            }
-            maskMotion={
-                prefersReducedMotion
-                    ? (null as unknown as undefined)
-                    : undefined
-            }
-            styles={{
-                body: {
-                    paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`,
-                    paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
-                    paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`,
-                    /*
-                     * Body scrolls independently from the sticky
-                     * footer so long notes don't push Save below the
-                     * fold. The keyboard-inset subtraction parallels
-                     * the modal's QW-18 fix.
-                     */
-                    overflowY: "auto"
-                }
-            }}
-            data-testid="task-detail-panel"
-            data-placement={drawerProps.placement}
-            // Pointer handlers ride the body div via styles — but on
-            // the Drawer surface they need to attach to the inner
-            // content container; AntD doesn't expose that directly.
-            // Wrap the body in our own div with the handlers so the
-            // gesture is captured anywhere inside the drawer
-            // (PointerEvents, R-B L).
-        >
-            <div
-                data-testid="task-detail-panel-swipe-target"
-                onPointerCancel={onPointerCancel}
-                onPointerDown={onPointerDown}
-                onPointerUp={onPointerUp}
-                style={{ minHeight: "100%" }}
+        <>
+            <Sheet
+                closable
+                data-testid="task-detail-panel"
+                defaultDetent="large"
+                detents={["medium", "large"]}
+                desktopPlacement="right"
+                desktopSize="large"
+                footer={footerNode}
+                mask
+                maskClosable
+                onClose={requestClose}
+                open={true}
+                styles={{
+                    body: {
+                        paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`,
+                        paddingInlineEnd: `max(${space.lg}px, env(safe-area-inset-right))`,
+                        paddingInlineStart: `max(${space.lg}px, env(safe-area-inset-left))`,
+                        /*
+                         * Body scrolls independently from the sticky
+                         * footer so long notes don't push Save below
+                         * the fold. The keyboard-inset subtraction
+                         * parallels the modal's QW-18 fix.
+                         */
+                        overflowY: "auto"
+                    }
+                }}
+                title={titleNode}
             >
-                {bodyContent}
-            </div>
+                {/*
+                 * Pointer handlers ride a dedicated wrapper inside the
+                 * Sheet's body slot. The Sheet primitive uses
+                 * grabber-only drag (`dragListener={false}` +
+                 * `useDragControls`), so body pointer events are NOT
+                 * captured by the Sheet's drag-to-dismiss — they
+                 * remain available for the panel's horizontal sibling-
+                 * navigation swipe (R-B L, Phase 3 A2).
+                 */}
+                <div
+                    data-testid="task-detail-panel-swipe-target"
+                    onPointerCancel={onPointerCancel}
+                    onPointerDown={onPointerDown}
+                    onPointerUp={onPointerUp}
+                    style={{ minHeight: "100%" }}
+                >
+                    {bodyContent}
+                </div>
+            </Sheet>
             {discardConfirm}
-        </Drawer>
+        </>
     );
 };
 
