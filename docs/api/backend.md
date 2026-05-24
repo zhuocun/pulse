@@ -1085,6 +1085,100 @@ Both snake_case and camelCase aliases are emitted for all fields to support the 
 
 `latency_ms` / `latencyMs` reflects the round-trip time of the database ping in milliseconds.
 
+### GET /api/v1/health/ai
+
+Structured AI-readiness probe for operator debugging. Surfaces the
+resolved chat-model provider, backend selections (post-`auto`
+resolution), bootstrapping state for the JWT secret, and collected
+issues / warnings in one payload.
+
+**Auth:** None required (operator-facing debugging probe; the response carries booleans + env-var names only — never key values, URIs, or other secrets).
+
+**Query params:**
+
+- `probe` (boolean, default `false`) — when `true`, issues a free `models.list()` call against the resolved provider to confirm connectivity. The result is cached for 30 seconds keyed by `(provider, hashed-api-key)` so back-to-back polls do not amplify into upstream traffic. The stub provider always reports reachable.
+
+**Response — 200 OK:**
+
+The endpoint always returns `200`; callers must inspect `ready`,
+`issues`, and `warnings` to decide whether the AI surface is usable.
+
+Every camelCase field is mirrored as snake_case so existing
+test suites and the React client read either casing without
+client-side mapping. The camelCase keys are documented inline below;
+each one has a snake_case twin (e.g. `providerResolved` ↔
+`provider_resolved`).
+
+| Field | Description |
+|---|---|
+| `ready` | `true` when `issues` is empty. |
+| `provider` / `providerResolved` | Resolved concrete provider (`anthropic` / `openai` / `stub`); never the literal `auto` sentinel. |
+| `providerConfigured` | The raw `AGENT_CHAT_MODEL_PROVIDER` value before resolution. |
+| `model` | Provider-specific model id (e.g. `claude-sonnet-4-6`). |
+| `stubMode` | `true` when the resolved provider is the deterministic stub. |
+| `anthropicKeyPresent` / `openaiKeyPresent` | Boolean only — the key value itself never appears. |
+| `failoverConfigured` | `true` when a cross-provider secondary spec is wired — the opposite-provider's API key is set and `AGENT_CHAT_MODEL_FAILOVER` is not in `{none,off,false,0}` (default `auto` enables it). |
+| `embeddingsProvider` | Resolved embeddings provider name. |
+| `embeddingsStubMode` | `true` when embeddings are stubbed. |
+| `checkpointerBackend` | Post-`auto` resolution: `memory` or `postgres`. |
+| `storeBackend` | Post-`auto` resolution: `memory` or `postgres`. |
+| `agentPostgresUriConfigured` | `true` when `AGENT_POSTGRES_URI` is non-empty (this is what flips the `auto` defaults to `postgres`). |
+| `rateLimitBackend` / `budgetBackend` / `idempotencyBackend` | Configured middleware backend names (`memory` / `redis`). |
+| `redisConfigured` | `true` when `REDIS_URI` is non-empty. |
+| `vectorSearchEnabled` | Reflects `AGENT_VECTOR_SEARCH_ENABLED`. |
+| `hostedPlatform` | Detected platform marker (`vercel` / `render` / `fly` / `railway` / `kubernetes`) or `null`. |
+| `multiInstance` | `true` when a hosted-platform marker is set or `WEB_CONCURRENCY` / `UVICORN_WORKERS` parses to > 1. |
+| `multiInstanceSafe` | `false` when `multiInstance` is `true` *and* one or more middleware / agent backends remain on `memory`. |
+| `jwtSecretSource` | `env` (explicit `UUID`), `persisted` (Mongo-bootstrapped), or `ephemeral` (single-process random). |
+| `corsOrigins` | Configured list (operator-facing only; not secret). |
+| `corsOriginRegex` | Configured regex (string or `null` when unset). |
+| `agentsLoaded` | Number of agents in the runtime registry. |
+| `issues` | Hard-fail list — when non-empty, `ready` is `false`. |
+| `warnings` | Non-blocking diagnostics (e.g. memory backends on a hosted deploy). |
+| `providerConnectivity` (only with `?probe=true`) | `{ reachable, detail, checkedAt }` — `detail` is a short class of failure (`authentication failed`, `network error`, `unexpected error: <ClassName>`) and never echoes the key. |
+
+**Example — `GET /api/v1/health/ai?probe=true` on a healthy Fly + Atlas deploy:**
+
+```json
+{
+  "ready": true,
+  "provider": "anthropic",
+  "providerResolved": "anthropic",
+  "providerConfigured": "auto",
+  "model": "claude-sonnet-4-6",
+  "stubMode": false,
+  "anthropicKeyPresent": true,
+  "openaiKeyPresent": false,
+  "failoverConfigured": false,
+  "embeddingsProvider": "stub",
+  "embeddingsStubMode": true,
+  "checkpointerBackend": "postgres",
+  "storeBackend": "postgres",
+  "agentPostgresUriConfigured": true,
+  "rateLimitBackend": "memory",
+  "budgetBackend": "memory",
+  "idempotencyBackend": "memory",
+  "redisConfigured": false,
+  "vectorSearchEnabled": false,
+  "hostedPlatform": "fly",
+  "multiInstance": true,
+  "multiInstanceSafe": false,
+  "jwtSecretSource": "persisted",
+  "corsOrigins": ["https://pulse.example.com"],
+  "corsOriginRegex": "",
+  "agentsLoaded": 6,
+  "issues": [],
+  "warnings": [
+    "Memory backend(s) on a multi-instance deploy: RATE_LIMIT_BACKEND=memory, BUDGET_BACKEND=memory, IDEMPOTENCY_BACKEND=memory"
+  ],
+  "providerConnectivity": {
+    "reachable": true,
+    "detail": "",
+    "checkedAt": 1716470400.123
+  }
+}
+```
+
 ---
 
 ## 14. AI v1 (`/api/v1/ai/*` and legacy `/api/ai/*`)

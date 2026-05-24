@@ -23,6 +23,8 @@ The server exposes the same `/api/v1/` prefix as the Express app:
 - `POST /api/v1/agents/{name}/invoke`
 - `POST /api/v1/agents/{name}/stream` (Server-Sent Events; FE-shaped `StreamPart` envelope)
 - `POST /api/ai/{task-draft,task-breakdown,estimate,readiness,board-brief,search,chat}` (legacy v1 shim)
+- `GET /api/v1/health` (liveness + DB ping; also at legacy `/health`).
+- `GET /api/v1/health/ai` (resolved AI readiness; add `?probe=true` for an LLM connectivity check, cached 30s; no auth).
 
 ## Local setup
 

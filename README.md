@@ -58,3 +58,5 @@ A deterministic in-browser local engine derives suggestions from the React Query
 
 For the binding wire contract see [`docs/prd/v2.1-agent.md`](docs/prd/v2.1-agent.md); for the UX layer on top see [`docs/prd/v3-ai-ux.md`](docs/prd/v3-ai-ux.md); for what has shipped vs what is open see [`docs/todo/product-done.md`](docs/todo/product-done.md) and [`docs/todo/release-todo.md`](docs/todo/release-todo.md). Full FE integration reference (env vars, hooks, mock server, local-engine fallback) lives in [`docs/api/frontend.md`](docs/api/frontend.md); contributor gotchas around the `useAgent` hook are documented in [`AGENTS.md`](AGENTS.md).
 
+For first-time deploy of Pulse with AI features for ~5 users, follow [`docs/operations/small-group-quickstart.md`](docs/operations/small-group-quickstart.md) (Fly BE + Vercel FE recommended, all-Vercel works with caveats).
+

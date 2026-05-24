@@ -383,6 +383,61 @@ describe("api proxy body extraction", () => {
     });
 });
 
+describe("api proxy BACKEND_URL env-var resolution", () => {
+    // The module imports BACKEND_URL as a top-level const frozen at
+    // import time, so a runtime ``process.env.BACKEND_URL`` mutation in
+    // a regular ``it`` block would not retroactively re-evaluate the
+    // proxy module. ``jest.isolateModules`` gives us a fresh module
+    // registry per case so we can stub the env, re-require the proxy,
+    // and observe the resolved constant.
+    const originalBackendUrl = process.env.BACKEND_URL;
+
+    afterEach(() => {
+        if (originalBackendUrl === undefined) {
+            delete process.env.BACKEND_URL;
+        } else {
+            process.env.BACKEND_URL = originalBackendUrl;
+        }
+    });
+
+    it("buildBackendTarget routes to process.env.BACKEND_URL when set, falling back to the canonical pulse-python-server URL when empty", () => {
+        const fallback = "https://pulse-python-server.vercel.app";
+
+        // 1. BACKEND_URL explicitly set -- routing must follow it.
+        jest.isolateModules(() => {
+            process.env.BACKEND_URL = "https://my-be.example.com";
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const mod = require("./_proxy") as typeof import("./_proxy");
+            expect(mod.BACKEND_URL).toBe("https://my-be.example.com");
+            expect(mod.buildBackendTarget("/api/v1/users")).toBe(
+                "https://my-be.example.com/api/v1/users/"
+            );
+        });
+
+        // 2. BACKEND_URL empty / whitespace-only -- fallback.
+        jest.isolateModules(() => {
+            process.env.BACKEND_URL = "   ";
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const mod = require("./_proxy") as typeof import("./_proxy");
+            expect(mod.BACKEND_URL).toBe(fallback);
+            expect(mod.buildBackendTarget("/api/v1/users")).toBe(
+                `${fallback}/api/v1/users/`
+            );
+        });
+
+        // 3. BACKEND_URL unset -- same fallback.
+        jest.isolateModules(() => {
+            delete process.env.BACKEND_URL;
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const mod = require("./_proxy") as typeof import("./_proxy");
+            expect(mod.BACKEND_URL).toBe(fallback);
+            expect(mod.buildBackendTarget("/api/v1/agents")).toBe(
+                `${fallback}/api/v1/agents`
+            );
+        });
+    });
+});
+
 describe("api proxy fetch handler", () => {
     const originalFetch = global.fetch;
     let mockFetch: jest.Mock;

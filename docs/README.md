@@ -37,6 +37,11 @@ the whole backlog without folder-hopping.
 
 ## Operations
 
+- [`operations/small-group-quickstart.md`](operations/small-group-quickstart.md)
+  — friendliest on-ramp: get Pulse + AI features running for ~5 users
+  (Fly BE + Vercel FE recommended; all-Vercel path documented with
+  caveats). Skips observability, multi-instance hardening, and vector
+  search.
 - [`operations/deployment.md`](operations/deployment.md) — production
   deployment guide (Vercel limits, Fly.io, Render, ECS / Cloud Run /
   Container Apps, dedicated uvicorn behind nginx, FE env vars, CDN
