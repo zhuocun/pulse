@@ -709,7 +709,6 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
         return (
             <Drawer
                 destroyOnClose
-                height="65vh"
                 onClose={onClose}
                 open={open}
                 placement="bottom"
@@ -717,7 +716,14 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                     body: {
                         paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`
                     },
-                    wrapper: { height: "65dvh" }
+                    // AntD v6 deprecated the top-level `height` prop on
+                    // Drawer (its replacement `size` only exposes
+                    // `default` / `large` presets at 320 px / 736 px,
+                    // which don't map to a 65 vh bottom sheet). Driving
+                    // the wrapper height via `styles.wrapper.height`
+                    // lets a custom viewport-relative value through
+                    // without tripping the deprecation lint.
+                    wrapper: { height: "65vh" }
                 }}
                 title={titleNode}
             >

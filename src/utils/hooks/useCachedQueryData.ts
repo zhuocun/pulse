@@ -1,12 +1,51 @@
-import { QueryClient, QueryKey, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+    QueryClient,
+    QueryKey,
+    hashKey,
+    useQueryClient
+} from "@tanstack/react-query";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+    useSyncExternalStore
+} from "react";
 
 const useCachedQueryData = <T>(queryKey: QueryKey): T | undefined => {
     const queryClient = useQueryClient();
+    /*
+     * Hash the watched key once per render so the subscribe / getSnapshot
+     * callbacks below are keyed on a primitive (string) rather than the
+     * unstable array reference call sites pass in. Without this the
+     * `subscribe` callback's deps would churn every render — re-subscribing
+     * on every render is harmless to React but means the cache observer is
+     * thrown away + recreated each commit, which is wasteful.
+     */
+    const watchedHash = useMemo(() => hashKey(queryKey), [queryKey]);
+
     const subscribe = useCallback(
         (onStoreChange: () => void) =>
-            queryClient.getQueryCache().subscribe(() => onStoreChange()),
-        [queryClient]
+            /*
+             * Filter cache events by query hash so this subscriber only
+             * wakes when ITS query changes, not on every unrelated cache
+             * mutation. Without this filter, mounting any new
+             * `useReactQuery` consumer elsewhere in the tree (e.g.
+             * ProjectModal's `["projects", {projectId}]` + `["users/members"]`
+             * observers) fires a cache `observerAdded` event that calls
+             * `onStoreChange` here, which schedules a re-render on the
+             * subscribing component (e.g. AuthProvider, which reads
+             * `["users"]`). React's setState-in-render guard then warns:
+             * "Cannot update a component (AuthProvider) while rendering a
+             * different component (ProjectModal)". Filtering by hash
+             * scopes the wake to the actual key this caller watches.
+             */
+            queryClient.getQueryCache().subscribe((event) => {
+                if (!event) return;
+                if (event.query.queryHash !== watchedHash) return;
+                onStoreChange();
+            }),
+        [queryClient, watchedHash]
     );
     const getSnapshot = useCallback(
         () => queryClient.getQueryData<T>(queryKey),

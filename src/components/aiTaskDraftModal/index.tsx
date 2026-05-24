@@ -5,7 +5,6 @@ import {
     Checkbox,
     Form,
     Input,
-    message,
     Modal,
     Progress,
     Select,
@@ -31,6 +30,7 @@ import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
 import useAiLedger from "../../utils/hooks/useAiLedger";
 import useApi from "../../utils/hooks/useApi";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -78,6 +78,10 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     onClose,
     columnId
 }) => {
+    // AntD v6: static `message` warns about dynamic theme;
+    // `useAppMessage()` returns a theme-aware instance (with a static
+    // fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const { user } = useAuth();
     const { projectId } = useParams<{ projectId: string }>();
     const columns =

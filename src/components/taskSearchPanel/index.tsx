@@ -1,6 +1,6 @@
 import { CloseOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { App, Button, Input, Popover, Segmented, Select, Space } from "antd";
+import { Button, Input, Popover, Segmented, Select, Space } from "antd";
 import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -13,6 +13,7 @@ import {
     type SavedFilterPresetState
 } from "../../store/reducers/userPreferencesSlice";
 import { breakpoints, radius, space } from "../../theme/tokens";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import FilterChips, { FilterChip } from "../filterChips";
@@ -204,7 +205,7 @@ const TaskSearchPanel: React.FC<Props> = ({
     const { user } = useAuth();
     const { projectId } = useParams<{ projectId: string }>();
     const dispatch = useDispatch<ReduxDispatch>();
-    const { message } = App.useApp();
+    const message = useAppMessage();
     const { density, setDensity } = useBoardDensity();
     const presets = useSelector<RootState, SavedFilterPresetState[]>(
         (state) => state.userPreferences.savedFilterPresets

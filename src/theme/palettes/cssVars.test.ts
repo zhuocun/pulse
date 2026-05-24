@@ -71,6 +71,11 @@ const REQUIRED_LIGHT_VARS = [
     "--ant-motion-detent-snap",
     "--ant-motion-tab-bar-minimize",
     "--ant-easing-detent",
+    // Phase 6 Wave 2 — lifted glass shadow recipe with a per-mode
+    // value (stronger in light because the cream page background
+    // drowns out the 6% inks of shadow.lg; softer in dark because
+    // the dark glass already pops against the dark page).
+    "--ant-shadow-glass-lifted",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -515,6 +520,25 @@ describe("paletteToCss", () => {
             expect(dark).toContain(
                 "--ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
             );
+        });
+
+        it("--ant-shadow-glass-lifted ships a stronger ink in light mode than the achromatic shadow.lg token", () => {
+            // The Phase 6 Wave 2 floating BottomTabBar capsule used to
+            // ship shadow.lg (`rgba(15, 23, 42, 0.06)` + 0.08), which
+            // is invisible against the warm-cream page (#fffaf5). The
+            // new lifted var must carry a stronger first-ink (>= 12%)
+            // so the capsule reads as a floating chrome over the page.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const liftedMatch = light.match(
+                /--ant-shadow-glass-lifted:\s*([^;]+);/
+            );
+            expect(liftedMatch).not.toBeNull();
+            // Extract the first alpha number from the rgba(...) inks.
+            const firstAlpha = Number(
+                liftedMatch![1].match(/rgba\([^)]*,\s*([\d.]+)\)/)?.[1]
+            );
+            expect(firstAlpha).toBeGreaterThanOrEqual(0.12);
         });
 
         it("foundation vars are identical between light and dark blocks (palette-independent)", () => {

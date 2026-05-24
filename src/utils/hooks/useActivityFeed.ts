@@ -1,4 +1,3 @@
-import { message } from "antd";
 import { useCallback, useEffect } from "react";
 import { useStore } from "react-redux";
 
@@ -12,6 +11,7 @@ import {
 } from "../../store/reducers/activityFeedSlice";
 
 import useAiLedger from "./useAiLedger";
+import useAppMessage from "./useAppMessage";
 import { useReduxDispatch, useReduxSelector } from "./useRedux";
 
 /**
@@ -212,6 +212,10 @@ const useAiLedgerBridge = (): void => {
 };
 
 const useActivityFeed = (): UseActivityFeed => {
+    // AntD v6: the static `message` import warns it can't read dynamic
+    // theme. `useAppMessage()` returns a theme-aware instance (with a
+    // static fallback for tests that render without `<App>`).
+    const message = useAppMessage();
     const dispatch = useReduxDispatch();
     const store = useStore<RootState>();
     const stateEvents = useReduxSelector((s) => s.activityFeed.events);
@@ -343,7 +347,7 @@ const useActivityFeed = (): UseActivityFeed => {
                 );
             }
         },
-        [aiLedger, dispatch, store]
+        [aiLedger, dispatch, message, store]
     );
 
     const isUndoable = useCallback(

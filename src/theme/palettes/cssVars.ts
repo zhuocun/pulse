@@ -120,6 +120,23 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  *     durations for Wave 3 sheet snapping and Wave 2 tab-bar minimize.
  *   - `--ant-easing-detent` — the iOS sheet curve (slow in/out, no
  *     overshoot). Pairs with `--ant-motion-detent-snap` for Wave 3.
+ *
+ * Phase 6 Wave 2 lift addition — `--ant-shadow-glass-lifted`.
+ *   - In LIGHT mode the page is `#fffaf5`; a near-white translucent
+ *     glass surface (`--glass-surface` rgba(255, 255, 255, 0.68)) with
+ *     only the `shadow.lg` token (six-percent inks) was visually
+ *     indistinguishable from the page chrome — the floating capsule
+ *     read as invisible. We need a stronger, higher-contrast shadow
+ *     in light to outline the capsule edge against the warm-cream
+ *     background.
+ *   - In DARK mode the rgba(10, 12, 8, 0.55) glass surface already
+ *     pops against the dark page, so a stronger shadow would over-
+ *     blacken the surround. We keep the value close to the existing
+ *     `shadow.lg` recipe.
+ *   - Consumers: BottomTabBar (Phase 6 Wave 2 floating capsule). Any
+ *     future floating glass surface that needs to feel detached from
+ *     the page should adopt this var so a single token tweak retunes
+ *     every lifted glass chrome together.
  */
 export const paletteToCss = (p: Palette): string => `
 :root,
@@ -148,6 +165,15 @@ html[data-color-scheme="light"] {
     --glass-refraction-tint: rgba(${p.accent.rgb}, 0.05);
     --glass-shadow-on-text: 0 8px 24px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.12);
     --glass-shadow-on-solid: 0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+    /*
+     * Light-mode lift for floating glass chrome (BottomTabBar capsule).
+     * Higher-opacity inks than the achromatic shadow.lg token because
+     * the cream page (#fffaf5) drowns out the lighter 6% ink the rest
+     * of the card chrome ships. See the cssVars docblock above.
+     */
+    --ant-shadow-glass-lifted:
+        0 8px 24px -4px rgba(15, 23, 42, 0.18),
+        0 2px 6px rgba(15, 23, 42, 0.08);
     --glass-rim-subtle: rgba(255, 255, 255, 0.18);
     --glass-rim: rgba(255, 255, 255, 0.32);
     --glass-rim-strong: rgba(255, 255, 255, 0.48);
@@ -200,6 +226,15 @@ html[data-color-scheme="dark"] {
     --glass-refraction-tint: rgba(${p.accent.rgbDark}, 0.08);
     --glass-shadow-on-text: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
     --glass-shadow-on-solid: 0 4px 16px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.18);
+    /*
+     * Dark-mode lift for floating glass chrome. The dark glass
+     * already pops against the dark page so the shadow stays at the
+     * existing two-stack recipe; pushing it higher would over-
+     * blacken the surround.
+     */
+    --ant-shadow-glass-lifted:
+        0 8px 16px rgba(0, 0, 0, 0.32),
+        0 16px 32px rgba(0, 0, 0, 0.38);
     --glass-rim-subtle: rgba(255, 255, 255, 0.06);
     --glass-rim: rgba(255, 255, 255, 0.12);
     --glass-rim-strong: rgba(255, 255, 255, 0.20);

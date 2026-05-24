@@ -86,8 +86,19 @@ const ThemedShell = ({ children }: { children: ReactNode }) => {
 
     return (
         <ConfigProvider theme={themeConfig} locale={localeEntry.antd}>
+            {/*
+             * AntD v6 warns when `cssVar` is enabled (set in
+             * `buildAntdTheme` as `cssVar: { key: "ant" }`) AND `App` is
+             * mounted with `component={false}` — the cssVar styles are
+             * generated as a class scoped to the App's root element, so
+             * disabling that root means components inside the App can't
+             * pick up the scoped CSS variables. Letting `component`
+             * default to `"div"` mounts a single `<div class="ant-app">`
+             * around the app tree so the cssVar block has a host. The
+             * extra div is block-level and inherits sizing from `#root`,
+             * so it does not change layout for any routed page.
+             */}
             <AntdApp
-                component={false}
                 notification={{ placement: "topRight" }}
                 message={{ maxCount: 3 }}
             >

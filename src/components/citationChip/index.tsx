@@ -1,11 +1,12 @@
 import styled from "@emotion/styled";
-import { App, Button, Popover, Typography } from "antd";
+import { Button, Popover, Typography } from "antd";
 import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { CitationRef } from "../../interfaces/agent";
 import { space } from "../../theme/tokens";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import CopilotChip from "../copilotChip";
 
 /**
@@ -68,7 +69,7 @@ const CitationChip: React.FC<CitationChipProps> = ({
     citation,
     onNavigate
 }) => {
-    const { message } = App.useApp();
+    const message = useAppMessage();
     const [flagged, setFlagged] = React.useState(false);
     const handleActivate = () => {
         track(ANALYTICS_EVENTS.CITATION_CLICKED, {

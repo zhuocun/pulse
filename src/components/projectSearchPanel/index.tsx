@@ -1,6 +1,6 @@
 import { SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Select, Tooltip, message } from "antd";
+import { Button, Input, Select, Tooltip } from "antd";
 import React, { useMemo } from "react";
 
 import { microcopy } from "../../constants/microcopy";
@@ -11,6 +11,7 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import useAppMessage from "../../utils/hooks/useAppMessage";
 import FilterChips, { FilterChip } from "../filterChips";
 
 export interface ProjectSearchParam {
@@ -203,6 +204,11 @@ const ProjectSearchPanel: React.FC<Props> = ({
     onResetToDefault,
     onClearSavedDefault
 }) => {
+    // AntD v6: the static `message` import warns that it can't consume
+    // dynamic theme context. `useAppMessage()` returns a theme-aware
+    // instance from the nearest `<App>` provider, falling back to the
+    // static API when none is mounted (tests rendering in isolation).
+    const message = useAppMessage();
     const managerName = members.find(
         (u) => u._id === param.managerId
     )?.username;
