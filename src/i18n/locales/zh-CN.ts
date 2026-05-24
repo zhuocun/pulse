@@ -493,7 +493,7 @@ const zhCN: Dictionary = {
             taskUpdated: "已更新任务 “{name}”",
             taskDeleted: "已删除任务 “{name}”",
             taskRenamed: "任务已重命名为 “{name}”",
-            taskMoved: "已移动任务 “{name}”",
+            taskMoved: "已将 “{taskName}” 从 {fromColumn} 移动到 {toColumn}",
             columnCreated: "已创建列 “{name}”",
             columnUpdated: "已更新列 “{name}”",
             columnDeleted: "已删除列 “{name}”",

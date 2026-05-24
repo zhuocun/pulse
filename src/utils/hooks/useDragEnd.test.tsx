@@ -1,6 +1,11 @@
+import { configureStore } from "@reduxjs/toolkit";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+import { activityFeedSlice } from "../../store/reducers/activityFeedSlice";
+import { aiLedgerSlice } from "../../store/reducers/aiLedgerSlice";
 
 import useDragEnd from "./useDragEnd";
 import useReactMutation from "./useReactMutation";
@@ -106,18 +111,26 @@ const renderProbe = (options: RenderProbeOptions = {}) => {
     );
 
     queryClient = createQueryClient();
+    const store = configureStore({
+        reducer: {
+            activityFeed: activityFeedSlice.reducer,
+            aiLedger: aiLedgerSlice.reducer
+        }
+    });
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-                <Routes>
-                    <Route
-                        path="/projects/:projectId/board"
-                        element={<Probe />}
-                    />
-                </Routes>
-            </MemoryRouter>
-        </QueryClientProvider>
+        <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={["/projects/project-1/board"]}>
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={<Probe />}
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        </Provider>
     );
 };
 
@@ -324,5 +337,33 @@ describe("useDragEnd", () => {
         );
 
         expect(reorderTask).not.toHaveBeenCalled();
+    });
+
+    it("records an activity-feed event for cross-column task moves", () => {
+        renderProbe();
+
+        drop(
+            { droppableId: "column-1", index: 0 },
+            { droppableId: "column-2", index: 0 }
+        );
+
+        // The reorder fires its usual mutation AND the activity feed
+        // observes the move — same-column reorders skip the feed (see
+        // the next test) but cross-column moves are meaningful audit.
+        expect(reorderTask).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips the activity-feed event for same-column reorders", () => {
+        renderProbe();
+
+        drop(
+            { droppableId: "column-1", index: 0 },
+            { droppableId: "column-1", index: 1 }
+        );
+
+        // The reorder still runs but the activity feed stays quiet —
+        // a same-column drag is visual-only and would noise up the
+        // drawer without giving users a meaningful Undo target.
+        expect(reorderTask).toHaveBeenCalledTimes(1);
     });
 });

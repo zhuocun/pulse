@@ -3,8 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useParams } from "react-router-dom";
 
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import { columnCallback, taskCallback } from "../optimisticUpdate/reorder";
 
+import useActivityFeed from "./useActivityFeed";
 import useReactMutation from "./useReactMutation";
 import useReactQuery, { getReactQueryKey } from "./useReactQuery";
 
@@ -25,6 +27,7 @@ const useDragEnd = (options?: { tasksEnabled?: boolean }) => {
         undefined,
         tasksEnabled
     );
+    const { record } = useActivityFeed();
 
     const { mutate: reorderColumn, isLoading: bLoading } = useReactMutation(
         "boards/orders",
@@ -89,9 +92,56 @@ const useDragEnd = (options?: { tasksEnabled?: boolean }) => {
                             ? "after"
                             : "before"
                 });
+                /*
+                 * Phase 4.3 follow-up — only cross-column moves are
+                 * surfaced in the activity feed. Same-column reorders
+                 * are visual-only on the board and would noise up the
+                 * drawer without giving users a meaningful Undo. The
+                 * undo closure re-runs `reorderTask` with the columns
+                 * swapped (and no reference task) so the task lands
+                 * back at the head of its original column — close
+                 * enough to a true revert without snapshotting the
+                 * exact source-index ordering.
+                 */
+                if (fromColumnId !== referenceColumnId) {
+                    const fromColumnName =
+                        boards?.find((b) => b._id === fromColumnId)
+                            ?.columnName ?? fromColumnId;
+                    const toColumnName =
+                        boards?.find((b) => b._id === referenceColumnId)
+                            ?.columnName ?? referenceColumnId;
+                    const taskName = fromTask.taskName ?? "";
+                    const summary = microcopyString(
+                        microcopy.activityFeed.descriptions.taskMoved
+                    )
+                        .replace("{taskName}", taskName)
+                        .replace("{fromColumn}", fromColumnName)
+                        .replace("{toColumn}", toColumnName);
+                    record({
+                        kind: "task",
+                        action: "move",
+                        summary,
+                        undo: () => {
+                            reorderTask({
+                                fromId: fromTask._id ?? "",
+                                fromColumnId: referenceColumnId,
+                                referenceColumnId: fromColumnId,
+                                type: "before"
+                            });
+                        }
+                    });
+                }
             }
         },
-        [boards, queryClient, projectId, reorderColumn, reorderTask, tasks]
+        [
+            boards,
+            queryClient,
+            projectId,
+            record,
+            reorderColumn,
+            reorderTask,
+            tasks
+        ]
     );
     return {
         onDragEnd,

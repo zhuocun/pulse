@@ -578,7 +578,7 @@ export const enSource = {
             taskUpdated: "Updated task “{name}”",
             taskDeleted: "Deleted task “{name}”",
             taskRenamed: "Renamed task to “{name}”",
-            taskMoved: "Moved task “{name}”",
+            taskMoved: "Moved “{taskName}” from {fromColumn} to {toColumn}",
             columnCreated: "Created column “{name}”",
             columnUpdated: "Updated column “{name}”",
             columnDeleted: "Deleted column “{name}”",

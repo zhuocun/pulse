@@ -332,6 +332,17 @@ const CardTitle = styled.div`
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+
+    /* Inline-edit Input (Wave 3) needs to mirror the title's density —
+     * AntD's default Input padding/font ignore the surrounding CSS
+     * custom properties, so without this override the edit affordance
+     * stays comfortable-sized even when the board is compact. The
+     * size="small" prop already trims AntD's vertical padding; we
+     * just need to align the font with the title above it. */
+    & .ant-input {
+        font-size: var(--density-card-title-fs, ${fontSize.base}px);
+        line-height: 1.4;
+    }
     /* A 120-char single-token name (URL, commit hash) has no natural break
      * points, so the line-clamp can't truncate and the unbreakable run grows
      * the column past 18rem, distorting the whole kanban. break-word lets the
