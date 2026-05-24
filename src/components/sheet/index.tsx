@@ -13,7 +13,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { radius } from "../../theme/tokens";
+import { radius, zIndex } from "../../theme/tokens";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
@@ -119,8 +119,17 @@ export interface SheetProps {
 
 /* -- Constants --------------------------------------------------------- */
 
-const Z_INDEX_SCRIM = 1000;
-const Z_INDEX_SURFACE = 1001;
+/*
+ * Source the Sheet's stacking pair from the central `zIndex.drawer`
+ * token rather than hard-coding 1000/1001. AntD's `<Drawer>` mask
+ * + content both ride at `drawer` (1000), so any sibling AntD overlay
+ * mounted concurrently would z-fight with a literal scrim value. Using
+ * `zIndex.drawer` + 1 keeps the surface above the scrim in a single
+ * stacking context while staying inside the same tier as Drawer for
+ * the rest of the chrome ladder.
+ */
+const Z_INDEX_SCRIM = zIndex.drawer;
+const Z_INDEX_SURFACE = zIndex.drawer + 1;
 const DEFAULT_DETENTS: readonly SheetDetent[] = ["medium", "large"];
 const SNAP_DURATION_S = 0.36;
 const SCRIM_DURATION_S = 0.22;
@@ -367,6 +376,103 @@ const orderDetents = (
 const surfaceTranslateY = (d: SheetDetent, surfaceHeight: number): number =>
     Math.max(0, surfaceHeight - detentExposedPx(d));
 
+/* -- Drag-end decision helper ----------------------------------------- */
+
+/**
+ * Inputs the drag-end decision needs. The component supplies these from
+ * the live Framer Motion `PanInfo` + the ordered detent list it already
+ * memoizes; the helper is otherwise pure so it can be unit-tested
+ * without standing up a DOM or a pointer-event harness (jsdom can't run
+ * Framer's pointer drag, which is what the original brief item G called
+ * out).
+ *
+ * `detentOffsetsPx` is the y-translation each detent in `orderedDetents`
+ * sits at — index-aligned. This shape avoids re-computing
+ * `surfaceTranslateY` inside the helper and keeps the threshold math
+ * exclusively pixel-space.
+ */
+export interface DragEndDecisionInput {
+    currentDetent: SheetDetent;
+    orderedDetents: readonly SheetDetent[];
+    /** y-translation (px) for each detent at the same index. */
+    detentOffsetsPx: readonly number[];
+    /** Drag offset y (px). Positive = downward (closer to dismiss). */
+    dragOffsetPx: number;
+    /** Pointer velocity y (px/s). Positive = downward. */
+    velocityPx: number;
+}
+
+export type DragEndDecision =
+    | { kind: "snap"; to: SheetDetent }
+    | { kind: "dismiss" };
+
+/**
+ * Pure decision function for drag-end. Returns `dismiss` when the
+ * user has flung past the lowest detent (or > 120px past it with no
+ * lower neighbour), otherwise the detent we should snap to. The
+ * caller is responsible for invoking `setDetent` or `onClose`.
+ *
+ * Branches in priority order:
+ *  1. Downward velocity > 800 px/s → dismiss-if-lowest or step-down.
+ *  2. Upward velocity > 800 px/s → step-up (no-op if already highest).
+ *  3. Downward drag past lowest detent by ≥ 120 px → dismiss.
+ *  4. Downward drag ≥ 40% of gap to the next-lower detent → snap down.
+ *  5. Upward drag ≥ 40% of gap to the next-higher detent → snap up.
+ *  6. Otherwise → snap back to current detent.
+ */
+export const decideDragEnd = (input: DragEndDecisionInput): DragEndDecision => {
+    const {
+        currentDetent,
+        orderedDetents,
+        detentOffsetsPx,
+        dragOffsetPx,
+        velocityPx
+    } = input;
+    const currentIdx = orderedDetents.indexOf(currentDetent);
+    const isLowest = currentIdx <= 0;
+    const isHighest = currentIdx >= orderedDetents.length - 1;
+
+    // Velocity override — fling downward past 800 px/s.
+    if (velocityPx > DRAG_VELOCITY_DISMISS) {
+        if (isLowest) return { kind: "dismiss" };
+        return { kind: "snap", to: orderedDetents[currentIdx - 1] };
+    }
+    // Velocity override — fling upward.
+    if (velocityPx < -DRAG_VELOCITY_DISMISS && !isHighest) {
+        return { kind: "snap", to: orderedDetents[currentIdx + 1] };
+    }
+
+    if (dragOffsetPx > 0) {
+        // Downward drag.
+        if (isLowest) {
+            if (dragOffsetPx > DRAG_DISMISS_PAST_PX) {
+                return { kind: "dismiss" };
+            }
+            return { kind: "snap", to: currentDetent };
+        }
+        const nextLower = orderedDetents[currentIdx - 1];
+        const gap =
+            detentOffsetsPx[currentIdx - 1] - detentOffsetsPx[currentIdx];
+        if (gap > 0 && dragOffsetPx > gap * DRAG_DISTANCE_THRESHOLD) {
+            return { kind: "snap", to: nextLower };
+        }
+        return { kind: "snap", to: currentDetent };
+    }
+
+    if (dragOffsetPx < 0) {
+        // Upward drag.
+        if (isHighest) return { kind: "snap", to: currentDetent };
+        const nextHigher = orderedDetents[currentIdx + 1];
+        const gap =
+            detentOffsetsPx[currentIdx] - detentOffsetsPx[currentIdx + 1];
+        if (gap > 0 && Math.abs(dragOffsetPx) > gap * DRAG_DISTANCE_THRESHOLD) {
+            return { kind: "snap", to: nextHigher };
+        }
+    }
+
+    return { kind: "snap", to: currentDetent };
+};
+
 /* -- Animated branch -------------------------------------------------- */
 
 interface AnimatedSheetProps {
@@ -477,76 +583,33 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
     );
 
     /**
-     * Decide what to do at drag-end:
-     *   - Big downward velocity → dismiss / step-down.
-     *   - Small downward motion (< threshold) → snap back.
-     *   - Crossing a detent gap by ≥ 40% → snap to that detent.
-     *   - Past lowest detent by ≥ 120 px → dismiss.
+     * Decide what to do at drag-end by delegating to the pure
+     * `decideDragEnd` helper. The helper carries the threshold math and
+     * branch table; this thin wrapper packs the Framer Motion `PanInfo`
+     * + the current detent geometry into the helper's input shape and
+     * dispatches `setDetent` / `onClose` based on the tagged result. The
+     * split exists so the helper is unit-testable in jsdom (Framer's
+     * pointer drag can't run there — see `decideDragEnd` doc).
      */
     const handleDragEnd = useCallback(
         (_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
-            const dragOffsetPx = info.offset.y; // positive = downward
-            const velocityPx = info.velocity.y;
-            const currentIdx = orderedDetents.indexOf(activeDetent);
-            const isLowest = currentIdx <= 0;
-            const isHighest = currentIdx >= orderedDetents.length - 1;
-
-            // Velocity override — fling downward past 800 px/s.
-            if (velocityPx > DRAG_VELOCITY_DISMISS) {
-                if (isLowest) {
-                    onClose();
-                    return;
-                }
-                setDetent(orderedDetents[currentIdx - 1]);
+            const detentOffsetsPx = orderedDetents.map((d) =>
+                surfaceTranslateY(d, surfaceHeight)
+            );
+            const decision = decideDragEnd({
+                currentDetent: activeDetent,
+                orderedDetents,
+                detentOffsetsPx,
+                dragOffsetPx: info.offset.y,
+                velocityPx: info.velocity.y
+            });
+            if (decision.kind === "dismiss") {
+                onClose();
                 return;
             }
-            // Velocity override — fling upward.
-            if (velocityPx < -DRAG_VELOCITY_DISMISS && !isHighest) {
-                setDetent(orderedDetents[currentIdx + 1]);
-                return;
-            }
-
-            if (dragOffsetPx > 0) {
-                // Downward drag.
-                if (isLowest) {
-                    if (dragOffsetPx > DRAG_DISMISS_PAST_PX) {
-                        onClose();
-                        return;
-                    }
-                    // Snap back to current.
-                    return;
-                }
-                const nextLower = orderedDetents[currentIdx - 1];
-                const gap =
-                    surfaceTranslateY(nextLower, surfaceHeight) - activeY;
-                if (gap > 0 && dragOffsetPx > gap * DRAG_DISTANCE_THRESHOLD) {
-                    setDetent(nextLower);
-                }
-                return;
-            }
-
-            if (dragOffsetPx < 0) {
-                // Upward drag.
-                if (isHighest) return;
-                const nextHigher = orderedDetents[currentIdx + 1];
-                const gap =
-                    activeY - surfaceTranslateY(nextHigher, surfaceHeight);
-                if (
-                    gap > 0 &&
-                    Math.abs(dragOffsetPx) > gap * DRAG_DISTANCE_THRESHOLD
-                ) {
-                    setDetent(nextHigher);
-                }
-            }
+            if (decision.to !== activeDetent) setDetent(decision.to);
         },
-        [
-            activeDetent,
-            activeY,
-            onClose,
-            orderedDetents,
-            setDetent,
-            surfaceHeight
-        ]
+        [activeDetent, onClose, orderedDetents, setDetent, surfaceHeight]
     );
 
     const handleScrimClick = useCallback(() => {
@@ -625,16 +688,31 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
                                         : "sheet-grabber"
                                 }
                                 onPointerDown={startDrag}
-                                role="separator"
-                                aria-orientation="horizontal"
-                                aria-label="Drag to resize"
+                                aria-hidden="true"
                             >
-                                <GrabberPill aria-hidden="true" />
+                                <GrabberPill />
                             </GrabberWrap>
                         ) : null}
                         {title || closable ? (
                             <HeaderRow>
-                                <TitleSlot id={labelledById}>{title}</TitleSlot>
+                                {/*
+                                 * Only stamp the resolved labelled-by id
+                                 * on the title wrapper when the consumer
+                                 * did NOT supply their own. If they did,
+                                 * their inner heading already carries the
+                                 * id — wrapping with the same id would
+                                 * produce a duplicate id in the DOM and
+                                 * fail jest-axe / WCAG. (P1.2)
+                                 */}
+                                <TitleSlot
+                                    id={
+                                        ariaLabelledBy === undefined
+                                            ? labelledById
+                                            : undefined
+                                    }
+                                >
+                                    {title}
+                                </TitleSlot>
                                 {closable ? (
                                     <CloseButton
                                         aria-label="Close"
@@ -711,6 +789,7 @@ const Sheet: React.FC<SheetProps> = ({
 
     if (!useAnimatedBranch) {
         const placement = isPhone ? "bottom" : desktopPlacement;
+        const resolvedAriaLabelledBy = ariaLabelledByProp ?? ariaLabelledBy;
         return (
             <Drawer
                 closable={closable}
@@ -725,6 +804,32 @@ const Sheet: React.FC<SheetProps> = ({
                 title={title}
                 footer={footer}
                 data-testid={dataTestid}
+                /*
+                 * Forward the consumer-supplied accessible name to the
+                 * underlying dialog so the AntD fallback retains the
+                 * same a11y contract as the animated branch. copilotDock
+                 * (a future Wave 3 migration) wires `aria-labelledby`
+                 * as its ONLY accessible name, so dropping it here would
+                 * silently strip the dialog's name on desktop /
+                 * reduced-motion / forceDrawerFallback. (P1.1)
+                 */
+                aria-labelledby={resolvedAriaLabelledBy}
+                /*
+                 * Honor `prefers-reduced-motion` by disabling AntD's
+                 * own slide / fade transitions. `rc-motion` (which AntD
+                 * Drawer routes its motion through) treats `null` as
+                 * "no motion" — passing `undefined` keeps the default
+                 * spring. Cast via `unknown` because AntD's type
+                 * declares the prop as `MotionProps | undefined` even
+                 * though `null` is the documented disable sentinel.
+                 * Mirrors taskDetailPanel's gating. (P2.1)
+                 */
+                motion={
+                    reducedMotion ? (null as unknown as undefined) : undefined
+                }
+                maskMotion={
+                    reducedMotion ? (null as unknown as undefined) : undefined
+                }
             >
                 {children}
             </Drawer>

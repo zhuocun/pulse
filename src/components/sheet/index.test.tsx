@@ -6,7 +6,7 @@ import React from "react";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
-import Sheet, { type SheetDetent } from ".";
+import Sheet, { decideDragEnd, type SheetDetent } from ".";
 
 expect.extend(toHaveNoViolations);
 
@@ -23,22 +23,28 @@ const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
 /**
  * Install the canonical AntD browser mocks so the fallback `<Drawer>`
  * branch (used in three of the test paths) renders without throwing on
- * `matchMedia` / `ResizeObserver` accesses.
+ * `matchMedia` / `ResizeObserver` accesses. Returns a cleanup function
+ * that restores the original values so other suites running in the same
+ * process aren't observed through these mocks. `matchMedia` is writable
+ * on the global setup so a plain assignment suffices; `ResizeObserver`
+ * is defined as non-writable on `globalThis`, so we go through
+ * `Object.defineProperty` (the original descriptor IS configurable).
  */
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
+const installAntdBrowserMocks = (): (() => void) => {
+    const previousMatchMedia = window.matchMedia;
+    const previousResizeObserver = window.ResizeObserver;
+    (window as { matchMedia: typeof window.matchMedia }).matchMedia = ((
+        query: string
+    ) => ({
+        addEventListener: jest.fn(),
+        addListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+        matches: false,
+        media: query,
+        onchange: null,
+        removeEventListener: jest.fn(),
+        removeListener: jest.fn()
+    })) as unknown as typeof window.matchMedia;
     class ResizeObserverMock {
         observe = jest.fn();
 
@@ -47,9 +53,19 @@ const installAntdBrowserMocks = () => {
         disconnect = jest.fn();
     }
     Object.defineProperty(window, "ResizeObserver", {
+        configurable: true,
         writable: true,
         value: ResizeObserverMock
     });
+    return () => {
+        (window as { matchMedia: typeof window.matchMedia }).matchMedia =
+            previousMatchMedia;
+        Object.defineProperty(window, "ResizeObserver", {
+            configurable: true,
+            writable: true,
+            value: previousResizeObserver
+        });
+    };
 };
 
 interface HarnessProps {
@@ -86,8 +102,12 @@ const Harness: React.FC<HarnessProps> = ({
 );
 
 describe("Sheet — animated phone branch", () => {
+    let restoreAntdBrowserMocks: () => void;
     beforeAll(() => {
-        installAntdBrowserMocks();
+        restoreAntdBrowserMocks = installAntdBrowserMocks();
+    });
+    afterAll(() => {
+        restoreAntdBrowserMocks();
     });
 
     beforeEach(() => {
@@ -232,8 +252,12 @@ describe("Sheet — animated phone branch", () => {
 });
 
 describe("Sheet — desktop drawer fallback", () => {
+    let restoreAntdBrowserMocks: () => void;
     beforeAll(() => {
-        installAntdBrowserMocks();
+        restoreAntdBrowserMocks = installAntdBrowserMocks();
+    });
+    afterAll(() => {
+        restoreAntdBrowserMocks();
     });
 
     beforeEach(() => {
@@ -263,8 +287,12 @@ describe("Sheet — desktop drawer fallback", () => {
 });
 
 describe("Sheet — reduced-motion fallback", () => {
+    let restoreAntdBrowserMocks: () => void;
     beforeAll(() => {
-        installAntdBrowserMocks();
+        restoreAntdBrowserMocks = installAntdBrowserMocks();
+    });
+    afterAll(() => {
+        restoreAntdBrowserMocks();
     });
 
     beforeEach(() => {
@@ -280,11 +308,21 @@ describe("Sheet — reduced-motion fallback", () => {
         ).not.toBeInTheDocument();
         expect(document.querySelector(".ant-drawer")).toBeTruthy();
     });
+
+    it("passes axe with no a11y violations in the reduced-motion branch", async () => {
+        const { baseElement } = render(<Harness />);
+        const results = await axe(baseElement);
+        expect(results).toHaveNoViolations();
+    });
 });
 
 describe("Sheet — forceDrawerFallback escape hatch", () => {
+    let restoreAntdBrowserMocks: () => void;
     beforeAll(() => {
-        installAntdBrowserMocks();
+        restoreAntdBrowserMocks = installAntdBrowserMocks();
+    });
+    afterAll(() => {
+        restoreAntdBrowserMocks();
     });
 
     beforeEach(() => {
@@ -299,5 +337,145 @@ describe("Sheet — forceDrawerFallback escape hatch", () => {
             screen.queryByTestId("test-sheet-surface")
         ).not.toBeInTheDocument();
         expect(document.querySelector(".ant-drawer")).toBeTruthy();
+    });
+
+    it("passes axe with no a11y violations in the forceDrawerFallback branch", async () => {
+        const { baseElement } = render(<Harness forceDrawerFallback />);
+        const results = await axe(baseElement);
+        expect(results).toHaveNoViolations();
+    });
+});
+
+describe("Sheet — decideDragEnd drag-end heuristics", () => {
+    /*
+     * The animated surface delegates its drag-end decision to the pure
+     * `decideDragEnd` helper. Framer Motion's pointer drag can't run
+     * faithfully in jsdom (no layout, no real pointer events), so the
+     * heuristics — velocity overrides, the 40% distance threshold, and
+     * the > 120 px past-lowest dismiss — are exercised here against the
+     * helper directly. The component's `handleDragEnd` is a thin packer
+     * that forwards `PanInfo` into this same helper, so covering the
+     * helper covers the contract.
+     *
+     * `detentOffsetsPx` is index-aligned with `orderedDetents` and
+     * corresponds to `surfaceTranslateY(d, surfaceHeight)`. With a 800
+     * px surface, peek (96 exposed) sits at y=704, medium (400 exposed)
+     * at y=400, large (~736 exposed) at y=64. Lower index → larger
+     * translateY (sheet pushed further down).
+     */
+    const orderedDetents = ["peek", "medium", "large"] as const;
+    const detentOffsetsPx = [704, 400, 64] as const;
+
+    it("dismisses on downward velocity past 800 px/s at the lowest detent", () => {
+        const result = decideDragEnd({
+            currentDetent: "peek",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 10,
+            velocityPx: 1200
+        });
+        expect(result).toEqual({ kind: "dismiss" });
+    });
+
+    it("steps down one detent on downward velocity past 800 px/s when not lowest", () => {
+        const result = decideDragEnd({
+            currentDetent: "medium",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 10,
+            velocityPx: 1200
+        });
+        expect(result).toEqual({ kind: "snap", to: "peek" });
+    });
+
+    it("steps up one detent on upward velocity past 800 px/s when not highest", () => {
+        const result = decideDragEnd({
+            currentDetent: "medium",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: -10,
+            velocityPx: -1200
+        });
+        expect(result).toEqual({ kind: "snap", to: "large" });
+    });
+
+    it("snaps down to the next lower detent when downward drag crosses ≥ 40% of the gap", () => {
+        // medium→peek gap = 704 - 400 = 304 px. 40% threshold = 121.6 px.
+        // 150 px drag → snap to peek.
+        const result = decideDragEnd({
+            currentDetent: "medium",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 150,
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "snap", to: "peek" });
+    });
+
+    it("snaps back to current detent when downward drag is under 40% of the gap", () => {
+        const result = decideDragEnd({
+            currentDetent: "medium",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 50, // 50 / 304 ≈ 16%
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "snap", to: "medium" });
+    });
+
+    it("snaps up to the next higher detent when upward drag crosses ≥ 40% of the gap", () => {
+        // medium→large gap = 400 - 64 = 336 px. 40% threshold ≈ 134 px.
+        const result = decideDragEnd({
+            currentDetent: "medium",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: -160,
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "snap", to: "large" });
+    });
+
+    it("dismisses when dragged > 120 px past the lowest detent with no further velocity", () => {
+        const result = decideDragEnd({
+            currentDetent: "peek",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 140,
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "dismiss" });
+    });
+
+    it("snaps back to lowest when dragged ≤ 120 px past it without velocity", () => {
+        const result = decideDragEnd({
+            currentDetent: "peek",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: 80,
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "snap", to: "peek" });
+    });
+
+    it("stays at highest when upward drag is below threshold or already at top", () => {
+        const result = decideDragEnd({
+            currentDetent: "large",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: -200,
+            velocityPx: 0
+        });
+        expect(result).toEqual({ kind: "snap", to: "large" });
+    });
+
+    it("ignores upward fling when already at the highest detent", () => {
+        const result = decideDragEnd({
+            currentDetent: "large",
+            orderedDetents,
+            detentOffsetsPx,
+            dragOffsetPx: -10,
+            velocityPx: -1500
+        });
+        expect(result).toEqual({ kind: "snap", to: "large" });
     });
 });
