@@ -124,6 +124,14 @@ describe("GlassPanel", () => {
         });
     });
 
+    describe("glass-on-glass collision marker", () => {
+        it("emits `data-glass-context=true` so Wave 3 overlays can detect a glass ancestor", () => {
+            const { container } = render(<GlassPanel>x</GlassPanel>);
+            const root = container.firstElementChild as HTMLElement;
+            expect(root.dataset.glassContext).toBe("true");
+        });
+    });
+
     describe("HTML attribute forwarding", () => {
         it("forwards data-*, aria-*, and id attributes onto the root", () => {
             const { container } = render(

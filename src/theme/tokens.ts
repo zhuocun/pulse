@@ -227,9 +227,10 @@ export const glass = {
     /*
      * Rim hairlines. `rimSubtle` for resting state, `rim` for the default
      * 1px ring, `rimStrong` for hover / active where the edge should
-     * read as engaged. Light variants use cool dark; dark variants use
-     * warm light so the ring catches on the opposite-luminance side of
-     * the surface.
+     * read as engaged. Both modes use white-at-varying-opacity — the rim
+     * models an achromatic specular highlight that catches the same way
+     * on light and dark surfaces. Dark-mode opacities are lower so the
+     * highlight reads as a glint, not a halo, against the dim ground.
      */
     rimSubtle: "rgba(255, 255, 255, 0.18)",
     rim: "rgba(255, 255, 255, 0.32)",

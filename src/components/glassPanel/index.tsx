@@ -95,28 +95,41 @@ const INTENSITY_BORDER: Record<GlassPanelIntensity, string> = {
 };
 
 /**
- * Only the `strong` intensity ships the inset shine + accent drop —
- * matches the AiTaskAssistPanel / welcome-banner recipe. Regular and
- * subtle stay quiet (header / dock-body parity).
+ * Drop shadow + inset shine. Only `strong` ships either — `regular` and
+ * `subtle` stay quiet (header / dock-body parity). Within `strong`, the
+ * `accent` tone gets a heavier drop because it carries the welcome-
+ * banner's "stronger brand wash" semantics — pairing the heavier shadow
+ * with the heavier overlay preserves the visual hierarchy that the two
+ * pre-refactor surfaces shipped.
  *
  * The inset uses `var(--glass-shine)` so dark mode flips automatically
  * (the AiTaskAssistPanel original hard-coded the light-mode literal,
  * which silently degraded the highlight in dark mode — normalized).
  */
-const INTENSITY_SHADOW: Record<GlassPanelIntensity, string> = {
-    strong: "0 4px 16px -8px var(--aurora-blob), var(--glass-shine)",
-    regular: "none",
-    subtle: "none"
+const INTENSITY_TONE_SHADOW: Record<
+    GlassPanelIntensity,
+    Record<GlassPanelTone, string>
+> = {
+    strong: {
+        neutral: "0 4px 16px -8px var(--aurora-blob), var(--glass-shine)",
+        aurora: "0 4px 16px -8px var(--aurora-blob), var(--glass-shine)",
+        accent: "0 6px 20px -10px var(--aurora-blob-strong), var(--glass-shine)"
+    },
+    regular: { neutral: "none", aurora: "none", accent: "none" },
+    subtle: { neutral: "none", aurora: "none", accent: "none" }
 };
 
 /**
- * Tone overlays. `accent` stacks two aurora layers — the welcome
- * banner's "richer warm cast" recipe; `aurora` is the single subtle
- * gradient the task-assist panel uses today.
+ * Tone overlays. `aurora` matches the AiTaskAssistPanel recipe — a
+ * single diagonal wash that fades by 70% so the right half of the
+ * surface stays clear of the accent (the original 0%→100% spread
+ * diluted the diagonal). `accent` stacks two layers — the welcome
+ * banner's "richer warm cast" recipe; both layers terminate before
+ * the full surface for the same reason.
  */
 const TONE_OVERLAY: Record<GlassPanelTone, string> = {
     neutral: "",
-    aurora: "linear-gradient(135deg, var(--aurora-blob-faint), transparent), ",
+    aurora: "linear-gradient(135deg, var(--aurora-blob-faint) 0%, transparent 70%), ",
     accent: [
         "linear-gradient(135deg, var(--aurora-blob-strong) 0%, transparent 75%)",
         "linear-gradient(45deg, var(--aurora-blob) 0%, transparent 60%)",
@@ -127,6 +140,13 @@ const TONE_OVERLAY: Record<GlassPanelTone, string> = {
 /* -- Styled root ------------------------------------------------------- */
 
 const GlassRoot = styled.div<GlassRootProps>`
+    /*
+     * Position relative so Wave 2 can attach a specular-rim ::before /
+     * ::after layer without each caller re-asserting it. Two of the
+     * three current callsites (AiTaskAssistPanel, CopilotDock body) do
+     * not set position themselves; the welcome banner already did.
+     */
+    position: relative;
     background: ${(p) =>
         `${TONE_OVERLAY[p.$tone]}${INTENSITY_SURFACE[p.$intensity]}`};
     backdrop-filter: blur(${(p) => INTENSITY_BLUR_PX[p.$intensity]}px)
@@ -135,7 +155,7 @@ const GlassRoot = styled.div<GlassRootProps>`
         saturate(${(p) => INTENSITY_SATURATION[p.$intensity]});
     border: 1px solid ${(p) => INTENSITY_BORDER[p.$intensity]};
     border-radius: ${radius.lg}px;
-    box-shadow: ${(p) => INTENSITY_SHADOW[p.$intensity]};
+    box-shadow: ${(p) => INTENSITY_TONE_SHADOW[p.$intensity][p.$tone]};
 
     /*
      * Honor the user's reduced-transparency preference: collapse the
@@ -191,6 +211,12 @@ const GlassPanel = React.forwardRef<HTMLElement, GlassPanelProps>(
             className={className}
             data-glass-intensity={intensity}
             data-glass-tone={tone}
+            // Marker for Wave 3 glass-on-glass collision handling: any
+            // overlay AntD surface (popover / dropdown / etc.) that
+            // opens with a glass ancestor will degrade to opaque so we
+            // don't stack frost-on-frost. Apple's explicit "never glass
+            // on glass" rule.
+            data-glass-context="true"
             ref={ref as React.Ref<HTMLDivElement>}
             style={style}
             {...rest}
