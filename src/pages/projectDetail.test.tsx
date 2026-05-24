@@ -95,4 +95,71 @@ describe("ProjectDetailPage", () => {
 
         expect(container.querySelector(".ant-tabs")).toBeNull();
     });
+
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 T3 — Liquid chrome recipe upgrade.
+     * The project-detail TopBar (secondary sticky chrome below the main
+     * Header) gains:
+     *   1. Specular rim (::before / ::after gradient layers).
+     *   2. Scroll-edge dissolve via mask-image on ::after (matches the
+     *      header recipe — both sticky bands sit over scrolling content).
+     *   3. Gel-flex micro-press on ChildNavLink breadcrumb tabs.
+     *   4. data-glass-context="true" marker.
+     */
+    describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it('marks the TopBar root with data-glass-context="true"', () => {
+            renderDetail("/projects/project-1/board");
+            const top = screen.getByTestId("project-detail-chrome");
+            expect(top.getAttribute("data-glass-context")).toBe("true");
+        });
+
+        it("emits a ::before specular-rim layer with --glass-specular-top", () => {
+            renderDetail("/projects/project-1/board");
+            const css = sheetText();
+            expect(css).toMatch(
+                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            );
+        });
+
+        it("emits a ::after companion + scroll-edge dissolve layer", () => {
+            renderDetail("/projects/project-1/board");
+            const css = sheetText();
+            expect(css).toMatch(
+                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            );
+            // 12 px scroll-edge mask, same shape the main Header ships
+            expect(css).toMatch(
+                /mask-image:\s*linear-gradient\([^)]*calc\(100% - 12px\)/
+            );
+        });
+
+        it("applies gel-flex transform recipe to ChildNavLink", () => {
+            renderDetail("/projects/project-1/board");
+            const css = sheetText();
+            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
+            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+        });
+
+        it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {
+            renderDetail("/projects/project-1/board");
+            const css = sheetText();
+            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
+            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+    });
 });

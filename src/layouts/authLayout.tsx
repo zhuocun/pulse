@@ -13,7 +13,6 @@ import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
 import {
     aurora,
-    blur,
     breakpoints,
     fontSize,
     fontWeight,
@@ -289,8 +288,14 @@ const FormCard = styled(Card)`
          * reading as crisp white rather than tinted; the emerald only
          * appears as a 1 px hairline at the border. */
         background: var(--glass-surface-strong);
-        backdrop-filter: blur(${blur.lg}px) saturate(180%);
-        -webkit-backdrop-filter: blur(${blur.lg}px) saturate(180%);
+        /* Wave 2 T4 — consume the STRONG intensity-toggle var. The
+         * auth form card is the brand-first-impression surface;
+         * preserves the original 28 px showpiece blur at default
+         * intensity while still scaling under "clear" (down to 20 px)
+         * and "solid" (none). Three-var system reconciles parity with
+         * the user-facing toggle. */
+        backdrop-filter: var(--ant-backdrop-filter-glass-strong);
+        -webkit-backdrop-filter: var(--ant-backdrop-filter-glass-strong);
         border: 1px solid var(--glass-border-strong);
         border-radius: ${radius.lg}px;
         box-shadow:
@@ -300,13 +305,79 @@ const FormCard = styled(Card)`
         max-width: 40rem;
         text-align: left;
         width: min(40rem, 100% - 2rem);
+        /*
+         * Phase 5 "Liquid Glass" Wave 2 — relative positioning so the
+         * ::before / ::after specular rim layers anchor to the card's
+         * box. AntD Card defaults to static positioning, so we promote
+         * it here.
+         */
+        position: relative;
     }
 
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — showpiece specular rim. The
+     * auth form is the strongest glass surface in the app (strong
+     * surface, heavy blur, brand-tinted border) so it gets the
+     * loudest rim via the --glass-rim-strong / white-at-0.48
+     * highlight stop in --glass-specular-top. The diagonal axis
+     * sits the highlight on the top-leading corner and the
+     * companion shadow on the bottom-trailing, modelling a tilted
+     * achromatic light catching the edge of the card.
+     */
+    && {
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: var(--glass-specular-top);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        &::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: var(--glass-specular-bottom);
+            pointer-events: none;
+            z-index: 0;
+        }
+    }
+
+    /* Children (the AntD card body) sit above the rim pseudo-elements. */
     && .ant-card-body {
         padding: ${space.lg}px;
+        position: relative;
+        z-index: 1;
 
         @media (min-width: ${breakpoints.sm}px) {
             padding: ${space.xxl}px;
+        }
+    }
+
+    /*
+     * Honour the user's reduced-transparency preference and Windows
+     * forced-colors mode: drop the rim layers so they don't paint
+     * achromatic gradients over an opaque body or compete with the
+     * system colour tokens.
+     */
+    @media (prefers-reduced-transparency: reduce) {
+        && {
+            &::before,
+            &::after {
+                background: none;
+            }
+        }
+    }
+
+    @media (forced-colors: active) {
+        && {
+            &::before,
+            &::after {
+                background: none;
+            }
         }
     }
 `;
@@ -321,6 +392,36 @@ export const AuthButton = styled(Button)`
         font-weight: 500;
         height: 44px;
         width: 100%;
+        /*
+         * Phase 5 "Liquid Glass" Wave 2 — gel-flex on the dominant
+         * submit CTA. The shorthand REPLACES AntD's transition:all
+         * so we re-enumerate the colour / bg / border / box-shadow
+         * channels AntD animates (100 ms cadence) and stack the
+         * spring-timed transform on top. transform-only so the 44 px
+         * hit target is preserved.
+         */
+        transition:
+            color 100ms ease-in-out,
+            background 100ms ease-in-out,
+            border-color 100ms ease-in-out,
+            box-shadow 100ms ease-in-out,
+            transform var(--motion-gel-flex, 220ms)
+                var(--easing-spring-snap, ease-out);
+        will-change: transform;
+    }
+
+    &&:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        && {
+            transition: none;
+        }
+
+        &&:active {
+            transform: none;
+        }
     }
 `;
 
@@ -364,7 +465,7 @@ const AuthLayout = () => {
                 <BrandHeader>
                     <BrandMark size="md" />
                 </BrandHeader>
-                <FormCard>
+                <FormCard data-glass-context="true">
                     {/* Suspense lives inside the layout so the brand
                      * chrome stays mounted while a lazy page chunk
                      * fetches. */}

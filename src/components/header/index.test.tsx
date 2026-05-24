@@ -609,4 +609,101 @@ describe("Header", () => {
             ).not.toBeInTheDocument();
         });
     });
+
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 T3 — Liquid chrome recipe upgrade.
+     * The header is one of five glass surfaces that gains:
+     *   1. Specular rim (::before / ::after gradient layers using
+     *      var(--glass-specular-top) / var(--glass-specular-bottom))
+     *   2. Gel-flex micro-press on interactive children (IconButton,
+     *      PillTrigger, BrandLink)
+     *   3. Scroll-edge dissolve via mask-image on ::after
+     *   4. data-glass-context="true" marker (so Wave 3's overlay
+     *      collision handler can detect a glass ancestor and degrade
+     *      AntD popovers to opaque-elevated).
+     *
+     * The pseudo-element / mask assertions walk the styled-component
+     * sheet directly because jsdom does not introspect ::before /
+     * ::after via getComputedStyle.
+     */
+    describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
+        const sheetText = () =>
+            Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+
+        it('marks the PageHeader root with data-glass-context="true"', () => {
+            const { container } = render(
+                <Provider store={store}>
+                    <BrowserRouter>
+                        <Header />
+                    </BrowserRouter>
+                </Provider>
+            );
+            const header = container.querySelector("header");
+            expect(header).not.toBeNull();
+            expect(header?.getAttribute("data-glass-context")).toBe("true");
+        });
+
+        it("emits a ::before specular-rim layer with --glass-specular-top", () => {
+            renderHeader();
+            const css = sheetText();
+            // The rim recipe paints the highlight gradient on the
+            // header's ::before pseudo-element. styled-components emits
+            // the rule verbatim into the document head.
+            expect(css).toMatch(
+                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            );
+        });
+
+        it("emits a ::after companion / scroll-edge layer with --glass-specular-bottom + mask-image", () => {
+            renderHeader();
+            const css = sheetText();
+            expect(css).toMatch(
+                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            );
+            // Scroll-edge dissolve: the ::after layer is masked with a
+            // linear-gradient to fade the bottom 12 px into transparent
+            // so scrolling content dissolves through the chrome edge.
+            expect(css).toMatch(
+                /mask-image:\s*linear-gradient\([^)]*calc\(100% - 12px\)/
+            );
+        });
+
+        it("applies gel-flex transform recipe to the account PillTrigger", () => {
+            renderHeader();
+            const css = sheetText();
+            // The PillTrigger transitions transform on the gel-flex
+            // duration + spring-snap easing tokens, and yields to
+            // scale(0.97) under :active.
+            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
+            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+        });
+
+        it("respects prefers-reduced-motion by dropping the gel-flex transition + scale", () => {
+            renderHeader();
+            const css = sheetText();
+            // The reduced-motion block neutralizes both the transition
+            // and the :active transform. We assert by string containment
+            // because the styled rule is verbatim in the sheet.
+            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
+            expect(css).toMatch(/transform:\s*none/);
+        });
+
+        it("respects prefers-reduced-transparency by dropping the rim background + dissolve", () => {
+            renderHeader();
+            const css = sheetText();
+            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+    });
 });

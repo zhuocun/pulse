@@ -15,7 +15,7 @@ import { useParams } from "react-router-dom";
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
@@ -32,6 +32,7 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
+import GlassPanel from "../glassPanel";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
 import {
@@ -609,350 +610,386 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     ]);
 
     return (
-        <Card
-            size="small"
+        <GlassPanel
+            intensity="strong"
+            tone="aurora"
             style={{
-                background:
-                    "linear-gradient(135deg, var(--aurora-blob-faint) 0%, transparent 70%), var(--glass-surface-strong)",
-                backdropFilter: "blur(20px) saturate(170%)",
-                WebkitBackdropFilter: "blur(20px) saturate(170%)",
-                borderColor: "var(--glass-border-strong)",
-                boxShadow:
-                    "0 4px 16px -8px var(--aurora-blob), inset 0 1px 0 rgba(255, 255, 255, 0.55)",
+                // Match the original AntD Card `size="small"` corner so
+                // the migrated panel sits at the same radius the rest of
+                // the form's surfaces resolve to (radius.md, not the
+                // GlassPanel default of radius.lg).
+                borderRadius: radius.md,
                 marginTop: space.md
             }}
-            title={
-                <Space align="center" size={space.xs} wrap>
-                    <AiSparkleIcon aria-hidden />
-                    <span style={{ fontWeight: fontWeight.semibold }}>
-                        {microcopy.ai.copilotLabel}
-                    </span>
-                    <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    {/*
-                     * EngineModeTag now mounts once in the global header.
-                     */}
-                    <CopilotPrivacyPopover route="estimate" />
-                </Space>
-            }
         >
-            <CopilotRemoteConsentNotice route="estimate" />
-            <SrOnlyLive>{suggestionStatusAnnouncement}</SrOnlyLive>
-            <SectionHeading
-                right={
-                    <Space align="center" wrap>
-                        {estimateData &&
-                        !showEstimateSpinner &&
-                        taskAssistEstimateSuggestionKey.length > 0 ? (
-                            <AiCopilotSurfaceFeedback
-                                ariaGroupLabel={asMicrocopyString(
-                                    microcopy.feedback.taskAssistTitle
-                                ).replace(
-                                    "{section}",
-                                    asMicrocopyString(
-                                        microcopy.ai.suggestedStoryPoints
-                                    )
-                                )}
-                                citationCount={0}
-                                suggestionKey={taskAssistEstimateSuggestionKey}
-                                surface="task-assist"
-                            />
-                        ) : null}
-                        {estimateData ? (
-                            <Tooltip title={microcopy.ai.regenerateLabel}>
-                                <Button
-                                    aria-label={microcopy.ai.regenerateLabel}
-                                    disabled={estimateIsLoading}
-                                    icon={<ReloadOutlined />}
-                                    onClick={handleRegenerate}
-                                    size="small"
-                                    type="text"
-                                />
-                            </Tooltip>
-                        ) : null}
+            <Card
+                size="small"
+                /*
+                 * Wave 1 T2: the GlassPanel above paints the frosted
+                 * surface (background + blur + border + shine). The
+                 * inner Card is kept for its title + body structure
+                 * (head padding + border-bottom separator + size=small
+                 * body padding) but is rendered fully transparent so
+                 * the panel's glass shows through.
+                 */
+                styles={{
+                    root: {
+                        background: "transparent",
+                        border: "none",
+                        boxShadow: "none"
+                    }
+                }}
+                title={
+                    <Space align="center" size={space.xs} wrap>
+                        <AiSparkleIcon aria-hidden />
+                        <span style={{ fontWeight: fontWeight.semibold }}>
+                            {microcopy.ai.copilotLabel}
+                        </span>
+                        <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
+                        {/*
+                         * EngineModeTag now mounts once in the global header.
+                         */}
+                        <CopilotPrivacyPopover route="estimate" />
                     </Space>
                 }
+                variant="borderless"
             >
-                {asMicrocopyString(microcopy.ai.suggestedStoryPoints)}
-            </SectionHeading>
-            <div aria-atomic="false" aria-live="polite">
-                {!trimmedName && !estimateIsLoading && (
-                    <Typography.Paragraph
-                        style={{ margin: 0 }}
-                        type="secondary"
-                    >
-                        {asMicrocopyString(microcopy.ai.estimateTaskNameHint)}
-                    </Typography.Paragraph>
-                )}
-                {showEstimateSpinner && (
-                    <Skeleton
-                        active
-                        aria-label={asMicrocopyString(
-                            microcopy.ai.estimatingPoints
-                        )}
-                        paragraph={{ rows: 2 }}
-                        title={false}
-                    />
-                )}
-                {estimateError && (
-                    <Alert
-                        action={
-                            errorView.retryable ? (
-                                <Button
-                                    onClick={handleRegenerate}
-                                    size="small"
-                                    type="link"
-                                >
-                                    {microcopy.ai.retryLabel}
-                                </Button>
-                            ) : null
-                        }
-                        title={errorView.heading}
-                        showIcon
-                        style={{ marginBottom: space.xs }}
-                        type={errorView.severity}
-                    />
-                )}
-                {estimateData && (
-                    <div>
-                        <div
-                            style={{
-                                alignItems: "center",
-                                display: "flex",
-                                gap: space.xs,
-                                flexWrap: "wrap"
-                            }}
-                        >
-                            <span
-                                aria-label={asMicrocopyString(
-                                    microcopy.ai.suggestedPointsAria
-                                ).replace(
-                                    "{points}",
-                                    String(estimateData.storyPoints)
-                                )}
-                                style={{
-                                    fontSize: fontSize.xxl,
-                                    fontWeight: 600
-                                }}
-                            >
-                                {estimateData.storyPoints}
-                            </span>
-                            <AiConfidenceIndicator
-                                confidence={estimateData.confidence}
-                                tooltip={asMicrocopyString(
-                                    microcopy.ai.estimateConfidenceTooltip
-                                )}
-                            />
-                            <Button
-                                aria-label={asMicrocopyString(
-                                    microcopy.ai.applyPointsAria
-                                )}
-                                onClick={handleApplyPoints}
-                                size="small"
-                                type={lowConfidence ? "default" : "primary"}
-                            >
-                                {lowConfidence
-                                    ? microcopy.ai.applyAnyway
-                                    : microcopy.actions.apply}
-                            </Button>
-                            {estimateData.similar.length > 1 && (
-                                <Button
-                                    aria-label={microcopy.ai.showAlternatives}
-                                    onClick={() =>
-                                        setShowAlternative((prev) => !prev)
-                                    }
-                                    size="small"
-                                    type="link"
-                                >
-                                    {microcopy.ai.showAlternatives}
-                                </Button>
-                            )}
-                        </div>
-                        <Typography.Paragraph
-                            style={{ margin: `${space.xxs}px 0` }}
-                            type="secondary"
-                        >
-                            {estimateData.rationale}
-                        </Typography.Paragraph>
-                        {showAlternative && estimateData.similar.length > 1 && (
-                            <Alert
-                                title={
-                                    <span>
-                                        <strong>Alternative:</strong> similar
-                                        task “
-                                        {taskById(estimateData.similar[1]._id)
-                                            ?.taskName ??
-                                            estimateData.similar[1]._id}
-                                        ” — {estimateData.similar[1].reason}
-                                    </span>
-                                }
-                                showIcon
-                                style={{ marginBottom: space.xs }}
-                                type="info"
-                            />
-                        )}
-                        {values.storyPoints !== undefined &&
-                            values.storyPoints === estimateData.storyPoints && (
-                                <AiSuggestedBadge
-                                    onRevert={() => {
-                                        const prev = previousPointsRef.current;
-                                        if (
-                                            prev !== undefined &&
-                                            prev !== null
-                                        ) {
-                                            onApplyStoryPoints(
-                                                prev as StoryPoints
-                                            );
-                                        }
-                                    }}
-                                    rationale={estimateData.rationale}
-                                    style={{ marginInlineEnd: space.xs }}
-                                />
-                            )}
-                        {estimateData.similar.length > 0 && (
-                            <div>
-                                <strong>
-                                    {asMicrocopyString(
-                                        microcopy.ai.similarTasks
-                                    )}
-                                </strong>
-                                <ul style={{ paddingLeft: space.lg }}>
-                                    {estimateData.similar.map((entry) => {
-                                        const task = taskById(entry._id);
-                                        return (
-                                            <li key={entry._id}>
-                                                <Button
-                                                    onClick={() =>
-                                                        onOpenSimilarTask(
-                                                            entry._id
-                                                        )
-                                                    }
-                                                    size="small"
-                                                    style={{
-                                                        height: "auto",
-                                                        padding: 0
-                                                    }}
-                                                    type="link"
-                                                >
-                                                    {task?.taskName ??
-                                                        entry._id}
-                                                </Button>{" "}
-                                                <Typography.Text type="secondary">
-                                                    — {entry.reason}
-                                                </Typography.Text>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            <div style={{ marginTop: space.md }}>
+                <CopilotRemoteConsentNotice route="estimate" />
+                <SrOnlyLive>{suggestionStatusAnnouncement}</SrOnlyLive>
                 <SectionHeading
                     right={
-                        readinessData &&
-                        !showReadinessSpinner &&
-                        taskAssistReadinessSuggestionKey.length > 0 ? (
-                            <AiCopilotSurfaceFeedback
-                                ariaGroupLabel={asMicrocopyString(
-                                    microcopy.feedback.taskAssistTitle
-                                ).replace(
-                                    "{section}",
-                                    asMicrocopyString(
-                                        microcopy.ai.readinessCheck
-                                    )
-                                )}
-                                citationCount={0}
-                                suggestionKey={taskAssistReadinessSuggestionKey}
-                                surface="task-assist"
-                            />
-                        ) : null
+                        <Space align="center" wrap>
+                            {estimateData &&
+                            !showEstimateSpinner &&
+                            taskAssistEstimateSuggestionKey.length > 0 ? (
+                                <AiCopilotSurfaceFeedback
+                                    ariaGroupLabel={asMicrocopyString(
+                                        microcopy.feedback.taskAssistTitle
+                                    ).replace(
+                                        "{section}",
+                                        asMicrocopyString(
+                                            microcopy.ai.suggestedStoryPoints
+                                        )
+                                    )}
+                                    citationCount={0}
+                                    suggestionKey={
+                                        taskAssistEstimateSuggestionKey
+                                    }
+                                    surface="task-assist"
+                                />
+                            ) : null}
+                            {estimateData ? (
+                                <Tooltip title={microcopy.ai.regenerateLabel}>
+                                    <Button
+                                        aria-label={
+                                            microcopy.ai.regenerateLabel
+                                        }
+                                        disabled={estimateIsLoading}
+                                        icon={<ReloadOutlined />}
+                                        onClick={handleRegenerate}
+                                        size="small"
+                                        type="text"
+                                    />
+                                </Tooltip>
+                            ) : null}
+                        </Space>
                     }
                 >
-                    {asMicrocopyString(microcopy.ai.readinessCheck)}
+                    {asMicrocopyString(microcopy.ai.suggestedStoryPoints)}
                 </SectionHeading>
-            </div>
-            <div aria-atomic="false" aria-live="polite">
-                {showReadinessSpinner && (
-                    <Skeleton
-                        active
-                        aria-label={asMicrocopyString(
-                            microcopy.ai.runningReadiness
-                        )}
-                        paragraph={{ rows: 1 }}
-                        title={false}
-                    />
-                )}
-                {readinessError && (
-                    <Alert
-                        title={readinessErrorView.heading}
-                        showIcon
-                        style={{ marginBottom: space.xs }}
-                        type={readinessErrorView.severity}
-                    />
-                )}
-                {readinessData && readinessData.issues.length === 0 && (
-                    <Alert
-                        title={asMicrocopyString(microcopy.ai.readinessReady)}
-                        showIcon
-                        type="success"
-                    />
-                )}
-                {readinessData &&
-                    readinessData.issues
-                        .filter(
-                            (issue) =>
-                                !dismissedKeys.has(
-                                    `${issue.field}-${issue.message}`
-                                )
-                        )
-                        .map((issue) => (
-                            <Alert
-                                action={
-                                    issue.suggestion ? (
-                                        <Button
-                                            aria-label={microcopy.a11y.applyReadinessSuggestion.replace(
-                                                "{field}",
-                                                issue.field
-                                            )}
-                                            onClick={() =>
-                                                handleApplyReadiness(issue)
-                                            }
-                                            size="small"
-                                            type="link"
-                                        >
-                                            {microcopy.actions.apply}
-                                        </Button>
-                                    ) : null
-                                }
-                                closable
-                                description={issue.suggestion}
-                                key={`${issue.field}-${issue.message}`}
-                                onClose={() => {
-                                    setDismissedKeys((prev) => {
-                                        const next = new Set(prev);
-                                        next.add(
-                                            `${issue.field}-${issue.message}`
-                                        );
-                                        return next;
-                                    });
+                <div aria-atomic="false" aria-live="polite">
+                    {!trimmedName && !estimateIsLoading && (
+                        <Typography.Paragraph
+                            style={{ margin: 0 }}
+                            type="secondary"
+                        >
+                            {asMicrocopyString(
+                                microcopy.ai.estimateTaskNameHint
+                            )}
+                        </Typography.Paragraph>
+                    )}
+                    {showEstimateSpinner && (
+                        <Skeleton
+                            active
+                            aria-label={asMicrocopyString(
+                                microcopy.ai.estimatingPoints
+                            )}
+                            paragraph={{ rows: 2 }}
+                            title={false}
+                        />
+                    )}
+                    {estimateError && (
+                        <Alert
+                            action={
+                                errorView.retryable ? (
+                                    <Button
+                                        onClick={handleRegenerate}
+                                        size="small"
+                                        type="link"
+                                    >
+                                        {microcopy.ai.retryLabel}
+                                    </Button>
+                                ) : null
+                            }
+                            title={errorView.heading}
+                            showIcon
+                            style={{ marginBottom: space.xs }}
+                            type={errorView.severity}
+                        />
+                    )}
+                    {estimateData && (
+                        <div>
+                            <div
+                                style={{
+                                    alignItems: "center",
+                                    display: "flex",
+                                    gap: space.xs,
+                                    flexWrap: "wrap"
                                 }}
-                                showIcon
-                                style={{ marginBottom: space.xxs }}
-                                title={`${microcopy.a11y.aiSuggestion}: ${issue.message}`}
-                                type={
-                                    issue.severity === "error"
-                                        ? "error"
-                                        : issue.severity === "warn"
-                                          ? "warning"
-                                          : "info"
-                                }
-                            />
-                        ))}
-            </div>
-        </Card>
+                            >
+                                <span
+                                    aria-label={asMicrocopyString(
+                                        microcopy.ai.suggestedPointsAria
+                                    ).replace(
+                                        "{points}",
+                                        String(estimateData.storyPoints)
+                                    )}
+                                    style={{
+                                        fontSize: fontSize.xxl,
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    {estimateData.storyPoints}
+                                </span>
+                                <AiConfidenceIndicator
+                                    confidence={estimateData.confidence}
+                                    tooltip={asMicrocopyString(
+                                        microcopy.ai.estimateConfidenceTooltip
+                                    )}
+                                />
+                                <Button
+                                    aria-label={asMicrocopyString(
+                                        microcopy.ai.applyPointsAria
+                                    )}
+                                    onClick={handleApplyPoints}
+                                    size="small"
+                                    type={lowConfidence ? "default" : "primary"}
+                                >
+                                    {lowConfidence
+                                        ? microcopy.ai.applyAnyway
+                                        : microcopy.actions.apply}
+                                </Button>
+                                {estimateData.similar.length > 1 && (
+                                    <Button
+                                        aria-label={
+                                            microcopy.ai.showAlternatives
+                                        }
+                                        onClick={() =>
+                                            setShowAlternative((prev) => !prev)
+                                        }
+                                        size="small"
+                                        type="link"
+                                    >
+                                        {microcopy.ai.showAlternatives}
+                                    </Button>
+                                )}
+                            </div>
+                            <Typography.Paragraph
+                                style={{ margin: `${space.xxs}px 0` }}
+                                type="secondary"
+                            >
+                                {estimateData.rationale}
+                            </Typography.Paragraph>
+                            {showAlternative &&
+                                estimateData.similar.length > 1 && (
+                                    <Alert
+                                        title={
+                                            <span>
+                                                <strong>Alternative:</strong>{" "}
+                                                similar task “
+                                                {taskById(
+                                                    estimateData.similar[1]._id
+                                                )?.taskName ??
+                                                    estimateData.similar[1]._id}
+                                                ” —{" "}
+                                                {estimateData.similar[1].reason}
+                                            </span>
+                                        }
+                                        showIcon
+                                        style={{ marginBottom: space.xs }}
+                                        type="info"
+                                    />
+                                )}
+                            {values.storyPoints !== undefined &&
+                                values.storyPoints ===
+                                    estimateData.storyPoints && (
+                                    <AiSuggestedBadge
+                                        onRevert={() => {
+                                            const prev =
+                                                previousPointsRef.current;
+                                            if (
+                                                prev !== undefined &&
+                                                prev !== null
+                                            ) {
+                                                onApplyStoryPoints(
+                                                    prev as StoryPoints
+                                                );
+                                            }
+                                        }}
+                                        rationale={estimateData.rationale}
+                                        style={{ marginInlineEnd: space.xs }}
+                                    />
+                                )}
+                            {estimateData.similar.length > 0 && (
+                                <div>
+                                    <strong>
+                                        {asMicrocopyString(
+                                            microcopy.ai.similarTasks
+                                        )}
+                                    </strong>
+                                    <ul style={{ paddingLeft: space.lg }}>
+                                        {estimateData.similar.map((entry) => {
+                                            const task = taskById(entry._id);
+                                            return (
+                                                <li key={entry._id}>
+                                                    <Button
+                                                        onClick={() =>
+                                                            onOpenSimilarTask(
+                                                                entry._id
+                                                            )
+                                                        }
+                                                        size="small"
+                                                        style={{
+                                                            height: "auto",
+                                                            padding: 0
+                                                        }}
+                                                        type="link"
+                                                    >
+                                                        {task?.taskName ??
+                                                            entry._id}
+                                                    </Button>{" "}
+                                                    <Typography.Text type="secondary">
+                                                        — {entry.reason}
+                                                    </Typography.Text>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ marginTop: space.md }}>
+                    <SectionHeading
+                        right={
+                            readinessData &&
+                            !showReadinessSpinner &&
+                            taskAssistReadinessSuggestionKey.length > 0 ? (
+                                <AiCopilotSurfaceFeedback
+                                    ariaGroupLabel={asMicrocopyString(
+                                        microcopy.feedback.taskAssistTitle
+                                    ).replace(
+                                        "{section}",
+                                        asMicrocopyString(
+                                            microcopy.ai.readinessCheck
+                                        )
+                                    )}
+                                    citationCount={0}
+                                    suggestionKey={
+                                        taskAssistReadinessSuggestionKey
+                                    }
+                                    surface="task-assist"
+                                />
+                            ) : null
+                        }
+                    >
+                        {asMicrocopyString(microcopy.ai.readinessCheck)}
+                    </SectionHeading>
+                </div>
+                <div aria-atomic="false" aria-live="polite">
+                    {showReadinessSpinner && (
+                        <Skeleton
+                            active
+                            aria-label={asMicrocopyString(
+                                microcopy.ai.runningReadiness
+                            )}
+                            paragraph={{ rows: 1 }}
+                            title={false}
+                        />
+                    )}
+                    {readinessError && (
+                        <Alert
+                            title={readinessErrorView.heading}
+                            showIcon
+                            style={{ marginBottom: space.xs }}
+                            type={readinessErrorView.severity}
+                        />
+                    )}
+                    {readinessData && readinessData.issues.length === 0 && (
+                        <Alert
+                            title={asMicrocopyString(
+                                microcopy.ai.readinessReady
+                            )}
+                            showIcon
+                            type="success"
+                        />
+                    )}
+                    {readinessData &&
+                        readinessData.issues
+                            .filter(
+                                (issue) =>
+                                    !dismissedKeys.has(
+                                        `${issue.field}-${issue.message}`
+                                    )
+                            )
+                            .map((issue) => (
+                                <Alert
+                                    action={
+                                        issue.suggestion ? (
+                                            <Button
+                                                aria-label={microcopy.a11y.applyReadinessSuggestion.replace(
+                                                    "{field}",
+                                                    issue.field
+                                                )}
+                                                onClick={() =>
+                                                    handleApplyReadiness(issue)
+                                                }
+                                                size="small"
+                                                type="link"
+                                            >
+                                                {microcopy.actions.apply}
+                                            </Button>
+                                        ) : null
+                                    }
+                                    closable
+                                    description={issue.suggestion}
+                                    key={`${issue.field}-${issue.message}`}
+                                    onClose={() => {
+                                        setDismissedKeys((prev) => {
+                                            const next = new Set(prev);
+                                            next.add(
+                                                `${issue.field}-${issue.message}`
+                                            );
+                                            return next;
+                                        });
+                                    }}
+                                    showIcon
+                                    style={{ marginBottom: space.xxs }}
+                                    title={`${microcopy.a11y.aiSuggestion}: ${issue.message}`}
+                                    type={
+                                        issue.severity === "error"
+                                            ? "error"
+                                            : issue.severity === "warn"
+                                              ? "warning"
+                                              : "info"
+                                    }
+                                />
+                            ))}
+                </div>
+            </Card>
+        </GlassPanel>
     );
 };
 

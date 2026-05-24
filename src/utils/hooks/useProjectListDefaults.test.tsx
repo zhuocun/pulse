@@ -18,7 +18,8 @@ const makeStore = (saved: ProjectListDefaults | null = null) =>
             userPreferences: {
                 boardDensity: "comfortable" as const,
                 savedFilterPresets: [],
-                projectListDefaults: saved
+                projectListDefaults: saved,
+                glassIntensity: "auto" as const
             }
         }
     });

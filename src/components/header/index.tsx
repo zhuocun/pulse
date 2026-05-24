@@ -12,7 +12,7 @@ import { useLocation } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { blur, breakpoints, radius, space } from "../../theme/tokens";
+import { breakpoints, radius, space } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -23,6 +23,7 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import ActivityFeedDrawer, { ActivityFeedBell } from "../activityFeedDrawer";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
+import GlassIntensitySelect from "../glassIntensitySelect";
 import LanguageSwitcher from "../languageSwitcher";
 import { NoPaddingButton } from "../projectList";
 import UserAvatar from "../userAvatar";
@@ -55,8 +56,14 @@ const PageHeader = styled.header`
      * rest, when there is nothing scrolled under it yet.
      */
     background: var(--glass-surface-subtle);
-    backdrop-filter: blur(${blur.md}px) saturate(180%);
-    -webkit-backdrop-filter: blur(${blur.md}px) saturate(180%);
+    /* Wave 2 T4 — read the global intensity lever instead of the
+     * literal blur recipe so the user-facing toggle (Clear / Regular /
+     * Solid) flips this chrome along with every other glass surface.
+     * Default value at "regular" intensity is the previous
+     * blur(20px) saturate(180%) recipe — pixel-identical to the
+     * pre-migration shipping value. */
+    backdrop-filter: var(--ant-backdrop-filter-glass);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
     border-bottom: 1px solid var(--glass-border);
     /*
      * Opt the sticky header out of the route cross-fade. With its own
@@ -72,20 +79,124 @@ const PageHeader = styled.header`
     padding-block-start: max(2px, env(safe-area-inset-top));
     padding-inline-start: max(${space.sm}px, env(safe-area-inset-left));
     padding-inline-end: max(${space.sm}px, env(safe-area-inset-right));
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — position the chrome as a
+     * relative containing block so the ::before / ::after specular
+     * rim layers and the scroll-edge dissolve gradient anchor to the
+     * header's box. position:sticky already creates a stacking context,
+     * but the rim recipe below depends on this containment regardless.
+     */
     position: sticky;
     top: 0;
     z-index: 10;
 
     /*
+     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim. A
+     * tilted achromatic highlight that models a light source at the
+     * top-leading corner catching the glass edge. The 135deg axis is
+     * fixed (light-source-conventional per Apple HIG); the gradient
+     * fades by 40% so the highlight pins to the rim rather than
+     * washing the centre of the chrome.
+     */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-top);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — bottom-trailing companion
+     * shadow. ::after paints the soft trough on the opposite corner
+     * from the highlight. The scroll-edge dissolve is on the chrome
+     * element itself (below) — masking ::after would only fade the
+     * rim shadow, not the actual chrome surface that needs to taper
+     * for the "content dissolves under chrome" effect.
+     */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--glass-specular-bottom);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /*
+     * Scroll-edge dissolve: mask the bottom 12 px of the chrome
+     * surface itself (including its backdrop-filter blur and tinted
+     * background) so scrolling content fades up through the chrome
+     * edge instead of hitting a hard cut. The 12 px is added as
+     * padding-bottom so the LeftCluster / RightCluster children sit
+     * above the masked region and don't get clipped — the bottom
+     * 12 px is intentional dead-zone trim that only the chrome
+     * paints into. forced-colors + reduced-transparency drop the
+     * mask below.
+     */
+    padding-bottom: 12px;
+    mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
+
+    /*
+     * Children sit above the rim pseudo-elements. The two flex
+     * clusters (LeftCluster, RightCluster) are direct children — lift
+     * them so the rim layers paint *behind* the icons / brand link
+     * rather than over them.
+     */
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    /*
      * Honor the user's reduced-transparency preference: collapse the
      * glass surface to the solid page background and drop the blur.
      * Same recipe App.css uses on the body and on AntD modals/drawers.
+     * Drop the rim + dissolve too — the achromatic highlight reads as
+     * noise once the body becomes opaque.
      */
     @media (prefers-reduced-transparency: reduce) {
         background: var(--page-background);
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
+
+        &::before,
+        &::after {
+            background: none;
+        }
+    }
+
+    /*
+     * Forced-colors mode (Windows high-contrast) replaces every author
+     * colour with system tokens. Drop the rim layers so Canvas /
+     * CanvasText win without competing achromatic gradients painted
+     * on top.
+     */
+    @media (forced-colors: active) {
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
+
+        &::before,
+        &::after {
+            background: none;
+        }
     }
 
     @media (min-width: ${breakpoints.sm}px) {
@@ -162,13 +273,37 @@ const PillTrigger = styled.button`
     max-width: 100%;
     min-width: 0;
     padding: 0 ${space.xs}px;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex micro-animation. The
+     * pill yields ~3 % under press then springs back via the snap
+     * easing curve. transform-only so the hit area (computed from
+     * layout, not paint) is unaffected and WCAG 2.5.5 stays intact
+     * on coarse pointers. will-change keeps the GPU layer hot.
+     */
     transition:
         background-color 120ms ease-out,
-        color 120ms ease-out;
+        color 120ms ease-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
+    will-change: transform;
 
     &:hover,
     &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition:
+            background-color 120ms ease-out,
+            color 120ms ease-out;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (min-width: ${breakpoints.sm}px) {
@@ -211,15 +346,37 @@ const IconButton = styled.button`
     height: 36px;
     justify-content: center;
     padding: 0;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex press recovery, same
+     * recipe as PillTrigger. Layout box stays intact under transform
+     * so the 44 × 44 coarse-pointer hit area is preserved.
+     */
     transition:
         background-color 120ms ease-out,
-        color 120ms ease-out;
+        color 120ms ease-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
     width: 36px;
+    will-change: transform;
 
     &:hover,
     &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
         color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition:
+            background-color 120ms ease-out,
+            color 120ms ease-out;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (pointer: coarse) {
@@ -318,10 +475,39 @@ const BrandLink = styled(NoPaddingButton)`
     display: inline-flex;
     flex: 0 1 auto;
     min-width: 0;
+    /*
+     * Phase 5 "Liquid Glass" Wave 2 — gel-flex on the brand pill.
+     * Yields under press for the same tactile feedback the IconButton
+     * + PillTrigger get. The shorthand REPLACES AntD's own
+     * transition:all so we re-enumerate the colour / bg / border /
+     * box-shadow channels AntD animates (using AntD's own 100 ms
+     * cadence) and stack the spring-timed transform on top. Without
+     * the enumeration, AntD's hover bg / colour changes go instant.
+     */
+    transition:
+        color 100ms ease-in-out,
+        background 100ms ease-in-out,
+        border-color 100ms ease-in-out,
+        box-shadow 100ms ease-in-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
+    will-change: transform;
 
     && {
         height: 36px;
         padding: 0;
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+
+        &:active {
+            transform: none;
+        }
     }
 
     @media (pointer: coarse) {
@@ -434,6 +620,19 @@ const Header: React.FC = () => {
             key: "language",
             label: <LanguageSwitcher />
         },
+        /*
+         * Phase 5 Wave 2 T4 — user-facing glass-intensity toggle.
+         * Renders the four-option Segmented picker inline inside the
+         * dropdown, mirroring the LanguageSwitcher row above. The
+         * setting persists through the userPreferences slice's
+         * persistence middleware on every dispatch, so the choice
+         * round-trips through localStorage without further
+         * orchestration.
+         */
+        {
+            key: "glass-intensity",
+            label: <GlassIntensitySelect />
+        },
         { type: "divider" as const },
         {
             key: "logout",
@@ -453,7 +652,7 @@ const Header: React.FC = () => {
     ];
 
     return (
-        <PageHeader ref={headerRef}>
+        <PageHeader data-glass-context="true" ref={headerRef}>
             <LeftCluster>
                 <BrandLink
                     aria-label={microcopy.header.logoLabel}

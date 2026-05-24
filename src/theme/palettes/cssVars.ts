@@ -1,6 +1,61 @@
 import type { Palette } from "./types";
 
 /**
+ * Compose a `backdrop-filter` value string from an intensity preset's
+ * `{ blur, saturation }` fields. `blur === 0` shorts to `none` so the
+ * Solid preset emits the property-cancelling value rather than
+ * `blur(0px) saturate(180%)` — both are pixel-equivalent at the GPU,
+ * but the literal `none` lets every consumer (including
+ * `-webkit-backdrop-filter` polyfills) opt the property out entirely.
+ *
+ * The intensity values that feed this helper are mirrored from
+ * `glass.intensityClear/Regular/Solid` in `../tokens.ts`. The two
+ * declarations must stay in sync; the cssVars test suite pins parity
+ * (see "derives the override values from glass.intensity tokens"
+ * — also asserts the structural match against the token literal).
+ * We deliberately do NOT `import { glass } from "../tokens"` here
+ * because the import chain `tokens → palettes/index → cssVars` would
+ * loop back through the palette re-export and partially-initialise
+ * the `palette` const at module-load time (silent breakage in every
+ * downstream consumer). The mirrored constants below keep this file
+ * cycle-free.
+ */
+const composeBackdropFilter = (preset: {
+    blur: number;
+    saturation: number;
+}): string =>
+    preset.blur === 0
+        ? "none"
+        : `blur(${preset.blur}px) saturate(${preset.saturation}%)`;
+
+/*
+ * Mirrors of `glass.intensityClear/Regular/Solid` `{blur, saturation}`
+ * fields from `../tokens.ts`. Kept here as a tiny in-file constants
+ * table so the file stays cycle-free; the cssVars test suite
+ * enforces parity with the token source (see the "intensity
+ * constants stay in sync with glass.intensity tokens" assertion in
+ * cssVars.test.ts).
+ *
+ * Phase 5 Wave 2 integration: extended with per-surface-tier ladders.
+ * The chrome ships three blur tiers — subtle (column header sticky
+ * over scrolling tasks; ~12px), regular (header / tab bar / TopBar;
+ * 20px), strong (auth FormCard showpiece; 28px). The user-facing
+ * intensity toggle scales all three tiers in concert: Clear softens
+ * every tier, Solid wipes every tier to none. Without per-tier vars
+ * the chrome that used to ship 12px or 28px would have been forced
+ * to the uniform 20px at default intensity (pixel-parity regression).
+ */
+const INTENSITY_CLEAR = { blur: 14, saturation: 170 } as const;
+const INTENSITY_REGULAR = { blur: 20, saturation: 180 } as const;
+const INTENSITY_SOLID = { blur: 0, saturation: 180 } as const;
+
+const INTENSITY_SUBTLE_CLEAR = { blur: 8, saturation: 170 } as const;
+const INTENSITY_SUBTLE_REGULAR = { blur: 12, saturation: 180 } as const;
+
+const INTENSITY_STRONG_CLEAR = { blur: 20, saturation: 180 } as const;
+const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
+
+/**
  * Render the runtime CSS custom properties for a palette. The output is a
  * complete CSS string with `:root` / `html[data-color-scheme="light"]` and
  * `html[data-color-scheme="dark"]` blocks. Mounted synchronously in
@@ -13,6 +68,42 @@ import type { Palette } from "./types";
  *   - `--glass-*` — frosted-glass surface, border, shine inset
  *   - `--aurora-blob` / `--aurora-blob-strong` — subtle body wash + AI
  *     panel wash; named so a single tint flip propagates everywhere
+ *
+ * Phase 5 "Liquid Glass" additions (Wave 1 T1) — every new var ships in
+ * BOTH the light and dark blocks with mode-appropriate values:
+ *   - `--glass-specular-top` / `--glass-specular-bottom` — rim highlight
+ *     gradients (achromatic; cooler / lower amplitude in dark mode)
+ *   - `--glass-refraction-tint` — accent body wash (derived from
+ *     `accent.rgb` / `accent.rgbDark` so a palette swap re-tints)
+ *   - `--glass-shadow-on-text` / `--glass-shadow-on-solid` — content-
+ *     aware drop shadows
+ *   - `--glass-rim-subtle` / `--glass-rim` / `--glass-rim-strong` —
+ *     three-step rim hairline border colours
+ *   - `--motion-morph` / `--motion-gel-flex` — additional durations
+ *     for surface morph and press recovery
+ *   - `--easing-spring-soft` / `--easing-spring-snap` — overshoot
+ *     curves for materialize and gel-flex
+ *   - `--ant-backdrop-filter-glass` — the global intensity lever.
+ *     Default `blur(20px) saturate(180%)` (regular preset). Wave 2 T4
+ *     adds `html[data-glass-intensity="clear" | "solid"]` overrides
+ *     that swap the value globally — the user's chosen intensity
+ *     re-tunes every chrome surface that consumes
+ *     `var(--ant-backdrop-filter-glass)`. The `--ant-` prefix is
+ *     intentional: it lives in the AntD CSS-var namespace so AntD-
+ *     overriding selectors in App.css can pick it up uniformly.
+ *
+ * Phase 5 Wave 2 T4 additions — the user-facing glass-intensity toggle:
+ *   - `html[data-glass-intensity="clear"]` block — overrides
+ *     `--ant-backdrop-filter-glass` to the Clear preset's recipe.
+ *   - `html[data-glass-intensity="solid"]` block — overrides the var
+ *     to `none` (the Solid preset wipes blur entirely).
+ *   - `@media (prefers-reduced-transparency: reduce)` block — pins
+ *     the var to `none` regardless of the user's stored preference
+ *     because the OS-level signal must always win (belt-and-
+ *     suspenders pairing with the App.css opt-out rule).
+ *
+ * Note: `data-glass-intensity="regular"` inherits the `:root` default,
+ * so no override block is needed for it — keeps the rendered CSS lean.
  */
 export const paletteToCss = (p: Palette): string => `
 :root,
@@ -35,6 +126,25 @@ html[data-color-scheme="light"] {
     --glass-border: rgba(15, 23, 42, 0.06);
     --glass-border-strong: rgba(${p.accent.rgb}, 0.22);
     --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+    --glass-specular-top: linear-gradient(135deg, rgba(255, 255, 255, 0.30), transparent 40%);
+    --glass-specular-bottom: linear-gradient(315deg, rgba(0, 0, 0, 0.12), transparent 40%);
+    --glass-refraction-tint: rgba(${p.accent.rgb}, 0.05);
+    --glass-shadow-on-text: 0 8px 24px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.12);
+    --glass-shadow-on-solid: 0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --glass-rim-subtle: rgba(255, 255, 255, 0.18);
+    --glass-rim: rgba(255, 255, 255, 0.32);
+    --glass-rim-strong: rgba(255, 255, 255, 0.48);
+
+    --motion-morph: 450ms;
+    --motion-gel-flex: 220ms;
+
+    --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
+
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
 
     --aurora-blob: rgba(${p.accent.rgb}, 0.10);
     --aurora-blob-strong: rgba(${p.accent.rgb}, 0.20);
@@ -61,8 +171,74 @@ html[data-color-scheme="dark"] {
     --glass-border-strong: rgba(${p.accent.rgbDark}, 0.30);
     --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
+    --glass-specular-top: linear-gradient(135deg, rgba(220, 235, 255, 0.18), transparent 40%);
+    --glass-specular-bottom: linear-gradient(315deg, rgba(0, 0, 0, 0.28), transparent 40%);
+    --glass-refraction-tint: rgba(${p.accent.rgbDark}, 0.08);
+    --glass-shadow-on-text: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+    --glass-shadow-on-solid: 0 4px 16px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.18);
+    --glass-rim-subtle: rgba(255, 255, 255, 0.06);
+    --glass-rim: rgba(255, 255, 255, 0.12);
+    --glass-rim-strong: rgba(255, 255, 255, 0.20);
+
+    --motion-morph: 450ms;
+    --motion-gel-flex: 220ms;
+
+    --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
+
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
+
     --aurora-blob: rgba(${p.accent.rgbDark}, 0.14);
     --aurora-blob-strong: rgba(${p.accent.rgbDark}, 0.24);
     --aurora-blob-faint: rgba(${p.accent.rgbDark}, 0.08);
+}
+
+/*
+ * Phase 5 Wave 2 T4 — user-facing glass intensity toggle. The
+ * useGlassIntensity hook writes the resolved intensity to
+ * html[data-glass-intensity="…"]; these selectors override
+ * --ant-backdrop-filter-glass so every chrome surface that consumes
+ * the var flips in one shot. "regular" inherits the :root default
+ * above — no override needed.
+ *
+ * Light + dark blocks both honour the user's choice; the data
+ * attribute lives on <html> which is the same ancestor for both
+ * data-color-scheme="light" and data-color-scheme="dark". AntD's
+ * cssVar scoping (:where(.ant)) doesn't apply here — we're writing
+ * the var on the html selector itself, which has higher specificity
+ * than :where() ever produces.
+ */
+html[data-glass-intensity="clear"] {
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_CLEAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_CLEAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_CLEAR)};
+}
+
+html[data-glass-intensity="solid"] {
+    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
+}
+
+/*
+ * Belt-and-suspenders: the OS-level reduced-transparency signal always
+ * wins, regardless of the user's stored choice. Pins the var to the
+ * Solid preset (which composes to "none") so even a user who
+ * deliberately picked "clear" gets the opt-out treatment when the OS
+ * tells us their accessibility needs differ. App.css ships the
+ * matching [data-glass-context="true"] override that wipes
+ * GlassPanel's prop-driven blur on the same media query — that's the
+ * Wave 2 T4 "deliberate accessibility choice" contract.
+ */
+@media (prefers-reduced-transparency: reduce) {
+    :root,
+    html[data-color-scheme="light"],
+    html[data-color-scheme="dark"] {
+        --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
+    }
 }
 `;

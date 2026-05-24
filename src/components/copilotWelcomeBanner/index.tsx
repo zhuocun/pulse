@@ -5,8 +5,9 @@ import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
-import { blur, fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import AiSparkleIcon from "../aiSparkleIcon";
+import GlassPanel from "../glassPanel";
 
 /**
  * First-time AI welcome banner (PRD v3 §8.1). Renders once per browser
@@ -15,28 +16,19 @@ import AiSparkleIcon from "../aiSparkleIcon";
  *
  * The banner intentionally lives in the page chrome, not as a modal: we
  * never block the user from doing real work on the board.
+ *
+ * Wave 1 T2 (Liquid Glass): the frosted surface, accent wash, and
+ * inset shine now come from the shared `<GlassPanel>` so all banner
+ * polish (specular rim in Wave 2, gel-flex motion in Wave 2 T3) flows
+ * from a single source of truth. The banner only owns layout — the
+ * flex row + padding + margin + overflow clipping that the body, CTA
+ * cluster, and dismiss button sit inside.
  */
-const Wrap = styled.div`
+const Wrap = styled(GlassPanel)`
     align-items: flex-start;
     position: relative;
     overflow: hidden;
-    /* Stronger brand-accent wash on the glass pane. The reference design
-     * uses a saturated brand colour on key hero surfaces — we bump the
-     * banner from a quiet whisper to a confident statement by stacking
-     * --aurora-blob-strong over the standard --aurora-blob, which gives
-     * the panel a richer warm cast while still letting the white surface
-     * and dark text underneath read clearly. */
-    background:
-        linear-gradient(135deg, var(--aurora-blob-strong) 0%, transparent 75%),
-        linear-gradient(45deg, var(--aurora-blob) 0%, transparent 60%),
-        var(--glass-surface-strong);
-    backdrop-filter: blur(${blur.md}px) saturate(170%);
-    -webkit-backdrop-filter: blur(${blur.md}px) saturate(170%);
-    border: 1px solid var(--glass-border-strong);
     border-radius: ${radius.md}px;
-    box-shadow:
-        0 6px 20px -10px var(--aurora-blob-strong),
-        var(--glass-shine);
     display: flex;
     /* Prevent flex-column parents (BoardShell has min-height: 0) from
      * squishing this banner — without this, overflow: hidden above
@@ -113,7 +105,12 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
         }
     };
     return (
-        <Wrap role="region" aria-label={microcopy.a11y.boardCopilotWelcome}>
+        <Wrap
+            aria-label={microcopy.a11y.boardCopilotWelcome}
+            intensity="strong"
+            role="region"
+            tone="accent"
+        >
             <AiSparkleIcon size="lg" aria-hidden style={{ marginTop: 2 }} />
             <Body>
                 <Typography.Text

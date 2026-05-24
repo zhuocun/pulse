@@ -186,7 +186,16 @@ const zhCN: Dictionary = {
         themeSystem: "跟随系统",
         aiEnabled: "看板 Copilot",
         pageTitle: "设置",
-        pageSubtitle: "选择您的主题、语言和 Copilot 偏好设置。"
+        pageSubtitle: "选择您的主题、语言和 Copilot 偏好设置。",
+        // Phase 5 Wave 2 T4 — Liquid Glass intensity toggle. The
+        // "Auto" option defers to the per-device ladder; the other
+        // three are explicit overrides that always win.
+        glassIntensity: "玻璃",
+        changeGlassIntensity: "切换玻璃强度",
+        glassIntensityAuto: "自动",
+        glassIntensityClear: "通透",
+        glassIntensityRegular: "标准",
+        glassIntensitySolid: "实心"
     },
     nav: {
         primaryLandmarkLabel: "主导航",

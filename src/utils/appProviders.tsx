@@ -10,6 +10,7 @@ import { buildAntdTheme } from "../theme/antdTheme";
 
 import AuthProvider from "./authProvider";
 import useColorScheme from "./hooks/useColorScheme";
+import useGlassIntensity from "./hooks/useGlassIntensity";
 
 const usePointerCoarse = () => {
     const [coarse, setCoarse] = useState<boolean>(() => {
@@ -47,6 +48,21 @@ const ThemedShell = ({ children }: { children: ReactNode }) => {
     const { scheme } = useColorScheme();
     const { entry: localeEntry } = useLocale();
     const coarse = usePointerCoarse();
+    /*
+     * Phase 5 Wave 2 T4 — mount the glass-intensity resolver as a
+     * sibling effect to the color-scheme writer. The hook reads
+     * `userPreferences.glassIntensity` from the slice and writes the
+     * effective intensity to `html[data-glass-intensity="…"]` via
+     * useLayoutEffect, which the chrome CSS-var override blocks in
+     * `cssVars.ts` pick up to flip every glass surface in one shot.
+     *
+     * ThemedShell sits inside the Redux Provider (mounted in
+     * `AppProviders` below), so the hook's selector resolves
+     * correctly. Mounting it once at this layer guarantees the
+     * attribute lives on `<html>` for every routed page without each
+     * page having to re-mount the bridge.
+     */
+    useGlassIntensity();
     const themeConfig = useMemo(
         () => buildAntdTheme(scheme, coarse),
         [scheme, coarse]

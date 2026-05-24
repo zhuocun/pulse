@@ -35,7 +35,11 @@ describe("userPreferencesSlice", () => {
         ).toEqual({
             boardDensity: "comfortable",
             savedFilterPresets: [],
-            projectListDefaults: null
+            projectListDefaults: null,
+            // Phase 5 Wave 2 T4 — default to "auto" so brand-new
+            // installs get the per-device ladder (no user-visible UI
+            // nag for "pick a glass setting").
+            glassIntensity: "auto"
         });
     });
 
@@ -119,7 +123,8 @@ describe("userPreferences persistence", () => {
         expect(loadPersistedUserPreferences()).toEqual({
             boardDensity: "comfortable",
             savedFilterPresets: [],
-            projectListDefaults: null
+            projectListDefaults: null,
+            glassIntensity: "auto"
         });
     });
 
@@ -144,7 +149,8 @@ describe("userPreferences persistence", () => {
         expect(loadPersistedUserPreferences()).toEqual({
             boardDensity: "comfortable",
             savedFilterPresets: [],
-            projectListDefaults: null
+            projectListDefaults: null,
+            glassIntensity: "auto"
         });
     });
 
@@ -180,11 +186,112 @@ describe("userPreferences persistence", () => {
         expect(loadPersistedUserPreferences().boardDensity).toBe("comfortable");
     });
 
+    /*
+     * Phase 5 Wave 2 T4 — `glassIntensity` round-trips through the v1
+     * envelope as an additive field. A legacy v1 blob with no
+     * `glassIntensity` sibling falls back to `"auto"`, and an explicit
+     * stored value (e.g. `"clear"`) survives the load path.
+     */
+    it("loads an explicit glassIntensity choice from a v1 envelope", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "clear"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        expect(loadPersistedUserPreferences().glassIntensity).toBe("clear");
+    });
+
+    it("falls back to auto for a legacy v1 blob with no glassIntensity field", () => {
+        // A v1 envelope persisted BEFORE Wave 2 T4 shipped — proves
+        // the append-only contract: the new field's default fills in
+        // and we don't need a schema version bump.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "compact",
+                savedFilterPresets: [],
+                projectListDefaults: null
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        const loaded = loadPersistedUserPreferences();
+        expect(loaded.glassIntensity).toBe("auto");
+        // Existing fields survive — the additive field doesn't poison
+        // the legacy read.
+        expect(loaded.boardDensity).toBe("compact");
+    });
+
+    it("rejects an unknown glassIntensity value and falls back to auto", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "translucent-lizard"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        expect(loadPersistedUserPreferences().glassIntensity).toBe("auto");
+    });
+
+    it("setGlassIntensity flips through every option", () => {
+        let state = initialState;
+        for (const next of ["clear", "regular", "solid", "auto"] as const) {
+            state = userPreferencesSlice.reducer(
+                state,
+                userPreferencesActions.setGlassIntensity(next)
+            );
+            expect(state.glassIntensity).toBe(next);
+        }
+    });
+
+    it("persists a glassIntensity choice through the store middleware", () => {
+        /*
+         * Wires the same persistence middleware shape the prod store
+         * uses so the round-trip "dispatch → localStorage" path is
+         * exercised end-to-end (mirrors the boardDensity persistence
+         * test above).
+         */
+        const persistMiddleware: Middleware = (api) => (nxt) => (action) => {
+            const before = api.getState().userPreferences;
+            const result = nxt(action);
+            const after = api.getState().userPreferences;
+            if (before !== after) persistUserPreferences(after);
+            return result;
+        };
+        const testStore = configureStore({
+            reducer: { userPreferences: userPreferencesSlice.reducer },
+            middleware: (getDefault) => getDefault().concat(persistMiddleware)
+        });
+        testStore.dispatch(userPreferencesActions.setGlassIntensity("solid"));
+        const stored = window.localStorage.getItem(
+            USER_PREFERENCES_STORAGE_KEY
+        );
+        expect(stored).not.toBeNull();
+        expect(JSON.parse(stored ?? "{}").state.glassIntensity).toBe("solid");
+    });
+
     it("persistUserPreferences writes the wrapped {version, state} envelope", () => {
         persistUserPreferences({
             boardDensity: "compact",
             savedFilterPresets: [makePreset("p1")],
-            projectListDefaults: null
+            projectListDefaults: null,
+            glassIntensity: "auto"
         });
         const stored = window.localStorage.getItem(
             USER_PREFERENCES_STORAGE_KEY
@@ -198,6 +305,7 @@ describe("userPreferences persistence", () => {
         expect(parsed.state.boardDensity).toBe("compact");
         expect(parsed.state.savedFilterPresets[0].id).toBe("p1");
         expect(parsed.state.projectListDefaults).toBeNull();
+        expect(parsed.state.glassIntensity).toBe("auto");
     });
 
     it("persists through the store middleware after a dispatched action", () => {
@@ -328,7 +436,8 @@ describe("userPreferences schema versioning", () => {
             expect(loaded).toEqual({
                 boardDensity: "comfortable",
                 savedFilterPresets: [],
-                projectListDefaults: null
+                projectListDefaults: null,
+                glassIntensity: "auto"
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 99/);
@@ -367,7 +476,8 @@ describe("userPreferences schema versioning", () => {
             expect(loaded).toEqual({
                 boardDensity: "comfortable",
                 savedFilterPresets: [],
-                projectListDefaults: null
+                projectListDefaults: null,
+                glassIntensity: "auto"
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 0/);
