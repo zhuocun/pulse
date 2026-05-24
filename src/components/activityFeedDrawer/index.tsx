@@ -7,7 +7,7 @@ import {
     UnorderedListOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Badge, Button, Drawer, Empty, Typography } from "antd";
+import { Badge, Button, Empty, Typography } from "antd";
 import React, {
     useCallback,
     useEffect,
@@ -21,7 +21,7 @@ import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import useActivityFeed, {
     type ActivityEvent
 } from "../../utils/hooks/useActivityFeed";
-import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import Sheet from "../sheet";
 
 /**
  * Phase 4.3 — Activity / notifications drawer.
@@ -29,11 +29,13 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
  * Surface that pairs with the bell icon in the header. Renders the
  * `useActivityFeed` events grouped by date bucket (Today / Yesterday /
  * Earlier), with an Undo button beside any row that still has a live
- * closure AND is inside the 10-second undo window. Mark-all-read at the
- * top, empty state when the feed is empty, and the existing
- * `useIsPhoneChrome` predicate decides between a right-side desktop
- * drawer and a bottom sheet on phones (mirroring `CopilotDockShell` and
- * `aiActivityLog`'s placement choices).
+ * closure AND is inside the 10-second undo window. Mark-all-read at
+ * the top, empty state when the feed is empty. Phase 6 Wave 3 migrated
+ * the placement / chrome split off the local `useIsPhoneChrome` call
+ * onto the shared `<Sheet>` primitive — on phone the sheet animates
+ * between medium / large detents, on desktop / tablet it renders the
+ * existing right-shelf AntD `<Drawer>` (mirroring `CopilotDockShell`
+ * and `aiActivityLog`'s placement choices).
  *
  * Mark-as-read semantics: closing the drawer marks ONLY the events that
  * were visible AND unread when the drawer was closed as read. We
@@ -221,7 +223,6 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
 }) => {
     const { events, undo, isUndoable, markAllRead, markRead } =
         useActivityFeed();
-    const isPhone = useIsPhoneChrome();
     /*
      * `now` ticks every 30 s while the drawer is open so the relative
      * timestamps stay fresh and the per-row undo-window expiration
@@ -406,20 +407,23 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
     );
 
     return (
-        <Drawer
+        <Sheet
             closable
             data-testid="activity-feed-drawer"
+            defaultDetent="medium"
+            detents={["medium", "large"]}
+            /*
+             * The Sheet primitive handles the phone vs desktop split
+             * internally via useIsPhoneChrome (Phase 6 Wave 3). On
+             * phone it ships a multi-detent animated surface; on
+             * desktop it renders an AntD Drawer at `desktopPlacement`.
+             * `desktopSize="default"` mirrors the previous Drawer
+             * sizing (~378 px right shelf).
+             */
+            desktopPlacement="right"
+            desktopSize="default"
             onClose={onClose}
             open={open}
-            placement={isPhone ? "bottom" : "right"}
-            /*
-             * AntD's `size="default"` resolves to ~378 px on right
-             * placement and a sensible vh-bounded sheet on bottom
-             * placement; that's the right baseline for the activity
-             * feed so we lean on the size token rather than emitting a
-             * separate `width=` (AntD now warns when both are present).
-             */
-            size="default"
             title={
                 <span>
                     <BellOutlined aria-hidden style={{ marginInlineEnd: 8 }} />
@@ -428,7 +432,7 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
             }
         >
             {body}
-        </Drawer>
+        </Sheet>
     );
 };
 
