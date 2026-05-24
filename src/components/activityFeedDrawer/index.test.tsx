@@ -268,8 +268,20 @@ describe("ActivityFeedDrawer", () => {
                 })
             );
         });
+        // Wrap `store.dispatch` so we can count the `markActivityEventRead`
+        // action type fired by the drawer's close-transition effect. This
+        // is the least-invasive surrogate for adding test-scoped
+        // middleware to the shared production store: the spy delegates to
+        // the real dispatch, so the slice still updates and downstream
+        // selectors see the same reducer output the production code path
+        // would observe.
+        const realDispatch = store.dispatch.bind(store);
+        const dispatchSpy = jest
+            .spyOn(store, "dispatch")
+            .mockImplementation((action) => realDispatch(action));
         const onClose = jest.fn();
         const { rerender } = renderDrawer(true, onClose);
+        const dispatchesBeforeClose = dispatchSpy.mock.calls.length;
         // Drawer opens, then transitions to closed — the markRead
         // sweep should fire on the falling edge only once.
         rerender(
@@ -277,10 +289,27 @@ describe("ActivityFeedDrawer", () => {
                 <ActivityFeedDrawer onClose={onClose} open={false} />
             </Provider>
         );
+        const markReadCalls = dispatchSpy.mock.calls
+            .slice(dispatchesBeforeClose)
+            .filter(([action]) => {
+                if (
+                    typeof action === "object" &&
+                    action !== null &&
+                    "type" in action
+                ) {
+                    return (
+                        (action as { type: string }).type ===
+                        "activityFeed/markActivityEventRead"
+                    );
+                }
+                return false;
+            });
+        expect(markReadCalls).toHaveLength(1);
         const state = store.getState().activityFeed;
         expect(state.events.find((e) => e.id === "evt-unread")?.isRead).toBe(
             true
         );
+        dispatchSpy.mockRestore();
     });
 
     it("dismisses the sheet via scrim click on phone chrome", () => {
