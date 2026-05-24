@@ -117,12 +117,54 @@ export const aurora = {
 } as const;
 
 /**
+ * Helper: produce an `rgba(...)` string from the active palette's accent
+ * triplet at the requested opacity. Centralises the "any new tint token
+ * must derive from `palette.accent.rgb`" rule so a palette swap re-tints
+ * every Liquid Glass surface in one shot. Use `accentAtDark` for the
+ * dark-mode-paired triplet (lighter, AA-safe on dark backgrounds).
+ *
+ * Don't use this for specular highlights — specular rims model an
+ * achromatic light source and stay neutral white/black on purpose.
+ */
+export const accentAt = (opacity: number): string =>
+    `rgba(${palette.accent.rgb}, ${opacity})`;
+export const accentAtDark = (opacity: number): string =>
+    `rgba(${palette.accent.rgbDark}, ${opacity})`;
+
+/**
  * Glass surface tokens. Surfaces stay neutral white-tinted (the elegance
  * comes from the surface itself, not from the accent leaking into every
- * pane); only the strong borders pick up the brand accent. NEVER apply
- * glass without the `prefers-reduced-transparency` fallback wired up in
- * App.css. Modals deliberately do NOT use these tokens — they render as
- * solid surfaces per product direction.
+ * pane); only the strong borders and the new refraction tint pick up the
+ * brand accent. NEVER apply glass without the
+ * `prefers-reduced-transparency` fallback wired up in App.css. Modals
+ * deliberately do NOT use these tokens — they render as solid surfaces
+ * per product direction.
+ *
+ * Phase 5 "Liquid Glass" additions (Wave 1 T1):
+ *
+ *   - `specularTop` / `specularBottom`: top-leading rim highlight and
+ *     bottom-trailing companion shadow, painted as `::before` gradient
+ *     backgrounds by Wave 2 to model a tilted light catching the glass
+ *     edge. Achromatic (white/black) because the light source itself is
+ *     uncolored — only the refracted body picks up hue.
+ *   - `refractionTint`: a faint accent wash overlay applied across the
+ *     full glass surface, modelling the body of the material absorbing
+ *     a sliver of the brand hue. Derived from `palette.accent.rgb` via
+ *     `accentAt` so a palette swap re-tints in one shot.
+ *   - `shadowOnText` / `shadowOnSolid`: content-aware drop shadows that
+ *     change density depending on what the glass is floating over.
+ *     Stronger over text-heavy / dark content (more visual separation
+ *     needed), softer over solid / light content (less needed).
+ *   - `rimSubtle` / `rim` / `rimStrong`: 1px hairline border colours for
+ *     the rim ring. Three steps so consumers can pick the right amount
+ *     of edge definition for hover / active / resting states.
+ *   - `intensityClear` / `intensityRegular` / `intensitySolid`: three
+ *     discrete intensity presets, switched by Wave 2's user-intensity
+ *     toggle (Clear / Regular / Solid). `intensitySolid` is the
+ *     accessibility opt-out — `blur: 0` and an opaque surface so the
+ *     glass disappears entirely when a user picks it. Bias toward
+ *     higher opacity rather than lower — Apple's iOS 26 beta walked back
+ *     from too-translucent glass after legibility complaints.
  */
 export const glass = {
     surface: "rgba(255, 255, 255, 0.68)",
@@ -136,7 +178,99 @@ export const glass = {
     borderStrong: `rgba(${palette.accent.rgb}, 0.22)`,
     borderStrongDark: `rgba(${palette.accent.rgbDark}, 0.30)`,
     shineInset: "inset 0 1px 0 rgba(255, 255, 255, 0.55)",
-    shineInsetDark: "inset 0 1px 0 rgba(255, 255, 255, 0.06)"
+    shineInsetDark: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+    /*
+     * Specular rim highlights. Painted as a `::before` overlay by
+     * `<GlassPanel>` (Wave 1 T2 / consumed by Wave 2). The 135deg axis
+     * models a light source at the top-leading corner — the highlight
+     * sits on the top-leading edge, the soft shadow on the bottom-
+     * trailing. White at 0.30 catches the eye without dominating the
+     * surface; the transparent-at-40% stop keeps the highlight pinned
+     * to the rim rather than washing the centre.
+     */
+    specularTop:
+        "linear-gradient(135deg, rgba(255, 255, 255, 0.30), transparent 40%)",
+    specularBottom:
+        "linear-gradient(315deg, rgba(0, 0, 0, 0.12), transparent 40%)",
+    /*
+     * Dark-mode specular variants. The highlight is cooler and lower
+     * amplitude (0.18 vs. 0.30) because a bright rim on a dark surface
+     * reads as much hotter than the same value on a light surface —
+     * physics tells us the same, since the contrast ratio is what the
+     * eye picks up. The companion shadow drops to 0.18 because the
+     * surface itself is already dark; we just want a faint trough.
+     */
+    specularTopDark:
+        "linear-gradient(135deg, rgba(220, 235, 255, 0.18), transparent 40%)",
+    specularBottomDark:
+        "linear-gradient(315deg, rgba(0, 0, 0, 0.28), transparent 40%)",
+    /*
+     * Refraction tint — the faint accent body wash absorbed by the
+     * "liquid" of the glass. Derived via `accentAt` so a palette swap
+     * re-tints in one shot. 0.05 in light and 0.08 in dark — the dark
+     * variant gets a touch more amplitude because the surface is denser
+     * and tints read more subtle on it.
+     */
+    refractionTint: accentAt(0.05),
+    refractionTintDark: accentAtDark(0.08),
+    /*
+     * Content-aware drop shadows. The `OnText` variant is denser (two
+     * stacked shadows) to lift glass above text-heavy / dark content
+     * where the eye needs help finding the edge. The `OnSolid` variant
+     * is softer for floating over light / solid backgrounds where less
+     * separation reads cleaner.
+     */
+    shadowOnText:
+        "0 8px 24px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.12)",
+    shadowOnSolid:
+        "0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06)",
+    /*
+     * Rim hairlines. `rimSubtle` for resting state, `rim` for the default
+     * 1px ring, `rimStrong` for hover / active where the edge should
+     * read as engaged. Light variants use cool dark; dark variants use
+     * warm light so the ring catches on the opposite-luminance side of
+     * the surface.
+     */
+    rimSubtle: "rgba(255, 255, 255, 0.18)",
+    rim: "rgba(255, 255, 255, 0.32)",
+    rimStrong: "rgba(255, 255, 255, 0.48)",
+    rimSubtleDark: "rgba(255, 255, 255, 0.06)",
+    rimDark: "rgba(255, 255, 255, 0.12)",
+    rimStrongDark: "rgba(255, 255, 255, 0.20)",
+    /*
+     * Intensity presets — three discrete configs Wave 2's user-intensity
+     * toggle picks from. Components consume them via the
+     * `--ant-backdrop-filter-glass` CSS var; Wave 2 will swap the var
+     * value globally so every glass surface flips in one shot.
+     *
+     * `clear`    — most translucent (lowest surface opacity, modest blur)
+     *              for "Clear" mode users who want maximum show-through.
+     * `regular`  — current default, balanced legibility / show-through.
+     * `solid`    — accessibility opt-out: `blur: 0` and opaque surface.
+     *              The glass effectively disappears, which is what users
+     *              with reduced-transparency / cognitive accessibility
+     *              needs depend on.
+     */
+    intensityClear: {
+        surface: "rgba(255, 255, 255, 0.42)",
+        blur: 14,
+        border: "rgba(15, 23, 42, 0.04)",
+        specular:
+            "linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 40%)"
+    },
+    intensityRegular: {
+        surface: "rgba(255, 255, 255, 0.68)",
+        blur: 20,
+        border: "rgba(15, 23, 42, 0.06)",
+        specular:
+            "linear-gradient(135deg, rgba(255, 255, 255, 0.30), transparent 40%)"
+    },
+    intensitySolid: {
+        surface: "rgba(255, 255, 255, 1)",
+        blur: 0,
+        border: "rgba(15, 23, 42, 0.08)",
+        specular: "none"
+    }
 } as const;
 
 /**
@@ -205,18 +339,76 @@ export const shadow = {
 /**
  * Motion durations in ms. Long, medium, short follow Material 3 buckets so
  * `prefers-reduced-motion` can cut all of them to zero in one place.
+ *
+ * Phase 5 "Liquid Glass" additions (Wave 1 T1):
+ *
+ *   - `morph` (450ms): glass surface state morphing — e.g. a panel that
+ *     reshapes when its content swaps. Slow enough to read as a fluid
+ *     transformation rather than a snap.
+ *   - `gelFlex` (220ms): press / tap gel-flex micro-animation — the
+ *     glass surface yields slightly under finger pressure then springs
+ *     back. Sits between `medium` and `long` so the press feels
+ *     immediate but the recovery is noticeable.
  */
 export const motion = {
     instant: 60,
     short: 120,
     medium: 200,
-    long: 320
+    long: 320,
+    morph: 450,
+    gelFlex: 220
 } as const;
 
+/**
+ * Easing curves. The `standard` / `emphasized` / `decelerate` curves cover
+ * the M3 "expressive easing" set; the two `spring*` curves are Wave 1 T1
+ * additions for Liquid Glass.
+ *
+ *   - `springSoft`: pronounced overshoot for "materialize" moments
+ *     (popover appearing, panel snapping into place). Goes past the
+ *     final value before settling, which reads as a buoyant, liquid
+ *     feel.
+ *   - `springSnap`: gentle overshoot for the gel-flex press recovery.
+ *     Less overshoot than `springSoft` because a button press should
+ *     spring back tight, not loose.
+ */
 export const easing = {
     standard: "cubic-bezier(0.2, 0, 0, 1)",
     emphasized: "cubic-bezier(0.3, 0, 0, 1)",
-    decelerate: "cubic-bezier(0, 0, 0, 1)"
+    decelerate: "cubic-bezier(0, 0, 0, 1)",
+    springSoft: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    springSnap: "cubic-bezier(0.16, 1.05, 0.36, 1)"
+} as const;
+
+/**
+ * View Transitions name registry. This is the CANONICAL source for every
+ * `view-transition-name` value used in the app — recording new entries
+ * here prevents two components from accidentally registering the same
+ * name (which would cause the browser to morph one into the other
+ * mid-route-change). Wave 5 adopts every entry below; Wave 2 adopts
+ * `topbar` for the project-detail breadcrumb chrome.
+ *
+ * Adding a new entry: declare here first, then reference via
+ * `viewTransition.<key>` in the component's `view-transition-name`
+ * declaration (so a grep for the literal string lands here).
+ */
+export const viewTransition = {
+    /** Sticky page header — already in use at src/components/header/index.tsx. */
+    header: "pulse-header",
+    /** Phone-chassis bottom tab bar — already in use at src/components/bottomTabBar/index.tsx. */
+    tabbar: "pulse-tabbar",
+    /** Project-detail breadcrumb / top bar — Wave 2 will adopt. */
+    topbar: "pulse-topbar",
+    /** Board column header — kept stable across column re-order / filter swaps. */
+    columnHeader: "pulse-column-header",
+    /** Global Cmd-K command palette — kept stable across route changes. */
+    commandPalette: "pulse-command-palette",
+    /** Right-edge Copilot dock — kept stable so the dock pins through navigations. */
+    copilotDock: "pulse-copilot-dock",
+    /** Lens (filter) chip — for chip-to-detail morphing. */
+    lensChip: "pulse-lens-chip",
+    /** Copilot suggestion chip — for chip-to-message morphing. */
+    copilotChip: "pulse-copilot-chip"
 } as const;
 
 /*

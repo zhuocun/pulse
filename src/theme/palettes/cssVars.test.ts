@@ -34,6 +34,23 @@ const REQUIRED_LIGHT_VARS = [
     "--glass-border",
     "--glass-border-strong",
     "--glass-shine",
+    // Phase 5 "Liquid Glass" additions (Wave 1 T1). Wave 2 consumers
+    // depend on every one of these being present in BOTH palette blocks;
+    // a regression that drops one in dark mode would leave specular
+    // highlights stuck at the light-mode value, breaking the contract.
+    "--glass-specular-top",
+    "--glass-specular-bottom",
+    "--glass-refraction-tint",
+    "--glass-shadow-on-text",
+    "--glass-shadow-on-solid",
+    "--glass-rim-subtle",
+    "--glass-rim",
+    "--glass-rim-strong",
+    "--motion-morph",
+    "--motion-gel-flex",
+    "--easing-spring-soft",
+    "--easing-spring-snap",
+    "--ant-backdrop-filter-glass",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -150,5 +167,97 @@ describe("paletteToCss", () => {
         // CSS injection happens once per palette switch; the same input
         // must produce the same output (no Date.now() / random tokens).
         expect(paletteToCss(orangePalette)).toBe(paletteToCss(orangePalette));
+    });
+
+    describe("Phase 5 Liquid Glass vars", () => {
+        it("light --glass-refraction-tint derives from accent.rgb", () => {
+            const css = paletteToCss(orangePalette);
+            expect(lightBlockOf(css)).toContain(
+                `--glass-refraction-tint: rgba(${orangePalette.accent.rgb}, 0.05);`
+            );
+        });
+
+        it("dark --glass-refraction-tint derives from accent.rgbDark", () => {
+            const css = paletteToCss(orangePalette);
+            expect(darkBlockOf(css)).toContain(
+                `--glass-refraction-tint: rgba(${orangePalette.accent.rgbDark}, 0.08);`
+            );
+        });
+
+        it("emerald --glass-refraction-tint follows the emerald accent (palette swap contract)", () => {
+            // A regression where refractionTint is hardcoded rather than
+            // derived from the active accent would leave the highlight
+            // tinted orange in emerald mode. This test pins the swap.
+            const css = paletteToCss(emeraldPalette);
+            expect(lightBlockOf(css)).toContain(
+                `--glass-refraction-tint: rgba(${emeraldPalette.accent.rgb}`
+            );
+            expect(darkBlockOf(css)).toContain(
+                `--glass-refraction-tint: rgba(${emeraldPalette.accent.rgbDark}`
+            );
+        });
+
+        it("--ant-backdrop-filter-glass defaults to the regular blur+saturate combo", () => {
+            // Wave 2's user-intensity toggle overrides this var to `none`
+            // when the user picks the Solid preset. The default value
+            // here is what Clear and Regular intensities consume.
+            const css = paletteToCss(orangePalette);
+            expect(lightBlockOf(css)).toContain(
+                "--ant-backdrop-filter-glass: blur(20px) saturate(180%);"
+            );
+            expect(darkBlockOf(css)).toContain(
+                "--ant-backdrop-filter-glass: blur(20px) saturate(180%);"
+            );
+        });
+
+        it("specular highlights are achromatic (neutral white / black, no accent leak)", () => {
+            // Specular models an uncolored light source; if a palette
+            // accent leaks into the specular gradient, the rim picks up
+            // the brand hue and the "liquid" illusion breaks. This pins
+            // that the specular gradients reference only neutrals.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            // Light specular-top declaration line should contain only
+            // the neutral white triplet, not the orange accent.
+            const specTopLine = light.match(/--glass-specular-top:[^;]*;/);
+            expect(specTopLine).not.toBeNull();
+            expect(specTopLine![0]).not.toContain(orangePalette.accent.rgb);
+        });
+
+        it("dark specular is lower-amplitude than light specular (physics)", () => {
+            // A bright rim on a dark surface reads as much hotter than
+            // the same value on a light surface. The dark variant must
+            // drop the highlight amplitude — codified as 0.18 vs. 0.30
+            // in the token comments.
+            const css = paletteToCss(orangePalette);
+            expect(lightBlockOf(css)).toContain("rgba(255, 255, 255, 0.30)");
+            expect(darkBlockOf(css)).toContain("rgba(220, 235, 255, 0.18)");
+        });
+
+        it("rim hairlines ramp upward in opacity (subtle < default < strong)", () => {
+            // Wave 2 will pick rimSubtle for resting state, rim for the
+            // default ring, and rimStrong for hover / active. The ramp
+            // direction must be monotonic so the visual hierarchy of
+            // edge-engagement reads as intended.
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const subtle = light.match(
+                /--glass-rim-subtle: rgba\(255, 255, 255, ([\d.]+)\);/
+            );
+            const mid = light.match(
+                /--glass-rim: rgba\(255, 255, 255, ([\d.]+)\);/
+            );
+            const strong = light.match(
+                /--glass-rim-strong: rgba\(255, 255, 255, ([\d.]+)\);/
+            );
+            expect(subtle).not.toBeNull();
+            expect(mid).not.toBeNull();
+            expect(strong).not.toBeNull();
+            const subtleA = Number(subtle![1]);
+            const midA = Number(mid![1]);
+            const strongA = Number(strong![1]);
+            expect(midA).toBeGreaterThan(subtleA);
+            expect(strongA).toBeGreaterThan(midA);
+        });
     });
 });

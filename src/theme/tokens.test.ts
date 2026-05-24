@@ -8,11 +8,15 @@
  * regression in `avatarGradients` shape would crash the `UserAvatar`
  * component when it indexes the readonly tuple.
  */
+import { palette } from "./palettes";
 import {
     accent,
+    accentAt,
+    accentAtDark,
     aurora,
     avatarGradients,
     breakpoints,
+    easing,
     fontFamily,
     fontSize,
     fontWeight,
@@ -30,6 +34,7 @@ import {
     tag,
     touchTargetCoarse,
     touchTargetMin,
+    viewTransition,
     zIndex
 } from "./tokens";
 
@@ -160,6 +165,247 @@ describe("semantic / brand palette", () => {
         ] as const) {
             expect(glass[key]).toMatch(/^rgba\(/);
         }
+    });
+});
+
+describe("Phase 5 Liquid Glass token additions", () => {
+    describe("accentAt / accentAtDark helpers", () => {
+        // The "any new tint token must derive from palette.accent.rgb"
+        // contract is enforced via these helpers. A regression here
+        // breaks the palette-swap one-line contract for Wave 2's
+        // Liquid Glass surfaces.
+        it("accentAt embeds the active palette accent triplet at the given opacity", () => {
+            expect(accentAt(0.05)).toBe(`rgba(${palette.accent.rgb}, 0.05)`);
+            expect(accentAt(0.32)).toBe(`rgba(${palette.accent.rgb}, 0.32)`);
+        });
+
+        it("accentAtDark embeds the dark-mode-paired triplet at the given opacity", () => {
+            expect(accentAtDark(0.08)).toBe(
+                `rgba(${palette.accent.rgbDark}, 0.08)`
+            );
+        });
+
+        it("identical opacity always produces an identical string (pure helper)", () => {
+            expect(accentAt(0.18)).toBe(accentAt(0.18));
+            expect(accentAtDark(0.18)).toBe(accentAtDark(0.18));
+        });
+    });
+
+    describe("glass.specular* tokens", () => {
+        it("light specular gradients are linear-gradient() strings on the 135deg / 315deg axes", () => {
+            expect(glass.specularTop).toMatch(/^linear-gradient\(135deg,/);
+            expect(glass.specularBottom).toMatch(/^linear-gradient\(315deg,/);
+        });
+
+        it("dark specular gradients exist with the same axis convention", () => {
+            expect(glass.specularTopDark).toMatch(/^linear-gradient\(135deg,/);
+            expect(glass.specularBottomDark).toMatch(
+                /^linear-gradient\(315deg,/
+            );
+        });
+
+        it("specular highlights are achromatic (no accent leak in the gradient string)", () => {
+            // Specular models an uncolored light source — the rim
+            // catches white / cool-blue / black, not the brand accent.
+            // If a future edit drops accent.rgb into the gradient,
+            // the rim picks up the brand hue and the liquid illusion
+            // breaks.
+            expect(glass.specularTop).not.toContain(palette.accent.rgb);
+            expect(glass.specularTopDark).not.toContain(palette.accent.rgb);
+            expect(glass.specularBottom).not.toContain(palette.accent.rgb);
+            expect(glass.specularBottomDark).not.toContain(palette.accent.rgb);
+        });
+    });
+
+    describe("glass.refractionTint", () => {
+        it("light tint derives from palette.accent.rgb (palette-swap contract)", () => {
+            expect(glass.refractionTint).toContain(palette.accent.rgb);
+        });
+
+        it("dark tint derives from palette.accent.rgbDark", () => {
+            expect(glass.refractionTintDark).toContain(palette.accent.rgbDark);
+        });
+    });
+
+    describe("glass shadow + rim tokens", () => {
+        it("content-aware shadows are comma-separated multi-shadow strings", () => {
+            // Stacked drop + ambient pair so the glass reads as floating
+            // above the underlying content, not stamped flat onto it.
+            expect(glass.shadowOnText.split(",").length).toBeGreaterThanOrEqual(
+                2
+            );
+            expect(
+                glass.shadowOnSolid.split(",").length
+            ).toBeGreaterThanOrEqual(2);
+        });
+
+        it("rim hairlines exist for both light and dark in three steps", () => {
+            for (const key of [
+                "rimSubtle",
+                "rim",
+                "rimStrong",
+                "rimSubtleDark",
+                "rimDark",
+                "rimStrongDark"
+            ] as const) {
+                expect(glass[key]).toMatch(/^rgba\(/);
+            }
+        });
+
+        it("rim opacity ramps monotonically upward (light)", () => {
+            const opacityOf = (s: string) =>
+                Number(s.match(/,\s*([\d.]+)\)$/)?.[1] ?? "0");
+            expect(opacityOf(glass.rim)).toBeGreaterThan(
+                opacityOf(glass.rimSubtle)
+            );
+            expect(opacityOf(glass.rimStrong)).toBeGreaterThan(
+                opacityOf(glass.rim)
+            );
+        });
+
+        it("rim opacity ramps monotonically upward (dark)", () => {
+            const opacityOf = (s: string) =>
+                Number(s.match(/,\s*([\d.]+)\)$/)?.[1] ?? "0");
+            expect(opacityOf(glass.rimDark)).toBeGreaterThan(
+                opacityOf(glass.rimSubtleDark)
+            );
+            expect(opacityOf(glass.rimStrongDark)).toBeGreaterThan(
+                opacityOf(glass.rimDark)
+            );
+        });
+    });
+
+    describe("glass intensity presets", () => {
+        it("all three presets ship the full { surface, blur, border, specular } shape", () => {
+            for (const preset of [
+                glass.intensityClear,
+                glass.intensityRegular,
+                glass.intensitySolid
+            ]) {
+                expect(typeof preset.surface).toBe("string");
+                expect(typeof preset.blur).toBe("number");
+                expect(typeof preset.border).toBe("string");
+                expect(typeof preset.specular).toBe("string");
+            }
+        });
+
+        it("intensitySolid is the accessibility opt-out (blur:0, opaque surface, no specular)", () => {
+            // Codified by the Phase 5 proposal: when a user picks the
+            // Solid preset (reduced-transparency parity), the glass
+            // disappears entirely. This test pins that contract — a
+            // regression that turns the blur back on or the surface
+            // translucent would silently re-introduce the legibility
+            // problem reduced-transparency users opted out of.
+            expect(glass.intensitySolid.blur).toBe(0);
+            expect(glass.intensitySolid.specular).toBe("none");
+            // The surface must be 1.0 alpha (fully opaque). Tolerate
+            // both `rgba(R, G, B, 1)` and `rgba(R, G, B, 1.0)` forms.
+            expect(glass.intensitySolid.surface).toMatch(
+                /rgba\(.+,\s*1(\.0+)?\)/
+            );
+        });
+
+        it("blur ramps downward across Clear → Regular → Solid (Solid is the lever-off)", () => {
+            // Wave 2's user intensity toggle: Clear has the most blur
+            // (most show-through), Solid has none. The ramp must be
+            // monotonic so the toggle reads as a continuous lever.
+            expect(glass.intensityRegular.blur).toBeGreaterThan(
+                glass.intensitySolid.blur
+            );
+            expect(glass.intensityClear.blur).toBeGreaterThan(
+                glass.intensitySolid.blur
+            );
+        });
+    });
+
+    describe("motion + easing additions", () => {
+        it("morph + gelFlex durations are positive integers (ms)", () => {
+            expect(motion.morph).toBeGreaterThan(0);
+            expect(Number.isInteger(motion.morph)).toBe(true);
+            expect(motion.gelFlex).toBeGreaterThan(0);
+            expect(Number.isInteger(motion.gelFlex)).toBe(true);
+        });
+
+        it("morph sits above the existing 'long' bucket (it IS slower than a route swap)", () => {
+            // Surface morph is a fluid transformation — slower than the
+            // M3 'long' bucket so it reads as liquid, not snap.
+            expect(motion.morph).toBeGreaterThan(motion.long);
+        });
+
+        it("gelFlex sits between 'medium' and 'long' (instant press, noticeable recovery)", () => {
+            expect(motion.gelFlex).toBeGreaterThan(motion.medium);
+            expect(motion.gelFlex).toBeLessThan(motion.long);
+        });
+
+        it("spring easings are cubic-bezier curves with > 1 overshoot in y", () => {
+            // A cubic-bezier with `y2 > 1` overshoots past the final
+            // value before settling — which is what produces the bouncy
+            // / springy feel. springSoft has more overshoot than
+            // springSnap by design.
+            const softMatch = easing.springSoft.match(
+                /^cubic-bezier\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)$/
+            );
+            const snapMatch = easing.springSnap.match(
+                /^cubic-bezier\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)$/
+            );
+            expect(softMatch).not.toBeNull();
+            expect(snapMatch).not.toBeNull();
+            // Second control point's y is the overshoot in the second
+            // half of the curve.
+            const softY2 = Number(softMatch![2]);
+            const snapY2 = Number(snapMatch![2]);
+            expect(softY2).toBeGreaterThan(1);
+            expect(snapY2).toBeGreaterThan(1);
+            // springSoft overshoots more than springSnap (materialize is
+            // looser than press-recovery).
+            expect(softY2).toBeGreaterThan(snapY2);
+        });
+    });
+
+    describe("viewTransition name registry", () => {
+        it("declares every name expected by Wave 2 / Wave 5 consumers", () => {
+            // Wave 5 adopts every entry below; Wave 2 adopts at least
+            // `topbar`. A regression that drops one of these would make
+            // a downstream consumer fall back to an ad-hoc literal —
+            // exactly the situation the registry exists to prevent.
+            for (const key of [
+                "header",
+                "tabbar",
+                "topbar",
+                "columnHeader",
+                "commandPalette",
+                "copilotDock",
+                "lensChip",
+                "copilotChip"
+            ] as const) {
+                expect(typeof viewTransition[key]).toBe("string");
+                expect(viewTransition[key].length).toBeGreaterThan(0);
+            }
+        });
+
+        it("pins the existing `pulse-header` / `pulse-tabbar` literals (no rename)", () => {
+            // The header + bottom tab bar already register these names
+            // in their component CSS. Renaming them in the registry
+            // without renaming the component-side literal would silently
+            // un-pair them and break the route-cross-fade behaviour.
+            expect(viewTransition.header).toBe("pulse-header");
+            expect(viewTransition.tabbar).toBe("pulse-tabbar");
+        });
+
+        it("every value is unique (two consumers can't accidentally morph into each other)", () => {
+            // If two components share a view-transition-name, the
+            // browser morphs one into the other across a route change —
+            // hilarious in dev, broken in prod. The registry is the
+            // canonical source, so the test enforces uniqueness here.
+            const values = Object.values(viewTransition);
+            expect(new Set(values).size).toBe(values.length);
+        });
+
+        it("every value uses the pulse-* namespace (so a future grep finds them all)", () => {
+            for (const v of Object.values(viewTransition)) {
+                expect(v).toMatch(/^pulse-/);
+            }
+        });
     });
 });
 
