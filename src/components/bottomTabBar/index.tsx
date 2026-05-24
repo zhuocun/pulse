@@ -327,7 +327,21 @@ const TabLink = styled(NavLink)`
      * total bar height at ~64 px in the resting state.
      */
     min-height: 56px;
-    min-width: 25vw;
+    /*
+     * min-width: 0 is load-bearing on flex children — its default
+     * value of "auto" blocks shrinking below the children's intrinsic
+     * content width, so a too-long label (or icon + label in a tight
+     * viewport) would push the rightmost tab past the capsule's
+     * content box and clip the label off the right rim (the Phase 6
+     * Wave 2 "Profile" regression). With 0, the flex distribution
+     * honours the "flex: 1 1 0" contract literally — each tab gets
+     * exactly 1/tabCount of the inner width and the label below
+     * truncates with ellipsis as a defensive backstop. The prior
+     * "min-width: 25vw" pinned every tab at >=98 px on a 393 px
+     * viewport, summing to ~393 px of required width inside a ~353 px
+     * content box.
+     */
+    min-width: 0;
     padding: ${space.xxs}px ${space.xs}px;
     position: relative;
     text-decoration: none;
@@ -387,6 +401,18 @@ const TabIcon = styled.span`
 const TabLabel = styled.span<{ $minimized: boolean }>`
     line-height: ${fontSize.xs * 1.1}px;
     /*
+     * Truncation defence — paired with min-width: 0 on TabLink, a
+     * label that overruns its allotted slot degrades to an ellipsis
+     * rather than visually clipping at the capsule rim. max-width:
+     * 100% keeps the truncation calculation anchored to the parent's
+     * flex-distributed width; nowrap prevents a line-wrap from
+     * silently pushing the bar's block size beyond the touch-target
+     * floor. Most locales will never hit this (Boards/Inbox/Copilot/
+     * Profile are short) — this is the safety net for longer
+     * translations.
+     */
+    max-width: 100%;
+    /*
      * Minimize-on-scroll — labels fade out so the bar shrinks to
      * icon-only chrome. Opacity transition over motion.tabBarMinimize
      * so the change reads as a confident collapse rather than a snap.
@@ -401,6 +427,8 @@ const TabLabel = styled.span<{ $minimized: boolean }>`
      */
     max-height: ${(props) => (props.$minimized ? "0" : "1.5em")};
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     transition:
         opacity var(--ant-motion-tab-bar-minimize, 280ms)
             var(--ant-easing-detent, ease-out),
