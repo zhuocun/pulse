@@ -1,12 +1,6 @@
+import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
-import {
-    useCallback,
-    useEffect,
-    useId,
-    useRef,
-    useState,
-    type ReactNode
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { easing, motion, radius, space, zIndex } from "../../theme/tokens";
@@ -133,9 +127,10 @@ const pop = (id: string): void => {
  * Test-only reset — clears the module singleton between tests so a
  * leaked mount from one case doesn't pollute the next. Not exposed
  * from the package barrel; the test file imports it directly. Plain
- * camelCase (rather than the conventional underscore-prefixed
- * `__resetForTests`) because the lint config forbids dangling
- * underscores; the `ForTests` suffix carries the same intent.
+ * camelCase (other test resets in the codebase use the
+ * `__resetForTests` convention with a per-line `eslint-disable
+ * no-underscore-dangle`; the suffix-only form here keeps the intent
+ * without the disable directive).
  */
 export const resetTabBarAccessoryForTests = (): void => {
     stack.length = 0;
@@ -214,22 +209,56 @@ const Slot = styled.div`
     view-transition-name: pulse-tab-accessory;
 `;
 
-const GlassChrome = styled(GlassPanel)<{ $visible: boolean }>`
+/*
+ * CSS animations (not transitions) so the materialize fade-in runs on
+ * the chrome's FIRST paint. A transition needs a prior state to
+ * interpolate from — the chrome is unmounted before content arrives,
+ * so there's no "from" state for a transition to use. Keyframes fire
+ * unconditionally when the rule applies, giving us a real materialize
+ * on mount and a real dematerialize on the exit pass (driven by the
+ * deferred-unmount window in <TabBarAccessoryMount />).
+ */
+const materializeKeyframes = keyframes`
+    from { opacity: 0; transform: translateY(${space.sm}px); }
+    to   { opacity: 1; transform: translateY(0); }
+`;
+
+const dematerializeKeyframes = keyframes`
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(${space.sm}px); }
+`;
+
+const GlassChrome = styled(GlassPanel)<{ $exiting: boolean }>`
+    animation: ${(p) =>
+            p.$exiting ? dematerializeKeyframes : materializeKeyframes}
+        ${motion.morph}ms ${easing.springSoft} forwards;
     border-radius: ${radius.lg}px;
-    opacity: ${(p) => (p.$visible ? 1 : 0)};
     padding: ${space.sm}px ${space.md}px;
-    pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
-    transform: ${(p) =>
-        p.$visible ? "translateY(0)" : `translateY(${space.sm}px)`};
-    transition:
-        opacity ${motion.morph}ms ${easing.springSoft},
-        transform ${motion.morph}ms ${easing.springSoft};
+    pointer-events: ${(p) => (p.$exiting ? "none" : "auto")};
     width: 100%;
 
     @media (prefers-reduced-motion: reduce) {
-        transition: none;
+        animation: none;
+        opacity: ${(p) => (p.$exiting ? 0 : 1)};
     }
 `;
+
+/*
+ * Idempotent portal-host installer. Lives outside the component so
+ * the useState initializer can call it during render WITHOUT mutating
+ * DOM at render time on subsequent renders — `document.getElementById`
+ * short-circuits when the host already exists (StrictMode-safe).
+ */
+const ensureSlotHost = (): HTMLDivElement | null => {
+    if (typeof document === "undefined") return null;
+    let host = document.getElementById(SLOT_DOM_ID) as HTMLDivElement | null;
+    if (!host) {
+        host = document.createElement("div");
+        host.id = SLOT_DOM_ID;
+        document.body.appendChild(host);
+    }
+    return host;
+};
 
 /**
  * The DOM mount point for the tab-bar accessory slot. Render exactly
@@ -241,10 +270,30 @@ const GlassChrome = styled(GlassPanel)<{ $visible: boolean }>`
  * We render the portal into `document.body` so the slot escapes any
  * `transform` / `filter` / `contain` ancestor that would otherwise
  * trap the fixed-position chrome inside a stacking context.
+ *
+ * Materialize / dematerialize is driven by a TWO-STATE machine:
+ *
+ *   - `renderedNode` — what the chrome currently displays. Set
+ *     immediately when content arrives; held for `motion.morph` ms
+ *     after content departs so the dematerialize animation can play
+ *     to completion before the chrome unmounts.
+ *   - `exiting` — drives the keyframes pair: false = materialize
+ *     (default), true = dematerialize.
+ *
+ * Without the deferred-unmount window, the chrome would pop out of the
+ * tree the moment content left, with no chance for an exit animation.
  */
 export const TabBarAccessoryMount: React.FC = () => {
     const [node, setNode] = useState<ReactNode | null>(currentNode);
-    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [renderedNode, setRenderedNode] = useState<ReactNode | null>(node);
+    const [exiting, setExiting] = useState<boolean>(false);
+    const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /*
+     * Install the portal host via useState initializer so it happens
+     * once per component lifetime, not on every render — and never as
+     * a render-time side effect.
+     */
+    const [containerHost] = useState<HTMLDivElement | null>(ensureSlotHost);
 
     useEffect(() => {
         /*
@@ -257,61 +306,52 @@ export const TabBarAccessoryMount: React.FC = () => {
     }, []);
 
     /*
-     * Ensure a stable mount node lives on document.body so the
-     * portal target survives across re-renders without re-creating
-     * the DOM element (which would re-trigger view-transition
-     * animations on every set).
+     * Drive renderedNode / exiting from node:
+     *   - content arrived (node !== null): mount chrome, animate in
+     *   - content gone (node === null): flip to exiting, hold chrome
+     *     mounted for motion.morph, then unmount
      */
     useEffect(() => {
-        if (typeof document === "undefined") return;
-        let host = document.getElementById(SLOT_DOM_ID);
-        if (!host) {
-            host = document.createElement("div");
-            host.id = SLOT_DOM_ID;
-            document.body.appendChild(host);
+        if (node !== null) {
+            if (exitTimerRef.current !== null) {
+                clearTimeout(exitTimerRef.current);
+                exitTimerRef.current = null;
+            }
+            setRenderedNode(node);
+            setExiting(false);
+            return;
         }
-        containerRef.current = host as HTMLDivElement;
-        // The mount has zero ownership of cleanup — multiple
-        // <TabBarAccessoryMount /> instances would race on the
-        // singleton DOM node, and Worker C will mount exactly one.
-        // Leaving the node attached across unmounts means a HMR
-        // boundary or test cleanup doesn't strand a half-removed
-        // element on the page.
-    }, []);
+        if (renderedNode === null) return;
+        setExiting(true);
+        exitTimerRef.current = setTimeout(() => {
+            setRenderedNode(null);
+            setExiting(false);
+            exitTimerRef.current = null;
+        }, motion.morph);
+        return () => {
+            if (exitTimerRef.current !== null) {
+                clearTimeout(exitTimerRef.current);
+                exitTimerRef.current = null;
+            }
+        };
+    }, [node, renderedNode]);
 
-    if (typeof document === "undefined") return null;
-    if (!containerRef.current) {
-        /*
-         * First render before the layout effect installs the host —
-         * we still need to attach it now so the portal call below
-         * has a target on the FIRST paint. Idempotent: the second
-         * effect call short-circuits when the element already exists.
-         */
-        let host = document.getElementById(SLOT_DOM_ID);
-        if (!host) {
-            host = document.createElement("div");
-            host.id = SLOT_DOM_ID;
-            document.body.appendChild(host);
-        }
-        containerRef.current = host as HTMLDivElement;
-    }
-
-    const visible = node !== null;
+    if (containerHost === null) return null;
 
     return createPortal(
         <Slot data-testid="tab-bar-accessory-slot">
-            {visible ? (
+            {renderedNode !== null ? (
                 <GlassChrome
-                    $visible={visible}
+                    $exiting={exiting}
                     intensity="regular"
                     role="region"
                     aria-label="Tab bar accessory"
                 >
-                    {node}
+                    {renderedNode}
                 </GlassChrome>
             ) : null}
         </Slot>,
-        containerRef.current
+        containerHost
     );
 };
 
