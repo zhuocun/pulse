@@ -107,6 +107,12 @@ class FakeStore:
             PROJECTS: [],
             COLUMNS: [],
             TASKS: [],
+            # ``system_config`` is the schema-less collection owned by
+            # :mod:`app.system_config` (persisted JWT secret etc.) -- it
+            # has no per-table field allowlist and uses sentinel string
+            # ``_id`` values, so it lives alongside the typed tables
+            # without going through ``TABLE_FIELDS`` validation.
+            "system_config": [],
         }
 
     def ping(self) -> None:
@@ -233,6 +239,11 @@ def seed_agent_test_projects_if_absent(store: FakeStore) -> None:
 @pytest.fixture()
 def store(monkeypatch: pytest.MonkeyPatch) -> FakeStore:
     fake = FakeStore()
+    # Setting UUID short-circuits the new persisted-JWT-secret bootstrap
+    # in ``_validate_settings``; without this the lifespan would mint a
+    # random secret on each TestClient construction and invalidate any
+    # tokens already created by an upstream test fixture.
+    monkeypatch.setenv("UUID", "test-secret-change-me-32-bytes-long")
     object.__setattr__(
         security.settings,
         "jwt_secret",

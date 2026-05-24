@@ -15,7 +15,11 @@ from app.agents.errors import AgentConfigurationError, AgentError, agent_app_err
 from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
 from app.agents.llm import assert_provider_available
 from app.config import Settings, settings
-from app.deploy_env import HOSTED_PLATFORM_ENV_MARKERS, has_hosted_platform_env
+from app.deploy_env import (
+    HOSTED_PLATFORM_ENV_MARKERS,
+    detected_hosted_platform,
+    has_hosted_platform_env,
+)
 from app.errors import AppError
 from app.middleware import budget as _budget
 from app.middleware import idempotency as _idempotency
@@ -34,6 +38,7 @@ from app.routers import (
     users,
 )
 from app.security import JWT_SECRET_MIN_LENGTH
+from app.system_config import load_or_create_jwt_secret
 from app.validation import unwrap_error_detail
 
 logger = logging.getLogger(__name__)
@@ -107,32 +112,125 @@ def _validate_agent_postgres_backend(cfg: Settings) -> None:
             ) from exc
 
 
-def _validate_settings(cfg: Settings) -> None:
-    """Fail-fast bootstrap checks for security-critical configuration."""
+def _validate_settings(cfg: Settings) -> str:
+    """Fail-fast bootstrap checks for security-critical configuration.
 
-    uuid_env = (os.getenv("UUID") or "").strip()
-    if not uuid_env and has_hosted_platform_env():
-        raise RuntimeError(
-            "UUID env var must be set to a stable secret of at least "
-            f"{JWT_SECRET_MIN_LENGTH} characters in hosted deployments; "
-            "ephemeral JWT secrets invalidate every session on cold start."
-        )
-    if not uuid_env and len(cfg.jwt_secret) >= JWT_SECRET_MIN_LENGTH:
-        logger.warning(
-            "UUID env var is not set; using an ephemeral JWT secret. "
-            "All tokens will be invalidated on each server restart. "
-            "Set UUID to a stable secret of at least %d characters.",
-            JWT_SECRET_MIN_LENGTH,
-        )
-    elif len(cfg.jwt_secret) < JWT_SECRET_MIN_LENGTH:
-        raise RuntimeError(
-            f"JWT secret must be at least {JWT_SECRET_MIN_LENGTH} characters; "
-            "token-issuing endpoints would fail at first request."
-        )
+    Returns the resolved JWT-secret source -- one of ``"env"``,
+    ``"persisted"``, ``"ephemeral"`` -- so the lifespan can stash it on
+    ``application.state`` for the readiness endpoint without re-running
+    the resolution. Mutates the frozen :class:`Settings` instance in
+    place via :func:`object.__setattr__` (the same pattern
+    ``conftest.py`` uses for test overrides).
+    """
+
+    source = _resolve_and_install_jwt_secret(cfg)
     _validate_cors_origin_regex(cfg.cors_origin_regex)
     assert_provider_available(settings=cfg)
     assert_embeddings_provider_available(settings=cfg)
     _validate_agent_postgres_backend(cfg)
+    return source
+
+
+def _resolve_and_install_jwt_secret(cfg: Settings) -> str:
+    """Resolve the JWT secret in priority order and write it onto ``cfg``.
+
+    Order:
+        1. ``UUID`` env (explicit operator override).
+        2. Persisted ``system_config.jwt_secret`` in Mongo (drops one
+           required env var: a Vercel deploy that already needs
+           ``MONGO_URI`` for user data now gets a stable JWT secret
+           without an extra knob).
+        3. Random ephemeral secret (local dev only).
+
+    Raises :class:`RuntimeError` when:
+        - ``UUID`` is set but shorter than
+          :data:`app.security.JWT_SECRET_MIN_LENGTH` (operator typo).
+        - On a hosted deploy where neither ``UUID`` nor a reachable
+          Mongo can supply a secret (the deploy already needs Mongo
+          for user data, so this is the same root cause).
+    """
+
+    uuid_env = (os.getenv("UUID") or "").strip()
+    if uuid_env:
+        if len(uuid_env) < JWT_SECRET_MIN_LENGTH:
+            raise RuntimeError(
+                f"UUID must be at least {JWT_SECRET_MIN_LENGTH} characters; "
+                "token-issuing endpoints would fail at first request."
+            )
+        object.__setattr__(cfg, "jwt_secret", uuid_env)
+        return "env"
+
+    secret, source = _try_persisted_jwt_secret(cfg)
+    if secret is not None:
+        object.__setattr__(cfg, "jwt_secret", secret)
+        if source == "generated":
+            logger.info(
+                "JWT secret bootstrapped into system_config.jwt_secret "
+                "(first boot). Subsequent restarts will reuse the persisted "
+                "value; set UUID env to override."
+            )
+        else:
+            logger.info("JWT secret loaded from persisted system_config.")
+        # Both ``persisted`` and ``generated`` are reported as ``persisted``
+        # to the readiness endpoint: the operator-visible distinction is
+        # only "the secret survives a restart" vs "it does not".
+        return "persisted"
+
+    if has_hosted_platform_env():
+        platform = detected_hosted_platform() or "this hosted platform"
+        raise RuntimeError(
+            f"MONGO_URI is unreachable on {platform.capitalize()} and no UUID "
+            "env var was set; the persisted JWT-secret bootstrap requires "
+            "Mongo. Set MONGO_URI to a reachable cluster (Mongo Atlas "
+            "serverless is the canonical option for Vercel) or set UUID to "
+            f"a stable secret of at least {JWT_SECRET_MIN_LENGTH} characters."
+        )
+
+    # Local dev fallback -- the dataclass already populated jwt_secret
+    # with a random hex via ``_resolve_jwt_secret``; keep it and warn
+    # so the operator notices the per-restart token invalidation.
+    if len(cfg.jwt_secret) < JWT_SECRET_MIN_LENGTH:
+        raise RuntimeError(
+            f"JWT secret must be at least {JWT_SECRET_MIN_LENGTH} characters; "
+            "token-issuing endpoints would fail at first request."
+        )
+    logger.warning(
+        "UUID env var is not set and Mongo is unreachable; using an "
+        "ephemeral JWT secret. All tokens will be invalidated on each "
+        "server restart. Set UUID to a stable secret of at least %d "
+        "characters or point MONGO_URI at a reachable cluster.",
+        JWT_SECRET_MIN_LENGTH,
+    )
+    return "ephemeral"
+
+
+def _try_persisted_jwt_secret(cfg: Settings) -> tuple[str | None, str]:
+    """Best-effort load of the persisted JWT secret; returns ``(None, "")`` on miss.
+
+    Pings the repository first so the bootstrap path does not get stuck
+    on a slow Mongo handshake (the same ping the lifespan does
+    explicitly; we pull it forward so the JWT resolution can rely on a
+    confirmed connection). All Mongo errors collapse to "missing" so
+    the caller can decide whether to fall back or escalate.
+    """
+
+    try:
+        repository.ping()
+    except Exception:  # noqa: BLE001 -- treat unreachable Mongo as missing
+        logger.debug(
+            "Repository ping failed during JWT-secret bootstrap; "
+            "falling back to next resolution path.",
+            exc_info=True,
+        )
+        return None, ""
+    try:
+        secret, source = load_or_create_jwt_secret(repository)
+    except Exception:  # noqa: BLE001 -- read/write failures fall back
+        logger.exception(
+            "Persisted JWT-secret bootstrap failed; falling back."
+        )
+        return None, ""
+    return secret, source
 
 
 def _propagate_langsmith_env(cfg: Settings) -> None:
@@ -231,13 +329,16 @@ def _warn_about_localhost_only_cors(cfg: Settings) -> None:
     if not all(_origin_is_localhost(origin) for origin in cfg.cors_origins):
         return
 
+    platform = detected_hosted_platform()
+    platform_label = platform.capitalize() if platform else "this hosted"
     logger.warning(
         "CORS is configured with localhost-only origins (%s) on a "
-        "production-shaped deploy; browser requests from the real FE "
+        "%s deploy; browser requests from the real FE "
         "origin will be blocked at the CORS preflight, so the AI "
         "features will not load. Set CORS_ORIGINS to the deployed FE "
         "origin (or CORS_ORIGIN_REGEX for multi-origin matches).",
         ", ".join(cfg.cors_origins),
+        platform_label,
     )
 
 
@@ -529,7 +630,12 @@ def _validate_memory_agent_backends(cfg: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-    _validate_settings(settings)
+    jwt_source = _validate_settings(settings)
+    # Stash the JWT-secret source for the readiness endpoint; using
+    # ``app.state`` keeps the value scoped to this app instance rather
+    # than a process-global (two TestClient sessions in the same
+    # process cannot leak each other's resolved source).
+    application.state.jwt_secret_source = jwt_source
     _propagate_langsmith_env(settings)
     configure_otel(settings=settings)
     configure_metrics(settings=settings)
@@ -540,7 +646,11 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     middleware_backends = _configure_middleware_backends(settings)
     _warn_about_localhost_only_cors(settings)
     _validate_memory_agent_backends(settings)
-    repository.ping()
+    # ``_validate_settings`` already pings the repository as part of
+    # the JWT-secret bootstrap; we do not re-ping here. If the bootstrap
+    # path returned ``"ephemeral"`` the ping failed but we still call
+    # ``ensure_schema`` for completeness -- it will surface the same
+    # connection error and the lifespan will fail with a clear message.
     repository.ensure_schema()
     logger.info("Connected to %s successfully.", settings.database)
     async with AsyncExitStack() as stack:
