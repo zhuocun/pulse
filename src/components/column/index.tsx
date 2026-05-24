@@ -440,17 +440,15 @@ const ColumnHeader = styled(Row)`
     /* Pull the sticky bg inside the column's own rounded corner so the
      * header doesn't paint past the column's radius when pinned. */
     border-radius: ${radius.sm}px;
-    /* Wave 2 T4 — consume the global intensity lever so the
-     * user-facing toggle (Clear / Regular / Solid) re-tunes the
-     * column header along with the rest of the chrome. NOTE: this
-     * lifts the blur from the prior blur.sm (12 px) recipe to the
-     * shared blur.md (20 px) default, the same recipe the page
-     * header / bottom-tab bar / topbar already use. The sticky
-     * column header now feels cut from the same cloth as the page
-     * chrome — minor pixel change at default intensity, but
-     * intentional for the chrome-consistency rationale. */
-    backdrop-filter: var(--ant-backdrop-filter-glass);
-    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
+    /* Wave 2 T4 — consume the SUBTLE intensity-toggle var. The column
+     * header is sticky over dense scrolling tasks; the original 12 px
+     * blur kept text legible underneath. The subtle var defaults to
+     * the same 12 px / 180% recipe but scales down under "clear" and
+     * to none under "solid" so the user toggle still reaches this
+     * surface. Three-var system reconciles parity (12 px today) with
+     * the global lever (toggle works). */
+    backdrop-filter: var(--ant-backdrop-filter-glass-subtle);
+    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass-subtle);
     padding: ${space.xxs}px ${space.xs}px;
     position: sticky;
     top: 0;

@@ -288,17 +288,14 @@ const FormCard = styled(Card)`
          * reading as crisp white rather than tinted; the emerald only
          * appears as a 1 px hairline at the border. */
         background: var(--glass-surface-strong);
-        /* Wave 2 T4 — consume the global intensity lever so the
-         * user-facing toggle (Clear / Regular / Solid) re-tunes the
-         * auth form card along with the rest of the chrome. NOTE:
-         * this drops the blur from the prior blur.lg (28 px) recipe
-         * to the shared blur.md (20 px) default. The auth card is
-         * the most heavily blurred surface in the app; lifting it to
-         * the standard chrome recipe trades a touch of show-through
-         * legibility for a uniform Liquid Glass identity across every
-         * surface the user encounters. */
-        backdrop-filter: var(--ant-backdrop-filter-glass);
-        -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
+        /* Wave 2 T4 — consume the STRONG intensity-toggle var. The
+         * auth form card is the brand-first-impression surface;
+         * preserves the original 28 px showpiece blur at default
+         * intensity while still scaling under "clear" (down to 20 px)
+         * and "solid" (none). Three-var system reconciles parity with
+         * the user-facing toggle. */
+        backdrop-filter: var(--ant-backdrop-filter-glass-strong);
+        -webkit-backdrop-filter: var(--ant-backdrop-filter-glass-strong);
         border: 1px solid var(--glass-border-strong);
         border-radius: ${radius.lg}px;
         box-shadow:
@@ -397,13 +394,19 @@ export const AuthButton = styled(Button)`
         width: 100%;
         /*
          * Phase 5 "Liquid Glass" Wave 2 — gel-flex on the dominant
-         * submit CTA. AntD Button paints its own transitions; we
-         * layer the transform onto whatever it ships rather than
-         * overriding the rule. transform-only so the 44 px hit
-         * target is preserved.
+         * submit CTA. The shorthand REPLACES AntD's transition:all
+         * so we re-enumerate the colour / bg / border / box-shadow
+         * channels AntD animates (100 ms cadence) and stack the
+         * spring-timed transform on top. transform-only so the 44 px
+         * hit target is preserved.
          */
-        transition: transform var(--motion-gel-flex, 220ms)
-            var(--easing-spring-snap, ease-out);
+        transition:
+            color 100ms ease-in-out,
+            background 100ms ease-in-out,
+            border-color 100ms ease-in-out,
+            box-shadow 100ms ease-in-out,
+            transform var(--motion-gel-flex, 220ms)
+                var(--easing-spring-snap, ease-out);
         will-change: transform;
     }
 

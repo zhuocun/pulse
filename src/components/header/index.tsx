@@ -110,13 +110,11 @@ const PageHeader = styled.header`
 
     /*
      * Phase 5 "Liquid Glass" Wave 2 — bottom-trailing companion
-     * shadow + scroll-edge dissolve. The ::after layer paints a soft
-     * trough on the opposite corner from the highlight AND fades
-     * the bottom 12px into transparent so content scrolling under
-     * the sticky header dissolves through the chrome edge rather
-     * than terminating in a hard cut. The mask-image gradient keeps
-     * the highlight + companion painted on the top 88% of the bar
-     * and tapers them out into the 12px scroll-edge trim.
+     * shadow. ::after paints the soft trough on the opposite corner
+     * from the highlight. The scroll-edge dissolve is on the chrome
+     * element itself (below) — masking ::after would only fade the
+     * rim shadow, not the actual chrome surface that needs to taper
+     * for the "content dissolves under chrome" effect.
      */
     &::after {
         content: "";
@@ -126,17 +124,30 @@ const PageHeader = styled.header`
         background: var(--glass-specular-bottom);
         pointer-events: none;
         z-index: 0;
-        mask-image: linear-gradient(
-            to bottom,
-            black calc(100% - 12px),
-            transparent 100%
-        );
-        -webkit-mask-image: linear-gradient(
-            to bottom,
-            black calc(100% - 12px),
-            transparent 100%
-        );
     }
+
+    /*
+     * Scroll-edge dissolve: mask the bottom 12 px of the chrome
+     * surface itself (including its backdrop-filter blur and tinted
+     * background) so scrolling content fades up through the chrome
+     * edge instead of hitting a hard cut. The 12 px is added as
+     * padding-bottom so the LeftCluster / RightCluster children sit
+     * above the masked region and don't get clipped — the bottom
+     * 12 px is intentional dead-zone trim that only the chrome
+     * paints into. forced-colors + reduced-transparency drop the
+     * mask below.
+     */
+    padding-bottom: 12px;
+    mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
 
     /*
      * Children sit above the rim pseudo-elements. The two flex
@@ -161,12 +172,13 @@ const PageHeader = styled.header`
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
 
         &::before,
         &::after {
             background: none;
-            mask-image: none;
-            -webkit-mask-image: none;
         }
     }
 
@@ -177,11 +189,13 @@ const PageHeader = styled.header`
      * on top.
      */
     @media (forced-colors: active) {
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
+
         &::before,
         &::after {
             background: none;
-            mask-image: none;
-            -webkit-mask-image: none;
         }
     }
 
@@ -464,12 +478,19 @@ const BrandLink = styled(NoPaddingButton)`
     /*
      * Phase 5 "Liquid Glass" Wave 2 — gel-flex on the brand pill.
      * Yields under press for the same tactile feedback the IconButton
-     * + PillTrigger get. AntD Button already paints its own
-     * transitions; layer the transform onto whatever it ships rather
-     * than overriding the whole rule.
+     * + PillTrigger get. The shorthand REPLACES AntD's own
+     * transition:all so we re-enumerate the colour / bg / border /
+     * box-shadow channels AntD animates (using AntD's own 100 ms
+     * cadence) and stack the spring-timed transform on top. Without
+     * the enumeration, AntD's hover bg / colour changes go instant.
      */
-    transition: transform var(--motion-gel-flex, 220ms)
-        var(--easing-spring-snap, ease-out);
+    transition:
+        color 100ms ease-in-out,
+        background 100ms ease-in-out,
+        border-color 100ms ease-in-out,
+        box-shadow 100ms ease-in-out,
+        transform var(--motion-gel-flex, 220ms)
+            var(--easing-spring-snap, ease-out);
     will-change: transform;
 
     && {

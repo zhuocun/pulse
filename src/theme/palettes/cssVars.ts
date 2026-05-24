@@ -35,10 +35,25 @@ const composeBackdropFilter = (preset: {
  * enforces parity with the token source (see the "intensity
  * constants stay in sync with glass.intensity tokens" assertion in
  * cssVars.test.ts).
+ *
+ * Phase 5 Wave 2 integration: extended with per-surface-tier ladders.
+ * The chrome ships three blur tiers — subtle (column header sticky
+ * over scrolling tasks; ~12px), regular (header / tab bar / TopBar;
+ * 20px), strong (auth FormCard showpiece; 28px). The user-facing
+ * intensity toggle scales all three tiers in concert: Clear softens
+ * every tier, Solid wipes every tier to none. Without per-tier vars
+ * the chrome that used to ship 12px or 28px would have been forced
+ * to the uniform 20px at default intensity (pixel-parity regression).
  */
 const INTENSITY_CLEAR = { blur: 14, saturation: 170 } as const;
 const INTENSITY_REGULAR = { blur: 20, saturation: 180 } as const;
 const INTENSITY_SOLID = { blur: 0, saturation: 180 } as const;
+
+const INTENSITY_SUBTLE_CLEAR = { blur: 8, saturation: 170 } as const;
+const INTENSITY_SUBTLE_REGULAR = { blur: 12, saturation: 180 } as const;
+
+const INTENSITY_STRONG_CLEAR = { blur: 20, saturation: 180 } as const;
+const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
 
 /**
  * Render the runtime CSS custom properties for a palette. The output is a
@@ -128,6 +143,8 @@ html[data-color-scheme="light"] {
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
 
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
 
     --aurora-blob: rgba(${p.accent.rgb}, 0.10);
     --aurora-blob-strong: rgba(${p.accent.rgb}, 0.20);
@@ -170,6 +187,8 @@ html[data-color-scheme="dark"] {
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
 
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
 
     --aurora-blob: rgba(${p.accent.rgbDark}, 0.14);
     --aurora-blob-strong: rgba(${p.accent.rgbDark}, 0.24);
@@ -193,10 +212,14 @@ html[data-color-scheme="dark"] {
  */
 html[data-glass-intensity="clear"] {
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_CLEAR)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_CLEAR)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_CLEAR)};
 }
 
 html[data-glass-intensity="solid"] {
     --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
 }
 
 /*
@@ -214,6 +237,8 @@ html[data-glass-intensity="solid"] {
     html[data-color-scheme="light"],
     html[data-color-scheme="dark"] {
         --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
     }
 }
 `;

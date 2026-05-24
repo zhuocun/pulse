@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-import { blur, radius } from "../../theme/tokens";
+import { radius } from "../../theme/tokens";
 
 /**
  * Shared frosted-glass surface (Phase 5 "Liquid Glass" — Wave 1 T2).
@@ -76,16 +76,33 @@ const INTENSITY_SURFACE: Record<GlassPanelIntensity, string> = {
     subtle: "var(--glass-surface-subtle)"
 };
 
-const INTENSITY_BLUR_PX: Record<GlassPanelIntensity, number> = {
-    strong: blur.md,
-    regular: blur.md,
-    subtle: blur.sm
-};
-
-const INTENSITY_SATURATION: Record<GlassPanelIntensity, string> = {
-    strong: "170%",
-    regular: "180%",
-    subtle: "160%"
+/*
+ * Phase 5 Wave 2 integration — consume the per-tier intensity CSS vars
+ * so the global user-facing toggle (Clear / Regular / Solid) re-tunes
+ * every GlassPanel callsite uniformly with the rest of the chrome.
+ * The vars carry both blur + saturation; the user toggle handles the
+ * Clear / Solid overrides at the cssVars layer. At default intensity:
+ *
+ *   - subtle  → 12 px / 180% (matches CopilotDock body's prior recipe;
+ *                              saturation lifts from 160 → 180,
+ *                              imperceptible delta)
+ *   - regular → 20 px / 180% (matches header / bottom-tab bar recipe)
+ *   - strong  → 20 px / 180% (matches AiTaskAssistPanel + welcome-
+ *                              banner's prior blur; saturation lifts
+ *                              from 170 → 180, imperceptible delta —
+ *                              the "strong" character is carried by
+ *                              surface alpha + border + drop shadow,
+ *                              not by saturation)
+ *
+ * Previously these were hardcoded `blur(${blur.md}px) saturate(170%)`
+ * literals which silently bypassed the user toggle (only the App.css
+ * `[data-glass-context="true"]` opt-out caught GlassPanel under solid).
+ * Now the toggle reaches every surface.
+ */
+const INTENSITY_BACKDROP_FILTER: Record<GlassPanelIntensity, string> = {
+    strong: "var(--ant-backdrop-filter-glass)",
+    regular: "var(--ant-backdrop-filter-glass)",
+    subtle: "var(--ant-backdrop-filter-glass-subtle)"
 };
 
 const INTENSITY_BORDER: Record<GlassPanelIntensity, string> = {
@@ -149,10 +166,8 @@ const GlassRoot = styled.div<GlassRootProps>`
     position: relative;
     background: ${(p) =>
         `${TONE_OVERLAY[p.$tone]}${INTENSITY_SURFACE[p.$intensity]}`};
-    backdrop-filter: blur(${(p) => INTENSITY_BLUR_PX[p.$intensity]}px)
-        saturate(${(p) => INTENSITY_SATURATION[p.$intensity]});
-    -webkit-backdrop-filter: blur(${(p) => INTENSITY_BLUR_PX[p.$intensity]}px)
-        saturate(${(p) => INTENSITY_SATURATION[p.$intensity]});
+    backdrop-filter: ${(p) => INTENSITY_BACKDROP_FILTER[p.$intensity]};
+    -webkit-backdrop-filter: ${(p) => INTENSITY_BACKDROP_FILTER[p.$intensity]};
     border: 1px solid ${(p) => INTENSITY_BORDER[p.$intensity]};
     border-radius: ${radius.lg}px;
     box-shadow: ${(p) => INTENSITY_TONE_SHADOW[p.$intensity][p.$tone]};

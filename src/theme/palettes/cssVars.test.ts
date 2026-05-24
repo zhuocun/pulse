@@ -53,6 +53,11 @@ const REQUIRED_LIGHT_VARS = [
     "--easing-spring-soft",
     "--easing-spring-snap",
     "--ant-backdrop-filter-glass",
+    // Wave 2 integration — per-surface-tier intensity vars so the user
+    // toggle reaches subtle / regular / strong surfaces without forcing
+    // a uniform-blur compromise.
+    "--ant-backdrop-filter-glass-subtle",
+    "--ant-backdrop-filter-glass-strong",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -360,22 +365,81 @@ describe("paletteToCss", () => {
          */
         it("intensity constants stay in sync with glass.intensity tokens (mirror parity)", () => {
             const css = paletteToCss(orangePalette);
-            // Clear override → uses glass.intensityClear.{blur, saturation}.
-            expect(css).toContain(
-                `html[data-glass-intensity="clear"] {
-    --ant-backdrop-filter-glass: blur(${glass.intensityClear.blur}px) saturate(${glass.intensityClear.saturation}%);
-}`
+            // Clear override block now ships three lines (one var per
+            // surface tier — subtle, regular, strong). The base var is
+            // glass.intensityClear-driven; the subtle/strong vars are
+            // sibling presets in the cssVars mirror.
+            expect(css).toMatch(
+                new RegExp(
+                    `html\\[data-glass-intensity="clear"\\]\\s*\\{[\\s\\S]*?--ant-backdrop-filter-glass:\\s*blur\\(${glass.intensityClear.blur}px\\)\\s*saturate\\(${glass.intensityClear.saturation}%\\);`
+                )
             );
-            // Solid override → blur === 0 composes to "none".
+            // Solid override → blur === 0 composes to "none" for all
+            // three vars.
             expect(glass.intensitySolid.blur).toBe(0);
-            expect(css).toContain(
-                `html[data-glass-intensity="solid"] {
-    --ant-backdrop-filter-glass: none;
-}`
+            expect(css).toMatch(
+                /html\[data-glass-intensity="solid"\]\s*\{\s*--ant-backdrop-filter-glass:\s*none;[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;[\s\S]*?\}/
             );
             // Regular default at :root → uses glass.intensityRegular.
             expect(css).toContain(
                 `--ant-backdrop-filter-glass: blur(${glass.intensityRegular.blur}px) saturate(${glass.intensityRegular.saturation}%);`
+            );
+        });
+
+        /*
+         * Wave 2 integration — the per-tier intensity ladder. Subtle
+         * and strong vars sit alongside the regular var so chrome
+         * surfaces that previously shipped 12 px (ColumnHeader) or
+         * 28 px (auth FormCard) can keep their blur character while
+         * still flipping under the user toggle.
+         */
+        it("emits --ant-backdrop-filter-glass-subtle at the subtle tier default", () => {
+            const css = paletteToCss(orangePalette);
+            // Subtle tier default: 12 px / 180% (matches the column
+            // header's pre-toggle recipe pixel-for-pixel).
+            expect(lightBlockOf(css)).toMatch(
+                /--ant-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
+            );
+            expect(darkBlockOf(css)).toMatch(
+                /--ant-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
+            );
+        });
+
+        it("emits --ant-backdrop-filter-glass-strong at the strong tier default", () => {
+            const css = paletteToCss(orangePalette);
+            // Strong tier default: 28 px / 180% (matches the auth
+            // FormCard's pre-toggle showpiece recipe pixel-for-pixel).
+            expect(lightBlockOf(css)).toMatch(
+                /--ant-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
+            );
+            expect(darkBlockOf(css)).toMatch(
+                /--ant-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
+            );
+        });
+
+        it("scales the subtle + strong vars under clear intensity", () => {
+            // Clear softens every tier proportionally — subtle drops
+            // to 8 px / 170%, strong drops to 20 px / 180%.
+            const css = paletteToCss(orangePalette);
+            expect(css).toMatch(
+                /html\[data-glass-intensity="clear"\][\s\S]*?--ant-backdrop-filter-glass-subtle:\s*blur\(8px\)\s*saturate\(170%\);/
+            );
+            expect(css).toMatch(
+                /html\[data-glass-intensity="clear"\][\s\S]*?--ant-backdrop-filter-glass-strong:\s*blur\(20px\)\s*saturate\(180%\);/
+            );
+        });
+
+        it("wipes the subtle + strong vars under solid intensity (all become none)", () => {
+            const css = paletteToCss(orangePalette);
+            expect(css).toMatch(
+                /html\[data-glass-intensity="solid"\][\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
+            );
+        });
+
+        it("wipes the subtle + strong vars under prefers-reduced-transparency (OS wins)", () => {
+            const css = paletteToCss(orangePalette);
+            expect(css).toMatch(
+                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
             );
         });
     });

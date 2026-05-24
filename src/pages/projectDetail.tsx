@@ -86,10 +86,11 @@ const TopBar = styled.div`
     }
 
     /*
-     * Bottom-trailing companion + scroll-edge dissolve. Same recipe
-     * the main header ships — fades the bottom 12 px of the chrome
-     * into transparency so content scrolling under the sticky bar
-     * dissolves through the edge rather than terminating in a cut.
+     * Bottom-trailing companion. ::after paints the soft trough on
+     * the opposite corner from the rim highlight. The scroll-edge
+     * dissolve is on the chrome element itself (below) — masking
+     * ::after would only fade the rim shadow, not the actual chrome
+     * surface that needs to taper.
      */
     &::after {
         content: "";
@@ -99,17 +100,27 @@ const TopBar = styled.div`
         background: var(--glass-specular-bottom);
         pointer-events: none;
         z-index: 0;
-        mask-image: linear-gradient(
-            to bottom,
-            black calc(100% - 12px),
-            transparent 100%
-        );
-        -webkit-mask-image: linear-gradient(
-            to bottom,
-            black calc(100% - 12px),
-            transparent 100%
-        );
     }
+
+    /*
+     * Scroll-edge dissolve: mask the bottom 12 px of the chrome
+     * (including backdrop-filter + tinted background) so content
+     * scrolling under the sticky bar fades up through the edge. The
+     * 12 px lives in padding-bottom so the breadcrumb / tabs row
+     * (the > * descendants) sit above the masked region and don't
+     * get clipped. Same recipe as the page header.
+     */
+    padding-bottom: 12px;
+    mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black calc(100% - 12px),
+        transparent 100%
+    );
 
     /* Children sit above the rim pseudo-elements. */
     > * {
@@ -143,12 +154,13 @@ const TopBar = styled.div`
         background-attachment: fixed;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
 
         &::before,
         &::after {
             background: none;
-            mask-image: none;
-            -webkit-mask-image: none;
         }
     }
 
@@ -158,11 +170,13 @@ const TopBar = styled.div`
      * CanvasText win.
      */
     @media (forced-colors: active) {
+        padding-bottom: 0;
+        mask-image: none;
+        -webkit-mask-image: none;
+
         &::before,
         &::after {
             background: none;
-            mask-image: none;
-            -webkit-mask-image: none;
         }
     }
 
