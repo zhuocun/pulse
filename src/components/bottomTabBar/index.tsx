@@ -148,7 +148,6 @@ const Nav = styled.nav<{ $hidden: boolean; $minimized: boolean }>`
      */
     padding: ${INNER_PADDING}px ${INNER_PADDING}px;
     position: fixed;
-    transform: translateX(-50%);
     /*
      * Width clamps to min(viewport minus inset, 480 px). Keeps the
      * bar comfortably wide on small phones and capped on tablets in
