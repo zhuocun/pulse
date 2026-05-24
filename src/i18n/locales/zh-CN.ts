@@ -267,12 +267,6 @@ const zhCN: Dictionary = {
         describeWork: "用您自己的话描述这项工作"
     },
     options: {
-        sort: {
-            nameAsc: "名称(A → Z)",
-            nameDesc: "名称(Z → A)",
-            newest: "最新优先",
-            oldest: "最旧优先"
-        },
         projectListSort: {
             createdAtDesc: "最新优先",
             createdAtAsc: "最旧优先",

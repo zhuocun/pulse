@@ -415,18 +415,37 @@ const ProjectPage = () => {
             shortcutSearchParams.get("openCopilot") === "1";
         if (hasShortcutParam) return;
         defaultsAppliedRef.current = true;
+        /*
+         * Phase 4.2 review follow-up — only write defaults into the URL
+         * when the user has explicitly saved one. Without this guard
+         * every fresh mount with no saved default would push the
+         * fallback `sort=createdAt-desc` into the URL, polluting the
+         * address bar for users who never opted in. When `savedDefaults`
+         * is null the list still renders correctly: `narrowSort` (and
+         * the rest of the page) falls through to the same
+         * `PROJECT_LIST_DEFAULTS_FALLBACK` baseline, the URL just stays
+         * clean.
+         */
+        if (savedProjectListDefaults === null) return;
         setParam({
-            sort: projectListDefaults.sort,
-            managerId: projectListDefaults.managerId ?? "",
-            favoritedOnly: projectListDefaults.favoritedOnly ? "1" : ""
+            sort: savedProjectListDefaults.sort,
+            managerId: savedProjectListDefaults.managerId ?? "",
+            favoritedOnly: savedProjectListDefaults.favoritedOnly ? "1" : ""
         });
         // Re-run when the shortcut params change so the deferred branch
         // above eventually fires on the post-strip render. The
         // `defaultsAppliedRef` guard keeps the write to a single
         // dispatch across the page's lifetime. `param`, `setParam`,
-        // and `projectListDefaults` are intentionally omitted: each
-        // change to those is what the user is reacting to and we
-        // want a one-shot apply on the initial render flow.
+        // and `savedProjectListDefaults` are intentionally omitted:
+        // adding them would re-fire the effect on every user filter
+        // tweak (and on the save-default click that mutates the slice
+        // from inside the panel), racing the PWA-shortcut strip
+        // documented above. The one-shot contract is enforced by the
+        // ref guard, not by the dep array — this is a load-bearing
+        // dep-array omission, not an oversight. The repo doesn't have
+        // `react-hooks/exhaustive-deps` enabled today so a disable
+        // comment would dangle; we rely on this comment block to keep
+        // future maintainers from "fixing" the deps.
     }, [shortcutSearchParams]);
     /*
      * Only the API-triggering params (projectName, managerId) are debounced;

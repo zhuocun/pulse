@@ -276,4 +276,47 @@ describe("ProjectSearchPanel", () => {
             })
         ).not.toBeInTheDocument();
     });
+
+    /*
+     * Phase 4.2 review follow-up — the DefaultsToolbar buttons render as
+     * compact `type="link"` AntD elements, well under the WCAG 2.5.8
+     * 44×44 touch target minimum on coarse-pointer (touch) devices. A
+     * `::before` pseudo-element expander sits on the wrapping
+     * `TouchTargetSlot` and is gated on `@media (pointer: coarse)` so
+     * desktop pointers stay precise. JSDOM doesn't evaluate the media
+     * query at layout time; the `data-touch-hit-area="44"` marker on
+     * the wrapper is the stable contract — a refactor that drops the
+     * wrapper would lose the marker AND the rule, tripping this
+     * assertion loudly. Mirrors the columnReadinessPill convention
+     * (PR #308 Followup B → PR #309 review).
+     */
+    it("wraps each defaults-toolbar button in a 44×44 touch-target slot on coarse pointers", () => {
+        render(
+            <ProjectSearchPanel
+                loading={false}
+                members={members}
+                param={{ projectName: "Road", managerId: "u1" }}
+                setParam={jest.fn()}
+                favoritedOnly
+                onFavoritedOnlyChange={jest.fn()}
+                hasSavedDefaults
+                onSaveDefault={jest.fn()}
+                onResetToDefault={jest.fn()}
+                onClearSavedDefault={jest.fn()}
+            />
+        );
+
+        // All three buttons (save / reset / clear) wear the slot when
+        // their callback + visibility gate is satisfied. The slot is
+        // the styled `<span>` that immediately wraps the AntD
+        // Tooltip / Button.
+        const slots = document.querySelectorAll('[data-touch-hit-area="44"]');
+        expect(slots.length).toBe(3);
+
+        // Each slot must wrap an actual interactive button — otherwise
+        // the expander is hanging in the DOM with no target.
+        slots.forEach((slot) => {
+            expect(slot.querySelector("button")).not.toBeNull();
+        });
+    });
 });

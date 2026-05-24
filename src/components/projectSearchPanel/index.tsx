@@ -129,6 +129,39 @@ const DefaultsToolbar = styled.div`
     padding-top: ${space.xs}px;
 `;
 
+/*
+ * Phase 4.2 review follow-up — touch hit-area expander mirroring the
+ * `columnReadinessPill` pattern from Wave 4. The toolbar's
+ * `type="link"` buttons are well under the WCAG 2.5.8 minimum 44×44
+ * tap target on coarse-pointer (touch) devices. A `::before`
+ * pseudo-element pads the click target out to 44×44 without changing
+ * the visible button size — the AntD link styling stays compact for
+ * fine-pointer (mouse) users, and the negative z-index keeps the
+ * expander behind the visible label so it doesn't sit on top of the
+ * text. The rule is gated on `(pointer: coarse)` so desktop
+ * precision pointing isn't affected. The `data-touch-hit-area="44"`
+ * marker on the wrapper is the stable contract for the test harness
+ * (mirrors the columnReadinessPill convention — a refactor that
+ * drops the wrapper would lose the marker AND the rule, tripping
+ * the assertion loudly).
+ */
+const TouchTargetSlot = styled.span`
+    display: inline-flex;
+    position: relative;
+
+    @media (pointer: coarse) {
+        &::before {
+            content: "";
+            inset: 50% auto auto 50%;
+            min-block-size: 44px;
+            min-inline-size: 44px;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+        }
+    }
+`;
+
 const FavoritedToggleButton = styled(Button, {
     /*
      * Drop the transient `$active` prop before forwarding to the
@@ -340,38 +373,50 @@ const ProjectSearchPanel: React.FC<Props> = ({
                     aria-label={microcopy.a11y.saveCurrentAsDefault}
                 >
                     {onSaveDefault ? (
-                        <Tooltip title={microcopy.a11y.saveCurrentAsDefault}>
-                            <Button
-                                aria-label={microcopy.a11y.saveCurrentAsDefault}
-                                onClick={handleSaveDefault}
-                                size="small"
-                                type="link"
+                        <TouchTargetSlot data-touch-hit-area="44">
+                            <Tooltip
+                                title={microcopy.a11y.saveCurrentAsDefault}
                             >
-                                {microcopy.actions.saveAsDefault}
-                            </Button>
-                        </Tooltip>
+                                <Button
+                                    aria-label={
+                                        microcopy.a11y.saveCurrentAsDefault
+                                    }
+                                    onClick={handleSaveDefault}
+                                    size="small"
+                                    type="link"
+                                >
+                                    {microcopy.actions.saveAsDefault}
+                                </Button>
+                            </Tooltip>
+                        </TouchTargetSlot>
                     ) : null}
                     {onResetToDefault && hasSavedDefaults ? (
-                        <Tooltip title={microcopy.a11y.resetToSavedDefault}>
+                        <TouchTargetSlot data-touch-hit-area="44">
+                            <Tooltip title={microcopy.a11y.resetToSavedDefault}>
+                                <Button
+                                    aria-label={
+                                        microcopy.a11y.resetToSavedDefault
+                                    }
+                                    onClick={handleResetToDefault}
+                                    size="small"
+                                    type="link"
+                                >
+                                    {microcopy.actions.resetToDefault}
+                                </Button>
+                            </Tooltip>
+                        </TouchTargetSlot>
+                    ) : null}
+                    {onClearSavedDefault && hasSavedDefaults ? (
+                        <TouchTargetSlot data-touch-hit-area="44">
                             <Button
-                                aria-label={microcopy.a11y.resetToSavedDefault}
-                                onClick={handleResetToDefault}
+                                aria-label={microcopy.actions.clear}
+                                onClick={onClearSavedDefault}
                                 size="small"
                                 type="link"
                             >
-                                {microcopy.actions.resetToDefault}
+                                {microcopy.actions.clear}
                             </Button>
-                        </Tooltip>
-                    ) : null}
-                    {onClearSavedDefault && hasSavedDefaults ? (
-                        <Button
-                            aria-label={microcopy.actions.clear}
-                            onClick={onClearSavedDefault}
-                            size="small"
-                            type="link"
-                        >
-                            {microcopy.actions.clear}
-                        </Button>
+                        </TouchTargetSlot>
                     ) : null}
                 </DefaultsToolbar>
             ) : null}
