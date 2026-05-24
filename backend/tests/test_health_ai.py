@@ -256,3 +256,88 @@ def test_hosted_memory_checkpointer_emits_uri_warning(
     body = response.json()
     assert body["hostedPlatform"] is not None
     assert any("AGENT_POSTGRES_URI" in w for w in body["warnings"])
+
+
+def test_hosted_with_localhost_only_cors_emits_warning(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hosted deploy + localhost-only CORS origins surfaces as a *warning*.
+
+    The branch in ``_ai_readiness_payload`` calls the router-local
+    :func:`_is_localhost_origin` for every entry; if every entry is a
+    loopback variant the readiness payload surfaces a CORS warning so
+    the operator dashboard pairs it with the boot-log gotcha. Empty
+    ``cors_origin_regex`` is required (a non-empty regex means the
+    operator opted into multi-origin matching).
+    """
+
+    monkeypatch.setenv("VERCEL", "1")
+    _patch_settings(
+        monkeypatch,
+        cors_origins=("http://localhost:3000", "http://127.0.0.1:3000"),
+        cors_origin_regex="",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert body["hostedPlatform"] is not None
+    assert any("localhost-only" in w for w in body["warnings"]), (
+        f"expected localhost-only CORS warning, got {body['warnings']!r}"
+    )
+
+
+def test_localhost_cors_warning_silent_for_non_loopback_origins(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real production origin must not trip the localhost CORS warning.
+
+    Exercises the early-return branches of the router-local
+    :func:`_is_localhost_origin`: the scheme guard (``file://``) and the
+    host-comparison path (``https://app.example.com`` -> not loopback).
+    """
+
+    monkeypatch.setenv("VERCEL", "1")
+    _patch_settings(
+        monkeypatch,
+        cors_origins=("https://app.example.com", "file:///tmp/idx.html"),
+        cors_origin_regex="",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert not any("localhost-only" in w for w in body["warnings"]), (
+        f"unexpected localhost-only CORS warning: {body['warnings']!r}"
+    )
+
+
+def test_postgres_backend_without_runtime_checkpointer_surfaces_issue(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``AGENT_CHECKPOINT_BACKEND=postgres`` + no runtime checkpointer is an issue.
+
+    Simulates a boot where ``AsyncPostgresSaver.setup()`` would have
+    been swallowed: the resolved backend is still ``postgres`` (because
+    the operator set the env var explicitly) but the runtime never
+    received a live saver. The readiness payload must surface this as
+    an *issue* (not merely a warning) so ``ready`` flips to ``False``
+    and the operator dashboard renders the red banner.
+    """
+
+    _patch_settings(
+        monkeypatch,
+        agent_checkpoint_backend="postgres",
+        agent_postgres_uri="postgres://example.invalid/db",
+    )
+    runtime = client.app.state.agent_runtime
+    monkeypatch.setattr(runtime, "_checkpointer", None, raising=False)
+
+    response = client.get("/api/v1/health/ai")
+    assert response.status_code == HTTPStatus.OK
+    body = response.json()
+    assert body["checkpointerBackend"] == "postgres"
+    assert body["ready"] is False
+    assert any(
+        "AGENT_CHECKPOINT_BACKEND=postgres" in issue
+        and "runtime checkpointer is None" in issue
+        for issue in body["issues"]
+    ), f"expected postgres-no-checkpointer issue, got {body['issues']!r}"

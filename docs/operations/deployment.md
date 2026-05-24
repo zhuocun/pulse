@@ -263,7 +263,9 @@ on login — see Beta §3 closure in
 
 ## Post-deploy verification
 
-Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`:
+Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
+
+**Start here** (every operator, every deploy):
 
 - `GET /api/v1/health/ai?probe=true` (no auth required — operator-debugging probe). Confirm:
   - `"ready": true`
@@ -272,8 +274,22 @@ Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_A
   - `"jwtSecretSource"` is `"env"` (explicit UUID) or `"persisted"` (Mongo-bootstrapped) — never `"ephemeral"` in production
   - `"issues": []` is empty
   Example: `curl -s https://<your-be>/api/v1/health/ai?probe=true | jq .`
+
+A clean `?probe=true` covers most surface-level misconfigurations in one
+call; the per-surface checks below pin behaviours the readiness probe
+cannot exercise from outside.
+
+**v1 polish AI shim** (`POST /api/ai/{...}`):
+
 - `POST /api/ai/readiness` with at least one issue → response must contain no `suggestion: null` keys (the key must be omitted entirely when there is no suggestion).
-- `POST /api/v1/agents/board-brief-agent/stream` → SSE citation objects must carry `source: "task"` or `source: "column"`, not `"fe.boardSnapshot"`.
+
+**v2.1 streaming agents** (`POST /api/v1/agents/{name}/stream`):
+
+- `POST /api/v1/agents/board-brief-agent/stream` → SSE citation objects must carry `source: "task"` or `source: "column"`, not `"fe.boardSnapshot"`. Requires a long-lived runtime (Fly / Render / ECS) — Vercel's serverless functions cannot hold an SSE connection open long enough to verify this surface.
+
+**Operational** (idempotency, worker topology, durable state):
+
+- If you used the small-group quickstart, you can skip the multi-worker negative test (default deploy is single-worker).
 - Idempotency dedupe: send the same `Idempotency-Key` twice within the dedup window → the second call must return the cached result without re-invoking the LLM (confirm by checking that `/health` budget metrics did not increment twice).
 - Multi-worker without Redis: set `UVICORN_WORKERS=2` (or equivalent)
   with `RATE_LIMIT_BACKEND=memory` → the process **must not start**
