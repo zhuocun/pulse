@@ -12,6 +12,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
 import { projectActions } from "../store/reducers/projectModalSlice";
+import { userPreferencesActions } from "../store/reducers/userPreferencesSlice";
 
 import ProjectPage from "./project";
 
@@ -521,6 +522,136 @@ describe("ProjectPage", () => {
                 expect(search).not.toContain("openTaskCreator");
                 expect(search).toContain("projectName=Road");
                 expect(search).toContain("managerId=member-1");
+            });
+        });
+    });
+
+    /*
+     * Phase 4.2 — saved project-list defaults. The page applies the
+     * user's saved defaults (or the `PROJECT_LIST_DEFAULTS_FALLBACK`)
+     * to the URL on first load when no filter / sort params are
+     * present. Explicit user filter changes do NOT auto-update the
+     * saved default — the user must click "Save as default" in the
+     * search panel.
+     */
+    describe("project-list saved defaults", () => {
+        afterEach(() => {
+            // Reset the persisted slice between cases so subsequent
+            // tests start from a known-empty default state.
+            act(() => {
+                store.dispatch(
+                    userPreferencesActions.setProjectListDefaults(null)
+                );
+            });
+        });
+
+        it("applies the fallback default sort on first load with no URL params", async () => {
+            renderPage();
+
+            // The fallback default sort is `createdAt-desc` — the
+            // first-load effect writes it to the URL once the page
+            // mounts, so the LocationProbe should reflect it.
+            await waitFor(() => {
+                const search = screen.getByTestId("location").textContent ?? "";
+                expect(search).toContain("sort=createdAt-desc");
+            });
+        });
+
+        it("applies the saved default sort + favoritedOnly on first load", async () => {
+            // Pre-seed the slice with a saved default that differs
+            // from the fallback so the assertion proves we're reading
+            // through to the user's preference (not just defaulting).
+            act(() => {
+                store.dispatch(
+                    userPreferencesActions.setProjectListDefaults({
+                        sort: "name-asc",
+                        managerId: "member-1",
+                        favoritedOnly: true
+                    })
+                );
+            });
+
+            renderPage();
+
+            await waitFor(() => {
+                const search = screen.getByTestId("location").textContent ?? "";
+                expect(search).toContain("sort=name-asc");
+                expect(search).toContain("managerId=member-1");
+                expect(search).toContain("favoritedOnly=1");
+            });
+        });
+
+        it("does NOT apply defaults when the URL already has filter/sort params", async () => {
+            // Seed a saved default — but the URL carries an explicit
+            // sort param, so the effect must leave the URL alone.
+            act(() => {
+                store.dispatch(
+                    userPreferencesActions.setProjectListDefaults({
+                        sort: "favorited-first",
+                        managerId: "member-2",
+                        favoritedOnly: true
+                    })
+                );
+            });
+
+            renderPage("/projects?sort=name-desc");
+
+            await screen.findByText("Roadmap");
+
+            // The URL keeps its explicit sort; the saved default sort
+            // (`favorited-first`) and managerId never get written.
+            const search = screen.getByTestId("location").textContent ?? "";
+            expect(search).toContain("sort=name-desc");
+            expect(search).not.toContain("sort=favorited-first");
+            expect(search).not.toContain("managerId=member-2");
+        });
+
+        it('persists current filters to the slice when "Save as default" is clicked', async () => {
+            renderPage("/projects?sort=name-desc&managerId=member-1");
+            await screen.findByText("Roadmap");
+
+            const saveBtn = screen.getByRole("button", {
+                name: /save current filters as default/i
+            });
+            fireEvent.click(saveBtn);
+
+            await waitFor(() => {
+                const saved =
+                    store.getState().userPreferences.projectListDefaults;
+                expect(saved).toEqual({
+                    sort: "name-desc",
+                    managerId: "member-1",
+                    favoritedOnly: false
+                });
+            });
+        });
+
+        it('"Reset to default" rewrites the URL to the saved default', async () => {
+            // Pre-seed a saved default, then load the page with a
+            // completely different sort / manager / favoritedOnly
+            // in the URL. Click "Reset to default" and assert the URL
+            // snaps to the saved default.
+            act(() => {
+                store.dispatch(
+                    userPreferencesActions.setProjectListDefaults({
+                        sort: "name-asc",
+                        managerId: null,
+                        favoritedOnly: false
+                    })
+                );
+            });
+            renderPage("/projects?sort=name-desc&managerId=member-2");
+            await screen.findByText("Roadmap");
+
+            const resetBtn = await screen.findByRole("button", {
+                name: /reset filters to saved default/i
+            });
+            fireEvent.click(resetBtn);
+
+            await waitFor(() => {
+                const search = screen.getByTestId("location").textContent ?? "";
+                expect(search).toContain("sort=name-asc");
+                expect(search).not.toContain("managerId=");
             });
         });
     });

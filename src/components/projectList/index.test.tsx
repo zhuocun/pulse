@@ -272,15 +272,28 @@ describe("ProjectList", () => {
     it("sorts project cards by name from the sort selector", async () => {
         renderList({
             dataSource: [
-                project({ _id: "project-z", projectName: "Zulu" }),
-                project({ _id: "project-a", projectName: "Alpha" })
+                project({
+                    _id: "project-z",
+                    projectName: "Zulu",
+                    // Disambiguate the createdAt timestamps so the
+                    // default `createdAt-desc` sort has a deterministic
+                    // ordering (newest first → Zulu).
+                    createdAt: "2026-05-02T00:00:00.000Z"
+                }),
+                project({
+                    _id: "project-a",
+                    projectName: "Alpha",
+                    createdAt: "2026-04-25T00:00:00.000Z"
+                })
             ]
         });
 
-        // Default sort is "Name (A → Z)" — Alpha comes first.
+        // Phase 4.2 — the default sort is now `createdAt-desc` (newest
+        // first) to match the saved-default fallback. Zulu has the
+        // later createdAt, so it appears first.
         expect(
             screen.getAllByRole("link").map((link) => link.textContent)
-        ).toEqual(["Alpha", "Zulu"]);
+        ).toEqual(["Zulu", "Alpha"]);
     });
 
     const projectNamesInGridOrder = () =>
@@ -290,7 +303,29 @@ describe("ProjectList", () => {
         fireEvent.mouseDown(
             screen.getByRole("combobox", { name: /sort projects/i })
         );
-        fireEvent.click(await screen.findByText(label));
+        /*
+         * AntD Select renders two parallel option surfaces:
+         *   1. A screen-reader listbox with `role="option"` and the
+         *      raw VALUE as `textContent` (and the human label as
+         *      `aria-label`). This is the one `findAllByRole("option")`
+         *      returns.
+         *   2. The visible virtual list, where options use `class=
+         *      "ant-select-item-option"` (no `role`) and the label
+         *      appears as `textContent` + the `title` attribute.
+         *
+         * We dispatch the click against the visible option (surface 2)
+         * since that's what mouse / keyboard users actually hit. The
+         * `title` attribute is the simplest way to locate it — it
+         * carries the label verbatim and is unique within the popup.
+         */
+        const candidates = await screen.findAllByTitle(label);
+        const option = candidates.find((node) =>
+            node.classList.contains("ant-select-item-option")
+        );
+        if (!option) {
+            throw new Error(`No sort option matched ${label}.`);
+        }
+        fireEvent.click(option);
     };
 
     it("keeps stable order for empty createdAt when sorting newest", async () => {
