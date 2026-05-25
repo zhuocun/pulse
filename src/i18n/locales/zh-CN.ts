@@ -40,6 +40,7 @@ const zhCN: Dictionary = {
         logOut: "退出登录",
         registerCta: "注册账号",
         loginCta: "登录账号",
+        refresh: "刷新",
         resetFilters: "重置筛选",
         retry: "重试",
         save: "保存",
@@ -1126,6 +1127,11 @@ const zhCN: Dictionary = {
         reload: "刷新",
         dismiss: "稍后",
         ariaLabel: "新版本可用通知"
+    },
+    pullToRefresh: {
+        pull: "下拉刷新",
+        release: "松开刷新",
+        refreshing: "正在刷新…"
     }
 };
 
