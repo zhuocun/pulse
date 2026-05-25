@@ -22,7 +22,7 @@ const SummaryRoot = styled.div`
 `;
 
 const SummaryTitle = styled.h2`
-    color: var(--ant-color-error, #ff4d4f);
+    color: var(--ant-color-error-text, #ff4d4f);
     font-size: ${fontSize.md}px;
     font-weight: ${fontWeight.semibold};
     margin: 0 0 ${space.xs}px;
