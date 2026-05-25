@@ -224,17 +224,7 @@ const Scrim = styled(motion.div)`
 `;
 
 const Surface = styled(motion.div)`
-    background:
-        var(--glass-surface, rgba(255, 255, 255, 0.7)),
-        var(--page-background, #ffffff);
-    backdrop-filter: var(
-        --ant-backdrop-filter-glass,
-        blur(20px) saturate(180%)
-    );
-    -webkit-backdrop-filter: var(
-        --ant-backdrop-filter-glass,
-        blur(20px) saturate(180%)
-    );
+    background: var(--pulse-bg-page, #ffffff);
     border-top: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
     border-radius: ${radius.lg}px ${radius.lg}px 0 0;
     bottom: 0;
@@ -257,17 +247,9 @@ const Surface = styled(motion.div)`
     right: 0;
     z-index: ${Z_INDEX_SURFACE};
 
-    @media (prefers-reduced-transparency: reduce) {
-        background: var(--page-background, #ffffff);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-    }
-
     @media (forced-colors: active) {
         background: Canvas;
         border-top: 1px solid CanvasText;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
     }
 `;
 
@@ -334,15 +316,6 @@ const CloseButton = styled.button`
 `;
 
 const Body = styled.div`
-    /*
-     * Content rests on a solid, opaque surface — never the frosted glass
-     * of the Surface. Liquid-Glass material belongs on the chrome (the
-     * grabber/header and footer bars); a plain content background keeps
-     * the white form fields from floating on the tinted faux-glass, which
-     * is the legibility win HIG calls for. The header / footer stay
-     * transparent over the Surface, so the glass reads as chrome only.
-     */
-    background: var(--pulse-bg-page, #ffffff);
     flex: 1 1 auto;
     overflow-y: auto;
     padding: 16px;
@@ -353,10 +326,6 @@ const Body = styled.div`
      * the bottom 34 pt.
      */
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-
-    @media (forced-colors: active) {
-        background: Canvas;
-    }
 `;
 
 const Footer = styled.div`
