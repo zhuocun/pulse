@@ -7,7 +7,9 @@ import { microcopy, microcopyString } from "../../constants/microcopy";
 import type { MutationProposal, TaskUpdate } from "../../interfaces/agent";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import useAiLedger from "../../utils/hooks/useAiLedger";
+import useHaptic from "../../utils/hooks/useHaptic";
 import CopilotChip, { type CopilotChipTone } from "../copilotChip";
+import SuccessSparkle from "../successSparkle";
 
 /**
  * Mutation preview card (PRD v3 §10.1, §7.4, C-R9). Renders the proposed
@@ -23,6 +25,9 @@ const Wrap = styled.div`
     border-radius: ${radius.md}px;
     margin: ${space.xs}px 0;
     padding: ${space.sm}px;
+    /* Positioning context for the absolutely-positioned success sparkle
+     * burst the card overlays on its committed phase (Wave 8). */
+    position: relative;
 `;
 
 const Heading = styled.div`
@@ -287,6 +292,14 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
      * countdown effect on each tick (issue #5 in the A8 review).
      */
     const { record: recordLedger, remove: removeLedger } = useAiLedger();
+    /*
+     * Wave 8: a success haptic at the accept/commit moment. NOT gated on
+     * `prefers-reduced-motion` — the orchestration brief treats haptics as
+     * a separate accessibility category from motion (see `useHaptic`'s
+     * header), so a motion-off user still feels the confirmation buzz.
+     * Fired exactly once, in the commit branch of the countdown effect.
+     */
+    const { vibrate } = useHaptic();
 
     /**
      * Three-phase lifecycle for the 10-second undo window:
@@ -316,6 +329,9 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                 id: proposal.proposal_id,
                 risk: proposal.risk
             });
+            // Success confirmation buzz at the real commit. Best-effort /
+            // feature-detected inside the hook; a no-op where unsupported.
+            vibrate("success");
             onAccept();
             const hasUndo =
                 proposal.undoable === true && typeof onUndo === "function";
@@ -351,10 +367,13 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
         onAccept,
         onUndo,
         proposal,
-        recordLedger
+        recordLedger,
+        vibrate
         // `removeLedger` intentionally omitted: the closure only uses
         // `recordLedger`; the in-card undo handler below captures
-        // `removeLedger` separately via the component scope.
+        // `removeLedger` separately via the component scope. `vibrate` is
+        // a stable `useCallback` from `useHaptic`, so listing it here
+        // does not re-fire the countdown tick effect each render.
     ]);
 
     const handleAccept = () => {
@@ -553,6 +572,19 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                         {microcopy.mutation.undoAvailableAfterAccepting}
                     </FooterHint>
                 </>
+            )}
+
+            {/*
+             * Wave 8: a one-shot success sparkle burst fires the moment the
+             * proposal reaches the committed phase, bursting over the card.
+             * Decorative only (`aria-hidden`, pointer-events: none) — the
+             * accept already owns its status/ledger announcement — and it
+             * renders nothing under `prefers-reduced-motion` (handled inside
+             * the component). Pairs with the success haptic fired in the
+             * commit branch of the countdown effect above.
+             */}
+            {phase === "committed" && (
+                <SuccessSparkle data-testid="mutation-proposal-sparkle" />
             )}
 
             {/*
