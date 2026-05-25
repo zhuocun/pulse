@@ -1342,6 +1342,18 @@ export const enSource = {
         pull: "Pull to refresh",
         release: "Release to refresh",
         refreshing: "Refreshing…"
+    },
+    /*
+     * Phase 6 Wave 6 — swipe-to-action pane labels. The visible (and
+     * AT-decorative) caption shown under the icon in a SwipeableRow's
+     * revealed action pane. Delete reuses `actions.delete`; these two are
+     * the standalone favorite/unfavorite verbs the heart toggle's
+     * `{name}`-templated aria-labels (`a11y.likeProject` /
+     * `a11y.unlikeProject`) can't double as in a compact pane.
+     */
+    swipeActions: {
+        favorite: "Favorite",
+        unfavorite: "Unfavorite"
     }
 } as const;
 

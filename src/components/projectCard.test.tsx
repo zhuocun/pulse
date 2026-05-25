@@ -1,9 +1,63 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe, toHaveNoViolations } from "jest-axe";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
+import useReducedMotion from "../utils/hooks/useReducedMotion";
+
 import ProjectCard from "./projectCard";
+
+expect.extend(toHaveNoViolations);
+
+/*
+ * The card wraps its body in `SwipeableRow`, which reads the phone-chrome /
+ * reduced-motion predicates through these two hooks (not `matchMedia`). Mock
+ * them directly — the same pattern the `swipeableRow` suite uses. The
+ * default in `beforeEach` is the DESKTOP branch (non-phone, motion on), so
+ * `SwipeableRow` is a no-listener passthrough and every pre-existing
+ * assertion in this file sees the card exactly as before; the phone-swipe
+ * block opts into the coarse branch explicitly.
+ */
+jest.mock("../utils/hooks/useIsPhoneChrome");
+jest.mock("../utils/hooks/useReducedMotion");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
+const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
+    typeof useReducedMotion
+>;
+
+beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseIsPhoneChrome.mockReturnValue(false);
+    mockedUseReducedMotion.mockReturnValue(false);
+});
+
+/**
+ * Pin a real row width on the swipe viewport — jsdom reports 0 (no layout),
+ * which the primitive falls back off of, but a fixed width makes the
+ * distance-threshold math deterministic (320 * 0.4 = 128 px commit point).
+ * Mirrors `stubRowWidth` in the swipeableRow suite.
+ */
+const stubRowWidth = (node: HTMLElement, width = 320): void => {
+    node.getBoundingClientRect = jest.fn(
+        () =>
+            ({
+                width,
+                height: 100,
+                top: 0,
+                left: 0,
+                right: width,
+                bottom: 100,
+                x: 0,
+                y: 0,
+                toJSON: () => ({})
+            }) as DOMRect
+    );
+};
 
 type DropdownMenuItem = {
     key?: string | number;
@@ -259,5 +313,167 @@ describe("ProjectCard", () => {
         expect(link).toHaveAttribute("href", "/projects/project-1");
 
         await user.click(link);
+    });
+
+    // Desktop (default mock branch): SwipeableRow is a no-listener
+    // passthrough, so a leftward drag over its testid node must NOT fire the
+    // delete path — the only delete affordance on desktop is the overflow
+    // menu (asserted above). Guards against the wrap accidentally arming the
+    // gesture on a fine pointer.
+    it("does not commit a swipe-delete on desktop (passthrough)", () => {
+        const { onDelete, onLike } = renderCard();
+        const swipe = screen.getByTestId("project-card-swipe");
+        stubRowWidth(swipe);
+
+        act(() => {
+            fireEvent.touchStart(swipe, {
+                touches: [{ clientX: 300, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchMove(swipe, {
+                touches: [{ clientX: 20, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchEnd(swipe);
+        });
+
+        expect(onDelete).not.toHaveBeenCalled();
+        expect(onLike).not.toHaveBeenCalled();
+    });
+});
+
+/* -- Phone swipe-to-action ---------------------------------------------- */
+
+describe("ProjectCard — phone swipe-to-action", () => {
+    const renderPhoneCard = (
+        props?: Partial<React.ComponentProps<typeof ProjectCard>>
+    ): {
+        onDelete: jest.Mock;
+        onEdit: jest.Mock;
+        onLike: jest.Mock;
+        swipe: HTMLElement;
+        container: HTMLElement;
+    } => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        mockedUseReducedMotion.mockReturnValue(false);
+        const onLike = jest.fn();
+        const onEdit = jest.fn();
+        const onDelete = jest.fn();
+        const merged = {
+            liked: false,
+            manager,
+            onDelete,
+            onEdit,
+            onLike,
+            project: sampleProject,
+            ...props
+        };
+        const { container } = render(
+            <MemoryRouter>
+                <ProjectCard {...merged} />
+            </MemoryRouter>
+        );
+        const swipe = screen.getByTestId("project-card-swipe");
+        stubRowWidth(swipe);
+        return { onDelete, onEdit, onLike, swipe, container };
+    };
+
+    it("commits delete on a leftward (trailing) swipe past the threshold", () => {
+        const { onDelete, onLike } = renderPhoneCard();
+        const swipe = screen.getByTestId("project-card-swipe");
+
+        // 300 → 20 = -280 px leftward, past 320 * 0.4 = 128 → commit trailing
+        // (delete). Velocity stays 0 under synthetic events, so the distance
+        // path decides.
+        act(() => {
+            fireEvent.touchStart(swipe, {
+                touches: [{ clientX: 300, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchMove(swipe, {
+                touches: [{ clientX: 20, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchEnd(swipe);
+        });
+
+        expect(onDelete).toHaveBeenCalledTimes(1);
+        expect(onLike).not.toHaveBeenCalled();
+    });
+
+    it("commits favorite on a rightward (leading) swipe past the threshold", () => {
+        const { onDelete, onLike } = renderPhoneCard();
+        const swipe = screen.getByTestId("project-card-swipe");
+
+        // 20 → 300 = +280 px rightward, past 128 → commit leading (favorite).
+        act(() => {
+            fireEvent.touchStart(swipe, {
+                touches: [{ clientX: 20, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchMove(swipe, {
+                touches: [{ clientX: 300, clientY: 50 }]
+            });
+        });
+        act(() => {
+            fireEvent.touchEnd(swipe);
+        });
+
+        expect(onLike).toHaveBeenCalledTimes(1);
+        expect(onDelete).not.toHaveBeenCalled();
+    });
+
+    it("reveals the trailing Delete pane and leading Favorite pane", () => {
+        renderPhoneCard();
+        const trailing = screen.getByTestId("project-card-swipe-trailing");
+        const leading = screen.getByTestId("project-card-swipe-leading");
+        expect(trailing).toHaveAttribute("aria-hidden", "true");
+        expect(trailing).toHaveTextContent(/delete/i);
+        expect(leading).toHaveAttribute("aria-hidden", "true");
+        expect(leading).toHaveTextContent(/favorite/i);
+    });
+
+    it("labels the leading pane 'Unfavorite' when already liked", () => {
+        renderPhoneCard({ liked: true });
+        const leading = screen.getByTestId("project-card-swipe-leading");
+        expect(leading).toHaveTextContent(/unfavorite/i);
+    });
+
+    // Even on phone, the overflow-menu Delete and the heart Like button stay
+    // present and functional — the gesture only DUPLICATES them, it does not
+    // replace them (and is the sole non-gesture path for reduced-motion).
+    it("keeps the overflow-menu delete and heart toggle working on phone", async () => {
+        const user = userEvent.setup();
+        const { onDelete, onLike } = renderPhoneCard();
+
+        await user.click(screen.getByRole("button", { name: /like roadmap/i }));
+        expect(onLike).toHaveBeenCalledTimes(1);
+
+        const dropdown = screen.getByTestId("project-card-actions-dropdown");
+        await user.click(
+            within(dropdown).getByRole("menuitem", { name: /^delete$/i })
+        );
+        expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it("has no axe violations in the phone-swipe render", async () => {
+        const { container } = renderPhoneCard();
+        /*
+         * `aria-required-parent` is disabled: the file's lightweight
+         * Dropdown mock renders bare `role="menuitem"` buttons without the
+         * `role="menu"` parent the real AntD Dropdown supplies (it portals a
+         * proper menu), so the violation is a fixture artifact, not a defect
+         * in the swipe render under test. Every other rule (incl. the swipe
+         * panes' `aria-hidden`) is enforced.
+         */
+        const results = await axe(container, {
+            rules: { "aria-required-parent": { enabled: false } }
+        });
+        expect(results).toHaveNoViolations();
     });
 });

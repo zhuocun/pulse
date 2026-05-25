@@ -1,4 +1,5 @@
 import {
+    DeleteOutlined,
     HeartFilled,
     HeartOutlined,
     MoreOutlined,
@@ -24,6 +25,7 @@ import {
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
+import SwipeableRow, { type SwipeAction } from "../swipeableRow";
 import UserAvatar from "../userAvatar";
 
 interface ProjectCardProps {
@@ -303,128 +305,172 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
         }
     ];
 
+    /*
+     * Phone-only swipe affordances mirroring the two row actions reachable
+     * elsewhere on the card: a left→right (leading) swipe favorites via the
+     * same `onLike` toggle the heart button drives, and a right→left
+     * (trailing) swipe deletes via the same `onDelete` the overflow menu
+     * drives (which owns whatever confirm flow exists upstream — we do NOT
+     * add another). `SwipeableRow` auto-gates to a no-listener passthrough on
+     * desktop / reduced-motion, so this wrap is unconditional and leaves the
+     * heart, the overflow menu, and the click-to-open link fully intact on
+     * every non-phone surface. The leading label flips with `liked` so the
+     * revealed caption reads the action it will perform.
+     */
+    const favoriteAction: SwipeAction = {
+        key: "favorite",
+        label: liked
+            ? microcopy.swipeActions.unfavorite
+            : microcopy.swipeActions.favorite,
+        icon: liked ? (
+            <HeartFilled aria-hidden />
+        ) : (
+            <HeartOutlined aria-hidden />
+        ),
+        background: semantic.favorite,
+        foreground: "#fff",
+        onCommit: onLike
+    };
+    const deleteAction: SwipeAction = {
+        key: "delete",
+        label: microcopy.actions.delete,
+        icon: <DeleteOutlined aria-hidden />,
+        background: semantic.error,
+        foreground: "#fff",
+        destructive: true,
+        onCommit: onDelete
+    };
+
     return (
         <Card>
-            <Body>
-                <HeaderRow>
-                    <UserAvatar
-                        id={project._id}
-                        name={project.projectName}
-                        size={40}
-                        style={{
-                            borderRadius: radius.md,
-                            flex: "0 0 auto"
-                        }}
-                    />
-                    <TitleStack>
-                        <Organization>
-                            {project.organization ||
-                                microcopy.labels.noOrganization}
-                        </Organization>
-                        <TitleLink
-                            href={`/projects/${project._id}`}
-                            onClick={(event) => {
-                                /*
-                                 * Let modifier-clicks (Cmd/Ctrl + click,
-                                 * middle-click) open the project in a new
-                                 * tab — the browser handles those for free
-                                 * when the anchor has a real `href`.
-                                 */
-                                if (
-                                    event.metaKey ||
-                                    event.ctrlKey ||
-                                    event.shiftKey ||
-                                    event.button !== 0
-                                ) {
-                                    return;
-                                }
-                                event.preventDefault();
-                                /*
-                                 * Force a real browser navigation — see
-                                 * `nativeNavigate.ts`.
-                                 */
-                                nativeNavigate(`/projects/${project._id}`);
+            <SwipeableRow
+                data-testid="project-card-swipe"
+                leadingAction={favoriteAction}
+                trailingAction={deleteAction}
+            >
+                <Body>
+                    <HeaderRow>
+                        <UserAvatar
+                            id={project._id}
+                            name={project.projectName}
+                            size={40}
+                            style={{
+                                borderRadius: radius.md,
+                                flex: "0 0 auto"
                             }}
-                        >
-                            {project.projectName}
-                        </TitleLink>
-                    </TitleStack>
-                </HeaderRow>
-                <MetaRow>
-                    <Identity>
-                        {manager ? (
-                            <>
-                                <UserAvatar
-                                    id={manager._id}
-                                    name={manager.username}
-                                    size="small"
-                                />
-                                <span className="name">{manager.username}</span>
-                            </>
-                        ) : (
-                            <>
-                                <TeamOutlined aria-hidden />
-                                <span className="name">
-                                    {microcopy.feedback.noManager}
-                                </span>
-                            </>
-                        )}
-                        <MetaSeparator aria-hidden>·</MetaSeparator>
-                        {strength ? (
-                            <AiMatchStrengthBadge strength={strength} />
-                        ) : null}
-                        <DateChip>{formatDate(project.createdAt)}</DateChip>
-                    </Identity>
-                    <ActionsCluster>
-                        <Button
-                            aria-label={
-                                liked
-                                    ? microcopy.a11y.unlikeProject.replace(
-                                          "{name}",
-                                          project.projectName
-                                      )
-                                    : microcopy.a11y.likeProject.replace(
-                                          "{name}",
-                                          project.projectName
-                                      )
-                            }
-                            aria-pressed={liked}
-                            icon={
-                                liked ? (
-                                    <HeartFilled
-                                        aria-hidden
-                                        style={{ color: semantic.favorite }}
-                                    />
-                                ) : (
-                                    <HeartOutlined aria-hidden />
-                                )
-                            }
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onLike();
-                            }}
-                            size="small"
-                            type="text"
                         />
-                        <Dropdown
-                            menu={{ items }}
-                            placement="bottomRight"
-                            trigger={["click"]}
-                        >
+                        <TitleStack>
+                            <Organization>
+                                {project.organization ||
+                                    microcopy.labels.noOrganization}
+                            </Organization>
+                            <TitleLink
+                                href={`/projects/${project._id}`}
+                                onClick={(event) => {
+                                    /*
+                                     * Let modifier-clicks (Cmd/Ctrl + click,
+                                     * middle-click) open the project in a new
+                                     * tab — the browser handles those for free
+                                     * when the anchor has a real `href`.
+                                     */
+                                    if (
+                                        event.metaKey ||
+                                        event.ctrlKey ||
+                                        event.shiftKey ||
+                                        event.button !== 0
+                                    ) {
+                                        return;
+                                    }
+                                    event.preventDefault();
+                                    /*
+                                     * Force a real browser navigation — see
+                                     * `nativeNavigate.ts`.
+                                     */
+                                    nativeNavigate(`/projects/${project._id}`);
+                                }}
+                            >
+                                {project.projectName}
+                            </TitleLink>
+                        </TitleStack>
+                    </HeaderRow>
+                    <MetaRow>
+                        <Identity>
+                            {manager ? (
+                                <>
+                                    <UserAvatar
+                                        id={manager._id}
+                                        name={manager.username}
+                                        size="small"
+                                    />
+                                    <span className="name">
+                                        {manager.username}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <TeamOutlined aria-hidden />
+                                    <span className="name">
+                                        {microcopy.feedback.noManager}
+                                    </span>
+                                </>
+                            )}
+                            <MetaSeparator aria-hidden>·</MetaSeparator>
+                            {strength ? (
+                                <AiMatchStrengthBadge strength={strength} />
+                            ) : null}
+                            <DateChip>{formatDate(project.createdAt)}</DateChip>
+                        </Identity>
+                        <ActionsCluster>
                             <Button
-                                aria-label={microcopy.a11y.moreActionsForProject.replace(
-                                    "{name}",
-                                    project.projectName
-                                )}
-                                icon={<MoreOutlined aria-hidden />}
-                                onClick={(e) => e.stopPropagation()}
+                                aria-label={
+                                    liked
+                                        ? microcopy.a11y.unlikeProject.replace(
+                                              "{name}",
+                                              project.projectName
+                                          )
+                                        : microcopy.a11y.likeProject.replace(
+                                              "{name}",
+                                              project.projectName
+                                          )
+                                }
+                                aria-pressed={liked}
+                                icon={
+                                    liked ? (
+                                        <HeartFilled
+                                            aria-hidden
+                                            style={{ color: semantic.favorite }}
+                                        />
+                                    ) : (
+                                        <HeartOutlined aria-hidden />
+                                    )
+                                }
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onLike();
+                                }}
                                 size="small"
                                 type="text"
                             />
-                        </Dropdown>
-                    </ActionsCluster>
-                </MetaRow>
-            </Body>
+                            <Dropdown
+                                menu={{ items }}
+                                placement="bottomRight"
+                                trigger={["click"]}
+                            >
+                                <Button
+                                    aria-label={microcopy.a11y.moreActionsForProject.replace(
+                                        "{name}",
+                                        project.projectName
+                                    )}
+                                    icon={<MoreOutlined aria-hidden />}
+                                    onClick={(e) => e.stopPropagation()}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Dropdown>
+                        </ActionsCluster>
+                    </MetaRow>
+                </Body>
+            </SwipeableRow>
         </Card>
     );
 };
