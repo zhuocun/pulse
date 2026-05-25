@@ -37,6 +37,7 @@ export const enSource = {
         logOut: "Log out",
         registerCta: "Sign up for an account",
         loginCta: "Log in to your account",
+        refresh: "Refresh",
         resetFilters: "Reset filters",
         retry: "Retry",
         save: "Save",
@@ -1336,6 +1337,11 @@ export const enSource = {
         reload: "Reload",
         dismiss: "Later",
         ariaLabel: "New version available notification"
+    },
+    pullToRefresh: {
+        pull: "Pull to refresh",
+        release: "Release to refresh",
+        refreshing: "Refreshing…"
     }
 } as const;
 
