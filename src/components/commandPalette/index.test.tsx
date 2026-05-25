@@ -49,6 +49,32 @@ const installAntdMocks = () => {
     });
 };
 
+// Force the responsive Grid into PHONE: every breakpoint media query
+// reports `matches: false`, so AntD's `Grid.useBreakpoint().md` resolves
+// falsy and `isMobile = !screens.md` is true — selecting the bottom-
+// anchored Drawer branch. `prefers-reduced-motion` also lands on false
+// (animation enabled), and `visualViewport` stays undefined in jsdom so
+// `useKeyboardOpen` returns false (keyboard closed) without extra mocks.
+const installPhoneMocks = () => {
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+        configurable: true,
+        value: 800
+    });
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => ({
+            addEventListener: jest.fn(),
+            addListener: jest.fn(),
+            dispatchEvent: jest.fn(),
+            matches: false,
+            media: query,
+            onchange: null,
+            removeEventListener: jest.fn(),
+            removeListener: jest.fn()
+        })
+    });
+};
+
 const seedClient = () => {
     const qc = new QueryClient();
     // Projects are loaded via parametric `["projects", filterRequest({...})]`
@@ -403,6 +429,72 @@ describe("CommandPalette", () => {
             // Legacy modal is NOT opened when the flag is on.
             expect(store.getState().overlays.editingTaskId).toBeFalsy();
             expect(onClose).toHaveBeenCalled();
+        });
+    });
+
+    describe("phone bottom-anchored search (CP-R5 / iOS 26 Liquid Glass)", () => {
+        beforeAll(() => {
+            installPhoneMocks();
+        });
+        afterAll(() => {
+            // Restore the desktop matchMedia so later suites (and the
+            // top-level `beforeAll`) keep their expected breakpoint.
+            installAntdMocks();
+        });
+
+        it("renders the bottom-sheet Drawer with both the combobox and the listbox", async () => {
+            renderPalette(true);
+            const combo = await screen.findByRole("combobox");
+            expect(combo).toBeInTheDocument();
+            expect(screen.getByRole("listbox")).toBeInTheDocument();
+            expect(screen.getByText("Roadmap")).toBeInTheDocument();
+        });
+
+        it("pins the search input BELOW the results in DOM order (results grow above the thumb-anchored field)", async () => {
+            renderPalette(true);
+            const combo = await screen.findByRole("combobox");
+            const list = screen.getByRole("listbox");
+            // Bottom-anchored layout: the scrollable results region precedes
+            // the pinned search field in the document, so a forward
+            // document-position comparison puts the listbox before the
+            // combobox.
+            expect(
+                list.compareDocumentPosition(combo) &
+                    Node.DOCUMENT_POSITION_FOLLOWING
+            ).toBeTruthy();
+        });
+
+        it("still focuses and accepts typing in the bottom-pinned input, filtering results", async () => {
+            renderPalette(true);
+            const combo = await screen.findByRole("combobox");
+            const inputEl = combo.querySelector("input") as HTMLInputElement;
+            fireEvent.change(inputEl, { target: { value: "road" } });
+            await waitFor(() => {
+                expect(screen.getByText("Roadmap")).toBeInTheDocument();
+                expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
+            });
+        });
+
+        it("keeps the sparkle AI-mode toggle working on phone", async () => {
+            renderPalette(true);
+            await screen.findByRole("combobox");
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.a11y.switchToBoardCopilot
+                })
+            );
+            await waitFor(() => {
+                expect(
+                    screen.getByText(/Ask Board Copilot/i)
+                ).toBeInTheDocument();
+            });
+        });
+
+        it("has no axe-detectable accessibility violations on phone", async () => {
+            const { container } = renderPalette(true);
+            await screen.findByRole("combobox");
+            const results = await axe(container);
+            expect(results).toHaveNoViolations();
         });
     });
 });
