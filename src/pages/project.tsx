@@ -15,6 +15,7 @@ import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
 import ProjectList from "../components/projectList";
 import ProjectSearchPanel from "../components/projectSearchPanel";
+import PullToRefresh from "../components/pullToRefresh";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import type { ProjectListSort } from "../store/reducers/userPreferencesSlice";
@@ -461,7 +462,8 @@ const ProjectPage = () => {
         isLoading: pLoading,
         error: pError,
         data: projects,
-        refetch: refetchProjects
+        refetch: refetchProjects,
+        isRefetching: projectsRefetching
     } = useReactQuery<IProject[]>("projects", fetchParam);
     const {
         isLoading: mLoading,
@@ -539,183 +541,199 @@ const ProjectPage = () => {
         });
     };
 
+    /*
+     * Phone pull-to-refresh (Wave 6). Re-fetches both the project list
+     * and the member roster so the stat rail + list reflect server state.
+     * `PullToRefresh` awaits this promise to time the spinner; it is a
+     * transparent passthrough on desktop, so desktop refreshes through the
+     * error-retry Alert exactly as before.
+     */
+    const handleRefresh = () =>
+        Promise.all([refetchProjects(), refetchMembers()]);
+
     return (
         <PageContainer>
-            <PageHeader>
-                <PageHeadingGroup>
-                    <PageHeading level={1}>
-                        {microcopy.projectsPage.title}
-                    </PageHeading>
-                    <PageSubheading>
-                        {microcopy.projectsPage.subtitle}
-                    </PageSubheading>
-                </PageHeadingGroup>
-                <Toolbar>
-                    {aiEnabled && (
-                        <Badge
-                            aria-label={copilotUnreadAriaLabel}
-                            count={copilotInboxUnread}
-                            data-testid="copilot-launcher-badge"
-                            offset={[-4, 4]}
-                            size="small"
-                        >
-                            <Button
-                                aria-label={microcopy.ai.askCopilot}
-                                icon={<AiSparkleIcon aria-hidden />}
-                                onClick={() => openChatDrawer()}
-                                type="default"
+            <PullToRefresh
+                data-testid="projects-pull-to-refresh"
+                onRefresh={handleRefresh}
+                refreshing={projectsRefetching}
+            >
+                <PageHeader>
+                    <PageHeadingGroup>
+                        <PageHeading level={1}>
+                            {microcopy.projectsPage.title}
+                        </PageHeading>
+                        <PageSubheading>
+                            {microcopy.projectsPage.subtitle}
+                        </PageSubheading>
+                    </PageHeadingGroup>
+                    <Toolbar>
+                        {aiEnabled && (
+                            <Badge
+                                aria-label={copilotUnreadAriaLabel}
+                                count={copilotInboxUnread}
+                                data-testid="copilot-launcher-badge"
+                                offset={[-4, 4]}
+                                size="small"
                             >
-                                {microcopy.labels.askShort}
-                            </Button>
-                        </Badge>
-                    )}
-                    <Button
-                        aria-label={microcopy.actions.createProject}
-                        icon={<PlusOutlined aria-hidden />}
-                        onClick={openModal}
-                        type="primary"
-                    >
-                        {microcopy.actions.createProject}
-                    </Button>
-                </Toolbar>
-            </PageHeader>
-            {/*
-             * Stat rail. `aria-busy` (was previously `aria-hidden`) lets
-             * the region stay in the AT tree during load — the visible
-             * cards still announce, but the polite live region below
-             * narrates the "loading" → "resolved counts" transition so
-             * SR users get a single sentence about the page instead of
-             * three separate stats. (QW-14.)
-             */}
-            <StatRail aria-busy={statsBusy}>
-                <StatCard>
-                    <StatHeader>
-                        <StatIcon aria-hidden>
-                            <AppstoreOutlined />
-                        </StatIcon>
-                        <StatLabel>
-                            {microcopy.projectsPage.totalProjects}
-                        </StatLabel>
-                    </StatHeader>
-                    <StatValue>{pLoading ? "—" : stats.total}</StatValue>
-                </StatCard>
-                <StatCard>
-                    <StatHeader>
-                        <StatIcon aria-hidden>
-                            <BankOutlined />
-                        </StatIcon>
-                        <StatLabel>
-                            {microcopy.projectsPage.organizations}
-                        </StatLabel>
-                    </StatHeader>
-                    <StatValue>
-                        {pLoading ? "—" : stats.organizations}
-                    </StatValue>
-                </StatCard>
-                <StatCard>
-                    <StatHeader>
-                        <StatIcon aria-hidden>
-                            <TeamOutlined />
-                        </StatIcon>
-                        <StatLabel>
-                            {microcopy.projectsPage.teamMembers}
-                        </StatLabel>
-                    </StatHeader>
-                    <StatValue>
-                        {mLoading ? "—" : (members?.length ?? 0)}
-                    </StatValue>
-                </StatCard>
-            </StatRail>
-            <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
-            <ProjectSearchPanel
-                param={param}
-                setParam={setParam}
-                members={members ?? []}
-                loading={mLoading}
-                favoritedOnly={favoritedOnly}
-                onFavoritedOnlyChange={(next) =>
-                    setParam({ favoritedOnly: next ? "1" : "" })
-                }
-                hasSavedDefaults={savedProjectListDefaults !== null}
-                onSaveDefault={handleSaveDefault}
-                onResetToDefault={handleResetToDefault}
-                onClearSavedDefault={clearProjectListDefaults}
-                aiSearchSlot={
-                    aiEnabled ? (
-                        <div
-                            style={{
-                                flexBasis: "100%",
-                                marginBottom: space.sm
-                            }}
-                        >
-                            <AiSearchInput
-                                kind="projects"
-                                projectsContext={{
-                                    projects: projects ?? [],
-                                    members: members ?? []
-                                }}
-                                semanticIds={param.semanticIds}
-                                setSemanticIds={(value) =>
-                                    setParam({ semanticIds: value })
-                                }
-                            />
-                        </div>
-                    ) : undefined
-                }
-            />
-            {pError || mError ? (
-                <Alert
-                    action={
+                                <Button
+                                    aria-label={microcopy.ai.askCopilot}
+                                    icon={<AiSparkleIcon aria-hidden />}
+                                    onClick={() => openChatDrawer()}
+                                    type="default"
+                                >
+                                    {microcopy.labels.askShort}
+                                </Button>
+                            </Badge>
+                        )}
                         <Button
-                            onClick={() => {
-                                if (pError) refetchProjects();
-                                if (mError) refetchMembers();
-                            }}
-                            size="small"
+                            aria-label={microcopy.actions.createProject}
+                            icon={<PlusOutlined aria-hidden />}
+                            onClick={openModal}
                             type="primary"
                         >
-                            {microcopy.actions.retry}
+                            {microcopy.actions.createProject}
                         </Button>
-                    }
-                    description={microcopy.feedback.retryHint}
-                    showIcon
-                    style={{ marginBottom: space.sm }}
-                    title={microcopy.feedback.loadFailed}
-                    type="error"
-                />
-            ) : null}
-            <ProjectList
-                dataSource={filteredProjects}
-                error={Boolean(pError || mError)}
-                members={members ?? []}
-                loading={pLoading || mLoading}
-                sortOrder={sortOrder}
-                onSortOrderChange={setSortOrder}
-            />
-            {aiEnabled && !environment.copilotDockEnabled && (
-                /*
-                 * R-A M1 Issue #4: when the dock flag is on, the host
-                 * mounts a single CopilotDock surface that survives
-                 * navigations and consumes any pending prompt through
-                 * the bridge. Keeping this drawer mounted alongside
-                 * caused the prompt to be dispatched TWICE: once by
-                 * this drawer's ChatTabBody on /projects, then again
-                 * by the host's ChatTabBody after the user navigated
-                 * to /projects/p1/board — because the new instance
-                 * still saw `chatDrawer.pendingPrompt` in Redux and
-                 * its own `initialPromptHandled.current` was null.
-                 */
-                <AiChatDrawer
-                    columns={[]}
-                    initialPrompt={chatInitialPrompt}
-                    knownProjectIds={(projects ?? []).map((p) => p._id)}
+                    </Toolbar>
+                </PageHeader>
+                {/*
+                 * Stat rail. `aria-busy` (was previously `aria-hidden`) lets
+                 * the region stay in the AT tree during load — the visible
+                 * cards still announce, but the polite live region below
+                 * narrates the "loading" → "resolved counts" transition so
+                 * SR users get a single sentence about the page instead of
+                 * three separate stats. (QW-14.)
+                 */}
+                <StatRail aria-busy={statsBusy}>
+                    <StatCard>
+                        <StatHeader>
+                            <StatIcon aria-hidden>
+                                <AppstoreOutlined />
+                            </StatIcon>
+                            <StatLabel>
+                                {microcopy.projectsPage.totalProjects}
+                            </StatLabel>
+                        </StatHeader>
+                        <StatValue>{pLoading ? "—" : stats.total}</StatValue>
+                    </StatCard>
+                    <StatCard>
+                        <StatHeader>
+                            <StatIcon aria-hidden>
+                                <BankOutlined />
+                            </StatIcon>
+                            <StatLabel>
+                                {microcopy.projectsPage.organizations}
+                            </StatLabel>
+                        </StatHeader>
+                        <StatValue>
+                            {pLoading ? "—" : stats.organizations}
+                        </StatValue>
+                    </StatCard>
+                    <StatCard>
+                        <StatHeader>
+                            <StatIcon aria-hidden>
+                                <TeamOutlined />
+                            </StatIcon>
+                            <StatLabel>
+                                {microcopy.projectsPage.teamMembers}
+                            </StatLabel>
+                        </StatHeader>
+                        <StatValue>
+                            {mLoading ? "—" : (members?.length ?? 0)}
+                        </StatValue>
+                    </StatCard>
+                </StatRail>
+                <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
+                <ProjectSearchPanel
+                    param={param}
+                    setParam={setParam}
                     members={members ?? []}
-                    onClose={closeChatDrawer}
-                    open={chatOpen}
-                    project={null}
-                    tasks={[]}
+                    loading={mLoading}
+                    favoritedOnly={favoritedOnly}
+                    onFavoritedOnlyChange={(next) =>
+                        setParam({ favoritedOnly: next ? "1" : "" })
+                    }
+                    hasSavedDefaults={savedProjectListDefaults !== null}
+                    onSaveDefault={handleSaveDefault}
+                    onResetToDefault={handleResetToDefault}
+                    onClearSavedDefault={clearProjectListDefaults}
+                    aiSearchSlot={
+                        aiEnabled ? (
+                            <div
+                                style={{
+                                    flexBasis: "100%",
+                                    marginBottom: space.sm
+                                }}
+                            >
+                                <AiSearchInput
+                                    kind="projects"
+                                    projectsContext={{
+                                        projects: projects ?? [],
+                                        members: members ?? []
+                                    }}
+                                    semanticIds={param.semanticIds}
+                                    setSemanticIds={(value) =>
+                                        setParam({ semanticIds: value })
+                                    }
+                                />
+                            </div>
+                        ) : undefined
+                    }
                 />
-            )}
+                {pError || mError ? (
+                    <Alert
+                        action={
+                            <Button
+                                onClick={() => {
+                                    if (pError) refetchProjects();
+                                    if (mError) refetchMembers();
+                                }}
+                                size="small"
+                                type="primary"
+                            >
+                                {microcopy.actions.retry}
+                            </Button>
+                        }
+                        description={microcopy.feedback.retryHint}
+                        showIcon
+                        style={{ marginBottom: space.sm }}
+                        title={microcopy.feedback.loadFailed}
+                        type="error"
+                    />
+                ) : null}
+                <ProjectList
+                    dataSource={filteredProjects}
+                    error={Boolean(pError || mError)}
+                    members={members ?? []}
+                    loading={pLoading || mLoading}
+                    sortOrder={sortOrder}
+                    onSortOrderChange={setSortOrder}
+                />
+                {aiEnabled && !environment.copilotDockEnabled && (
+                    /*
+                     * R-A M1 Issue #4: when the dock flag is on, the host
+                     * mounts a single CopilotDock surface that survives
+                     * navigations and consumes any pending prompt through
+                     * the bridge. Keeping this drawer mounted alongside
+                     * caused the prompt to be dispatched TWICE: once by
+                     * this drawer's ChatTabBody on /projects, then again
+                     * by the host's ChatTabBody after the user navigated
+                     * to /projects/p1/board — because the new instance
+                     * still saw `chatDrawer.pendingPrompt` in Redux and
+                     * its own `initialPromptHandled.current` was null.
+                     */
+                    <AiChatDrawer
+                        columns={[]}
+                        initialPrompt={chatInitialPrompt}
+                        knownProjectIds={(projects ?? []).map((p) => p._id)}
+                        members={members ?? []}
+                        onClose={closeChatDrawer}
+                        open={chatOpen}
+                        project={null}
+                        tasks={[]}
+                    />
+                )}
+            </PullToRefresh>
         </PageContainer>
     );
 };
