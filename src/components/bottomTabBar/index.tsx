@@ -397,13 +397,30 @@ const TabLink = styled(NavLink)`
     }
 `;
 
-const TabIcon = styled.span`
+const TabIcon = styled.span<{ $minimized: boolean }>`
     /* Lift the icon to a comfortable size for thumb scanning. */
     align-items: center;
     display: inline-flex;
     font-size: ${fontSize.xl}px;
     justify-content: center;
     line-height: 1;
+    /*
+     * Minimize-on-scroll — the tap region is floored at 56 px (see
+     * TabLink), so the bar can only lose its ~8 px block padding; that
+     * alone reads as too subtle. Scale the icon down to give the
+     * minimized state a second, unmistakable "compact" signal alongside
+     * the label collapse. transform-only (no font-size reflow), pivots
+     * on centre so the glyph stays put inside the floored tap region,
+     * and the touch target is untouched.
+     */
+    transform: ${(props) => (props.$minimized ? "scale(0.82)" : "scale(1)")};
+    transform-origin: center;
+    transition: transform var(--ant-motion-tab-bar-minimize, 280ms)
+        var(--ant-easing-detent, ease-out);
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
 `;
 
 const TabLabel = styled.span<{ $minimized: boolean }>`
@@ -616,7 +633,7 @@ const BottomTabBar: React.FC = () => {
                         }}
                         to={tab.to}
                     >
-                        <TabIcon>{tab.icon}</TabIcon>
+                        <TabIcon $minimized={minimized}>{tab.icon}</TabIcon>
                         <TabLabel $minimized={minimized}>
                             {microcopy.nav.tabs[tab.labelKey]}
                         </TabLabel>
