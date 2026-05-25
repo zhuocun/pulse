@@ -38,7 +38,7 @@ import useAgent from "../../utils/hooks/useAgent";
 import type { UseAgentResult } from "../../utils/hooks/useAgent";
 import type { AiChatMessage } from "../../utils/ai/chatEngine";
 
-import CopilotDock, { type CopilotDockTab } from ".";
+import CopilotDock, { CopilotDockShell, type CopilotDockTab } from ".";
 
 const mockedUseAiChat = useAiChat as jest.MockedFunction<typeof useAiChat>;
 const mockedUseAgent = useAgent as jest.MockedFunction<typeof useAgent>;
@@ -322,20 +322,30 @@ describe("CopilotDock", () => {
     it("mounts as a right-placement drawer on desktop/tablet (default jsdom mocks)", () => {
         renderDock();
 
+        // Phase 6 Wave 3 — the dock now renders through the Sheet
+        // primitive. On non-coarse-pointer (desktop/tablet) Sheet falls
+        // back to an AntD `<Drawer placement={desktopPlacement}>`, which
+        // ships the `.ant-drawer-right` class. Assert via the class so
+        // the test stays decoupled from the Sheet's internal data-attr
+        // forwarding policy.
         const dock = document.querySelector("[data-testid='copilot-dock']");
         expect(dock).not.toBeNull();
-        // Public placement attribute mirrors TaskDetailPanel's pattern —
-        // we don't couple to AntD's private `.ant-drawer-*` classes.
-        expect(dock?.getAttribute("data-placement")).toBe("right");
+        expect(document.querySelector(".ant-drawer-right")).not.toBeNull();
     });
 
-    it("mounts as a bottom-sheet on coarse-pointer phone viewports", async () => {
+    it("mounts as a multi-detent Sheet on coarse-pointer phone viewports", async () => {
         installAntdBrowserMocks(true);
         renderDock();
 
+        // Phase 6 Wave 3 — phone branch now goes through the Sheet's
+        // animated multi-detent surface. The Sheet emits a
+        // `${data-testid}-surface` node carrying the active detent in
+        // `data-detent`; the dock's `defaultDetent="large"` so the
+        // initial detent is large.
         await waitFor(() => {
-            const dock = document.querySelector("[data-testid='copilot-dock']");
-            expect(dock?.getAttribute("data-placement")).toBe("bottom");
+            const surface = screen.getByTestId("copilot-dock-surface");
+            expect(surface).toBeInTheDocument();
+            expect(surface).toHaveAttribute("data-detent", "large");
         });
     });
 
@@ -349,8 +359,11 @@ describe("CopilotDock", () => {
         // ChatTabBody's per-message disclaimer ALSO renders the
         // `microcopy.a11y.aiBadge` string, so a global text count can
         // exceed one without telling us anything about the header.
-        // Scope the assertion to the AntD drawer header region so we
-        // count badges that actually live in the dock title row only.
+        // Scope the assertion to the dock header by querying the title
+        // element by its id (`copilot-dock-title`) and walking up to the
+        // enclosing AntD drawer header — the desktop branch still uses
+        // the AntD `<Drawer>` fallback under the Sheet primitive so the
+        // `.ant-drawer-header` selector is still valid on this branch.
         const header = document.querySelector(
             "[data-testid='copilot-dock'] .ant-drawer-header"
         );
@@ -364,13 +377,30 @@ describe("CopilotDock", () => {
         expect(headerAiBadges).toHaveLength(1);
     });
 
-    it("invokes onClose when the mask is clicked (dirty-state-safe close)", () => {
+    it("invokes onClose when the mask is clicked on desktop (dirty-state-safe close)", () => {
         const onClose = jest.fn();
         renderDock({ onClose });
 
+        // Desktop branch uses the AntD Drawer fallback (the Sheet's
+        // non-animated path), so the dismiss surface is the AntD mask
+        // class — same selector as before the Sheet migration.
         const mask = document.querySelector(".ant-drawer-mask");
         expect(mask).not.toBeNull();
         fireEvent.click(mask as Element);
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it("invokes onClose when the scrim is clicked on phone chrome", async () => {
+        installAntdBrowserMocks(true);
+        const onClose = jest.fn();
+        renderDock({ onClose });
+
+        // Phase 6 Wave 3 — phone branch goes through the Sheet's
+        // animated surface, which emits a scrim with the suffixed
+        // `${data-testid}-scrim` id. Clicking it must invoke the same
+        // `onClose` callback the AntD mask click used to fire.
+        const scrim = await screen.findByTestId("copilot-dock-scrim");
+        fireEvent.click(scrim);
         expect(onClose).toHaveBeenCalled();
     });
 
@@ -378,8 +408,10 @@ describe("CopilotDock", () => {
         const onClose = jest.fn();
         renderDock({ onClose });
 
-        // AntD Drawer listens for Esc on the dialog content; firing
-        // keyDown from the document level reliably triggers the close.
+        // AntD Drawer (desktop) listens for Esc on the dialog content;
+        // firing keyDown from the document level reliably triggers the
+        // close. The Sheet's animated branch also listens for Escape at
+        // the window level, so the same fireEvent works on phone too.
         fireEvent.keyDown(document.body, {
             key: "Escape",
             code: "Escape"
@@ -390,10 +422,94 @@ describe("CopilotDock", () => {
     it("does not mount the drawer surface when open=false", () => {
         renderDock({ open: false });
 
-        // When closed, AntD does not render the dialog content into the
-        // DOM (it animates back to a hidden state). The test root will
-        // not show the tablist or the composer.
+        // When closed, neither Sheet branch renders the surface body
+        // into the DOM. The test root will not show the tablist or the
+        // composer.
         expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    });
+
+    it("forwards aria-labelledby to the AntD Drawer fallback on desktop", () => {
+        renderDock();
+
+        // Sheet's P1.1 fix forwards the consumer-supplied
+        // `aria-labelledby` to the underlying AntD Drawer fallback so
+        // the desktop dialog keeps its accessible name. The dock's only
+        // accessible-name carrier is the title element; the labelledby
+        // wiring is what surfaces it to AT. The rc-drawer panel renders
+        // a `role="dialog"` with the consumer's `aria-labelledby`
+        // picked off the props via `pickAttrs({ aria: true })`.
+        const dialog = document.querySelector("[role='dialog']");
+        expect(dialog).not.toBeNull();
+        expect(dialog?.getAttribute("aria-labelledby")).toBe(
+            "copilot-dock-title"
+        );
+        // Title id appears exactly once in the DOM (no duplicate id
+        // from the Sheet's own title-slot wrapper — Sheet's P1.2 fix
+        // skips stamping the id when the consumer supplies their own
+        // `ariaLabelledBy`).
+        const titleNodes = document.querySelectorAll("#copilot-dock-title");
+        expect(titleNodes).toHaveLength(1);
+    });
+
+    it("forwards aria-labelledby to the animated surface on phone chrome", async () => {
+        installAntdBrowserMocks(true);
+        renderDock();
+
+        // Phase 6 Wave 3 — phone branch animated surface must carry the
+        // same aria-labelledby attribute pointing at the consumer-owned
+        // title node. No duplicate id either.
+        const surface = await screen.findByTestId("copilot-dock-surface");
+        expect(surface.getAttribute("aria-labelledby")).toBe(
+            "copilot-dock-title"
+        );
+        const titleNodes = document.querySelectorAll("#copilot-dock-title");
+        expect(titleNodes).toHaveLength(1);
+    });
+
+    /*
+     * Phase 4 A8 / Wave 3 — the host pattern is `<CopilotDockShell
+     * open={open}>{<ProjectScopedDockBody key={projectId} />}</...>`.
+     * The shell stays mounted across project switches; only the body
+     * remounts via the key. Migrating to Sheet must not break that
+     * contract — the surface DOM identity must persist, and `onClose`
+     * MUST NOT fire on a child key change.
+     */
+    it("keeps the shell surface mounted when keyed children remount across projectId changes", async () => {
+        installAntdBrowserMocks(true);
+        const onClose = jest.fn();
+        const ShellHarness: React.FC<{ projectId: string }> = ({
+            projectId
+        }) => (
+            <CopilotDockShell onClose={onClose} open>
+                <div data-testid="dock-body-key" key={projectId}>
+                    {projectId}
+                </div>
+            </CopilotDockShell>
+        );
+        const { rerender } = render(
+            <Provider store={store}>
+                <AntdApp>
+                    <ShellHarness projectId="p1" />
+                </AntdApp>
+            </Provider>
+        );
+        const surfaceBefore = await screen.findByTestId("copilot-dock-surface");
+        expect(screen.getByTestId("dock-body-key").textContent).toBe("p1");
+
+        rerender(
+            <Provider store={store}>
+                <AntdApp>
+                    <ShellHarness projectId="p2" />
+                </AntdApp>
+            </Provider>
+        );
+        const surfaceAfter = await screen.findByTestId("copilot-dock-surface");
+        // The surface element identity is preserved across the keyed
+        // child remount — the Sheet doesn't tear down and re-create the
+        // animated portal in response to the inner `key` change.
+        expect(surfaceAfter).toBe(surfaceBefore);
+        expect(screen.getByTestId("dock-body-key").textContent).toBe("p2");
+        expect(onClose).not.toHaveBeenCalled();
     });
 
     /*

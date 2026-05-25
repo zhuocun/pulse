@@ -237,17 +237,87 @@ describe("ActivityFeedDrawer", () => {
         ).toBeInTheDocument();
     });
 
-    it("renders as a bottom sheet on phone chrome", () => {
+    it("renders as a multi-detent Sheet on phone chrome", () => {
         mockedUseIsPhoneChrome.mockReturnValue(true);
         renderDrawer(true);
-        const drawer = screen.getByTestId("activity-feed-drawer");
-        // AntD applies a placement-specific class on the wrapping
-        // element. The drawer body itself uses `ant-drawer-bottom` when
-        // placement is "bottom".
+        // Phase 6 Wave 3 — the drawer now goes through the Sheet
+        // primitive on phone. Assert the animated-surface testids the
+        // Sheet emits instead of the AntD drawer placement class.
+        expect(screen.getByTestId("activity-feed-drawer")).toBeInTheDocument();
+        const surface = screen.getByTestId("activity-feed-drawer-surface");
+        expect(surface).toBeInTheDocument();
+        // Default detent is medium per the consumer config.
+        expect(surface).toHaveAttribute("data-detent", "medium");
         expect(
-            drawer.closest(".ant-drawer-bottom") ||
-                document.querySelector(".ant-drawer-bottom")
-        ).toBeTruthy();
+            screen.getByTestId("activity-feed-drawer-grabber")
+        ).toBeInTheDocument();
+    });
+
+    it("fires markRead exactly once on the open → closed transition", () => {
+        const now = Date.now();
+        act(() => {
+            store.dispatch(
+                activityFeedActions.recordActivityEvent({
+                    id: "evt-unread",
+                    timestamp: now - 1000,
+                    kind: "task",
+                    action: "create",
+                    summary: "Pending read",
+                    undoable: false,
+                    isRead: false
+                })
+            );
+        });
+        // Wrap `store.dispatch` so we can count the `markActivityEventRead`
+        // action type fired by the drawer's close-transition effect. This
+        // is the least-invasive surrogate for adding test-scoped
+        // middleware to the shared production store: the spy delegates to
+        // the real dispatch, so the slice still updates and downstream
+        // selectors see the same reducer output the production code path
+        // would observe.
+        const realDispatch = store.dispatch.bind(store);
+        const dispatchSpy = jest
+            .spyOn(store, "dispatch")
+            .mockImplementation((action) => realDispatch(action));
+        const onClose = jest.fn();
+        const { rerender } = renderDrawer(true, onClose);
+        const dispatchesBeforeClose = dispatchSpy.mock.calls.length;
+        // Drawer opens, then transitions to closed — the markRead
+        // sweep should fire on the falling edge only once.
+        rerender(
+            <Provider store={store}>
+                <ActivityFeedDrawer onClose={onClose} open={false} />
+            </Provider>
+        );
+        const markReadCalls = dispatchSpy.mock.calls
+            .slice(dispatchesBeforeClose)
+            .filter(([action]) => {
+                if (
+                    typeof action === "object" &&
+                    action !== null &&
+                    "type" in action
+                ) {
+                    return (
+                        (action as { type: string }).type ===
+                        "activityFeed/markActivityEventRead"
+                    );
+                }
+                return false;
+            });
+        expect(markReadCalls).toHaveLength(1);
+        const state = store.getState().activityFeed;
+        expect(state.events.find((e) => e.id === "evt-unread")?.isRead).toBe(
+            true
+        );
+        dispatchSpy.mockRestore();
+    });
+
+    it("dismisses the sheet via scrim click on phone chrome", () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        const onClose = jest.fn();
+        renderDrawer(true, onClose);
+        fireEvent.click(screen.getByTestId("activity-feed-drawer-scrim"));
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -270,28 +270,40 @@ describe("TaskDetailPanel", () => {
 
         await screen.findByText(/edit task · build task/i);
 
-        // Assert on the public `data-placement` attribute so we don't
-        // couple to AntD's internal `.ant-drawer-*` classnames (B-T2).
         // jsdom default mocks `pointer: coarse` to false, so
         // `useIsPhoneChrome()` returns false and the right-drawer
-        // branch wins.
-        const panel = document.querySelector(
-            "[data-testid='task-detail-panel']"
-        );
-        expect(panel).not.toBeNull();
-        expect(panel?.getAttribute("data-placement")).toBe("right");
+        // branch wins. Phase 6 Wave 3 Phase 2 routes that branch
+        // through the `<Sheet>` primitive's AntD `<Drawer>` fallback,
+        // so the placement class lives on the Drawer wrapper rather
+        // than a public `data-placement` attribute. We assert the
+        // `.ant-drawer-right` class — internal to AntD but the only
+        // public signal of placement when the Sheet fallback fires.
+        expect(
+            document.querySelector("[data-testid='task-detail-panel']")
+        ).not.toBeNull();
+        expect(document.querySelector(".ant-drawer-right")).not.toBeNull();
+        expect(document.querySelector(".ant-drawer-bottom")).toBeNull();
     });
 
-    it("mounts as a bottom-sheet on coarse-pointer phone viewports", async () => {
+    it("mounts as an animated Sheet surface on coarse-pointer phone viewports", async () => {
         installCoarsePointerMock();
         renderPanelAt("/projects/project-1/board/task/task-1");
         await screen.findByText(/edit task · build task/i);
 
-        const panel = document.querySelector(
-            "[data-testid='task-detail-panel']"
-        );
-        expect(panel).not.toBeNull();
-        expect(panel?.getAttribute("data-placement")).toBe("bottom");
+        // Phase 6 Wave 3 Phase 2 — the phone branch now renders the
+        // Sheet primitive's animated multi-detent surface (not an AntD
+        // Drawer). Assert the Sheet's portal'd testids instead of the
+        // legacy `.ant-drawer-bottom` placement class.
+        expect(screen.getByTestId("task-detail-panel")).toBeInTheDocument();
+        const surface = screen.getByTestId("task-detail-panel-surface");
+        expect(surface).toBeInTheDocument();
+        // Consumer configures `defaultDetent="large"`.
+        expect(surface).toHaveAttribute("data-detent", "large");
+        expect(
+            screen.getByTestId("task-detail-panel-grabber")
+        ).toBeInTheDocument();
+        // The Drawer-fallback wrapper should NOT be present on phone.
+        expect(document.querySelector(".ant-drawer-bottom")).toBeNull();
         // Restore default mock for subsequent tests.
         installAntdBrowserMocks();
     });
@@ -497,6 +509,42 @@ describe("TaskDetailPanel", () => {
             });
             expect(dialog).toBeNull();
         });
+    });
+
+    it("surfaces the discard confirm Modal above the Sheet on phone scrim click", async () => {
+        // Phase 6 Wave 3 Phase 2 — the phone branch routes dirty-close
+        // through Sheet's scrim. Verify the discard Modal still
+        // renders (and renders above the Sheet) when the user taps
+        // the scrim with unsaved edits. AntD Modal sits at
+        // `zIndex.modal` (1050) > Sheet at `zIndex.drawer` (1000-1001),
+        // so the Modal naturally stacks above the Sheet without any
+        // explicit z-index work on the consumer side.
+        installCoarsePointerMock();
+        try {
+            renderPanelAt("/projects/project-1/board/task/task-1");
+
+            const input = await screen.findByDisplayValue("Build task");
+            fireEvent.change(input, { target: { value: "Edited" } });
+
+            // Click the Sheet's portal'd scrim — the consumer routes
+            // `Sheet.onClose` to `requestClose`, which then opens the
+            // discard Modal because the form is dirty.
+            const scrim = await screen.findByTestId("task-detail-panel-scrim");
+            fireEvent.click(scrim);
+
+            // Confirm Modal title appears above the Sheet surface.
+            const dialog = await screen.findByText(
+                microcopy.taskDetailPanel.confirmDiscardTitle as string
+            );
+            expect(dialog).toBeInTheDocument();
+            // Sheet's animated surface is still mounted (no auto-close
+            // race) — the discard guard intercepts cleanly.
+            expect(
+                screen.getByTestId("task-detail-panel-surface")
+            ).toBeInTheDocument();
+        } finally {
+            installAntdBrowserMocks();
+        }
     });
 
     it("blocks programmatic navigation while dirty and shows the confirm dialog", async () => {
@@ -868,10 +916,13 @@ describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
         installAntdBrowserMocks();
     });
 
-    it("falls back to AntD Drawer on coarse-pointer phone even at >= lg width", async () => {
+    it("falls back to the animated Sheet on coarse-pointer phone even at >= lg width", async () => {
         // Touchscreen-laptop case: pointer:coarse=true AND screens.lg=true.
-        // useIsPhoneChrome wins — the bottom-sheet Drawer is the right
-        // call because the user is still tapping with a thumb.
+        // useIsPhoneChrome wins — the animated bottom Sheet is the right
+        // call because the user is still tapping with a thumb. Phase 6
+        // Wave 3 Phase 2 routes the phone chassis through the shared
+        // `<Sheet>` primitive instead of the legacy AntD Drawer with
+        // `placement="bottom"`.
         Object.defineProperty(window, "matchMedia", {
             writable: true,
             value: (query: string) => ({
@@ -893,12 +944,13 @@ describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
         renderPanelAt("/projects/project-1/board/task/task-1");
         await screen.findByText(/edit task · build task/i);
 
-        const panel = document.querySelector(
-            "[data-testid='task-detail-panel']"
-        );
-        expect(panel).not.toBeNull();
-        // Phone branch wins even though screens.lg is true.
-        expect(panel?.getAttribute("data-placement")).toBe("bottom");
+        // Phone branch wins even though screens.lg is true — the Sheet's
+        // animated surface mounts and no AntD `.ant-drawer` chrome
+        // appears for the panel chassis.
+        expect(
+            screen.getByTestId("task-detail-panel-surface")
+        ).toBeInTheDocument();
+        expect(document.querySelector(".ant-drawer-bottom")).toBeNull();
         installAntdBrowserMocks();
     });
 });
