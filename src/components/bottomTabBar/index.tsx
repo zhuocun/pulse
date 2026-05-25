@@ -2,8 +2,10 @@ import {
     AppstoreOutlined,
     InboxOutlined,
     RobotOutlined,
+    SearchOutlined,
     UserOutlined
 } from "@ant-design/icons";
+import { css } from "@emotion/react";
 import styled from "@emotion/styled";
 import { useRef } from "react";
 import { NavLink, useLocation } from "react-router";
@@ -35,12 +37,28 @@ import nativeNavigate from "../../utils/nativeNavigate";
  * Phase 3 A3 contract; the geometry, hide-mode, accessory mount, and
  * minimize-on-scroll behaviour are the Wave 2 additions.
  *
- * Markup choice — we still use `<nav role="navigation" aria-label=
- * "Primary">` + `<NavLink>`-per-tab rather than the ARIA `tablist` /
- * `tab` pattern. Each tab is a route, not a panel pivot inside one
- * page, so the NavLink / `aria-current` contract is the more accurate
- * semantic. `<NavLink>` emits the active state via
- * `aria-current="page"`, which AT consumers already recognise.
+ * Phase 6 Wave 7 — a fifth "Search" tab joins the bar. Unlike the four
+ * destinations it is an ACTION tab, not a route: activating it
+ * dispatches a `commandPalette:open` event (the `App.tsx` listener
+ * opens the palette; on phone that's the Wave 4 bottom-anchored
+ * search) rather than navigating. This also closes a real gap — phone
+ * users previously had no launcher for the palette (Cmd/Ctrl+K only).
+ * `TAB_DEFINITIONS` is a discriminated union (`kind: "route" |
+ * "action"`) so the route tabs keep their `to` / `end` contract while
+ * the action tab carries an `onActivate` callback instead. Because the
+ * action tab has no route it is never `aria-current`, and the morphing
+ * indicator (keyed on `pathname`) never sits on it.
+ *
+ * Markup choice — the route tabs are `<nav role="navigation"
+ * aria-label="Primary">` + `<NavLink>`-per-tab rather than the ARIA
+ * `tablist` / `tab` pattern. Each is a route, not a panel pivot inside
+ * one page, so the NavLink / `aria-current` contract is the more
+ * accurate semantic. `<NavLink>` emits the active state via
+ * `aria-current="page"`, which AT consumers already recognise. The
+ * Search action tab is a real `<button type="button">` styled to
+ * match the links (same 56 px touch target, same focus ring) — a
+ * button is the correct semantic for an in-place action with no URL,
+ * and it is keyboard-activatable (Enter / Space) for free.
  *
  * Keyboard hide — driven by `useKeyboardOpen()`, the single source of
  * truth for the keyboard-open predicate. With the floating geometry a
@@ -75,30 +93,78 @@ import nativeNavigate from "../../utils/nativeNavigate";
  * media-query block (no transition).
  */
 
-/* `end={false}` on /projects keeps the Boards tab active on nested
- * routes ('/projects/:id/board'); the others require an exact match. */
-const TAB_DEFINITIONS = [
+/*
+ * Tab model. Most tabs are routes (`kind: "route"`) carrying the
+ * NavLink `to` / `end` contract; the Search tab is an action
+ * (`kind: "action"`) that runs `onActivate` instead of navigating. The
+ * discriminated union keeps each variant minimally typed — a route tab
+ * can't omit `to`, an action tab can't carry one — and the render +
+ * indicator logic narrows on `kind`. `labelKey` keys into
+ * `microcopy.nav.tabs`; the literal union keeps that lookup typed.
+ */
+type TabLabelKey = keyof typeof microcopy.nav.tabs;
+
+interface RouteTab {
+    kind: "route";
+    to: string;
+    labelKey: TabLabelKey;
+    icon: React.ReactNode;
+    /* `end={false}` on /projects keeps the Boards tab active on nested
+     * routes ('/projects/:id/board'); the others require an exact
+     * match. */
+    end: boolean;
+}
+
+interface ActionTab {
+    kind: "action";
+    labelKey: TabLabelKey;
+    icon: React.ReactNode;
+    onActivate: () => void;
+}
+
+type TabDefinition = RouteTab | ActionTab;
+
+const TAB_DEFINITIONS: readonly TabDefinition[] = [
     {
+        kind: "route",
         to: "/projects",
-        labelKey: "boards" as const,
+        labelKey: "boards",
         icon: <AppstoreOutlined aria-hidden />,
         end: false
     },
     {
+        /*
+         * Search sits right after Boards: it's a global utility rather
+         * than a personal destination, so it pairs naturally beside the
+         * primary browse surface (mirrors iOS apps that place search
+         * early) while the user-centric tabs (Inbox / Copilot /
+         * Profile) stay clustered with Profile anchored last.
+         */
+        kind: "action",
+        labelKey: "search",
+        icon: <SearchOutlined aria-hidden />,
+        onActivate: () => {
+            window.dispatchEvent(new CustomEvent("commandPalette:open"));
+        }
+    },
+    {
+        kind: "route",
         to: "/inbox",
-        labelKey: "inbox" as const,
+        labelKey: "inbox",
         icon: <InboxOutlined aria-hidden />,
         end: true
     },
     {
+        kind: "route",
         to: "/copilot",
-        labelKey: "copilot" as const,
+        labelKey: "copilot",
         icon: <RobotOutlined aria-hidden />,
         end: true
     },
     {
+        kind: "route",
         to: "/settings",
-        labelKey: "profile" as const,
+        labelKey: "profile",
         icon: <UserOutlined aria-hidden />,
         end: true
     }
@@ -315,7 +381,18 @@ const ActiveIndicator = styled.span`
     }
 `;
 
-const TabLink = styled(NavLink)`
+/*
+ * Shared tab presentation. Both the route tabs (`TabLink`, a styled
+ * NavLink) and the Search action tab (`TabButton`, a styled
+ * `<button>`) draw from this fragment so the link and the button are
+ * pixel-identical — same 56 px touch target, same gel-flex press, same
+ * focus ring. Extracted to a `css` fragment rather than duplicated so
+ * the two render as one visual control with one source of truth. The
+ * `&[aria-current="page"]` callout only ever fires on the NavLink (a
+ * `<button>` never carries `aria-current` here) but lives in the
+ * shared block harmlessly.
+ */
+const tabStyles = css`
     align-items: center;
     background: transparent;
     border: none;
@@ -355,10 +432,9 @@ const TabLink = styled(NavLink)`
     text-decoration: none;
     /*
      * Phase 5 "Liquid Glass" Wave 2 — gel-flex on bottom-tab taps.
-     * Each NavLink yields on press for tactile parity with the
-     * header's IconButton / PillTrigger. transform-only; layout box
-     * stays at the 56 px floor so the min-height invariant is
-     * preserved.
+     * Each tab yields on press for tactile parity with the header's
+     * IconButton / PillTrigger. transform-only; layout box stays at
+     * the 56 px floor so the min-height invariant is preserved.
      */
     transition:
         color ${motion.short}ms ease-out,
@@ -395,6 +471,25 @@ const TabLink = styled(NavLink)`
             transform: none;
         }
     }
+`;
+
+const TabLink = styled(NavLink)`
+    ${tabStyles}
+`;
+
+/*
+ * The Search action tab. A real `<button>` (correct semantic for an
+ * in-place action with no URL) styled identically to the route
+ * NavLinks via the shared `tabStyles` fragment. `font: inherit`
+ * neutralises the UA button font so the label matches the links;
+ * `appearance: none` strips native chrome. Keyboard activation
+ * (Enter / Space) comes free from the button element.
+ */
+const TabButton = styled.button`
+    ${tabStyles}
+    appearance: none;
+    font: inherit;
+    text-align: center;
 `;
 
 const TabIcon = styled.span<{ $minimized: boolean }>`
@@ -486,7 +581,14 @@ const isPrimaryClick = (event: React.MouseEvent<HTMLAnchorElement>): boolean =>
     event.button === 0;
 
 const BottomTabBar: React.FC = () => {
-    const tabsRef = useRef<HTMLAnchorElement[]>([]);
+    /*
+     * Roving-focus registry. Holds both the route NavLinks (anchors)
+     * and the Search action tab (a button), so the ←/→/Home/End
+     * handler walks all five slots uniformly. Widened from
+     * `HTMLAnchorElement[]` to `HTMLElement[]` for the mixed element
+     * types — `.focus()` is the only method called, shared by both.
+     */
+    const tabsRef = useRef<HTMLElement[]>([]);
     const location = useLocation();
     /*
      * Hide the bar while the soft keyboard is open. The detection
@@ -517,14 +619,14 @@ const BottomTabBar: React.FC = () => {
 
     /*
      * Arrow-key navigation as a convenience. We use a <nav> landmark
-     * with NavLinks (not the ARIA tablist roving-tabindex pattern); each
-     * tab is independently Tab-reachable so screen-reader users walk
-     * them as plain links. ←/→ and Home/End move focus across the bar
-     * once the user has tabbed in. Enter and Space activate via the
-     * browser anchor default.
+     * with NavLinks + one action button (not the ARIA tablist
+     * roving-tabindex pattern); each tab is independently Tab-reachable
+     * so screen-reader users walk them as plain links / a button. ←/→
+     * and Home/End move focus across the bar once the user has tabbed
+     * in. Enter and Space activate via the browser element default.
      */
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-        const tabs = tabsRef.current.filter((node): node is HTMLAnchorElement =>
+        const tabs = tabsRef.current.filter((node): node is HTMLElement =>
             Boolean(node)
         );
         if (tabs.length === 0) return;
@@ -548,13 +650,19 @@ const BottomTabBar: React.FC = () => {
      * left + width vars. We resolve it the same way NavLink does
      * internally (exact match, or any prefix match when `end={false}`)
      * so the indicator and the aria-current attribute stay
-     * synchronised.
+     * synchronised. Action tabs (the Search button) have no route, so
+     * they never match here — the indicator only ever tracks the
+     * active ROUTE tab, keyed on `pathname`. When the only-ever-active
+     * candidates miss (e.g. an unknown path) `activeIndex` is -1 and
+     * the indicator hides entirely.
      */
-    const activeIndex = TAB_DEFINITIONS.findIndex((tab) =>
-        tab.end
-            ? location.pathname === tab.to
-            : location.pathname === tab.to ||
-              location.pathname.startsWith(`${tab.to}/`)
+    const activeIndex = TAB_DEFINITIONS.findIndex(
+        (tab) =>
+            tab.kind === "route" &&
+            (tab.end
+                ? location.pathname === tab.to
+                : location.pathname === tab.to ||
+                  location.pathname.startsWith(`${tab.to}/`))
     );
     /*
      * Indicator geometry — width is a fraction of the bar's inner
@@ -591,6 +699,57 @@ const BottomTabBar: React.FC = () => {
                 style={indicatorStyle}
             />
             {TAB_DEFINITIONS.map((tab, idx) => {
+                /*
+                 * Tab body (icon + label) is shared between the route
+                 * link and the action button — same markup, same
+                 * minimize wiring — so the two render identically.
+                 */
+                const body = (
+                    <>
+                        <TabIcon $minimized={minimized}>{tab.icon}</TabIcon>
+                        <TabLabel $minimized={minimized}>
+                            {microcopy.nav.tabs[tab.labelKey]}
+                        </TabLabel>
+                    </>
+                );
+                /*
+                 * View-transition name is per-tab so the morph
+                 * indicator can slide between them. React's inline
+                 * `style` prop expects camelCase — kebab-case
+                 * `view-transition-name` triggers an "Unsupported
+                 * style property" warning on every render; the cast
+                 * keeps the key tolerant of `CSSProperties` typings
+                 * that predate `viewTransitionName`. The styled CSS
+                 * strings keep kebab-case (plain CSS, not React props).
+                 */
+                const viewTransitionStyle: React.CSSProperties = {
+                    ["viewTransitionName" as string]: `pulse-tab-${tab.labelKey}`
+                };
+
+                // The Search action tab: a real <button> that opens the
+                // command palette instead of navigating. It carries no
+                // route, so it's never aria-current and the indicator
+                // never sits on it. Same haptic the route tabs fire.
+                if (tab.kind === "action") {
+                    return (
+                        <TabButton
+                            key={`action-${tab.labelKey}`}
+                            type="button"
+                            aria-label={microcopy.nav.tabs[tab.labelKey]}
+                            onClick={() => {
+                                vibrate("tap");
+                                tab.onActivate();
+                            }}
+                            ref={(node: HTMLButtonElement | null) => {
+                                tabsRef.current[idx] = node as HTMLElement;
+                            }}
+                            style={viewTransitionStyle}
+                        >
+                            {body}
+                        </TabButton>
+                    );
+                }
+
                 // Same active-state predicate NavLink applies internally:
                 // exact match, or any prefix match when `end={false}`.
                 const isActive = tab.end
@@ -614,29 +773,12 @@ const BottomTabBar: React.FC = () => {
                             nativeNavigate(tab.to);
                         }}
                         ref={(node: HTMLAnchorElement | null) => {
-                            tabsRef.current[idx] = node as HTMLAnchorElement;
+                            tabsRef.current[idx] = node as HTMLElement;
                         }}
-                        style={{
-                            /*
-                             * React's inline `style` prop expects CSS
-                             * properties in camelCase — kebab-case
-                             * `view-transition-name` triggers a console
-                             * "Unsupported style property" warning on
-                             * every render. The cast keeps the key
-                             * tolerant of `CSSProperties` typings that
-                             * predate `viewTransitionName` (relatively
-                             * recent addition). The styled-components
-                             * CSS strings above can keep kebab-case
-                             * since they're plain CSS, not React props.
-                             */
-                            ["viewTransitionName" as string]: `pulse-tab-${tab.labelKey}`
-                        }}
+                        style={viewTransitionStyle}
                         to={tab.to}
                     >
-                        <TabIcon $minimized={minimized}>{tab.icon}</TabIcon>
-                        <TabLabel $minimized={minimized}>
-                            {microcopy.nav.tabs[tab.labelKey]}
-                        </TabLabel>
+                        {body}
                     </TabLink>
                 );
             })}

@@ -41,6 +41,24 @@ const renderBar = (initialPath = "/projects") =>
         </MemoryRouter>
     );
 
+/*
+ * Collect every interactive tab — the four route NavLinks plus the
+ * Search action <button> — in DOM order. The roving arrow-key handler
+ * walks all of them, so the keyboard tests assert against this merged,
+ * document-ordered list rather than `getAllByRole("link")` (which
+ * would silently drop the button) or `getAllByRole("button")` (which
+ * would drop the links).
+ */
+const allTabs = (): HTMLElement[] => {
+    const links = screen.getAllByRole("link");
+    const buttons = screen.queryAllByRole("button");
+    return [...links, ...buttons].sort((a, b) =>
+        // Node.compareDocumentPosition returns a bitmask;
+        // DOCUMENT_POSITION_FOLLOWING (4) is set when `b` follows `a`.
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+    );
+};
+
 describe("BottomTabBar", () => {
     beforeEach(() => {
         mockedNativeNavigate.mockReset();
@@ -54,7 +72,7 @@ describe("BottomTabBar", () => {
         delete (window as { visualViewport?: VisualViewport }).visualViewport;
     });
 
-    it("renders four tabs with the canonical microcopy labels", () => {
+    it("renders five tabs with the canonical microcopy labels (4 routes + Search action)", () => {
         renderBar();
         expect(screen.getByText(microcopy.nav.tabs.boards)).toBeInTheDocument();
         expect(screen.getByText(microcopy.nav.tabs.inbox)).toBeInTheDocument();
@@ -64,6 +82,17 @@ describe("BottomTabBar", () => {
         expect(
             screen.getByText(microcopy.nav.tabs.profile)
         ).toBeInTheDocument();
+        // Phase 6 Wave 7 — the Search action tab. It's a <button>, not
+        // a route link, so it surfaces by its label text alongside the
+        // four destination tabs.
+        expect(screen.getByText(microcopy.nav.tabs.search)).toBeInTheDocument();
+    });
+
+    it("renders exactly four route links (Search is an action button, not a link)", () => {
+        renderBar();
+        // The four destinations are NavLinks; the Search tab is a
+        // <button>, so getAllByRole("link") must still return four.
+        expect(screen.getAllByRole("link")).toHaveLength(4);
     });
 
     it("renders inside a <nav> landmark with the Primary aria-label", () => {
@@ -112,6 +141,140 @@ describe("BottomTabBar", () => {
             name: new RegExp(microcopy.nav.tabs.profile, "i")
         });
         expect(profile).toHaveAttribute("aria-current", "page");
+    });
+
+    /*
+     * Phase 6 Wave 7 — the Search action tab. It opens the existing
+     * command palette via a `commandPalette:open` CustomEvent (the
+     * App.tsx listener handles it; on phone that's the Wave 4
+     * bottom-anchored search) and is the first/only production trigger
+     * for that event — closing the gap where phone users had no
+     * palette launcher (Cmd/Ctrl+K only). It is NOT a route: it never
+     * navigates, never carries aria-current, and the morph indicator
+     * never sits on it.
+     */
+    describe("Search action tab (Phase 6 Wave 7)", () => {
+        it("renders the Search tab as a <button>, not a route link", () => {
+            renderBar();
+            const search = screen.getByRole("button", {
+                name: new RegExp(microcopy.nav.tabs.search, "i")
+            });
+            expect(search).toBeInTheDocument();
+            expect(search).toHaveAttribute("type", "button");
+            // It must NOT surface as a link (no href / NavLink).
+            expect(
+                screen.queryByRole("link", {
+                    name: new RegExp(microcopy.nav.tabs.search, "i")
+                })
+            ).toBeNull();
+        });
+
+        it("dispatches a commandPalette:open event when activated and does NOT navigate", async () => {
+            const user = userEvent.setup();
+            const handler = jest.fn();
+            window.addEventListener("commandPalette:open", handler);
+            renderBar("/projects");
+            const search = screen.getByRole("button", {
+                name: new RegExp(microcopy.nav.tabs.search, "i")
+            });
+            await user.click(search);
+            expect(handler).toHaveBeenCalledTimes(1);
+            // It's an action tab — must never route through nativeNavigate.
+            expect(mockedNativeNavigate).not.toHaveBeenCalled();
+            window.removeEventListener("commandPalette:open", handler);
+        });
+
+        it("fires the same haptic 'tap' the route tabs use on activation", async () => {
+            // useHaptic maps "tap" → a 10ms single pulse via
+            // navigator.vibrate; install a spy so we can assert parity
+            // with the route tabs' haptic.
+            const spy = jest.fn().mockReturnValue(true);
+            (navigator as unknown as { vibrate?: typeof spy }).vibrate = spy;
+            const user = userEvent.setup();
+            renderBar("/projects");
+            const search = screen.getByRole("button", {
+                name: new RegExp(microcopy.nav.tabs.search, "i")
+            });
+            await user.click(search);
+            expect(spy).toHaveBeenCalledWith(10);
+            delete (navigator as unknown as { vibrate?: typeof spy }).vibrate;
+        });
+
+        it("is keyboard-activatable (Enter / Space dispatch the open event)", async () => {
+            const user = userEvent.setup();
+            const handler = jest.fn();
+            window.addEventListener("commandPalette:open", handler);
+            renderBar("/projects");
+            const search = screen.getByRole("button", {
+                name: new RegExp(microcopy.nav.tabs.search, "i")
+            });
+            search.focus();
+            await user.keyboard("{Enter}");
+            await user.keyboard(" ");
+            // Both Enter and Space activate a native <button>.
+            expect(handler).toHaveBeenCalledTimes(2);
+            window.removeEventListener("commandPalette:open", handler);
+        });
+
+        it.each(["/projects", "/inbox", "/copilot", "/settings"])(
+            "never marks the Search tab active (no aria-current) on %s while the route tab still is",
+            (path) => {
+                renderBar(path);
+                const search = screen.getByRole("button", {
+                    name: new RegExp(microcopy.nav.tabs.search, "i")
+                });
+                // The action tab carries no route, so it must never be
+                // aria-current regardless of the active pathname.
+                expect(search).not.toHaveAttribute("aria-current");
+                // And exactly one route link is active (the indicator's
+                // anchor), so the bar still reflects "you are here".
+                const activeLinks = screen
+                    .getAllByRole("link")
+                    .filter(
+                        (link) => link.getAttribute("aria-current") === "page"
+                    );
+                expect(activeLinks).toHaveLength(1);
+            }
+        );
+
+        it("positions the morph indicator on the active ROUTE slot, never the Search slot, with the 5-tab geometry", () => {
+            // Inbox is slot index 2 in the 5-tab array (Boards=0,
+            // Search=1, Inbox=2). The indicator's left offset must use
+            // index 2 — proving the never-active Search slot (index 1)
+            // doesn't shift the indicator math — and its width must
+            // divide the inner track by 5, not 4.
+            const { container } = renderBar("/inbox");
+            const indicator = container.querySelector(
+                "[data-active-indicator]"
+            ) as HTMLElement;
+            expect(indicator).not.toBeNull();
+            const left = indicator.style.getPropertyValue("--indicator-left");
+            const width = indicator.style.getPropertyValue("--indicator-width");
+            // Width slices the inner track into 5 equal slots.
+            expect(width).toContain("/ 5");
+            // Left advances by index 2 (the Inbox route slot), so the
+            // indicator sits on Inbox — NOT on Search (index 1).
+            expect(left).toContain("2 *");
+            expect(left).toContain("/ 5");
+            // Indicator is visible (not display:none) when a route matches.
+            expect(indicator.style.display).not.toBe("none");
+        });
+
+        it("hides the morph indicator entirely when no route tab matches (e.g. an unknown path)", () => {
+            // On a path that matches no route tab, activeIndex is -1 and
+            // the indicator collapses to display:none — it must never
+            // fall back onto the Search action slot.
+            const { container } = renderBar("/totally-unknown");
+            const indicator = container.querySelector(
+                "[data-active-indicator]"
+            ) as HTMLElement;
+            expect(indicator.style.display).toBe("none");
+            // No route link is active either.
+            const activeLinks = screen
+                .getAllByRole("link")
+                .filter((link) => link.getAttribute("aria-current") === "page");
+            expect(activeLinks).toHaveLength(0);
+        });
     });
 
     it("clicking a tab forces a real document navigation to the target route", async () => {
@@ -186,9 +349,13 @@ describe("BottomTabBar", () => {
         expect(inbox).toHaveAttribute("href", "/inbox");
     });
 
-    it("supports arrow-key navigation between tabs", () => {
+    it("supports arrow-key navigation across all five tabs (links + Search button) in DOM order", () => {
         renderBar("/projects");
-        const tabs = screen.getAllByRole("link");
+        // Roving focus walks every interactive tab — the four NavLinks
+        // AND the Search action button — in DOM order, so collect both
+        // roles and sort by document position.
+        const tabs = allTabs();
+        expect(tabs).toHaveLength(5);
         tabs[0]?.focus();
         fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
         expect(tabs[1]).toHaveFocus();
@@ -202,9 +369,23 @@ describe("BottomTabBar", () => {
         expect(tabs[0]).toHaveFocus();
     });
 
+    it("includes the Search action button in the arrow-key roving order", () => {
+        renderBar("/projects");
+        const tabs = allTabs();
+        const search = screen.getByRole("button", {
+            name: new RegExp(microcopy.nav.tabs.search, "i")
+        });
+        // Search sits in slot index 1 (right after Boards), so a single
+        // ArrowRight from the first tab lands focus on the button.
+        expect(tabs[1]).toBe(search);
+        tabs[0]?.focus();
+        fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+        expect(search).toHaveFocus();
+    });
+
     it("wraps arrow navigation past the last tab back to the first", () => {
         renderBar("/projects");
-        const tabs = screen.getAllByRole("link");
+        const tabs = allTabs();
         tabs[tabs.length - 1]?.focus();
         fireEvent.keyDown(tabs[tabs.length - 1]!, { key: "ArrowRight" });
         expect(tabs[0]).toHaveFocus();
@@ -489,20 +670,20 @@ describe("BottomTabBar", () => {
             expect(css).toMatch(/view-transition-name:\s*pulse-tab-indicator/);
         });
 
-        it("tags each tab with a per-tab view-transition-name so the indicator can morph between them", () => {
+        it("tags each tab (route links AND the Search button) with a per-tab view-transition-name so the indicator can morph between them", () => {
             renderBar();
-            const tabs = screen.getAllByRole("link");
-            // Each tab carries an inline style with its
+            // Walk every interactive tab — including the Search action
+            // button — since each carries an inline style with its
             // `view-transition-name: pulse-tab-<labelKey>`.
+            const tabs = allTabs();
             const names = tabs.map(
                 (tab) =>
-                    (tab as HTMLElement).style.getPropertyValue(
-                        "view-transition-name"
-                    ) || ""
+                    tab.style.getPropertyValue("view-transition-name") || ""
             );
             expect(names).toEqual(
                 expect.arrayContaining([
                     "pulse-tab-boards",
+                    "pulse-tab-search",
                     "pulse-tab-inbox",
                     "pulse-tab-copilot",
                     "pulse-tab-profile"
