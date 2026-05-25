@@ -1,17 +1,19 @@
 /* eslint-disable global-require */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 
 import { microcopy } from "../constants/microcopy";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
 import SettingsPage from "./settings";
 
 jest.mock("../utils/hooks/useAiEnabled");
 jest.mock("../utils/hooks/useAuth");
 jest.mock("../utils/hooks/useColorScheme");
+jest.mock("../utils/hooks/useIsPhoneChrome");
 
 const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
     typeof useAiEnabled
@@ -19,6 +21,9 @@ const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
     typeof useColorScheme
+>;
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
 >;
 
 const installAntdBrowserMocks = () => {
@@ -49,6 +54,9 @@ describe("SettingsPage", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // Default to the desktop chassis so the legacy `Card` layout is
+        // exercised; the phone branch is covered in its own describe.
+        mockedUseIsPhoneChrome.mockReturnValue(false);
         mockedUseAuth.mockReturnValue({
             user: { _id: "u1", email: "a@b.c", username: "Alice" } as IUser,
             isAuthenticated: true,
@@ -195,5 +203,143 @@ describe("SettingsPage", () => {
         // the first which is the host button.
         fireEvent.click(logoutButtons[0]!);
         expect(logout).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("SettingsPage (phone chassis)", () => {
+    beforeAll(installAntdBrowserMocks);
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        // Coarse pointer → grouped-table sections instead of Card rows.
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        mockedUseAuth.mockReturnValue({
+            user: { _id: "u1", email: "a@b.c", username: "Alice" } as IUser,
+            isAuthenticated: true,
+            logout: jest.fn()
+        });
+        mockedUseAiEnabled.mockReturnValue({
+            available: true,
+            enabled: true,
+            setEnabled: jest.fn()
+        });
+        mockedUseColorScheme.mockReturnValue({
+            preference: "light",
+            scheme: "light",
+            setPreference: jest.fn()
+        });
+    });
+
+    it("renders the three grouped section headers", () => {
+        renderPage();
+        // All three groups mount on phone.
+        expect(
+            screen.getByTestId("settings-section-appearance")
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId("settings-section-copilot")
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId("settings-section-account")
+        ).toBeInTheDocument();
+        // Appearance / Account headers are unique strings.
+        expect(
+            within(screen.getByTestId("settings-section-appearance")).getByText(
+                microcopy.settings.sections.appearance.header
+            )
+        ).toBeInTheDocument();
+        expect(
+            within(screen.getByTestId("settings-section-account")).getByText(
+                microcopy.settings.sections.account.header
+            )
+        ).toBeInTheDocument();
+        // The Board Copilot section has no header (its footer gloss supplies
+        // the context); the "Board Copilot" string appears only as the AI
+        // row's own label.
+        const copilotSection = screen.getByTestId("settings-section-copilot");
+        const aiRow = within(copilotSection).getByTestId("settings-row-ai");
+        expect(
+            within(aiRow).getByText(microcopy.settings.aiEnabled)
+        ).toBeInTheDocument();
+    });
+
+    it("keeps the four settings rows with their controls", () => {
+        renderPage();
+        expect(screen.getByTestId("settings-row-theme")).toBeInTheDocument();
+        expect(screen.getByTestId("settings-row-language")).toBeInTheDocument();
+        expect(screen.getByTestId("settings-row-ai")).toBeInTheDocument();
+        expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();
+        // The widgets still resolve by role, so the controls survived the
+        // move into the grouped rows.
+        expect(
+            screen.getByRole("radio", { name: microcopy.settings.themeLight })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("switch", {
+                name: microcopy.settings.toggleBoardCopilot
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.getAllByRole("button", { name: microcopy.actions.logOut })
+                .length
+        ).toBeGreaterThan(0);
+    });
+
+    it("drives the same hooks from the grouped controls", () => {
+        const setPreference = jest.fn();
+        const setEnabled = jest.fn();
+        const logout = jest.fn();
+        mockedUseColorScheme.mockReturnValue({
+            preference: "light",
+            scheme: "light",
+            setPreference
+        });
+        mockedUseAiEnabled.mockReturnValue({
+            available: true,
+            enabled: true,
+            setEnabled
+        });
+        mockedUseAuth.mockReturnValue({
+            user: { _id: "u1", email: "a@b.c", username: "Alice" } as IUser,
+            isAuthenticated: true,
+            logout
+        });
+        renderPage();
+        fireEvent.click(
+            screen.getByRole("radio", { name: microcopy.settings.themeDark })
+        );
+        expect(setPreference).toHaveBeenCalledWith("dark");
+        fireEvent.click(
+            screen.getByRole("switch", {
+                name: microcopy.settings.toggleBoardCopilot
+            })
+        );
+        expect(setEnabled.mock.calls[0]?.[0]).toBe(false);
+        fireEvent.click(
+            screen.getAllByRole("button", {
+                name: microcopy.actions.logOut
+            })[0]!
+        );
+        expect(logout).toHaveBeenCalledTimes(1);
+    });
+
+    it("omits the Board Copilot section when AI is unavailable", () => {
+        mockedUseAiEnabled.mockReturnValue({
+            available: false,
+            enabled: false,
+            setEnabled: jest.fn()
+        });
+        renderPage();
+        expect(screen.queryByTestId("settings-row-ai")).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId("settings-section-copilot")
+        ).not.toBeInTheDocument();
+        // The other two sections still render.
+        expect(
+            screen.getByTestId("settings-section-appearance")
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId("settings-section-account")
+        ).toBeInTheDocument();
     });
 });

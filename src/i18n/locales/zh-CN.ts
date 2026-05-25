@@ -195,7 +195,20 @@ const zhCN: Dictionary = {
         glassIntensityAuto: "自动",
         glassIntensityClear: "通透",
         glassIntensityRegular: "标准",
-        glassIntensitySolid: "实心"
+        glassIntensitySolid: "实心",
+        sections: {
+            appearance: {
+                header: "外观",
+                footer: "主题和语言将应用于您的所有设备。"
+            },
+            copilot: {
+                footer: "看板 Copilot 使用 AI 起草和拆分工作。您可以随时关闭。"
+            },
+            account: {
+                header: "账户",
+                footer: "在此设备上退出 Pulse。"
+            }
+        }
     },
     nav: {
         primaryLandmarkLabel: "主导航",
