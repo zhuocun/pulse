@@ -200,7 +200,20 @@ export const enSource = {
         glassIntensityAuto: "Auto",
         glassIntensityClear: "Clear",
         glassIntensityRegular: "Regular",
-        glassIntensitySolid: "Solid"
+        glassIntensitySolid: "Solid",
+        sections: {
+            appearance: {
+                header: "Appearance",
+                footer: "Theme and language apply across all your devices."
+            },
+            copilot: {
+                footer: "Board Copilot uses AI to draft and break down work. Turn it off anytime."
+            },
+            account: {
+                header: "Account",
+                footer: "Sign out of Pulse on this device."
+            }
+        }
     },
     /**
      * Bottom tab bar (Phase 3 A3). Surfaces the four primary destinations
