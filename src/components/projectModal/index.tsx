@@ -1,4 +1,4 @@
-import { Form, Grid, Input, Modal, Select, Spin, Typography } from "antd";
+import { Button, Form, Grid, Input, Select, Spin, Typography } from "antd";
 import { useForm } from "antd/lib/form/Form";
 import { useEffect, useState } from "react";
 
@@ -10,6 +10,7 @@ import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import deleteProjectCallback from "../../utils/optimisticUpdate/deleteProject";
 import ErrorBox from "../errorBox";
+import ResponsiveFormSheet from "../responsiveFormSheet";
 
 /**
  * Create / edit project surface.
@@ -165,51 +166,50 @@ const ProjectModal: React.FC = () => {
      */
     const { data: members } = useMembersList();
 
-    return (
-        <Modal
-            cancelText={microcopy.actions.cancel}
-            centered
-            confirmLoading={mutateLoading}
-            destroyOnHidden={false}
-            forceRender
-            okButtonProps={{
-                block: !screens.sm,
-                disabled: isLoading,
-                size: "large"
+    /*
+     * Footer rendered as a plain node so the SAME markup feeds both the
+     * desktop Modal footer slot and the phone Sheet footer slot (the
+     * Sheet does not support AntD's footer render-prop form). Cancel
+     * always precedes Save/Create in DOM order so the primary action is
+     * the bottom-most / right-most target — on phone-narrow the column
+     * puts the primary in the thumb zone (QW-19), and on tablet/desktop
+     * the row keeps it right-aligned. Edge-to-edge `block` buttons on
+     * narrow widths avoid the stray 8px inter-button offset the default
+     * AntD footer produced when both buttons wrapped.
+     */
+    const footer = (
+        <div
+            style={{
+                display: "flex",
+                flexDirection: screens.sm ? "row" : "column",
+                gap: space.xs,
+                justifyContent: "flex-end"
             }}
-            cancelButtonProps={{ block: !screens.sm, size: "large" }}
-            okText={okText}
-            onCancel={onClose}
-            onOk={submit}
+        >
+            <Button block={!screens.sm} onClick={onClose} size="large">
+                {microcopy.actions.cancel}
+            </Button>
+            <Button
+                block={!screens.sm}
+                disabled={isLoading}
+                loading={mutateLoading}
+                onClick={submit}
+                size="large"
+                type="primary"
+            >
+                {okText}
+            </Button>
+        </div>
+    );
+
+    return (
+        <ResponsiveFormSheet
+            centered
+            destroyOnHidden={false}
+            footer={footer}
+            forceRender
+            onClose={onClose}
             open={isModalOpened}
-            /*
-             * Phone-width footer: the default AntD footer keeps the two
-             * buttons in one flex row with `>*+* { margin-inline-start: 8px }`.
-             * When both are `block` (full-width) they wrap onto two rows but
-             * the OK button still gets the 8 px left margin and ends up
-             * visibly offset from the Cancel button. Render a stacked
-             * column without that inter-button margin so the two buttons
-             * line up edge-to-edge — with Save (primary) at the bottom in
-             * the thumb zone and Cancel above it per QW-19 in
-             * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
-             * Tablet / desktop keep the default right-aligned arrangement.
-             */
-            footer={
-                !screens.sm
-                    ? (_, { OkBtn, CancelBtn }) => (
-                          <div
-                              style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: space.xs
-                              }}
-                          >
-                              <CancelBtn />
-                              <OkBtn />
-                          </div>
-                      )
-                    : undefined
-            }
             styles={{
                 body: {
                     /*
@@ -318,7 +318,7 @@ const ProjectModal: React.FC = () => {
                     </Form.Item>
                 </Form>
             </Spin>
-        </Modal>
+        </ResponsiveFormSheet>
     );
 };
 
