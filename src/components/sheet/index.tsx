@@ -334,6 +334,15 @@ const CloseButton = styled.button`
 `;
 
 const Body = styled.div`
+    /*
+     * Content rests on a solid, opaque surface — never the frosted glass
+     * of the Surface. Liquid-Glass material belongs on the chrome (the
+     * grabber/header and footer bars); a plain content background keeps
+     * the white form fields from floating on the tinted faux-glass, which
+     * is the legibility win HIG calls for. The header / footer stay
+     * transparent over the Surface, so the glass reads as chrome only.
+     */
+    background: var(--pulse-bg-page, #ffffff);
     flex: 1 1 auto;
     overflow-y: auto;
     padding: 16px;
@@ -344,6 +353,10 @@ const Body = styled.div`
      * the bottom 34 pt.
      */
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+
+    @media (forced-colors: active) {
+        background: Canvas;
+    }
 `;
 
 const Footer = styled.div`
