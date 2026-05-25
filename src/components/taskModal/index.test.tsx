@@ -17,8 +17,27 @@ import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import TaskModal from ".";
+
+// `ResponsiveFormSheet` swaps the desktop Modal for the animated bottom
+// Sheet on coarse-pointer chrome. Both hooks are auto-mocked so every
+// test can pin the branch: the default wired in `beforeEach` keeps the
+// jsdom-desktop Modal (the existing `.ant-modal-*` assertions), and the
+// dedicated phone test flips `useIsPhoneChrome` -> true to exercise the
+// Sheet surface. `useReducedMotion` -> false selects the animated branch
+// (the Drawer fallback has no `-surface` testid).
+jest.mock("../../utils/hooks/useIsPhoneChrome");
+jest.mock("../../utils/hooks/useReducedMotion");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
+const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
+    typeof useReducedMotion
+>;
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "member-1",
@@ -177,6 +196,10 @@ describe("TaskModal", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(response({ _id: "task-1" }));
+        // Default every test to desktop chrome so the legacy `.ant-modal*`
+        // assertions hold; the phone-branch test overrides this locally.
+        mockedUseIsPhoneChrome.mockReturnValue(false);
+        mockedUseReducedMotion.mockReturnValue(false);
         // Clear both slices so the Phase 4.3 integration assertions
         // below read a deterministic event list. The AI-ledger bridge
         // re-forwards every surviving aiLedger entry on each test
@@ -674,6 +697,76 @@ describe("TaskModal", () => {
         expect(deleteIdx).toBeGreaterThanOrEqual(0);
         expect(cancelIdx).toBeGreaterThan(deleteIdx);
         expect(saveIdx).toBeGreaterThan(cancelIdx);
+    });
+
+    it("renders the bottom Sheet (medium detent) with the full footer on phone chrome, and the primary button reflects the mutation's loading/disabled state", async () => {
+        // Phone migration (ResponsiveFormSheet). With coarse-pointer chrome
+        // the editor renders the animated bottom Sheet instead of the
+        // Modal. Assert the Sheet surface opens at the MEDIUM detent, the
+        // footer still carries Delete + Cancel + Save (Delete -> Cancel ->
+        // Save stacking preserved), and the primary button picks up the
+        // PUT mutation's loading/disabled state while it is in flight.
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        let resolvePut: (value: Response) => void = () => undefined;
+        fetchMock.mockImplementation(
+            () =>
+                new Promise<Response>((resolve) => {
+                    resolvePut = resolve;
+                })
+        );
+        renderModal();
+
+        const surface = await screen.findByTestId("task-modal-surface");
+        expect(surface).toHaveAttribute("role", "dialog");
+        expect(surface).toHaveAttribute("data-detent", "medium");
+        // The Sheet body wraps the form — no `.ant-modal*` chrome here.
+        expect(screen.getByTestId("task-modal-body")).toBeInTheDocument();
+        expect(
+            within(surface).getByDisplayValue("Build task")
+        ).toBeInTheDocument();
+
+        const deleteButton = within(surface).getByRole("button", {
+            name: /^delete build task$/i
+        });
+        const cancelButton = within(surface).getByRole("button", {
+            name: /^cancel$/i
+        });
+        const saveButton = within(surface).getByRole("button", {
+            name: /^save$/i
+        });
+        expect(deleteButton).toBeInTheDocument();
+        expect(cancelButton).toBeInTheDocument();
+        // Footer stacking order is preserved on the Sheet too.
+        expect(
+            deleteButton.compareDocumentPosition(cancelButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        expect(
+            cancelButton.compareDocumentPosition(saveButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+
+        // Primary starts enabled (task resolved, no mutation in flight).
+        expect(saveButton).toBeEnabled();
+        expect(saveButton).not.toHaveClass("ant-btn-loading");
+
+        fireEvent.change(within(surface).getByDisplayValue("Build task"), {
+            target: { value: "Build task details" }
+        });
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        // PUT is pending -> the primary mirrors `confirmLoading`/disabled.
+        await waitFor(() => expect(saveButton).toHaveClass("ant-btn-loading"));
+        expect(saveButton).toBeDisabled();
+
+        await act(async () => {
+            resolvePut(response({ _id: "task-1" }));
+        });
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
     });
 
     it("does not open the modal for optimistic placeholder ids while tasks are still loading", () => {

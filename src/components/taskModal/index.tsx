@@ -11,7 +11,7 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import environment from "../../constants/env";
@@ -35,6 +35,7 @@ import AiGhostText, {
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import ErrorBox from "../errorBox";
+import ResponsiveFormSheet from "../responsiveFormSheet";
 
 // Replaces lodash/isEqual for the modal's diff check. ITask is a flat
 // object (see src/interfaces/task.d.ts) — every field is a primitive, so
@@ -156,6 +157,7 @@ const TaskModal: React.FC<{
     const { openTask } = useTaskPanelNavigation();
     const { enabled: aiEnabled } = useAiEnabled();
     const screens = Grid.useBreakpoint();
+    const titleId = useId();
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
     const [appliedFieldOrigin, setAppliedFieldOrigin] = useState<
@@ -454,6 +456,7 @@ const TaskModal: React.FC<{
                 </Tag>
             ) : null}
             <Typography.Text
+                id={titleId}
                 style={{
                     fontSize: fontSize.lg,
                     fontWeight: fontWeight.semibold,
@@ -466,95 +469,101 @@ const TaskModal: React.FC<{
         </div>
     );
 
+    const deleteButton = (
+        <Button
+            aria-label={
+                editingTask?.taskName
+                    ? microcopy.a11y.deleteTask.replace(
+                          "{name}",
+                          editingTask.taskName
+                      )
+                    : microcopy.actions.delete
+            }
+            block={!screens.sm}
+            danger
+            disabled={deleteDisabled}
+            onClick={onDelete}
+            type="text"
+        >
+            {microcopy.actions.delete}
+        </Button>
+    );
+    const cancelButton = (
+        <Button block={!screens.sm} onClick={onClose} size="large">
+            {microcopy.actions.cancel}
+        </Button>
+    );
+    const okButton = (
+        <Button
+            block={!screens.sm}
+            disabled={!editingTask || uLoading}
+            loading={uLoading}
+            onClick={onOk}
+            size="large"
+            type="primary"
+        >
+            {microcopy.actions.save}
+        </Button>
+    );
+    /*
+     * Footer rebuilt as a PLAIN NODE (the responsive wrapper forwards a
+     * single node to both the desktop Modal footer slot and the phone
+     * Sheet footer slot — AntD's `(_, { OkBtn, CancelBtn }) => …`
+     * render-prop form is unsupported there). The breakpoint-driven order
+     * is preserved exactly: on phone widths the buttons stack full-width
+     * with the primary Save in the thumb zone (bottom), Cancel directly
+     * above it, and the destructive Delete at the top, de-emphasised as a
+     * danger text button. Desktop / tablet keeps Delete-left,
+     * Cancel/Save-right. See QW-19 in
+     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+     */
+    const footerNode = !screens.sm ? (
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: space.xs
+            }}
+        >
+            {deleteButton}
+            {cancelButton}
+            {okButton}
+        </div>
+    ) : (
+        <div
+            style={{
+                alignItems: "center",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: space.xs,
+                justifyContent: "space-between",
+                rowGap: space.xs
+            }}
+        >
+            {deleteButton}
+            <div
+                style={{
+                    display: "flex",
+                    flex: "0 0 auto",
+                    flexWrap: "wrap",
+                    gap: space.xs,
+                    justifyContent: "flex-end"
+                }}
+            >
+                {cancelButton}
+                {okButton}
+            </div>
+        </div>
+    );
+
     return (
-        <Modal
-            confirmLoading={uLoading}
+        <ResponsiveFormSheet
             centered
             forceRender
-            okText={microcopy.actions.save}
-            okButtonProps={{
-                disabled: !editingTask || uLoading,
-                size: "large",
-                block: !screens.sm
-            }}
-            cancelButtonProps={{ size: "large", block: !screens.sm }}
-            onOk={onOk}
-            cancelText={microcopy.actions.cancel}
-            onCancel={onClose}
-            footer={(_originalFooter, { OkBtn, CancelBtn }) => {
-                const deleteButton = (
-                    <Button
-                        aria-label={
-                            editingTask?.taskName
-                                ? microcopy.a11y.deleteTask.replace(
-                                      "{name}",
-                                      editingTask.taskName
-                                  )
-                                : microcopy.actions.delete
-                        }
-                        block={!screens.sm}
-                        danger
-                        disabled={deleteDisabled}
-                        onClick={onDelete}
-                        type="text"
-                    >
-                        {microcopy.actions.delete}
-                    </Button>
-                );
-                /*
-                 * On phone widths the buttons stack full-width with the
-                 * primary action in the thumb zone (bottom of the stack)
-                 * and the destructive Delete at the top of the stack,
-                 * de-emphasised as a danger-coloured text button. The
-                 * thumb-down reach is reserved for Save, Cancel sits
-                 * directly above it, and Delete is intentionally far from
-                 * the primary tap target. Desktop / tablet keeps the
-                 * conventional Delete-left, Cancel/Save-right
-                 * arrangement. See QW-19 in
-                 * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
-                 */
-                if (!screens.sm) {
-                    return (
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: space.xs
-                            }}
-                        >
-                            {deleteButton}
-                            <CancelBtn />
-                            <OkBtn />
-                        </div>
-                    );
-                }
-                return (
-                    <div
-                        style={{
-                            alignItems: "center",
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: space.xs,
-                            justifyContent: "space-between",
-                            rowGap: space.xs
-                        }}
-                    >
-                        {deleteButton}
-                        <div
-                            style={{
-                                display: "flex",
-                                flex: "0 0 auto",
-                                flexWrap: "wrap",
-                                gap: space.xs,
-                                justifyContent: "flex-end"
-                            }}
-                        >
-                            <CancelBtn />
-                            <OkBtn />
-                        </div>
-                    </div>
-                );
-            }}
+            footer={footerNode}
+            onClose={onClose}
+            ariaLabelledBy={titleId}
+            data-testid="task-modal"
             title={titleNode}
             open={modalOpen}
             styles={{
@@ -886,7 +895,7 @@ const TaskModal: React.FC<{
                         )}
                 </div>
             </div>
-        </Modal>
+        </ResponsiveFormSheet>
     );
 };
 
