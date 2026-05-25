@@ -31,6 +31,7 @@ import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
 import EmptyState from "../components/emptyState";
+import GlassActionCluster from "../components/glassActionCluster";
 import LensChips, { parseLensId } from "../components/lensChips";
 import { buildLensPredicate } from "../components/lensChips/lensPredicate";
 import MemberPopover from "../components/memberPopover";
@@ -59,8 +60,10 @@ import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
+import useReducedMotion from "../utils/hooks/useReducedMotion";
 import useTaskModal from "../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../utils/hooks/useTaskPanelNavigation";
 import useTitle from "../utils/hooks/useTitle";
@@ -455,6 +458,11 @@ const BoardPage = () => {
         setDisabled: setProjectAiDisabled
     } = useAiProjectDisabled(projectId);
     const boardAiOn = aiEnabled && !aiDisabledForProject;
+    // Phone chassis clusters the header toolbar controls into a single
+    // Liquid Glass capsule (iOS 26 toolbar idiom). Desktop keeps the
+    // plain right-aligned flex row.
+    const isPhone = useIsPhoneChrome();
+    const reducedMotion = useReducedMotion();
     const aiProjectContext =
         currentProject && board
             ? {
@@ -717,160 +725,204 @@ const BoardPage = () => {
                             </BoardTitle>
                         )}
                         <BoardActions>
-                            <MemberPopover />
-                            {aiEnabled && (
-                                <>
-                                    {boardAiOn && (
-                                        <>
-                                            {/* P1-A: CopilotMenu — consolidated AI entry point */}
-                                            <Dropdown
-                                                menu={{
-                                                    items: [
-                                                        {
-                                                            key: "ask",
-                                                            label: microcopy
-                                                                .board
-                                                                .copilotMenuAsk,
-                                                            icon: (
-                                                                <MessageOutlined
-                                                                    aria-hidden
+                            {/*
+                             * Phone clusters these controls into a single
+                             * Liquid Glass capsule (iOS 26 toolbar idiom).
+                             * Desktop renders them in the plain flex row.
+                             * The cluster flattens the fragment so each
+                             * control becomes its own focusable slot.
+                             */}
+                            {(() => {
+                                const toolbarControls = (
+                                    <>
+                                        <MemberPopover />
+                                        {aiEnabled && (
+                                            <>
+                                                {boardAiOn && (
+                                                    <>
+                                                        {/* P1-A: CopilotMenu — consolidated AI entry point */}
+                                                        <Dropdown
+                                                            menu={{
+                                                                items: [
+                                                                    {
+                                                                        key: "ask",
+                                                                        label: microcopy
+                                                                            .board
+                                                                            .copilotMenuAsk,
+                                                                        icon: (
+                                                                            <MessageOutlined
+                                                                                aria-hidden
+                                                                            />
+                                                                        ),
+                                                                        onClick:
+                                                                            () =>
+                                                                                openChatDrawer()
+                                                                    },
+                                                                    {
+                                                                        key: "brief",
+                                                                        label: microcopy
+                                                                            .board
+                                                                            .copilotMenuBrief,
+                                                                        icon: (
+                                                                            <FileTextOutlined
+                                                                                aria-hidden
+                                                                            />
+                                                                        ),
+                                                                        onClick:
+                                                                            () =>
+                                                                                openBriefDrawer()
+                                                                    }
+                                                                ] satisfies MenuProps["items"]
+                                                            }}
+                                                            placement="bottomRight"
+                                                            trigger={["click"]}
+                                                        >
+                                                            {/*
+                                                             * Phase 4 A8 — launcher badge
+                                                             * advertises unread Inbox
+                                                             * nudges produced by the
+                                                             * triage agent. The count
+                                                             * comes from Redux (owned by
+                                                             * `CopilotDockHost`) so the
+                                                             * Button doesn't need to
+                                                             * subscribe to the agent.
+                                                             * `count={0}` hides the dot
+                                                             * automatically — AntD's
+                                                             * Badge collapses to nothing
+                                                             * when count is falsy.
+                                                             */}
+                                                            <Badge
+                                                                aria-label={
+                                                                    copilotUnreadAriaLabel
+                                                                }
+                                                                count={
+                                                                    copilotInboxUnread
+                                                                }
+                                                                data-testid="copilot-launcher-badge"
+                                                                offset={[-4, 4]}
+                                                                size="small"
+                                                            >
+                                                                <Button
+                                                                    aria-label={
+                                                                        microcopy
+                                                                            .a11y
+                                                                            .boardCopilotMenu
+                                                                    }
+                                                                    icon={
+                                                                        <AiSparkleIcon
+                                                                            aria-hidden
+                                                                        />
+                                                                    }
+                                                                    type="default"
+                                                                >
+                                                                    {
+                                                                        microcopy
+                                                                            .labels
+                                                                            .copilotShort
+                                                                    }
+                                                                </Button>
+                                                            </Badge>
+                                                        </Dropdown>
+                                                    </>
+                                                )}
+                                                <Popover
+                                                    content={
+                                                        <Space
+                                                            orientation="vertical"
+                                                            size={themeSpace.xs}
+                                                            style={{
+                                                                maxWidth: 280
+                                                            }}
+                                                        >
+                                                            <Typography.Text type="secondary">
+                                                                {
+                                                                    microcopy.ai
+                                                                        .copilotLabel
+                                                                }
+                                                            </Typography.Text>
+                                                            <div
+                                                                style={{
+                                                                    alignItems:
+                                                                        "center",
+                                                                    display:
+                                                                        "flex",
+                                                                    gap: themeSpace.sm,
+                                                                    justifyContent:
+                                                                        "space-between"
+                                                                }}
+                                                            >
+                                                                <span>
+                                                                    {
+                                                                        microcopy
+                                                                            .board
+                                                                            .enableCopilotOnBoard
+                                                                    }
+                                                                </span>
+                                                                <Switch
+                                                                    aria-label={
+                                                                        microcopy
+                                                                            .a11y
+                                                                            .boardCopilotProjectToggle
+                                                                    }
+                                                                    checked={
+                                                                        !aiDisabledForProject
+                                                                    }
+                                                                    onChange={(
+                                                                        checked
+                                                                    ) =>
+                                                                        setProjectAiDisabled(
+                                                                            !checked
+                                                                        )
+                                                                    }
+                                                                    size="small"
                                                                 />
-                                                            ),
-                                                            onClick: () =>
-                                                                openChatDrawer()
-                                                        },
-                                                        {
-                                                            key: "brief",
-                                                            label: microcopy
-                                                                .board
-                                                                .copilotMenuBrief,
-                                                            icon: (
-                                                                <FileTextOutlined
-                                                                    aria-hidden
-                                                                />
-                                                            ),
-                                                            onClick: () =>
-                                                                openBriefDrawer()
-                                                        }
-                                                    ] satisfies MenuProps["items"]
-                                                }}
-                                                placement="bottomRight"
-                                                trigger={["click"]}
-                                            >
-                                                {/*
-                                                 * Phase 4 A8 — launcher badge
-                                                 * advertises unread Inbox
-                                                 * nudges produced by the
-                                                 * triage agent. The count
-                                                 * comes from Redux (owned by
-                                                 * `CopilotDockHost`) so the
-                                                 * Button doesn't need to
-                                                 * subscribe to the agent.
-                                                 * `count={0}` hides the dot
-                                                 * automatically — AntD's
-                                                 * Badge collapses to nothing
-                                                 * when count is falsy.
-                                                 */}
-                                                <Badge
-                                                    aria-label={
-                                                        copilotUnreadAriaLabel
+                                                            </div>
+                                                            <Typography.Text
+                                                                style={{
+                                                                    fontSize:
+                                                                        fontSize.xs
+                                                                }}
+                                                                type="secondary"
+                                                            >
+                                                                {
+                                                                    microcopy
+                                                                        .board
+                                                                        .copilotProjectDisabledDescription
+                                                                }
+                                                            </Typography.Text>
+                                                        </Space>
                                                     }
-                                                    count={copilotInboxUnread}
-                                                    data-testid="copilot-launcher-badge"
-                                                    offset={[-4, 4]}
-                                                    size="small"
+                                                    placement="bottomRight"
+                                                    trigger={["click"]}
                                                 >
                                                     <Button
                                                         aria-label={
                                                             microcopy.a11y
-                                                                .boardCopilotMenu
+                                                                .boardCopilotSettings
                                                         }
                                                         icon={
-                                                            <AiSparkleIcon
+                                                            <SettingOutlined
                                                                 aria-hidden
                                                             />
                                                         }
-                                                        type="default"
-                                                    >
-                                                        {
-                                                            microcopy.labels
-                                                                .copilotShort
-                                                        }
-                                                    </Button>
-                                                </Badge>
-                                            </Dropdown>
-                                        </>
-                                    )}
-                                    <Popover
-                                        content={
-                                            <Space
-                                                orientation="vertical"
-                                                size={themeSpace.xs}
-                                                style={{ maxWidth: 280 }}
-                                            >
-                                                <Typography.Text type="secondary">
-                                                    {microcopy.ai.copilotLabel}
-                                                </Typography.Text>
-                                                <div
-                                                    style={{
-                                                        alignItems: "center",
-                                                        display: "flex",
-                                                        gap: themeSpace.sm,
-                                                        justifyContent:
-                                                            "space-between"
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {
-                                                            microcopy.board
-                                                                .enableCopilotOnBoard
-                                                        }
-                                                    </span>
-                                                    <Switch
-                                                        aria-label={
-                                                            microcopy.a11y
-                                                                .boardCopilotProjectToggle
-                                                        }
-                                                        checked={
-                                                            !aiDisabledForProject
-                                                        }
-                                                        onChange={(checked) =>
-                                                            setProjectAiDisabled(
-                                                                !checked
-                                                            )
-                                                        }
-                                                        size="small"
+                                                        type="text"
                                                     />
-                                                </div>
-                                                <Typography.Text
-                                                    style={{
-                                                        fontSize: fontSize.xs
-                                                    }}
-                                                    type="secondary"
-                                                >
-                                                    {
-                                                        microcopy.board
-                                                            .copilotProjectDisabledDescription
-                                                    }
-                                                </Typography.Text>
-                                            </Space>
-                                        }
-                                        placement="bottomRight"
-                                        trigger={["click"]}
+                                                </Popover>
+                                            </>
+                                        )}
+                                    </>
+                                );
+                                return isPhone ? (
+                                    <GlassActionCluster
+                                        data-testid="board-actions-cluster"
+                                        reducedMotion={reducedMotion}
                                     >
-                                        <Button
-                                            aria-label={
-                                                microcopy.a11y
-                                                    .boardCopilotSettings
-                                            }
-                                            icon={
-                                                <SettingOutlined aria-hidden />
-                                            }
-                                            type="text"
-                                        />
-                                    </Popover>
-                                </>
-                            )}
+                                        {toolbarControls}
+                                    </GlassActionCluster>
+                                ) : (
+                                    toolbarControls
+                                );
+                            })()}
                         </BoardActions>
                     </Row>
                 </BoardHeader>
