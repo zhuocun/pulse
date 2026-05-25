@@ -12,7 +12,8 @@ import {
     fireEvent,
     render,
     screen,
-    waitFor
+    waitFor,
+    within
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
@@ -20,8 +21,24 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import TaskModal from ".";
+
+// Pin the ResponsiveFormSheet branch: desktop Modal by default (so the
+// existing ghost-text assertions hold), phone Sheet in the dedicated
+// case below to prove the wrapper still wires through after the Sheet
+// remounts the subtree fresh on each open.
+jest.mock("../../utils/hooks/useIsPhoneChrome");
+jest.mock("../../utils/hooks/useReducedMotion");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
+const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
+    typeof useReducedMotion
+>;
 
 jest.mock("../../constants/env", () => ({
     __esModule: true,
@@ -134,6 +151,8 @@ beforeEach(() => {
     jest.useFakeTimers();
     window.localStorage.clear();
     setFlag(false);
+    mockedUseIsPhoneChrome.mockReturnValue(false);
+    mockedUseReducedMotion.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -350,6 +369,44 @@ describe("TaskModal ghost-text integration", () => {
         await waitFor(() => {
             expect(
                 screen.getByTestId("ai-ghost-text-overlay")
+            ).toBeInTheDocument();
+        });
+    });
+
+    it("activates the ghost-text surface inside the phone Sheet and round-trips a suggestion", async () => {
+        // Phone-branch coverage for the ResponsiveFormSheet migration. The
+        // Sheet remounts the form subtree fresh on every open (it does not
+        // honor `forceRender`), so this proves the ghost-text wiring still
+        // mounts and surfaces a suggestion when the editor is the bottom
+        // Sheet rather than the desktop Modal.
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        setFlag(true);
+        window.localStorage.setItem("boardCopilot:privacyShown:task-note", "1");
+        renderModal();
+
+        const surface = await screen.findByTestId("task-modal-surface");
+        await waitFor(() => {
+            expect(
+                within(surface).getByTestId("ai-ghost-text")
+            ).toBeInTheDocument();
+        });
+
+        const note = within(surface)
+            .getAllByRole("textbox")
+            .filter(
+                (el) => el.tagName.toLowerCase() === "textarea"
+            )[0] as HTMLTextAreaElement;
+        await act(async () => {
+            fireEvent.change(note, {
+                target: { value: "Customers cannot complete checkout" }
+            });
+        });
+        await act(async () => {
+            jest.advanceTimersByTime(600);
+        });
+        await waitFor(() => {
+            expect(
+                within(surface).getByTestId("ai-ghost-text-overlay")
             ).toBeInTheDocument();
         });
     });

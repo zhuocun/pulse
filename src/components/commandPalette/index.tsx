@@ -14,15 +14,25 @@ import { useNavigate } from "react-router";
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    easing,
+    fontSize,
+    fontWeight,
+    motion,
+    radius,
+    space
+} from "../../theme/tokens";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
+import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isMacLike } from "../../utils/platform";
 import AiSparkleIcon from "../aiSparkleIcon";
+import GlassPanel from "../glassPanel";
 
 interface CommandPaletteProps {
     open: boolean;
@@ -124,6 +134,86 @@ const SamplePromptRow = styled.button`
     &:hover,
     &:focus-visible {
         background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
+    }
+`;
+
+/**
+ * Phone-only chassis (iOS 26 bottom-anchored search): a flex column that
+ * fills the Drawer body. Results occupy the scroll area on top; the search
+ * capsule pins to the bottom near the thumb. `min-height: 0` lets the
+ * scroll child shrink inside the flex parent instead of overflowing the
+ * sheet.
+ */
+const PhoneShell = styled.div`
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+`;
+
+/**
+ * Scrollable results region. Grows upward from the bottom-pinned input —
+ * `justify-content: flex-end` keeps short result sets anchored just above
+ * the search field (the iOS Mail/Messages idiom) rather than floating at
+ * the top of a tall sheet. `flex: 1` + `min-height: 0` makes it the
+ * scroll surface; the inner `dvh` cap on `ListContainer` still applies.
+ */
+const PhoneResults = styled.div`
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    overflow-y: auto;
+`;
+
+/**
+ * Bottom-pinned search row. Sits above the safe-area inset and lifts above
+ * the soft keyboard via `env(keyboard-inset-height)` (with the
+ * safe-area inset as the resting floor). `flex-shrink: 0` keeps the
+ * capsule a fixed height while the results above absorb the remaining
+ * space. The `$keyboardOpen` flag tightens the bottom gap once the
+ * keyboard owns the safe area so the field doesn't float over it.
+ */
+const PhoneSearchDock = styled.div<{
+    $keyboardOpen: boolean;
+    $reducedMotion: boolean;
+}>`
+    flex-shrink: 0;
+    padding-top: ${space.sm}px;
+    padding-bottom: ${(p) =>
+        p.$keyboardOpen
+            ? `max(${space.sm}px, env(keyboard-inset-height, 0px))`
+            : `max(${space.sm}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`};
+    transition: ${(p) =>
+        p.$reducedMotion
+            ? "none"
+            : `padding-bottom ${motion.medium}ms ${easing.standard}`};
+`;
+
+/**
+ * Liquid Glass capsule wrapping the search input on phone. Renders as a
+ * `<GlassPanel intensity="regular">` so the frosted surface, hairline
+ * border, and `prefers-reduced-transparency` / `forced-colors` opaque
+ * fallbacks come from the shared recipe. The pill radius (radius.pill →
+ * border-radius = half the ~50px height) and the inner AntD `<Input>`
+ * stripped of its own chrome give the iOS 26 capsule field.
+ */
+const GlassSearchCapsule = styled(GlassPanel)`
+    align-items: center;
+    border-radius: ${radius.pill}px;
+    display: flex;
+    min-height: 50px;
+    padding-inline: ${space.xs}px;
+
+    .ant-input-affix-wrapper,
+    .ant-input-affix-wrapper:focus,
+    .ant-input-affix-wrapper-focused,
+    .ant-input {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        width: 100%;
     }
 `;
 
@@ -288,6 +378,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const listboxId = useId();
     const announcerId = useId();
     const screens = Grid.useBreakpoint();
+    const keyboardOpen = useKeyboardOpen();
+    const reducedMotion = useReducedMotion();
 
     const projects = useGatheredCachedList<IProject>(["projects"]);
     const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
@@ -497,66 +589,66 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const isMobile = !screens.md;
     const resultCount = visible.length;
 
-    const renderBody = () => (
-        <>
-            <HiddenLabel id={`${listboxId}-label`}>
-                {microcopy.commandPalette.navigateInstructions}
-            </HiddenLabel>
-            <div
+    const renderSearchField = () => (
+        <div
+            aria-controls={listboxId}
+            aria-expanded={!aiMode && resultCount > 0}
+            aria-haspopup="listbox"
+            aria-owns={listboxId}
+            role="combobox"
+        >
+            <Input
+                aria-activedescendant={
+                    renderedItems[activeIndex]?.type === "row"
+                        ? `entry-${(renderedItems[activeIndex] as RenderedRow).entry.id}`
+                        : undefined
+                }
+                aria-autocomplete="list"
                 aria-controls={listboxId}
-                aria-expanded={!aiMode && resultCount > 0}
-                aria-haspopup="listbox"
-                aria-owns={listboxId}
-                role="combobox"
-            >
-                <Input
-                    aria-activedescendant={
-                        renderedItems[activeIndex]?.type === "row"
-                            ? `entry-${(renderedItems[activeIndex] as RenderedRow).entry.id}`
-                            : undefined
-                    }
-                    aria-autocomplete="list"
-                    aria-controls={listboxId}
-                    aria-label={placeholder}
-                    autoComplete="off"
-                    enterKeyHint="search"
-                    inputMode="search"
-                    onChange={(event) => handleQueryChange(event.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={placeholder}
-                    prefix={
-                        <button
-                            aria-label={
-                                aiMode
-                                    ? microcopy.a11y.exitBoardCopilotMode
-                                    : microcopy.a11y.switchToBoardCopilot
-                            }
-                            aria-pressed={aiMode}
-                            onClick={() => toggleAiMode()}
-                            style={{
-                                background: aiMode
-                                    ? "var(--color-copilot-bg-medium)"
-                                    : "transparent",
-                                border: 0,
-                                borderRadius: 999,
-                                cursor: "pointer",
-                                lineHeight: 0,
-                                minHeight: 44,
-                                minWidth: 44,
-                                padding: 4
-                            }}
-                            type="button"
-                        >
-                            <AiSparkleIcon aria-hidden />
-                        </button>
-                    }
-                    ref={(node) => {
-                        inputRef.current = node?.input ?? null;
-                    }}
-                    size="large"
-                    value={query}
-                />
-            </div>
+                aria-label={placeholder}
+                autoComplete="off"
+                enterKeyHint="search"
+                inputMode="search"
+                onChange={(event) => handleQueryChange(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                prefix={
+                    <button
+                        aria-label={
+                            aiMode
+                                ? microcopy.a11y.exitBoardCopilotMode
+                                : microcopy.a11y.switchToBoardCopilot
+                        }
+                        aria-pressed={aiMode}
+                        onClick={() => toggleAiMode()}
+                        style={{
+                            background: aiMode
+                                ? "var(--color-copilot-bg-medium)"
+                                : "transparent",
+                            border: 0,
+                            borderRadius: 999,
+                            cursor: "pointer",
+                            lineHeight: 0,
+                            minHeight: 44,
+                            minWidth: 44,
+                            padding: 4
+                        }}
+                        type="button"
+                    >
+                        <AiSparkleIcon aria-hidden />
+                    </button>
+                }
+                ref={(node) => {
+                    inputRef.current = node?.input ?? null;
+                }}
+                size="large"
+                value={query}
+            />
+        </div>
+    );
+
+    const renderResults = () => (
+        <>
             <SrOnlyLive id={announcerId}>
                 {aiMode
                     ? microcopy.a11y.boardCopilotModeAnnouncement
@@ -705,6 +797,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
         </span>
     );
 
+    const hiddenLabel = (
+        <HiddenLabel id={`${listboxId}-label`}>
+            {microcopy.commandPalette.navigateInstructions}
+        </HiddenLabel>
+    );
+
     if (isMobile) {
         return (
             <Drawer
@@ -713,21 +811,41 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                 open={open}
                 placement="bottom"
                 styles={{
+                    // The flex column owns the safe-area / keyboard inset
+                    // via PhoneSearchDock, so the body itself keeps a
+                    // square bottom and a flush fill.
                     body: {
-                        paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`
+                        display: "flex",
+                        flexDirection: "column",
+                        paddingBottom: 0
                     },
                     // AntD v6 deprecated the top-level `height` prop on
                     // Drawer (its replacement `size` only exposes
                     // `default` / `large` presets at 320 px / 736 px,
-                    // which don't map to a 65 vh bottom sheet). Driving
-                    // the wrapper height via `styles.wrapper.height`
-                    // lets a custom viewport-relative value through
-                    // without tripping the deprecation lint.
-                    wrapper: { height: "65vh" }
+                    // which don't map to a viewport-relative bottom
+                    // sheet). Driving the wrapper height via
+                    // `styles.wrapper.height` lets a custom value through
+                    // without tripping the deprecation lint. A tall
+                    // `dvh` sheet gives the results room to grow above
+                    // the bottom-pinned search; `dvh` (not `vh`) rides
+                    // out the iOS Safari URL-bar collapse so the sheet
+                    // doesn't jump.
+                    wrapper: { height: "88dvh" }
                 }}
                 title={titleNode}
             >
-                {renderBody()}
+                <PhoneShell>
+                    {hiddenLabel}
+                    <PhoneResults>{renderResults()}</PhoneResults>
+                    <PhoneSearchDock
+                        $keyboardOpen={keyboardOpen}
+                        $reducedMotion={reducedMotion}
+                    >
+                        <GlassSearchCapsule intensity="regular">
+                            {renderSearchField()}
+                        </GlassSearchCapsule>
+                    </PhoneSearchDock>
+                </PhoneShell>
             </Drawer>
         );
     }
@@ -741,7 +859,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
             title={titleNode}
             width={560}
         >
-            {renderBody()}
+            {hiddenLabel}
+            {renderSearchField()}
+            {renderResults()}
         </Modal>
     );
 };

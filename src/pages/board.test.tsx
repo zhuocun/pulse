@@ -12,8 +12,22 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
 import BoardPage from "./board";
+
+/*
+ * `useIsPhoneChrome` is `(pointer: coarse)`; jsdom defaults to desktop
+ * (false). Mock it so the existing suite keeps the desktop branch and a
+ * focused test can flip to the phone branch to assert the Liquid Glass
+ * toolbar cluster. The default factory returns `false` so every test
+ * that doesn't opt in stays on the desktop layout.
+ */
+jest.mock("../utils/hooks/useIsPhoneChrome");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
 
 type DragDropContextMockProps = {
     children: ReactNode;
@@ -268,6 +282,9 @@ describe("BoardPage", () => {
 
     beforeEach(() => {
         localStorage.clear();
+        // Default to the desktop chrome; the phone-cluster test opts into
+        // the coarse-pointer branch explicitly.
+        mockedUseIsPhoneChrome.mockReturnValue(false);
         fetchMock.mockReset();
         fetchMock.mockImplementation((input) => {
             const url = String(input);
@@ -691,6 +708,67 @@ describe("BoardPage", () => {
                 ).not.toHaveTextContent("lens");
             });
             expect(screen.getByText("Fix bug")).toBeInTheDocument();
+        });
+    });
+
+    describe("toolbar Liquid Glass cluster (phone)", () => {
+        it("clusters the toolbar controls into the shared glass capsule on phone", async () => {
+            mockedUseIsPhoneChrome.mockReturnValue(true);
+            renderBoard();
+
+            await screen.findByText("Roadmap board");
+
+            const cluster = await screen.findByTestId("board-actions-cluster");
+            // The Copilot launcher badge + the Settings cog both live
+            // INSIDE the capsule on phone.
+            expect(cluster).toContainElement(
+                screen.getByTestId("copilot-launcher-badge")
+            );
+            expect(cluster).toContainElement(
+                screen.getByRole("button", {
+                    name: /Board Copilot settings/i
+                })
+            );
+            // MemberPopover trigger is clustered too.
+            expect(cluster).toContainElement(
+                screen.getByRole("button", { name: /view team members/i })
+            );
+            // Each leaf control gets its OWN slot so the hairline
+            // separators paint between adjacent controls. board.tsx passes
+            // the controls inside a (nested) fragment, which the cluster
+            // must flatten — a single collapsed slot would paint no
+            // dividers. Members + Copilot + Settings = 3 slots.
+            expect(
+                cluster.querySelectorAll(".pulse-cluster-slot")
+            ).toHaveLength(3);
+            // The controls remain individually focusable inside the
+            // capsule — the shared glass background is purely visual.
+            const settings = screen.getByRole("button", {
+                name: /Board Copilot settings/i
+            });
+            settings.focus();
+            expect(settings).toHaveFocus();
+        });
+
+        it("renders the toolbar controls in the plain BoardActions row on desktop (no capsule)", async () => {
+            mockedUseIsPhoneChrome.mockReturnValue(false);
+            renderBoard();
+
+            await screen.findByText("Roadmap board");
+
+            // No glass capsule on desktop.
+            expect(
+                screen.queryByTestId("board-actions-cluster")
+            ).not.toBeInTheDocument();
+            // The same controls still render — just in the flat flex row.
+            expect(
+                screen.getByTestId("copilot-launcher-badge")
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("button", {
+                    name: /Board Copilot settings/i
+                })
+            ).toBeInTheDocument();
         });
     });
 });
