@@ -151,8 +151,8 @@ export type SwipeDecision =
  *   - The active direction commits only when it HAS an action AND either
  *     the magnitude passed `rowWidth * SWIPE_COMMIT_DISTANCE_RATIO` OR the
  *     velocity in that direction passed `SWIPE_COMMIT_VELOCITY`.
- *   - If the active direction has no action it always snaps back (the
- *     consumer rubber-bands that side during the drag).
+ *   - If the active direction has no action it always snaps back (the live
+ *     drag hard-clamps that side to 0, so it never opens onto an empty pane).
  */
 export const resolveSwipe = ({
     offsetX,
@@ -337,8 +337,8 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({
         };
 
         // Clamp the live offset: only the side that HAS an action travels
-        // freely; the actionless direction rubber-bands to a hard 0 so the
-        // row can't open onto an empty pane.
+        // freely; the actionless direction is hard-clamped to 0 (no elastic
+        // give) so the row can't open onto an empty pane.
         const clampOffset = (raw: number): number => {
             if (raw > 0) return leadingRef.current ? raw : 0;
             if (raw < 0) return trailingRef.current ? raw : 0;
@@ -377,6 +377,9 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({
             const state = stateRef.current;
             if (!state || state.abandoned) return;
             const touch = event.touches[0];
+            // A multi-touch lift can momentarily empty `touches` mid-gesture;
+            // bail rather than dereference an undefined touch.
+            if (!touch) return;
             const dx = touch.clientX - state.startX;
             const dy = touch.clientY - state.startY;
 
@@ -465,6 +468,18 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({
             }
         };
 
+        const handleTouchCancel = (): void => {
+            const state = stateRef.current;
+            stateRef.current = null;
+            if (!state || !state.claimed) return;
+            // The OS reclaimed a CLAIMED swipe (e.g. system-gesture
+            // promotion). Snap back WITHOUT committing — for a destructive
+            // trailing action a stray commit is worse than none, so a cancel
+            // must never fire `onCommit` (unlike touchend).
+            setSettling(true);
+            setOffset(0);
+        };
+
         node.addEventListener("touchstart", handleTouchStart, {
             passive: true
         });
@@ -474,14 +489,14 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({
             passive: false
         });
         node.addEventListener("touchend", handleTouchEnd, { passive: true });
-        node.addEventListener("touchcancel", handleTouchEnd, {
+        node.addEventListener("touchcancel", handleTouchCancel, {
             passive: true
         });
         return () => {
             node.removeEventListener("touchstart", handleTouchStart);
             node.removeEventListener("touchmove", handleTouchMove);
             node.removeEventListener("touchend", handleTouchEnd);
-            node.removeEventListener("touchcancel", handleTouchEnd);
+            node.removeEventListener("touchcancel", handleTouchCancel);
         };
     }, [enabled]);
 

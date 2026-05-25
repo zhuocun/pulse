@@ -322,7 +322,7 @@ describe("SwipeableRow — gesture mode (phone + motion)", () => {
         expect(onChildClick).toHaveBeenCalledTimes(1);
     });
 
-    it("rubber-bands the actionless direction — leftward with no trailing action snaps back", () => {
+    it("hard-clamps the actionless direction — leftward with no trailing action snaps back", () => {
         mockedUseIsPhoneChrome.mockReturnValue(true);
         mockedUseReducedMotion.mockReturnValue(false);
         const leading = makeAction("leading");
@@ -379,6 +379,30 @@ describe("SwipeableRow — gesture mode (phone + motion)", () => {
         });
 
         expect(trailing?.onCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT commit when a past-threshold gesture is touch-cancelled", () => {
+        const { leading, trailing, root } = setupPhone();
+
+        act(() => {
+            fireEvent.touchStart(root, {
+                touches: [{ clientX: 300, clientY: 100 }]
+            });
+        });
+        // Claimed and well past the 128 px commit threshold...
+        act(() => {
+            fireEvent.touchMove(root, {
+                touches: [{ clientX: 20, clientY: 100 }]
+            });
+        });
+        // ...but the OS reclaims the gesture — must snap back, never commit
+        // (a stray destructive Delete on a cancelled swipe is unacceptable).
+        act(() => {
+            fireEvent.touchCancel(root);
+        });
+
+        expect(leading?.onCommit).not.toHaveBeenCalled();
+        expect(trailing?.onCommit).not.toHaveBeenCalled();
     });
 
     it("passes axe with no a11y violations in gesture mode", async () => {
