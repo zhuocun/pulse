@@ -733,14 +733,20 @@ describe("BoardPage", () => {
             expect(cluster).toContainElement(
                 screen.getByRole("button", { name: /view team members/i })
             );
+            // Wave 6 — the phone-only refresh button is the first segment
+            // in the capsule (the board has no vertical pull-to-refresh
+            // gesture, so the toolbar button is the honest affordance).
+            expect(cluster).toContainElement(
+                screen.getByTestId("board-refresh")
+            );
             // Each leaf control gets its OWN slot so the hairline
             // separators paint between adjacent controls. board.tsx passes
             // the controls inside a (nested) fragment, which the cluster
             // must flatten — a single collapsed slot would paint no
-            // dividers. Members + Copilot + Settings = 3 slots.
+            // dividers. Refresh + Members + Copilot + Settings = 4 slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")
-            ).toHaveLength(3);
+            ).toHaveLength(4);
             // The controls remain individually focusable inside the
             // capsule — the shared glass background is purely visual.
             const settings = screen.getByRole("button", {
@@ -769,6 +775,11 @@ describe("BoardPage", () => {
                     name: /Board Copilot settings/i
                 })
             ).toBeInTheDocument();
+            // The Wave 6 refresh button is phone-only — never on desktop,
+            // where the board has its own in-page refresh affordances.
+            expect(
+                screen.queryByTestId("board-refresh")
+            ).not.toBeInTheDocument();
         });
     });
 });

@@ -2,6 +2,7 @@ import {
     CloseOutlined,
     FileTextOutlined,
     MessageOutlined,
+    ReloadOutlined,
     SettingOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
@@ -359,7 +360,8 @@ const BoardPage = () => {
         data: board,
         isLoading: bLoading,
         error: bError,
-        refetch: refetchBoard
+        refetch: refetchBoard,
+        isRefetching: boardRefetching
     } = useReactQuery<IColumn[]>("boards", {
         projectId
     });
@@ -369,7 +371,8 @@ const BoardPage = () => {
         data: tasks,
         isLoading: tLoading,
         error: tError,
-        refetch: refetchTasks
+        refetch: refetchTasks,
+        isRefetching: tasksRefetching
     } = useReactQuery<ITask[]>(
         "tasks",
         {
@@ -384,6 +387,18 @@ const BoardPage = () => {
     const { onDragEnd, isColumnDragDisabled, isTaskDragDisabled } = useDragEnd({
         tasksEnabled: Boolean(board)
     });
+
+    /*
+     * Wave 6 — phone-only toolbar refresh. The board has no page-level
+     * vertical scroll (the column container scrolls horizontally, each
+     * column's task list scrolls internally, and the card itself is the
+     * dnd drag handle), so a vertical pull-to-refresh gesture is
+     * infeasible / conflict-prone here. A toolbar button is the honest
+     * affordance. Re-fetches both the column layout and the tasks.
+     */
+    const handleRefresh = () => Promise.all([refetchBoard(), refetchTasks()]);
+    const boardRefreshing = boardRefetching || tasksRefetching;
+
     const visibleTasks = tasks ?? [];
     // Phase 3 A7 — lens predicate narrows the task universe before the
     // filter rail's per-column predicate runs in `column.tsx`.
@@ -735,6 +750,22 @@ const BoardPage = () => {
                             {(() => {
                                 const toolbarControls = (
                                     <>
+                                        {isPhone && (
+                                            <Button
+                                                aria-label={
+                                                    microcopy.actions.refresh
+                                                }
+                                                data-testid="board-refresh"
+                                                icon={
+                                                    <ReloadOutlined
+                                                        aria-hidden
+                                                    />
+                                                }
+                                                loading={boardRefreshing}
+                                                onClick={handleRefresh}
+                                                type="text"
+                                            />
+                                        )}
                                         <MemberPopover />
                                         {aiEnabled && (
                                             <>
