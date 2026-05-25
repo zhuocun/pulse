@@ -9,6 +9,7 @@ import styled from "@emotion/styled";
 import { Button, Card, Segmented, Space, Switch, Typography } from "antd";
 
 import PageContainer from "../components/pageContainer";
+import SettingsSection, { SettingsRow } from "../components/settingsSection";
 import { microcopy } from "../constants/microcopy";
 import { useLocale, type LocaleCode } from "../i18n";
 import {
@@ -22,6 +23,7 @@ import {
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
@@ -38,6 +40,14 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * still reaches them via the header dropdown — both surfaces share the
  * same hooks (useColorScheme, useAiEnabled, useAuth) so a setting
  * change in one place is reflected in the other on next paint.
+ *
+ * Chassis split (Phase 6 Wave 5): on phone (`useIsPhoneChrome()`) the
+ * four controls compose the iOS grouped-table primitives
+ * (`SettingsSection` / `SettingsRow`) into three sections — Appearance,
+ * Board Copilot, Account. On desktop the original `SettingsList` of
+ * `Card` rows is kept verbatim. Both branches consume the same control
+ * elements, computed once below, so the underlying widgets (and their
+ * `aria-label`s) are identical regardless of chassis.
  */
 
 const PageHeading = styled(Typography.Title)`
@@ -116,6 +126,7 @@ const RowText = styled(Typography.Text)`
 
 const SettingsPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.settings), false);
+    const isPhone = useIsPhoneChrome();
     const { logout } = useAuth();
     const {
         available: aiAvailable,
@@ -129,6 +140,143 @@ const SettingsPage = () => {
     } = useColorScheme();
     const { locale, availableLocales, setLocale } = useLocale();
 
+    /*
+     * Controls, labels, and icons are built once so both chassis branches
+     * render byte-identical widgets (same options, handlers, aria-labels);
+     * only the surrounding shell (grouped sections vs. Card rows) differs.
+     */
+    const themeIcon =
+        scheme === "dark" ? (
+            <MoonOutlined aria-hidden />
+        ) : (
+            <SunOutlined aria-hidden />
+        );
+    const languageIcon = <GlobalOutlined aria-hidden />;
+    const logoutIcon = <LogoutOutlined aria-hidden />;
+
+    /*
+     * 3-state Segmented preserves the underlying `useColorScheme()`
+     * contract (light / dark / system). The previous 2-state Switch
+     * collapsed `system` to either light or dark on toggle and left the
+     * user no way back to "follow OS" once they touched it. Aria-label
+     * stays on the wrapping group so screen readers announce the control
+     * purpose; each item carries its own visible label + icon.
+     */
+    const themeControl = (
+        <Segmented
+            aria-label={microcopy.settings.theme}
+            options={[
+                {
+                    label: microcopy.settings.themeLight,
+                    value: "light",
+                    icon: <SunOutlined aria-hidden />
+                },
+                {
+                    label: microcopy.settings.themeDark,
+                    value: "dark",
+                    icon: <MoonOutlined aria-hidden />
+                },
+                {
+                    label: microcopy.settings.themeSystem,
+                    value: "system",
+                    icon: <DesktopOutlined aria-hidden />
+                }
+            ]}
+            onChange={(value) =>
+                setPreference(value as "light" | "dark" | "system")
+            }
+            value={themePreference}
+        />
+    );
+
+    /* Native names ("English", "中文") so the option you want is always
+     * readable in its own script. */
+    const languageControl = (
+        <Segmented
+            aria-label={microcopy.settings.changeLanguage}
+            options={availableLocales.map((entry) => ({
+                label: entry.nativeName,
+                value: entry.code,
+                title: entry.englishName
+            }))}
+            onChange={(value) => setLocale(value as LocaleCode)}
+            value={locale}
+        />
+    );
+
+    const aiControl = (
+        <Switch
+            aria-label={microcopy.settings.toggleBoardCopilot}
+            checked={aiEnabled}
+            onChange={setAiEnabled}
+        />
+    );
+
+    const logoutControl = (
+        <Button
+            aria-label={microcopy.actions.logOut}
+            danger
+            onClick={() => {
+                logout();
+            }}
+        >
+            {microcopy.actions.logOut}
+        </Button>
+    );
+
+    if (isPhone) {
+        return (
+            <PageContainer>
+                <PageHeading level={1}>
+                    {microcopy.settings.pageTitle}
+                </PageHeading>
+                <PageSubtitle>{microcopy.settings.pageSubtitle}</PageSubtitle>
+                <SettingsSection
+                    data-testid="settings-section-appearance"
+                    footer={microcopy.settings.sections.appearance.footer}
+                    header={microcopy.settings.sections.appearance.header}
+                >
+                    <SettingsRow
+                        control={themeControl}
+                        data-testid="settings-row-theme"
+                        icon={themeIcon}
+                        label={microcopy.settings.theme}
+                    />
+                    <SettingsRow
+                        control={languageControl}
+                        data-testid="settings-row-language"
+                        icon={languageIcon}
+                        label={microcopy.settings.language}
+                    />
+                </SettingsSection>
+                {aiAvailable ? (
+                    <SettingsSection
+                        data-testid="settings-section-copilot"
+                        footer={microcopy.settings.sections.copilot.footer}
+                    >
+                        <SettingsRow
+                            control={aiControl}
+                            data-testid="settings-row-ai"
+                            label={microcopy.settings.aiEnabled}
+                        />
+                    </SettingsSection>
+                ) : null}
+                <SettingsSection
+                    data-testid="settings-section-account"
+                    footer={microcopy.settings.sections.account.footer}
+                    header={microcopy.settings.sections.account.header}
+                >
+                    <SettingsRow
+                        control={logoutControl}
+                        data-testid="settings-row-logout"
+                        icon={logoutIcon}
+                        label={microcopy.actions.logOut}
+                    />
+                </SettingsSection>
+            </PageContainer>
+        );
+    }
+
     return (
         <PageContainer>
             <PageHeading level={1}>{microcopy.settings.pageTitle}</PageHeading>
@@ -137,97 +285,37 @@ const SettingsPage = () => {
                 <Row data-testid="settings-row-theme">
                     <RowLabel>
                         <Space size={space.xs}>
-                            {scheme === "dark" ? (
-                                <MoonOutlined aria-hidden />
-                            ) : (
-                                <SunOutlined aria-hidden />
-                            )}
+                            {themeIcon}
                             <RowText>{microcopy.settings.theme}</RowText>
                         </Space>
                     </RowLabel>
-                    {/*
-                     * 3-state Segmented preserves the underlying
-                     * `useColorScheme()` contract (light / dark / system).
-                     * The previous 2-state Switch collapsed `system` to
-                     * either light or dark on toggle and left the user
-                     * no way back to "follow OS" once they touched it.
-                     * Aria-label stays on the wrapping group so screen
-                     * readers announce the control purpose; each item
-                     * carries its own visible label + icon.
-                     */}
-                    <Segmented
-                        aria-label={microcopy.settings.theme}
-                        options={[
-                            {
-                                label: microcopy.settings.themeLight,
-                                value: "light",
-                                icon: <SunOutlined aria-hidden />
-                            },
-                            {
-                                label: microcopy.settings.themeDark,
-                                value: "dark",
-                                icon: <MoonOutlined aria-hidden />
-                            },
-                            {
-                                label: microcopy.settings.themeSystem,
-                                value: "system",
-                                icon: <DesktopOutlined aria-hidden />
-                            }
-                        ]}
-                        onChange={(value) =>
-                            setPreference(value as "light" | "dark" | "system")
-                        }
-                        value={themePreference}
-                    />
+                    {themeControl}
                 </Row>
                 <Row data-testid="settings-row-language">
                     <RowLabel>
                         <Space size={space.xs}>
-                            <GlobalOutlined aria-hidden />
+                            {languageIcon}
                             <RowText>{microcopy.settings.language}</RowText>
                         </Space>
                     </RowLabel>
-                    {/* Native names ("English", "中文") so the option you
-                     * want is always readable in its own script. */}
-                    <Segmented
-                        aria-label={microcopy.settings.changeLanguage}
-                        options={availableLocales.map((entry) => ({
-                            label: entry.nativeName,
-                            value: entry.code,
-                            title: entry.englishName
-                        }))}
-                        onChange={(value) => setLocale(value as LocaleCode)}
-                        value={locale}
-                    />
+                    {languageControl}
                 </Row>
                 {aiAvailable ? (
                     <Row data-testid="settings-row-ai">
                         <RowLabel>
                             <RowText>{microcopy.settings.aiEnabled}</RowText>
                         </RowLabel>
-                        <Switch
-                            aria-label={microcopy.settings.toggleBoardCopilot}
-                            checked={aiEnabled}
-                            onChange={setAiEnabled}
-                        />
+                        {aiControl}
                     </Row>
                 ) : null}
                 <Row data-testid="settings-row-logout">
                     <RowLabel>
                         <Space size={space.xs}>
-                            <LogoutOutlined aria-hidden />
+                            {logoutIcon}
                             <RowText>{microcopy.actions.logOut}</RowText>
                         </Space>
                     </RowLabel>
-                    <Button
-                        aria-label={microcopy.actions.logOut}
-                        danger
-                        onClick={() => {
-                            logout();
-                        }}
-                    >
-                        {microcopy.actions.logOut}
-                    </Button>
+                    {logoutControl}
                 </Row>
             </SettingsList>
         </PageContainer>
