@@ -31,6 +31,57 @@ const flushAcceptCountdown = () => {
     }
 };
 
+/**
+ * Swap `window.matchMedia` so `useReducedMotion` (consumed by the Wave 8
+ * success sparkle) resolves to the requested state on first render. The
+ * hook seeds its state from a synchronous `matchMedia(...).matches` read,
+ * so this MUST be installed before the card renders. Returns a restore fn
+ * so the mock isn't observed by other suites — the `sheet` / `bottomTabBar`
+ * pattern.
+ */
+const setReducedMotion = (reduced: boolean): (() => void) => {
+    const previous = window.matchMedia;
+    (window as { matchMedia: typeof window.matchMedia }).matchMedia = ((
+        query: string
+    ) => ({
+        addEventListener: jest.fn(),
+        addListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+        matches: query === "(prefers-reduced-motion: reduce)" ? reduced : false,
+        media: query,
+        onchange: null,
+        removeEventListener: jest.fn(),
+        removeListener: jest.fn()
+    })) as unknown as typeof window.matchMedia;
+    return () => {
+        (window as { matchMedia: typeof window.matchMedia }).matchMedia =
+            previous;
+    };
+};
+
+type VibrateFn = Navigator["vibrate"];
+type VibrateSurface = { vibrate?: VibrateFn };
+
+/**
+ * Install a `navigator.vibrate` spy (jsdom ships none). `useHaptic`
+ * feature-detects `navigator.vibrate` per call, so the spy lets us assert
+ * the Wave 8 success buzz fires on commit. Mirrors the `bottomTabBar`
+ * haptic-test pattern.
+ */
+const installVibrate = (): jest.Mock<boolean, [number | number[]]> => {
+    const spy = jest.fn().mockReturnValue(true) as jest.Mock<
+        boolean,
+        [number | number[]]
+    >;
+    (navigator as unknown as VibrateSurface).vibrate =
+        spy as unknown as VibrateFn;
+    return spy;
+};
+
+const uninstallVibrate = (): void => {
+    delete (navigator as unknown as VibrateSurface).vibrate;
+};
+
 const baseProposal: MutationProposal = {
     proposal_id: "p-1",
     description: "Reassign two unowned bugs to Alice",
@@ -594,5 +645,170 @@ describe("MutationProposalCard", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    /*
+     * Wave 8 — success sparkle burst + success haptic on accept/commit.
+     * Accepting a proposal previously had NO success feedback (only
+     * analytics + a ledger entry). The card now bursts a decorative
+     * particle effect over itself and fires `vibrate("success")` exactly
+     * once at the real commit (countdown → committed transition).
+     */
+    describe("Wave 8 — success sparkle + haptic on accept", () => {
+        afterEach(() => {
+            uninstallVibrate();
+        });
+
+        it("renders the success sparkle burst once the proposal reaches the committed phase", () => {
+            const restoreMotion = setReducedMotion(false);
+            jest.useFakeTimers();
+            try {
+                renderCard({
+                    onAccept: jest.fn(),
+                    onReject: jest.fn(),
+                    proposal: baseProposal
+                });
+                // Idle phase: no sparkle yet.
+                expect(
+                    screen.queryByTestId("mutation-proposal-sparkle")
+                ).not.toBeInTheDocument();
+
+                fireEvent.click(
+                    screen.getByRole("button", {
+                        name: microcopy.a11y.acceptProposal as string
+                    })
+                );
+                // Countdown phase (pre-commit): still no sparkle.
+                expect(
+                    screen.queryByTestId("mutation-proposal-sparkle")
+                ).not.toBeInTheDocument();
+
+                // Run the countdown to completion → committed phase.
+                flushAcceptCountdown();
+                const sparkle = screen.getByTestId("mutation-proposal-sparkle");
+                expect(sparkle).toBeInTheDocument();
+                // Decorative only — hidden from the AX tree.
+                expect(sparkle).toHaveAttribute("aria-hidden", "true");
+            } finally {
+                jest.useRealTimers();
+                restoreMotion();
+            }
+        });
+
+        it("renders NO sparkle under prefers-reduced-motion even after a full commit", () => {
+            const restoreMotion = setReducedMotion(true);
+            jest.useFakeTimers();
+            try {
+                renderCard({
+                    onAccept: jest.fn(),
+                    onReject: jest.fn(),
+                    proposal: baseProposal
+                });
+                fireEvent.click(
+                    screen.getByRole("button", {
+                        name: microcopy.a11y.acceptProposal as string
+                    })
+                );
+                flushAcceptCountdown();
+                // Committed, but reduced-motion users get no animation at all.
+                expect(
+                    screen.queryByTestId("mutation-proposal-sparkle")
+                ).not.toBeInTheDocument();
+            } finally {
+                jest.useRealTimers();
+                restoreMotion();
+            }
+        });
+
+        it("fires vibrate('success') exactly once at the commit transition", () => {
+            const restoreMotion = setReducedMotion(false);
+            const vibrate = installVibrate();
+            jest.useFakeTimers();
+            try {
+                const onAccept = jest.fn();
+                renderCard({
+                    onAccept,
+                    onReject: jest.fn(),
+                    proposal: baseProposal
+                });
+
+                // No buzz on render or while idle.
+                expect(vibrate).not.toHaveBeenCalled();
+
+                fireEvent.click(
+                    screen.getByRole("button", {
+                        name: microcopy.a11y.acceptProposal as string
+                    })
+                );
+                // No buzz during the countdown — only the real commit buzzes.
+                expect(vibrate).not.toHaveBeenCalled();
+
+                flushAcceptCountdown();
+                // useHaptic maps "success" → the [10, 40, 20] pattern.
+                expect(onAccept).toHaveBeenCalledTimes(1);
+                expect(vibrate).toHaveBeenCalledTimes(1);
+                expect(vibrate).toHaveBeenCalledWith([10, 40, 20]);
+            } finally {
+                jest.useRealTimers();
+                restoreMotion();
+            }
+        });
+
+        it("fires the success haptic even under reduced-motion (haptics are not motion-gated)", () => {
+            const restoreMotion = setReducedMotion(true);
+            const vibrate = installVibrate();
+            jest.useFakeTimers();
+            try {
+                renderCard({
+                    onAccept: jest.fn(),
+                    onReject: jest.fn(),
+                    proposal: baseProposal
+                });
+                fireEvent.click(
+                    screen.getByRole("button", {
+                        name: microcopy.a11y.acceptProposal as string
+                    })
+                );
+                flushAcceptCountdown();
+                // The sparkle is suppressed (asserted elsewhere) but the
+                // confirmation buzz still fires — haptics are a separate
+                // accessibility category from motion (see `useHaptic`).
+                expect(vibrate).toHaveBeenCalledTimes(1);
+                expect(vibrate).toHaveBeenCalledWith([10, 40, 20]);
+            } finally {
+                jest.useRealTimers();
+                restoreMotion();
+            }
+        });
+
+        it("keeps the committed phase axe-clean with the decorative sparkle present", async () => {
+            const restoreMotion = setReducedMotion(false);
+            jest.useFakeTimers();
+            try {
+                const { container } = renderCard({
+                    onAccept: jest.fn(),
+                    onReject: jest.fn(),
+                    onUndo: jest.fn(),
+                    proposal: baseProposal
+                });
+                fireEvent.click(
+                    screen.getByRole("button", {
+                        name: microcopy.a11y.acceptProposal as string
+                    })
+                );
+                flushAcceptCountdown();
+                expect(
+                    screen.getByTestId("mutation-proposal-sparkle")
+                ).toBeInTheDocument();
+                // jest-axe is async; switch back to real timers so its
+                // internal scheduling isn't starved by the fake clock.
+                jest.useRealTimers();
+                const results = await axe(container);
+                expect(results).toHaveNoViolations();
+            } finally {
+                jest.useRealTimers();
+                restoreMotion();
+            }
+        });
     });
 });
