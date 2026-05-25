@@ -164,6 +164,33 @@ describe("userPreferences persistence", () => {
         });
     });
 
+    it("falls back to defaults (with a warning) on a future/unknown schema version", () => {
+        // The slice only ever WRITES version 1, so a higher version can
+        // only arrive from a future build (then a downgrade) or a foreign
+        // writer — never from normal app use. Treat it as forward-incompat:
+        // blank to defaults rather than misread an unknown shape, and warn
+        // so the rollback is debuggable. This is by design, and is the path
+        // behind the audit-env "unsupported version 4" console noise — a
+        // fresh real-user session never reaches it.
+        const warnSpy = jest
+            .spyOn(console, "warn")
+            .mockImplementation(() => {});
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify({
+                version: 4,
+                state: { boardDensity: "compact", savedFilterPresets: [] }
+            })
+        );
+
+        expect(loadPersistedUserPreferences()).toEqual(initialState);
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("unsupported version 4")
+        );
+
+        warnSpy.mockRestore();
+    });
+
     it("drops malformed preset entries without dropping valid ones", () => {
         const stored = {
             boardDensity: "compact",
