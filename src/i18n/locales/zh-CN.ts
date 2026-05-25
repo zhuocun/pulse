@@ -1132,6 +1132,10 @@ const zhCN: Dictionary = {
         pull: "下拉刷新",
         release: "松开刷新",
         refreshing: "正在刷新…"
+    },
+    swipeActions: {
+        favorite: "收藏",
+        unfavorite: "取消收藏"
     }
 };
 
