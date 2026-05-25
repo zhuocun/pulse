@@ -217,13 +217,28 @@ const zhCN: Dictionary = {
             boards: "看板",
             inbox: "收件箱",
             copilot: "Copilot",
-            profile: "我的"
+            profile: "我的",
+            search: "搜索"
         }
     },
     inbox: {
         emptyTitle: "收件箱为空",
         emptyDescription: "整理提议、提及和 AI 活动将显示在此处。",
-        heading: "收件箱"
+        heading: "收件箱",
+        sections: {
+            triage: {
+                title: "待处理",
+                empty: "暂无待审核的提议。Board Copilot 会在每个看板上推送待处理提醒。"
+            },
+            mentions: {
+                title: "提及",
+                empty: "暂无提及。"
+            },
+            activity: {
+                title: "活动",
+                empty: "本次会话暂无内容 —— 任务和 AI 变更会显示在此处。"
+            }
+        }
     },
     /*
      * Phase 4.7 报告占位页面。该路由是「我们听到了」的页面,

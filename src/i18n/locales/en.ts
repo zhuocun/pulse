@@ -227,14 +227,29 @@ export const enSource = {
             boards: "Boards",
             inbox: "Inbox",
             copilot: "Copilot",
-            profile: "Profile"
+            profile: "Profile",
+            search: "Search"
         }
     },
     inbox: {
         emptyTitle: "Your inbox is empty",
         emptyDescription:
             "Triage proposals, mentions, and AI activity will appear here.",
-        heading: "Inbox"
+        heading: "Inbox",
+        sections: {
+            triage: {
+                title: "Triage",
+                empty: "No proposals to review right now. Board Copilot surfaces triage nudges on each board."
+            },
+            mentions: {
+                title: "Mentions",
+                empty: "No mentions yet."
+            },
+            activity: {
+                title: "Activity",
+                empty: "Nothing yet this session — task and AI changes show up here."
+            }
+        }
     },
     /*
      * Phase 4.7 reports placeholder. The route is a "we hear you"
