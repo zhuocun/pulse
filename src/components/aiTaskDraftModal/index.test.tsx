@@ -4,8 +4,20 @@ import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { store } from "../../store";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import AiTaskDraftModal from ".";
+
+jest.mock("../../utils/hooks/useIsPhoneChrome");
+jest.mock("../../utils/hooks/useReducedMotion");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
+const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
+    typeof useReducedMotion
+>;
 
 const installAntdMocks = () => {
     Object.defineProperty(window, "matchMedia", {
@@ -90,6 +102,8 @@ describe("AiTaskDraftModal", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(response({ _id: "task-new" }));
+        mockedUseIsPhoneChrome.mockReturnValue(false);
+        mockedUseReducedMotion.mockReturnValue(false);
     });
 
     afterAll(() => {
@@ -339,5 +353,29 @@ describe("AiTaskDraftModal", () => {
                 screen.getByText(/1 removed, 1 could not be removed/i)
             ).toBeInTheDocument();
         });
+    });
+
+    it("renders a medium-detent bottom sheet with the draft UI on phone chrome", async () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        mountModal();
+
+        const surface = await screen.findByTestId(
+            "ai-task-draft-modal-surface"
+        );
+        expect(surface).toBeInTheDocument();
+        expect(surface).toHaveAttribute("role", "dialog");
+        expect(surface).toHaveAttribute("data-detent", "medium");
+
+        // Draft UI + the in-body action buttons come along verbatim.
+        expect(screen.getByLabelText("Task prompt")).toBeInTheDocument();
+        expect(
+            screen.getByLabelText("Draft task with Copilot")
+        ).toBeInTheDocument();
+        expect(
+            screen.getByLabelText("Break the prompt into subtasks")
+        ).toBeInTheDocument();
+
+        // The desktop AntD Modal must NOT render on the phone branch.
+        expect(document.querySelector(".ant-modal")).toBeNull();
     });
 });

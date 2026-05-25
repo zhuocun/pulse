@@ -5,7 +5,6 @@ import {
     Checkbox,
     Form,
     Input,
-    Modal,
     Progress,
     Select,
     Space,
@@ -41,6 +40,7 @@ import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
+import ResponsiveFormSheet from "../responsiveFormSheet";
 
 interface AiTaskDraftModalProps {
     open: boolean;
@@ -550,10 +550,11 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
         : 0;
 
     return (
-        <Modal
+        <ResponsiveFormSheet
+            data-testid="ai-task-draft-modal"
             destroyOnHidden
             footer={null}
-            onCancel={onClose}
+            onClose={onClose}
             open={open}
             styles={{
                 body: {
@@ -1009,7 +1010,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                     </div>
                 </div>
             )}
-        </Modal>
+        </ResponsiveFormSheet>
     );
 };
 
