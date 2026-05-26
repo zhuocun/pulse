@@ -246,8 +246,7 @@ export const enSource = {
                 empty: "No mentions yet."
             },
             activity: {
-                title: "Activity",
-                empty: "Nothing yet this session — task and AI changes show up here."
+                title: "Activity"
             }
         }
     },

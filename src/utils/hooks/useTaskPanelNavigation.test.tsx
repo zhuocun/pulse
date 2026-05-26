@@ -120,28 +120,6 @@ const renderHook = (
     return { ref, queryClient, ...utils };
 };
 
-const column = (overrides: Partial<IColumn> = {}): IColumn => ({
-    _id: "column-1",
-    columnName: "Todo",
-    index: 0,
-    projectId: "p1",
-    ...overrides
-});
-
-const task = (overrides: Partial<ITask> = {}): ITask => ({
-    _id: "task-1",
-    columnId: "column-1",
-    coordinatorId: "member-1",
-    epic: "Feature",
-    index: 0,
-    note: "",
-    projectId: "p1",
-    storyPoints: 1,
-    taskName: "Task 1",
-    type: "Task",
-    ...overrides
-});
-
 describe("useTaskPanelNavigation", () => {
     it("navigates to /projects/:projectId/board/task/:taskId via openTask", () => {
         const { ref, getByTestId } = renderHook();

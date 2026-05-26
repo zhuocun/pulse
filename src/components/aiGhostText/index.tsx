@@ -20,6 +20,7 @@ import {
     noteCompletion,
     type NoteCompletionContext
 } from "../../utils/ai/engine";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 /**
  * Phase 4 W3 — Inline ghost-text suggestions in any task-note textarea
@@ -138,37 +139,6 @@ const usePrivacyConsent = (route: AiGhostTextRoute): boolean => {
     return consent;
 };
 
-const usePrefersReducedMotion = (): boolean => {
-    const [reduced, setReduced] = useState<boolean>(() => {
-        if (typeof window === "undefined" || !window.matchMedia) return false;
-        try {
-            return window.matchMedia("(prefers-reduced-motion: reduce)")
-                .matches;
-        } catch {
-            return false;
-        }
-    });
-    useEffect(() => {
-        if (typeof window === "undefined" || !window.matchMedia) return;
-        let media: MediaQueryList;
-        try {
-            media = window.matchMedia("(prefers-reduced-motion: reduce)");
-        } catch {
-            return;
-        }
-        const handler = (event: MediaQueryListEvent) =>
-            setReduced(event.matches);
-        if (typeof media.addEventListener === "function") {
-            media.addEventListener("change", handler);
-            return () => media.removeEventListener("change", handler);
-        }
-        // Older Safari fallback
-        media.addListener?.(handler);
-        return () => media.removeListener?.(handler);
-    }, []);
-    return reduced;
-};
-
 /**
  * Mirror element that lines up exactly with the textarea so the
  * suggestion text appears immediately after the typed prefix. We render
@@ -206,7 +176,7 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
 }) => {
     const flagOn = environment.aiGhostTextEnabled;
     const consent = usePrivacyConsent(route);
-    const reducedMotion = usePrefersReducedMotion();
+    const reducedMotion = useReducedMotion();
     const textAreaRef = useRef<TextAreaRef | null>(null);
     const mirrorRef = useRef<HTMLDivElement | null>(null);
     const composingRef = useRef<boolean>(false);
