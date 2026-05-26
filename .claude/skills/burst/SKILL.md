@@ -1,13 +1,13 @@
 ---
 name: burst
-description: Orchestrates parallel subagents as the primary performers of research and implementation work.
+description: Orchestrate authorized parallel subagents as the primary performers of research, audit, implementation, and review work. Use when a task has independent workstreams, benefits from sidecar exploration or verification, or needs worker output to pass through a reviewer before integration.
 ---
 
 # Burst
 
 ## Role
 
-Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research and implementation work** — exploration, analysis, lookups, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb that work itself unless it is genuinely tiny or tightly coupled to the next local action.
+Work as an orchestrator, not a single-threaded executor. **Subagents are the primary performers of research, audit, implementation, and review work** — exploration, analysis, lookups, implementation, refactors, fixes, tests, and verification all default to subagents. The orchestrator's job is to plan, decompose, scope, dispatch, review, and integrate — not to absorb that work itself unless it is genuinely tiny or tightly coupled to the next local action.
 
 Worker output is never integrated directly. Every worker deliverable passes through a dedicated **reviewer subagent** (top-tier model, high reasoning) before the orchestrator runs its own final gate. The full chain: **orchestrator → worker → reviewer → orchestrator**.
 
@@ -15,20 +15,19 @@ Worker output is never integrated directly. Every worker deliverable passes thro
 
 Burst has two modes:
 
-- **default** — workers and reviewers run on top-tier models with high reasoning. Workers may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
-- **light** — workers drop to mid-tier models, faster and cheaper than the orchestrator. Reviewers and the orchestrator stay top-tier; the orchestrator absorbs the quality premium during integration. Optimizes for parallel throughput and cost when mid-tier worker quality is sufficient.
+- **default** — every subagent role runs on top-tier models with high reasoning: workers, reviewers, verifiers, sidecar explorers, and any other delegated role. Workers may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
+- **light** — worker-side roles may drop to mid-tier models: implementation workers, sidecar explorers, lookup agents, and mechanical verifiers. Reviewers stay top-tier with high reasoning; an independent quality-gate verifier should be treated like a reviewer. Optimizes for parallel throughput and cost when mid-tier worker quality is sufficient.
 
-Run in default mode unless the user opts into light. Switch to **light** when:
+Run in default mode unless the user explicitly specifies light mode. Do not infer light mode from task size, shallowness, or cost concerns unless the user says so. Switch to **light** only when:
 
 - the user explicitly asks ("light mode", "save tokens", "go fast")
 - the slash-command is invoked with a `light` argument
-- the task is a wide-but-shallow fan-out where mid-tier workers won't force costly rework
 
 A single subtask inside an otherwise-light task may be individually promoted to default config if integration-sensitive; the rest stays light.
 
 ## When to delegate
 
-Only delegate when the session or user authorizes subagents. If no subagent launcher exists, ignore this skill. If the platform exposes a faster-but-still-capable subagent option, prefer it when it does not hurt quality.
+Only delegate when the session or user authorizes subagents. If no subagent launcher exists, ignore this skill. Do not choose a cheaper or faster subagent configuration in default mode; use reduced-cost settings only under **light** mode.
 
 When delegation is allowed, **subagents are the default executor**. Treat staying local as the exception. A task is worth delegating if any of these are true:
 
@@ -82,11 +81,11 @@ Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-haiku`-c
 
 ### Default
 
-Worker model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. Workers may run the same model and reasoning budget as the orchestrator.
+All delegated roles use top-tier models — Opus on Anthropic, the best non-mini GPT on OpenAI, or the best subagent model the platform exposes elsewhere. This applies to workers, reviewers, verifiers, sidecar explorers, and any specialized role spawned for the task. Workers may run the same model and reasoning budget as the orchestrator.
 
 Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of default mode.
 
-Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
+Platform-cap exception: if the platform forbids concurrent agents from using the exact same top-tier model and reasoning budget, keep the top-tier model and use the highest reasoning budget the platform allows. State the exception in the progress/final note if it changes a subagent's requested config. Do not switch to light mode unless the user asked for light mode.
 
 ### Light mode
 
