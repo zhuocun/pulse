@@ -39,9 +39,9 @@ shared Jest / CI infrastructure. Earlier per-area docs
   assert the exact `(kind, surface)` sequence emitted by an agent,
   which is fragile against harmless reordering. Not currently red, but
   the most likely first failure of a benign refactor.
-- **There is no GitHub Actions workflow for the frontend Jest suite.**
-  Only `backend-ci.yml` exists, so ordering or environment-only flakes
-  surface only locally / in Husky.
+- **Frontend Jest now runs in GitHub Actions.**
+  `.github/workflows/frontend-ci.yml` runs the CI Jest command,
+  typecheck, lint, and build on frontend-path changes.
 - **`__json_server_mock__/db.json` is stale relative to `/api/v1`.**
   Not strictly a flaky-test source, but the most common cause of
   "looks-like-a-flake" local failures when developers point the SPA at
@@ -129,12 +129,11 @@ pytest
 | Rank | Suspect | Evidence | Why flaky | Fix |
 | ---- | ------- | -------- | --------- | --- |
 | 1 | Sleep-driven timeout tests in v2.1 router suite | `tests/test_agents_router_v21.py:427`, `:449`, `:486`, `:930`, `:952` | `asyncio.sleep(...)` introduces wall-clock dependency and variance under loaded CI workers. | **Shipped (`d650874`)**: replaced sleeps with `await asyncio.Event().wait()`; tightened `timeout` from `1` to `0.1`. |
-| 2 | Sleep-driven timeout tests in coverage filler suite | `tests/test_coverage_filling.py:1247`, `:1968` | Timeout assertions depended on sleep length and event-loop scheduling. | **Shipped (`244baaf`, `d650874`)**: never-signaled event waits; `timeout=0.01` (avoids the `timeout=0` immediate-scheduling edge race). |
-| 3 | Live Postgres smoke test guard not visible at collection time | `tests/test_agents_postgres_live.py:28` | Previously skipped inside test body; accidental collection in mixed environments could look like intermittent failures. | **Shipped (`bcab537`)**: module-level `pytestmark = pytest.mark.skipif(...)` keyed on `PYTEST_AGENT_POSTGRES_URI`. |
-| 4 | Strict full-sequence SSE shape assertion | `tests/test_agent_sse_transcripts.py:254` | Asserts exact `(kind, surface)` sequence; can fail on harmless reordering. | Switch to subsequence/contains assertions for invariant events; filter transient kinds before equality. |
-| 5 | Wall-clock branch test without frozen time | `tests/test_redis_backends.py:282` | Uses ambient `time.time()`; current assertion is coarse but the path is sensitive to clock anomalies. | Patch `time.time` (or backend clock provider) for deterministic timestamps. |
-| 6 | "non-413 means pass" assertion | `tests/test_ai_limits.py:193` | Test passes on unrelated 4xx/5xx outcomes — false confidence and apparent intermittency. | Tighten to a specific accepted-status set and verify response envelope shape. |
-| 7 | Mutable singleton repository patching relies on fixture discipline | `tests/conftest.py:231-243` | Singleton monkeypatch is correct but vulnerable if a test bypasses `store` and touches global repository state. | Add an autouse guard asserting `main.repository is FakeStore` during test execution. |
+| 2 | Live Postgres smoke test guard not visible at collection time | `tests/test_agents_postgres_live.py:28` | Previously skipped inside test body; accidental collection in mixed environments could look like intermittent failures. | **Shipped (`bcab537`)**: module-level `pytestmark = pytest.mark.skipif(...)` keyed on `PYTEST_AGENT_POSTGRES_URI`. |
+| 3 | Strict full-sequence SSE shape assertion | `tests/test_agent_sse_transcripts.py:254` | Asserts exact `(kind, surface)` sequence; can fail on harmless reordering. | Switch to subsequence/contains assertions for invariant events; filter transient kinds before equality. |
+| 4 | Wall-clock branch test without frozen time | `tests/test_redis_backends.py:282` | Uses ambient `time.time()`; current assertion is coarse but the path is sensitive to clock anomalies. | Patch `time.time` (or backend clock provider) for deterministic timestamps. |
+| 5 | AI limit status assertions | `tests/test_ai_limits.py` | Limit tests are most valuable when they assert the exact accepted/rejected status and response envelope, not just "not 413". | Keep the focused 413 and accepted-status assertions pinned as the route surface changes. |
+| 6 | Mutable singleton repository patching relies on fixture discipline | `tests/conftest.py:231-243` | Singleton monkeypatch is correct but vulnerable if a test bypasses `store` and touches global repository state. | Add an autouse guard asserting `main.repository is FakeStore` during test execution. |
 
 ### Marker inventory
 
@@ -178,16 +177,15 @@ Scope: `jest.config.cjs`, `babel.config.cjs`, `src/setupTests.ts`,
    those files will fail the suite hard (loud, not flaky). Verify on
    each upgrade.
 
-5. **Babel test target ≠ `tsconfig` compile target.**
+5. **Babel test target differs from the TS emit target.**
    `babel.config.cjs:3` uses `@babel/preset-env` `{ targets: { node:
-   "current" } }`; `tsconfig.json:3` sets `"target": "es5"`. Rare
-   correctness divergence (async/generator, builtins) more than a
-   classic flake. Accept as intentional or introduce
-   `tsconfig.jest.json` if parity issues appear.
+   "current" } }`; `tsconfig.json:3` sets `"target": "ES2022"`. Rare
+   correctness divergence more than a classic flake; introduce
+   `tsconfig.jest.json` only if parity issues appear.
 
-6. **No frontend Jest workflow in `.github/workflows/`.** Only
-   `backend-ci.yml` exists. Ordering / environment-only flakes
-   surface only locally.
+6. **Frontend CI exists, but local reproduction must match it.**
+   `.github/workflows/frontend-ci.yml` is the canonical recipe for Jest
+   worker count, typecheck, lint, and build flags.
 
 7. **Backend `pytest` runs once with no flaky quarantine / rerun.**
    Treat any add of `pytest-rerunfailures` as a quarantine mechanism,
@@ -220,7 +218,6 @@ Scope: `jest.config.cjs`, `babel.config.cjs`, `src/setupTests.ts`,
 | frontend | `src/components/taskModal/index.test.tsx` | `Modal.confirm` spy restored only on happy path. | `try/finally` with `confirmSpy.mockRestore()` in `finally`. |
 | frontend | `src/components/aiTaskAssistPanel/index.test.tsx` | Suite-level `beforeAll(useFakeTimers)` leaked timer state. | Per-test fake-timer ownership + `act`-wrapped `advanceBy`. |
 | backend | `tests/test_agents_router_v21.py` (5 tests) | Cancellation paths driven by `asyncio.sleep(...)`. | `await asyncio.Event().wait()`; `timeout` 1 → 0.1. |
-| backend | `tests/test_coverage_filling.py` (`_with_disconnect` + v1 chat timeout) | Sleep-based timeout setup; `timeout=0` immediate-schedule race. | `Event().wait()` + `timeout=0.01`. |
 | backend | `tests/test_agents_postgres_live.py` | Live-service skip lived inside test bodies. | Module-level `pytestmark = pytest.mark.skipif(...)` keyed on `PYTEST_AGENT_POSTGRES_URI`. |
 
 ## Recommended follow-ups
@@ -228,10 +225,9 @@ Scope: `jest.config.cjs`, `babel.config.cjs`, `src/setupTests.ts`,
 Ranked by expected impact, with effort tags (S = single-file
 hardening, M = a few files / small infra change, L = cross-cutting).
 
-1. **Add a frontend Jest GitHub Actions workflow (M).** `npm ci` and
-   `NODE_OPTIONS=--max-old-space-size=8192 npx jest --forceExit
-   --detectOpenHandles` on PR + main. Optional `--shard` for
-   parallelism.
+1. **Keep local frontend reproduction aligned with CI (S).** Run the
+   exact Jest, typecheck, lint, and build commands from
+   `.github/workflows/frontend-ci.yml` when investigating flakes.
 2. **Migrate `aiTaskAssistPanel/agent.test.tsx` to per-test fake
    timers (S).**
 3. **Wrap `advanceTimersByTime` in `act` in
@@ -243,8 +239,8 @@ hardening, M = a few files / small infra change, L = cross-cutting).
 5. **Relax strict full-sequence SSE assertions in
    `test_agent_sse_transcripts.py` (S).**
 6. **Freeze time in `test_redis_backends.py:282` (S).**
-7. **Tighten `test_ai_limits.py:193` (S).** Replace `status != 413`
-   with a narrow expected-status set.
+7. **Keep AI limit tests envelope-specific (S).** Any new limit path
+   should assert both status and error body shape.
 8. **Restore `security.settings.jwt_secret` in the `store`
    fixture (M).**
 9. **Refresh or replace `__json_server_mock__/db.json` (M).** Align

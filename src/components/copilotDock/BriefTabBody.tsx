@@ -168,21 +168,32 @@ interface CachedBrief {
 
 const BRIEF_CACHE = new Map<string, CachedBrief>();
 
+export const resetBriefCacheForTests = (): void => {
+    BRIEF_CACHE.clear();
+};
+
 const fingerprintBoard = (
     columns: IColumn[],
     tasks: ITask[],
     members: IMember[]
 ): string => {
-    return [
-        columns.length,
-        tasks.length,
-        members.length,
-        // Sample a few tasks' ids so adding/removing a single task busts the cache
-        tasks
-            .slice(0, 8)
-            .map((t) => `${t._id}:${t.columnId ?? ""}:${t.coordinatorId ?? ""}`)
-            .join("|")
-    ].join("/");
+    const columnFingerprint = [...columns]
+        .sort((a, b) => a.index - b.index || a._id.localeCompare(b._id))
+        .map((column) => `${column._id}:${column.index}:${column.columnName}`)
+        .join("|");
+    const taskFingerprint = [...tasks]
+        .sort((a, b) => a.index - b.index || a._id.localeCompare(b._id))
+        .map(
+            (task) =>
+                `${task._id}:${task.index}:${task.columnId}:${task.coordinatorId}:${task.storyPoints}:${task.taskName}`
+        )
+        .join("|");
+    const memberFingerprint = [...members]
+        .sort((a, b) => a._id.localeCompare(b._id))
+        .map((member) => `${member._id}:${member.username}`)
+        .join("|");
+
+    return [columnFingerprint, taskFingerprint, memberFingerprint].join("/");
 };
 
 /*

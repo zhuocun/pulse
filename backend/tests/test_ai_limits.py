@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from http import HTTPStatus
 from typing import Any, Iterable
 
@@ -9,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pytest import FixtureRequest
 
-from app import main, security
+from app import config, main, security
 from app.agents.limits import enforce_request_limits
 from app.routers.agents import _input_token_estimate
 from app.security import create_token
@@ -160,6 +161,21 @@ def test_content_length_header_within_limit_falls_through() -> None:
         headers = {"content-length": "100"}
 
     enforce_request_limits({"prompt": "ok"}, request=_RequestStub())  # type: ignore[arg-type]
+
+
+def test_enforce_request_limits_reads_settings_at_enforcement_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config,
+        "settings",
+        replace(config.settings, ai_max_prompt_bytes=3),
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        enforce_request_limits({"prompt": "four"})
+
+    assert exc_info.value.status_code == 413  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

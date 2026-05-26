@@ -8,20 +8,12 @@ a malicious payload cannot inflate provider costs.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterator
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
 
-# Total serialised JSON body: 64 KiB
-_MAX_BODY_BYTES: int = int(os.getenv("AI_MAX_BODY_BYTES", "65536"))
-# Single string field (e.g. ``prompt``): 8 KiB
-_MAX_PROMPT_BYTES: int = int(os.getenv("AI_MAX_PROMPT_BYTES", "8192"))
-# Number of messages in a ``messages`` list
-_MAX_MESSAGES: int = int(os.getenv("AI_MAX_MESSAGES", "50"))
-# Per-message ``content`` length: 8 KiB
-_MAX_MESSAGE_CONTENT_BYTES: int = int(os.getenv("AI_MAX_MESSAGE_CONTENT_BYTES", "8192"))
+from app import config
 
 
 def iter_message_content_texts(content: object) -> Iterator[str]:
@@ -64,7 +56,7 @@ def enforce_request_limits(
                 declared = int(header_value)
             except ValueError:
                 declared = -1
-            if declared > _MAX_BODY_BYTES:
+            if declared > config.settings.ai_max_body_bytes:
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail="Request payload too large",
@@ -78,7 +70,7 @@ def enforce_request_limits(
     # but 3-4 bytes; measuring codepoints would allow those payloads to bypass
     # the limit.
     body_size = len(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    if body_size > _MAX_BODY_BYTES:
+    if body_size > config.settings.ai_max_body_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Request payload too large",
@@ -90,7 +82,10 @@ def enforce_request_limits(
     if isinstance(inputs, dict):
         prompt_candidates.append(inputs.get("prompt"))
     for prompt in prompt_candidates:
-        if isinstance(prompt, str) and len(prompt.encode()) > _MAX_PROMPT_BYTES:
+        if (
+            isinstance(prompt, str)
+            and len(prompt.encode()) > config.settings.ai_max_prompt_bytes
+        ):
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Request payload too large",
@@ -102,7 +97,7 @@ def enforce_request_limits(
     for messages in candidates:
         if not isinstance(messages, list):
             continue
-        if len(messages) > _MAX_MESSAGES:
+        if len(messages) > config.settings.ai_max_messages:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Request payload too large",
@@ -114,7 +109,7 @@ def enforce_request_limits(
                 len(text.encode())
                 for text in iter_message_content_texts(msg.get("content"))
             )
-            if content_size > _MAX_MESSAGE_CONTENT_BYTES:
+            if content_size > config.settings.ai_max_message_content_bytes:
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail="Request payload too large",

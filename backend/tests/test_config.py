@@ -19,6 +19,13 @@ def test_default_agent_chat_model_timeout_seconds() -> None:
     assert default_settings.agent_chat_model_timeout_seconds == 30.0
 
 
+def test_default_ai_request_size_limits() -> None:
+    assert default_settings.ai_max_body_bytes == 65536
+    assert default_settings.ai_max_prompt_bytes == 8192
+    assert default_settings.ai_max_messages == 50
+    assert default_settings.ai_max_message_content_bytes == 8192
+
+
 def test_agent_chat_model_max_retries_env(monkeypatch) -> None:
     """AGENT_CHAT_MODEL_MAX_RETRIES env var is read into Settings."""
 
@@ -33,6 +40,20 @@ def test_agent_chat_model_timeout_seconds_env(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_CHAT_MODEL_TIMEOUT_SECONDS", "45.5")
     s = Settings()
     assert s.agent_chat_model_timeout_seconds == 45.5
+
+
+def test_ai_request_size_limit_env(monkeypatch) -> None:
+    monkeypatch.setenv("AI_MAX_BODY_BYTES", "12345")
+    monkeypatch.setenv("AI_MAX_PROMPT_BYTES", "123")
+    monkeypatch.setenv("AI_MAX_MESSAGES", "12")
+    monkeypatch.setenv("AI_MAX_MESSAGE_CONTENT_BYTES", "234")
+
+    s = Settings()
+
+    assert s.ai_max_body_bytes == 12345
+    assert s.ai_max_prompt_bytes == 123
+    assert s.ai_max_messages == 12
+    assert s.ai_max_message_content_bytes == 234
 
 
 def test_settings_reads_env_when_instance_is_created(monkeypatch) -> None:

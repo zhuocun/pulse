@@ -45,7 +45,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from app.agents import AgentRuntime
 from app.agents.base import AgentMetadata
 from app.agents.limits import enforce_request_limits
-from app.agents.errors import AgentError
+from app.agents.errors import AgentError, agent_http_error_detail
 from app.agents.llm import result_token_usage_from_graph_result
 from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
@@ -227,12 +227,14 @@ def _gate_with_reservation(
     if not is_project_ai_enabled(project_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "AI is disabled for this project"},
+            detail=agent_http_error_detail(
+                "forbidden", "AI is disabled for this project"
+            ),
         )
     if project_id and not is_project_manager(project_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Forbidden"},
+            detail=agent_http_error_detail("forbidden", "Forbidden"),
         )
     limits = metadata.rate_limit if metadata is not None else DEFAULT_LIMIT
     allowed, retry_after = rate_limiter.check(agent_label, user_id, limits=limits)
@@ -240,7 +242,9 @@ def _gate_with_reservation(
         record_invocation(agent_label, "rate_limited")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"error": "rate limit exceeded"},
+            detail=agent_http_error_detail(
+                "rate_limit_exceeded", "rate limit exceeded"
+            ),
             headers={"Retry-After": str(retry_after)},
         )
     if project_id:
@@ -248,7 +252,9 @@ def _gate_with_reservation(
             record_invocation(agent_label, "budget_exhausted")
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail={"error": "project budget exhausted"},
+                detail=agent_http_error_detail(
+                    "budget_exhausted", "project budget exhausted"
+                ),
                 headers={"X-Reason": "budget"},
             )
         request.state.redaction_spans = []

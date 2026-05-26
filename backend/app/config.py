@@ -168,6 +168,12 @@ class Settings:
     agent_request_timeout_seconds: int = _env_positive_int_field(
         "AGENT_REQUEST_TIMEOUT_SECONDS", "120"
     )
+    ai_max_body_bytes: int = _env_positive_int_field("AI_MAX_BODY_BYTES", "65536")
+    ai_max_prompt_bytes: int = _env_positive_int_field("AI_MAX_PROMPT_BYTES", "8192")
+    ai_max_messages: int = _env_positive_int_field("AI_MAX_MESSAGES", "50")
+    ai_max_message_content_bytes: int = _env_positive_int_field(
+        "AI_MAX_MESSAGE_CONTENT_BYTES", "8192"
+    )
     agent_default_autonomy: str = _env_str_field("AGENT_DEFAULT_AUTONOMY", "plan")
     agent_disabled_project_ids: tuple[str, ...] = _env_csv_field(
         "AGENT_DISABLED_PROJECT_IDS"

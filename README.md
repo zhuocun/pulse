@@ -22,12 +22,13 @@ Run from the repository root:
 
 ### Deployments
 
-Both apps deploy through Vercel's GitHub integration on every push to the tracked branch — no GitHub secrets, no `flyctl` token, no CI workflow to babysit.
+Both apps deploy through Vercel's GitHub integration on every push to the tracked branch. Frontend and backend CI also run through GitHub Actions.
 
 | Target            | How it deploys                                                                                                                                                                                       | Configured?         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
 | Frontend → Vercel | Push to the FE Vercel project's tracked branch. Root `.vercelignore` keeps `backend/` out of the build; root `vercel.json` `ignoreCommand` skips the FE rebuild when only `backend/` changed.        | ✅ in repo          |
 | Backend → Vercel  | Push to the BE Vercel project's tracked branch. `backend/vercel.json` `ignoreCommand` skips the BE rebuild when nothing under `backend/` changed. Project must have **Root Directory = `backend/`**. | ⚠️ see manual steps |
+| Frontend CI       | `.github/workflows/frontend-ci.yml`, scoped to frontend files, runs Jest, typecheck, lint, and build from the repo root.                                                                             | ✅ in repo          |
 | Backend CI        | `.github/workflows/backend-ci.yml`, scoped to `backend/**`, runs from `backend/`.                                                                                                                    | ✅ in repo          |
 
 `backend/Dockerfile` and `backend/fly.toml` are kept as a fallback — anyone can `cd backend && fly deploy` from a Fly-authenticated machine — but they're not on the active deploy path.
