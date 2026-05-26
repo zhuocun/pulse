@@ -55,11 +55,43 @@ const setupViewport = (
 };
 
 describe("useKeyboardOpen", () => {
+    // `setupViewport` redefines `window.innerHeight` (and `visualViewport`)
+    // via `Object.defineProperty`. jsdom does NOT reset window dimensions
+    // between suites the way it resets modules, so a leaked `innerHeight`
+    // bleeds into whatever suite runs next in the same worker — e.g. the
+    // `Sheet` primitive reads `window.innerHeight * 0.92` for its surface
+    // height and would inherit our pinned value (or a corrupted one),
+    // surfacing as a `height: NaN` console error elsewhere. Capture the
+    // original descriptors up front and restore them after each test so no
+    // mutation escapes this suite's scope.
+    const originalInnerHeight = Object.getOwnPropertyDescriptor(
+        window,
+        "innerHeight"
+    );
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(
+        window,
+        "visualViewport"
+    );
+
     afterEach(() => {
-        // JSDOM doesn't ship visualViewport by default. The cast widens
-        // window to an interface that allows deletion of the optional
-        // property so the next test starts from a clean slate.
-        delete (window as { visualViewport?: VisualViewport }).visualViewport;
+        if (originalInnerHeight) {
+            Object.defineProperty(window, "innerHeight", originalInnerHeight);
+        }
+        // jsdom doesn't ship visualViewport by default, so the original
+        // descriptor is usually absent — fall back to deleting the property
+        // the tests added so the next test starts from a clean slate.
+        if (originalVisualViewport) {
+            Object.defineProperty(
+                window,
+                "visualViewport",
+                originalVisualViewport
+            );
+        } else {
+            // The cast widens window to an interface that allows deletion of
+            // the optional property.
+            delete (window as { visualViewport?: VisualViewport })
+                .visualViewport;
+        }
         // Clean up any focused inputs the tests appended to the body.
         document.body.innerHTML = "";
     });
