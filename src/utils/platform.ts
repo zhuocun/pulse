@@ -8,10 +8,8 @@
  * (Firefox, Safari ≤16); finally falls back to scanning `navigator.userAgent`.
  * The UA fallback covers post-iOS-17 / 18+ builds where `navigator.platform`
  * has been observed to come back as an empty string on iPhone — the previous
- * platform-only check would then mis-classify iPhone as non-Mac-like and
- * skip the full-document `nativeNavigate` after login, leaving the user on
- * the still-mounted login form. Wrapped in a function so SSR / Jest envs
- * without `navigator` short-circuit to false.
+ * platform-only check would then mis-classify iPhone as non-Mac-like. Wrapped
+ * in a function so SSR / Jest envs without `navigator` short-circuit to false.
  */
 export const isMacLike = (): boolean => {
     if (typeof navigator === "undefined") return false;
