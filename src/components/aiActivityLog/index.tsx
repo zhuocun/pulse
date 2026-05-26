@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import useAiLedger, { type LedgerEntry } from "../../utils/hooks/useAiLedger";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
@@ -111,38 +112,22 @@ const Description = styled(Typography.Text)`
 `;
 
 /*
- * Inline relative-time formatter. Mirrors the brief tab body's helper
- * but reads from the dedicated `aiActivityLog.relative*` keys so
- * future tuning ("just now" vs "moments ago") is local to this surface.
+ * Inline relative-time formatter. Delegates to the shared
+ * `formatRelativeTime` util but reads from the dedicated
+ * `aiActivityLog.relative*` keys (through `microcopyString`) so future
+ * tuning ("just now" vs "moments ago") stays local to this surface. The
+ * Proxy reads stay here so a locale switch propagates on the next tick.
  */
-const formatRelative = (then: number, now: number): string => {
-    const seconds = Math.max(0, Math.round((now - then) / 1000));
-    if (seconds < 30)
-        return microcopyString(microcopy.aiActivityLog.relativeJustNow);
-    if (seconds < 90)
-        return microcopyString(microcopy.aiActivityLog.relativeOneMinute);
-    const minutes = Math.round(seconds / 60);
-    if (minutes < 60)
-        return microcopyString(microcopy.aiActivityLog.relativeMinutes).replace(
-            "{count}",
-            String(minutes)
-        );
-    const hours = Math.round(minutes / 60);
-    if (hours < 24)
-        return hours === 1
-            ? microcopyString(microcopy.aiActivityLog.relativeOneHour)
-            : microcopyString(microcopy.aiActivityLog.relativeHours).replace(
-                  "{count}",
-                  String(hours)
-              );
-    const days = Math.round(hours / 24);
-    return days === 1
-        ? microcopyString(microcopy.aiActivityLog.relativeOneDay)
-        : microcopyString(microcopy.aiActivityLog.relativeDays).replace(
-              "{count}",
-              String(days)
-          );
-};
+const formatRelative = (then: number, now: number): string =>
+    formatRelativeTime(then, now, {
+        justNow: microcopyString(microcopy.aiActivityLog.relativeJustNow),
+        oneMinute: microcopyString(microcopy.aiActivityLog.relativeOneMinute),
+        minutes: microcopyString(microcopy.aiActivityLog.relativeMinutes),
+        oneHour: microcopyString(microcopy.aiActivityLog.relativeOneHour),
+        hours: microcopyString(microcopy.aiActivityLog.relativeHours),
+        oneDay: microcopyString(microcopy.aiActivityLog.relativeOneDay),
+        days: microcopyString(microcopy.aiActivityLog.relativeDays)
+    });
 
 interface LedgerListBodyProps {
     entries: LedgerEntry[];

@@ -27,6 +27,7 @@ import {
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
+import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
@@ -184,26 +185,24 @@ const fingerprintBoard = (
     ].join("/");
 };
 
-const formatRelative = (then: number, now: number): string => {
-    const seconds = Math.max(0, Math.round((now - then) / 1000));
-    if (seconds < 30) return microcopy.brief.relativeJustNow;
-    if (seconds < 90) return microcopy.brief.relativeOneMinute;
-    const minutes = Math.round(seconds / 60);
-    if (minutes < 60)
-        return microcopy.brief.relativeMinutes.replace(
-            "{count}",
-            String(minutes)
-        );
-    const hours = Math.round(minutes / 60);
-    if (hours < 24)
-        return hours === 1
-            ? microcopy.brief.relativeOneHour
-            : microcopy.brief.relativeHours.replace("{count}", String(hours));
-    const days = Math.round(hours / 24);
-    return days === 1
-        ? microcopy.brief.relativeOneDay
-        : microcopy.brief.relativeDays.replace("{count}", String(days));
-};
+/*
+ * Localized relative-time formatter. Delegates to the shared
+ * `formatRelativeTime` util, reading the copy from
+ * `microcopy.brief.relative*` directly (these keys resolve to string
+ * leaves through the locale-aware Proxy, so no `microcopyString`
+ * coercion is needed — preserving this surface's original reads exactly).
+ * The Proxy reads stay at this call site so a locale switch propagates.
+ */
+const formatRelative = (then: number, now: number): string =>
+    formatRelativeTime(then, now, {
+        justNow: microcopy.brief.relativeJustNow,
+        oneMinute: microcopy.brief.relativeOneMinute,
+        minutes: microcopy.brief.relativeMinutes,
+        oneHour: microcopy.brief.relativeOneHour,
+        hours: microcopy.brief.relativeHours,
+        oneDay: microcopy.brief.relativeOneDay,
+        days: microcopy.brief.relativeDays
+    });
 
 const STRENGTH_COLOR: Record<
     NonNullable<IBoardBrief["recommendationDetail"]>["strength"],

@@ -1,21 +1,15 @@
-import {
-    FolderOpenOutlined,
-    ProjectOutlined,
-    RobotOutlined,
-    UnorderedListOutlined
-} from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Typography } from "antd";
-import React, { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
+import { KIND_ICON } from "../components/activityKindIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import SettingsSection from "../components/settingsSection";
 import { microcopy, microcopyString } from "../constants/microcopy";
 import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
-import useActivityFeed, {
-    type ActivityEvent
-} from "../utils/hooks/useActivityFeed";
+import { formatRelativeTime } from "../utils/formatRelativeTime";
+import useActivityFeed from "../utils/hooks/useActivityFeed";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
@@ -39,53 +33,23 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * sections render (with Triage / Mentions showing their empty copy).
  */
 
-/*
- * Per-kind leading glyph. Mirrors the activity drawer's `KIND_ICON`
- * map (the drawer keeps it module-private, so we re-state it here rather
- * than reach across the module boundary) so the two surfaces present
- * the same event taxonomy.
- */
-const KIND_ICON: Record<ActivityEvent["kind"], React.ReactNode> = {
-    task: <UnorderedListOutlined aria-hidden />,
-    column: <FolderOpenOutlined aria-hidden />,
-    project: <ProjectOutlined aria-hidden />,
-    ai: <RobotOutlined aria-hidden />
-};
-
 /**
- * Localized relative-time formatter. Mirrors the activity drawer's
- * `formatRelative` (and, transitively, the AI activity-log helper) so
- * the surfaces speak the same temporal language; the strings live under
- * `microcopy.activityFeed.relative*`.
+ * Localized relative-time formatter. Delegates to the shared
+ * `formatRelativeTime` util, reading the copy from
+ * `microcopy.activityFeed.relative*` (through `microcopyString`) so the
+ * Inbox and the activity drawer speak the same temporal language. The
+ * Proxy reads stay at this call site so a locale switch propagates.
  */
-const formatRelative = (then: number, now: number): string => {
-    const seconds = Math.max(0, Math.round((now - then) / 1000));
-    if (seconds < 30)
-        return microcopyString(microcopy.activityFeed.relativeJustNow);
-    if (seconds < 90)
-        return microcopyString(microcopy.activityFeed.relativeOneMinute);
-    const minutes = Math.round(seconds / 60);
-    if (minutes < 60)
-        return microcopyString(microcopy.activityFeed.relativeMinutes).replace(
-            "{count}",
-            String(minutes)
-        );
-    const hours = Math.round(minutes / 60);
-    if (hours < 24)
-        return hours === 1
-            ? microcopyString(microcopy.activityFeed.relativeOneHour)
-            : microcopyString(microcopy.activityFeed.relativeHours).replace(
-                  "{count}",
-                  String(hours)
-              );
-    const days = Math.round(hours / 24);
-    return days === 1
-        ? microcopyString(microcopy.activityFeed.relativeOneDay)
-        : microcopyString(microcopy.activityFeed.relativeDays).replace(
-              "{count}",
-              String(days)
-          );
-};
+const formatRelative = (then: number, now: number): string =>
+    formatRelativeTime(then, now, {
+        justNow: microcopyString(microcopy.activityFeed.relativeJustNow),
+        oneMinute: microcopyString(microcopy.activityFeed.relativeOneMinute),
+        minutes: microcopyString(microcopy.activityFeed.relativeMinutes),
+        oneHour: microcopyString(microcopy.activityFeed.relativeOneHour),
+        hours: microcopyString(microcopy.activityFeed.relativeHours),
+        oneDay: microcopyString(microcopy.activityFeed.relativeOneDay),
+        days: microcopyString(microcopy.activityFeed.relativeDays)
+    });
 
 const PageHeading = styled(Typography.Title)`
     && {
