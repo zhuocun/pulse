@@ -20,10 +20,11 @@ import GlassPanel from "../glassPanel";
  *     component declared anywhere in the React tree. Whatever it
  *     receives as `children` is teleported into the mount point
  *     described below. Unmounting clears the slot.
- *   - `<TabBarAccessoryMount />` — the actual DOM slot. Worker C will
- *     mount this above the `BottomTabBar` in the Wave 2 refactor of
- *     `BottomTabBar` itself. We intentionally do NOT mount it from
- *     `MainLayout` here — that lives in Worker C's diff.
+ *   - `<TabBarAccessoryMount />` — the actual DOM slot, mounted above the
+ *     `BottomTabBar` from `MainLayout`. The push side (`<TabBarAccessory>`)
+ *     has no production consumer yet: it is a reserved primitive kept for
+ *     the future active-state surfaces above (mini-player, active call).
+ *     Intentionally unconsumed — not dead code.
  *
  * Single-child contract — if two `<TabBarAccessory>` instances mount,
  * the LAST one wins (mini-player + active call simultaneously is an

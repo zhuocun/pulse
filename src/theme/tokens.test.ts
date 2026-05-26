@@ -363,21 +363,12 @@ describe("Phase 5 Liquid Glass token additions", () => {
     });
 
     describe("viewTransition name registry", () => {
-        it("declares every name expected by Wave 2 / Wave 5 consumers", () => {
-            // Wave 5 adopts every entry below; Wave 2 adopts at least
-            // `topbar`. A regression that drops one of these would make
-            // a downstream consumer fall back to an ad-hoc literal —
-            // exactly the situation the registry exists to prevent.
-            for (const key of [
-                "header",
-                "tabbar",
-                "topbar",
-                "columnHeader",
-                "commandPalette",
-                "copilotDock",
-                "lensChip",
-                "copilotChip"
-            ] as const) {
+        it("declares the wired view-transition names", () => {
+            // The registry holds only the names actually applied in
+            // component CSS (page header, bottom tab bar, tab-bar
+            // accessory). Dropping one would un-pair a consumer from its
+            // `view-transition-name` and break the pinned cross-fade.
+            for (const key of ["header", "tabbar", "tabAccessory"] as const) {
                 expect(typeof viewTransition[key]).toBe("string");
                 expect(viewTransition[key].length).toBeGreaterThan(0);
             }

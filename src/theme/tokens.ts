@@ -489,8 +489,7 @@ export const easing = {
  * `view-transition-name` value used in the app — recording new entries
  * here prevents two components from accidentally registering the same
  * name (which would cause the browser to morph one into the other
- * mid-route-change). Wave 5 adopts every entry below; Wave 2 adopts
- * `topbar` for the project-detail breadcrumb chrome.
+ * mid-route-change).
  *
  * Adding a new entry: declare here first, then reference via
  * `viewTransition.<key>` in the component's `view-transition-name`
@@ -501,18 +500,6 @@ export const viewTransition = {
     header: "pulse-header",
     /** Phone-chassis bottom tab bar — already in use at src/components/bottomTabBar/index.tsx. */
     tabbar: "pulse-tabbar",
-    /** Project-detail breadcrumb / top bar — Wave 2 will adopt. */
-    topbar: "pulse-topbar",
-    /** Board column header — kept stable across column re-order / filter swaps. */
-    columnHeader: "pulse-column-header",
-    /** Global Cmd-K command palette — kept stable across route changes. */
-    commandPalette: "pulse-command-palette",
-    /** Right-edge Copilot dock — kept stable so the dock pins through navigations. */
-    copilotDock: "pulse-copilot-dock",
-    /** Lens (filter) chip — for chip-to-detail morphing. */
-    lensChip: "pulse-lens-chip",
-    /** Copilot suggestion chip — for chip-to-message morphing. */
-    copilotChip: "pulse-copilot-chip",
     /** Phone-chassis tab-bar accessory slot — pinned across navigations. */
     tabAccessory: "pulse-tab-accessory"
 } as const;
