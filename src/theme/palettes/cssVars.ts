@@ -175,6 +175,7 @@ html[data-color-scheme="light"] {
     --pulse-accent-border: rgba(${p.accent.rgb}, 0.22);
     --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
+    --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
 
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};
@@ -270,6 +271,7 @@ html[data-color-scheme="dark"] {
     --pulse-accent-border: rgba(${p.accent.rgb}, 0.22);
     --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
+    --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
 
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};

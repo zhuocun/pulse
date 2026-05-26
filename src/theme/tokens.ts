@@ -435,7 +435,7 @@ export const shadow = {
     md: "0 2px 4px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.06)",
     lg: "0 8px 16px rgba(15, 23, 42, 0.06), 0 16px 32px rgba(15, 23, 42, 0.08)",
     xl: "0 16px 32px rgba(15, 23, 42, 0.10), 0 32px 64px rgba(15, 23, 42, 0.12)",
-    focus: `0 0 0 3px rgba(${palette.accent.rgb}, 0.22)`,
+    focus: `0 0 0 3px var(--pulse-accent-border, rgba(${palette.accent.rgb}, 0.22))`,
     inset: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
     /* Single brand-accent glow + soft aurora drop. Derived from the active
      * palette so a palette swap re-tints both in one shot. */

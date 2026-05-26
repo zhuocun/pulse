@@ -39,6 +39,7 @@ const REQUIRED_LIGHT_VARS = [
     "--pulse-accent-border",
     "--pulse-accent-bg-medium",
     "--pulse-accent-bg-subtle",
+    "--pulse-accent-bg-hover",
     "--pulse-aurora-deep",
     "--pulse-aurora-mid",
     "--pulse-aurora-light",

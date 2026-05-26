@@ -451,7 +451,8 @@ describe("shadow tokens", () => {
         }
     });
 
-    it("focus shadow includes the accent rgb triplet", () => {
+    it("focus shadow references the accent-border var so it re-colors with the palette", () => {
+        expect(shadow.focus).toContain("var(--pulse-accent-border");
         expect(shadow.focus).toMatch(/rgba\(/);
     });
 });
