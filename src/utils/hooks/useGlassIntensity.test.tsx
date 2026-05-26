@@ -23,7 +23,8 @@ const makeStore = (preference: GlassIntensityPreference = "auto") =>
                 // Phase 6 Wave 1 — set the version sentinel so the
                 // hook reads the post-migration shape (the test
                 // store doesn't go through the load-path migration).
-                glassIntensityVersion: 1
+                glassIntensityVersion: 1,
+                colorTheme: "orange" as const
             }
         }
     });

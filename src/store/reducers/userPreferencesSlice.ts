@@ -1,5 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+import { paletteNames, type PaletteName } from "../../theme/palettes";
+
 /**
  * Phase 4.2 per-user preferences slice.
  *
@@ -45,6 +47,22 @@ export type BoardDensity = "comfortable" | "compact";
  * trying a manual override.
  */
 export type GlassIntensityPreference = "auto" | "clear" | "regular" | "solid";
+
+/**
+ * Runtime colour-theme preference. The app ships six contrast-verified
+ * palettes (orange, rose, violet, indigo, cyan, emerald — see
+ * `theme/palettes`); the user picks one on the Settings page and it
+ * re-colors both the AntD components and the styled-component surface
+ * live. Stored as the palette NAME (`PaletteName`) so the registry stays
+ * the single source of truth — adding a palette extends both the union
+ * and the persisted value space without touching the slice.
+ *
+ * Orange is the default, so existing users who never opt in see no
+ * change. This is an append-only field (mirrors how `glassIntensity` was
+ * added) — no schema-version bump; the `readSlice` guard falls through to
+ * `"orange"` for any blob persisted before this field shipped.
+ */
+export type ColorThemePreference = PaletteName;
 
 /**
  * Phase 4.2 — defaults the project list applies when loaded with no
@@ -153,6 +171,17 @@ export interface UserPreferencesState {
      * the post-migration ladder).
      */
     glassIntensityVersion: number;
+    /**
+     * The user's chosen colour theme (palette name). Defaults to
+     * `"orange"` — the historical brand — so existing users see no change
+     * unless they opt in. Append-only field (no schema-version bump): a
+     * blob persisted before this field shipped falls through the
+     * `readSlice` guard to the default, mirroring how `glassIntensity`
+     * was added. `usePaletteTheme` resolves this to a `Palette` object at
+     * runtime and re-renders the `#pulse-theme-vars` style element +
+     * rebuilds the AntD theme so the whole app re-colors in one shot.
+     */
+    colorTheme: ColorThemePreference;
 }
 
 /**
@@ -209,11 +238,26 @@ const initialState: UserPreferencesState = {
      * version) so the load-path migration skips them.
      */
     glassIntensity: "auto",
-    glassIntensityVersion: GLASS_INTENSITY_CURRENT_VERSION
+    glassIntensityVersion: GLASS_INTENSITY_CURRENT_VERSION,
+    /*
+     * Orange is the historical brand — existing users who never open the
+     * colour-theme picker stay on it (append-only field, no schema bump).
+     */
+    colorTheme: "orange"
 };
 
 const isBoardDensity = (value: unknown): value is BoardDensity =>
     value === "comfortable" || value === "compact";
+
+/*
+ * Guard the persisted colour-theme name against the live palette
+ * registry — a stale / hand-edited name (or a palette that was removed
+ * in a downgrade) falls back to the default. Reading `paletteNames` from
+ * the registry keeps the guard in lockstep with the shipped palettes
+ * without a hard-coded literal list.
+ */
+const isColorTheme = (value: unknown): value is ColorThemePreference =>
+    typeof value === "string" && (paletteNames as string[]).includes(value);
 
 const isGlassIntensityPreference = (
     value: unknown
@@ -327,7 +371,17 @@ const readSlice = (
         glassIntensityVersion:
             typeof candidate.glassIntensityVersion === "number"
                 ? candidate.glassIntensityVersion
-                : 0
+                : 0,
+        /*
+         * `colorTheme` is append-only (no schema bump). A blob persisted
+         * before the colour-theme picker shipped has no `colorTheme`
+         * sibling; the guard's fall-through fills in the orange default
+         * so existing users keep the historical brand. Same pattern the
+         * slice already uses for `glassIntensity` and `filterState.lens`.
+         */
+        colorTheme: isColorTheme(candidate.colorTheme)
+            ? candidate.colorTheme
+            : initialState.colorTheme
     };
 };
 
@@ -561,6 +615,17 @@ export const userPreferencesSlice = createSlice({
             action: PayloadAction<GlassIntensityPreference>
         ) {
             state.glassIntensity = action.payload;
+        },
+        /**
+         * Sets the user's colour-theme choice (palette name).
+         * `usePaletteTheme` reads this on the next layout effect,
+         * re-renders the matching palette's CSS into `#pulse-theme-vars`,
+         * and the AntD theme rebuilds from the resolved palette object —
+         * so both the styled-component surface and the AntD components
+         * re-color in one shot. Persists through the store middleware.
+         */
+        setColorTheme(state, action: PayloadAction<ColorThemePreference>) {
+            state.colorTheme = action.payload;
         }
     }
 });

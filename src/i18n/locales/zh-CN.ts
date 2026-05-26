@@ -199,6 +199,17 @@ const zhCN: Dictionary = {
         glassIntensityClear: "通透",
         glassIntensityRegular: "标准",
         glassIntensitySolid: "实心",
+        // 运行时配色切换。标签旁是六选一的 Segmented 控件（每个配色一项），
+        // 每项在单字色名旁显示品牌主色样本。橙色为默认；其余配色会实时
+        // 重新着色整个应用。
+        colorTheme: "配色",
+        changeColorTheme: "切换配色",
+        colorThemeOrange: "橙色",
+        colorThemeRose: "玫红",
+        colorThemeViolet: "紫罗兰",
+        colorThemeIndigo: "靛蓝",
+        colorThemeCyan: "青色",
+        colorThemeEmerald: "翡翠绿",
         sections: {
             appearance: {
                 header: "外观",

@@ -1,8 +1,10 @@
 /* eslint-disable global-require */
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
 import { microcopy } from "../constants/microcopy";
+import { store } from "../store";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
@@ -44,9 +46,16 @@ const installAntdBrowserMocks = () => {
 
 const renderPage = () =>
     render(
-        <BrowserRouter>
-            <SettingsPage />
-        </BrowserRouter>
+        // The colour-theme picker reads + dispatches against the
+        // userPreferences slice, so the page needs a real Redux Provider.
+        // We use the app store singleton — the other settings controls are
+        // mocked at the hook layer, so the only slice interaction here is
+        // the colour-theme read/write.
+        <Provider store={store}>
+            <BrowserRouter>
+                <SettingsPage />
+            </BrowserRouter>
+        </Provider>
     );
 
 describe("SettingsPage", () => {
@@ -87,12 +96,33 @@ describe("SettingsPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("renders the theme, language, AI, and logout rows", () => {
+    it("renders the theme, language, color-theme, AI, and logout rows", () => {
         renderPage();
         expect(screen.getByTestId("settings-row-theme")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-language")).toBeInTheDocument();
+        expect(
+            screen.getByTestId("settings-row-color-theme")
+        ).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-ai")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();
+    });
+
+    it("renders the six-palette color-theme picker", () => {
+        renderPage();
+        const row = screen.getByTestId("settings-row-color-theme");
+        // The picker is a Segmented with one radio per shipped palette.
+        for (const name of [
+            microcopy.settings.colorThemeOrange,
+            microcopy.settings.colorThemeRose,
+            microcopy.settings.colorThemeViolet,
+            microcopy.settings.colorThemeIndigo,
+            microcopy.settings.colorThemeCyan,
+            microcopy.settings.colorThemeEmerald
+        ]) {
+            expect(
+                within(row).getByRole("radio", { name })
+            ).toBeInTheDocument();
+        }
     });
 
     it("hides the AI row when ai is unavailable at build time", () => {
@@ -263,10 +293,27 @@ describe("SettingsPage (phone chassis)", () => {
         ).toBeInTheDocument();
     });
 
-    it("keeps the four settings rows with their controls", () => {
+    it("nests the color-theme row inside the Appearance section", () => {
+        renderPage();
+        const appearance = screen.getByTestId("settings-section-appearance");
+        expect(
+            within(appearance).getByTestId("settings-row-color-theme")
+        ).toBeInTheDocument();
+        // The swatch Segmented exposes one radio per palette.
+        expect(
+            within(appearance).getByRole("radio", {
+                name: microcopy.settings.colorThemeEmerald
+            })
+        ).toBeInTheDocument();
+    });
+
+    it("keeps the settings rows with their controls", () => {
         renderPage();
         expect(screen.getByTestId("settings-row-theme")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-language")).toBeInTheDocument();
+        expect(
+            screen.getByTestId("settings-row-color-theme")
+        ).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-ai")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();
         // The widgets still resolve by role, so the controls survived the

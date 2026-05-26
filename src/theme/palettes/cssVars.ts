@@ -121,6 +121,24 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  *   - `--ant-easing-detent` — the iOS sheet curve (slow in/out, no
  *     overshoot). Pairs with `--ant-motion-detent-snap` for Wave 3.
  *
+ * Runtime palette switch addition — the brand / accent / aurora /
+ * avatar-gradient vars. These let the styled-component / inline-style
+ * surfaces that read the matching `var(--pulse-…, <orange fallback>)`
+ * tokens in `tokens.ts` re-color live when the user picks a different
+ * colour theme (the resolver hook `usePaletteTheme` re-renders this CSS
+ * into the `#pulse-theme-vars` style element). Unlike the copilot / glass
+ * vars these are mode-AGNOSTIC brand hexes — emitted identically in both
+ * the light and dark blocks so the "every var defined for one mode is
+ * defined for both" contract holds without forcing a per-mode value:
+ *   - `--pulse-brand-*` — primary / hover / active / bg / bgDark / dark
+ *   - `--pulse-accent-start` / `--pulse-accent-end` — gradient stops
+ *   - `--pulse-accent-bg-*` / `--pulse-accent-border` — the exact rgba
+ *     opacities consumed by static styled-components (0.32 / 0.22 / 0.16
+ *     / 0.04); kept pre-composed so a styled-component can drop the var
+ *     straight into `background` / `border` without recomputing rgba.
+ *   - `--pulse-aurora-*` — deep / mid / light / cinematicBase
+ *   - `--pulse-avatar-grad-0..5` — the six monogram gradient strings
+ *
  * Phase 6 Wave 2 lift addition — `--ant-shadow-glass-lifted`.
  *   - In LIGHT mode the page is `#fffaf5`; a near-white translucent
  *     glass surface (`--glass-surface` rgba(255, 255, 255, 0.68)) with
@@ -143,6 +161,32 @@ export const paletteToCss = (p: Palette): string => `
 html[data-color-scheme="light"] {
     --pulse-bg-page: ${p.page.bgLight};
     --pulse-text-base: ${p.page.textLight};
+
+    --pulse-brand-primary: ${p.brand.primary};
+    --pulse-brand-primary-hover: ${p.brand.primaryHover};
+    --pulse-brand-primary-active: ${p.brand.primaryActive};
+    --pulse-brand-primary-bg: ${p.brand.primaryBg};
+    --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
+    --pulse-brand-primary-dark: ${p.brand.primaryDark};
+
+    --pulse-accent-start: ${p.accent.start};
+    --pulse-accent-end: ${p.accent.end};
+    --pulse-accent-bg-strong: rgba(${p.accent.rgb}, 0.32);
+    --pulse-accent-border: rgba(${p.accent.rgb}, 0.22);
+    --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
+    --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
+
+    --pulse-aurora-deep: ${p.aurora.deep};
+    --pulse-aurora-mid: ${p.aurora.mid};
+    --pulse-aurora-light: ${p.aurora.light};
+    --pulse-aurora-cinematic-base: ${p.aurora.cinematicBase};
+
+    --pulse-avatar-grad-0: ${p.avatarGradients[0]};
+    --pulse-avatar-grad-1: ${p.avatarGradients[1]};
+    --pulse-avatar-grad-2: ${p.avatarGradients[2]};
+    --pulse-avatar-grad-3: ${p.avatarGradients[3]};
+    --pulse-avatar-grad-4: ${p.avatarGradients[4]};
+    --pulse-avatar-grad-5: ${p.avatarGradients[5]};
 
     --color-copilot-grad-start: ${p.aurora.deep};
     --color-copilot-grad-mid: ${p.aurora.mid};
@@ -204,6 +248,40 @@ html[data-color-scheme="light"] {
 html[data-color-scheme="dark"] {
     --pulse-bg-page: ${p.page.bgDark};
     --pulse-text-base: ${p.page.textDark};
+
+    /*
+     * Brand / accent / aurora / avatar-gradient vars are mode-agnostic
+     * brand hexes — emitted identically to the light block so the
+     * "every var defined for one mode is defined for both" contract
+     * holds. The light/dark divergence for AI + glass surfaces lives in
+     * the --color-copilot-* / --glass-* vars below, which DO swap per
+     * mode (e.g. accent.rgbDark for dark-mode tints).
+     */
+    --pulse-brand-primary: ${p.brand.primary};
+    --pulse-brand-primary-hover: ${p.brand.primaryHover};
+    --pulse-brand-primary-active: ${p.brand.primaryActive};
+    --pulse-brand-primary-bg: ${p.brand.primaryBg};
+    --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
+    --pulse-brand-primary-dark: ${p.brand.primaryDark};
+
+    --pulse-accent-start: ${p.accent.start};
+    --pulse-accent-end: ${p.accent.end};
+    --pulse-accent-bg-strong: rgba(${p.accent.rgb}, 0.32);
+    --pulse-accent-border: rgba(${p.accent.rgb}, 0.22);
+    --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
+    --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
+
+    --pulse-aurora-deep: ${p.aurora.deep};
+    --pulse-aurora-mid: ${p.aurora.mid};
+    --pulse-aurora-light: ${p.aurora.light};
+    --pulse-aurora-cinematic-base: ${p.aurora.cinematicBase};
+
+    --pulse-avatar-grad-0: ${p.avatarGradients[0]};
+    --pulse-avatar-grad-1: ${p.avatarGradients[1]};
+    --pulse-avatar-grad-2: ${p.avatarGradients[2]};
+    --pulse-avatar-grad-3: ${p.avatarGradients[3]};
+    --pulse-avatar-grad-4: ${p.avatarGradients[4]};
+    --pulse-avatar-grad-5: ${p.avatarGradients[5]};
 
     --color-copilot-grad-start: ${p.brand.primaryDark};
     --color-copilot-grad-mid: ${p.aurora.light};

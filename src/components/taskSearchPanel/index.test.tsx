@@ -109,7 +109,8 @@ const makePanelStore = (preset?: SavedFilterPresetState[]) =>
                 glassIntensity: "auto" as const,
                 // Phase 6 Wave 1 — preloadedState must carry the
                 // current migration sentinel.
-                glassIntensityVersion: 1
+                glassIntensityVersion: 1,
+                colorTheme: "orange" as const
             }
         }
     });

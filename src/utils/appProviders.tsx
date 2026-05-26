@@ -11,6 +11,7 @@ import { buildAntdTheme } from "../theme/antdTheme";
 import AuthProvider from "./authProvider";
 import useColorScheme from "./hooks/useColorScheme";
 import useGlassIntensity from "./hooks/useGlassIntensity";
+import usePaletteTheme from "./hooks/usePaletteTheme";
 
 const usePointerCoarse = () => {
     const [coarse, setCoarse] = useState<boolean>(() => {
@@ -63,9 +64,20 @@ const ThemedShell = ({ children }: { children: ReactNode }) => {
      * page having to re-mount the bridge.
      */
     useGlassIntensity();
+    /*
+     * Runtime colour-theme resolver. Reads `userPreferences.colorTheme`,
+     * re-renders the chosen palette's CSS into `#pulse-theme-vars` (which
+     * re-colors every styled-component reading a `--pulse-*` var), and
+     * returns the resolved Palette object. We thread that object into
+     * `buildAntdTheme` so AntD's algorithmic shade derivation tracks the
+     * same palette — both surfaces re-color in one shot. Mounted here for
+     * the same reason as `useGlassIntensity`: inside the Redux Provider,
+     * once, so the attribute/vars live for every routed page.
+     */
+    const activePalette = usePaletteTheme();
     const themeConfig = useMemo(
-        () => buildAntdTheme(scheme, coarse),
-        [scheme, coarse]
+        () => buildAntdTheme(scheme, coarse, activePalette),
+        [scheme, coarse, activePalette]
     );
 
     useEffect(() => {

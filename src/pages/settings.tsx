@@ -1,4 +1,5 @@
 import {
+    BgColorsOutlined,
     DesktopOutlined,
     GlobalOutlined,
     LogoutOutlined,
@@ -8,6 +9,7 @@ import {
 import styled from "@emotion/styled";
 import { Button, Card, Segmented, Space, Switch, Typography } from "antd";
 
+import ColorThemeSelect from "../components/colorThemeSelect";
 import PageContainer from "../components/pageContainer";
 import SettingsSection, { SettingsRow } from "../components/settingsSection";
 import { microcopy } from "../constants/microcopy";
@@ -152,6 +154,7 @@ const SettingsPage = () => {
             <SunOutlined aria-hidden />
         );
     const languageIcon = <GlobalOutlined aria-hidden />;
+    const colorThemeIcon = <BgColorsOutlined aria-hidden />;
     const logoutIcon = <LogoutOutlined aria-hidden />;
 
     /*
@@ -188,6 +191,11 @@ const SettingsPage = () => {
             value={themePreference}
         />
     );
+
+    /* The colour-theme picker owns its own slice read/dispatch +
+     * Segmented (six palette swatches), so the page just slots the
+     * element into both chassis branches like any other control. */
+    const colorThemeControl = <ColorThemeSelect />;
 
     /* Native names ("English", "中文") so the option you want is always
      * readable in its own script. */
@@ -248,6 +256,12 @@ const SettingsPage = () => {
                         icon={languageIcon}
                         label={microcopy.settings.language}
                     />
+                    <SettingsRow
+                        control={colorThemeControl}
+                        data-testid="settings-row-color-theme"
+                        icon={colorThemeIcon}
+                        label={microcopy.settings.colorTheme}
+                    />
                 </SettingsSection>
                 {aiAvailable ? (
                     <SettingsSection
@@ -299,6 +313,15 @@ const SettingsPage = () => {
                         </Space>
                     </RowLabel>
                     {languageControl}
+                </Row>
+                <Row data-testid="settings-row-color-theme">
+                    <RowLabel>
+                        <Space size={space.xs}>
+                            {colorThemeIcon}
+                            <RowText>{microcopy.settings.colorTheme}</RowText>
+                        </Space>
+                    </RowLabel>
+                    {colorThemeControl}
                 </Row>
                 {aiAvailable ? (
                     <Row data-testid="settings-row-ai">
