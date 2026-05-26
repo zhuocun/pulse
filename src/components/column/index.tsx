@@ -909,12 +909,15 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         name: task.taskName
                     })
                 }
-                aria-disabled={dragDisabledByFilters || undefined}
                 aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 disabled={isMock}
                 onClick={handleCardClick}
                 ref={setCardRef}
-                title={microcopy.dragHints.taskCardKeyboard}
+                title={
+                    dragDisabledByFilters
+                        ? undefined
+                        : microcopy.dragHints.taskCardKeyboard
+                }
                 type="button"
                 {...rest}
             >

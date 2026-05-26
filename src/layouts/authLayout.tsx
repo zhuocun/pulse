@@ -499,7 +499,7 @@ const AuthLayout = () => {
                 </HeroInner>
             </HeroRail>
             <Canvas id="auth-main" tabIndex={-1}>
-                <BrandHeader aria-label="Pulse">
+                <BrandHeader>
                     <BrandMark size="md" />
                 </BrandHeader>
                 <FormCard data-glass-context="true">
