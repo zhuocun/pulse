@@ -13,21 +13,18 @@ Worker output is never integrated directly. Every worker deliverable passes thro
 
 ## Mode
 
-Pick a mode up front and keep it consistent across the task unless the user changes it. State the chosen mode in your first orchestration update.
+Burst has two modes:
 
-### standard (default)
+- **default** — workers and reviewers run on top-tier models with high reasoning. Workers may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
+- **light** — workers drop to mid-tier models, faster and cheaper than the orchestrator. Reviewers and the orchestrator stay top-tier; the orchestrator absorbs the quality premium during integration. Optimizes for parallel throughput and cost when mid-tier worker quality is sufficient.
 
-Subagents run on **mid-tier, non-best** models — faster and cheaper than the orchestrator. The orchestrator absorbs the quality premium; subagents handle bounded, well-scoped work where mid-tier quality is sufficient. Optimizes for parallel throughput and cost.
+Run in default mode unless the user opts into light. Switch to **light** when:
 
-### max
+- the user explicitly asks ("light mode", "save tokens", "go fast")
+- the slash-command is invoked with a `light` argument
+- the task is a wide-but-shallow fan-out where mid-tier workers won't force costly rework
 
-Subagents run on **top-tier** models and may match the orchestrator's exact model and reasoning budget. Optimizes for correctness and depth per subagent; accept the cost.
-
-### Selecting the mode
-
-- Default to **standard**.
-- Switch to **max** when the user explicitly asks for it ("max mode", "use the best models", "highest quality"), when the slash-command is invoked with a `max` argument, or when the task is large and integration-sensitive enough that mid-tier subagents would force costly rework.
-- A single subtask inside an otherwise-standard task may be individually promoted to max-mode configuration if it is integration-sensitive enough to warrant it; the rest of the task stays standard.
+A single subtask inside an otherwise-light task may be individually promoted to default config if integration-sensitive; the rest stays light.
 
 ## When to delegate
 
@@ -81,11 +78,19 @@ Map the terminology to whatever the platform exposes — `model`, `subagent_type
 
 **Always set these parameters explicitly on every subagent call.** Never accept the platform default: it can route to a forbidden tier, silently downgrade reasoning, or mirror the orchestrator's own config.
 
-Forbidden tier (both modes): never use the smallest/distilled variants (`*-mini`, `*-haiku`-class) unless a higher-priority instruction requires them.
+Forbidden tier: never use the smallest/distilled variants (`*-mini`, `*-haiku`-class) unless a higher-priority instruction requires them.
 
-### Standard mode
+### Default
 
-Subagent model: mid-tier — cheaper or faster than the orchestrator, never the forbidden tier. The subagent must differ from the orchestrator in either model or reasoning budget. Apply the rule that fits your platform:
+Worker model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. Workers may run the same model and reasoning budget as the orchestrator.
+
+Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of default mode.
+
+Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
+
+### Light mode
+
+Worker model: mid-tier — cheaper or faster than the orchestrator, never the forbidden tier. The worker must differ from the orchestrator in either model or reasoning budget. Apply the rule that fits your platform:
 
 1. Anthropic / OpenAI: step down one tier in the same family (Opus → Sonnet; top-tier GPT → next-tier non-mini GPT).
 2. Cursor: choose the best Composer model.
@@ -94,14 +99,6 @@ Subagent model: mid-tier — cheaper or faster than the orchestrator, never the 
 Reasoning budget: moderate for sidecar/exploration/lookup work; high for implementation or integration-sensitive code paths. Pick the fastest setting that still meets the quality bar; escalate only when correctness is at risk.
 
 **Reviewers are the explicit exception to the divergence rule above.** They always run top-tier with high reasoning — the cost premium buys an independent quality gate above the cheaper worker.
-
-### Max mode
-
-Subagent model: top-tier — Opus on Anthropic, the best non-mini GPT on OpenAI, the best subagent model the platform exposes elsewhere. The subagent may run the same model and reasoning budget as the orchestrator; the standard-mode divergence rule does not apply here.
-
-Reasoning budget: high across the board, including sidecar exploration. Do not downgrade reasoning to save tokens — that defeats the point of max mode.
-
-Tie-breaker: if the platform forbids two agents running the exact same model+budget concurrently, drop the subagent's reasoning budget by one level rather than downgrading the model itself.
 
 ## Orchestrator final gate
 
@@ -115,7 +112,7 @@ A reviewer `pass` does not bypass the orchestrator. The reviewer catches subtask
 
 ## Communication
 
-- Briefly tell the user what stays local on the critical path and what is being delegated. Include which mode (standard / max) you chose and why.
+- Briefly tell the user what stays local on the critical path and what is being delegated. Note when running in light mode; default mode needs no announcement.
 - Note when a reviewer flags issues that trigger worker rework. Escalate to the user before a third review cycle on the same subtask.
 - Keep progress updates short and integration-focused.
 - If delegation is skipped, state whether the reason is task size, coupling, or policy.
