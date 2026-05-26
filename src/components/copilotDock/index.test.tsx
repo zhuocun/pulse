@@ -19,6 +19,8 @@ import {
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 
+import { resetBriefCacheForTests } from "./BriefTabBody";
+
 // Mock the hooks the dock bodies pull in so tab-switch tests can spy on
 // `abort` / `start` directly. Default `mockReturnValue` shapes are
 // applied in `beforeEach` so the dock-level tests above (which don't
@@ -200,19 +202,25 @@ const renderDock = (options: RenderOptions = {}) => {
  * (e.g. simulate a board mutation while the user is on the Chat tab).
  */
 interface ControlledDockProps {
-    initialTab?: CopilotDockTab;
+    initialColumns?: IColumn[];
+    initialMembers?: IMember[];
     initialOpen?: boolean;
+    initialTab?: CopilotDockTab;
     initialTasks?: ITask[];
     /**
-     * Exposes the internal `setTasks` setter so a test can simulate a
-     * board mutation (fingerprint change) from outside React's tree.
+     * Exposes internal state setters so a test can simulate a board mutation
+     * (fingerprint change) from outside React's tree.
      */
     onMount?: (controls: {
+        setColumns: React.Dispatch<React.SetStateAction<IColumn[]>>;
+        setMembers: React.Dispatch<React.SetStateAction<IMember[]>>;
         setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
     }) => void;
 }
 
 const ControlledDock: React.FC<ControlledDockProps> = ({
+    initialColumns = [column()],
+    initialMembers = [member()],
     initialTab = "chat",
     initialOpen = true,
     initialTasks = [],
@@ -220,22 +228,24 @@ const ControlledDock: React.FC<ControlledDockProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<CopilotDockTab>(initialTab);
     const [open, setOpen] = useState(initialOpen);
+    const [columns, setColumns] = useState<IColumn[]>(initialColumns);
+    const [members, setMembers] = useState<IMember[]>(initialMembers);
     const [tasks, setTasks] = useState<ITask[]>(initialTasks);
-    // Surface setTasks once so the test can mutate the fingerprint.
+    // Surface setters once so the test can mutate the fingerprint.
     const onMountRef = useRef(onMount);
     onMountRef.current = onMount;
     const surfaced = useRef(false);
     useEffect(() => {
         if (surfaced.current) return;
         surfaced.current = true;
-        onMountRef.current?.({ setTasks });
+        onMountRef.current?.({ setColumns, setMembers, setTasks });
     }, []);
     return (
         <CopilotDock
             activeTab={activeTab}
-            columns={[column()]}
+            columns={columns}
             knownProjectIds={["project-1"]}
-            members={[member()]}
+            members={members}
             onClose={() => setOpen(false)}
             onTabChange={setActiveTab}
             open={open}
@@ -269,6 +279,7 @@ const renderControlled = (
 
 describe("CopilotDock", () => {
     beforeEach(() => {
+        resetBriefCacheForTests();
         installAntdBrowserMocks(false);
         // Safe default mock returns so existing dock-level assertions
         // (which don't care about hook internals) keep passing. Tests
@@ -841,12 +852,126 @@ describe("CopilotDock", () => {
             });
         };
 
+        const mutateColumns = async (
+            controls: {
+                setColumns: React.Dispatch<React.SetStateAction<IColumn[]>>;
+            },
+            columns: IColumn[]
+        ): Promise<void> => {
+            await act(async () => {
+                controls.setColumns(columns);
+                await Promise.resolve();
+            });
+        };
+
+        const mutateMembers = async (
+            controls: {
+                setMembers: React.Dispatch<React.SetStateAction<IMember[]>>;
+            },
+            members: IMember[]
+        ): Promise<void> => {
+            await act(async () => {
+                controls.setMembers(members);
+                await Promise.resolve();
+            });
+        };
+
         const advanceBy = async (ms: number): Promise<void> => {
             await act(async () => {
                 jest.advanceTimersByTime(ms);
                 await Promise.resolve();
             });
         };
+
+        it("refetches when a task after the eighth row changes", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            const initialTasks = Array.from({ length: 9 }, (_, index) =>
+                newTask(String(index + 1))
+            );
+            let controls: {
+                setTasks: React.Dispatch<React.SetStateAction<ITask[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialTab: "brief",
+                    initialTasks,
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                await mutateTasks(
+                    controls!,
+                    initialTasks.map((task, index) =>
+                        index === 8
+                            ? { ...task, coordinatorId: "member-2" }
+                            : task
+                    )
+                );
+
+                expect(countRefreshes(sink)).toBe(1);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
+
+        it("refetches when column or member fields used by the brief change", async () => {
+            const sink = jest.fn<
+                ReturnType<AnalyticsSink>,
+                Parameters<AnalyticsSink>
+            >();
+            const previous = setAnalyticsSink(sink);
+            const initialColumns = [column()];
+            const initialMembers = [member()];
+            let controls: {
+                setColumns: React.Dispatch<React.SetStateAction<IColumn[]>>;
+                setMembers: React.Dispatch<React.SetStateAction<IMember[]>>;
+            } | null = null;
+            try {
+                renderControlled({
+                    initialColumns,
+                    initialMembers,
+                    initialTab: "brief",
+                    onMount: (c) => {
+                        controls = c;
+                    }
+                });
+                await waitFor(() => {
+                    expect(
+                        sink.mock.calls.filter(
+                            ([event]) =>
+                                event === ANALYTICS_EVENTS.COPILOT_BRIEF_OPEN
+                        )
+                    ).toHaveLength(1);
+                });
+
+                await mutateColumns(controls!, [
+                    { ...initialColumns[0], columnName: "Ready for QA" }
+                ]);
+                expect(countRefreshes(sink)).toBe(1);
+
+                await advanceBy(30_000);
+
+                await mutateMembers(controls!, [
+                    { ...initialMembers[0], username: "Alice Updated" }
+                ]);
+                expect(countRefreshes(sink)).toBe(2);
+            } finally {
+                setAnalyticsSink(previous);
+            }
+        });
 
         it("collapses rapid fingerprint changes within MIN_INTERVAL into a single refetch + analytics event", async () => {
             const sink = jest.fn<

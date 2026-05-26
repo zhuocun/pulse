@@ -11,6 +11,20 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.tools import be_tools
+from app.tools.fe_tool_names import (
+    ALL_FE_TOOL_NAMES,
+    FE_APPLY_APPROVED_MUTATION,
+    FE_BOARD_SNAPSHOT,
+    FE_GET_PROJECT,
+    FE_GET_TASK,
+    FE_LIST_BOARD,
+    FE_LIST_MEMBERS,
+    FE_LIST_PROJECTS,
+    FE_LIST_TASKS,
+    FE_REQUEST_MUTATION_APPROVAL,
+    FE_SEARCH_CANDIDATES,
+    FE_SIMILAR_TASKS,
+)
 from app.tools.fe_tool_schemas import (
     FE_TOOL_SCHEMAS,
     fe_tool_definitions,
@@ -145,20 +159,27 @@ def test_redaction_span_dataclass_is_frozen() -> None:
 # ---------------------------------------------------------------------------
 
 
-_EXPECTED_TOOLS = {
-    "fe.listProjects",
-    "fe.listMembers",
-    "fe.getProject",
-    "fe.listBoard",
-    "fe.listTasks",
-    "fe.getTask",
-    "fe.boardSnapshot",
-    "fe.similarTasks",
-}
+_EXPECTED_FE_TOOLS = frozenset(
+    (
+        FE_LIST_PROJECTS,
+        FE_LIST_MEMBERS,
+        FE_GET_PROJECT,
+        FE_LIST_BOARD,
+        FE_LIST_TASKS,
+        FE_GET_TASK,
+        FE_BOARD_SNAPSHOT,
+        FE_SIMILAR_TASKS,
+        FE_SEARCH_CANDIDATES,
+        FE_REQUEST_MUTATION_APPROVAL,
+        FE_APPLY_APPROVED_MUTATION,
+    )
+)
 
 
 def test_all_fe_tool_names_present() -> None:
-    assert _EXPECTED_TOOLS <= set(FE_TOOL_SCHEMAS)
+    assert ALL_FE_TOOL_NAMES == _EXPECTED_FE_TOOLS
+    assert frozenset(FE_TOOL_SCHEMAS) == _EXPECTED_FE_TOOLS
+    assert len(ALL_FE_TOOL_NAMES) == 11
 
 
 def test_each_schema_has_required_keys() -> None:
@@ -171,7 +192,7 @@ def test_each_schema_has_required_keys() -> None:
 def test_fe_tool_definitions_returns_list_of_named_dicts() -> None:
     defs = fe_tool_definitions()
     names = {item["name"] for item in defs}
-    assert names == set(FE_TOOL_SCHEMAS)
+    assert names == ALL_FE_TOOL_NAMES
     for item in defs:
         assert "description" in item
         assert "args_schema" in item

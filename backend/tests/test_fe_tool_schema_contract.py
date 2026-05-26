@@ -2,10 +2,10 @@
 
 (a) Every tool name declared in an agent's ``metadata.tools`` either:
     - starts with ``"fe."`` and exists in ``FE_TOOL_SCHEMAS``, OR
-    - starts with ``"be."`` (BE-side tool, no schema registry to check), OR
-    - has no ``.`` separator (simple FE chat tool name); for these we
-      allow any name present in the ``CHAT_TOOLS`` list from
-      ``app.agents.catalog._chat_tools``.
+    - starts with ``"be."`` (BE-side tool, no schema registry to check).
+
+    Bare LangGraph tool node names are model-internal and must not appear
+    in public agent metadata.
 
 (b) For every entry in ``FE_TOOL_SCHEMAS``, ``interrupt_payload(name, args)``
     round-trips correctly: a minimal args dict built from ``required``
@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import app.agents.catalog as catalog
-from app.agents.catalog._chat_tools import CHAT_TOOLS
 from app.agents.registry import registry
 from app.tools.fe_tool_schemas import FE_TOOL_SCHEMAS, interrupt_payload
 
@@ -24,8 +23,6 @@ from app.tools.fe_tool_schemas import FE_TOOL_SCHEMAS, interrupt_payload
 # ---------------------------------------------------------------------------
 # (a) Catalog tool references are valid
 # ---------------------------------------------------------------------------
-
-_CHAT_TOOL_NAMES: frozenset[str] = frozenset(t.name for t in CHAT_TOOLS)
 
 
 def test_catalog_tool_references_are_valid() -> None:
@@ -47,12 +44,10 @@ def test_catalog_tool_references_are_valid() -> None:
                 # BE-side tools have no schema registry; allow all.
                 pass
             else:
-                # No dot separator — must be a known CHAT_TOOLS name.
-                if tool_name not in _CHAT_TOOL_NAMES:
-                    errors.append(
-                        f"Agent {meta.name!r}: simple tool {tool_name!r} not found "
-                        f"in CHAT_TOOLS ({sorted(_CHAT_TOOL_NAMES)!r})"
-                    )
+                errors.append(
+                    f"Agent {meta.name!r}: public tool metadata must use a "
+                    f"qualified tool name, got {tool_name!r}"
+                )
 
     assert not errors, "\n".join(errors)
 

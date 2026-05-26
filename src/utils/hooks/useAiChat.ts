@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { humanizeTool } from "../ai/toolDisplay";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import type { CitationRef } from "../../interfaces/agent";
@@ -42,9 +43,6 @@ import useApi from "./useApi";
  * steps" fallback still applies.
  */
 const MAX_TOOL_ROUNDS = 10;
-
-const humanizeTool = (name: string) =>
-    name.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 
 export type { AiChatMessage };
 

@@ -2294,6 +2294,8 @@ def test_gate_records_rate_limited_on_429(
             json={"context": _project_context(), "prompt": "x"},
         )
         assert response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        body = response.json()
+        assert body["error"]["code"] == "rate_limit_exceeded"
         rate_limited_value = metrics_module.agent_invocations_total.labels(
             agent="v1-task-draft", outcome="rate_limited"
         )._value.get()
@@ -2326,7 +2328,9 @@ def test_gate_with_reservation_rejects_disabled_project(
         },
     )
     assert response.status_code == HTTPStatus.FORBIDDEN
-    assert "disabled" in response.text
+    body = response.json()
+    assert body["error"]["code"] == "forbidden"
+    assert "disabled" in body["error"]["message"]
 
 
 def test_gate_with_reservation_rejects_non_manager(
@@ -2370,6 +2374,8 @@ def test_gate_with_reservation_records_budget_exhausted_on_402(
             },
         )
         assert response.status_code == HTTPStatus.PAYMENT_REQUIRED
+        body = response.json()
+        assert body["error"]["code"] == "budget_exhausted"
         budget_exhausted_value = metrics_module.agent_invocations_total.labels(
             agent="chat-agent", outcome="budget_exhausted"
         )._value.get()

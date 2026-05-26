@@ -242,7 +242,7 @@ def test_assert_embeddings_provider_available_uses_settings_when_spec_missing() 
 def test_assert_embeddings_provider_available_raises_for_missing_openai(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mirror of :func:`tests.test_coverage_filling`'s missing-extra check."""
+    """Cover the missing-extra branch for OpenAI provider availability."""
 
     monkeypatch.setitem(sys.modules, "langchain_openai", None)
     spec = EmbeddingsSpec(

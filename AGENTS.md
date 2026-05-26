@@ -54,8 +54,8 @@ concrete rule plus the canonical anchor that demonstrates it.
   cleanup is the template). Fix root causes, not symptoms.
 - **High-coverage** — Backend gate is `--cov-fail-under=85`; real
   coverage runs ~98%. Write a test for every branch you add — never a
-  test purely to hit a coverage line (deleted `test_coverage_filling.py`
-  is why the gate was lowered).
+  test purely to hit a coverage line (deleted coverage-filler tests are
+  why the gate was lowered).
 
 ## Other guardrails
 

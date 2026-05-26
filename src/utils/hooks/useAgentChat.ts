@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { microcopy } from "../../constants/microcopy";
+import { humanizeTool } from "../ai/toolDisplay";
 import type {
     AutonomyLevel,
     CitationRef,
@@ -23,34 +23,6 @@ const agentRoleToChatRole = (
 ): AiChatMessage["role"] => {
     if (role === "system") return "assistant";
     return role as AiChatMessage["role"];
-};
-
-/**
- * Tool verb map — mirrors the drawer's `TOOL_VERB` so the adapter produces
- * identical tool-trace summaries for the v2.1 path as the v1 path does.
- */
-const TOOL_VERB: Record<string, string> = {
-    listProjects: microcopy.ai.toolVerbs.checkedProjects,
-    "fe.listProjects": microcopy.ai.toolVerbs.checkedProjects,
-    listMembers: microcopy.ai.toolVerbs.checkedTeamMembers,
-    "fe.listMembers": microcopy.ai.toolVerbs.checkedTeamMembers,
-    listBoard: microcopy.ai.toolVerbs.checkedBoardColumns,
-    "fe.listBoard": microcopy.ai.toolVerbs.checkedBoardColumns,
-    listTasks: microcopy.ai.toolVerbs.checkedTasks,
-    "fe.listTasks": microcopy.ai.toolVerbs.checkedTasks,
-    getProject: microcopy.ai.toolVerbs.openedProject,
-    "fe.getProject": microcopy.ai.toolVerbs.openedProject,
-    getTask: microcopy.ai.toolVerbs.openedTask,
-    "fe.getTask": microcopy.ai.toolVerbs.openedTask
-};
-
-const humanizeToolName = (name: string): string => {
-    if (TOOL_VERB[name]) return TOOL_VERB[name];
-    // Strip "fe." prefix if present, then sentence-case
-    const base = name.replace(/^fe\./, "");
-    return base
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, (s) => s.toUpperCase());
 };
 
 /**
@@ -219,7 +191,7 @@ const useAgentChat = (
         lastInterruptSignatureRef.current = interruptKey;
         const traceMsg: AiChatMessage = {
             role: "tool",
-            content: `${humanizeToolName(pendingInterrupt.tool)}…`,
+            content: `${humanizeTool(pendingInterrupt.tool)}…`,
             toolCallId: `trace-${pendingInterrupt.tool}-${Date.now()}`,
             toolName: undefined
         };

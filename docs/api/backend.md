@@ -1744,7 +1744,7 @@ List all registered agents (excludes `shadow` agents).
       "status": "active",
       "rate_limit": {"per_minute": 60, "per_hour": 600},
       "allowed_autonomy": ["suggest", "plan"],
-      "tools": ["fe.similarTasks", "fe.viewerContext"]
+      "tools": ["fe.boardSnapshot", "fe.similarTasks"]
     }
   ]
 }
@@ -1793,9 +1793,9 @@ Expose the FE-tool catalogue. Agents interrupt for FE-side data by naming a tool
     {"name": "fe.getTask", "description": "Fetch a single task by id.", "args_schema": {"type": "object", "properties": {"task_id": {"type": "string"}}, "required": ["task_id"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"task": {"type": "object"}}, "required": ["task"]}},
     {"name": "fe.boardSnapshot", "description": "Return a normalised board snapshot used by the brief and triage agents.", "args_schema": {"type": "object", "properties": {"project_id": {"type": "string"}}, "required": ["project_id"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"project_id": {"type": "string"}, "columns": {"type": "array"}, "tasks": {"type": "array"}, "members": {"type": "array"}}}},
     {"name": "fe.similarTasks", "description": "Return tasks similar to a given prompt or draft for grounding.", "args_schema": {"type": "object", "properties": {"project_id": {"type": "string"}, "query": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["project_id", "query"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"similar": {"type": "array", "items": {"type": "object"}}}, "required": ["similar"]}},
-    {"name": "fe.viewerContext", "description": "Return the current viewer's identity, role and preferences.", "args_schema": {"type": "object", "properties": {}, "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"user_id": {"type": "string"}, "role": {"type": "string"}, "preferences": {"type": "object"}}}},
-    {"name": "fe.recentActivity", "description": "Return recent activity entries for a project.", "args_schema": {"type": "object", "properties": {"project_id": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["project_id"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"activity": {"type": "array", "items": {"type": "object"}}}, "required": ["activity"]}},
-    {"name": "fe.formDraft", "description": "Return any draft the user has in-flight in a task creation form.", "args_schema": {"type": "object", "properties": {"project_id": {"type": "string"}}, "required": ["project_id"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"draft": {"type": ["object", "null"]}}}}
+    {"name": "fe.searchCandidates", "description": "Return candidate tasks or projects for embedding-based reranking.", "args_schema": {"type": "object", "properties": {"project_id": {"type": "string"}, "query": {"type": "string"}, "kind": {"type": "string", "enum": ["tasks", "projects"]}, "limit": {"type": "integer"}}, "required": ["project_id", "query", "kind"], "additionalProperties": false}, "result_schema": {"type": "object", "properties": {"candidates": {"type": "array", "items": {"type": "object"}}}, "required": ["candidates"]}},
+    {"name": "fe.requestMutationApproval", "description": "Request human approval for a board mutation.", "args_schema": {"type": "object", "properties": {"proposal_id": {"type": "string"}, "project_id": {"type": "string"}, "mutation": {"type": "object"}}, "required": ["proposal_id"], "additionalProperties": true}, "result_schema": {"type": "object", "properties": {"approval_id": {"type": "string"}, "status": {"type": "string", "enum": ["pending", "rejected", "approved"]}, "explanation": {"type": "string"}}, "required": ["approval_id", "status"]}},
+    {"name": "fe.applyApprovedMutation", "description": "Apply a mutation that has already been approved.", "args_schema": {"type": "object", "properties": {"approval_id": {"type": "string"}, "project_id": {"type": "string"}, "diff": {"type": "object"}}, "required": ["approval_id"], "additionalProperties": true}, "result_schema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["applied", "failed"]}, "details": {"type": "object"}}, "required": ["status"]}}
   ]
 }
 ```
@@ -1836,7 +1836,7 @@ Get metadata for a single agent.
   "status": "active",
   "rate_limit": {"per_minute": 60, "per_hour": 600},
   "allowed_autonomy": ["suggest", "plan"],
-  "tools": ["fe.similarTasks", "fe.viewerContext"]
+  "tools": ["fe.boardSnapshot", "fe.similarTasks"]
 }
 ```
 

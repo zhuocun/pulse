@@ -32,7 +32,7 @@ the local-engine fallback that activates when `REACT_APP_AI_BASE_URL` is unset.
 | `eslint`       | `eslint src … --fix`                                   | Lint + auto-fix                  |
 | `pre-commit`   | `prettier && eslint && typecheck`                      | Pre-commit gate (run by Husky)   |
 
-Node version requirement: `>=22 <25`.
+Node version requirement: use the version pinned in `.nvmrc`.
 
 ---
 
@@ -1276,9 +1276,9 @@ interface FeTool<Args = unknown, Result = unknown> {
 | `fe.getTask`        | Returns a single task by id from cache                                          | `feTools/getTask.ts`        |
 | `fe.boardSnapshot`  | Compact board summary: counts, unowned tasks, workload                          | `feTools/boardSnapshot.ts`  |
 | `fe.similarTasks`   | Jaccard-ranked task ids for a free-text query                                   | `feTools/similarTasks.ts`   |
-| `fe.viewerContext`  | Viewer user, role, current route, focused task, selection                       | `feTools/viewerContext.ts`  |
-| `fe.recentActivity` | Last-24h action log (returns `{activity: []}` until action history slice lands) | `feTools/recentActivity.ts` |
-| `fe.formDraft`      | In-progress form draft (returns `{draft: null}` until form context lands)       | `feTools/formDraft.ts`      |
+| `fe.searchCandidates` | Returns task/project candidates for embedding rerank                          | `feTools/searchCandidates.ts` |
+| `fe.requestMutationApproval` | Opens the human-review stage for a proposed mutation                 | `feTools/requestMutationApproval.ts` |
+| `fe.applyApprovedMutation` | Applies a mutation after approval-id validation                          | `feTools/applyApprovedMutation.ts` |
 
 FE tool argument names use **snake_case** to match the Python server's schemas:
 
@@ -1289,6 +1289,9 @@ FE tool argument names use **snake_case** to match the Python server's schemas:
 | `fe.listBoard`   | `project_id?: string`                    |
 | `fe.listTasks`   | `project_id?: string`                    |
 | `fe.listMembers` | `project_id?: string`                    |
+| `fe.searchCandidates` | `project_id?: string`, `query: string`, `kind: "tasks" \| "projects"` |
+| `fe.requestMutationApproval` | `proposal_id: string`, `description?: string`, `mutation?: object`, `diff?: object` |
+| `fe.applyApprovedMutation` | `approval_id: string`, `project_id?: string`, `diff?: object` |
 
 **`fe.boardSnapshot`** redacts task notes longer than 4 KB at `"suggest"` autonomy to
 `head(1024) + …[redacted len=N h=<djb2>]… + tail(512)`. At `"plan"` / `"auto"` the

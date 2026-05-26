@@ -31,7 +31,7 @@ The server exposes the same `/api/v1/` prefix as the Express app:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install ".[dev]"
+python -m pip install ".[dev,ai]"
 cp .env.example .env
 ```
 
