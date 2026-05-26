@@ -13,7 +13,12 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { radius, zIndex } from "../../theme/tokens";
+import {
+    chromeInset,
+    radius,
+    touchTargetCoarse,
+    zIndex
+} from "../../theme/tokens";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
@@ -265,6 +270,15 @@ const GrabberWrap = styled.div`
     &:active {
         cursor: grabbing;
     }
+
+    /*
+     * The visible pill is only ~4px tall; pad the interactive drag
+     * target up to ${touchTargetCoarse}px on coarse pointers (WCAG
+     * 2.5.8 / Apple HIG) without growing the pill itself.
+     */
+    @media (pointer: coarse) {
+        min-height: ${touchTargetCoarse}px;
+    }
 `;
 
 const GrabberPill = styled.div`
@@ -318,14 +332,20 @@ const CloseButton = styled.button`
 const Body = styled.div`
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 16px;
+    padding: ${chromeInset.mobile}px;
     /*
      * iOS Safari: the dvh-based height collapses to the visual
      * viewport when the URL bar is visible, so we add a safe-area
      * inset for the home indicator clearance to avoid swallowing
-     * the bottom 34 pt.
+     * the bottom 34 pt. The keyboard-inset-height term keeps bottom
+     * content clear of the on-screen keyboard when an input in the body
+     * is focused (matches the TaskModal / TaskDetailPanel footers).
      */
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-bottom: max(
+        ${chromeInset.mobile}px,
+        env(safe-area-inset-bottom),
+        env(keyboard-inset-height, 0px)
+    );
 `;
 
 const Footer = styled.div`

@@ -160,7 +160,9 @@ const zhCN: Dictionary = {
     dragHints: {
         taskCardKeyboard:
             "键盘拖拽：按空格键提起，方向键移动，再按空格键放下，按 Esc 取消。",
-        columnDragHandle: "拖动以重新排序列"
+        columnDragHandle: "拖动以重新排序列",
+        reorderDisabledByFilters:
+            "筛选启用时暂停重新排序。清除筛选后即可拖动排序。"
     },
     labels: {
         members: "成员",
@@ -939,6 +941,7 @@ const zhCN: Dictionary = {
         registerSubtitle: "创建账号,开始追踪工作。",
         switchToRegister: "还没有账号?",
         switchToLogin: "已有账号?",
+        backToLogin: "返回登录",
         errorSummaryTitle: "存在问题",
         errorSummaryIntro: "请修正以下项目后重试。",
         errorSummaryRegionAriaLabel: "表单错误",

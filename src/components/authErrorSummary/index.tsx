@@ -101,7 +101,7 @@ const AuthErrorSummaryBody = ({
             aria-describedby="auth-error-summary-intro auth-error-summary-sr-only"
             aria-labelledby="auth-error-summary-title"
             id="auth-error-summary"
-            role="alert"
+            role="group"
             tabIndex={-1}
         >
             <SummaryTitle id="auth-error-summary-title">

@@ -151,7 +151,15 @@ const CitationChip: React.FC<CitationChipProps> = ({
                 interactive={navigable}
                 onClick={handleActivate}
                 onKeyDown={onKeyDown}
-                role={navigable ? "button" : "note"}
+                /*
+                 * Non-navigable chips are inline `[n]` markers, not aside
+                 * document sections — `role="note"` (an aside landmark)
+                 * misrepresents them. `role="img"` pairs with the existing
+                 * `aria-label` so the chip surfaces a single self-contained
+                 * accessible name instead of leaking the `[n]` glyph as
+                 * separate text. The navigable branch keeps `role="button"`.
+                 */
+                role={navigable ? "button" : "img"}
                 style={{
                     margin: "0 2px",
                     verticalAlign: "super"

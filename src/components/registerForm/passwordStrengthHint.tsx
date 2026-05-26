@@ -25,9 +25,12 @@ const BarFill = styled.div<{ $color: string; $value: number }>`
     border-radius: inherit;
     background: ${(p) => p.$color};
     inline-size: ${(p) => (p.$value / 4) * 100}%;
-    transition:
-        inline-size 160ms ease-out,
-        background-color 160ms ease-out;
+
+    @media (prefers-reduced-motion: no-preference) {
+        transition:
+            inline-size 160ms ease-out,
+            background-color 160ms ease-out;
+    }
 `;
 
 const StrengthText = styled.span`

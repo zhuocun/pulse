@@ -1,3 +1,4 @@
+import { CloseOutlined } from "@ant-design/icons";
 import {
     Alert,
     Button,
@@ -1205,14 +1206,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             {titleNode}
                         </div>
                         <Button
-                            aria-label={microcopy.actions.cancel}
+                            aria-label={microcopy.actions.close}
+                            icon={<CloseOutlined aria-hidden />}
                             onClick={requestClose}
                             size="small"
                             type="text"
                             style={{ borderRadius: radius.pill }}
-                        >
-                            ×
-                        </Button>
+                        />
                     </header>
                     <div
                         style={{

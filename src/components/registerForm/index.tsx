@@ -57,7 +57,7 @@ const RegisterForm: React.FC<{
         try {
             await mutateAsync({
                 ...input,
-                email: input.email.trim(),
+                email: input.email.trim().toLowerCase(),
                 username: input.username.trim()
             });
             // Confirm success before navigating so the user knows the
@@ -121,7 +121,6 @@ const RegisterForm: React.FC<{
                     autoComplete="email"
                     enterKeyHint="next"
                     inputMode="email"
-                    onChange={() => onError(null)}
                     placeholder={microcopy.placeholders.emailExample}
                     size={inputSize}
                     type="email"
@@ -144,7 +143,6 @@ const RegisterForm: React.FC<{
                     autoComplete="username"
                     enterKeyHint="next"
                     inputMode="text"
-                    onChange={() => onError(null)}
                     size={inputSize}
                     type="text"
                     id="username"
@@ -192,7 +190,6 @@ const RegisterForm: React.FC<{
                             />
                         )
                     }
-                    onChange={() => onError(null)}
                     onKeyUp={(event) =>
                         setCapsLockOn(
                             "getModifierState" in event &&

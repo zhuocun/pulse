@@ -80,21 +80,18 @@ body {
  * normally — clipping the document does not interfere with descendant
  * scrollers.
  *
- * ``overflow-x: clip`` on ``html`` (not ``hidden``) is load-bearing: the
- * legacy ``overflow-x: hidden`` declaration here AND on ``body`` made
- * ``body`` the document scroller, detaching ``window.scrollY``
- * (permanently 0) and silently breaking IntersectionObserver
- * (root: null), scroll-restoration, sticky observers, and Playwright
- * fullPage captures. ``clip`` is the modern equivalent that does not
- * promote a scroll container, so the document scroller stays on the
- * viewport where every observer expects it.
+ * ONLY ``html`` carries ``overflow-x: clip`` (not ``hidden``); ``body``
+ * must NOT set overflow-x. ``clip`` does not promote a scroll container,
+ * but when ``html`` is non-visible any ``overflow: hidden`` on ``body``
+ * re-elects ``body`` as the document scroller on Chromium — detaching
+ * ``window.scrollY`` (permanently 0) and silently breaking
+ * IntersectionObserver (root: null), scroll-restoration, sticky
+ * observers, and Playwright fullPage captures. Keeping the clip on
+ * ``html`` alone leaves the document scroller on the viewport where
+ * every observer expects it.
  */
 html {
     overflow-x: clip;
-}
-
-body {
-    overflow-x: hidden;
 }
 
 /* Block-level images and embeds default to filling their container so
@@ -443,5 +440,22 @@ html[data-glass-intensity="solid"] [data-glass-context="true"] {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
         border: 1px solid CanvasText;
+    }
+}
+
+/*
+ * Honor user contrast preference (Apple "Increase Contrast" / WCAG
+ * 1.4.11). The resting glass border (rgba(15, 23, 42, 0.06)) and the rim
+ * hairlines (rgba(255, 255, 255, 0.18)) are effectively invisible at high
+ * contrast, so edges never meet the 3:1 non-text boundary. We thicken the
+ * hairlines toward a visible step and raise glass surfaces toward opaque
+ * so text contrast over the surface is preserved. The per-var bumps that
+ * the chrome consumes live in cssVars.ts on the same query; this block
+ * covers the GlassPanel surfaces and the static fallbacks here.
+ */
+@media (prefers-contrast: more) {
+    [data-glass-context="true"] {
+        background: var(--glass-surface-strong) !important;
+        border: 1px solid var(--glass-border) !important;
     }
 }

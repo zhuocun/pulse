@@ -256,12 +256,17 @@ const FilteredEmptyButton = styled.button`
     }
 `;
 
-const TaskCardOuter = styled.button`
+const TaskCardOuter = styled.button<{ $dragDisabledByFilters?: boolean }>`
     background: var(--ant-color-bg-container, #fff);
     border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
     border-radius: ${radius.md}px;
     box-shadow: ${shadow.xs};
-    cursor: pointer;
+    /*
+     * not-allowed signals that reordering is paused while filters are
+     * active; the card itself stays clickable to open the task.
+     */
+    cursor: ${({ $dragDisabledByFilters }) =>
+        $dragDisabledByFilters ? "not-allowed" : "pointer"};
     display: block;
     /* Density-driven padding. Comfortable resolves the var to the
      * legacy 12 / 16 px (space.sm / space.md) rhythm; compact tightens
@@ -708,11 +713,21 @@ type TaskCardProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
     members: IMember[];
     onOpen?: () => void;
     isMock?: boolean;
+    /** Reordering is paused by active filters — advisory affordance only. */
+    dragDisabledByFilters?: boolean;
 };
 
 const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
     (
-        { task, members, onOpen, isMock, "aria-label": ariaLabel, ...rest },
+        {
+            task,
+            members,
+            onOpen,
+            isMock,
+            dragDisabledByFilters,
+            "aria-label": ariaLabel,
+            ...rest
+        },
         ref
     ) => {
         const { projectId } = useParams<{ projectId: string }>();
@@ -887,12 +902,14 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         }, [onOpen]);
         return (
             <TaskCardOuter
+                $dragDisabledByFilters={dragDisabledByFilters}
                 aria-label={
                     ariaLabel ??
                     formatTemplate(microcopy.a11y.openTask as string, {
                         name: task.taskName
                     })
                 }
+                aria-disabled={dragDisabledByFilters || undefined}
                 aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 disabled={isMock}
                 onClick={handleCardClick}
@@ -1045,6 +1062,13 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
      * `isDragDisabled` so a single flag still disables both behaviors.
      */
     taskDragDisabled?: boolean;
+    /**
+     * True when row drag is disabled SOLELY because filters are active
+     * (not by an in-flight reorder). Surfaces a tooltip + `aria-disabled`
+     * affordance on the cards so the user understands why reordering is
+     * paused. Does not itself disable drag — `taskDragDisabled` does that.
+     */
+    dragDisabledByFilters?: boolean;
     boardAiOn?: boolean;
     members?: IMember[];
     onResetFilters?: () => void;
@@ -1058,6 +1082,7 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             tasks,
             isDragDisabled,
             taskDragDisabled = isDragDisabled,
+            dragDisabledByFilters = false,
             boardAiOn = true,
             members = [],
             onResetFilters,
@@ -1196,6 +1221,27 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                 const taskDragId = task._id
                                     ? `task${task._id}`
                                     : `task-unsaved-${index}`;
+                                // Only persisted cards are reorderable, so the
+                                // filter-paused affordance only applies there.
+                                const showFilterPausedHint =
+                                    dragDisabledByFilters && hasPersistedTaskId;
+
+                                const card = (
+                                    <TaskCard
+                                        className="task-card-lift-surface"
+                                        dragDisabledByFilters={
+                                            showFilterPausedHint
+                                        }
+                                        isMock={!hasPersistedTaskId}
+                                        members={members}
+                                        onOpen={
+                                            hasPersistedTaskId
+                                                ? () => startEditing(task._id)
+                                                : undefined
+                                        }
+                                        task={task}
+                                    />
+                                );
 
                                 return (
                                     <Drag
@@ -1210,21 +1256,25 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                         // refuses to drag from by default; opt out of that block.
                                         disableInteractiveElementBlocking
                                     >
+                                        {/*
+                                         * The drag shell stays the direct child
+                                         * of <Drag> so dnd attaches its ref /
+                                         * draggable props to the real DOM node;
+                                         * the tooltip only wraps the inner card.
+                                         */}
                                         <TaskRowDragShell>
-                                            <TaskCard
-                                                className="task-card-lift-surface"
-                                                isMock={!hasPersistedTaskId}
-                                                members={members}
-                                                onOpen={
-                                                    hasPersistedTaskId
-                                                        ? () =>
-                                                              startEditing(
-                                                                  task._id
-                                                              )
-                                                        : undefined
-                                                }
-                                                task={task}
-                                            />
+                                            {showFilterPausedHint ? (
+                                                <Tooltip
+                                                    title={
+                                                        microcopy.dragHints
+                                                            .reorderDisabledByFilters
+                                                    }
+                                                >
+                                                    {card}
+                                                </Tooltip>
+                                            ) : (
+                                                card
+                                            )}
                                         </TaskRowDragShell>
                                     </Drag>
                                 );
