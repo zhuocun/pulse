@@ -1,3 +1,16 @@
+/*
+ * Benign-warning note (investigated 2026-05): jest occasionally logs
+ * "A worker process has failed to exit gracefully ... tests leaking due
+ * to improper teardown." There is NO leaked handle. At worker teardown
+ * the only active libuv handles are the stdout/stderr sockets; the line
+ * fires when V8/libuv teardown of the large multi-suite module graph
+ * occasionally exceeds jest's hard-coded 500ms force-exit deadline under
+ * CPU load. It never fails tests. The two usual suspects are both ruled
+ * out: jsdom clears the MessageChannel polyfill's setTimeout on
+ * window.close(), and reportWebVitals (the only dynamic import / observer
+ * path) is mocked in every test. Do NOT add `--forceExit` or otherwise
+ * suppress it — there is no real leak to fix, only a load-timing race.
+ */
 module.exports = {
     clearMocks: true,
     restoreMocks: true,
