@@ -235,8 +235,7 @@ const zhCN: Dictionary = {
                 empty: "暂无提及。"
             },
             activity: {
-                title: "活动",
-                empty: "本次会话暂无内容 —— 任务和 AI 变更会显示在此处。"
+                title: "活动"
             }
         }
     },

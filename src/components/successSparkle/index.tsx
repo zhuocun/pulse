@@ -142,4 +142,3 @@ const SuccessSparkle: React.FC<SuccessSparkleProps> = ({
 };
 
 export default SuccessSparkle;
-export { SuccessSparkle };

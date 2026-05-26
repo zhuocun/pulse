@@ -162,48 +162,6 @@ interface TaskDetailPanelProps {
     boardAiOn?: boolean;
 }
 
-/**
- * Honors `prefers-reduced-motion: reduce`. Phase 6 Wave 3 Phase 2 moved
- * the chassis motion gating into the shared `<Sheet>` primitive (which
- * carries its own `useReducedMotion`), so this hook is no longer wired
- * to chassis chrome. Kept in place pending the follow-up consolidation
- * task that dedupes the project's `prefers-reduced-motion` listeners
- * onto `utils/hooks/useReducedMotion`. Future callers (e.g. the
- * swipe-to-next ornament if it ever gains animated easing) can keep
- * reading from here without rewiring once the dedup lands.
- */
-const usePrefersReducedMotion = (): boolean => {
-    const [reduced, setReduced] = useState<boolean>(() => {
-        if (
-            typeof window === "undefined" ||
-            typeof window.matchMedia !== "function"
-        ) {
-            return false;
-        }
-        return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    });
-
-    useEffect(() => {
-        if (
-            typeof window === "undefined" ||
-            typeof window.matchMedia !== "function"
-        ) {
-            return;
-        }
-        const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-        const handler = (event: MediaQueryListEvent) =>
-            setReduced(event.matches);
-        if (typeof media.addEventListener === "function") {
-            media.addEventListener("change", handler);
-            return () => media.removeEventListener("change", handler);
-        }
-        media.addListener(handler);
-        return () => media.removeListener(handler);
-    }, []);
-
-    return reduced;
-};
-
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     projectId,
     taskId,
@@ -1294,10 +1252,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      *   - Anything else (mouse, narrow-desktop, reduced-motion) →
      *     AntD `<Drawer>` at `desktopPlacement="right"` / `size="large"`.
      *
-     * Sheet also owns the `prefers-reduced-motion` gating, so the
-     * local `usePrefersReducedMotion` hook is no longer wired through
-     * here. (It survives in the file pending the cross-project
-     * `useReducedMotion` consolidation task.)
+     * Sheet also owns the `prefers-reduced-motion` gating, so this
+     * branch does not gate motion itself.
      *
      * The bottom-tab bar collision guard from the previous Drawer
      * config (B-H1) is preserved because Sheet treats phone chrome the

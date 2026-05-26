@@ -60,16 +60,48 @@ const allTabs = (): HTMLElement[] => {
 };
 
 describe("BottomTabBar", () => {
+    // Several keyboard-state cases pin `window.innerHeight` (and
+    // `visualViewport`) via `Object.defineProperty`. jsdom does NOT reset
+    // window dimensions between suites the way it resets modules, so a
+    // leaked `innerHeight` bleeds into whatever suite runs next in the same
+    // worker — e.g. the `Sheet` primitive reads `window.innerHeight * 0.92`
+    // for its surface height and would inherit our pinned value (or a
+    // corrupted one), surfacing as a `height: NaN` console error elsewhere.
+    // Capture the original descriptors up front and restore them after each
+    // test so no mutation escapes this suite's scope.
+    const originalInnerHeight = Object.getOwnPropertyDescriptor(
+        window,
+        "innerHeight"
+    );
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(
+        window,
+        "visualViewport"
+    );
+
     beforeEach(() => {
         mockedNativeNavigate.mockReset();
     });
 
     afterEach(() => {
-        // Reset visualViewport mocks between tests so keyboard-state
-        // assertions don't leak across cases. The cast widens window to
-        // an interface that allows deletion of the optional property
-        // (JSDOM doesn't ship visualViewport by default).
-        delete (window as { visualViewport?: VisualViewport }).visualViewport;
+        // Restore the window dimensions / viewport so keyboard-state
+        // assertions don't leak across cases (or suites). jsdom doesn't ship
+        // visualViewport by default, so its original descriptor is usually
+        // absent — fall back to deleting the property the tests added.
+        if (originalInnerHeight) {
+            Object.defineProperty(window, "innerHeight", originalInnerHeight);
+        }
+        if (originalVisualViewport) {
+            Object.defineProperty(
+                window,
+                "visualViewport",
+                originalVisualViewport
+            );
+        } else {
+            // The cast widens window to an interface that allows deletion of
+            // the optional property.
+            delete (window as { visualViewport?: VisualViewport })
+                .visualViewport;
+        }
     });
 
     it("renders five tabs with the canonical microcopy labels (4 routes + Search action)", () => {
