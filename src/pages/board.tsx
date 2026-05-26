@@ -668,6 +668,25 @@ const BoardPage = () => {
         }
     }, []);
 
+    /*
+     * Coaching UI should disappear once the user demonstrates the
+     * behaviour (Apple HIG): the first horizontal scroll of the board
+     * container dismisses the swipe hint, so it never lingers after a
+     * swipe. The manual close button still persists the dismissal.
+     */
+    useEffect(() => {
+        if (swipeHintDismissed) return;
+        const node = boardScrollRef.current;
+        if (!node) return;
+        node.addEventListener("scroll", dismissSwipeHint, {
+            passive: true,
+            once: true
+        });
+        return () => node.removeEventListener("scroll", dismissSwipeHint);
+        // `board` is a dep so the listener attaches once the
+        // ColumnContainer mounts after the async board load resolves.
+    }, [swipeHintDismissed, dismissSwipeHint, board]);
+
     useEffect(() => {
         if (!boardAiOn && param.semanticIds) {
             setParam({ semanticIds: undefined });
@@ -1106,6 +1125,10 @@ const BoardPage = () => {
                                                         taskDragDisabled={
                                                             isTaskDragDisabled ||
                                                             hasActiveFilters
+                                                        }
+                                                        dragDisabledByFilters={
+                                                            hasActiveFilters &&
+                                                            !isTaskDragDisabled
                                                         }
                                                     />
                                                 </Drag>

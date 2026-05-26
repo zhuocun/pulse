@@ -151,7 +151,7 @@ describe("LoginForm", () => {
 
         await submitLogin();
 
-        const summary = await screen.findByRole("alert", {
+        const summary = await screen.findByRole("group", {
             name: /there is a problem/i
         });
         expect(summary).toBeInTheDocument();
@@ -233,14 +233,16 @@ describe("LoginForm", () => {
         );
     });
 
-    it("clears the parent error as fields change", async () => {
+    it("keeps the API error visible while fields change", async () => {
+        // The API error summary must persist until the next submit so the
+        // user can finish reading and correcting it — clearing it on the
+        // first keystroke dismissed the summary before it could be read.
         const { onError } = renderLoginForm();
 
         await changeField(/^email$/i, "alice@example.com");
         await changeField(/^password$/i, "secret");
 
-        expect(onError).toHaveBeenCalledTimes(2);
-        expect(onError).toHaveBeenCalledWith(null);
+        expect(onError).not.toHaveBeenCalled();
     });
 
     it("submits credentials, verifies the session, stores the AI proxy token, and SPA-navigates to projects", async () => {
@@ -311,10 +313,12 @@ describe("LoginForm", () => {
         expect(tokenStorage.readAiProxyToken()).toBeNull();
     });
 
-    it("sets autoComplete=username on the email field for password managers", () => {
+    it("sets autoComplete=username webauthn on the email field for password managers and passkeys", () => {
+        // The `webauthn` token lets iOS 26 surface conditional passkey
+        // autofill on the email field alongside saved-password suggestions.
         renderLoginForm();
         const email = screen.getByLabelText(/^email$/i);
-        expect(email).toHaveAttribute("autocomplete", "username");
+        expect(email).toHaveAttribute("autocomplete", "username webauthn");
     });
 
     it("shows a welcome-back toast on successful login", async () => {

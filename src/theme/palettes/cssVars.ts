@@ -308,4 +308,45 @@ html[data-glass-intensity="solid"] {
         --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
     }
 }
+
+/*
+ * Honor user contrast preference (Apple "Increase Contrast" / WCAG
+ * 1.4.11). At default opacity the glass border and rim hairlines never
+ * meet a 3:1 non-text boundary and the orange primary fails AA for link
+ * text, so this query thickens the hairlines, pushes glass surfaces
+ * toward opaque (so text over the surface keeps its contrast), and steps
+ * the link/text colour to the darker brand step (primaryActive light /
+ * primaryDark on dark). Writing on the html[data-color-scheme] selectors
+ * outbeats AntD's :where()-scoped colour vars without !important. App.css
+ * ships the matching [data-glass-context="true"] override for GlassPanel
+ * surfaces on the same query.
+ */
+@media (prefers-contrast: more) {
+    :root,
+    html[data-color-scheme="light"] {
+        --glass-surface: rgba(255, 255, 255, 0.95);
+        --glass-surface-strong: rgba(255, 255, 255, 0.98);
+        --glass-surface-subtle: rgba(255, 255, 255, 0.92);
+        --glass-border: rgba(15, 23, 42, 0.30);
+        --glass-rim-subtle: rgba(255, 255, 255, 0.55);
+        --glass-rim: rgba(255, 255, 255, 0.70);
+        --glass-rim-strong: rgba(255, 255, 255, 0.85);
+
+        --ant-color-link: ${p.brand.primaryActive};
+        --ant-color-primary: ${p.brand.primaryActive};
+    }
+
+    html[data-color-scheme="dark"] {
+        --glass-surface: rgba(10, 12, 8, 0.96);
+        --glass-surface-strong: rgba(10, 12, 8, 0.99);
+        --glass-surface-subtle: rgba(10, 12, 8, 0.92);
+        --glass-border: rgba(255, 255, 255, 0.45);
+        --glass-rim-subtle: rgba(255, 255, 255, 0.30);
+        --glass-rim: rgba(255, 255, 255, 0.45);
+        --glass-rim-strong: rgba(255, 255, 255, 0.60);
+
+        --ant-color-link: ${p.brand.primaryDark};
+        --ant-color-primary: ${p.brand.primaryDark};
+    }
+}
 `;

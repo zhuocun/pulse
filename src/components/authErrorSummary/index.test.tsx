@@ -48,19 +48,19 @@ const Harness = ({
 describe("AuthErrorSummary", () => {
     it("renders nothing when there are no errors", () => {
         render(<Harness />);
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(screen.queryByRole("group")).not.toBeInTheDocument();
     });
 
     it("surfaces a server error message in the summary", () => {
         render(<Harness serverError={new Error("Invalid credentials")} />);
-        const alert = screen.getByRole("alert");
-        expect(alert).toHaveTextContent(/invalid credentials/i);
+        const summary = screen.getByRole("group");
+        expect(summary).toHaveTextContent(/invalid credentials/i);
     });
 
     it("focuses the summary when it becomes visible", () => {
         render(<Harness serverError={new Error("Server down")} />);
-        const alert = screen.getByRole("alert");
-        expect(document.activeElement).toBe(alert);
+        const summary = screen.getByRole("group");
+        expect(document.activeElement).toBe(summary);
     });
 
     it("does not re-steal focus when field errors update while the summary stays visible", () => {
@@ -81,8 +81,8 @@ describe("AuthErrorSummary", () => {
                 { name: "email", errors: ["Email is required"] }
             ]);
         });
-        const alert = screen.getByRole("alert");
-        const focusSpy = jest.spyOn(alert, "focus");
+        const summary = screen.getByRole("group");
+        const focusSpy = jest.spyOn(summary, "focus");
 
         // Subsequent validation passes the user typing into the field
         // would trigger should not re-focus the summary.
@@ -117,14 +117,14 @@ describe("AuthErrorSummary", () => {
         // to false on the hidden render so the next 0 -> 1 transition
         // re-focuses.
         const { rerender } = render(<Harness />);
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(screen.queryByRole("group")).not.toBeInTheDocument();
 
         rerender(<Harness serverError={new Error("Boom")} />);
-        expect(document.activeElement).toBe(screen.getByRole("alert"));
+        expect(document.activeElement).toBe(screen.getByRole("group"));
 
         rerender(<Harness />);
         rerender(<Harness serverError={new Error("Boom again")} />);
-        expect(document.activeElement).toBe(screen.getByRole("alert"));
+        expect(document.activeElement).toBe(screen.getByRole("group"));
     });
 
     it("lists field-level errors as anchor links when includeFieldErrors is true", () => {
@@ -191,17 +191,17 @@ describe("AuthErrorSummary", () => {
 
         // Only the server message is listed; the field-level link is hidden.
         expect(screen.queryByRole("link")).not.toBeInTheDocument();
-        expect(screen.getByRole("alert")).toHaveTextContent(/boom/i);
+        expect(screen.getByRole("group")).toHaveTextContent(/boom/i);
     });
 
-    // The 1×1 clipped SrOnly announcer inside the alert sits absolute over
+    // The 1×1 clipped SrOnly announcer inside the summary sits absolute over
     // the visible submit button on auth pages. Without `pointer-events: none`
     // the invisible box would intercept clicks targeted at the button below.
     // Mirrors the invariant the deleted srOnlyLiveRegions strict file held.
-    it("the SR-only announcer inside the alert is non-interactive", () => {
+    it("the SR-only announcer inside the summary is non-interactive", () => {
         render(<Harness serverError={new Error("Boom")} />);
-        const alert = screen.getByRole("alert");
-        const srOnly = alert.querySelector("#auth-error-summary-sr-only");
+        const summary = screen.getByRole("group");
+        const srOnly = summary.querySelector("#auth-error-summary-sr-only");
         expect(srOnly).not.toBeNull();
         expect(srOnly).toHaveStyle({ pointerEvents: "none" });
     });

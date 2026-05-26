@@ -205,6 +205,7 @@ const renderColumn = ({
     boardColumn = column(),
     isDragDisabled = false,
     taskDragDisabled,
+    dragDisabledByFilters = false,
     boardAiOn = true,
     param = defaultParam,
     boardDensity = "comfortable",
@@ -225,6 +226,7 @@ const renderColumn = ({
     boardColumn?: IColumn;
     isDragDisabled?: boolean;
     taskDragDisabled?: boolean;
+    dragDisabledByFilters?: boolean;
     param?: TaskSearchParam;
     tasks?: ITask[];
     boardAiOn?: boolean;
@@ -252,6 +254,7 @@ const renderColumn = ({
                             <Column
                                 boardAiOn={boardAiOn}
                                 column={boardColumn}
+                                dragDisabledByFilters={dragDisabledByFilters}
                                 isDragDisabled={isDragDisabled}
                                 param={param}
                                 taskDragDisabled={taskDragDisabled}
@@ -270,6 +273,30 @@ describe("Column", () => {
         jest.clearAllMocks();
         mockedEnvironment.taskPanelRouted = false;
         mockedEnvironment.aiColumnReadinessEnabled = false;
+    });
+
+    it("advertises the keyboard-drag hint on a card while reordering is allowed", () => {
+        renderColumn();
+
+        expect(
+            screen.getByRole("button", { name: /open task build task/i })
+        ).toHaveAttribute(
+            "title",
+            microcopy.dragHints.taskCardKeyboard as string
+        );
+    });
+
+    it("drops the misleading drag affordances when filters pause reordering", () => {
+        renderColumn({ dragDisabledByFilters: true });
+
+        // The card still opens the task on click, so it must NOT advertise
+        // itself as disabled; the native keyboard-drag title is suppressed
+        // (the reorder-paused Tooltip carries the explanation instead).
+        const card = screen.getByRole("button", {
+            name: /open task build task/i
+        });
+        expect(card).not.toHaveAttribute("aria-disabled");
+        expect(card).not.toHaveAttribute("title");
     });
 
     it("renders the column title, matching task cards, and TaskCreator state", () => {

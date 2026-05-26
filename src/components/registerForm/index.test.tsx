@@ -127,7 +127,7 @@ describe("RegisterForm", () => {
 
         await submitRegister();
 
-        const summary = await screen.findByRole("alert", {
+        const summary = await screen.findByRole("group", {
             name: /there is a problem/i
         });
         expect(
@@ -178,15 +178,17 @@ describe("RegisterForm", () => {
         expect(mutateAsync).not.toHaveBeenCalled();
     });
 
-    it("clears the parent error as fields change", async () => {
+    it("keeps the API error visible while fields change", async () => {
+        // The API error summary must persist until the next submit so the
+        // user can finish reading and correcting it — clearing it on the
+        // first keystroke dismissed the summary before it could be read.
         const { onError } = renderRegisterForm();
 
         await changeField(/^email$/i, "alice@example.com");
         await changeField(/^username$/i, "Alice");
         await changeField(/^password$/i, "secret-password");
 
-        expect(onError).toHaveBeenCalledTimes(3);
-        expect(onError).toHaveBeenCalledWith(null);
+        expect(onError).not.toHaveBeenCalled();
     });
 
     it("submits registration data and navigates to login", async () => {
@@ -206,6 +208,26 @@ describe("RegisterForm", () => {
         });
         await waitFor(() => {
             expect(window.location.pathname).toBe("/login");
+        });
+    });
+
+    it("normalizes the submitted email by trimming and lowercasing", async () => {
+        // Mirrors the login form: pasted whitespace or auto-fill casing
+        // would otherwise create an identity that mismatches the lower-cased
+        // record the backend stores.
+        renderRegisterForm();
+
+        await changeField(/^email$/i, "  USER@EXAMPLE.com  ");
+        await changeField(/^username$/i, "Alice");
+        await changeField(/^password$/i, "secret-password");
+        await submitRegister();
+
+        await waitFor(() => {
+            expect(mutateAsync).toHaveBeenCalledWith({
+                email: "user@example.com",
+                password: "secret-password",
+                username: "Alice"
+            });
         });
     });
 

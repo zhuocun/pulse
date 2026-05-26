@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import { Space, Tabs, Tag, Typography } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
@@ -218,6 +219,26 @@ export interface CopilotDockShellProps {
     children: React.ReactNode;
 }
 
+/*
+ * Legibility-first glass: the GlassPanel root carries `backdrop-filter`,
+ * which on macOS Safari forces a compositing layer that disables
+ * sub-pixel antialiasing on descendant text. Per the GlassPanel contract
+ * (its header note), text must live in an isolated content child so the
+ * tab bodies paint on their own stacking context instead of the filtered
+ * root. `isolation: isolate` + `position: relative` establish that
+ * context; the flex props mirror the GlassPanel's own layout so the inner
+ * Tabs (`flex: 1 1 auto`) + footer slot stay full-bleed — visually inert
+ * on Chrome / Firefox.
+ */
+const DockContentLayer = styled.div`
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    isolation: isolate;
+    min-height: 0;
+    position: relative;
+`;
+
 export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
     open,
     onClose,
@@ -317,7 +338,7 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                     paddingTop: space.lg
                 }}
             >
-                {children}
+                <DockContentLayer>{children}</DockContentLayer>
             </GlassPanel>
         </Sheet>
     );

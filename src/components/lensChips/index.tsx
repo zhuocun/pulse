@@ -78,6 +78,7 @@ const ChipRow = styled.div`
 
 interface ChipButtonProps {
     $active: boolean;
+    $disabled?: boolean;
 }
 
 const ChipButton = styled.button<ChipButtonProps>`
@@ -96,7 +97,8 @@ const ChipButton = styled.button<ChipButtonProps>`
         $active
             ? "var(--ant-color-text-light-solid, #fff)"
             : "var(--ant-color-text, rgba(15, 23, 42, 0.85))"};
-    cursor: pointer;
+    cursor: ${({ $disabled }) => ($disabled ? "not-allowed" : "pointer")};
+    opacity: ${({ $disabled }) => ($disabled ? 0.55 : 1)};
     display: inline-flex;
     font-size: ${fontSize.sm}px;
     font-weight: ${fontWeight.medium};
@@ -109,10 +111,12 @@ const ChipButton = styled.button<ChipButtonProps>`
         color ${motion.short}ms ease-out;
 
     &:hover {
-        background: ${({ $active }) =>
-            $active
-                ? "var(--ant-color-primary-hover, #f97316)"
-                : "var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04))"};
+        background: ${({ $active, $disabled }) =>
+            $disabled
+                ? "var(--ant-color-bg-container, #fff)"
+                : $active
+                  ? "var(--ant-color-primary-hover, #f97316)"
+                  : "var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04))"};
     }
 
     &:focus-visible {
@@ -185,14 +189,26 @@ const LensChips: React.FC<LensChipsProps> = ({ active, onChange }) => {
     return (
         <ChipRow aria-label={microcopy.a11y.lensChips} role="group">
             {chips.map((chip) => {
-                const isActive = active === chip.id;
                 const isComingSoon = COMING_SOON_LENSES.has(chip.id);
+                const isActive = !isComingSoon && active === chip.id;
                 return (
                     <ChipButton
                         $active={isActive}
-                        aria-pressed={isActive}
+                        $disabled={isComingSoon}
+                        /*
+                         * Coming-soon lenses have no working predicate, so
+                         * they read as disabled (no toggle, no pressed
+                         * state) until their data field ships — tapping
+                         * one must not silently filter nothing.
+                         */
+                        aria-disabled={isComingSoon || undefined}
+                        aria-pressed={isComingSoon ? undefined : isActive}
                         key={chip.id}
-                        onClick={() => onChange(isActive ? null : chip.id)}
+                        onClick={
+                            isComingSoon
+                                ? undefined
+                                : () => onChange(isActive ? null : chip.id)
+                        }
                         title={chip.tooltip}
                         type="button"
                     >

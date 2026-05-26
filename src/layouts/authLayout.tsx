@@ -22,6 +22,40 @@ import {
     space
 } from "../theme/tokens";
 
+const SkipLink = styled.a`
+    /*
+     * Unfocused skip links sit above the canvas while translated
+     * off-screen; keep pointer-events off until focus so clicks reach
+     * real targets. Mirrors the MainLayout skip-link pattern.
+     */
+    pointer-events: none;
+    background: var(--ant-color-primary, #ea580c);
+    border-radius: ${radius.md}px;
+    color: #fff;
+    font-size: ${fontSize.sm}px;
+    font-weight: ${fontWeight.semibold};
+    left: ${space.sm}px;
+    padding: ${space.xs}px ${space.md}px;
+    position: absolute;
+    text-decoration: none;
+    top: ${space.sm}px;
+    transform: translateY(-200%);
+    transition: transform 120ms ease-out;
+    z-index: 9999;
+
+    &:focus,
+    &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+`;
+
 const Page = styled.div`
     display: grid;
     grid-template-columns: 1fr;
@@ -33,7 +67,7 @@ const Page = styled.div`
      * this glow alone gives the canvas its only colour. */
     background:
         radial-gradient(
-            60rem 50rem at 50% 30%,
+            60vmin 50vmin at 50% 30%,
             var(--aurora-blob) 0%,
             transparent 70%
         ),
@@ -71,7 +105,7 @@ const HeroRail = styled.aside`
          * active palette without any edits to this file. */
         background:
             radial-gradient(
-                70rem 60rem at 30% 30%,
+                70vmin 60vmin at 30% 30%,
                 ${aurora.mid} 0%,
                 transparent 70%
             ),
@@ -428,6 +462,9 @@ export const AuthButton = styled(Button)`
 const AuthLayout = () => {
     return (
         <Page>
+            <SkipLink href="#auth-main">
+                {microcopy.a11y.skipToMainContent}
+            </SkipLink>
             <HeroRail aria-hidden="true">
                 <HeroInner>
                     <HeroBadge>
@@ -461,7 +498,7 @@ const AuthLayout = () => {
                     </HeroFinePrint>
                 </HeroInner>
             </HeroRail>
-            <Canvas>
+            <Canvas id="auth-main" tabIndex={-1}>
                 <BrandHeader>
                     <BrandMark size="md" />
                 </BrandHeader>

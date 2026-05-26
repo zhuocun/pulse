@@ -176,10 +176,9 @@ const LoginForm: React.FC<{
                  * iOS Safari / Keychain autofill (WCAG 3.3.7).
                  */}
                 <Input
-                    autoComplete="username"
+                    autoComplete="username webauthn"
                     enterKeyHint="next"
                     inputMode="email"
-                    onChange={() => onError(null)}
                     placeholder={microcopy.placeholders.emailExample}
                     size={inputSize}
                     type="email"
@@ -221,7 +220,6 @@ const LoginForm: React.FC<{
                             />
                         )
                     }
-                    onChange={() => onError(null)}
                     onKeyUp={(event) =>
                         setCapsLockOn(
                             "getModifierState" in event &&

@@ -172,7 +172,9 @@ export const enSource = {
     dragHints: {
         taskCardKeyboard:
             "Keyboard drag: Space to lift, arrow keys to move, Space to drop, Escape to cancel.",
-        columnDragHandle: "Drag to reorder column"
+        columnDragHandle: "Drag to reorder column",
+        reorderDisabledByFilters:
+            "Reordering is paused while filters are active. Clear filters to reorder."
     },
     settings: {
         darkMode: "Dark mode",
@@ -1123,6 +1125,7 @@ export const enSource = {
         registerSubtitle: "Create your account to start tracking work.",
         switchToRegister: "Don't have an account?",
         switchToLogin: "Already have an account?",
+        backToLogin: "Back to log in",
         errorSummaryTitle: "There is a problem",
         errorSummaryIntro: "Correct the following and try again.",
         errorSummaryRegionAriaLabel: "Form errors",

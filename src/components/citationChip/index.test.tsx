@@ -24,6 +24,47 @@ describe("CitationChip", () => {
         ).toBeInTheDocument();
     });
 
+    it("exposes a non-navigable chip as a single labeled image, not an aside note", () => {
+        const citation: CitationRef = {
+            source: "user",
+            id: "u1",
+            quote: "Alice created the task"
+        };
+
+        render(
+            <AntdApp>
+                <CitationChip citation={citation} index={1} />
+            </AntdApp>
+        );
+
+        expect(
+            screen.getByRole("img", { name: "Citation 1: User u1" })
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("exposes a navigable chip as a button", () => {
+        const citation: CitationRef = {
+            source: "task",
+            id: "t-7",
+            quote: "Switch to TanStack Query for board fetches."
+        };
+
+        render(
+            <AntdApp>
+                <CitationChip
+                    citation={citation}
+                    index={2}
+                    onNavigate={jest.fn()}
+                />
+            </AntdApp>
+        );
+
+        expect(
+            screen.getByRole("button", { name: "Citation 2: Task t-7" })
+        ).toBeInTheDocument();
+    });
+
     /*
      * QW#7 (2026-05 review §Quick Wins): the citation overlay is now a
      * Popover with a click trigger, not a hover Tooltip. The body still
