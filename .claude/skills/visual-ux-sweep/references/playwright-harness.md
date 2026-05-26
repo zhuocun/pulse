@@ -142,6 +142,25 @@ const run = async () => {
 run().catch((e) => { console.error("fatal", e); process.exit(1); });
 ```
 
+## Deep / nested / guarded routes
+
+A direct `goto` works for top-level routes. For a nested/guarded route,
+render the parent and click in — verified far more reliable than a
+deep-link `goto`, which can leave the child stuck in Suspense with only
+the app-shell queries fired:
+
+```js
+await page.goto(`${BASE_URL}/projects`, { waitUntil: "domcontentloaded" });
+await page.waitForFunction(
+    (t) => document.body.innerText.includes(t), "Demo project", { timeout: 15000 }
+);
+await page.getByText("Demo project").first().click();      // navigate like a user
+await page.waitForFunction(
+    () => document.body.innerText.includes("Backlog"), { timeout: 15000 } // a board column
+);
+// now screenshot the board
+```
+
 ## One-shot root-cause probe (step 6)
 
 When a shot is blank/stuck, don't guess from code — ask the page:

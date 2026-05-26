@@ -40,9 +40,10 @@ loading spinner.
    the manifest:
     - `npm i playwright --no-save` (keeps `package.json` / lockfile
       untouched).
-    - `npx playwright install chromium` (downloads the binary, ~150 MB;
-      may need `--with-deps` on a bare box). If the network blocks the
-      CDN, stop and tell the user — the sweep can't run here.
+    - `npx playwright install chromium` (downloads ~300 MB — Chromium
+      plus a headless shell; may need `--with-deps` on a bare box). If
+      the network blocks the CDN, stop and tell the user — the sweep
+      can't run here.
     - Browsers may land outside the default cache when
       `PLAYWRIGHT_BROWSERS_PATH` is set in the environment; the runtime
       reads the same variable, so leave it as-is and just verify a
@@ -56,6 +57,13 @@ loading spinner.
     - `npm run build`, then serve it: `npx vite preview --port <p>`,
       `npx serve -s dist`, `next start`, etc.
     - Production chunks are pre-bundled and load deterministically.
+    - **Necessary, not always sufficient.** The build is the reliable
+      surface to *launch* from, but a deeply nested route can still fail
+      to render when reached by a direct deep-link — reach those by UI
+      navigation (see below). Verified on a real app: a list page that
+      hung forever in dev rendered on the preview build, but the nested
+      board route under it stayed stuck on a direct `goto` and only
+      rendered after a click-through from its parent.
     - Caveat: a build may use different env defaults than dev (feature
       flags, API engine), so some chrome differs — fine for visual
       review; note it. Only fall back to the dev server for a trivial
@@ -86,7 +94,7 @@ loading spinner.
 - **Intercept ALL API calls** in the browser context
   (`context.route("**/<api-base>/**", …)`) and fulfill plausible JSON —
   the real backend is usually blocked from the sandbox. An un-mocked
-  call hangs and the page never leaves loading.
+  call hangs or errors and the page never leaves loading.
 - **Return arrays where the app maps over a collection.** A scalar or
   `"ok"` string where an array is expected throws
   `(x ?? []).map is not a function` and trips the error boundary — a
@@ -98,10 +106,14 @@ loading spinner.
 
 ## Navigation + timing (stable rendering)
 
-- **Drive the app like a user.** Reach deep/guarded routes by clicking
-  the app's own navigation, not synthetic `history.pushState` or a raw
-  deep-link `goto` — those are brittle for nested/guarded routes and
-  often leave the destination's data queries un-fired.
+- **Drive the app like a user.** A direct `goto` is fine for top-level /
+  public routes (login, a list page). For a deeply nested or guarded
+  route (e.g. `/projects/:id/board`), render the parent and click into
+  the child — do NOT deep-link `goto` it or fake `history.pushState`.
+  Verified: a direct `goto` to a nested route left it stuck in Suspense
+  with only the app-shell queries firing (`users`, `health`, members);
+  clicking into it from the rendered parent fired every data query and
+  rendered it fully. The harness reference shows the click-through.
 - **Wait for content, not for "loading" to vanish.** A "no loading
   text" or `networkidle` check passes prematurely (e.g. just before an
   auth redirect kicks off the next load). Wait for a known content
@@ -132,9 +144,11 @@ Per PNG, in both light and dark and at phone + desktop widths:
 - **State:** loading/empty/error parity; focus rings present and
   ≥ 3:1; disabled vs. active read correctly; touch targets ≥ 44 px on
   coarse pointers.
-- **A11y modes:** capture `prefers-contrast: more`,
-  `prefers-reduced-transparency`, and `forced-colors` via
-  `emulateMedia` — these are routinely unstyled.
+- **A11y modes:** drive `colorScheme`, `contrast: "more"`,
+  `reducedMotion: "reduce"`, and `forcedColors: "active"` through
+  `emulateMedia` (these are the options it actually supports) — they are
+  routinely unstyled. `prefers-reduced-transparency` has no `emulateMedia`
+  switch yet, so verify that one in code / manually.
 - **Anti-patterns that look wrong but are correct:** intentional
   translucency/blur (glass), deliberately muted "coming soon" controls,
   brand-specific spacing. Confirm against tokens/design intent before
