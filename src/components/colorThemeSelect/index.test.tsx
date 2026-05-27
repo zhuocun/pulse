@@ -49,7 +49,7 @@ describe("ColorThemeSelect", () => {
         renderSelect();
         // AntD Segmented renders each option as a radio in the
         // accessible tree.
-        for (const name of ["Orange", "Sky", "Emerald"]) {
+        for (const name of ["Orange", "Blue", "Emerald"]) {
             expect(screen.getByRole("radio", { name })).toBeInTheDocument();
         }
     });
@@ -68,8 +68,8 @@ describe("ColorThemeSelect", () => {
         const { store } = renderSelect("orange");
         // The Segmented input has pointer-events: none, so fireEvent is
         // required to bypass it (mirrors the GlassIntensitySelect test).
-        fireEvent.click(screen.getByRole("radio", { name: "Sky" }));
-        expect(store.getState().userPreferences.colorTheme).toBe("sky");
+        fireEvent.click(screen.getByRole("radio", { name: "Blue" }));
+        expect(store.getState().userPreferences.colorTheme).toBe("blue");
     });
 
     it("dispatches setColorTheme back to orange (the default)", () => {

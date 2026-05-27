@@ -75,11 +75,11 @@ describe("usePaletteTheme", () => {
     it("creates the style element when absent and renders the palette CSS", () => {
         expect(styleEl()).toBeNull();
         renderHook(() => usePaletteTheme(), {
-            wrapper: wrapperFor(makeStore("sky"))
+            wrapper: wrapperFor(makeStore("blue"))
         });
         const el = styleEl();
         expect(el).not.toBeNull();
-        expect(el?.textContent).toBe(paletteToCss(getPalette("sky")));
+        expect(el?.textContent).toBe(paletteToCss(getPalette("blue")));
     });
 
     it("replaces an existing seeded element's content in place (no duplicate)", () => {
@@ -90,12 +90,12 @@ describe("usePaletteTheme", () => {
         document.head.appendChild(seed);
 
         renderHook(() => usePaletteTheme(), {
-            wrapper: wrapperFor(makeStore("sky"))
+            wrapper: wrapperFor(makeStore("blue"))
         });
         // Exactly one element with the id — the seed was reused, not
         // duplicated.
         expect(document.querySelectorAll(`#${STYLE_ID}`)).toHaveLength(1);
-        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("sky")));
+        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("blue")));
     });
 
     it("re-renders the CSS when the preference dispatches a new value", () => {
@@ -104,9 +104,9 @@ describe("usePaletteTheme", () => {
             wrapper: wrapperFor(store)
         });
         expect(result.current.name).toBe("orange");
-        act(() => store.dispatch(userPreferencesActions.setColorTheme("sky")));
-        expect(result.current.name).toBe("sky");
-        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("sky")));
+        act(() => store.dispatch(userPreferencesActions.setColorTheme("blue")));
+        expect(result.current.name).toBe("blue");
+        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("blue")));
     });
 
     it("restores the orange default on unmount (does not strand the app)", () => {
