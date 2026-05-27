@@ -85,9 +85,8 @@ describe("isMacLike", () => {
 
     it("falls back to navigator.userAgent when platform is empty (iOS 17+ quirk)", () => {
         // Post-iOS-17 iPhone Safari has been observed to report an
-        // empty `navigator.platform`. Without the UA fallback the
-        // post-login flow would skip the iOS-specific `nativeNavigate`
-        // and stay on the still-mounted login form.
+        // empty `navigator.platform`. Without the UA fallback iPhone
+        // would be mis-classified as non-Mac-like.
         setUserAgentData(undefined);
         setPlatform("");
         setUserAgent(

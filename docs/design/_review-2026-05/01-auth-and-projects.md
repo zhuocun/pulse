@@ -341,14 +341,13 @@
   ```
   Then `stopPropagation` (`projectCard.tsx:287, 314, 432, 448`) and the inline `<button>` styling can all go.
 
-### F-24 — `ProjectCard` calls `nativeNavigate(\`/projects/${project._id}\`)` for the title link (`:374`) — a full document navigation that drops SPA state, but the more menu items use AntD's normal click handler
+### F-24 — `ProjectCard` title link forced a full document navigation that dropped SPA state, but the more menu items use AntD's normal click handler — RESOLVED
 
-- **Surface:** `src/components/projectCard/index.tsx:354-376, 124-128`
+- **Surface:** `src/components/projectCard/index.tsx`
 - **Severity:** Low (carried-over scar)
 - **Type:** bug / mobile
-- **Evidence:** The comment at `:114-128` explains the iOS Safari URL-state-propagation failure that motivated this. But it's a scar from before URL-state-overlays were moved to Redux per PR #226 (visible in `useProjectModal.ts:13-17`). Now that overlays live in Redux, the "context-propagation failure" no longer applies — React Router navigation should work again.
-- **Why it matters:** Full document reload loses React Query cache, mounts the entire app shell again, and is the slowest possible mobile path. View-Transitions don't apply (full reload). The decision to bypass Router for the highest-frequency action on this page (clicking a project to open its board) is costly.
-- **Proposed fix:** Re-try `navigate(\`/projects/${id}\`, { viewTransition: true })` after the Redux migration; the bug it worked around no longer exists. Keep `nativeNavigate` as a fallback for the specific iOS standalone PWA `target="_blank"` case (per `mobile-native-best-practices.md` §"Standalone-mode link breakout").
+- **Resolution:** The title link now navigates client-side via `navigate(\`/projects/${id}\`, { viewTransition: true })`; the modifier-click guard keeps the anchor `href` so Cmd/Ctrl/Shift/middle-click still open the project in a new tab. The full-document-navigation helper and the "context-propagation failure" workaround it embodied have been removed entirely — the dependency tree has a single deduped `react-router` pair, so plain client-side navigation works.
+- **Why it had mattered:** A full document reload lost the React Query cache, remounted the entire app shell, and was the slowest possible mobile path for the highest-frequency action on this page (clicking a project to open its board). View Transitions now apply.
 
 ### F-25 — `EmptyState` Container is `role="status"`, which is an ARIA live region — its CTA buttons get announced as part of the status update
 

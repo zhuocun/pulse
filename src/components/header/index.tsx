@@ -8,7 +8,7 @@ import {
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
@@ -16,7 +16,6 @@ import { breakpoints, radius, space } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
-import nativeNavigate from "../../utils/nativeNavigate";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
@@ -543,6 +542,7 @@ const Header: React.FC = () => {
     } = useAiEnabled();
     const { scheme, setPreference } = useColorScheme();
     const path = useLocation().pathname;
+    const navigate = useNavigate();
     /*
      * Phase 4.3 — activity feed. The bell icon is always visible
      * (including phone chrome) so notifications stay reachable without
@@ -660,7 +660,10 @@ const Header: React.FC = () => {
                     type="link"
                     onClick={
                         path !== "/projects"
-                            ? () => nativeNavigate("/projects")
+                            ? () =>
+                                  navigate("/projects", {
+                                      viewTransition: true
+                                  })
                             : undefined
                     }
                 >

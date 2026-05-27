@@ -12,28 +12,6 @@ import AppProviders from "../utils/appProviders";
 // when other suites are competing for the worker pool.
 jest.setTimeout(60000);
 
-/*
- * `nativeNavigate` calls `window.location.assign(...)` to force a real
- * browser document navigation in production. jsdom's `Location` is
- * non-configurable so the call is a no-op in tests — replace it with a
- * `history.pushState` so React Router still sees the URL change and
- * the integration assertions on `window.location.pathname` keep working.
- */
-jest.mock("../utils/nativeNavigate", () => ({
-    __esModule: true,
-    default: (url: string) => {
-        const g = globalThis as {
-            history?: History;
-            dispatchEvent?: (e: Event) => boolean;
-        };
-        g.history?.pushState({}, "", url);
-        // `pushState` doesn't fire `popstate` — synthesize one so React
-        // Router's history listener notices the URL changed and re-runs
-        // the routes.
-        g.dispatchEvent?.(new Event("popstate"));
-    }
-}));
-
 jest.mock("../constants/env", () => ({
     __esModule: true,
     default: {
@@ -423,14 +401,13 @@ describe("App integration (full providers + routes)", () => {
     }, 20000);
 
     /*
-     * Regression: BottomTabBar from board page (claude/fix-bottom-nav-board).
+     * Regression: BottomTabBar from board page.
      *
      * User report: clicking a bottom-tab on a coarse-pointer viewport
      * while the user is on `/projects/:projectId/board` updated the
-     * URL but the page stayed on the board until refresh. Same
-     * iOS Safari WebKit / Chrome Android purgatory `ProjectCard` and
-     * the brand logo already route around via `nativeNavigate`. The
-     * bar now mirrors that pattern.
+     * URL but the page stayed on the board until refresh. The bar now
+     * uses idiomatic react-router NavLink navigation, so the route
+     * swaps client-side and the new view renders without a refresh.
      */
     it("clicking a BottomTabBar tab from the board page navigates to the new view (mobile)", async () => {
         // Coarse pointer signals phone chrome — the bar mounts, the

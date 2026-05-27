@@ -8,8 +8,7 @@ import {
 import styled from "@emotion/styled";
 import { Button, Dropdown, MenuProps, Skeleton } from "antd";
 import React from "react";
-
-import nativeNavigate from "../../utils/nativeNavigate";
+import { useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
@@ -114,19 +113,10 @@ const TitleStack = styled.div`
 `;
 
 /*
- * Native `<a>` with an `onClick` that triggers a real browser
- * navigation via `window.location.assign(...)`. React Router's
- * `<Link>` and `useNavigate()` both updated the URL through
- * `history.pushState` without the `Routes` element re-rendering to
- * match on iOS Safari WebKit — same context-propagation failure
- * that broke overlay binding before we moved overlays off URL
- * state. A full document navigation bypasses Router entirely:
- * the browser fetches `index.html`, the app mounts fresh, and
- * React Router reads the URL on the first render. Slower than SPA
- * navigation, but the user actually gets to the board. The native
- * `href` is left in place so Cmd/Ctrl/Shift/middle-click open the
- * project in a new tab through the browser without going through
- * the imperative path at all.
+ * Native `<a>` whose primary-click is intercepted to navigate
+ * client-side via `useNavigate`. The real `href` is left in place so
+ * Cmd/Ctrl/Shift/middle-click open the project in a new tab through
+ * the browser.
  */
 const TitleLink = styled.a`
     color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
@@ -278,6 +268,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onEdit,
     onDelete
 }) => {
+    const navigate = useNavigate();
     // Per-result strength badge (P1-2). Null when no AI search is active.
     const strength = getAiSearchStrength("projects", project._id);
     /*
@@ -382,11 +373,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                         return;
                                     }
                                     event.preventDefault();
-                                    /*
-                                     * Force a real browser navigation — see
-                                     * `nativeNavigate.ts`.
-                                     */
-                                    nativeNavigate(`/projects/${project._id}`);
+                                    navigate(`/projects/${project._id}`, {
+                                        viewTransition: true
+                                    });
                                 }}
                             >
                                 {project.projectName}

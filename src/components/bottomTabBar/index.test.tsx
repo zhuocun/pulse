@@ -1,28 +1,21 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
-import nativeNavigate from "../../utils/nativeNavigate";
 
 import BottomTabBar from ".";
 
 /*
- * `nativeNavigate` calls `window.location.assign(...)` in production
- * (no-op in jsdom). Mock to a spy so we can assert the URL the bar
- * forwards to the document-navigation hatch. The BottomTabBar routes
- * through `nativeNavigate` to bypass the iOS Safari WebKit / Chrome
- * Android "URL changed, page didn't navigate" purgatory (see
- * `src/utils/nativeNavigate.ts`).
+ * Probe component that surfaces the current pathname into the DOM so
+ * the navigation tests can assert that clicking a tab performs a real
+ * client-side route change (no document reload — the bar uses idiomatic
+ * react-router NavLink navigation).
  */
-jest.mock("../../utils/nativeNavigate", () => ({
-    __esModule: true,
-    default: jest.fn()
-}));
-
-const mockedNativeNavigate = nativeNavigate as jest.MockedFunction<
-    typeof nativeNavigate
->;
+const LocationProbe: React.FC = () => {
+    const { pathname } = useLocation();
+    return <div data-testid="loc">{pathname}</div>;
+};
 
 const renderBar = (initialPath = "/projects") =>
     render(
@@ -34,6 +27,7 @@ const renderBar = (initialPath = "/projects") =>
                         <>
                             <BottomTabBar />
                             <main>page body</main>
+                            <LocationProbe />
                         </>
                     }
                 />
@@ -77,10 +71,6 @@ describe("BottomTabBar", () => {
         window,
         "visualViewport"
     );
-
-    beforeEach(() => {
-        mockedNativeNavigate.mockReset();
-    });
 
     afterEach(() => {
         // Restore the window dimensions / viewport so keyboard-state
@@ -211,8 +201,8 @@ describe("BottomTabBar", () => {
             });
             await user.click(search);
             expect(handler).toHaveBeenCalledTimes(1);
-            // It's an action tab — must never route through nativeNavigate.
-            expect(mockedNativeNavigate).not.toHaveBeenCalled();
+            // It's an action tab — it must never navigate.
+            expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
             window.removeEventListener("commandPalette:open", handler);
         });
 
@@ -309,64 +299,69 @@ describe("BottomTabBar", () => {
         });
     });
 
-    it("clicking a tab forces a real document navigation to the target route", async () => {
+    it("clicking a tab performs a client-side route change to the target route", async () => {
         const user = userEvent.setup();
         renderBar("/projects");
+        expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
         const inbox = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.inbox, "i")
         });
         await user.click(inbox);
-        expect(mockedNativeNavigate).toHaveBeenCalledWith("/inbox");
-        expect(mockedNativeNavigate).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("loc")).toHaveTextContent("/inbox");
     });
 
-    it("does not force a navigation when the user clicks the active tab", async () => {
+    it("leaves the pathname unchanged when the user clicks the active tab", async () => {
         const user = userEvent.setup();
         renderBar("/inbox");
         const inbox = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.inbox, "i")
         });
         await user.click(inbox);
-        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("loc")).toHaveTextContent("/inbox");
     });
 
-    it("treats nested /projects routes as the active Boards tab (no-op click)", async () => {
+    it("pops to the Boards root (/projects) when its active tab is tapped from a nested /projects/:id/board route", async () => {
+        // The Boards tab uses `end={false}`, so it reads as active on a
+        // nested board route — but its destination is the `/projects`
+        // root. Tapping it pops back to that root (iOS "re-tap selected
+        // tab → pop to root" behaviour) via idiomatic NavLink navigation.
         const user = userEvent.setup();
         renderBar("/projects/p1/board");
         const boards = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.boards, "i")
         });
         await user.click(boards);
-        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
     });
 
-    it("forces navigation from a nested /projects route to a sibling tab (board page bug fix)", async () => {
+    it("navigates from a nested /projects route to a sibling tab (board page bug fix)", async () => {
         const user = userEvent.setup();
         // The reported bug: clicking a BottomTabBar tab from
         // `/projects/:projectId/board` updated the URL but the page
-        // stayed on the board until refresh. The fix routes through
-        // `nativeNavigate` so the document reloads against the new URL.
+        // stayed on the board until refresh. The bar now uses idiomatic
+        // NavLink navigation, so the route swaps client-side.
         renderBar("/projects/p1/board");
         const inbox = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.inbox, "i")
         });
         await user.click(inbox);
-        expect(mockedNativeNavigate).toHaveBeenCalledWith("/inbox");
+        expect(screen.getByTestId("loc")).toHaveTextContent("/inbox");
     });
 
-    it("lets modifier-clicks fall through to the anchor href (new-tab affordance)", () => {
+    it("lets modifier-clicks fall through to the anchor href without navigating", () => {
         renderBar("/projects");
         const inbox = screen.getByRole("link", {
             name: new RegExp(microcopy.nav.tabs.inbox, "i")
         });
         // userEvent doesn't expose modifier-state on click, but
-        // fireEvent does. Cmd/Ctrl-click must not call nativeNavigate.
+        // fireEvent does. Cmd/Ctrl/Shift-click must let the browser open
+        // the href in a new tab rather than swap the SPA route.
         fireEvent.click(inbox, { metaKey: true });
-        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
         fireEvent.click(inbox, { ctrlKey: true });
-        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
         fireEvent.click(inbox, { shiftKey: true });
-        expect(mockedNativeNavigate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("loc")).toHaveTextContent("/projects");
     });
 
     it("keeps the rendered anchor href so middle-click and copy-link still work", () => {
@@ -376,8 +371,7 @@ describe("BottomTabBar", () => {
         });
         // NavLink resolves `to` to an `href` attribute on the anchor.
         // Verify it matches the tab's destination so right-click "Copy
-        // link" and middle-click "Open in new tab" work without
-        // round-tripping through `nativeNavigate`.
+        // link" and middle-click "Open in new tab" work.
         expect(inbox).toHaveAttribute("href", "/inbox");
     });
 
@@ -744,9 +738,9 @@ describe("BottomTabBar", () => {
                 name: new RegExp(microcopy.nav.tabs.inbox, "i")
             });
             await user.click(inbox);
-            // Same-tab click is a no-op — no haptic, no navigation.
+            // Same-tab click is a no-op — no haptic, pathname unchanged.
             expect(vibrate).not.toHaveBeenCalled();
-            expect(mockedNativeNavigate).not.toHaveBeenCalled();
+            expect(screen.getByTestId("loc")).toHaveTextContent("/inbox");
         });
 
         it("does NOT fire haptic on modifier-clicks (new-tab affordance)", () => {

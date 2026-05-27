@@ -25,7 +25,6 @@ import {
 import useHaptic from "../../utils/hooks/useHaptic";
 import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
 import useScrollDirection from "../../utils/hooks/useScrollDirection";
-import nativeNavigate from "../../utils/nativeNavigate";
 
 /**
  * BottomTabBar — Phase 6 Wave 2 floating capsule refactor.
@@ -561,17 +560,9 @@ const TabLabel = styled.span<{ $minimized: boolean }>`
 `;
 
 /*
- * Same iOS Safari WebKit / Chrome Android "URL changed, page didn't
- * navigate" purgatory that bites `ProjectCard.TitleLink` and the brand
- * logo (see `nativeNavigate.ts`). React Router's context propagation
- * fails on those engines when the click originates from a subtree
- * loaded under deep providers (board page, with the DnD context + AI
- * drawers + multiple `useUrl` instances mounted). The address bar
- * updates via `pushState` but `Routes` never re-renders — refreshing
- * the page resolves it because the React tree mounts fresh against
- * the new URL. We mirror the project-card pattern: keep the anchor
- * `href` for accessibility + middle-/modifier-click, but intercept the
- * primary click and force a real document navigation.
+ * Gate the haptic to a primary (unmodified left) click. Modifier /
+ * middle clicks fall through to the browser opening a new tab, so they
+ * shouldn't buzz.
  */
 const isPrimaryClick = (event: React.MouseEvent<HTMLAnchorElement>): boolean =>
     !event.metaKey &&
@@ -761,22 +752,20 @@ const BottomTabBar: React.FC = () => {
                         key={tab.to}
                         end={tab.end}
                         onClick={(event) => {
-                            // Leave the active tab a no-op; let
-                            // modifier-clicks open in a new tab via the
-                            // anchor `href`.
+                            // Haptic ONLY when navigation will actually
+                            // happen — re-tapping the current tab is
+                            // intentionally silent (matches iOS), and
+                            // modifier-clicks fall through to the browser
+                            // opening a new tab via the anchor `href`.
                             if (isActive || !isPrimaryClick(event)) return;
-                            event.preventDefault();
-                            // Haptic ONLY when the destination actually
-                            // changes — re-tapping the current tab is
-                            // intentionally silent (matches iOS).
                             vibrate("tap");
-                            nativeNavigate(tab.to);
                         }}
                         ref={(node: HTMLAnchorElement | null) => {
                             tabsRef.current[idx] = node as HTMLElement;
                         }}
                         style={viewTransitionStyle}
                         to={tab.to}
+                        viewTransition
                     >
                         {body}
                     </TabLink>

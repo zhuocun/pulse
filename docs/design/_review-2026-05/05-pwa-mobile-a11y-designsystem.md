@@ -164,7 +164,7 @@ The mobile-native doc §A explicitly says: *"For custom install prompts, capture
 - **Area:** PWA / iOS
 - **Severity:** Medium (visible jank)
 - **Type:** Correctness
-- **Evidence:** `src/components/projectCard/index.tsx:129` (`<TitleLink as a real <a> for SPA-bypass`), `src/components/header/index.tsx:438` (`BrandLink` uses `nativeNavigate`), `src/utils/nativeNavigate.ts` (full-page navigation).
+- **Evidence:** `src/components/projectCard/index.tsx` (`TitleLink` is a real `<a>`), `src/components/header/index.tsx` (`BrandLink` is a real `<a>`). Both now intercept the primary click for client-side navigation while keeping the `href` for modifier-click new-tab.
 
 The mobile-native doc §3 calls this out: *"Standalone-mode link breakout: tapping any `<a>` with `target="_blank"` or different origin in iOS standalone PWA jumps the user back to Safari (intercept clicks; check `window.navigator.standalone`)."* Pulse has zero `target="_blank"` triggers in the audited scope, but the policy isn't codified — any future external link in chat / brief would silently break out.
 
