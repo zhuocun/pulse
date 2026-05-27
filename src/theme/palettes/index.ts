@@ -1,7 +1,7 @@
 /**
  * Palette registry + active-palette default.
  *
- * The app ships six contrast-verified palettes. ONE of them (orange) is the
+ * The app ships three contrast-verified palettes. ONE of them (orange) is the
  * module-load default exported as `palette` — the synchronous CSS-var
  * injection in `index.tsx`, the literal fallbacks in `tokens.ts` /
  * `aiTokens.ts`, and the default `buildAntdTheme` argument all read it so the
@@ -21,12 +21,10 @@
  * breakage in every downstream consumer). See the cycle docblock in
  * `cssVars.ts`.
  */
-import { cyanPalette } from "./cyan";
 import { emeraldPalette } from "./emerald";
-import { indigoPalette } from "./indigo";
 import { orangePalette } from "./orange";
-import { rosePalette } from "./rose";
-import { violetPalette } from "./violet";
+import { skyPalette } from "./sky";
+import type { Palette } from "./types";
 
 export { paletteToCss } from "./cssVars";
 export { orangePalette as palette } from "./orange";
@@ -42,16 +40,12 @@ export const defaultPaletteName = "orange" as const;
 
 /**
  * The registry — insertion order IS the display order in the settings picker
- * (orange, rose, violet, indigo, cyan, emerald). The key is the persisted
- * `colorTheme` value; the value is the palette object the runtime resolver
- * and AntD builder consume.
+ * (orange, sky, emerald). The key is the persisted `colorTheme` value; the
+ * value is the palette object the runtime resolver and AntD builder consume.
  */
 export const paletteRegistry = {
     orange: orangePalette,
-    rose: rosePalette,
-    violet: violetPalette,
-    indigo: indigoPalette,
-    cyan: cyanPalette,
+    sky: skyPalette,
     emerald: emeraldPalette
 } as const;
 
@@ -66,5 +60,3 @@ export const paletteNames = Object.keys(paletteRegistry) as PaletteName[];
  */
 export const getPalette = (name: string): Palette =>
     paletteRegistry[name as PaletteName] ?? orangePalette;
-
-import type { Palette } from "./types";

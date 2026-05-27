@@ -320,14 +320,7 @@ describe("userPreferences persistence", () => {
      */
     it("setColorTheme flips through every shipped palette", () => {
         let state = initialState;
-        for (const next of [
-            "rose",
-            "violet",
-            "indigo",
-            "cyan",
-            "emerald",
-            "orange"
-        ] as const) {
+        for (const next of ["sky", "emerald", "orange"] as const) {
             state = userPreferencesSlice.reducer(
                 state,
                 userPreferencesActions.setColorTheme(next)
@@ -345,14 +338,14 @@ describe("userPreferences persistence", () => {
                 projectListDefaults: null,
                 glassIntensity: "auto",
                 glassIntensityVersion: 1,
-                colorTheme: "violet"
+                colorTheme: "sky"
             }
         };
         window.localStorage.setItem(
             USER_PREFERENCES_STORAGE_KEY,
             JSON.stringify(stored)
         );
-        expect(loadPersistedUserPreferences().colorTheme).toBe("violet");
+        expect(loadPersistedUserPreferences().colorTheme).toBe("sky");
     });
 
     it("falls back to orange for a legacy blob with no colorTheme field", () => {
