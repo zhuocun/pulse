@@ -17,6 +17,7 @@
  */
 import { emeraldPalette } from "./emerald";
 import { orangePalette } from "./orange";
+import { skyPalette } from "./sky";
 import type { Palette } from "./types";
 
 const RGB_TRIPLET = /^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/;
@@ -24,7 +25,8 @@ const HEX_COLOR = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
 
 const palettes: ReadonlyArray<[string, Palette]> = [
     ["emerald", emeraldPalette],
-    ["orange", orangePalette]
+    ["orange", orangePalette],
+    ["sky", skyPalette]
 ];
 
 describe.each(palettes)("palette: %s", (name, palette) => {

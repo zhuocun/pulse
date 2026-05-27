@@ -107,16 +107,13 @@ describe("SettingsPage", () => {
         expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();
     });
 
-    it("renders the six-palette color-theme picker", () => {
+    it("renders the three-palette color-theme picker", () => {
         renderPage();
         const row = screen.getByTestId("settings-row-color-theme");
         // The picker is a Segmented with one radio per shipped palette.
         for (const name of [
             microcopy.settings.colorThemeOrange,
-            microcopy.settings.colorThemeRose,
-            microcopy.settings.colorThemeViolet,
-            microcopy.settings.colorThemeIndigo,
-            microcopy.settings.colorThemeCyan,
+            microcopy.settings.colorThemeSky,
             microcopy.settings.colorThemeEmerald
         ]) {
             expect(

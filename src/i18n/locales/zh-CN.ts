@@ -205,10 +205,7 @@ const zhCN: Dictionary = {
         colorTheme: "配色",
         changeColorTheme: "切换配色",
         colorThemeOrange: "橙色",
-        colorThemeRose: "玫红",
-        colorThemeViolet: "紫罗兰",
-        colorThemeIndigo: "靛蓝",
-        colorThemeCyan: "青色",
+        colorThemeSky: "天蓝",
         colorThemeEmerald: "翡翠绿",
         sections: {
             appearance: {

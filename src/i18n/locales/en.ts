@@ -215,10 +215,7 @@ export const enSource = {
         colorTheme: "Color theme",
         changeColorTheme: "Change color theme",
         colorThemeOrange: "Orange",
-        colorThemeRose: "Rose",
-        colorThemeViolet: "Violet",
-        colorThemeIndigo: "Indigo",
-        colorThemeCyan: "Cyan",
+        colorThemeSky: "Sky",
         colorThemeEmerald: "Emerald",
         sections: {
             appearance: {

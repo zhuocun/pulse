@@ -75,11 +75,11 @@ describe("usePaletteTheme", () => {
     it("creates the style element when absent and renders the palette CSS", () => {
         expect(styleEl()).toBeNull();
         renderHook(() => usePaletteTheme(), {
-            wrapper: wrapperFor(makeStore("violet"))
+            wrapper: wrapperFor(makeStore("sky"))
         });
         const el = styleEl();
         expect(el).not.toBeNull();
-        expect(el?.textContent).toBe(paletteToCss(getPalette("violet")));
+        expect(el?.textContent).toBe(paletteToCss(getPalette("sky")));
     });
 
     it("replaces an existing seeded element's content in place (no duplicate)", () => {
@@ -90,12 +90,12 @@ describe("usePaletteTheme", () => {
         document.head.appendChild(seed);
 
         renderHook(() => usePaletteTheme(), {
-            wrapper: wrapperFor(makeStore("rose"))
+            wrapper: wrapperFor(makeStore("sky"))
         });
         // Exactly one element with the id — the seed was reused, not
         // duplicated.
         expect(document.querySelectorAll(`#${STYLE_ID}`)).toHaveLength(1);
-        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("rose")));
+        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("sky")));
     });
 
     it("re-renders the CSS when the preference dispatches a new value", () => {
@@ -104,18 +104,18 @@ describe("usePaletteTheme", () => {
             wrapper: wrapperFor(store)
         });
         expect(result.current.name).toBe("orange");
-        act(() =>
-            store.dispatch(userPreferencesActions.setColorTheme("indigo"))
-        );
-        expect(result.current.name).toBe("indigo");
-        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("indigo")));
+        act(() => store.dispatch(userPreferencesActions.setColorTheme("sky")));
+        expect(result.current.name).toBe("sky");
+        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("sky")));
     });
 
     it("restores the orange default on unmount (does not strand the app)", () => {
         const { unmount } = renderHook(() => usePaletteTheme(), {
-            wrapper: wrapperFor(makeStore("cyan"))
+            wrapper: wrapperFor(makeStore("emerald"))
         });
-        expect(styleEl()?.textContent).toBe(paletteToCss(getPalette("cyan")));
+        expect(styleEl()?.textContent).toBe(
+            paletteToCss(getPalette("emerald"))
+        );
         unmount();
         // Cleanup restores the default rather than deleting the element so
         // the whole app's colour identity stays intact.
