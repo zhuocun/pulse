@@ -5,6 +5,7 @@ import {
     MoonOutlined,
     SunOutlined
 } from "@ant-design/icons";
+import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +13,17 @@ import { useLocation, useNavigate } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, radius, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    easing,
+    fontSize,
+    fontWeight,
+    letterSpacing,
+    lineHeight,
+    motion,
+    radius,
+    space
+} from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -26,6 +37,21 @@ import GlassIntensitySelect from "../glassIntensitySelect";
 import LanguageSwitcher from "../languageSwitcher";
 import { NoPaddingButton } from "../projectList";
 import UserAvatar from "../userAvatar";
+
+/**
+ * Resolves the current top-level route to the contextual title shown in the
+ * centered phone-chrome navigation bar. Board / project-detail routes return
+ * `null` because they render their own breadcrumb sub-header — surfacing a
+ * title here too would duplicate it.
+ */
+export const resolveMobileHeaderTitle = (path: string): string | null => {
+    if (path === "/projects") return microcopy.nav.tabs.boards;
+    if (path.startsWith("/projects/")) return null;
+    if (path.startsWith("/inbox")) return microcopy.nav.tabs.inbox;
+    if (path.startsWith("/copilot")) return microcopy.nav.tabs.copilot;
+    if (path.startsWith("/settings")) return microcopy.settings.pageTitle;
+    return null;
+};
 
 const PageHeader = styled.header`
     /* Icons centred vertically inside the chrome (align-items: center)
@@ -225,7 +251,7 @@ const PageHeader = styled.header`
     }
 `;
 
-const LeftCluster = styled.div`
+const LeftCluster = styled.div<{ $centered?: boolean }>`
     align-items: center;
     display: flex;
     flex: 1 1 auto;
@@ -235,9 +261,11 @@ const LeftCluster = styled.div`
     @media (min-width: ${breakpoints.md}px) {
         gap: ${space.md}px;
     }
+
+    ${(props) => (props.$centered ? "flex: 1 1 0;" : "")}
 `;
 
-const RightCluster = styled.div`
+const RightCluster = styled.div<{ $centered?: boolean }>`
     align-items: center;
     display: flex;
     flex: 0 0 auto;
@@ -245,6 +273,53 @@ const RightCluster = styled.div`
 
     @media (min-width: ${breakpoints.md}px) {
         gap: ${space.xs}px;
+    }
+
+    ${(props) =>
+        props.$centered ? "flex: 1 1 0; justify-content: flex-end;" : ""}
+`;
+
+const titleEnter = keyframes`
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+
+/**
+ * Centered contextual title third (phone chrome only). Sits between the two
+ * flex clusters; with all three children at `flex: 1 1 0` the middle third is
+ * truly centered in the bar regardless of differing left/right widths.
+ * Non-interactive — `pointer-events: none` so taps fall through to whatever
+ * sits behind it.
+ */
+const CenterTitle = styled.div`
+    align-items: center;
+    display: flex;
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    pointer-events: none;
+`;
+
+const CenterTitleText = styled.span`
+    color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
+    font-size: ${fontSize.md}px;
+    font-weight: ${fontWeight.semibold};
+    line-height: ${lineHeight.tight};
+    letter-spacing: ${letterSpacing.tight};
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    animation: ${titleEnter} ${motion.medium}ms ${easing.standard};
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
     }
 `;
 
@@ -563,6 +638,14 @@ const Header: React.FC = () => {
     const isPhoneChrome = useIsPhoneChrome();
     const rightClusterHidden = environment.bottomNavEnabled && isPhoneChrome;
     /*
+     * iOS-26-style centered contextual title — phone chrome only. Suppressed
+     * on board / project-detail routes (they own their breadcrumb sub-header)
+     * and on desktop. When present, the title shifts the clusters to equal
+     * flex thirds so it centers truly between them.
+     */
+    const mobileTitle = isPhoneChrome ? resolveMobileHeaderTitle(path) : null;
+    const titleCentered = mobileTitle !== null;
+    /*
      * Publish the rendered header height to a global CSS custom property
      * so secondary sticky chrome (e.g. the project detail page's
      * breadcrumb / tabs row) can stick at `top: var(--header-height)`
@@ -653,7 +736,7 @@ const Header: React.FC = () => {
 
     return (
         <PageHeader data-glass-context="true" ref={headerRef}>
-            <LeftCluster>
+            <LeftCluster $centered={titleCentered}>
                 <BrandLink
                     aria-label={microcopy.header.logoLabel}
                     title={microcopy.header.logoLabel}
@@ -670,7 +753,14 @@ const Header: React.FC = () => {
                     <BrandMark size="sm" />
                 </BrandLink>
             </LeftCluster>
-            <RightCluster>
+            {mobileTitle !== null && (
+                <CenterTitle>
+                    <CenterTitleText key={mobileTitle}>
+                        {mobileTitle}
+                    </CenterTitleText>
+                </CenterTitle>
+            )}
+            <RightCluster $centered={titleCentered}>
                 {environment.aiEnabled && (
                     <HiddenOnNarrow>
                         <EngineModeTag />

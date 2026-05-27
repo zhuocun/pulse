@@ -20,7 +20,7 @@ import { __resetActivityFeedUndoCallbacksForTests } from "../../utils/hooks/useA
 
 import { microcopy } from "../../constants/microcopy";
 
-import Header from ".";
+import Header, { resolveMobileHeaderTitle } from ".";
 
 jest.mock("../../assets/logo-software.svg?react", () => {
     const React = require("react");
@@ -606,6 +606,84 @@ describe("Header", () => {
             renderHeader();
             expect(
                 screen.queryByTestId("activity-feed-bell")
+            ).not.toBeInTheDocument();
+        });
+    });
+
+    /*
+     * iOS-26-style centered contextual title (phone chrome only). The title
+     * resolver is a pure function exported from the header module; the
+     * rendered cases gate on the shared `useIsPhoneChrome` predicate, which
+     * reads `window.matchMedia('(pointer: coarse)')` — the same coarse-pointer
+     * mock the phone-demotion suite uses.
+     */
+    describe("centered contextual title (phone chrome)", () => {
+        const installCoarsePointer = () => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: (query: string) => ({
+                    addEventListener: jest.fn(),
+                    addListener: jest.fn(),
+                    dispatchEvent: jest.fn(),
+                    matches: query === "(pointer: coarse)",
+                    media: query,
+                    onchange: null,
+                    removeEventListener: jest.fn(),
+                    removeListener: jest.fn()
+                })
+            });
+        };
+
+        afterEach(() => {
+            installAntdBrowserMocks();
+        });
+
+        it("resolves the top-level route to its contextual title", () => {
+            expect(resolveMobileHeaderTitle("/projects")).toBe(
+                microcopy.nav.tabs.boards
+            );
+            expect(
+                resolveMobileHeaderTitle("/projects/abc123/board")
+            ).toBeNull();
+            expect(
+                resolveMobileHeaderTitle("/projects/abc/reports")
+            ).toBeNull();
+            expect(resolveMobileHeaderTitle("/inbox")).toBe(
+                microcopy.nav.tabs.inbox
+            );
+            expect(resolveMobileHeaderTitle("/copilot")).toBe(
+                microcopy.nav.tabs.copilot
+            );
+            expect(resolveMobileHeaderTitle("/settings")).toBe(
+                microcopy.settings.pageTitle
+            );
+            expect(resolveMobileHeaderTitle("/anything-else")).toBeNull();
+        });
+
+        it("renders the contextual title in phone chrome on a top-level route", () => {
+            installCoarsePointer();
+            renderHeader("/projects");
+            expect(
+                screen.getByText(microcopy.nav.tabs.boards)
+            ).toBeInTheDocument();
+        });
+
+        it("suppresses the contextual title on board / project-detail routes", () => {
+            installCoarsePointer();
+            renderHeader("/projects/p1/board");
+            // `resolveMobileHeaderTitle` returns null for board routes, so the
+            // resolved "Boards" string must not surface as the centered title.
+            expect(
+                screen.queryByText(microcopy.nav.tabs.boards)
+            ).not.toBeInTheDocument();
+        });
+
+        it("does not render the contextual title on desktop chrome", () => {
+            // Default mocks report a fine pointer, so `useIsPhoneChrome` is
+            // false and the title third never mounts.
+            renderHeader("/projects");
+            expect(
+                screen.queryByText(microcopy.nav.tabs.boards)
             ).not.toBeInTheDocument();
         });
     });
