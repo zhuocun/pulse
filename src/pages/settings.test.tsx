@@ -113,7 +113,7 @@ describe("SettingsPage", () => {
         // The picker is a Segmented with one radio per shipped palette.
         for (const name of [
             microcopy.settings.colorThemeOrange,
-            microcopy.settings.colorThemeSky,
+            microcopy.settings.colorThemeBlue,
             microcopy.settings.colorThemeEmerald
         ]) {
             expect(

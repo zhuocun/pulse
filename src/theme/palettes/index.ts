@@ -21,9 +21,9 @@
  * breakage in every downstream consumer). See the cycle docblock in
  * `cssVars.ts`.
  */
+import { bluePalette } from "./blue";
 import { emeraldPalette } from "./emerald";
 import { orangePalette } from "./orange";
-import { skyPalette } from "./sky";
 import type { Palette } from "./types";
 
 export { paletteToCss } from "./cssVars";
@@ -40,12 +40,12 @@ export const defaultPaletteName = "orange" as const;
 
 /**
  * The registry — insertion order IS the display order in the settings picker
- * (orange, sky, emerald). The key is the persisted `colorTheme` value; the
+ * (orange, blue, emerald). The key is the persisted `colorTheme` value; the
  * value is the palette object the runtime resolver and AntD builder consume.
  */
 export const paletteRegistry = {
     orange: orangePalette,
-    sky: skyPalette,
+    blue: bluePalette,
     emerald: emeraldPalette
 } as const;
 

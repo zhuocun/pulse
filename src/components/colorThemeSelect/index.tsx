@@ -107,7 +107,7 @@ const LABEL_KEYS: Record<
     keyof typeof microcopy.settings
 > = {
     orange: "colorThemeOrange",
-    sky: "colorThemeSky",
+    blue: "colorThemeBlue",
     emerald: "colorThemeEmerald"
 };
 
