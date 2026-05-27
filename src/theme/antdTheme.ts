@@ -1,10 +1,9 @@
 import { theme as antdTheme, ThemeConfig } from "antd";
 
-import { palette } from "./palettes";
+import { palette, type Palette } from "./palettes";
 import {
     accent,
     aurora,
-    brand,
     fontFamily,
     fontSize,
     fontWeight,
@@ -23,26 +22,38 @@ import {
  * `algorithm` switches between light and dark; component overrides keep the
  * compact density (small controls, dense tables) without losing the
  * 24px minimum target size mandated by WCAG 2.5.8.
+ *
+ * `activePalette` is the user's chosen colour theme (resolved by
+ * `usePaletteTheme`), defaulting to the orange `palette`. AntD reads the
+ * Palette OBJECT directly — NOT the `var(--pulse-*)` tokens in `tokens.ts`
+ * — because AntD derives every shade (hover, active, bg, border) from a
+ * single real `colorPrimary` hex algorithmically; a CSS `var()` would
+ * leave those derivations stuck on the literal string. Threading the
+ * palette object here is what makes the AntD component surface re-color in
+ * lockstep with the styled-component surface when the user switches theme.
  */
 export const buildAntdTheme = (
     mode: "light" | "dark",
-    coarsePointer = false
+    coarsePointer = false,
+    activePalette: Palette = palette
 ): ThemeConfig => ({
     algorithm:
         mode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     cssVar: { key: "ant" },
     token: {
         // Brand. `colorPrimary` is the bright shade used for filled CTAs
-        // (white text on orange bg, plenty of contrast). Links override to
-        // `primaryHover` (a darker step) so orange link text on a white
-        // page still hits WCAG AA contrast (~4.74:1) for normal text.
-        colorPrimary: brand.primary,
-        colorPrimaryHover: brand.primaryHover,
-        colorPrimaryActive: brand.primaryActive,
-        colorLink: brand.primaryHover,
-        colorLinkHover: brand.primaryActive,
-        colorLinkActive: brand.primaryActive,
-        colorInfo: brand.primary,
+        // (white text on the brand bg, plenty of contrast). Links override
+        // to `primaryHover` (a darker step) so brand link text on a white
+        // page still hits WCAG AA contrast (~4.74:1) for normal text. Read
+        // straight off the active Palette so AntD's shade derivation tracks
+        // the user's chosen colour theme.
+        colorPrimary: activePalette.brand.primary,
+        colorPrimaryHover: activePalette.brand.primaryHover,
+        colorPrimaryActive: activePalette.brand.primaryActive,
+        colorLink: activePalette.brand.primaryHover,
+        colorLinkHover: activePalette.brand.primaryActive,
+        colorLinkActive: activePalette.brand.primaryActive,
+        colorInfo: activePalette.brand.primary,
 
         // Semantic
         colorSuccess: semantic.success,
@@ -89,8 +100,8 @@ export const buildAntdTheme = (
         controlOutlineWidth: 3,
         controlOutline:
             mode === "dark"
-                ? `rgba(${palette.accent.rgbDark}, 0.30)`
-                : `rgba(${palette.accent.rgb}, 0.22)`,
+                ? `rgba(${activePalette.accent.rgbDark}, 0.30)`
+                : `rgba(${activePalette.accent.rgb}, 0.22)`,
 
         // Motion
         motionDurationFast: `${motion.short}ms`,
@@ -149,8 +160,8 @@ export const buildAntdTheme = (
             borderRadius: radius.md,
             activeShadow: `0 0 0 3px ${
                 mode === "dark"
-                    ? `rgba(${palette.accent.rgbDark}, 0.30)`
-                    : `rgba(${palette.accent.rgb}, 0.20)`
+                    ? `rgba(${activePalette.accent.rgbDark}, 0.30)`
+                    : `rgba(${activePalette.accent.rgb}, 0.20)`
             }`
         },
         Select: {
@@ -169,8 +180,8 @@ export const buildAntdTheme = (
             headerSplitColor: "transparent",
             rowHoverBg:
                 mode === "dark"
-                    ? `rgba(${palette.accent.rgbDark}, 0.12)`
-                    : `rgba(${palette.accent.rgb}, 0.06)`,
+                    ? `rgba(${activePalette.accent.rgbDark}, 0.12)`
+                    : `rgba(${activePalette.accent.rgb}, 0.06)`,
             borderColor:
                 mode === "dark"
                     ? "rgba(255, 255, 255, 0.06)"
@@ -188,10 +199,10 @@ export const buildAntdTheme = (
                     : "rgba(15, 23, 42, 0.72)"
         },
         Tabs: {
-            inkBarColor: brand.primary,
-            itemActiveColor: brand.primary,
-            itemHoverColor: brand.primaryHover,
-            itemSelectedColor: brand.primary,
+            inkBarColor: activePalette.brand.primary,
+            itemActiveColor: activePalette.brand.primary,
+            itemHoverColor: activePalette.brand.primaryHover,
+            itemSelectedColor: activePalette.brand.primary,
             titleFontSize: fontSize.base
         },
         Tooltip: {
@@ -246,13 +257,19 @@ export const buildAntdTheme = (
 
 /**
  * Re-export the accent gradient as raw CSS so styled components can drop it
- * directly without re-importing the token module. Resolves to the
- * single-hue emerald gradient via the updated `accent` tokens.
+ * directly without re-importing the token module. Composes from the
+ * `accent.start` / `accent.end` tokens, which are `var(--pulse-accent-*)`
+ * references — so this gradient re-colors with the user's chosen theme too
+ * (its orange literals survive as the var fallbacks). Module-level (not a
+ * function of palette) because no flipping surface consumes it today; if
+ * one does, promote it to `(p: Palette) => …` then.
  */
 export const accentGradientCss = `linear-gradient(135deg, ${accent.start} 0%, ${accent.end} 100%)`;
 
 /**
- * Linear deep → mid emerald gradient. Used for buttons, badges, and the
+ * Linear deep → mid brand gradient. Used for buttons, badges, and the
  * sparkle icon when a single-stripe gradient fits better than a flat fill.
+ * Inherits `aurora.gradLine`'s `var(--pulse-aurora-*)` references so it
+ * follows the active colour theme.
  */
 export const auroraGradientCss = aurora.gradLine;

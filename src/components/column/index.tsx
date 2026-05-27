@@ -367,7 +367,8 @@ const CardFooter = styled.div`
 
 const TaskTypeBadge = styled.span<{ $isBug: boolean }>`
     align-items: center;
-    color: ${(p) => (p.$isBug ? "#DB2777" : "#EA580C")};
+    color: ${(p) =>
+        p.$isBug ? "#DB2777" : "var(--pulse-brand-primary, #EA580C)"};
     display: inline-flex;
     font-weight: ${fontWeight.medium};
     gap: ${space.xxs}px;

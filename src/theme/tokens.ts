@@ -131,32 +131,53 @@ export const letterSpacing = {
 } as const;
 
 /**
- * Brand surfaces — derived from the active palette. AA contrast on white
- * is enforced at the palette level, not here. To change the palette, edit
- * `palettes/index.ts` (one line); these tokens follow automatically.
+ * Brand surfaces. Each token is a `var(--pulse-brand-*, <orange literal>)`
+ * reference so the user's runtime colour-theme choice re-colors every
+ * styled-component that reads them (the resolver hook `usePaletteTheme`
+ * re-renders the `--pulse-*` vars into the `#pulse-theme-vars` style
+ * element). The literal fallback is the orange default so the very first
+ * paint — and any environment where the palette CSS is absent (SSR / a
+ * stripped test DOM) — keeps the historical brand. AA contrast on white
+ * is enforced at the palette level, not here.
+ *
+ * NOTE: AntD's `buildAntdTheme` does NOT read these — it takes the active
+ * Palette OBJECT and uses real hexes (AntD derives shades algorithmically
+ * and cannot consume `var()` here). These tokens feed the emotion /
+ * styled-component surface only.
  */
 export const brand = {
-    primary: palette.brand.primary,
-    primaryHover: palette.brand.primaryHover,
-    primaryActive: palette.brand.primaryActive,
-    primaryBg: palette.brand.primaryBg,
-    primaryBgDark: palette.brand.primaryBgDark
+    primary: `var(--pulse-brand-primary, ${palette.brand.primary})`,
+    primaryHover: `var(--pulse-brand-primary-hover, ${palette.brand.primaryHover})`,
+    primaryActive: `var(--pulse-brand-primary-active, ${palette.brand.primaryActive})`,
+    primaryBg: `var(--pulse-brand-primary-bg, ${palette.brand.primaryBg})`,
+    primaryBgDark: `var(--pulse-brand-primary-bg-dark, ${palette.brand.primaryBgDark})`
 } as const;
 
 /**
  * Accent gradient stops for AI surfaces (sparkle icon, badges, highlights).
  * The translucent `bg*` / `border` / `glow` variants are computed from the
  * palette's `rgb` triplet so a palette swap moves them all in one shot.
+ *
+ * The fields actually consumed by runtime styled-components (`start`,
+ * `end`, `bgStrong`, `border`, `bgMedium`, `bgSubtle`) are
+ * `var(--pulse-accent-*, <orange literal>)` references so the user's
+ * colour-theme choice re-colors them live — the cssVars renderer
+ * pre-composes the matching `--pulse-accent-*` vars at the SAME opacities
+ * (0.32 / 0.22 / 0.16 / 0.04) so orange is pixel-identical to today. The
+ * remaining derivatives (`glow`, `bgSoft`, `secondaryStrong`,
+ * `selectionBg`) have no live styled-component consumer, so they stay
+ * plain `rgba()` literals derived from the module-load palette — adding a
+ * matching CSS var would be dead bytes until something reads them.
  */
 export const accent = {
-    start: palette.accent.start,
-    end: palette.accent.end,
+    start: `var(--pulse-accent-start, ${palette.accent.start})`,
+    end: `var(--pulse-accent-end, ${palette.accent.end})`,
     glow: `rgba(${palette.accent.rgb}, 0.22)`,
-    bgSubtle: `rgba(${palette.accent.rgb}, 0.04)`,
+    bgSubtle: `var(--pulse-accent-bg-subtle, rgba(${palette.accent.rgb}, 0.04))`,
     bgSoft: `rgba(${palette.accent.rgb}, 0.08)`,
-    bgMedium: `rgba(${palette.accent.rgb}, 0.16)`,
-    bgStrong: `rgba(${palette.accent.rgb}, 0.32)`,
-    border: `rgba(${palette.accent.rgb}, 0.22)`,
+    bgMedium: `var(--pulse-accent-bg-medium, rgba(${palette.accent.rgb}, 0.16))`,
+    bgStrong: `var(--pulse-accent-bg-strong, rgba(${palette.accent.rgb}, 0.32))`,
+    border: `var(--pulse-accent-border, rgba(${palette.accent.rgb}, 0.22))`,
     secondaryStrong: `rgba(${palette.accent.rgb}, 0.32)`,
     selectionBg: `rgba(${palette.accent.rgb}, 0.20)`
 } as const;
@@ -166,16 +187,23 @@ export const accent = {
  * `cinematicBase` is the deepest step, used as the dark backdrop on the
  * auth hero rail. `gradLine` is the linear sweep used by the sparkle icon
  * and other single-stripe gradient surfaces.
+ *
+ * `deep` / `mid` / `light` / `cinematicBase` (and the `gradLine` sweep
+ * composed from them) are `var(--pulse-aurora-*, <orange literal>)`
+ * references so the auth hero rail and any future aurora surface
+ * re-color live when the user switches colour theme. `surface`,
+ * `deepSoft`, `midSoft`, `gradLineSoft` have no styled-component consumer
+ * today, so they stay literal — converting them would be dead vars.
  */
 export const aurora = {
-    deep: palette.aurora.deep,
-    mid: palette.aurora.mid,
-    light: palette.aurora.light,
+    deep: `var(--pulse-aurora-deep, ${palette.aurora.deep})`,
+    mid: `var(--pulse-aurora-mid, ${palette.aurora.mid})`,
+    light: `var(--pulse-aurora-light, ${palette.aurora.light})`,
     surface: palette.brand.primaryBg,
     deepSoft: `rgba(${palette.accent.rgb}, 0.10)`,
     midSoft: `rgba(${palette.accent.rgb}, 0.12)`,
-    cinematicBase: palette.aurora.cinematicBase,
-    gradLine: `linear-gradient(135deg, ${palette.aurora.deep} 0%, ${palette.aurora.mid} 100%)`,
+    cinematicBase: `var(--pulse-aurora-cinematic-base, ${palette.aurora.cinematicBase})`,
+    gradLine: `linear-gradient(135deg, var(--pulse-aurora-deep, ${palette.aurora.deep}) 0%, var(--pulse-aurora-mid, ${palette.aurora.mid}) 100%)`,
     gradLineSoft: `linear-gradient(135deg, rgba(${palette.accent.rgb}, 0.10) 0%, rgba(${palette.accent.rgb}, 0.06) 100%)`
 } as const;
 
@@ -407,7 +435,7 @@ export const shadow = {
     md: "0 2px 4px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.06)",
     lg: "0 8px 16px rgba(15, 23, 42, 0.06), 0 16px 32px rgba(15, 23, 42, 0.08)",
     xl: "0 16px 32px rgba(15, 23, 42, 0.10), 0 32px 64px rgba(15, 23, 42, 0.12)",
-    focus: `0 0 0 3px rgba(${palette.accent.rgb}, 0.22)`,
+    focus: `0 0 0 3px var(--pulse-accent-border, rgba(${palette.accent.rgb}, 0.22))`,
     inset: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
     /* Single brand-accent glow + soft aurora drop. Derived from the active
      * palette so a palette swap re-tints both in one shot. */
@@ -588,11 +616,22 @@ export const modalWidthCss = (max: number) =>
     `min(${max}px, calc(100dvw - ${modalGutterPx}px))`;
 
 /**
- * Monochromatic gradient palette for user / project avatars — derived from
- * the active palette. Six lightness variations so every distinct id reads
- * as a unique monogram while staying inside the single-color identity.
+ * Monochromatic gradient palette for user / project avatars. Six lightness
+ * variations so every distinct id reads as a unique monogram while staying
+ * inside the single-color identity. Each entry is a
+ * `var(--pulse-avatar-grad-N, <orange literal>)` reference so opting into a
+ * colour theme re-tints every monogram avatar live. Kept a length-6 tuple
+ * so `gradientFor()` in `userAvatar` can index it by `hash % 6` exactly as
+ * before.
  */
-export const avatarGradients = palette.avatarGradients;
+export const avatarGradients = [
+    `var(--pulse-avatar-grad-0, ${palette.avatarGradients[0]})`,
+    `var(--pulse-avatar-grad-1, ${palette.avatarGradients[1]})`,
+    `var(--pulse-avatar-grad-2, ${palette.avatarGradients[2]})`,
+    `var(--pulse-avatar-grad-3, ${palette.avatarGradients[3]})`,
+    `var(--pulse-avatar-grad-4, ${palette.avatarGradients[4]})`,
+    `var(--pulse-avatar-grad-5, ${palette.avatarGradients[5]})`
+] as const;
 
 /**
  * Modern sans-serif stack. We load Inter from Google Fonts; the rest is a

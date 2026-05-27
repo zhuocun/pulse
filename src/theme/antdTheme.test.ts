@@ -14,7 +14,9 @@
  */
 import { theme as antdTheme } from "antd";
 
-import { brand, fontFamily, touchTargetCoarse } from "./tokens";
+import { emeraldPalette } from "./palettes/emerald";
+import { orangePalette } from "./palettes/orange";
+import { fontFamily, touchTargetCoarse } from "./tokens";
 import {
     accentGradientCss,
     auroraGradientCss,
@@ -35,12 +37,37 @@ describe("buildAntdTheme", () => {
     });
 
     describe("token surface", () => {
-        it("threads the brand primary into colorPrimary / colorInfo", () => {
+        it("threads the default (orange) brand primary into colorPrimary / colorInfo", () => {
+            // AntD reads the Palette OBJECT (real hex), not the
+            // `var(--pulse-*)` tokens — it derives every shade from a
+            // single colorPrimary hex algorithmically. With no palette
+            // arg the builder defaults to orange.
             const cfg = buildAntdTheme("light");
-            expect(cfg.token?.colorPrimary).toBe(brand.primary);
-            expect(cfg.token?.colorInfo).toBe(brand.primary);
-            expect(cfg.token?.colorPrimaryHover).toBe(brand.primaryHover);
-            expect(cfg.token?.colorPrimaryActive).toBe(brand.primaryActive);
+            expect(cfg.token?.colorPrimary).toBe(orangePalette.brand.primary);
+            expect(cfg.token?.colorInfo).toBe(orangePalette.brand.primary);
+            expect(cfg.token?.colorPrimaryHover).toBe(
+                orangePalette.brand.primaryHover
+            );
+            expect(cfg.token?.colorPrimaryActive).toBe(
+                orangePalette.brand.primaryActive
+            );
+        });
+
+        it("threads the supplied palette through colorPrimary (runtime colour-theme switch)", () => {
+            // The third `activePalette` arg is what makes the AntD
+            // component surface re-color when the user picks a different
+            // colour theme. Passing emerald must move colorPrimary (and
+            // its derived link/hover steps) onto the emerald hexes.
+            const cfg = buildAntdTheme("light", false, emeraldPalette);
+            expect(cfg.token?.colorPrimary).toBe(emeraldPalette.brand.primary);
+            expect(cfg.token?.colorInfo).toBe(emeraldPalette.brand.primary);
+            expect(cfg.token?.colorLink).toBe(
+                emeraldPalette.brand.primaryHover
+            );
+            const tabs = cfg.components?.Tabs as
+                | { inkBarColor?: string }
+                | undefined;
+            expect(tabs?.inkBarColor).toBe(emeraldPalette.brand.primary);
         });
 
         it("links route through primaryHover to clear AA on white", () => {
@@ -48,7 +75,7 @@ describe("buildAntdTheme", () => {
             // primaryHover for WCAG AA contrast on white. The mapping
             // belongs here in the AntD builder, not in the palette.
             const cfg = buildAntdTheme("light");
-            expect(cfg.token?.colorLink).toBe(brand.primaryHover);
+            expect(cfg.token?.colorLink).toBe(orangePalette.brand.primaryHover);
         });
 
         it("uses Inter font stack as the global fontFamily", () => {
@@ -153,12 +180,12 @@ describe("buildAntdTheme", () => {
     });
 
     describe("Tabs / Tooltip overrides", () => {
-        it("Tabs inkBar uses the brand primary", () => {
+        it("Tabs inkBar uses the brand primary (default orange hex)", () => {
             const cfg = buildAntdTheme("light");
             const tabs = cfg.components?.Tabs as
                 | { inkBarColor?: string }
                 | undefined;
-            expect(tabs?.inkBarColor).toBe(brand.primary);
+            expect(tabs?.inkBarColor).toBe(orangePalette.brand.primary);
         });
 
         it("Tooltip spotlight tint differs between light and dark", () => {

@@ -116,7 +116,14 @@ describe("avatarGradients tuple", () => {
         expect(avatarGradients).toHaveLength(6);
         for (const grad of avatarGradients) {
             expect(typeof grad).toBe("string");
-            expect(grad).toMatch(/^linear-gradient\(/);
+            // Runtime palette switch — each entry is now a
+            // `var(--pulse-avatar-grad-N, <orange linear-gradient>)`
+            // reference so the avatar monograms re-tint when the user
+            // picks a colour theme. The orange `linear-gradient(...)`
+            // literal survives as the fallback so a stripped DOM (SSR /
+            // test) still renders the historical gradient.
+            expect(grad).toMatch(/^var\(--pulse-avatar-grad-\d,/);
+            expect(grad).toContain("linear-gradient(");
         }
     });
 });
@@ -138,15 +145,25 @@ describe("semantic / brand palette", () => {
         }
     });
 
-    it("accent.bg* are rgba() strings derived from the palette accent triplet", () => {
+    it("accent.bg* embed the palette accent triplet at the documented opacity", () => {
+        // Runtime palette switch — the styled-component-consumed accent
+        // tints (`bgSubtle` / `bgMedium` / `bgStrong` / `border`) are now
+        // `var(--pulse-accent-*, rgba(<orange triplet>, <opacity>))`
+        // references so a colour-theme switch re-tints them live. The
+        // orange `rgba(...)` literal survives inside the var fallback, so
+        // we assert the triplet is embedded rather than pinning the
+        // string prefix. `glow` / `bgSoft` have no live consumer and stay
+        // plain `rgba()` literals.
         for (const key of [
             "bgSubtle",
-            "bgSoft",
             "bgMedium",
             "bgStrong",
-            "glow",
             "border"
         ] as const) {
+            expect(accent[key]).toMatch(/^var\(--pulse-accent-/);
+            expect(accent[key]).toContain(`rgba(${palette.accent.rgb}`);
+        }
+        for (const key of ["bgSoft", "glow"] as const) {
             expect(accent[key]).toMatch(/^rgba\(/);
         }
     });
@@ -434,7 +451,8 @@ describe("shadow tokens", () => {
         }
     });
 
-    it("focus shadow includes the accent rgb triplet", () => {
+    it("focus shadow references the accent-border var so it re-colors with the palette", () => {
+        expect(shadow.focus).toContain("var(--pulse-accent-border");
         expect(shadow.focus).toMatch(/rgba\(/);
     });
 });

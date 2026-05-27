@@ -204,6 +204,22 @@ export const enSource = {
         glassIntensityClear: "Clear",
         glassIntensityRegular: "Regular",
         glassIntensitySolid: "Solid",
+        /*
+         * Runtime colour-theme picker. The label sits beside a 6-option
+         * Segmented (one per shipped palette), each option showing a small
+         * brand-primary swatch next to its single-word hue name. Orange is
+         * the default; the rest re-color the whole app live. Hue labels are
+         * deliberately single words to mirror the Light/Dark/System theme
+         * convention and fit the 6-option control.
+         */
+        colorTheme: "Color theme",
+        changeColorTheme: "Change color theme",
+        colorThemeOrange: "Orange",
+        colorThemeRose: "Rose",
+        colorThemeViolet: "Violet",
+        colorThemeIndigo: "Indigo",
+        colorThemeCyan: "Cyan",
+        colorThemeEmerald: "Emerald",
         sections: {
             appearance: {
                 header: "Appearance",

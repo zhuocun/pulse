@@ -27,38 +27,60 @@ import { buildAntdTheme } from "../theme/antdTheme";
 
 describe("theme/palette integration", () => {
     describe("active palette is propagated to every downstream surface", () => {
-        it("tokens.brand mirrors palette.brand", () => {
-            // The tokens module is the bridge between palette and AntD
-            // theme. If this drifts, AntD's `colorPrimary` will silently
-            // diverge from the palette's `brand.primary`.
-            expect(brand.primary).toBe(palette.brand.primary);
-            expect(brand.primaryHover).toBe(palette.brand.primaryHover);
-            expect(brand.primaryActive).toBe(palette.brand.primaryActive);
-            expect(brand.primaryBg).toBe(palette.brand.primaryBg);
+        it("tokens.brand references the palette brand via CSS var + orange fallback", () => {
+            // Runtime palette switch — the brand tokens are now
+            // `var(--pulse-brand-*, <orange literal>)` references so a
+            // colour-theme switch re-colors styled-components live. The
+            // module-load `palette` is orange, so its hexes are the var
+            // fallbacks. We assert the var reference AND the embedded
+            // fallback rather than exact equality.
+            expect(brand.primary).toMatch(/^var\(--pulse-brand-primary,/);
+            expect(brand.primary).toContain(palette.brand.primary);
+            expect(brand.primaryHover).toContain(palette.brand.primaryHover);
+            expect(brand.primaryActive).toContain(palette.brand.primaryActive);
+            expect(brand.primaryBg).toContain(palette.brand.primaryBg);
         });
 
-        it("tokens.accent derivatives use palette.accent.rgb", () => {
-            expect(accent.start).toBe(palette.accent.start);
-            expect(accent.end).toBe(palette.accent.end);
-            // The translucent variants must embed the palette's rgb
-            // triplet — otherwise a palette swap won't re-tint glow,
-            // selection, focus, etc.
+        it("tokens.accent derivatives reference the palette accent", () => {
+            // `start` / `end` flip live via CSS var; `glow` / `selectionBg`
+            // have no live consumer and stay plain rgba() literals. Both
+            // paths must still embed the active palette's accent so a
+            // palette swap re-tints what it can and the fallback matches
+            // orange for everything else.
+            expect(accent.start).toMatch(/^var\(--pulse-accent-start,/);
+            expect(accent.start).toContain(palette.accent.start);
+            expect(accent.end).toContain(palette.accent.end);
             expect(accent.glow).toContain(palette.accent.rgb);
             expect(accent.selectionBg).toContain(palette.accent.rgb);
         });
 
-        it("tokens.aurora mirrors palette.aurora", () => {
-            expect(aurora.deep).toBe(palette.aurora.deep);
-            expect(aurora.mid).toBe(palette.aurora.mid);
-            expect(aurora.light).toBe(palette.aurora.light);
-            expect(aurora.cinematicBase).toBe(palette.aurora.cinematicBase);
+        it("tokens.aurora references palette.aurora via CSS var + orange fallback", () => {
+            expect(aurora.deep).toMatch(/^var\(--pulse-aurora-deep,/);
+            expect(aurora.deep).toContain(palette.aurora.deep);
+            expect(aurora.mid).toContain(palette.aurora.mid);
+            expect(aurora.light).toContain(palette.aurora.light);
+            expect(aurora.cinematicBase).toContain(
+                palette.aurora.cinematicBase
+            );
         });
 
-        it("avatarGradients mirrors palette.avatarGradients (by-value)", () => {
-            expect(avatarGradients).toEqual(palette.avatarGradients);
+        it("avatarGradients references palette.avatarGradients via CSS var + fallback", () => {
+            // Length-6 tuple preserved (gradientFor indexes it by
+            // hash % 6); each entry is a var() ref carrying the orange
+            // gradient as its fallback.
+            expect(avatarGradients).toHaveLength(6);
+            palette.avatarGradients.forEach((grad, i) => {
+                expect(avatarGradients[i]).toContain(grad);
+                expect(avatarGradients[i]).toMatch(
+                    new RegExp(`^var\\(--pulse-avatar-grad-${i},`)
+                );
+            });
         });
 
-        it("AntD theme.colorPrimary lands on palette.brand.primary", () => {
+        it("AntD theme.colorPrimary lands on the palette brand primary (real hex)", () => {
+            // AntD derives shades algorithmically and cannot consume a
+            // `var()`, so buildAntdTheme reads the active Palette OBJECT
+            // and emits a real hex — the orange default here.
             const cfg = buildAntdTheme("light");
             expect(cfg.token?.colorPrimary).toBe(palette.brand.primary);
         });

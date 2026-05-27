@@ -22,6 +22,34 @@ import { orangePalette } from "./orange";
 const REQUIRED_LIGHT_VARS = [
     "--pulse-bg-page",
     "--pulse-text-base",
+    // Runtime palette-switch vars — the brand / accent / aurora /
+    // avatar-gradient surface consumed by the `var(--pulse-…)` tokens in
+    // tokens.ts. These are mode-agnostic brand hexes (emitted identically
+    // in both blocks); the contract pins them present in BOTH so a
+    // palette swap re-colors styled-components in light AND dark.
+    "--pulse-brand-primary",
+    "--pulse-brand-primary-hover",
+    "--pulse-brand-primary-active",
+    "--pulse-brand-primary-bg",
+    "--pulse-brand-primary-bg-dark",
+    "--pulse-brand-primary-dark",
+    "--pulse-accent-start",
+    "--pulse-accent-end",
+    "--pulse-accent-bg-strong",
+    "--pulse-accent-border",
+    "--pulse-accent-bg-medium",
+    "--pulse-accent-bg-subtle",
+    "--pulse-accent-bg-hover",
+    "--pulse-aurora-deep",
+    "--pulse-aurora-mid",
+    "--pulse-aurora-light",
+    "--pulse-aurora-cinematic-base",
+    "--pulse-avatar-grad-0",
+    "--pulse-avatar-grad-1",
+    "--pulse-avatar-grad-2",
+    "--pulse-avatar-grad-3",
+    "--pulse-avatar-grad-4",
+    "--pulse-avatar-grad-5",
     "--color-copilot-grad-start",
     "--color-copilot-grad-mid",
     "--color-copilot-grad-end",
@@ -168,9 +196,22 @@ describe("paletteToCss", () => {
         expect(light).toContain(`rgba(${orangePalette.accent.rgb}`);
         expect(light).not.toContain(`rgba(${orangePalette.accent.rgbDark}`);
 
-        // And vice-versa.
+        // And vice-versa for the MODE-DEPENDENT vars (`--color-copilot-*`
+        // / `--glass-*` / `--aurora-blob*`). The dark block must use the
+        // lighter dark triplet for those. We scope the negative check to
+        // the mode-dependent lines because the mode-AGNOSTIC pre-composed
+        // `--pulse-accent-*` brand vars deliberately ship the light
+        // `accent.rgb` triplet in BOTH blocks (they re-color
+        // styled-components, which read the same brand hue regardless of
+        // light/dark — the per-mode flip lives in the copilot/glass vars).
         expect(dark).toContain(`rgba(${orangePalette.accent.rgbDark}`);
-        expect(dark).not.toContain(`rgba(${orangePalette.accent.rgb}`);
+        const darkModeDependentLines = dark
+            .split("\n")
+            .filter((line) => !line.includes("--pulse-accent-"))
+            .join("\n");
+        expect(darkModeDependentLines).not.toContain(
+            `rgba(${orangePalette.accent.rgb}`
+        );
     });
 
     it("renders the same shape for any palette (emerald)", () => {

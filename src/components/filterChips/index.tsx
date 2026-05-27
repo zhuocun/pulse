@@ -77,7 +77,7 @@ const ChipDismiss = styled.button`
 
     &:hover,
     &:focus-visible {
-        background: rgba(234, 88, 12, 0.18);
+        background: var(--pulse-accent-bg-hover, rgba(234, 88, 12, 0.18));
         opacity: 1;
     }
 

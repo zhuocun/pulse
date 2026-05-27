@@ -21,11 +21,16 @@ import {
  * styled-components see the runtime CSS vars from frame 1 — there's no
  * flash of an unstyled palette while React hydrates.
  *
- * The whole color identity flows from `./theme/palettes/index.ts`'s
- * active palette, so swapping palettes is a one-line edit there.
+ * We seed with the orange default (`palette`) so the very first paint is
+ * correct for users who never opted into a colour theme. The runtime
+ * resolver hook `usePaletteTheme` then finds this element BY ITS FIXED ID
+ * and replaces its `textContent` in place with the user's chosen palette
+ * — the stable `pulse-theme-vars` id (vs. the old palette-name-suffixed
+ * id) is what lets the hook re-color the live app without leaving a stale
+ * duplicate block behind.
  */
 const themeStyle = document.createElement("style");
-themeStyle.id = `pulse-theme-vars-${palette.name}`;
+themeStyle.id = "pulse-theme-vars";
 themeStyle.textContent = paletteToCss(palette);
 document.head.appendChild(themeStyle);
 

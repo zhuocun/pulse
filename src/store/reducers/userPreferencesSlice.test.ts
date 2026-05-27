@@ -44,7 +44,10 @@ describe("userPreferencesSlice", () => {
             // glassIntensityVersion at the current sentinel so the
             // load-path migration is a no-op for them.
             glassIntensity: "auto",
-            glassIntensityVersion: 1
+            glassIntensityVersion: 1,
+            // Runtime colour-theme switch — orange is the default so
+            // existing users see no change.
+            colorTheme: "orange"
         });
     });
 
@@ -133,7 +136,8 @@ describe("userPreferences persistence", () => {
             // Phase 6 Wave 1 — brand-new installs get the current
             // migration sentinel so the load-path migration is a
             // no-op for them (they receive the post-flip default).
-            glassIntensityVersion: 1
+            glassIntensityVersion: 1,
+            colorTheme: "orange"
         });
     });
 
@@ -160,7 +164,8 @@ describe("userPreferences persistence", () => {
             savedFilterPresets: [],
             projectListDefaults: null,
             glassIntensity: "auto",
-            glassIntensityVersion: 1
+            glassIntensityVersion: 1,
+            colorTheme: "orange"
         });
     });
 
@@ -307,6 +312,90 @@ describe("userPreferences persistence", () => {
         }
     });
 
+    /*
+     * Runtime colour-theme switch — append-only field (no schema bump),
+     * mirroring how glassIntensity was added. A blob with no `colorTheme`
+     * sibling falls through to orange; an explicit shipped palette name
+     * survives; an unknown name is rejected back to orange.
+     */
+    it("setColorTheme flips through every shipped palette", () => {
+        let state = initialState;
+        for (const next of [
+            "rose",
+            "violet",
+            "indigo",
+            "cyan",
+            "emerald",
+            "orange"
+        ] as const) {
+            state = userPreferencesSlice.reducer(
+                state,
+                userPreferencesActions.setColorTheme(next)
+            );
+            expect(state.colorTheme).toBe(next);
+        }
+    });
+
+    it("loads an explicit colorTheme choice from a v1 envelope", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto",
+                glassIntensityVersion: 1,
+                colorTheme: "violet"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        expect(loadPersistedUserPreferences().colorTheme).toBe("violet");
+    });
+
+    it("falls back to orange for a legacy blob with no colorTheme field", () => {
+        // A v1 envelope persisted before the colour-theme picker shipped
+        // carries no `colorTheme` sibling — the append-only guard fills
+        // in the orange default so existing users keep the historical
+        // brand.
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto",
+                glassIntensityVersion: 1
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        expect(loadPersistedUserPreferences().colorTheme).toBe("orange");
+    });
+
+    it("rejects an unknown colorTheme value and falls back to orange", () => {
+        const stored = {
+            version: 1,
+            state: {
+                boardDensity: "comfortable",
+                savedFilterPresets: [],
+                projectListDefaults: null,
+                glassIntensity: "auto",
+                glassIntensityVersion: 1,
+                colorTheme: "ultraviolet"
+            }
+        };
+        window.localStorage.setItem(
+            USER_PREFERENCES_STORAGE_KEY,
+            JSON.stringify(stored)
+        );
+        expect(loadPersistedUserPreferences().colorTheme).toBe("orange");
+    });
+
     it("persists a glassIntensity choice through the store middleware", () => {
         /*
          * Wires the same persistence middleware shape the prod store
@@ -339,7 +428,8 @@ describe("userPreferences persistence", () => {
             savedFilterPresets: [makePreset("p1")],
             projectListDefaults: null,
             glassIntensity: "auto",
-            glassIntensityVersion: 1
+            glassIntensityVersion: 1,
+            colorTheme: "orange"
         });
         const stored = window.localStorage.getItem(
             USER_PREFERENCES_STORAGE_KEY
@@ -697,7 +787,8 @@ describe("userPreferences schema versioning", () => {
                 savedFilterPresets: [],
                 projectListDefaults: null,
                 glassIntensity: "auto",
-                glassIntensityVersion: 1
+                glassIntensityVersion: 1,
+                colorTheme: "orange"
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 99/);
@@ -738,7 +829,8 @@ describe("userPreferences schema versioning", () => {
                 savedFilterPresets: [],
                 projectListDefaults: null,
                 glassIntensity: "auto",
-                glassIntensityVersion: 1
+                glassIntensityVersion: 1,
+                colorTheme: "orange"
             });
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy.mock.calls[0][0]).toMatch(/unsupported version 0/);
