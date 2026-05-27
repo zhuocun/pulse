@@ -9,7 +9,8 @@ import {
     type ColorThemePreference
 } from "../../store/reducers/userPreferencesSlice";
 import { getPalette, paletteNames } from "../../theme/palettes";
-import { radius } from "../../theme/tokens";
+import { radius, space } from "../../theme/tokens";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
 
 /**
@@ -32,14 +33,66 @@ import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
  * the `Card` Row on desktop) already supply the "Color theme" label + icon,
  * so an internal label would duplicate it. The `role="group"` + aria-label
  * keep the control self-describing for screen readers.
+ *
+ * Width handling — six options + swatches + text are wider than a phone.
+ * Two narrow surfaces are at play and each gets its own treatment so the
+ * control never spills past its card:
+ *   - Coarse-pointer phone chassis (`useIsPhoneChrome`): the picker lives
+ *     in a single-line `SettingsRow` whose trailing slot does NOT shrink,
+ *     so labels can't fit. We hide the hue TEXT (kept in the DOM as a
+ *     screen-reader-only span — the swatch already conveys the colour
+ *     visually) so six compact swatches fit the row.
+ *   - Narrow fine-pointer desktop window: the desktop `Card` row stretches
+ *     the control full-width, so the labelled control can exceed the card.
+ *     The `Scroller` wrapper caps it at the card width and scrolls
+ *     horizontally rather than overflowing.
  */
 
 const Swatch = styled.span`
     border-radius: ${radius.xs}px;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
     display: inline-block;
+    flex: 0 0 auto;
     height: 12px;
     width: 12px;
+`;
+
+/*
+ * Each option is a swatch + hue label. On the coarse-pointer phone the
+ * label text collapses to a visually-hidden (but screen-reader-readable)
+ * span so the six options fit a single grouped-table row; the swatch
+ * stays visible as the colour cue.
+ */
+const OptionLabel = styled.span<{ $compact: boolean }>`
+    align-items: center;
+    display: inline-flex;
+    gap: ${space.xxs}px;
+
+    .ct-name {
+        ${(p) =>
+            p.$compact
+                ? `border: 0;
+                   clip: rect(0 0 0 0);
+                   height: 1px;
+                   margin: -1px;
+                   overflow: hidden;
+                   padding: 0;
+                   position: absolute;
+                   white-space: nowrap;
+                   width: 1px;`
+                : ""}
+    }
+`;
+
+/*
+ * Caps the control at the available width and scrolls horizontally when
+ * the labelled six-option Segmented can't fit (narrow desktop windows
+ * where the Card row stretches the control full-width). On roomy widths
+ * the Segmented is narrower than this and no scrollbar appears.
+ */
+const Scroller = styled.div`
+    max-width: 100%;
+    overflow-x: auto;
 `;
 
 /*
@@ -63,6 +116,7 @@ const LABEL_KEYS: Record<
 
 const ColorThemeSelect = () => {
     const dispatch = useReduxDispatch() as ReduxDispatch;
+    const isPhone = useIsPhoneChrome();
     const colorTheme = useReduxSelector<ColorThemePreference>(
         (state: RootState) => state.userPreferences.colorTheme
     );
@@ -82,19 +136,24 @@ const ColorThemeSelect = () => {
         [dispatch]
     );
 
-    const options = paletteNames.map((name) => ({
-        label: microcopy.settings[LABEL_KEYS[name]] as string,
-        value: name,
-        icon: (
-            <Swatch
-                aria-hidden
-                style={{ background: getPalette(name).brand.primary }}
-            />
-        )
-    }));
+    const options = paletteNames.map((name) => {
+        const text = microcopy.settings[LABEL_KEYS[name]] as string;
+        return {
+            value: name,
+            label: (
+                <OptionLabel $compact={isPhone}>
+                    <Swatch
+                        aria-hidden
+                        style={{ background: getPalette(name).brand.primary }}
+                    />
+                    <span className="ct-name">{text}</span>
+                </OptionLabel>
+            )
+        };
+    });
 
     return (
-        <span role="group" aria-label={microcopy.settings.changeColorTheme}>
+        <Scroller role="group" aria-label={microcopy.settings.changeColorTheme}>
             <Segmented
                 aria-label={microcopy.settings.changeColorTheme}
                 options={options}
@@ -102,7 +161,7 @@ const ColorThemeSelect = () => {
                 value={colorTheme}
                 onChange={handleChange}
             />
-        </span>
+        </Scroller>
     );
 };
 
