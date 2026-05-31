@@ -86,6 +86,14 @@ def test_chat_tool_arg_shapes_match_fe_dispatcher() -> None:
         )
 
 
+def test_mutation_tool_description_advertises_task_updates_only() -> None:
+    schema = CHAT_TOOL_SCHEMAS["requestMutationApproval"]
+    diff_description = schema["args"]["diff"]["description"]
+    assert "task_updates" in diff_description
+    assert "column_updates" not in diff_description
+    assert "bulk_apply" not in diff_description
+
+
 def test_list_tasks_filter_subschema_matches_fe_known_fields() -> None:
     """The ``listTasks.filter`` sub-schema advertises supported task fields."""
 

@@ -44,6 +44,10 @@ jest.mock("../../constants/env", () => ({
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 import useAgent from "../../utils/hooks/useAgent";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 
@@ -169,12 +173,22 @@ describe("BoardBriefDrawer — remote agent path", () => {
     beforeEach(() => {
         mockedStream.mockReset();
         mockedUseAgent.mockReset();
+        act(() => {
+            resetRemoteAiConsentForTests();
+            acknowledgeRemoteAi("https://agents.example");
+        });
         mockedUseTaskModal.mockReturnValue({
             closeModal: jest.fn(),
             editingTaskId: undefined,
             isLoading: false,
             startEditing: jest.fn()
         } as unknown as ReturnType<typeof useTaskModal>);
+    });
+
+    afterEach(() => {
+        act(() => {
+            resetRemoteAiConsentForTests();
+        });
     });
 
     it("renders brief content from a custom/suggestion lastSuggestion payload", async () => {
@@ -498,6 +512,9 @@ describe("BoardBriefDrawer — local engine fallback (aiUseLocalEngine)", () => 
         // is invoked with isRemote=false — which we simulate by verifying that
         // in the local engine file (index.test.tsx) mockedStream is never called.
         // This test confirms the remote-path agent starts when open=true.
+        act(() => {
+            acknowledgeRemoteAi("https://agents.example");
+        });
         const start = jest.fn().mockResolvedValue(undefined);
         renderDrawer(true, { start });
         // In remote mode, start should have been called

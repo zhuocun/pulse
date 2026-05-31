@@ -17,6 +17,10 @@ jest.mock("../../utils/hooks/useAgent", () => ({
 
 import useAgent from "../../utils/hooks/useAgent";
 import type { UseAgentResult } from "../../utils/hooks/useAgent";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 
 jest.mock("../../utils/hooks/useAiEnabled", () => ({
     __esModule: true,
@@ -80,10 +84,35 @@ const projectContext = {
 describe("AiSearchInput remote search transport", () => {
     beforeEach(() => {
         mockedUseAgent.mockReset();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://copilot.example");
     });
 
     afterEach(() => {
         jest.clearAllMocks();
+        resetRemoteAiConsentForTests();
+    });
+
+    it("does not start remote search before consent is acknowledged", () => {
+        resetRemoteAiConsentForTests();
+        const start = jest.fn().mockResolvedValue(undefined);
+        mockedUseAgent.mockReturnValue(baseAgent({ start }));
+
+        render(
+            <AiSearchInput
+                kind="tasks"
+                projectContext={projectContext}
+                semanticIds={undefined}
+                setSemanticIds={jest.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByRole("textbox"), {
+            target: { value: "login" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: /find related/i }));
+
+        expect(start).not.toHaveBeenCalled();
     });
 
     it("shows a failure hint when the remote agent errors", async () => {

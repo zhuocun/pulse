@@ -58,6 +58,10 @@ jest.mock("../../utils/ai/agentClient", () => {
 // eslint-disable-next-line simple-import-sort/imports
 import useAgent from "../../utils/hooks/useAgent";
 import useAgentChat from "../../utils/hooks/useAgentChat";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 import type { UseAgentResult } from "../../utils/hooks/useAgent";
 import type { UseAgentChatResult } from "../../utils/hooks/useAgentChat";
 
@@ -209,10 +213,16 @@ const renderControlled = (props: ControlledDockProps = {}) => {
 describe("CopilotDock — remote agent path", () => {
     beforeEach(() => {
         installAntdBrowserMocks();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
         mockedUseAgent.mockReset();
         mockedUseAgentChat.mockReset();
         mockedUseAgent.mockReturnValue(baseAgent());
         mockedUseAgentChat.mockReturnValue(baseAgentChat());
+    });
+
+    afterEach(() => {
+        resetRemoteAiConsentForTests();
     });
 
     /*

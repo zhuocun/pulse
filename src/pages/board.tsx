@@ -53,6 +53,7 @@ import {
 } from "../theme/tokens";
 import type { TriageNudge } from "../interfaces/agent";
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
+import { useRemoteAiConsent } from "../utils/ai/remoteAiConsent";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
@@ -551,6 +552,7 @@ const BoardPage = () => {
     });
     const startTriageAgent = triageAgent.start;
     const dismissTriageNudge = triageAgent.dismissNudge;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
     /**
      * Track which project IDs have already triggered a triage run in
      * this app session so we fire at most once per (project, session).
@@ -573,6 +575,7 @@ const BoardPage = () => {
         if (!pid) return;
         if (!boardAiOn) return;
         if (environment.aiUseLocalEngine) return;
+        if (!remoteAiConsentGranted) return;
         if (triagedProjectsRef.current.has(pid)) return;
 
         triagedProjectsRef.current.add(pid);
@@ -589,7 +592,13 @@ const BoardPage = () => {
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // the error will also surface via triageAgent.error if needed.
         }
-    }, [boardAiOn, chatOpen, currentProject?._id, startTriageAgent]);
+    }, [
+        boardAiOn,
+        chatOpen,
+        currentProject?._id,
+        remoteAiConsentGranted,
+        startTriageAgent
+    ]);
 
     const { startEditing: openTaskModal } = useTaskModal();
     const { openTask: openTaskPanel } = useTaskPanelNavigation();

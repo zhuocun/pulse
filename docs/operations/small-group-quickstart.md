@@ -7,8 +7,9 @@ pick one.
 ## Prerequisites (both paths)
 
 - **MongoDB Atlas** free shared cluster — get a `mongodb+srv://...` URI.
-- **One LLM API key** — `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Either
-  works (`AGENT_CHAT_MODEL_PROVIDER=auto` picks whichever you set).
+- **One LLM API key** — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or
+  `DEEPSEEK_API_KEY`. Any one works (`AGENT_CHAT_MODEL_PROVIDER=auto`
+  picks whichever you set).
 - **Free-tier Postgres** — Neon, Supabase, or Vercel Postgres. Required
   for the four interrupt-using agents (`board-brief-agent`,
   `task-drafting-agent`, `task-estimation-agent`, `triage-agent`) to
@@ -31,7 +32,7 @@ cap.
 1. Create the managed services and copy the connection strings:
    - Atlas → `MONGO_URI` (mongodb+srv://...)
    - Neon / Supabase / Vercel Postgres → `AGENT_POSTGRES_URI` (postgresql://...)
-   - Anthropic console or OpenAI dashboard → one API key
+   - Anthropic console, OpenAI dashboard, or DeepSeek console → one API key
 
 2. From the repo root, deploy the backend to Fly. The shipped
    `backend/fly.toml` already pins `auto_stop_machines = false` and
@@ -46,9 +47,11 @@ cap.
    fly secrets set \
        MONGO_URI="mongodb+srv://<user>:<pw>@<cluster>/jira?retryWrites=true&w=majority" \
        AGENT_POSTGRES_URI="postgresql://<user>:<pw>@<host>/<db>?sslmode=require" \
-       OPENAI_API_KEY="sk-..." \
+       DEEPSEEK_API_KEY="sk-..." \
+       AGENT_CHAT_MODEL_PROVIDER="deepseek" \
+       AGENT_CHAT_MODEL_ID="deepseek-v4-flash" \
        CORS_ORIGINS="https://<your-fe>.vercel.app"
-   # Swap OPENAI_API_KEY -> ANTHROPIC_API_KEY if that's the key you have.
+   # Swap DEEPSEEK_* for OPENAI_API_KEY or ANTHROPIC_API_KEY if that is the provider you use.
 
    fly deploy
    ```
@@ -69,7 +72,9 @@ cap.
 4. Deploy the FE to Vercel. From a Vercel project pointed at the repo:
 
    ```bash
-   vercel env add BACKEND_URL    # -> https://<your-be>.fly.dev (no trailing slash)
+   vercel env add BACKEND_URL              # -> https://<your-be>.fly.dev (no trailing slash)
+   vercel env add REACT_APP_API_URL        # -> same backend origin, for deployed aiBaseUrl fallback
+   vercel env add REACT_APP_AI_BASE_URL    # -> same backend origin, for direct agent/SSE calls
    vercel deploy --prod
    ```
 
@@ -110,7 +115,7 @@ For strict reliability use Path A.
    vercel link        # pick or create the project
    vercel env add MONGO_URI
    vercel env add AGENT_POSTGRES_URI
-   vercel env add OPENAI_API_KEY     # or ANTHROPIC_API_KEY
+   vercel env add DEEPSEEK_API_KEY   # or OPENAI_API_KEY / ANTHROPIC_API_KEY
    vercel env add CORS_ORIGINS       # https://<fe-project>.vercel.app
    vercel deploy --prod
    ```

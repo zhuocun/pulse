@@ -15,8 +15,22 @@
  * mode, older browsers, server-side render).
  */
 
+import { useSyncExternalStore } from "react";
+
 const STORAGE_KEY_PREFIX = "boardCopilot:remoteConsent:";
 const memoryState = new Map<string, boolean>();
+const listeners = new Set<() => void>();
+
+const emitConsentChange = (): void => {
+    listeners.forEach((listener) => listener());
+};
+
+const subscribeRemoteAiConsent = (listener: () => void): (() => void) => {
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
+    };
+};
 
 const storageKeyFor = (baseUrl: string): string => {
     const trimmed = (baseUrl || "").trim();
@@ -51,7 +65,15 @@ export const acknowledgeRemoteAi = (baseUrl: string): void => {
     const key = storageKeyFor(baseUrl);
     memoryState.set(key, true);
     safeWriteStorage(key);
+    emitConsentChange();
 };
+
+export const useRemoteAiConsent = (baseUrl: string): boolean =>
+    useSyncExternalStore(
+        subscribeRemoteAiConsent,
+        () => hasAcknowledgedRemoteAi(baseUrl),
+        () => false
+    );
 
 /** Test-only helper: reset both memory and storage state. */
 export const resetRemoteAiConsentForTests = (baseUrl?: string): void => {
@@ -64,6 +86,7 @@ export const resetRemoteAiConsentForTests = (baseUrl?: string): void => {
                 /* ignore */
             }
         }
+        emitConsentChange();
         return;
     }
     memoryState.clear();
@@ -79,4 +102,5 @@ export const resetRemoteAiConsentForTests = (baseUrl?: string): void => {
             /* ignore */
         }
     }
+    emitConsentChange();
 };

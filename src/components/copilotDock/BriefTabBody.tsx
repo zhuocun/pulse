@@ -27,6 +27,7 @@ import {
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
@@ -388,6 +389,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     const remoteBriefThreadId = remoteAgent.threadId;
 
     const isRemote = !environment.aiUseLocalEngine;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
 
     const {
         run,
@@ -484,6 +486,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
 
     useEffect(() => {
         if (!isRemote) return;
+        if (!remoteAiConsentGranted) return;
         // Kick the remote brief request only when the user is actually
         // looking at the Brief surface. Tearing it down is wired to
         // `dockOpen` below so a Chat ↔ Brief tab switch doesn't abort the
@@ -504,6 +507,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         surfaceVisible,
         dockOpen,
         isRemote,
+        remoteAiConsentGranted,
         projectId,
         remoteBriefIsStreaming,
         remoteBriefSuggestion,
@@ -534,6 +538,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
             }
             return;
         }
+        if (isRemote && !remoteAiConsentGranted) return;
         const prevFingerprint = lastFingerprintRef.current;
         const fingerprintChanged =
             prevFingerprint !== "" && prevFingerprint !== fingerprint;
@@ -625,6 +630,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         fingerprint,
         runBrief,
         isRemote,
+        remoteAiConsentGranted,
         abortRemoteBrief,
         clearRemoteBriefSuggestion,
         startRemoteBrief
@@ -727,6 +733,7 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     };
 
     const handleRefresh = async () => {
+        if (isRemote && !remoteAiConsentGranted) return;
         track(ANALYTICS_EVENTS.BRIEF_REFRESHED, { projectId });
         // R-A M3 — a user-initiated refresh resets the auto-refresh
         // gate baseline. Without this, an auto-trailing refetch could

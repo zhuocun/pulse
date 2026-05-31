@@ -36,6 +36,12 @@ const Trigger = styled.button`
     text-decoration: underline;
     text-underline-offset: 2px;
 
+    @media (pointer: coarse) {
+        min-height: 44px;
+        min-width: 44px;
+        padding-inline: ${space.xs}px;
+    }
+
     &:hover,
     &:focus-visible {
         color: var(--ant-color-text, rgba(15, 23, 42, 0.9));

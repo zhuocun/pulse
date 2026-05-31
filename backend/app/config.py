@@ -222,6 +222,7 @@ class Settings:
     )
     anthropic_api_key: str = _env_str_field("ANTHROPIC_API_KEY", "")
     openai_api_key: str = _env_str_field("OPENAI_API_KEY", "")
+    deepseek_api_key: str = _env_str_field("DEEPSEEK_API_KEY", "")
     # Embeddings provider. Selection mirrors AGENT_CHAT_MODEL_PROVIDER.
     # ``auto`` picks OpenAI if OPENAI_API_KEY is set (Anthropic has no
     # embeddings API), and the deterministic SHA-256 stub otherwise.

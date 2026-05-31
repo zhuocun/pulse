@@ -1,4 +1,5 @@
 import environment from "../../constants/env";
+import { clearAiProxyToken, writeAiProxyToken } from "../tokenStorage";
 import {
     AgentAuthError,
     AgentBudgetError,
@@ -85,9 +86,11 @@ describe("agentClient", () => {
 
     beforeEach(() => {
         fetchSpy = jest.spyOn(global, "fetch");
+        writeAiProxyToken("narrow-ai");
     });
 
     afterEach(() => {
+        clearAiProxyToken();
         fetchSpy.mockRestore();
     });
 
@@ -105,6 +108,76 @@ describe("agentClient", () => {
     };
 
     describe("streamAgent", () => {
+        it("refreshes a missing AI proxy token before opening the stream", async () => {
+            clearAiProxyToken();
+            fetchSpy
+                .mockResolvedValueOnce(okJsonResponse({ ai_jwt: "fresh-ai" }))
+                .mockResolvedValueOnce(buildStreamResponse([]));
+
+            const out = [];
+            for await (const part of streamAgent(baseRequest)) {
+                out.push(part);
+            }
+
+            expect(out).toEqual([]);
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(String(fetchSpy.mock.calls[0][0])).toBe(
+                `${environment.apiBaseUrl}/auth/ai-token`
+            );
+            expect(fetchSpy.mock.calls[0][1]).toEqual(
+                expect.objectContaining({
+                    credentials: "include",
+                    method: "POST"
+                })
+            );
+            expect(fetchSpy.mock.calls[1][1]).toEqual(
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        Authorization: "Bearer fresh-ai"
+                    })
+                })
+            );
+        });
+
+        it("refreshes an expired AI proxy token before opening the stream", async () => {
+            writeAiProxyToken("header.eyJleHAiOjF9.signature");
+            fetchSpy
+                .mockResolvedValueOnce(okJsonResponse({ ai_jwt: "renewed-ai" }))
+                .mockResolvedValueOnce(buildStreamResponse([]));
+
+            for await (const _ of streamAgent(baseRequest)) {
+                // drain
+            }
+
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+            expect(fetchSpy.mock.calls[1][1]).toEqual(
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        Authorization: "Bearer renewed-ai"
+                    })
+                })
+            );
+        });
+
+        it("does not open the stream when AI proxy token refresh returns auth", async () => {
+            clearAiProxyToken();
+            fetchSpy.mockResolvedValueOnce(
+                errorResponse(401, { message: "sign in" })
+            );
+
+            await expect(
+                (async () => {
+                    for await (const _ of streamAgent(baseRequest)) {
+                        // drain
+                    }
+                })()
+            ).rejects.toBeInstanceOf(AgentAuthError);
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+            expect(String(fetchSpy.mock.calls[0][0])).toBe(
+                `${environment.apiBaseUrl}/auth/ai-token`
+            );
+        });
+
         it("yields parsed StreamParts in order", async () => {
             const chunks = [
                 sseChunk({

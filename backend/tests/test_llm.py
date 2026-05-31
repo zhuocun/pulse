@@ -11,8 +11,10 @@ from langchain_core.messages import AIMessage
 from app.agents import llm as llm_module
 from app.agents.llm import (
     DEFAULT_ANTHROPIC_MODEL,
+    DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_OPENAI_MODEL,
     PROVIDER_ANTHROPIC,
+    PROVIDER_DEEPSEEK,
     PROVIDER_OPENAI,
     PROVIDER_STUB,
     ChatModelSpec,
@@ -79,6 +81,31 @@ def test_resolve_spec_auto_picks_openai_when_only_openai_key_set() -> None:
     )
     assert spec.provider == PROVIDER_OPENAI
     assert spec.model == DEFAULT_OPENAI_MODEL
+
+
+def test_resolve_spec_auto_picks_deepseek_after_anthropic_and_openai() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(
+            anthropic_api_key="",
+            openai_api_key="",
+            deepseek_api_key="sk-deepseek",
+        )
+    )
+    assert spec.provider == PROVIDER_DEEPSEEK
+    assert spec.model == DEFAULT_DEEPSEEK_MODEL
+    assert spec.api_key == "sk-deepseek"
+    assert spec.base_url == "https://api.deepseek.com"
+
+
+def test_resolve_spec_auto_prefers_openai_over_deepseek() -> None:
+    spec = resolve_chat_model_spec(
+        _settings(
+            anthropic_api_key="",
+            openai_api_key="sk-openai",
+            deepseek_api_key="sk-deepseek",
+        )
+    )
+    assert spec.provider == PROVIDER_OPENAI
 
 
 def test_resolve_spec_explicit_provider_overrides_auto() -> None:
@@ -203,6 +230,25 @@ def test_assert_provider_available_passes_when_key_present_in_prod(
             anthropic_api_key="sk-real",
         )
     )
+
+
+def test_assert_provider_available_passes_for_deepseek_with_key() -> None:
+    llm_module.assert_provider_available(
+        settings=_settings(
+            agent_chat_model_provider="deepseek",
+            deepseek_api_key="sk-real",
+        )
+    )
+
+
+def test_assert_provider_available_raises_for_explicit_deepseek_without_key() -> None:
+    with pytest.raises(RuntimeError, match="DEEPSEEK_API_KEY"):
+        llm_module.assert_provider_available(
+            settings=_settings(
+                agent_chat_model_provider="deepseek",
+                deepseek_api_key="",
+            )
+        )
 
 
 def test_assert_provider_available_passes_in_local_dev_without_key(

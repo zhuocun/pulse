@@ -246,6 +246,29 @@ const isTaskArray = (x: unknown): x is ITask[] =>
     Array.isArray(x) &&
     x.every((t) => t && typeof (t as ITask)._id === "string");
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === "object";
+
+const payloadForTool = (toolName: ChatToolName, payload: unknown): unknown => {
+    if (!isRecord(payload)) return payload;
+    switch (toolName) {
+        case "listProjects":
+            return "projects" in payload ? payload.projects : payload;
+        case "listMembers":
+            return "members" in payload ? payload.members : payload;
+        case "getProject":
+            return "project" in payload ? payload.project : payload;
+        case "listBoard":
+            return "columns" in payload ? payload.columns : payload;
+        case "listTasks":
+            return "tasks" in payload ? payload.tasks : payload;
+        case "getTask":
+            return "task" in payload ? payload.task : payload;
+        default:
+            return payload;
+    }
+};
+
 /**
  * Extract structured citations from a tool result payload. Returns at
  * most three refs so the UI doesn't flood the bubble with chips for
@@ -259,7 +282,8 @@ export const citationsFromToolResult = (
     toolName: ChatToolName,
     payload: unknown
 ): CitationRef[] => {
-    if (!payload || typeof payload !== "object") return [];
+    const citationPayload = payloadForTool(toolName, payload);
+    if (!isRecord(citationPayload)) return [];
     const make = (entry: Record<string, unknown>): CitationRef | null => {
         const id = typeof entry._id === "string" ? entry._id : null;
         if (!id) return null;
@@ -281,7 +305,9 @@ export const citationsFromToolResult = (
                 : "project";
         return { source, id, quote };
     };
-    const list = Array.isArray(payload) ? payload : [payload];
+    const list = Array.isArray(citationPayload)
+        ? citationPayload
+        : [citationPayload];
     const refs: CitationRef[] = [];
     for (const entry of list) {
         if (!entry || typeof entry !== "object") continue;
@@ -319,38 +345,45 @@ export const summarizeToolResultForUser = (
     if (payload && typeof payload === "object" && "error" in payload) {
         return String((payload as { error: string }).error);
     }
+    const resultPayload = payloadForTool(toolName, payload);
     switch (toolName) {
         case "listProjects":
-            if (isProjectArray(payload)) {
-                if (payload.length === 0)
+            if (isProjectArray(resultPayload)) {
+                if (resultPayload.length === 0)
                     return microcopy.ai.noProjectsFound as string;
-                const lines = payload.map((p) => `• **${p.projectName}**`);
+                const lines = resultPayload.map(
+                    (p) => `• **${p.projectName}**`
+                );
                 return [
-                    (payload.length === 1
+                    (resultPayload.length === 1
                         ? microcopy.ai.checkedProjectsSummaryOne
                         : microcopy.ai.checkedProjectsSummaryOther
-                    ).replace("{count}", String(payload.length)),
+                    ).replace("{count}", String(resultPayload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "listMembers":
-            if (isMemberArray(payload)) {
-                if (payload.length === 0)
+            if (isMemberArray(resultPayload)) {
+                if (resultPayload.length === 0)
                     return microcopy.ai.noTeamMembersFound as string;
-                const lines = payload.map((m) => `• **${m.username}**`);
+                const lines = resultPayload.map((m) => `• **${m.username}**`);
                 return [
-                    (payload.length === 1
+                    (resultPayload.length === 1
                         ? microcopy.ai.checkedMembersSummaryOne
                         : microcopy.ai.checkedMembersSummaryOther
-                    ).replace("{count}", String(payload.length)),
+                    ).replace("{count}", String(resultPayload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "getProject":
-            if (payload && typeof payload === "object" && "_id" in payload) {
-                const p = payload as IProject;
+            if (
+                resultPayload &&
+                typeof resultPayload === "object" &&
+                "_id" in resultPayload
+            ) {
+                const p = resultPayload as IProject;
                 return microcopy.ai.openedProjectSummary
                     .replace("{name}", p.projectName)
                     .replace(
@@ -360,41 +393,45 @@ export const summarizeToolResultForUser = (
             }
             break;
         case "listBoard":
-            if (isColumnArray(payload)) {
-                if (payload.length === 0)
+            if (isColumnArray(resultPayload)) {
+                if (resultPayload.length === 0)
                     return microcopy.ai.noColumnsFound as string;
-                const lines = [...payload]
+                const lines = [...resultPayload]
                     .sort((a, b) => a.index - b.index)
                     .map((c) => `• ${c.columnName}`);
                 return [
-                    (payload.length === 1
+                    (resultPayload.length === 1
                         ? microcopy.ai.checkedColumnsSummaryOne
                         : microcopy.ai.checkedColumnsSummaryOther
-                    ).replace("{count}", String(payload.length)),
+                    ).replace("{count}", String(resultPayload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "listTasks":
-            if (isTaskArray(payload)) {
-                if (payload.length === 0)
+            if (isTaskArray(resultPayload)) {
+                if (resultPayload.length === 0)
                     return microcopy.ai.noTasksFound as string;
-                const lines = payload.map(
+                const lines = resultPayload.map(
                     (t) =>
                         `• **${t.taskName}** — ${t.type}, ${microcopy.brief.markdownStoryPoints.replace("{count}", String(t.storyPoints))}`
                 );
                 return [
-                    (payload.length === 1
+                    (resultPayload.length === 1
                         ? microcopy.ai.checkedTasksSummaryOne
                         : microcopy.ai.checkedTasksSummaryOther
-                    ).replace("{count}", String(payload.length)),
+                    ).replace("{count}", String(resultPayload.length)),
                     ...lines
                 ].join("\n");
             }
             break;
         case "getTask":
-            if (payload && typeof payload === "object" && "_id" in payload) {
-                const t = payload as ITask;
+            if (
+                resultPayload &&
+                typeof resultPayload === "object" &&
+                "_id" in resultPayload
+            ) {
+                const t = resultPayload as ITask;
                 return [
                     microcopy.ai.openedTaskSummary.replace(
                         "{name}",

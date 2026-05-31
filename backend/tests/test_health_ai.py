@@ -41,6 +41,8 @@ def test_default_shape_with_stub_provider(client: TestClient) -> None:
     # The default test setup ships without a real provider key.
     assert body["anthropicKeyPresent"] is False
     assert body["openaiKeyPresent"] is False
+    assert body["deepseekKeyPresent"] is False
+    assert body["providerConnectivityProbeSupported"] is True
 
 
 def test_ready_false_when_openai_provider_set_without_key(
@@ -76,6 +78,26 @@ def test_ready_false_when_anthropic_provider_set_without_key(
     assert any("ANTHROPIC_API_KEY" in issue for issue in body["issues"])
 
 
+def test_ready_false_when_deepseek_provider_set_without_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_settings(
+        monkeypatch,
+        agent_chat_model_provider="deepseek",
+        openai_api_key="",
+        anthropic_api_key="",
+        deepseek_api_key="",
+    )
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+    assert body["provider"] == "deepseek"
+    assert body["stubMode"] is False
+    assert body["deepseekKeyPresent"] is False
+    assert body["providerConnectivityProbeSupported"] is True
+    assert body["ready"] is False
+    assert any("DEEPSEEK_API_KEY" in issue for issue in body["issues"])
+
+
 def test_camelcase_and_snake_case_mirrors_match(client: TestClient) -> None:
     """Every camelCase field has a snake_case mirror with the same value.
 
@@ -93,6 +115,11 @@ def test_camelcase_and_snake_case_mirrors_match(client: TestClient) -> None:
         ("stubMode", "stub_mode"),
         ("anthropicKeyPresent", "anthropic_key_present"),
         ("openaiKeyPresent", "openai_key_present"),
+        ("deepseekKeyPresent", "deepseek_key_present"),
+        (
+            "providerConnectivityProbeSupported",
+            "provider_connectivity_probe_supported",
+        ),
         ("failoverConfigured", "failover_configured"),
         ("embeddingsProvider", "embeddings_provider"),
         ("embeddingsStubMode", "embeddings_stub_mode"),
@@ -148,6 +175,7 @@ def test_no_api_key_value_appears_in_response_body(
     body = response.json()
     assert body["openaiKeyPresent"] is True
     assert body["anthropicKeyPresent"] is True
+    assert body["deepseekKeyPresent"] is False
 
 
 def test_agents_loaded_matches_runtime_registry(client: TestClient) -> None:

@@ -4,7 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.database import COLUMNS, PROJECTS, TASKS, USERS
-from app.security import encrypt_password, legacy_password_hash, create_token
+from app.security import (
+    JWT_SCOPE_AI_PROXY,
+    create_token,
+    decode_token,
+    encrypt_password,
+    legacy_password_hash,
+)
 from app.services import auth_service, board_service, task_service, user_service
 from app.validation import unwrap_error_detail
 from tests.conftest import FakeStore
@@ -482,6 +488,35 @@ def test_login_sets_session_cookie_and_omits_rest_jwt_from_body(
     me = client.get("/api/v1/users/")
     assert me.status_code == 200
     assert me.json()["email"] == "cookie@example.com"
+
+
+def test_authenticated_user_can_refresh_ai_proxy_token(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "aitoken",
+            "email": "aitoken@example.com",
+            "password": "secret",
+        },
+    )
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "aitoken@example.com", "password": "secret"},
+    )
+    assert login.status_code == 200
+
+    response = client.post("/api/v1/auth/ai-token")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"ai_jwt"}
+    assert body["ai_jwt"]
+    assert decode_token(body["ai_jwt"])["scp"] == JWT_SCOPE_AI_PROXY
+
+
+def test_ai_proxy_token_refresh_requires_rest_session(client: TestClient) -> None:
+    response = client.post("/api/v1/auth/ai-token")
+    assert response.status_code == 401
 
 
 def test_logout_clears_the_session_cookie(client: TestClient) -> None:
