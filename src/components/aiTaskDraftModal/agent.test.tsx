@@ -44,6 +44,10 @@ jest.mock("../../constants/env", () => ({
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 import useAgent from "../../utils/hooks/useAgent";
 import { store } from "../../store";
 
@@ -179,6 +183,12 @@ describe("AiTaskDraftModal — remote agent path", () => {
     beforeEach(() => {
         mockedStream.mockReset();
         mockedUseAgent.mockReset();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
+    });
+
+    afterEach(() => {
+        resetRemoteAiConsentForTests();
     });
 
     it("calls agent.start with the prompt when Draft button is clicked", async () => {

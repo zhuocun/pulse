@@ -22,6 +22,9 @@ from app.agents import AgentRuntime
 from app.agents.checkpointing import resolve_agent_backend
 from app.agents.embeddings import resolve_embeddings_spec
 from app.agents.llm import (
+    PROVIDER_ANTHROPIC,
+    PROVIDER_DEEPSEEK,
+    PROVIDER_OPENAI,
     PROVIDER_STUB,
     _failover_secondary_spec,
     probe_provider_connectivity,
@@ -203,20 +206,17 @@ def _ai_readiness_payload(
 
     # Provider / key sanity. We name the missing env var without ever
     # echoing the key value (booleans only flow into the payload).
-    if (
-        chat_spec.provider == "openai"
-        and not chat_spec.api_key
-    ):
-        issues.append(
-            "OPENAI_API_KEY missing -- provider explicitly set to 'openai'"
-        )
-    if (
-        chat_spec.provider == "anthropic"
-        and not chat_spec.api_key
-    ):
-        issues.append(
+    missing_key_messages = {
+        PROVIDER_OPENAI: "OPENAI_API_KEY missing -- provider explicitly set to 'openai'",
+        PROVIDER_ANTHROPIC: (
             "ANTHROPIC_API_KEY missing -- provider explicitly set to 'anthropic'"
-        )
+        ),
+        PROVIDER_DEEPSEEK: (
+            "DEEPSEEK_API_KEY missing -- provider explicitly set to 'deepseek'"
+        ),
+    }
+    if chat_spec.provider in missing_key_messages and not chat_spec.api_key:
+        issues.append(missing_key_messages[chat_spec.provider])
 
     if chat_spec.provider == PROVIDER_STUB:
         warnings.append(
@@ -288,6 +288,9 @@ def _ai_readiness_payload(
         "stubMode": chat_spec.provider == PROVIDER_STUB,
         "anthropicKeyPresent": bool(settings.anthropic_api_key),
         "openaiKeyPresent": bool(settings.openai_api_key),
+        "deepseekKeyPresent": bool(settings.deepseek_api_key),
+        "providerConnectivityProbeSupported": chat_spec.provider
+        in {PROVIDER_ANTHROPIC, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_STUB},
         "failoverConfigured": failover_spec is not None,
         "embeddingsProvider": embeddings_spec.provider,
         "embeddingsStubMode": embeddings_spec.is_stub,
@@ -331,6 +334,10 @@ def _ai_readiness_payload(
         "stub_mode": payload["stubMode"],
         "anthropic_key_present": payload["anthropicKeyPresent"],
         "openai_key_present": payload["openaiKeyPresent"],
+        "deepseek_key_present": payload["deepseekKeyPresent"],
+        "provider_connectivity_probe_supported": payload[
+            "providerConnectivityProbeSupported"
+        ],
         "failover_configured": payload["failoverConfigured"],
         "embeddings_provider": payload["embeddingsProvider"],
         "embeddings_stub_mode": payload["embeddingsStubMode"],

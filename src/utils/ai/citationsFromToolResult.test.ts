@@ -46,6 +46,30 @@ describe("citationsFromToolResult", () => {
         ]);
     });
 
+    it("extracts citations from FE tool envelope payloads", () => {
+        const refs = citationsFromToolResult("listTasks", {
+            tasks: [
+                {
+                    _id: "t1",
+                    taskName: "Investigate flaky login",
+                    type: "Bug",
+                    storyPoints: 3
+                }
+            ]
+        });
+        expect(refs).toEqual([
+            {
+                source: "task",
+                id: "t1",
+                quote: "Investigate flaky login"
+            }
+        ]);
+    });
+
+    it("returns no citations for null get envelopes", () => {
+        expect(citationsFromToolResult("getTask", { task: null })).toEqual([]);
+    });
+
     it("returns no citations for error payloads", () => {
         expect(citationsFromToolResult("listTasks", { error: "boom" })).toEqual(
             []

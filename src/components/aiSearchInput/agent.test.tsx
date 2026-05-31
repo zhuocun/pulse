@@ -40,6 +40,10 @@ jest.mock("../../constants/env", () => ({
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 import useAgent from "../../utils/hooks/useAgent";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 
@@ -140,6 +144,8 @@ describe("AiSearchInput — remote agent path", () => {
     beforeEach(() => {
         mockedStream.mockReset();
         mockedUseAgent.mockReset();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
         mockedUseAiEnabled.mockReturnValue({
             available: true,
             enabled: true,
@@ -148,6 +154,7 @@ describe("AiSearchInput — remote agent path", () => {
     });
 
     afterEach(() => {
+        resetRemoteAiConsentForTests();
         jest.clearAllMocks();
     });
 

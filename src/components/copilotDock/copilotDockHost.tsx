@@ -4,6 +4,7 @@ import { useMatch } from "react-router-dom";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import type { TriageNudge } from "../../interfaces/agent";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import useAgent from "../../utils/hooks/useAgent";
 import useAiChatDrawer from "../../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
@@ -134,6 +135,7 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
     });
     const startTriageAgent = triageAgent.start;
     const dismissTriageNudge = triageAgent.dismissNudge;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
     const triagedProjectsRef = useRef<Set<string>>(new Set());
 
     const triageTabActive =
@@ -142,6 +144,7 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
         if (!triageTabActive) return;
         if (!projectId) return;
         if (environment.aiUseLocalEngine) return;
+        if (!remoteAiConsentGranted) return;
         if (triagedProjectsRef.current.has(projectId)) return;
 
         triagedProjectsRef.current.add(projectId);
@@ -158,7 +161,7 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // surfaced via triageAgent.error if needed.
         }
-    }, [triageTabActive, projectId, startTriageAgent]);
+    }, [triageTabActive, projectId, remoteAiConsentGranted, startTriageAgent]);
 
     const visibleTasks = useMemo(() => tasks ?? [], [tasks]);
 

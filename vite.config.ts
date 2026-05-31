@@ -22,7 +22,36 @@ export default defineConfig(({ mode }) => {
 
     return {
         build: {
-            chunkSizeWarningLimit: 1600
+            chunkSizeWarningLimit: 1000,
+            rolldownOptions: {
+                output: {
+                    codeSplitting: {
+                        groups: [
+                            {
+                                name: "react-vendor",
+                                priority: 40,
+                                test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
+                            },
+                            {
+                                maxSize: 600 * 1024,
+                                name: "antd-vendor",
+                                priority: 30,
+                                test: /node_modules[\\/](antd|@ant-design|@rc-component|rc-)[\\/]/
+                            },
+                            {
+                                name: "motion-vendor",
+                                priority: 20,
+                                test: /node_modules[\\/](framer-motion|motion-dom|motion-utils|tslib)[\\/]/
+                            },
+                            {
+                                name: "app-vendor",
+                                priority: 10,
+                                test: /node_modules[\\/]/
+                            }
+                        ]
+                    }
+                }
+            }
         },
         define: {
             "process.env.REACT_APP_API_URL": JSON.stringify(apiUrl),

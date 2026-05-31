@@ -72,11 +72,11 @@ Frontend code cannot read that cookie; all REST calls use same-origin
 optional `ai_jwt` response field is stored separately in `sessionStorage` for
 AI proxy calls that may live outside the cookie origin.
 
-### localStorage keys
+### Browser storage keys
 
 | Key                                      | Owner                 | Content                                                      |
 | ---------------------------------------- | --------------------- | ------------------------------------------------------------ |
-| `"AiProxyJwt"`                           | `tokenStorage.ts`     | Narrow AI proxy JWT from login response                      |
+| `"AiProxyJwt"`                           | `tokenStorage.ts`     | `sessionStorage` narrow AI proxy JWT from login / refresh    |
 | `"boardCopilot:enabled"`                 | `useAiEnabled.ts`     | `"true"` / `"false"` — per-browser AI toggle                 |
 | `"boardCopilot:autonomy"`                | `useAiEnabled.ts`     | `"suggest"` / `"plan"` / `"auto"`                            |
 | `"boardCopilot:disabledProjectIds"`      | `projectAiStorage.ts` | JSON array of project ids opted-out of AI                    |
@@ -86,7 +86,7 @@ AI proxy calls that may live outside the cookie origin.
 
 ## HTTP Routes Consumed
 
-All REST routes are relative to `apiBaseUrl` (`${REACT_APP_API_URL}/api/v1`).
+All REST routes are relative to `apiBaseUrl` (`/api/v1` in browser builds).
 All AI v1 routes are relative to `aiBaseUrl` (only called when `aiUseLocalEngine` is `false`).
 All Agents v2.1 routes are relative to `aiBaseUrl`.
 
@@ -96,9 +96,10 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 
 | Method   | Path                    | Called by                                                                         | Request body / query                                             | Response type                  |
 | -------- | ----------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------ |
-| `POST`   | `/api/v1/auth/login`    | `authApis.login`, `loginForm`                                                     | `{ email, password }`                                            | `IUser` (includes `jwt`)       |
+| `POST`   | `/api/v1/auth/login`    | `authApis.login`, `loginForm`                                                     | `{ email, password }`                                            | `IUser` (sets HttpOnly cookie; may include `ai_jwt`) |
+| `POST`   | `/api/v1/auth/ai-token` | `aiProxyToken.ensureFreshAiProxyToken`                                            | —                                                                | `{ ai_jwt: string }`           |
 | `POST`   | `/api/v1/auth/register` | `authApis.register`, `registerForm`                                               | `{ username, email, password }`                                  | `string` (`"User created"`)    |
-| `GET`    | `/api/v1/users`         | `authProvider`, `useAuth.refreshUser`                                             | —                                                                | `IUser`                        |
+| `GET`    | `/api/v1/users`         | `authProvider`                                                                    | —                                                                | `IUser`                        |
 | `PUT`    | `/api/v1/users/likes`   | `projectList`                                                                     | `{ projectId }`                                                  | `IUser`                        |
 | `GET`    | `/api/v1/users/members` | `projectModal`, `memberPopover`, `chatTools.listMembers`, `chatTools.getProject`  | —                                                                | `IMember[]`                    |
 | `GET`    | `/api/v1/projects`      | `project.tsx`, `projectPopover`, `chatTools.listProjects`, `chatTools.getProject` | `?projectId=…` (optional)                                        | `IProject[]` or `IProject`     |
@@ -173,7 +174,7 @@ HTTP sample for a streaming start:
 POST /api/v1/agents/board-copilot/stream HTTP/1.1
 Content-Type: application/json
 Accept: text/event-stream
-Authorization: Bearer <jwt>
+Authorization: Bearer <ai_jwt>
 Idempotency-Key: <uuid>
 
 {
@@ -210,14 +211,14 @@ const useApi: () => (
 ) => Promise<unknown>;
 ```
 
-**Returns** a memoized `api` function scoped to the current user's JWT.
+**Returns** a memoized `api` function for same-origin REST requests.
 
 The returned function:
 
 - Prepends `environment.apiBaseUrl/` to `endpoint`.
 - On `GET` / `DELETE`: serializes `data` as a query string via `qs.stringify`.
 - On other methods: serializes `data` as a JSON body.
-- Attaches `Authorization: Bearer <jwt>` from `useAuth`.
+- Sends `credentials: "include"` so the HttpOnly `Token` cookie is attached.
 - Parses the response body via `parseFetchBody` (JSON or text).
 - Rejects with an `Error` whose message is extracted from the response body.
 - Converts network-level `TypeError` via `rewriteNetworkFetchError`.
@@ -279,17 +280,15 @@ _Source: `src/utils/hooks/useAuth.ts:7`_
 ```ts
 const useAuth: () => {
     user: IUser | undefined;
-    token: string | null;
+    isAuthenticated: boolean;
     logout: () => void;
-    refreshUser: () => Promise<void>;
 };
 ```
 
 - `user` is read from the React Query cache under key `["users"]`.
-- `token` is read from `localStorage` via `readAuthToken()`.
-- `logout()` clears the query cache, removes the token, and navigates to `/login`.
-- `refreshUser()` refetches `["users"]` and patches `jwt` back into the cache entry
-  from `localStorage`. On error it clears auth and redirects to `/login`.
+- `isAuthenticated` is derived from the cached `user._id`; the REST JWT is in an HttpOnly cookie and is not readable from JavaScript.
+- `logout()` asks the backend to clear the cookie, clears the narrow AI proxy token and query cache, and navigates to `/login`.
+- `refreshUser()` is owned by `AuthProvider`'s unconditional `GET /users` probe; a 401 leaves the cache empty and route guards redirect to `/login`.
 
 ---
 
@@ -770,8 +769,9 @@ Exported helpers used by the engine internally and by AI surface tests.
 
 _Source: `src/utils/ai/agentClient.ts:1`_
 
-Typed HTTP transport over the LangGraph v2 agent surface. All functions attach
-`Authorization: Bearer <jwt>` via `getStoredBearerAuthHeader()`.
+Typed HTTP transport over the LangGraph v2 agent surface. All functions refresh
+the short-lived `ai_jwt` when needed and attach it via
+`getStoredBearerAuthHeader()`.
 
 #### `streamAgent`
 
@@ -1073,9 +1073,9 @@ _Source: `src/utils/aiAuthHeader.ts:1`_
 function getStoredBearerAuthHeader(): string;
 ```
 
-Returns `"Bearer <token>"` if a token exists in `localStorage`, or `""` when no
-token is stored. Used by `useAi.ts`, `useAiChat.ts`, and `agentClient.ts` to attach
-auth headers to all AI proxy and agent server requests.
+Returns `"Bearer <token>"` if a narrow AI proxy token exists in `sessionStorage`,
+or `""` when no token is stored. Used by `useAi.ts`, `useAiChat.ts`, and
+`agentClient.ts` to attach auth headers to AI proxy and agent server requests.
 
 ---
 
@@ -1698,11 +1698,11 @@ _Sources: `src/interfaces/`_
 | `IColumn`     | `_id`, `columnName`, `projectId`, `index`                                                                   | `column.d.ts`  |
 | `IProject`    | `_id`, `projectName`, `managerId`, `organization`, `createdAt?`                                             | `project.d.ts` |
 | `IMember`     | `_id`, `username`, `email`                                                                                  | `member.d.ts`  |
-| `IUser`       | extends `IMember`, adds `likedProjects: string[]`, `jwt?: string`                                           | `user.d.ts`    |
+| `IUser`       | extends `IMember`, adds `likedProjects: string[]`, `ai_jwt?: string`                                        | `user.d.ts`    |
 | `IError`      | `error: { msg: string }[] \| string`                                                                        | `error.d.ts`   |
 | `StoryPoints` | `1 \| 2 \| 3 \| 5 \| 8 \| 13`                                                                               | `ai.d.ts`      |
 
-`IUser.jwt` is present only in `POST /auth/login` responses. `GET /users` and `PUT /users/likes` intentionally omit it. `useAuth.refreshUser` patches the token back into the cache from `localStorage`.
+`IUser.ai_jwt` may be present in `POST /auth/login` responses and is copied into `sessionStorage` for remote AI calls. `GET /users` and `PUT /users/likes` intentionally omit tokens; the REST session stays in the HttpOnly `Token` cookie.
 
 ---
 

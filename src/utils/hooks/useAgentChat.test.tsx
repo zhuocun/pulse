@@ -58,6 +58,10 @@ jest.mock("./useAgent", () => {
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../ai/remoteAiConsent";
 import useAgentChat from "./useAgentChat";
 
 const mockedStream = streamAgent as unknown as jest.Mock;
@@ -98,6 +102,8 @@ describe("useAgentChat", () => {
     beforeEach(() => {
         mockedStream.mockReset();
         useAgentResumeOverride.current = null;
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
         localStorage.removeItem("boardCopilot:disabledProjectIds");
     });
 

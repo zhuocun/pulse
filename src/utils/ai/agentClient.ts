@@ -7,6 +7,7 @@ import type {
 } from "../../interfaces/agent";
 import environment from "../../constants/env";
 import { getStoredBearerAuthHeader } from "../aiAuthHeader";
+import { ensureFreshAiProxyToken } from "./aiProxyToken";
 import {
     AgentAuthError,
     AgentBudgetError,
@@ -58,9 +59,12 @@ interface AgentByNameRequest extends BaseRequest {
 const trimSlash = (url: string) => url.replace(/\/+$/, "");
 
 const buildHeaders = (
-    extra?: Record<string, string>
+    extra?: Record<string, string>,
+    aiProxyToken?: string
 ): Record<string, string> => {
-    const auth = getStoredBearerAuthHeader();
+    const auth = aiProxyToken
+        ? `Bearer ${aiProxyToken}`
+        : getStoredBearerAuthHeader();
     const base: Record<string, string> = {
         "Content-Type": "application/json"
     };
@@ -141,6 +145,7 @@ export async function* streamAgent({
     headers
 }: AgentEnvelopeRequest): AsyncGenerator<StreamPart, void, void> {
     checkAlreadyAborted(signal);
+    const aiProxyToken = await ensureFreshAiProxyToken(signal);
     const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
@@ -148,11 +153,14 @@ export async function* streamAgent({
             `${trimSlash(baseUrl)}/api/v1/agents/${encodeURIComponent(name)}/stream`,
             {
                 body: JSON.stringify(body),
-                headers: buildHeaders({
-                    Accept: "text/event-stream",
-                    "Idempotency-Key": idempotencyKey,
-                    ...(headers ?? {})
-                }),
+                headers: buildHeaders(
+                    {
+                        Accept: "text/event-stream",
+                        "Idempotency-Key": idempotencyKey,
+                        ...(headers ?? {})
+                    },
+                    aiProxyToken
+                ),
                 method: "POST",
                 signal
             }
@@ -209,6 +217,7 @@ export const invokeAgent = async <T = unknown>({
     headers
 }: AgentEnvelopeRequest): Promise<T> => {
     checkAlreadyAborted(signal);
+    const aiProxyToken = await ensureFreshAiProxyToken(signal);
     const idempotencyKey = newIdempotencyKey();
     let response: Response;
     try {
@@ -216,10 +225,13 @@ export const invokeAgent = async <T = unknown>({
             `${trimSlash(baseUrl)}/api/v1/agents/${encodeURIComponent(name)}/invoke`,
             {
                 body: JSON.stringify(body),
-                headers: buildHeaders({
-                    "Idempotency-Key": idempotencyKey,
-                    ...(headers ?? {})
-                }),
+                headers: buildHeaders(
+                    {
+                        "Idempotency-Key": idempotencyKey,
+                        ...(headers ?? {})
+                    },
+                    aiProxyToken
+                ),
                 method: "POST",
                 signal
             }
@@ -239,10 +251,11 @@ export const listAgents = async ({
     signal
 }: BaseRequest): Promise<AgentListResponse> => {
     checkAlreadyAborted(signal);
+    const aiProxyToken = await ensureFreshAiProxyToken(signal);
     let response: Response;
     try {
         response = await fetch(`${trimSlash(baseUrl)}/api/v1/agents`, {
-            headers: buildHeaders(headers),
+            headers: buildHeaders(headers, aiProxyToken),
             method: "GET",
             signal
         });
@@ -275,12 +288,13 @@ export const getAgentMetadata = async ({
     signal
 }: AgentByNameRequest): Promise<AgentMetadata> => {
     checkAlreadyAborted(signal);
+    const aiProxyToken = await ensureFreshAiProxyToken(signal);
     let response: Response;
     try {
         response = await fetch(
             `${trimSlash(baseUrl)}/api/v1/agents/${encodeURIComponent(name)}`,
             {
-                headers: buildHeaders(headers),
+                headers: buildHeaders(headers, aiProxyToken),
                 method: "GET",
                 signal
             }

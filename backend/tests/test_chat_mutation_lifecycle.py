@@ -10,7 +10,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
-from app.agents.catalog.chat import ChatAgent
+from app.agents.catalog.chat import ChatAgent, _organic_mutation_proposal
 from app.agents.llm import make_stub_chat_model
 
 
@@ -26,6 +26,71 @@ def _ctx():
         "project_id": "p-test",
         "autonomy_level": "plan",
     }
+
+
+def test_organic_mutation_proposal_accepts_task_updates_only() -> None:
+    proposal = _organic_mutation_proposal(
+        {
+            "description": "Rename task",
+            "risk": "low",
+            "diff": {
+                "task_updates": [
+                    {
+                        "task_id": "t1",
+                        "field": "taskName",
+                        "from": "Old",
+                        "to": "New",
+                    }
+                ]
+            },
+        }
+    )
+
+    assert proposal is not None
+    assert proposal.diff.task_updates
+    assert proposal.diff.column_updates is None
+    assert proposal.diff.bulk_apply is None
+
+
+@pytest.mark.parametrize(
+    "diff",
+    [
+        {
+            "column_updates": [
+                {"column_id": "c1", "field": "name", "from": "Todo", "to": "Ready"}
+            ]
+        },
+        {
+            "task_updates": [
+                {
+                    "task_id": "t1",
+                    "field": "taskName",
+                    "from": "Old",
+                    "to": "New",
+                }
+            ],
+            "column_updates": [],
+        },
+        {"bulk_apply": [{"operation": "delete", "targets": ["t1"], "payload": {}}]},
+        {
+            "task_updates": [
+                {
+                    "task_id": "t1",
+                    "field": "taskName",
+                    "from": "Old",
+                    "to": "New",
+                }
+            ],
+            "bulk_apply": [],
+        },
+    ],
+)
+def test_organic_mutation_proposal_rejects_column_and_bulk_diffs(diff) -> None:
+    proposal = _organic_mutation_proposal(
+        {"description": "Unsupported diff", "risk": "low", "diff": diff}
+    )
+
+    assert proposal is None
 
 
 def test_chat_stub_mutation_emits_proposal_and_interrupts(chat_graph) -> None:

@@ -6,7 +6,7 @@ import { microcopy } from "../../constants/microcopy";
 import { space as themeSpace } from "../../theme/tokens";
 import {
     acknowledgeRemoteAi,
-    hasAcknowledgedRemoteAi
+    useRemoteAiConsent
 } from "../../utils/ai/remoteAiConsent";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 
@@ -47,11 +47,7 @@ const CopilotRemoteConsentNotice: React.FC<CopilotRemoteConsentNoticeProps> = ({
 }) => {
     const isLocal = environment.aiUseLocalEngine;
     const baseUrl = environment.aiBaseUrl;
-    // `useState` initializer reads localStorage once; subsequent mounts stay
-    // in sync via the in-memory cache in `remoteAiConsent.ts`.
-    const [acknowledged, setAcknowledged] = React.useState<boolean>(() =>
-        isLocal ? true : hasAcknowledgedRemoteAi(baseUrl)
-    );
+    const acknowledged = useRemoteAiConsent(baseUrl);
     if (isLocal || acknowledged) return null;
     const origin = getRemoteOrigin(baseUrl);
     const body = origin
@@ -59,7 +55,6 @@ const CopilotRemoteConsentNotice: React.FC<CopilotRemoteConsentNoticeProps> = ({
         : microcopy.ai.remoteConsentBodyGeneric;
     const onAccept = () => {
         acknowledgeRemoteAi(baseUrl);
-        setAcknowledged(true);
     };
     const description = (
         <>

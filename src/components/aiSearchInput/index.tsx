@@ -22,6 +22,7 @@ import {
     clearAiSearchStrengths,
     setAiSearchStrengths
 } from "../../utils/ai/aiSearchStrength";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import {
     AiContextProject,
     AiSearchProjectsContext,
@@ -174,6 +175,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
     const remoteError = remoteAgent.error;
     const remoteIsStreaming = remoteAgent.isStreaming;
     const isRemote = !environment.aiUseLocalEngine;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
     const [draft, setDraft] = useState("");
     const [noMatchHint, setNoMatchHint] = useState<string | null>(null);
     const [reformulations, setReformulations] = useState<string[]>([]);
@@ -294,6 +296,7 @@ const AiSearchInput: React.FC<Props> = (props) => {
         async (rawQuery: string) => {
             const query = rawQuery.trim();
             if (!query) return;
+            if (isRemote && !remoteAiConsentGranted) return;
             // Don't disable the input. Cancel any in-flight request so
             // the latest query wins, then start a fresh one.
             abortRef.current?.abort();
@@ -362,7 +365,13 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 applyResult(validateSearch(raw, valid), query);
             }
         },
-        [applyResult, isRemote, props, startRemoteSearch]
+        [
+            applyResult,
+            isRemote,
+            props,
+            remoteAiConsentGranted,
+            startRemoteSearch
+        ]
     );
 
     const onClear = () => {

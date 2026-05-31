@@ -87,7 +87,11 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
         "result_schema": {
             "type": "object",
-            "properties": {"project": {"type": "object"}},
+            "properties": {
+                "project": {
+                    "anyOf": [{"type": "object"}, {"type": "null"}],
+                },
+            },
             "required": ["project"],
         },
     },
@@ -159,7 +163,11 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
         "result_schema": {
             "type": "object",
-            "properties": {"task": {"type": "object"}},
+            "properties": {
+                "task": {
+                    "anyOf": [{"type": "object"}, {"type": "null"}],
+                },
+            },
             "required": ["task"],
         },
     },
@@ -174,11 +182,61 @@ FE_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "result_schema": {
             "type": "object",
             "properties": {
-                "project_id": {"type": "string"},
-                "columns": {"type": "array"},
-                "tasks": {"type": "array"},
-                "members": {"type": "array"},
+                "counts": {
+                    "type": "object",
+                    "properties": {
+                        "total": {"type": "integer"},
+                        "byColumn": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "columnId": {"type": "string"},
+                                    "count": {"type": "integer"},
+                                },
+                                "required": ["columnId", "count"],
+                            },
+                        },
+                    },
+                    "required": ["total", "byColumn"],
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["id", "name"],
+                    },
+                },
+                "unowned": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "taskId": {"type": "string"},
+                            "name": {"type": "string"},
+                            "note": {"type": "string"},
+                        },
+                        "required": ["taskId", "name"],
+                    },
+                },
+                "workload": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "coordinatorId": {"type": "string"},
+                            "count": {"type": "integer"},
+                            "points": {"type": "number"},
+                        },
+                        "required": ["coordinatorId", "count", "points"],
+                    },
+                },
             },
+            "required": ["counts", "members", "unowned", "workload"],
         },
     },
     FE_SIMILAR_TASKS: {
@@ -403,7 +461,7 @@ CHAT_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "Propose a reversible board change for human review. Use this "
             "only after reading the relevant board/task data. The argument "
             "must include a description, risk ('low', 'med', or 'high'), "
-            "and a diff with task_updates, column_updates, or bulk_apply. "
+            "and a diff with task_updates only. "
             "The runtime will show an approval card and, if accepted, apply "
             "the approved diff through the separate FE mutation stage."
         ),
@@ -424,10 +482,9 @@ CHAT_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "diff": {
                 "type": "object",
                 "description": (
-                    "Mutation diff. Supported keys: task_updates "
-                    "([{task_id, field, from, to}]), column_updates "
-                    "([{column_id, field, from, to}]), and bulk_apply "
-                    "([{operation, targets, payload}])."
+                    "Mutation diff. Supported key: task_updates "
+                    "([{task_id, field, from, to}]). Column and bulk diffs "
+                    "are not accepted from organic chat proposals."
                 ),
             },
         },

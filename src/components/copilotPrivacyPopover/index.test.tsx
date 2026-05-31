@@ -26,6 +26,55 @@ describe("CopilotPrivacyPopover", () => {
         ).toBeInTheDocument();
     });
 
+    it("declares a coarse-pointer touch target of at least 44 px", () => {
+        render(<CopilotPrivacyPopover />);
+        const trigger = screen.getByRole("button", {
+            name: microcopy.ai.privacyLink
+        });
+        const styledCls = trigger.className
+            .split(/\s+/)
+            .find(
+                (tok) =>
+                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
+                    !tok.startsWith("css-var-") &&
+                    !tok.startsWith("css-dev-only-")
+            );
+        expect(styledCls).toBeTruthy();
+
+        const heights: number[] = [];
+        const widths: number[] = [];
+        const visit = (rule: CSSRule) => {
+            if (rule instanceof CSSStyleRule) {
+                if (!styledCls || !rule.selectorText.includes(styledCls)) {
+                    return;
+                }
+                const parent = rule.parentRule;
+                const inCoarse =
+                    parent instanceof CSSMediaRule &&
+                    parent.conditionText.includes("coarse");
+                if (!inCoarse) return;
+                const heightMatch =
+                    /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/i.exec(
+                        rule.cssText
+                    );
+                const widthMatch =
+                    /(?:^|[\s;{])(?:min-)?width:\s*(\d+(?:\.\d+)?)px/i.exec(
+                        rule.cssText
+                    );
+                if (heightMatch) heights.push(Number(heightMatch[1]));
+                if (widthMatch) widths.push(Number(widthMatch[1]));
+            } else if ("cssRules" in rule) {
+                Array.from((rule as CSSMediaRule).cssRules).forEach(visit);
+            }
+        };
+        Array.from(document.styleSheets).forEach((sheet) => {
+            Array.from(sheet.cssRules).forEach(visit);
+        });
+
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+    });
+
     it("opens the popover and shows the route-specific scope when route is set", () => {
         render(<CopilotPrivacyPopover route="board-brief" />);
         const trigger = screen.getByRole("button", {

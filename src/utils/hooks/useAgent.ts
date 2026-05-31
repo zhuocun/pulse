@@ -15,6 +15,7 @@ import { STREAM_WATCHDOG_MS } from "../../theme/aiTokens";
 import { AgentForbiddenError } from "../ai/agentErrors";
 import { coerceAgentTransportError, streamAgent } from "../ai/agentClient";
 import { FE_TOOL_REGISTRY } from "../ai/feTools";
+import { hasAcknowledgedRemoteAi } from "../ai/remoteAiConsent";
 import {
     isProjectAiDisabled,
     PROJECT_AI_DISABLED_MESSAGE
@@ -601,6 +602,12 @@ const useAgent = (
 
     const start = useCallback(
         async (input: unknown, startOptions: StartOptions = {}) => {
+            if (
+                !environment.aiUseLocalEngine &&
+                !hasAcknowledgedRemoteAi(baseUrl)
+            ) {
+                return;
+            }
             if (startOptions.threadId) {
                 threadIdRef.current = startOptions.threadId;
                 if (mountedRef.current) setThreadId(startOptions.threadId);
@@ -670,11 +677,17 @@ const useAgent = (
                 version: "v2"
             });
         },
-        [options.projectId, resetNudges, runStream, safeSetState]
+        [baseUrl, options.projectId, resetNudges, runStream, safeSetState]
     );
 
     const resume = useCallback(
         async (resumeValue: unknown) => {
+            if (
+                !environment.aiUseLocalEngine &&
+                !hasAcknowledgedRemoteAi(baseUrl)
+            ) {
+                return;
+            }
             // See `start()` above for why `user_id` is omitted from the
             // wire body — the server derives it from the JWT.
             await runStream({
@@ -691,7 +704,7 @@ const useAgent = (
                 version: "v2"
             });
         },
-        [options.projectId, runStream]
+        [baseUrl, options.projectId, runStream]
     );
 
     const abort = useCallback(() => {
