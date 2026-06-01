@@ -24,6 +24,7 @@ import { microcopy, microcopyString } from "../../constants/microcopy";
 import { modalWidthCss, space } from "../../theme/tokens";
 import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import { validateBreakdown, validateDraft } from "../../utils/ai/validate";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
@@ -135,6 +136,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     const remoteAgent = useAgent("task-drafting-agent", { projectId });
 
     const isRemote = !environment.aiUseLocalEngine;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
     const remoteStart = remoteAgent.start;
     const remoteAbort = remoteAgent.abort;
     const remoteClearSuggestion = remoteAgent.clearSuggestion;
@@ -266,6 +268,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const onDraft = async () => {
         if (!prompt.trim()) return;
+        if (isRemote && !remoteAiConsentGranted) return;
         setBreakdownMode(false);
         track(ANALYTICS_EVENTS.COPILOT_DRAFT_SUBMIT, {
             mode: "single",
@@ -290,6 +293,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
 
     const onBreakdown = async (axis: BreakdownAxis = breakdownAxis) => {
         if (!prompt.trim()) return;
+        if (isRemote && !remoteAiConsentGranted) return;
         track(ANALYTICS_EVENTS.COPILOT_DRAFT_SUBMIT, {
             mode: "breakdown",
             axis,

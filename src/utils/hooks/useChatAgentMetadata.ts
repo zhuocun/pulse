@@ -17,9 +17,10 @@ const CHAT_AGENT_NAME = "chat-agent";
  * {@link getSessionCachedAgentMetadata}). No network when the local engine
  * is active, AI is disabled, or the AI base URL is empty.
  */
-const useChatAgentMetadata = (): ChatAgentMetadataState => {
+const useChatAgentMetadata = (enabled = true): ChatAgentMetadataState => {
     const baseUrl = environment.aiBaseUrl;
     const remoteConfigured =
+        enabled &&
         !environment.aiUseLocalEngine &&
         baseUrl.length > 0 &&
         environment.aiEnabled;

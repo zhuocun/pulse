@@ -198,6 +198,29 @@ def test_fe_tool_definitions_returns_list_of_named_dicts() -> None:
         assert "args_schema" in item
 
 
+def test_fe_tool_result_schema_envelopes_match_fe_contract() -> None:
+    required_keys = {
+        FE_LIST_PROJECTS: ["projects"],
+        FE_LIST_MEMBERS: ["members"],
+        FE_GET_PROJECT: ["project"],
+        FE_LIST_BOARD: ["columns"],
+        FE_LIST_TASKS: ["tasks"],
+        FE_GET_TASK: ["task"],
+        FE_BOARD_SNAPSHOT: ["counts", "members", "unowned", "workload"],
+        FE_SIMILAR_TASKS: ["similar"],
+        FE_SEARCH_CANDIDATES: ["candidates"],
+    }
+    for name, expected in required_keys.items():
+        assert FE_TOOL_SCHEMAS[name]["result_schema"]["required"] == expected
+
+    assert FE_TOOL_SCHEMAS[FE_GET_PROJECT]["result_schema"]["properties"][
+        "project"
+    ] == {"anyOf": [{"type": "object"}, {"type": "null"}]}
+    assert FE_TOOL_SCHEMAS[FE_GET_TASK]["result_schema"]["properties"][
+        "task"
+    ] == {"anyOf": [{"type": "object"}, {"type": "null"}]}
+
+
 def test_interrupt_payload_known_tool() -> None:
     payload = interrupt_payload("fe.boardSnapshot", {"project_id": "p1"})
     assert payload == {"tool": "fe.boardSnapshot", "args": {"project_id": "p1"}}

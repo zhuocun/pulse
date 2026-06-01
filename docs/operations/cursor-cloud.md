@@ -118,8 +118,9 @@ Backend tests use in-memory fakes and do **not** require MongoDB.
   `?probe=true` adds a free `models.list()` LLM connectivity check
   (cached 30s).
 - All AI agents fall back to **deterministic stubs** without
-  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, so the app is fully
-  functional for CRUD and agent-endpoint testing without any LLM keys.
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY`, so the
+  app is fully functional for CRUD and agent-endpoint testing without
+  any LLM keys.
 - The `[dev]` extra alone is **not enough** to run the full test
   suite — install `".[dev,ai]"` (or `".[dev]"` then `".[ai]"`
   separately) so the observability tests find their imports.
@@ -139,4 +140,3 @@ Backend tests use in-memory fakes and do **not** require MongoDB.
 | `AI_MAX_MESSAGES` | `50` | Maximum number of entries in a `messages` list (top-level or under `inputs.messages`). |
 | `AI_MAX_MESSAGE_CONTENT_BYTES` | `8192` (8 KiB) | Maximum byte length for a single message `content` field. |
 | `EMBEDDINGS_DIMENSIONS` | `16` | Dimensions passed to `OpenAIEmbeddings(dimensions=...)`. Default `16` preserves backward compat with the SHA-256 stub. Set `512` or higher when using real OpenAI embeddings in production. The stub path ignores this and always returns 16-dim vectors. |
-

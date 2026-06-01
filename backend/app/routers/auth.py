@@ -1,9 +1,14 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Body, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Request, Response, status
 
 from app.config import settings
-from app.security import SESSION_COOKIE_NAME
+from app.security import (
+    SESSION_COOKIE_NAME,
+    create_ai_proxy_token,
+    current_user_id,
+    current_user_payload,
+)
 from app.services import auth_service
 
 
@@ -60,6 +65,13 @@ def login(
     if rest_jwt:
         _set_session_cookie(response, request, rest_jwt)
     return result
+
+
+@router.post("/ai-token", status_code=status.HTTP_200_OK)
+def refresh_ai_token(payload: Dict[str, Any] = Depends(current_user_payload)) -> Dict[str, str]:
+    """Issue a fresh narrow AI proxy token for an existing REST session."""
+
+    return {"ai_jwt": create_ai_proxy_token(current_user_id(payload))}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

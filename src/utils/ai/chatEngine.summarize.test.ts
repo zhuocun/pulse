@@ -82,6 +82,39 @@ describe("summarizeToolResultForUser plain-language evidence", () => {
         );
         expect(summary.split("\n")[0]).toMatch(/Checked 1 task\./);
     });
+
+    it("formats FE tool envelope payloads while preserving legacy raw payload support", () => {
+        expect(
+            summarizeToolResultForUser("listProjects", {
+                projects: fixture.listProjects
+            })
+        ).toContain("Roadmap");
+        expect(
+            summarizeToolResultForUser("listMembers", {
+                members: fixture.listMembers
+            })
+        ).toContain("alice");
+        expect(
+            summarizeToolResultForUser("listBoard", {
+                columns: fixture.listBoard
+            })
+        ).toContain("Todo");
+        expect(
+            summarizeToolResultForUser("getProject", {
+                project: fixture.listProjects[0]
+            })
+        ).toContain("Roadmap");
+        expect(
+            summarizeToolResultForUser("listTasks", {
+                tasks: fixture.listTasks
+            })
+        ).toContain("Fix login redirect");
+        expect(
+            summarizeToolResultForUser("getTask", {
+                task: fixture.getTask
+            })
+        ).toContain("Fix login redirect");
+    });
 });
 
 describe("summarizeToolResultForUser edge cases", () => {

@@ -13,9 +13,9 @@
 #   docker compose up --build
 #   curl http://localhost:8000/health
 #
-# Override the AI provider key by exporting ANTHROPIC_API_KEY (or
-# OPENAI_API_KEY) before `docker compose up`; the variable is
-# forwarded to the server container automatically.
+# Override the AI provider key by exporting ANTHROPIC_API_KEY,
+# OPENAI_API_KEY, or DEEPSEEK_API_KEY before `docker compose up`;
+# the variable is forwarded to the server container automatically.
 
 services:
   server:
@@ -39,6 +39,7 @@ services:
       # Forward provider keys from the host shell when present.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-}

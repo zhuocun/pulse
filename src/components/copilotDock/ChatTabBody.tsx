@@ -44,6 +44,7 @@ import {
     loadChatHistory,
     saveChatHistory
 } from "../../utils/ai/projectAiStorage";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -192,7 +193,8 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     //     dispatch, and history restore — anything that should only run
     //     while the user is looking at the chat surface.
     const surfaceVisible = dockOpen && (tabActive ?? true);
-    const chatMeta = useChatAgentMetadata();
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
+    const chatMeta = useChatAgentMetadata(remoteAiConsentGranted);
     const allowedAutonomy = useMemo(
         () =>
             chatMeta.status === "ready"
@@ -238,7 +240,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         environment.aiBaseUrl ?? "",
         {
             agentName: "chat-agent",
-            enabled: remoteHealthEnabled
+            enabled: remoteHealthEnabled && remoteAiConsentGranted
         }
     );
     const [input, setInput] = useState("");
@@ -511,9 +513,12 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     }, [reset]);
 
     const dispatch = useCallback(
-        (text: string) => {
+        (text: string): boolean => {
             const trimmed = text.trim();
-            if (!trimmed) return;
+            if (!trimmed) return false;
+            if (!environment.aiUseLocalEngine && !remoteAiConsentGranted) {
+                return false;
+            }
             track(ANALYTICS_EVENTS.COPILOT_CHAT_SEND, {
                 length: trimmed.length
             });
@@ -521,8 +526,9 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
             startTransition(() => {
                 void send(trimmed);
             });
+            return true;
         },
-        [send]
+        [remoteAiConsentGranted, send]
     );
 
     const lastUserText = useMemo(() => {
@@ -554,8 +560,8 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         // send into the chat surface.
         if (!surfaceVisible || !initialPrompt) return;
         if (initialPromptHandled.current === initialPrompt) return;
+        if (!dispatch(initialPrompt)) return;
         initialPromptHandled.current = initialPrompt;
-        dispatch(initialPrompt);
         // R-A M1 Issue #8: notify the host that the prompt is consumed
         // so the host can clear the staged prompt in Redux. A
         // subsequent ProjectScopedDock remount (e.g. after a project

@@ -58,7 +58,9 @@ in that file (or pass `--app`) so deploys never target another team's Fly app.
 ```bash
 fly launch --copy-config --no-deploy
 fly secrets set \
-    ANTHROPIC_API_KEY=... \
+    DEEPSEEK_API_KEY=... \
+    AGENT_CHAT_MODEL_PROVIDER=deepseek \
+    AGENT_CHAT_MODEL_ID=deepseek-v4-flash \
     AGENT_POSTGRES_URI="postgresql://..." \
     MONGO_URI="mongodb+srv://..."
 # Optional: set UUID="$(openssl rand -hex 32)" only if you want a stable
@@ -110,8 +112,12 @@ services:
       # UUID is optional; the lifespan persists a bootstrap secret in Mongo when unset.
       - key: UUID
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: DEEPSEEK_API_KEY
         sync: false
+      - key: AGENT_CHAT_MODEL_PROVIDER
+        value: deepseek
+      - key: AGENT_CHAT_MODEL_ID
+        value: deepseek-v4-flash
       - key: AGENT_POSTGRES_URI
         sync: false
       - key: MONGO_URI
@@ -199,7 +205,7 @@ live.
 - [ ] `python -m pip install ".[postgres-agents]"` (or `".[ai]"`) baked into the image — the published `requirements.txt` already includes `langgraph-checkpoint-postgres` so the production Dockerfile picks it up automatically.
 - [ ] `CORS_ORIGINS` set to the deployed FE origin (the `localhost` defaults will block every browser request from the real FE; the server logs a WARNING when it detects that case on a production-shaped host, see below).
 - [ ] EITHER `UUID` is set (≥32 chars; the server raises `RuntimeError` on shorter values), OR `MONGO_URI` is reachable so the lifespan can persist a bootstrapped secret in the `system_config` collection. On a hosted deploy (Vercel / Render / Fly / Railway / Kubernetes) the boot hard-fails with a platform-named error when BOTH are missing. Explicit `UUID` is recommended when you want a stable secret outside Mongo (e.g. to share with a legacy signer).
-- [ ] `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set. `langchain-anthropic` and `langchain-openai` are base dependencies; no extra install step is required. Without a key the catalog stays on the deterministic stub.
+- [ ] `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY` set. `langchain-anthropic` and `langchain-openai` are base dependencies; no extra install step is required. Without a key the catalog stays on the deterministic stub.
 - [ ] `AGENT_BUDGET_MONTHLY_TOKEN_CAP` reviewed for the deployed tier. The default `1000000` is a placeholder.
 - [ ] `RATE_LIMIT_BACKEND=redis` and `BUDGET_BACKEND=redis` with a reachable `REDIS_URI`. The default `memory` backends keep their state per-process, so multi-worker / serverless deploys enforce `workers × cap` rather than `cap`, and a cold start zeroes the running tally. The Redis backends use server-side Lua scripts so check-and-mutate stays atomic across workers without a separate distributed lock. The published `requirements.txt` includes `redis>=5.0` so the production Dockerfile already has the integration; flip the env vars and provide a connection string.
 - [ ] `IDEMPOTENCY_BACKEND=redis` (same `REDIS_URI`). Without it, the FE's `Idempotency-Key` header is useless across multiple workers — a duplicate request landing on a different worker is not deduplicated, double-charging the budget.
@@ -221,7 +227,8 @@ Set these in the Vercel FE project (or whichever host serves the SPA):
 
 | Variable                                  | Notes                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REACT_APP_AI_BASE_URL`                   | Optional. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead.          |
+| `REACT_APP_API_URL`                       | Public backend origin used by deployed builds as the default AI origin when `REACT_APP_AI_BASE_URL` is unset. Browser REST calls still stay same-origin at `/api/v1/*` through the FE proxy so the HttpOnly session cookie rides automatically.                                                                                                                              |
+| `REACT_APP_AI_BASE_URL`                   | Optional but recommended for the remote agent/SSE surface. When set, must be an absolute `https://` URL (or `http:` in dev). Validated at module load; invalid URLs fall back to the local engine. Trailing slashes are trimmed. **When unset**, deployed builds default `aiBaseUrl` to `apiOrigin` so they reach the backend without this var. Set `REACT_APP_AI_USE_LOCAL=true` to force the local engine instead. |
 | `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | Defaults **`true`**. Set to `false` only as an operator rollback to suppress `MutationProposalCard` even if an agent emits a `pendingProposal`. The BE `MutationProposal` lifecycle is closed in code; see [`../todo/release-todo.md`](../todo/release-todo.md) §1.                                                                                                   |
 | `VITE_ANALYTICS_ENDPOINT`                 | Full URL for batched analytics POSTs. **Without this, every `track()` call is silently dropped in production** — `devMemorySink` (in-memory) is the only active sink. In production builds a `console.warn` fires at startup when this var is unset; warnings are also exposed at `window.__copilotObservabilityWarnings__`. De-facto required for production observability. |
 | `VITE_ERROR_REPORT_ENDPOINT`              | Full URL for error event POSTs. **Without this, `ErrorBoundary` exceptions and AI error events are never reported.** In production builds a `console.warn` fires at startup when this var is unset (see `window.__copilotObservabilityWarnings__`). De-facto required for production error visibility.                                                                       |
@@ -252,18 +259,20 @@ browsers fetch the new bundle reference. Subsequent deploys are clean.
 
 ### Security considerations
 
-The AI proxy accepts **`ai_jwt`** (`scp=ai_proxy`, session-oriented TTL)
-from `sessionStorage` for `/api/ai/*` and `/api/v1/agents/*` requests while
-full **`jwt`** (`scp=rest`) remains in `localStorage` for REST CRUD.
-Limit XSS blast radius by keeping proxy tokens short-lived and renewing
-on login — see Beta §3 closure in
-[`../todo/release-todo.md`](../todo/release-todo.md).
+The REST JWT (`scp=rest`) is issued only as an HttpOnly `Token` cookie
+by `POST /api/v1/auth/login`; frontend JavaScript cannot read it, and
+same-origin REST requests send it with `credentials: "include"`. The AI
+proxy uses a separate **`ai_jwt`** (`scp=ai_proxy`, short TTL) from
+`sessionStorage` for `/api/ai/*` and `/api/v1/agents/*` requests that may
+target a different origin. `POST /api/v1/auth/ai-token` renews that
+narrow token from an existing REST cookie session. Keep the proxy token
+short-lived to limit XSS blast radius.
 
 ---
 
 ## Post-deploy verification
 
-Run these checks after first deploy with a real `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`:
+Run these checks after first deploy with a real `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY`:
 
 - `GET /api/v1/health/ai?probe=true` (no auth required — operator-debugging probe). Confirm:
   - `"ready": true`
@@ -345,8 +354,8 @@ The localhost-only check fires on any of `VERCEL`, `VERCEL_URL`,
 <ENV_VAR> is empty on <Platform>; set it in <platform-specific location>. Without it, every AI call will fail mid-SSE.
 ```
 
-`<ENV_VAR>` is `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` depending on
-the resolved provider; `<Platform>` is the detected hosted platform
+`<ENV_VAR>` is `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or
+`DEEPSEEK_API_KEY` depending on the resolved provider; `<Platform>` is the detected hosted platform
 capitalized; `<platform-specific location>` is one of:
 
 - `your Vercel project settings → Environment Variables`

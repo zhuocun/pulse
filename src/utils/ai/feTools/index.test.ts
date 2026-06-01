@@ -249,7 +249,7 @@ describe("FE_TOOL_REGISTRY", () => {
             projectName: "Solo"
         });
         const result = await listProjectsTool.run(undefined, buildCtx(qc));
-        const ids = result.map((p) => p._id).sort();
+        const ids = result.projects.map((p) => p._id).sort();
         expect(ids).toEqual(["p1", "p2", "p3"]);
     });
 
@@ -266,8 +266,8 @@ describe("FE_TOOL_REGISTRY", () => {
             { project_id: "p9" },
             buildCtx(qc)
         );
-        expect(result?._id).toBe("p9");
-        expect(result?.projectName).toBe("Singleton");
+        expect(result.project?._id).toBe("p9");
+        expect(result.project?.projectName).toBe("Singleton");
     });
 
     it("getProject returns null when the project is not in any cached variant", async () => {
@@ -288,7 +288,7 @@ describe("FE_TOOL_REGISTRY", () => {
             { project_id: "missing" },
             buildCtx(qc)
         );
-        expect(result).toBeNull();
+        expect(result).toEqual({ project: null });
     });
 
     it("getTask finds a task by snake_case task_id", async () => {
@@ -315,8 +315,8 @@ describe("FE_TOOL_REGISTRY", () => {
             { task_id: "t42", project_id: "p1" },
             buildCtx(qc, "p1")
         );
-        expect(result?._id).toBe("t42");
-        expect(result?.taskName).toBe("Fix login");
+        expect(result.task?._id).toBe("t42");
+        expect(result.task?.taskName).toBe("Fix login");
     });
 
     it("getTask returns null when task_id is not in cache", async () => {
@@ -326,7 +326,7 @@ describe("FE_TOOL_REGISTRY", () => {
             { task_id: "t-missing", project_id: "p1" },
             buildCtx(qc, "p1")
         );
-        expect(result).toBeNull();
+        expect(result).toEqual({ task: null });
     });
 
     it("listBoard returns sorted columns using snake_case project_id", async () => {
@@ -343,9 +343,9 @@ describe("FE_TOOL_REGISTRY", () => {
             { project_id: "p1" },
             buildCtx(qc, "p1")
         );
-        expect(result).toHaveLength(2);
-        expect(result[0]._id).toBe("c1");
-        expect(result[1]._id).toBe("c2");
+        expect(result.columns).toHaveLength(2);
+        expect(result.columns[0]._id).toBe("c1");
+        expect(result.columns[1]._id).toBe("c2");
     });
 
     it("listTasks returns tasks using snake_case project_id", async () => {
@@ -372,8 +372,8 @@ describe("FE_TOOL_REGISTRY", () => {
             { project_id: "p5" },
             buildCtx(qc, "p5")
         );
-        expect(result).toHaveLength(1);
-        expect(result[0]._id).toBe("t1");
+        expect(result.tasks).toHaveLength(1);
+        expect(result.tasks[0]._id).toBe("t1");
     });
 
     it("listMembers returns members using snake_case project_id arg (ignored)", async () => {
@@ -387,8 +387,8 @@ describe("FE_TOOL_REGISTRY", () => {
             { project_id: "p1" },
             buildCtx(qc, "p1")
         );
-        expect(result).toHaveLength(1);
-        expect(result[0]._id).toBe("m1");
+        expect(result.members).toHaveLength(1);
+        expect(result.members[0]._id).toBe("m1");
     });
 
     it("searchCandidates returns task candidates from the cache for kind=tasks", async () => {

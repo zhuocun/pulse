@@ -20,11 +20,13 @@ from fastapi.testclient import TestClient
 
 from app.agents import llm as llm_module
 from app.agents.llm import (
+    PROVIDER_DEEPSEEK,
     PROVIDER_STUB,
     ProviderConnectivityResult,
     probe_provider_connectivity,
     resolve_chat_model_spec,
 )
+from app.config import settings as app_settings
 
 
 @pytest.fixture(autouse=True)
@@ -85,6 +87,44 @@ def test_probe_true_invokes_probe_and_attaches_result(
     assert body["providerConnectivity"]["reachable"] is True
     assert body["providerConnectivity"]["checkedAt"] == 42.0
     assert body["provider_connectivity"]["checked_at"] == 42.0
+
+
+def test_deepseek_readiness_can_report_live_provider_reachable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dataclasses import replace
+
+    monkeypatch.setattr(
+        "app.routers.health.settings",
+        replace(
+            app_settings,
+            agent_chat_model_provider=PROVIDER_DEEPSEEK,
+            anthropic_api_key="",
+            openai_api_key="",
+            deepseek_api_key="sk-deepseek",
+        ),
+    )
+
+    async def _fake_probe(spec=None, **_kw):
+        assert spec.provider == PROVIDER_DEEPSEEK
+        return ProviderConnectivityResult(
+            provider=PROVIDER_DEEPSEEK,
+            reachable=True,
+            detail="",
+            checked_at=43.0,
+        )
+
+    monkeypatch.setattr(
+        "app.routers.health.probe_provider_connectivity", _fake_probe
+    )
+
+    response = client.get("/api/v1/health/ai?probe=true")
+    body = response.json()
+
+    assert body["provider"] == PROVIDER_DEEPSEEK
+    assert body["stubMode"] is False
+    assert body["deepseekKeyPresent"] is True
+    assert body["providerConnectivity"]["reachable"] is True
 
 
 def test_probe_failure_promotes_to_issue(
@@ -161,6 +201,51 @@ def test_probe_cache_collapses_back_to_back_calls() -> None:
     assert first.reachable is True
     assert second.reachable is True
     assert call_count["value"] == 1, "cache hit must short-circuit the SDK call"
+
+
+def test_deepseek_probe_uses_openai_compatible_base_url() -> None:
+    import asyncio
+    import sys
+
+    from app.agents.llm import ChatModelSpec, PROVIDER_DEEPSEEK
+
+    captured: dict[str, object] = {}
+
+    class _FakeModels:
+        async def list(self):
+            return {"data": []}
+
+    class _FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.models = _FakeModels()
+
+    class _FakeOpenAI:
+        AsyncOpenAI = _FakeClient
+
+        class AuthenticationError(Exception):
+            pass
+
+        class APIConnectionError(Exception):
+            pass
+
+        class APITimeoutError(Exception):
+            pass
+
+    sys.modules["openai"] = _FakeOpenAI  # type: ignore[assignment]
+    try:
+        spec = ChatModelSpec(
+            provider=PROVIDER_DEEPSEEK,
+            model="deepseek-v4-flash",
+            api_key="sk-deepseek",
+            base_url="https://api.deepseek.com",
+        )
+        result = asyncio.run(probe_provider_connectivity(spec))
+    finally:
+        sys.modules.pop("openai", None)
+
+    assert result.reachable is True
+    assert captured["base_url"] == "https://api.deepseek.com"
 
 
 def test_stub_provider_probe_returns_reachable_without_imports() -> None:

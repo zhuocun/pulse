@@ -18,6 +18,7 @@ import { microcopy } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
+import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
@@ -166,6 +167,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
     const remoteLastSuggestion = remoteAgent.lastSuggestion;
     const remoteError = remoteAgent.error;
     const remoteIsStreaming = remoteAgent.isStreaming;
+    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
 
     const runEstimate = estimateAi.run;
     const runReadiness = readinessAi.run;
@@ -360,11 +362,18 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
 
     useEffect(() => {
         if (!trimmedName || !isRemote) return;
+        if (!remoteAiConsentGranted) return;
         const clearDismissed = () =>
             setDismissedKeys((prev) => (prev.size === 0 ? prev : new Set()));
         clearDismissed();
         void startRemoteEstimate(remoteInput, { autonomy: "plan" });
-    }, [trimmedName, isRemote, remoteInput, startRemoteEstimate]);
+    }, [
+        trimmedName,
+        isRemote,
+        remoteAiConsentGranted,
+        remoteInput,
+        startRemoteEstimate
+    ]);
 
     useEffect(() => {
         if (!trimmedName || isRemote) return;
@@ -537,6 +546,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
             surface: "estimate"
         });
         if (isRemote) {
+            if (!remoteAiConsentGranted) return;
             clearRemoteSuggestion();
             void startRemoteEstimate(remoteInput, { autonomy: "plan" });
         } else {
@@ -554,6 +564,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
         localAiContext,
         excludeTaskId,
         isRemote,
+        remoteAiConsentGranted,
         remoteInput,
         startRemoteEstimate,
         clearRemoteSuggestion,

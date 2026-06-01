@@ -173,9 +173,18 @@ class BulkApplyWire(BaseModel):
 class MutationDiffWire(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    task_updates: Optional[list[TaskUpdateWire]] = None
-    column_updates: Optional[list[ColumnUpdateWire]] = None
-    bulk_apply: Optional[list[BulkApplyWire]] = None
+    task_updates: Optional[list[TaskUpdateWire]] = Field(
+        default=None,
+        description="Supported organic chat mutation diff rows.",
+    )
+    column_updates: Optional[list[ColumnUpdateWire]] = Field(
+        default=None,
+        description="Reserved for non-organic proposal sources until undo support is safe.",
+    )
+    bulk_apply: Optional[list[BulkApplyWire]] = Field(
+        default=None,
+        description="Reserved for non-organic proposal sources until undo support is safe.",
+    )
 
 
 class MutationProposalWire(BaseModel):

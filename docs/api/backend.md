@@ -39,13 +39,16 @@ CORS is controlled by `CORS_ORIGINS` (comma-separated) and `CORS_ORIGIN_REGEX`. 
 
 ## 2. Authentication
 
-### Obtaining a Token
+### Obtaining a Session
 
-Call `POST /api/v1/auth/login` (documented below) with `email` and `password`. The response body contains a `jwt` field.
+Call `POST /api/v1/auth/login` (documented below) with `email` and
+`password`. Browser clients receive the REST JWT as an HttpOnly `Token`
+cookie and a narrow `ai_jwt` in the JSON body for AI proxy calls.
 
-### Sending the Token
+### Sending Auth
 
-All protected endpoints require:
+Browser clients use same-origin requests with `credentials: "include"`.
+The server also accepts an explicit REST bearer for non-browser clients:
 
 ```
 Authorization: Bearer <jwt>
@@ -61,7 +64,7 @@ Configured via `JWT_EXPIRES_SECONDS` (default: `86400` — 24 hours). After expi
 
 | Condition | Status | Body |
 |---|---|---|
-| Missing or malformed `Authorization` header | 401 | `{"error": "empty JWT"}` |
+| Missing cookie / malformed `Authorization` header | 401 | `{"error": "empty JWT"}` |
 | Expired or invalid signature | 401 | `{"error": "invalid JWT"}` |
 
 ---
@@ -334,7 +337,7 @@ Content-Type: application/json
 
 ### POST /api/v1/auth/login
 
-Authenticate and receive a JWT.
+Authenticate and establish a REST cookie session.
 
 **Auth:** None required.
 
@@ -360,11 +363,15 @@ Authenticate and receive a JWT.
   "username": "alice",
   "email": "alice@example.com",
   "likedProjects": ["64a1f2e3b4c5d6e7f8a9b0c2"],
-  "jwt": "eyJhbGciOiJIUzI1NiJ9..."
+  "ai_jwt": "eyJhbGciOiJIUzI1NiJ9..."
 }
 ```
 
-Use the `jwt` value as the Bearer token for all subsequent requests.
+The response also sets `Set-Cookie: Token=<rest-jwt>; HttpOnly;
+SameSite=Lax`. Same-origin REST requests send that cookie automatically.
+Use `ai_jwt` only for `/api/ai/*` and `/api/v1/agents/*` requests that
+need an explicit bearer, especially when `REACT_APP_AI_BASE_URL` points
+at a different origin.
 
 **Status codes:**
 
@@ -377,13 +384,36 @@ Use the `jwt` value as the Bearer token for all subsequent requests.
 
 **Note:** Unknown email and wrong password produce the same `401` response to prevent user enumeration.
 
+### POST /api/v1/auth/ai-token
+
+Refresh the narrow AI proxy token from an existing REST cookie session.
+
+**Auth:** REST session cookie or REST bearer required.
+
+**Response — 200 OK:**
+
+```json
+{
+  "ai_jwt": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Token refreshed |
+| 401 | Missing, expired, or invalid REST session |
+| 503 | JWT secret not configured on the server |
+
 ---
 
 ## 9. Users
 
 Base path: `/api/v1/users`
 
-All users endpoints require a valid JWT (`Authorization: Bearer <token>`).
+All users endpoints require a valid REST session cookie or
+`Authorization: Bearer <token>`.
 
 ---
 
@@ -1112,11 +1142,12 @@ each one has a snake_case twin (e.g. `providerResolved` ↔
 | Field | Description |
 |---|---|
 | `ready` | `true` when `issues` is empty. |
-| `provider` / `providerResolved` | Resolved concrete provider (`anthropic` / `openai` / `stub`); never the literal `auto` sentinel. |
+| `provider` / `providerResolved` | Resolved concrete provider (`anthropic` / `openai` / `deepseek` / `stub`); never the literal `auto` sentinel. |
 | `providerConfigured` | The raw `AGENT_CHAT_MODEL_PROVIDER` value before resolution. |
 | `model` | Provider-specific model id (e.g. `claude-sonnet-4-6`). |
 | `stubMode` | `true` when the resolved provider is the deterministic stub. |
-| `anthropicKeyPresent` / `openaiKeyPresent` | Boolean only — the key value itself never appears. |
+| `anthropicKeyPresent` / `openaiKeyPresent` / `deepseekKeyPresent` | Boolean only — the key value itself never appears. |
+| `providerConnectivityProbeSupported` | `true` when the resolved provider has a readiness probe (`anthropic`, `openai`, `deepseek`, or `stub`). |
 | `failoverConfigured` | `true` when a cross-provider secondary spec is wired — the opposite-provider's API key is set and `AGENT_CHAT_MODEL_FAILOVER` is not in `{none,off,false,0}` (default `auto` enables it). |
 | `embeddingsProvider` | Resolved embeddings provider name. |
 | `embeddingsStubMode` | `true` when embeddings are stubbed. |
@@ -1276,7 +1307,7 @@ Generate a task draft from a prompt.
 }
 ```
 
-When a real LLM provider is configured (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`), `taskName`, `note`, and `rationale` are rewritten by the `task-drafting-agent`'s `polish_draft` helper.
+When a real LLM provider is configured (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY`), `taskName`, `note`, and `rationale` are rewritten by the `task-drafting-agent`'s `polish_draft` helper.
 
 **Status codes:**
 
@@ -2045,4 +2076,4 @@ See [`../todo/release-todo.md`](../todo/release-todo.md) §15 for the planned sc
 
 ### triage-agent LLM integration
 
-The rules engine in `app/tools/be_tools.detect_drift` remains the source of truth for *which* signals fire and at what severity. With `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, `polish_triage` (in `app/agents/catalog/triage.py`) rewrites each nudge `summary` field with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic "WIP overflow"); without a key the deterministic `_NUDGE_TITLES` string is used. Token usage flows through the standard `emit_custom({"kind": "usage", ...})` event.
+The rules engine in `app/tools/be_tools.detect_drift` remains the source of truth for *which* signals fire and at what severity. With `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY` set, `polish_triage` (in `app/agents/catalog/triage.py`) rewrites each nudge `summary` field with signal-specific context (e.g. "WIP overflow in 'In Progress' (8/5)" instead of the generic "WIP overflow"); without a key the deterministic `_NUDGE_TITLES` string is used. Token usage flows through the standard `emit_custom({"kind": "usage", ...})` event.

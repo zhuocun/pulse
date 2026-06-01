@@ -4,9 +4,10 @@ The factory hides three concerns from the catalog:
 
 1. Detecting which provider to use. ``AGENT_CHAT_MODEL_PROVIDER=auto`` (the
    default) inspects the environment and picks Anthropic if
-   ``ANTHROPIC_API_KEY`` is set, OpenAI if ``OPENAI_API_KEY`` is set, and
-   the deterministic stub otherwise. Explicit values (``anthropic``,
-   ``openai``, ``stub``) skip the auto-detect.
+   ``ANTHROPIC_API_KEY`` is set, OpenAI if ``OPENAI_API_KEY`` is set,
+   DeepSeek if ``DEEPSEEK_API_KEY`` is set, and the deterministic stub
+   otherwise. Explicit values (``anthropic``, ``openai``, ``deepseek``,
+   ``stub``) skip the auto-detect.
 2. Importing the right LangChain integration package only when it is
    actually needed -- ``langchain-anthropic`` and ``langchain-openai`` are
    optional dependencies, so a deployment that never wants real LLMs does
@@ -60,19 +61,29 @@ logger = logging.getLogger(__name__)
 PROVIDER_AUTO = "auto"
 PROVIDER_ANTHROPIC = "anthropic"
 PROVIDER_OPENAI = "openai"
+PROVIDER_DEEPSEEK = "deepseek"
 PROVIDER_STUB = "stub"
 
 SUPPORTED_PROVIDERS = frozenset(
-    {PROVIDER_AUTO, PROVIDER_ANTHROPIC, PROVIDER_OPENAI, PROVIDER_STUB}
+    {
+        PROVIDER_AUTO,
+        PROVIDER_ANTHROPIC,
+        PROVIDER_OPENAI,
+        PROVIDER_DEEPSEEK,
+        PROVIDER_STUB,
+    }
 )
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 # (langchain integration module, pyproject extras name) per provider.
 _PROVIDER_PACKAGES: dict[str, tuple[str, str]] = {
     PROVIDER_ANTHROPIC: ("langchain_anthropic", "anthropic"),
     PROVIDER_OPENAI: ("langchain_openai", "openai"),
+    PROVIDER_DEEPSEEK: ("langchain_openai", "openai"),
 }
 
 
@@ -115,6 +126,7 @@ class ChatModelSpec:
     model: str
     temperature: float = 0.2
     api_key: str = ""
+    base_url: str = ""
     max_retries: int = 2
     timeout_seconds: float = 30.0
 
@@ -130,6 +142,8 @@ def _detect_provider(settings: Settings) -> str:
         return PROVIDER_ANTHROPIC
     if settings.openai_api_key:
         return PROVIDER_OPENAI
+    if settings.deepseek_api_key:
+        return PROVIDER_DEEPSEEK
     return PROVIDER_STUB
 
 
@@ -156,14 +170,23 @@ def resolve_chat_model_spec(
     elif provider == PROVIDER_OPENAI:
         model = cfg.agent_chat_model_id or DEFAULT_OPENAI_MODEL
         api_key = cfg.openai_api_key
+        base_url = ""
+    elif provider == PROVIDER_DEEPSEEK:
+        model = cfg.agent_chat_model_id or DEFAULT_DEEPSEEK_MODEL
+        api_key = cfg.deepseek_api_key
+        base_url = DEEPSEEK_BASE_URL
     else:
         model = cfg.agent_chat_model_id or "stub"
         api_key = ""
+        base_url = ""
+    if provider == PROVIDER_ANTHROPIC:
+        base_url = ""
     return ChatModelSpec(
         provider=provider,
         model=model,
         temperature=cfg.agent_chat_model_temperature,
         api_key=api_key,
+        base_url=base_url,
         max_retries=cfg.agent_chat_model_max_retries,
         timeout_seconds=cfg.agent_chat_model_timeout_seconds,
     )
@@ -214,6 +237,7 @@ def make_chat_model_for_id(
         model=model_id.strip(),
         temperature=base.temperature,
         api_key=base.api_key,
+        base_url=base.base_url,
         max_retries=base.max_retries,
         timeout_seconds=base.timeout_seconds,
     )
@@ -273,13 +297,14 @@ def _instantiate_chat_model(resolved: ChatModelSpec) -> BaseChatModel:
             max_retries=resolved.max_retries,
             timeout=resolved.timeout_seconds,
         )
-    if resolved.provider == PROVIDER_OPENAI:
+    if resolved.provider in (PROVIDER_OPENAI, PROVIDER_DEEPSEEK):
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
             model=resolved.model,
             temperature=resolved.temperature,
             api_key=resolved.api_key or None,
+            base_url=resolved.base_url or None,
             max_retries=resolved.max_retries,
             timeout=resolved.timeout_seconds,
         )
@@ -343,6 +368,7 @@ def _failover_secondary_spec(
             model=DEFAULT_OPENAI_MODEL,
             temperature=primary.temperature,
             api_key=cfg.openai_api_key,
+            base_url="",
             max_retries=primary.max_retries,
             timeout_seconds=primary.timeout_seconds,
         )
@@ -356,6 +382,7 @@ def _failover_secondary_spec(
             model=DEFAULT_ANTHROPIC_MODEL,
             temperature=primary.temperature,
             api_key=cfg.anthropic_api_key,
+            base_url="",
             max_retries=primary.max_retries,
             timeout_seconds=primary.timeout_seconds,
         )
@@ -380,6 +407,7 @@ def _wrap_cross_provider_failover(
         model=resolved.model,
         temperature=resolved.temperature,
         api_key=resolved.api_key,
+        base_url=resolved.base_url,
         max_retries=0,
         timeout_seconds=resolved.timeout_seconds,
     )
@@ -388,6 +416,7 @@ def _wrap_cross_provider_failover(
         model=secondary_spec.model,
         temperature=secondary_spec.temperature,
         api_key=secondary_spec.api_key,
+        base_url=secondary_spec.base_url,
         max_retries=0,
         timeout_seconds=secondary_spec.timeout_seconds,
     )
@@ -430,6 +459,16 @@ def _wrap_cross_provider_failover(
 _PROVIDER_PRODUCTION_SHAPED_ENV_VARS = HOSTED_PLATFORM_ENV_MARKERS
 
 
+def _provider_api_key_env_var(provider: str) -> str:
+    if provider == PROVIDER_ANTHROPIC:
+        return "ANTHROPIC_API_KEY"
+    if provider == PROVIDER_OPENAI:
+        return "OPENAI_API_KEY"
+    if provider == PROVIDER_DEEPSEEK:
+        return "DEEPSEEK_API_KEY"
+    return ""
+
+
 def _is_production_like_env() -> bool:
     """``True`` when one of the curated hosted-platform env vars is set."""
 
@@ -452,24 +491,26 @@ def assert_provider_available(
     500s on the SSE stream.
 
     A second, parallel failure mode also fails fast here: an operator
-    sets ``AGENT_CHAT_MODEL_PROVIDER=anthropic`` (or ``=openai``, or
+    sets ``AGENT_CHAT_MODEL_PROVIDER=anthropic`` (or ``=openai`` /
+    ``=deepseek``, or
     ``=auto`` on a deploy where the key is absent) but forgets to set
-    the matching ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY``. Today this
+    the matching provider API key. Today this
     only blows up mid-SSE on the first real model call; on a
     production-shaped deploy that surfaces as a user-visible error
     envelope. We raise here so the deploy log carries the wiring problem
     instead.
 
     The guard fires on the *resolved* provider (not the raw configured
-    value), so ``provider=auto`` that resolved to anthropic/openai with
+    value), so ``provider=auto`` that resolved to a hosted provider with
     an empty key is also caught.  Local dev with ``auto`` falling back
     to the stub is unaffected because the resolved provider will be
     ``stub``.
 
-    The check is gated on a production-shaped env on purpose: local dev
-    runs without API keys and uses ``provider=auto`` (which falls back
-    to the stub). Default ``auto`` keeps that degrade behaviour
-    untouched.
+    The check is gated on a production-shaped env on purpose for the
+    historical Anthropic/OpenAI providers. Explicit DeepSeek is always
+    fail-fast without ``DEEPSEEK_API_KEY`` so a local or hosted
+    deployment cannot silently select a provider that has no anonymous
+    mode. Default ``auto`` keeps the stub degrade behaviour untouched.
 
     No-op when the resolved provider is the deterministic stub: the stub
     has no integration package to import and is the documented fallback
@@ -479,16 +520,16 @@ def assert_provider_available(
     resolved = spec if spec is not None else resolve_chat_model_spec(settings)
     _require_integration(resolved.provider)
 
-    if (
+    raw_provider = (
+        (settings if settings is not None else default_settings).agent_chat_model_provider
+        or PROVIDER_AUTO
+    ).strip().lower()
+    missing_key_requires_failure = (
         resolved.provider in (PROVIDER_ANTHROPIC, PROVIDER_OPENAI)
-        and not resolved.api_key
         and _is_production_like_env()
-    ):
-        env_var = (
-            "ANTHROPIC_API_KEY"
-            if resolved.provider == PROVIDER_ANTHROPIC
-            else "OPENAI_API_KEY"
-        )
+    ) or (raw_provider == PROVIDER_DEEPSEEK and resolved.provider == PROVIDER_DEEPSEEK)
+    if resolved.provider != PROVIDER_STUB and not resolved.api_key and missing_key_requires_failure:
+        env_var = _provider_api_key_env_var(resolved.provider)
         platform = detected_hosted_platform()
         # Name the platform when we recognise it so the operator sees
         # an actionable pointer (e.g. "set it in your Vercel project
@@ -659,10 +700,10 @@ class ProviderConnectivityResult:
 # 30s matches the FE health-poll cadence, so back-to-back readiness
 # pokes collapse onto one upstream request.
 _PROBE_CACHE_TTL_SECONDS = 30.0
-_probe_cache: dict[tuple[str, int], tuple[float, ProviderConnectivityResult]] = {}
+_probe_cache: dict[tuple[str, str, int], tuple[float, ProviderConnectivityResult]] = {}
 
 
-def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, int]:
+def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, str, int]:
     """Stable cache key that does NOT leak the API key value.
 
     We hash the key with the built-in :func:`hash` (process-local
@@ -670,7 +711,7 @@ def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, int]:
     (provider, key) pair without ever surfacing the key itself.
     """
 
-    return (spec.provider, hash(spec.api_key))
+    return (spec.provider, spec.base_url, hash(spec.api_key))
 
 
 def _cached_probe_result(spec: "ChatModelSpec") -> ProviderConnectivityResult | None:
@@ -734,7 +775,7 @@ async def probe_provider_connectivity(
         _store_probe_result(resolved, result)
         return result
 
-    if resolved.provider == PROVIDER_OPENAI:
+    if resolved.provider in (PROVIDER_OPENAI, PROVIDER_DEEPSEEK):
         result = await _probe_openai(resolved, timeout_seconds=timeout_seconds)
     elif resolved.provider == PROVIDER_ANTHROPIC:
         result = await _probe_anthropic(resolved, timeout_seconds=timeout_seconds)
@@ -770,7 +811,9 @@ async def _probe_openai(
         )
     try:
         client = openai.AsyncOpenAI(
-            api_key=spec.api_key or None, timeout=timeout_seconds
+            api_key=spec.api_key or None,
+            base_url=spec.base_url or None,
+            timeout=timeout_seconds,
         )
         await client.models.list()
     except openai.AuthenticationError:

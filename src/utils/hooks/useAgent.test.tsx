@@ -38,6 +38,10 @@ import {
     AgentTransportError
 } from "../ai/agentErrors";
 import { streamAgent } from "../ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../ai/remoteAiConsent";
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import useAgent, {
     NUDGE_EXPIRY_MS,
@@ -66,6 +70,8 @@ const wrapper = (queryClient: QueryClient) => {
 describe("useAgent", () => {
     beforeEach(() => {
         mockedStream.mockReset();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
     });
 
     it("starts a run and reduces messages from streamed chunks", async () => {
@@ -106,6 +112,22 @@ describe("useAgent", () => {
         );
         expect(result.current.state.lastUpdate).toEqual({ step: 1 });
         expect(mockedStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not start a remote run before consent is acknowledged", async () => {
+        resetRemoteAiConsentForTests();
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("board-coach", { projectId: "p1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start("hi");
+        });
+
+        expect(mockedStream).not.toHaveBeenCalled();
+        expect(result.current.state.messages).toEqual([]);
     });
 
     it("preserves structured input fields for non-chat agents", async () => {

@@ -236,7 +236,7 @@ def _tool_call_args(call: dict[str, Any]) -> dict[str, Any]:
 
 
 def _has_supported_diff(diff: MutationDiffWire) -> bool:
-    return bool(diff.task_updates or diff.column_updates or diff.bulk_apply)
+    return bool(diff.task_updates)
 
 
 def _organic_mutation_proposal(args: dict[str, Any]) -> MutationProposalWire | None:
@@ -254,6 +254,8 @@ def _organic_mutation_proposal(args: dict[str, Any]) -> MutationProposalWire | N
     try:
         diff = MutationDiffWire(**diff_raw)
     except (TypeError, ValueError):
+        return None
+    if diff.column_updates is not None or diff.bulk_apply is not None:
         return None
     if not _has_supported_diff(diff):
         return None

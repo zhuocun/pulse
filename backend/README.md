@@ -41,9 +41,9 @@ Set `MONGO_URI` / `MONGO_DB` in `.env`, then run:
 uvicorn app.main:app --reload --port 8000
 ```
 
-`langchain-anthropic` and `langchain-openai` are base dependencies —
-setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is the only step
-needed to enable real LLM calls in single-worker dev. Optional
+`langchain-anthropic` and `langchain-openai` are base dependencies.
+Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY` to
+enable real LLM calls in single-worker dev. Optional
 extras:
 
 ```bash

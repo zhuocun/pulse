@@ -1,5 +1,9 @@
 import type { FeTool } from "./types";
 
+interface ListMembersResult {
+    members: IMember[];
+}
+
 /**
  * `fe.listMembers` — read-only proxy to the cached members query
  * (`useReactQuery<IMember[]>("users/members")`). The agent may pass
@@ -8,12 +12,12 @@ import type { FeTool } from "./types";
  */
 export const listMembersTool: FeTool<
     { project_id?: string } | void,
-    IMember[]
+    ListMembersResult
 > = {
     name: "fe.listMembers",
     description: "List the members visible to the viewer.",
     run: (_args, ctx) => {
         const data = ctx.queryClient.getQueryData<IMember[]>(["users/members"]);
-        return data ?? [];
+        return { members: data ?? [] };
     }
 };

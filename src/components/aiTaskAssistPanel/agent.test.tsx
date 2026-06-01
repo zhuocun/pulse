@@ -44,6 +44,10 @@ jest.mock("../../constants/env", () => ({
 
 // eslint-disable-next-line simple-import-sort/imports
 import { streamAgent } from "../../utils/ai/agentClient";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 import useAgent from "../../utils/hooks/useAgent";
 import { store } from "../../store";
 
@@ -191,6 +195,12 @@ describe("AiTaskAssistPanel — remote agent path", () => {
     beforeEach(() => {
         mockedStream.mockReset();
         mockedUseAgent.mockReset();
+        resetRemoteAiConsentForTests();
+        acknowledgeRemoteAi("https://agents.example");
+    });
+
+    afterEach(() => {
+        resetRemoteAiConsentForTests();
     });
 
     it("renders estimate UI (story-point label + confidence) from a surface:estimate suggestion", async () => {
