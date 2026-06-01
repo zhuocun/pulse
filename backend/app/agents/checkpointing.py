@@ -239,6 +239,8 @@ async def enter_agent_postgres_pool(
         min_size=1,
         max_size=settings.agent_pg_pool_size,
         kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        # Hosted Postgres providers can close idle SSL sockets between turns.
+        check=AsyncConnectionPool.check_connection,
         open=False,
     )
     await stack.enter_async_context(pool)

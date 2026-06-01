@@ -47,6 +47,7 @@ from app.agents.checkpointing import (
     PostgresCheckpointerSpec,
     _resolve_agent_postgres_uri,
     build_checkpointer,
+    enter_agent_postgres_pool,
     open_checkpointer,
 )
 from app.agents.stores import (
@@ -712,6 +713,10 @@ class _FakeAsyncConnectionPool:
     async def close(self) -> None:
         self.close_calls += 1
 
+    @staticmethod
+    async def check_connection(_conn: Any) -> None:
+        return None
+
     async def __aenter__(self) -> "_FakeAsyncConnectionPool":
         await self.open()
         return self
@@ -940,6 +945,27 @@ def test_open_checkpointer_postgres_enters_context_and_runs_setup(
     saver = asyncio.run(run())
     assert state["exited"] is True
     assert saver.setup_calls == 1  # setup() still called exactly once
+
+
+def test_enter_agent_postgres_pool_checks_connections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_psycopg_pool_module(monkeypatch)
+    cfg = Settings(agent_postgres_uri="postgres://pool", agent_pg_pool_size=7)
+
+    async def run() -> _FakeAsyncConnectionPool:
+        async with AsyncExitStack() as stack:
+            pool = await enter_agent_postgres_pool(
+                stack,
+                "postgres://pool",
+                cfg,
+            )
+            assert pool.kwargs["max_size"] == 7
+            assert pool.kwargs["check"] is _FakeAsyncConnectionPool.check_connection
+            return pool
+
+    pool = asyncio.run(run())
+    assert pool.close_calls == 1
 
 
 def test_open_store_postgres_enters_context_and_runs_setup(

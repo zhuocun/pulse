@@ -146,6 +146,21 @@ describe("useAgentChat", () => {
         expect(result.current.messages).toEqual([]);
     });
 
+    it("keeps derived messages stable across unrelated rerenders", () => {
+        const queryClient = new QueryClient();
+        const ctx = makeCtx();
+        const { result, rerender } = renderHook(() => useAgentChat(ctx), {
+            wrapper: makeWrapper(queryClient)
+        });
+
+        const firstMessages = result.current.messages;
+        const firstNudges = result.current.pendingNudges;
+        rerender();
+
+        expect(result.current.messages).toBe(firstMessages);
+        expect(result.current.pendingNudges).toBe(firstNudges);
+    });
+
     it("does nothing when trimmed text is empty", async () => {
         mockedStream.mockReturnValueOnce(fromParts([]));
         const queryClient = new QueryClient();

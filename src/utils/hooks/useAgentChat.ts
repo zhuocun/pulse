@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { humanizeTool } from "../ai/toolDisplay";
 import type {
@@ -222,11 +222,20 @@ const useAgentChat = (
     ]);
 
     // Derive displayed messages and streamingText from agent state.
-    const { messages, streamingText } = deriveMessagesAndStreaming(
-        agent.state.messages,
-        toolTraceMessages,
-        agent.isStreaming,
-        agent.citations
+    const { messages, streamingText } = useMemo(
+        () =>
+            deriveMessagesAndStreaming(
+                agent.state.messages,
+                toolTraceMessages,
+                agent.isStreaming,
+                agent.citations
+            ),
+        [
+            agent.citations,
+            agent.isStreaming,
+            agent.state.messages,
+            toolTraceMessages
+        ]
     );
 
     // Effective error (null if dismissed).
@@ -309,8 +318,9 @@ const useAgentChat = (
         [agent.dismissNudge]
     );
 
-    const pendingNudges = agent.nudges.filter(
-        (n) => !dismissedNudgeIds.has(n.nudge_id)
+    const pendingNudges = useMemo(
+        () => agent.nudges.filter((n) => !dismissedNudgeIds.has(n.nudge_id)),
+        [agent.nudges, dismissedNudgeIds]
     );
 
     const seedMessages = useCallback(

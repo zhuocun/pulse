@@ -378,15 +378,17 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
 
     useEffect(() => {
         setMessageTimes((prev) => {
-            if (messages.length === 0) return [];
+            if (messages.length === 0) return prev.length === 0 ? prev : [];
             const next = prev.slice(0, messages.length);
+            let changed = next.length !== prev.length;
             const now = Date.now();
             for (let i = 0; i < messages.length; i += 1) {
                 if (next[i] === undefined) {
                     next[i] = now - (messages.length - 1 - i) * 1000;
+                    changed = true;
                 }
             }
-            return next;
+            return changed ? next : prev;
         });
     }, [messages]);
 
