@@ -26,8 +26,14 @@ import {
 import { Provider } from "react-redux";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
+import environment from "../../constants/env";
+import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
+import {
+    acknowledgeRemoteAi,
+    resetRemoteAiConsentForTests
+} from "../../utils/ai/remoteAiConsent";
 
 jest.mock("../../constants/env", () => ({
     __esModule: true,
@@ -255,6 +261,9 @@ describe("CopilotDockHost", () => {
     });
 
     beforeEach(() => {
+        environment.aiBaseUrl = "";
+        environment.aiUseLocalEngine = true;
+        resetRemoteAiConsentForTests();
         mockedUseAiChat.mockReturnValue(baseAiChat());
         mockedUseAgent.mockReturnValue(baseAgent());
         // Localstorage flag boardCopilot:enabled defaults true (see
@@ -319,6 +328,7 @@ describe("CopilotDockHost", () => {
 
     afterEach(() => {
         fetchMock.mockRestore();
+        resetRemoteAiConsentForTests();
     });
 
     it("does not mount the dock surface when the URL is off-board (no projectId)", () => {
@@ -398,6 +408,37 @@ describe("CopilotDockHost", () => {
             "textarea[aria-label='Message Board Copilot']"
         ) as HTMLTextAreaElement | null;
         expect(composerStill).not.toBeNull();
+    });
+
+    it("starts the remote triage agent with suggest autonomy", async () => {
+        environment.aiBaseUrl = "https://agents.example";
+        environment.aiUseLocalEngine = false;
+        acknowledgeRemoteAi(environment.aiBaseUrl);
+
+        const start = jest.fn().mockResolvedValue(undefined);
+        mockedUseAgent.mockImplementation((agentName) =>
+            agentName === "triage-agent" ? baseAgent({ start }) : baseAgent()
+        );
+
+        renderHarness();
+        act(() => {
+            store.dispatch(overlaysActions.openChatDrawer());
+        });
+
+        await waitFor(() => {
+            expect(start).toHaveBeenCalledTimes(1);
+        });
+        expect(start).toHaveBeenCalledWith(
+            {
+                messages: [
+                    {
+                        role: "user",
+                        content: microcopy.ai.runBoardTriagePrompt
+                    }
+                ]
+            },
+            { autonomy: "suggest" }
+        );
     });
 
     it("preserves the active tab when the user switched to Brief before navigating", async () => {

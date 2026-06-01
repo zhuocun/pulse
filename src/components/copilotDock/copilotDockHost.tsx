@@ -149,14 +149,17 @@ const ProjectScopedDockBody: React.FC<ProjectScopedDockBodyProps> = ({
 
         triagedProjectsRef.current.add(projectId);
         try {
-            void startTriageAgent({
-                messages: [
-                    {
-                        role: "user",
-                        content: microcopy.ai.runBoardTriagePrompt
-                    }
-                ]
-            });
+            void startTriageAgent(
+                {
+                    messages: [
+                        {
+                            role: "user",
+                            content: microcopy.ai.runBoardTriagePrompt
+                        }
+                    ]
+                },
+                { autonomy: "suggest" }
+            );
         } catch {
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // surfaced via triageAgent.error if needed.

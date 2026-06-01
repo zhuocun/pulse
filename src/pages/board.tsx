@@ -580,14 +580,17 @@ const BoardPage = () => {
 
         triagedProjectsRef.current.add(pid);
         try {
-            void startTriageAgent({
-                messages: [
-                    {
-                        role: "user",
-                        content: microcopy.ai.runBoardTriagePrompt
-                    }
-                ]
-            });
+            void startTriageAgent(
+                {
+                    messages: [
+                        {
+                            role: "user",
+                            content: microcopy.ai.runBoardTriagePrompt
+                        }
+                    ]
+                },
+                { autonomy: "suggest" }
+            );
         } catch {
             // AgentForbiddenError (per-project AI opt-out) — fail silently;
             // the error will also surface via triageAgent.error if needed.

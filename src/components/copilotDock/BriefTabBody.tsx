@@ -497,7 +497,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         // "board moved underneath you" case below.
         if (surfaceVisible && projectId) {
             if (!remoteBriefIsStreaming && !remoteBriefSuggestion) {
-                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt, {
+                    autonomy: "suggest"
+                });
             }
         } else if (!dockOpen) {
             abortRemoteBrief();
@@ -582,7 +584,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
             } else {
                 abortRemoteBrief();
                 clearRemoteBriefSuggestion();
-                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+                void startRemoteBrief(microcopy.ai.generateBoardBriefPrompt, {
+                    autonomy: "suggest"
+                });
             }
         };
 
@@ -747,7 +751,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         }
         if (isRemote) {
             clearRemoteBriefSuggestion();
-            await startRemoteBrief(microcopy.ai.generateBoardBriefPrompt);
+            await startRemoteBrief(microcopy.ai.generateBoardBriefPrompt, {
+                autonomy: "suggest"
+            });
         } else {
             await runBrief({ bypassCache: true });
         }

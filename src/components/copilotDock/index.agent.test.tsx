@@ -277,7 +277,8 @@ describe("CopilotDock — remote agent path", () => {
             expect(start).toHaveBeenCalledTimes(1);
         });
         expect(start).toHaveBeenCalledWith(
-            microcopy.ai.generateBoardBriefPrompt
+            microcopy.ai.generateBoardBriefPrompt,
+            { autonomy: "suggest" }
         );
 
         // Switch to Chat. surfaceVisible flips false on Brief; the
