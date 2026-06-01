@@ -37,6 +37,8 @@ def test_default_shape_with_stub_provider(client: TestClient) -> None:
     assert body["providerResolved"] == "stub"
     assert body["stubMode"] is True
     assert body["ready"] is True
+    assert body["realProviderReady"] is False
+    assert body["real_provider_ready"] is False
     assert "Running in stub mode" in " ".join(body["warnings"])
     # The default test setup ships without a real provider key.
     assert body["anthropicKeyPresent"] is False
@@ -60,7 +62,30 @@ def test_ready_false_when_openai_provider_set_without_key(
     assert response.status_code == HTTPStatus.OK
     body = response.json()
     assert body["ready"] is False
+    assert body["realProviderReady"] is False
     assert any("OPENAI_API_KEY" in issue for issue in body["issues"])
+
+
+def test_explicit_openai_provider_with_key_reports_real_provider_ready(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_settings(
+        monkeypatch,
+        agent_chat_model_provider="openai",
+        openai_api_key="sk-openai-ready",
+        anthropic_api_key="",
+        deepseek_api_key="",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    body = response.json()
+
+    assert body["ready"] is True
+    assert body["provider"] == "openai"
+    assert body["stubMode"] is False
+    assert body["openaiKeyPresent"] is True
+    assert body["realProviderReady"] is True
+    assert body["real_provider_ready"] is True
 
 
 def test_ready_false_when_anthropic_provider_set_without_key(
@@ -120,6 +145,7 @@ def test_camelcase_and_snake_case_mirrors_match(client: TestClient) -> None:
             "providerConnectivityProbeSupported",
             "provider_connectivity_probe_supported",
         ),
+        ("realProviderReady", "real_provider_ready"),
         ("failoverConfigured", "failover_configured"),
         ("embeddingsProvider", "embeddings_provider"),
         ("embeddingsStubMode", "embeddings_stub_mode"),

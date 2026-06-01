@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List
 
 from fastapi import APIRouter, Request, status
 
@@ -26,6 +25,7 @@ from app.agents.llm import (
     PROVIDER_DEEPSEEK,
     PROVIDER_OPENAI,
     PROVIDER_STUB,
+    ProviderConnectivityResult,
     _failover_secondary_spec,
     probe_provider_connectivity,
     resolve_chat_model_spec,
@@ -73,7 +73,7 @@ def _agent_persistence_ok(runtime: AgentRuntime) -> bool:
     return True
 
 
-def health(runtime: AgentRuntime) -> Dict[str, Any]:
+def health(runtime: AgentRuntime) -> dict[str, object]:
     """Build the health payload, exercising the DB once per probe.
 
     A health endpoint that never touches the DB happily reports ``ok``
@@ -134,7 +134,7 @@ def health(runtime: AgentRuntime) -> Dict[str, Any]:
 
 
 @router.get("", status_code=status.HTTP_200_OK)
-def health_endpoint(request: Request) -> Dict[str, Any]:
+def health_endpoint(request: Request) -> dict[str, object]:
     return health(request.app.state.agent_runtime)
 
 
@@ -165,8 +165,8 @@ def _is_multi_instance() -> tuple[bool, str]:
 def _ai_readiness_payload(
     request: Request,
     *,
-    probe_result: Any = None,
-) -> Dict[str, Any]:
+    probe_result: ProviderConnectivityResult | None = None,
+) -> dict[str, object]:
     """Build the structured AI-readiness payload.
 
     Issues / warnings are collected inline so the operator sees every
@@ -201,8 +201,8 @@ def _ai_readiness_payload(
         (settings.agent_postgres_uri or "").strip()
     )
 
-    issues: List[str] = []
-    warnings: List[str] = []
+    issues: list[str] = []
+    warnings: list[str] = []
 
     # Provider / key sanity. We name the missing env var without ever
     # echoing the key value (booleans only flow into the payload).
@@ -215,7 +215,10 @@ def _ai_readiness_payload(
             "DEEPSEEK_API_KEY missing -- provider explicitly set to 'deepseek'"
         ),
     }
-    if chat_spec.provider in missing_key_messages and not chat_spec.api_key:
+    provider_key_issue = (
+        chat_spec.provider in missing_key_messages and not chat_spec.api_key
+    )
+    if provider_key_issue:
         issues.append(missing_key_messages[chat_spec.provider])
 
     if chat_spec.provider == PROVIDER_STUB:
@@ -278,9 +281,18 @@ def _ai_readiness_payload(
 
     redis_configured = bool((settings.redis_uri or "").strip())
     cors_origins = list(settings.cors_origins)
+    provider_probe_reachable = (
+        probe_result is None or probe_result.reachable
+    )
+    real_provider_ready = (
+        chat_spec.provider != PROVIDER_STUB
+        and not provider_key_issue
+        and provider_probe_reachable
+    )
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, object] = {
         "ready": not issues,
+        "realProviderReady": real_provider_ready,
         "provider": chat_spec.provider,
         "providerResolved": chat_spec.provider,
         "providerConfigured": settings.agent_chat_model_provider,
@@ -329,6 +341,7 @@ def _ai_readiness_payload(
     # snake_case mirror for every camelCase field. Built mechanically
     # so a new field cannot drift out of casing parity over time.
     snake_mirror = {
+        "real_provider_ready": payload["realProviderReady"],
         "provider_resolved": payload["providerResolved"],
         "provider_configured": payload["providerConfigured"],
         "stub_mode": payload["stubMode"],
@@ -382,7 +395,7 @@ def _is_localhost_origin(origin: str) -> bool:
 
 
 @router.get("/ai", status_code=status.HTTP_200_OK)
-async def ai_health(request: Request, probe: bool = False) -> Dict[str, Any]:
+async def ai_health(request: Request, probe: bool = False) -> dict[str, object]:
     """Structured readiness payload for the AI features.
 
     ``?probe=true`` triggers a connectivity probe against the

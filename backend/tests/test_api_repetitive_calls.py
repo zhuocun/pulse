@@ -1781,7 +1781,9 @@ def test_cross_origin_preflight_is_consistent_across_methods(client: TestClient)
                 headers={
                     "Origin": "http://localhost:3000",
                     "Access-Control-Request-Method": method,
-                    "Access-Control-Request-Headers": "authorization,content-type",
+                    "Access-Control-Request-Headers": (
+                        "authorization,content-type,x-pulse-model"
+                    ),
                 },
             )
             assert response.status_code == HTTPStatus.OK, (path, method)
@@ -1789,6 +1791,8 @@ def test_cross_origin_preflight_is_consistent_across_methods(client: TestClient)
                 response.headers.get("access-control-allow-origin")
                 == "http://localhost:3000"
             ), (path, method)
+            allow_headers = response.headers.get("access-control-allow-headers", "")
+            assert "x-pulse-model" in allow_headers.lower(), (path, method)
 
 
 def test_user_password_update_invalidates_old_password_for_every_login(

@@ -11,7 +11,10 @@
         "prettier": "prettier --check .",
         "prettier:fix": "prettier --write .",
         "eslint": "eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js --fix",
-        "pre-commit": "npm run prettier && npm run eslint && npm run typecheck",
+        "pre-commit": "npm run prettier && npm run eslint && npm run typecheck && npm run smoke:ai:prod:check && npm run test:smoke:ai:prod",
+        "smoke:ai:prod": "node scripts/production-ai-smoke.js",
+        "smoke:ai:prod:check": "node --check scripts/production-ai-smoke.js && node --check scripts/production-ai-smoke.test.js",
+        "test:smoke:ai:prod": "node --test scripts/production-ai-smoke.test.js",
         "server": "node __json_server_mock__/server.cjs",
         "backend:dev": "cd backend && uvicorn app.main:app --reload --port 8000",
         "backend:test": "cd backend && pytest"

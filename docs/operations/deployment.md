@@ -274,8 +274,44 @@ short-lived to limit XSS blast radius.
 
 Run these checks after first deploy with a real `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY`:
 
+- Automated AI smoke:
+  ```bash
+  PULSE_BE_URL="https://<your-be>" \
+  PULSE_SMOKE_EMAIL="smoke@example.com" \
+  PULSE_SMOKE_PASSWORD="<password>" \
+  npm run smoke:ai:prod
+  ```
+  The script checks `GET /api/v1/health/ai?probe=true`, logs in or
+  registers the smoke user, verifies narrow AI-token renewal, lists
+  `GET /api/v1/agents`, creates or finds a manager-owned smoke project,
+  and opens an authenticated `chat-agent` SSE stream with `project_id`
+  so manager and budget gates execute. It redacts token-like fields from
+  failures. Use a fixed smoke account for repeat runs; omitting the
+  credential vars registers a generated one-off user. Set
+  `PULSE_SMOKE_CLEANUP_PROJECT=true` only when the smoke project can be
+  deleted after the run. If you set `PULSE_SMOKE_ALLOW_REGISTER=false`,
+  provide an existing smoke account with `PULSE_SMOKE_EMAIL` and
+  `PULSE_SMOKE_PASSWORD`; the script will not create a generated user.
+  Do not set `PULSE_SMOKE_ALLOW_STUB=true` for production; it only
+  permits non-production stub checks by bypassing `realProviderReady` /
+  `stubMode` failures while still requiring `ready=true` and
+  provider connectivity. Do not set
+  `PULSE_SMOKE_ALLOW_NON_PRODUCTION=true` for production; it only
+  permits small-group/non-production health warnings, non-Postgres
+  persistence, or an ephemeral JWT source.
+- FE proxy smoke after the Vercel deploy:
+  ```bash
+  PULSE_BE_URL="https://<your-fe>.vercel.app" \
+  PULSE_SMOKE_EMAIL="smoke@example.com" \
+  PULSE_SMOKE_PASSWORD="<password>" \
+  npm run smoke:ai:prod
+  ```
+  Pointing `PULSE_BE_URL` at the FE origin exercises the Vercel
+  `/api/:path*` rewrite and `BACKEND_URL` proxy boundary. The backend
+  origin smoke above verifies the companion server directly.
 - `GET /api/v1/health/ai?probe=true` (no auth required — operator-debugging probe). Confirm:
   - `"ready": true`
+  - `"realProviderReady": true`
   - `"providerConnectivity": { "reachable": true }`
   - `"checkpointerBackend"` and `"storeBackend"` show `"postgres"` (the `auto` default flipped because `AGENT_POSTGRES_URI` is set)
   - `"jwtSecretSource"` is `"env"` (explicit UUID) or `"persisted"` (Mongo-bootstrapped) — never `"ephemeral"` in production

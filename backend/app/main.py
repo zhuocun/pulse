@@ -696,6 +696,7 @@ app.add_middleware(
         "Authorization",
         "Content-Type",
         "X-Request-Id",
+        "X-Pulse-Model",
         "Idempotency-Key",
         "Accept",
     ],

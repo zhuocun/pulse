@@ -65,9 +65,32 @@ cap.
 
    Look for:
    - `"ready": true`
+   - `"realProviderReady": true`
    - `"providerConnectivity": { "reachable": true }`
    - `"checkpointerBackend": "postgres"` and `"storeBackend": "postgres"`
      (the `auto` default flipped because `AGENT_POSTGRES_URI` is set)
+
+   With smoke credentials ready, run the repo-side AI smoke from the
+   repo root:
+
+   ```bash
+   PULSE_BE_URL="https://${BE_URL}" \
+   PULSE_SMOKE_EMAIL="smoke@example.com" \
+   PULSE_SMOKE_PASSWORD="<password>" \
+   PULSE_SMOKE_ALLOW_NON_PRODUCTION=true \
+   npm run smoke:ai:prod
+   ```
+
+   It verifies readiness, login/register, AI-token renewal, agent
+   registry access, project manager/budget gates, and one authenticated
+   `chat-agent` stream.
+   Do not set `PULSE_SMOKE_ALLOW_STUB=true` for production; it only
+   permits non-production stub checks by bypassing `realProviderReady` /
+   `stubMode` failures while still requiring `ready=true` and provider
+   connectivity. This quickstart sets
+   `PULSE_SMOKE_ALLOW_NON_PRODUCTION=true` because the 5-user recipe can
+   intentionally tolerate health warnings such as memory-backed
+   rate-limit/budget/idempotency state; omit it for strict production.
 
 4. Deploy the FE to Vercel. From a Vercel project pointed at the repo:
 
@@ -83,6 +106,17 @@ cap.
    to change. The proxy reads `BACKEND_URL` from the Vercel serverless
    env at request time and falls back to the bundled default only when
    the var is unset.
+
+   After the FE deploy, run the same smoke through the FE origin to
+   exercise the Vercel proxy boundary:
+
+   ```bash
+   PULSE_BE_URL="https://<your-fe>.vercel.app" \
+   PULSE_SMOKE_EMAIL="smoke@example.com" \
+   PULSE_SMOKE_PASSWORD="<password>" \
+   PULSE_SMOKE_ALLOW_NON_PRODUCTION=true \
+   npm run smoke:ai:prod
+   ```
 
 ## Path B: All Vercel
 
@@ -134,10 +168,21 @@ For strict reliability use Path A.
    you forgot to set `AGENT_POSTGRES_URI` — the `auto` default needs
    it to flip to `"postgres"`.
 
+   Then run the same authenticated smoke from the repo root:
+
+   ```bash
+   PULSE_BE_URL="https://<your-be>.vercel.app" \
+   PULSE_SMOKE_EMAIL="smoke@example.com" \
+   PULSE_SMOKE_PASSWORD="<password>" \
+   PULSE_SMOKE_ALLOW_NON_PRODUCTION=true \
+   npm run smoke:ai:prod
+   ```
+
 ## After deploying (both paths)
 
 1. Open the BE URL: `GET /api/v1/health/ai?probe=true`. Verify
-   `"ready": true` and `"providerConnectivity": { "reachable": true }`.
+   `"ready": true`, `"realProviderReady": true`, and
+   `"providerConnectivity": { "reachable": true }`.
    The endpoint requires no auth, so this works straight from a
    browser tab or `curl`.
 
@@ -148,6 +193,12 @@ For strict reliability use Path A.
 
 4. Invite the other 4 users — they register, then the manager adds
    them to the project.
+
+5. Re-run `npm run smoke:ai:prod` after changing AI, auth, or
+   project-gate env vars. Point `PULSE_BE_URL` at the FE origin when
+   changing proxy env vars so the smoke exercises `/api/:path*` through
+   Vercel. Use `PULSE_SMOKE_CLEANUP_PROJECT=true` only when the
+   configured smoke project is disposable.
 
 ## When to upgrade beyond this recipe
 

@@ -12,6 +12,7 @@ endpoint could be turned into a DoS amplifier.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from http import HTTPStatus
 from typing import Iterable
 
@@ -92,8 +93,6 @@ def test_probe_true_invokes_probe_and_attaches_result(
 def test_deepseek_readiness_can_report_live_provider_reachable(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from dataclasses import replace
-
     monkeypatch.setattr(
         "app.routers.health.settings",
         replace(
@@ -124,6 +123,8 @@ def test_deepseek_readiness_can_report_live_provider_reachable(
     assert body["provider"] == PROVIDER_DEEPSEEK
     assert body["stubMode"] is False
     assert body["deepseekKeyPresent"] is True
+    assert body["realProviderReady"] is True
+    assert body["real_provider_ready"] is True
     assert body["providerConnectivity"]["reachable"] is True
 
 
@@ -131,6 +132,17 @@ def test_probe_failure_promotes_to_issue(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An unreachable provider downgrades ``ready`` to false."""
+
+    monkeypatch.setattr(
+        "app.routers.health.settings",
+        replace(
+            app_settings,
+            agent_chat_model_provider="openai",
+            openai_api_key="sk-openai",
+            anthropic_api_key="",
+            deepseek_api_key="",
+        ),
+    )
 
     async def _fake_probe(spec=None, **_kw):
         return ProviderConnectivityResult(
@@ -148,6 +160,8 @@ def test_probe_failure_promotes_to_issue(
     body = response.json()
 
     assert body["ready"] is False
+    assert body["realProviderReady"] is False
+    assert body["real_provider_ready"] is False
     assert any(
         "authentication failed" in issue for issue in body["issues"]
     )

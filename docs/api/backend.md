@@ -33,7 +33,7 @@ https://<host>
 
 All endpoints are served over HTTPS in production. No version prefix is required for Auth, Users, Projects, Boards, and Tasks — they all live under `/api/v1/`. The legacy alias `/api/ai/*` (without `v1`) mirrors the AI v1 router exactly and is kept for backward compatibility with the shipped React client; new integrations should use `/api/v1/ai/*`.
 
-CORS is controlled by `CORS_ORIGINS` (comma-separated) and `CORS_ORIGIN_REGEX`. Credentialed requests are allowed. Allowed headers include `Authorization`, `Content-Type`, `X-Request-Id`, `Idempotency-Key`, and `Accept`. Exposed response headers include `X-Request-Id`, `Deprecation`, `Sunset`, `Retry-After`, and `Idempotent-Replay`.
+CORS is controlled by `CORS_ORIGINS` (comma-separated) and `CORS_ORIGIN_REGEX`. Credentialed requests are allowed. Allowed headers include `Authorization`, `Content-Type`, `X-Request-Id`, `X-Pulse-Model`, `Idempotency-Key`, and `Accept`. Exposed response headers include `X-Request-Id`, `Deprecation`, `Sunset`, `Retry-After`, and `Idempotent-Replay`.
 
 ---
 
@@ -1142,6 +1142,7 @@ each one has a snake_case twin (e.g. `providerResolved` ↔
 | Field | Description |
 |---|---|
 | `ready` | `true` when `issues` is empty. |
+| `realProviderReady` | `true` only when the resolved provider is not `stub`, the required provider key is present, and any requested provider connectivity probe is reachable. This can be `false` while local-dev `ready` remains `true` under the stub provider. |
 | `provider` / `providerResolved` | Resolved concrete provider (`anthropic` / `openai` / `deepseek` / `stub`); never the literal `auto` sentinel. |
 | `providerConfigured` | The raw `AGENT_CHAT_MODEL_PROVIDER` value before resolution. |
 | `model` | Provider-specific model id (e.g. `claude-sonnet-4-6`). |
@@ -1173,6 +1174,7 @@ each one has a snake_case twin (e.g. `providerResolved` ↔
 ```json
 {
   "ready": true,
+  "realProviderReady": true,
   "provider": "anthropic",
   "providerResolved": "anthropic",
   "providerConfigured": "auto",
