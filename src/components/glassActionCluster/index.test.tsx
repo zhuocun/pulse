@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 
+import {
+    coarseTouchTargetsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
+
 import GlassActionCluster from ".";
 
 expect.extend(toHaveNoViolations);
@@ -206,6 +211,17 @@ describe("GlassActionCluster", () => {
     it("does not crash on the reduced-motion path", () => {
         expect(() => renderCluster({ reducedMotion: true })).not.toThrow();
         expect(screen.getByTestId("cluster")).toBeInTheDocument();
+    });
+
+    it("declares coarse-pointer hit areas for slots and buttons", () => {
+        renderCluster();
+        const cluster = screen.getByTestId("cluster");
+        const styledClass = styledClassFor(cluster);
+        expect(styledClass).toBeTruthy();
+
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 
     it("has no axe violations", async () => {

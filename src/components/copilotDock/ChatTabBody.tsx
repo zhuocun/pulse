@@ -62,8 +62,10 @@ import AiFeedbackPopover, {
 } from "../aiFeedbackPopover";
 import { AiChatComposer } from "../aiChatDrawer/AiChatComposer";
 import {
+    AssistantActionRow,
     AssistantAttribution,
     AssistantDisclaimer,
+    ChatTabLayout,
     MessageBubble,
     MessageRow,
     StreamingCursor,
@@ -843,11 +845,12 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     );
 
     return (
-        <>
+        <ChatTabLayout>
             <Space
                 size={space.xs}
                 style={{
                     display: "flex",
+                    flexWrap: "wrap",
                     justifyContent: "flex-end",
                     marginBottom: space.xs
                 }}
@@ -1513,14 +1516,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                     </AssistantDisclaimer>
                                 )}
                                 {isAssistant && !isLoading && (
-                                    <Space
-                                        size={4}
-                                        style={{
-                                            display: "block",
-                                            marginTop: 4,
-                                            textAlign: "left"
-                                        }}
-                                    >
+                                    <AssistantActionRow data-testid="assistant-action-row">
                                         <Button
                                             aria-label={microcopyString(
                                                 microcopy.ai.copyMessage
@@ -1659,7 +1655,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                                 </Button>
                                             </Tooltip>
                                         </AiFeedbackPopover>
-                                    </Space>
+                                    </AssistantActionRow>
                                 )}
                             </MessageRow>
                         );
@@ -1872,7 +1868,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                 remoteHealthEnabled={remoteHealthActive}
                 setInput={setInput}
             />
-        </>
+        </ChatTabLayout>
     );
 };
 

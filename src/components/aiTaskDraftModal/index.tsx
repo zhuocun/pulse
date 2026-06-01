@@ -13,6 +13,7 @@ import {
     Tooltip,
     Typography
 } from "antd";
+import styled from "@emotion/styled";
 import { useForm } from "antd/lib/form/Form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +22,12 @@ import { useParams } from "react-router-dom";
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { modalWidthCss, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    modalWidthCss,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 import { isMacLike } from "../../utils/platform";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
@@ -59,6 +65,37 @@ const BREAKDOWN_AXES: BreakdownAxis[] = [
     "by_risk",
     "freeform"
 ];
+
+const DraftActionRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xs}px;
+    margin-bottom: ${space.md}px;
+
+    && .ant-select {
+        width: 180px;
+    }
+
+    @media (max-width: ${breakpoints.sm}px) {
+        && > .ant-btn,
+        && > .ant-select {
+            flex: 1 1 100%;
+            min-width: 0;
+            width: 100%;
+        }
+    }
+
+    @media (pointer: coarse) {
+        && > .ant-btn,
+        && .ant-select-selector {
+            min-height: ${touchTargetCoarse}px;
+        }
+
+        && .ant-select-selector {
+            align-items: center;
+        }
+    }
+`;
 
 /**
  * Form fields the AI draft populates. After Apply, each populated field
@@ -645,14 +682,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                     ))}
                 </Space>
             )}
-            <div
-                style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: space.xs,
-                    marginBottom: space.md
-                }}
-            >
+            <DraftActionRow data-testid="ai-task-draft-action-row">
                 <Button
                     aria-label={microcopy.a11y.draftTaskWithCopilot}
                     disabled={
@@ -681,7 +711,6 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         ),
                         value: axis
                     }))}
-                    style={{ width: 180 }}
                     value={breakdownAxis}
                 />
                 <Button
@@ -712,7 +741,7 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         />
                     </Tooltip>
                 )}
-            </div>
+            </DraftActionRow>
 
             {activeError && (
                 <Alert

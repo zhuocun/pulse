@@ -890,10 +890,11 @@ const BoardPage = () => {
                                                 <Popover
                                                     content={
                                                         <Space
-                                                            orientation="vertical"
+                                                            direction="vertical"
                                                             size={themeSpace.xs}
                                                             style={{
-                                                                maxWidth: 280
+                                                                maxWidth: 280,
+                                                                width: "100%"
                                                             }}
                                                         >
                                                             <Typography.Text type="secondary">

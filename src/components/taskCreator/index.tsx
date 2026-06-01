@@ -6,7 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontWeight, radius, space } from "../../theme/tokens";
+import {
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiDraftModal from "../../utils/hooks/useAiDraftModal";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
@@ -73,6 +78,14 @@ const CreateLink = styled.button`
 
     @media (pointer: coarse) {
         min-height: 44px;
+    }
+`;
+
+const DraftWithAiButton = styled(Button)`
+    @media (pointer: coarse) {
+        && {
+            min-height: ${touchTargetCoarse}px;
+        }
     }
 `;
 
@@ -185,7 +198,7 @@ const TaskCreator: React.FC<{
                 </CreateLink>
                 {aiEnabled && boardAiOn && (
                     <>
-                        <Button
+                        <DraftWithAiButton
                             aria-label={microcopy.actions.draftWithAi}
                             disabled={disabled}
                             icon={<AiSparkleIcon aria-hidden />}
@@ -194,7 +207,7 @@ const TaskCreator: React.FC<{
                             type="link"
                         >
                             {microcopy.actions.draftWithAi}
-                        </Button>
+                        </DraftWithAiButton>
                         {aiOpen && (
                             <AiTaskDraftModal
                                 columnId={columnId}

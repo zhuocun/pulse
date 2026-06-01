@@ -607,7 +607,11 @@ const TaskSearchPanel: React.FC<Props> = ({
                     />
                     <Popover
                         content={
-                            <Space orientation="vertical" size="small">
+                            <Space
+                                direction="vertical"
+                                size="small"
+                                style={{ width: "100%" }}
+                            >
                                 <Input
                                     aria-label={
                                         microcopy.board.presets.namePlaceholder
@@ -624,7 +628,7 @@ const TaskSearchPanel: React.FC<Props> = ({
                                     }
                                     value={draftName}
                                 />
-                                <Space size="small">
+                                <Space size="small" wrap>
                                     <Button
                                         onClick={handleSavePreset}
                                         disabled={!draftName.trim()}

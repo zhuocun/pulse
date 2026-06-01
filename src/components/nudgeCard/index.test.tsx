@@ -7,6 +7,11 @@ import {
     type AnalyticsSink
 } from "../../constants/analytics";
 import type { TriageNudge } from "../../interfaces/agent";
+import {
+    coarseTouchTargetsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 
 import NudgeCard from "./index";
 
@@ -114,5 +119,19 @@ describe("NudgeCard", () => {
         expect(
             screen.getByRole("button", { name: /triage now/i })
         ).toBeInTheDocument();
+    });
+
+    it("wraps actions and declares mobile touch targets", () => {
+        renderWith({}, { onAction: jest.fn(), onDismiss: jest.fn() });
+        const row = screen.getByTestId("nudge-card-action-row");
+        const styledClass = styledClassFor(row);
+        expect(styledClass).toBeTruthy();
+
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("display: flex");
+        expect(ruleText).toContain("flex-wrap: wrap");
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 });

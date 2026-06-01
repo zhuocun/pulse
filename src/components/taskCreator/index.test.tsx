@@ -12,6 +12,10 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
+import {
+    coarseTouchTargetsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 
 import TaskCreator from ".";
 
@@ -259,6 +263,16 @@ describe("TaskCreator", () => {
         // 44px }` rule must surface. A regression to a smaller value or a
         // removed rule fails loudly.
         expect(heights).toContain(44);
+    });
+
+    it("declares a touch-target height for the Draft with AI trigger", () => {
+        renderCreator();
+        const button = screen.getByLabelText(microcopy.actions.draftWithAi);
+        const styledClass = styledClassFor(button);
+        expect(styledClass).toBeTruthy();
+
+        const { heights } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
     });
 
     /*

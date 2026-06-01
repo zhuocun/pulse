@@ -14,6 +14,29 @@ import InboxTabBody, { type InboxTabBodyProps } from "./InboxTabBody";
 
 export type CopilotDockTab = "chat" | "brief" | "inbox";
 
+const DockTabs = styled(Tabs)`
+    && {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    && .ant-tabs-content-holder,
+    && .ant-tabs-content {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    && .ant-tabs-tabpane-active {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+`;
+
 /**
  * Phase 4 A8 — body slot for the dock surface (tabs + active tab body).
  *
@@ -161,7 +184,7 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
 
     return (
         <>
-            <Tabs
+            <DockTabs
                 activeKey={activeTab}
                 aria-label={microcopy.copilotDock.tabListLabel}
                 data-testid="copilot-dock-tabs"
@@ -176,12 +199,6 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
                 items={tabItems}
                 onChange={(key) => onTabChange(key as CopilotDockTab)}
                 size="small"
-                style={{
-                    display: "flex",
-                    flex: "1 1 auto",
-                    flexDirection: "column",
-                    minHeight: 0
-                }}
             />
             {footerSlot ? (
                 <div

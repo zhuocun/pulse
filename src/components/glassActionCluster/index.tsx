@@ -149,6 +149,18 @@ const ClusterRoot = styled.div<ClusterRootProps>`
         transform: ${(p) => (p.$reducedMotion ? "none" : "scale(0.96)")};
     }
 
+    @media (pointer: coarse) {
+        .pulse-cluster-slot,
+        .ant-btn {
+            min-block-size: ${touchTargetCoarse}px;
+            min-inline-size: ${touchTargetCoarse}px;
+        }
+
+        .pulse-cluster-slot {
+            justify-content: center;
+        }
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .ant-btn {
             transition: background ${motion.short}ms ${easing.standard};

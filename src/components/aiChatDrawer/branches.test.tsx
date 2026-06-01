@@ -10,6 +10,11 @@ import { App as AntdApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
+import {
+    coarseTouchTargetsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import type { AiChatMessage } from "../../utils/ai/chatEngine";
 import useAuth from "../../utils/hooks/useAuth";
 
@@ -218,6 +223,34 @@ describe("AiChatDrawer UI branches (mocked chat hook)", () => {
         );
         expect(assistantGroup).toBeTruthy();
         expect(assistantGroup!.textContent).toContain(microcopy.a11y.aiBadge);
+    });
+
+    it("renders assistant action controls as a wrapping horizontal row with touch targets", () => {
+        mockedUseAiChat.mockReturnValue({
+            ...baseChat(),
+            messages: [
+                { role: "user", content: "Hi" },
+                { role: "assistant", content: "Hello back" }
+            ]
+        });
+        renderDrawer();
+
+        const row = screen.getByTestId("assistant-action-row");
+        expect(
+            screen.getByLabelText(microcopy.ai.copyMessage as string)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByLabelText(microcopy.a11y.regenerateResponse)
+        ).toBeInTheDocument();
+
+        const styledClass = styledClassFor(row);
+        expect(styledClass).toBeTruthy();
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("display: inline-flex");
+        expect(ruleText).toContain("flex-wrap: wrap");
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 
     it("tags the freshly regenerated assistant message with a Regenerated badge", () => {

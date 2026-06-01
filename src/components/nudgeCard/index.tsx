@@ -4,13 +4,19 @@ import {
     WarningOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Space, Typography } from "antd";
+import { Button, Typography } from "antd";
 import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { TriageNudge } from "../../interfaces/agent";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    fontSize,
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 
 /**
  * Compact nudge card (PRD v3 §10.3, C-R8, §7.2). Renders an inline
@@ -55,6 +61,20 @@ const IconCol = styled.div<{ severity: TriageNudge["severity"] }>`
 const Body = styled.div`
     flex: 1 1 auto;
     min-width: 0;
+`;
+
+const ActionRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xs}px;
+    margin-top: ${space.xxs}px;
+
+    @media (pointer: coarse) {
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
 `;
 
 const SeverityIcon: React.FC<{ severity: TriageNudge["severity"] }> = ({
@@ -135,7 +155,7 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
                 >
                     {nudge.summary}
                 </Typography.Text>
-                <Space size={space.xs} style={{ marginTop: space.xxs }}>
+                <ActionRow data-testid="nudge-card-action-row">
                     {onAction && (
                         <Button
                             onClick={handleAction}
@@ -155,7 +175,7 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
                             {microcopy.ai.dismissNudge}
                         </Button>
                     )}
-                </Space>
+                </ActionRow>
             </Body>
         </Wrap>
     );

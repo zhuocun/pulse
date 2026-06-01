@@ -1,6 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import {
+    coarseTouchTargetsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
+
 import AiFeedbackPopover, {
     FEEDBACK_CATEGORIES,
     type AiFeedbackSubmission
@@ -110,5 +116,27 @@ describe("AiFeedbackPopover", () => {
         render(<Harness />);
         const note = screen.getByRole("textbox") as HTMLTextAreaElement;
         expect(note.maxLength).toBe(280);
+    });
+
+    it("clamps the popover width and gives action buttons mobile touch targets", () => {
+        render(<Harness />);
+        const contentClass = styledClassFor(
+            screen.getByTestId("ai-feedback-popover-content")
+        );
+        const actionsClass = styledClassFor(
+            screen.getByTestId("ai-feedback-popover-actions")
+        );
+        expect(contentClass).toBeTruthy();
+        expect(actionsClass).toBeTruthy();
+
+        const contentRules = ruleTextsFor(contentClass ?? "").join("\n");
+        expect(contentRules).toContain("100dvw");
+        expect(contentRules).toContain("max-width: min(320px");
+
+        const actionRules = ruleTextsFor(actionsClass ?? "").join("\n");
+        expect(actionRules).toContain("flex-wrap: wrap");
+        const { heights, widths } = coarseTouchTargetsFor(actionsClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 });

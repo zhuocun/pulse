@@ -1,11 +1,13 @@
-import { StopOutlined } from "@ant-design/icons";
-import { Button, Input, Space, Typography } from "antd";
+import { SendOutlined, StopOutlined } from "@ant-design/icons";
+import { Button, Input, Typography } from "antd";
 import type { TextAreaRef } from "antd/es/input/TextArea";
 import type { RefObject } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontSize } from "../../theme/tokens";
 import type { AgentHealthStatus } from "../../utils/hooks/useAgentHealth";
+
+import { ComposerControlRow } from "./aiChatDrawerStyles";
 
 export interface AiChatComposerProps {
     input: string;
@@ -49,7 +51,7 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
     };
     return (
         <>
-            <Space.Compact style={{ width: "100%" }}>
+            <ComposerControlRow data-testid="ai-chat-composer-row">
                 <Input.TextArea
                     aria-label={microcopy.a11y.messageBoardCopilot}
                     autoComplete="off"
@@ -76,7 +78,9 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
                         onClick={onAbort}
                         type="default"
                     >
-                        {microcopy.actions.stop}
+                        <span className="ai-chat-composer-button-text">
+                            {microcopy.actions.stop}
+                        </span>
                     </Button>
                 ) : (
                     <Button
@@ -85,13 +89,16 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
                             !input.trim() ||
                             (remoteHealthEnabled && healthStatus === "offline")
                         }
+                        icon={<SendOutlined aria-hidden />}
                         onClick={handleSubmit}
                         type="primary"
                     >
-                        {microcopy.actions.send}
+                        <span className="ai-chat-composer-button-text">
+                            {microcopy.actions.send}
+                        </span>
                     </Button>
                 )}
-            </Space.Compact>
+            </ComposerControlRow>
             <Typography.Text
                 data-testid="chat-prompt-char-hint"
                 style={{

@@ -1,7 +1,22 @@
 import styled from "@emotion/styled";
 import { Tag, Typography } from "antd";
 
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    fontSize,
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
+
+export const ChatTabLayout = styled.div`
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+`;
 
 export const MessageRow = styled.div<{ $isUser: boolean }>`
     margin-bottom: ${space.sm}px;
@@ -88,6 +103,71 @@ export const AssistantDisclaimer = styled.div`
     color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
     font-size: ${fontSize.xs}px;
     margin-top: 2px;
+`;
+
+export const AssistantActionRow = styled.div`
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: ${space.xxs}px;
+    margin-top: ${space.xxs}px;
+    max-width: min(100%, 36rem);
+    text-align: left;
+
+    && .ant-btn {
+        flex: 0 0 auto;
+    }
+
+    @media (pointer: coarse) {
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
+`;
+
+export const ComposerControlRow = styled.div`
+    align-items: flex-end;
+    display: flex;
+    gap: ${space.xs}px;
+    min-width: 0;
+    width: 100%;
+
+    && textarea.ant-input {
+        flex: 1 1 auto;
+        min-height: 40px;
+        min-width: 0;
+    }
+
+    && .ant-btn {
+        flex: 0 0 auto;
+        min-height: 40px;
+        white-space: nowrap;
+    }
+
+    @media (max-width: ${breakpoints.sm}px) {
+        gap: ${space.xxs}px;
+
+        && .ant-btn {
+            min-width: ${touchTargetCoarse}px;
+            padding-inline: 0;
+            width: ${touchTargetCoarse}px;
+        }
+
+        && .ai-chat-composer-button-text {
+            display: none;
+        }
+    }
+
+    @media (pointer: coarse) {
+        && textarea.ant-input,
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+        }
+
+        && .ant-btn {
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
 `;
 
 export const ToolPayloadPanel = styled.div`

@@ -4,6 +4,12 @@ import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { store } from "../../store";
+import {
+    coarseTouchTargetsFor,
+    mediaRuleTextsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
@@ -125,6 +131,22 @@ describe("AiTaskDraftModal", () => {
         expect(body).not.toBeNull();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
         expect(body!.style.maxHeight).toMatch(/max\(/);
+    });
+
+    it("renders the AI draft action row with mobile wrapping and touch targets", async () => {
+        mountModal();
+        const row = await screen.findByTestId("ai-task-draft-action-row");
+        const styledClass = styledClassFor(row);
+        expect(styledClass).toBeTruthy();
+
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("display: flex");
+        expect(ruleText).toContain("flex-wrap: wrap");
+        expect(
+            mediaRuleTextsFor(styledClass ?? "", "480px").join("\n")
+        ).toContain("width: 100%");
+        const { heights } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
     });
 
     it("disables the Draft button until a prompt is entered", async () => {

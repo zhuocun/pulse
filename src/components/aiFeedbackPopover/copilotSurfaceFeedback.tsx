@@ -1,9 +1,10 @@
+import styled from "@emotion/styled";
 import { Button } from "antd";
 import React, { useCallback, useEffect, useState } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
-import { space } from "../../theme/tokens";
+import { space, touchTargetCoarse } from "../../theme/tokens";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 
 import AiFeedbackPopover, { AiFeedbackSubmission } from "./feedbackPopover";
@@ -16,6 +17,21 @@ export interface AiCopilotSurfaceFeedbackProps {
     citationCount?: number;
     ariaGroupLabel: string;
 }
+
+const FeedbackRail = styled.div`
+    align-items: center;
+    column-gap: ${space.xxs}px;
+    display: inline-flex;
+    flex-wrap: wrap;
+    row-gap: ${space.xxs}px;
+
+    @media (pointer: coarse) {
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
+`;
 
 /**
  * Mirrors `AiChatDrawer` thumbs rail for non-chat surfaces — same analytics
@@ -83,17 +99,7 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
     if (!suggestionKey) return null;
 
     return (
-        <div
-            aria-label={ariaGroupLabel}
-            role="group"
-            style={{
-                alignItems: "center",
-                columnGap: space.xxs,
-                display: "inline-flex",
-                flexWrap: "wrap",
-                rowGap: space.xxs
-            }}
-        >
+        <FeedbackRail aria-label={ariaGroupLabel} role="group">
             <Button
                 aria-label={microcopy.a11y.helpfulAnswer}
                 aria-pressed={value === "up"}
@@ -121,7 +127,7 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
                     👎
                 </Button>
             </AiFeedbackPopover>
-        </div>
+        </FeedbackRail>
     );
 };
 

@@ -1,8 +1,9 @@
+import styled from "@emotion/styled";
 import { Button, Checkbox, Input, Popover, Space, Typography } from "antd";
 import React, { useCallback, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, space } from "../../theme/tokens";
+import { fontSize, space, touchTargetCoarse } from "../../theme/tokens";
 
 /**
  * Categories the user can attribute a thumbs-down to (Optimization Plan
@@ -39,6 +40,26 @@ interface AiFeedbackPopoverProps {
 }
 
 const NOTE_MAX_LENGTH = 280;
+
+const FeedbackContent = styled.div`
+    max-width: min(320px, calc(100dvw - ${space.lg * 2}px));
+    width: min(320px, calc(100dvw - ${space.lg * 2}px));
+`;
+
+const FeedbackActionRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xxs}px;
+    justify-content: flex-end;
+    width: 100%;
+
+    @media (pointer: coarse) {
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
+`;
 
 const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
     open,
@@ -78,7 +99,7 @@ const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
     }, [onSkip]);
 
     const content = (
-        <div style={{ maxWidth: 320 }}>
+        <FeedbackContent data-testid="ai-feedback-popover-content">
             <Typography.Text strong style={{ fontSize: fontSize.sm }}>
                 {microcopy.ai.feedbackPromptDownTitle}
             </Typography.Text>
@@ -125,7 +146,7 @@ const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
             >
                 {microcopy.ai.feedbackImpactNotice}
             </Typography.Paragraph>
-            <Space style={{ justifyContent: "flex-end", width: "100%" }}>
+            <FeedbackActionRow data-testid="ai-feedback-popover-actions">
                 <Button onClick={handleSkip} size="small" type="text">
                     {microcopy.ai.feedbackSkip}
                 </Button>
@@ -137,8 +158,8 @@ const AiFeedbackPopover: React.FC<AiFeedbackPopoverProps> = ({
                 >
                     {microcopy.ai.feedbackSubmit}
                 </Button>
-            </Space>
-        </div>
+            </FeedbackActionRow>
+        </FeedbackContent>
     );
 
     return (

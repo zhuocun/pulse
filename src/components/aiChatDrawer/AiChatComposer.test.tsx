@@ -3,6 +3,12 @@ import type { TextAreaRef } from "antd/es/input/TextArea";
 import { createRef } from "react";
 
 import { microcopy } from "../../constants/microcopy";
+import {
+    coarseTouchTargetsFor,
+    mediaRuleTextsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 
 import { AiChatComposer } from "./AiChatComposer";
 
@@ -141,5 +147,31 @@ describe("AiChatComposer", () => {
         expect(screen.getByTestId("chat-prompt-char-hint")).toHaveTextContent(
             "12 / 2000"
         );
+    });
+
+    it("renders a flex composer row with coarse-pointer touch targets", () => {
+        renderComposer();
+        const row = screen.getByTestId("ai-chat-composer-row");
+        const styledClass = styledClassFor(row);
+        expect(styledClass).toBeTruthy();
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("display: flex");
+        expect(ruleText).toContain("min-width: 0");
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+    });
+
+    it("keeps mobile composer controls compact below the small breakpoint", () => {
+        renderComposer();
+        const row = screen.getByTestId("ai-chat-composer-row");
+        const styledClass = styledClassFor(row);
+        expect(styledClass).toBeTruthy();
+
+        const mobileRules = mediaRuleTextsFor(styledClass ?? "", "480px").join(
+            "\n"
+        );
+        expect(mobileRules).toContain("width: 44px");
+        expect(mobileRules).toContain("display: none");
     });
 });
