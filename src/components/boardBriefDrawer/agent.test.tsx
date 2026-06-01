@@ -253,7 +253,8 @@ describe("BoardBriefDrawer — remote agent path", () => {
         renderDrawer(true, { start });
 
         expect(start).toHaveBeenCalledWith(
-            "Generate the brief for this board."
+            "Generate the brief for this board.",
+            { autonomy: "suggest" }
         );
     });
 
@@ -320,7 +321,8 @@ describe("BoardBriefDrawer — remote agent path", () => {
             expect(abort).toHaveBeenCalled();
             expect(clearSuggestion).toHaveBeenCalled();
             expect(start).toHaveBeenCalledWith(
-                "Generate the brief for this board."
+                "Generate the brief for this board.",
+                { autonomy: "suggest" }
             );
         });
     });
