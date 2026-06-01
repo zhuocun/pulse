@@ -17,6 +17,32 @@ export default defineConfig(({ mode }) => {
         env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED ??
         env.VITE_AI_MUTATION_PROPOSALS_ENABLED ??
         "";
+    const aiKnowledgeCutoff =
+        env.REACT_APP_AI_KNOWLEDGE_CUTOFF ?? env.VITE_AI_KNOWLEDGE_CUTOFF ?? "";
+    const bottomNavEnabled =
+        env.REACT_APP_BOTTOM_NAV_ENABLED ?? env.VITE_BOTTOM_NAV_ENABLED ?? "";
+    const taskPanelRouted =
+        env.REACT_APP_TASK_PANEL_ROUTED ?? env.VITE_TASK_PANEL_ROUTED ?? "";
+    const copilotDockEnabled =
+        env.REACT_APP_COPILOT_DOCK_ENABLED ??
+        env.VITE_COPILOT_DOCK_ENABLED ??
+        "";
+    const aiColumnReadinessEnabled =
+        env.REACT_APP_AI_COLUMN_READINESS_ENABLED ??
+        env.VITE_AI_COLUMN_READINESS_ENABLED ??
+        "";
+    const aiGhostTextEnabled =
+        env.REACT_APP_AI_GHOST_TEXT_ENABLED ??
+        env.VITE_AI_GHOST_TEXT_ENABLED ??
+        "";
+    const boardMinimapEnabled =
+        env.REACT_APP_BOARD_MINIMAP_ENABLED ??
+        env.VITE_BOARD_MINIMAP_ENABLED ??
+        "";
+    const activityFeedEnabled =
+        env.REACT_APP_ACTIVITY_FEED_ENABLED ??
+        env.VITE_ACTIVITY_FEED_ENABLED ??
+        "";
     const analyticsEndpoint = env.VITE_ANALYTICS_ENDPOINT ?? "";
     const errorReportEndpoint = env.VITE_ERROR_REPORT_ENDPOINT ?? "";
 
@@ -33,10 +59,14 @@ export default defineConfig(({ mode }) => {
                                 test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
                             },
                             {
-                                maxSize: 600 * 1024,
                                 name: "antd-vendor",
                                 priority: 30,
                                 test: /node_modules[\\/](antd|@ant-design|@rc-component|rc-)[\\/]/
+                            },
+                            {
+                                name: "antd-icons",
+                                priority: 35,
+                                test: /node_modules[\\/]@ant-design[\\/](icons|icons-svg)[\\/]/
                             },
                             {
                                 name: "motion-vendor",
@@ -60,6 +90,23 @@ export default defineConfig(({ mode }) => {
             "process.env.REACT_APP_AI_USE_LOCAL": JSON.stringify(aiUseLocalRaw),
             "process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED":
                 JSON.stringify(aiMutationProposalsEnabledRaw),
+            "process.env.REACT_APP_AI_KNOWLEDGE_CUTOFF":
+                JSON.stringify(aiKnowledgeCutoff),
+            "process.env.REACT_APP_BOTTOM_NAV_ENABLED":
+                JSON.stringify(bottomNavEnabled),
+            "process.env.REACT_APP_TASK_PANEL_ROUTED":
+                JSON.stringify(taskPanelRouted),
+            "process.env.REACT_APP_COPILOT_DOCK_ENABLED":
+                JSON.stringify(copilotDockEnabled),
+            "process.env.REACT_APP_AI_COLUMN_READINESS_ENABLED": JSON.stringify(
+                aiColumnReadinessEnabled
+            ),
+            "process.env.REACT_APP_AI_GHOST_TEXT_ENABLED":
+                JSON.stringify(aiGhostTextEnabled),
+            "process.env.REACT_APP_BOARD_MINIMAP_ENABLED":
+                JSON.stringify(boardMinimapEnabled),
+            "process.env.REACT_APP_ACTIVITY_FEED_ENABLED":
+                JSON.stringify(activityFeedEnabled),
             "process.env.VITE_ANALYTICS_ENDPOINT":
                 JSON.stringify(analyticsEndpoint),
             "process.env.VITE_ERROR_REPORT_ENDPOINT":

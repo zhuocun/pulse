@@ -47,14 +47,9 @@ document.head.appendChild(themeStyle);
  * in Jest) rather than `import.meta.env` to keep the file compatible with
  * the Jest/Babel test runner which does not support import.meta syntax.
  */
-const analyticsEndpoint =
-    (typeof process !== "undefined" && process.env?.VITE_ANALYTICS_ENDPOINT) ||
-    "";
+const analyticsEndpoint = process.env.VITE_ANALYTICS_ENDPOINT || "";
 
-const errorEndpoint =
-    (typeof process !== "undefined" &&
-        process.env?.VITE_ERROR_REPORT_ENDPOINT) ||
-    "";
+const errorEndpoint = process.env.VITE_ERROR_REPORT_ENDPOINT || "";
 
 /**
  * Emits one `console.warn` per missing observability env var when running in

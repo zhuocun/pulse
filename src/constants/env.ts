@@ -31,11 +31,38 @@
  */
 const DEFAULT_API_ORIGIN = "https://pulse-python-server.vercel.app";
 
-const readEnv = (key: string): string | undefined => {
-    if (typeof process !== "undefined" && process.env && key in process.env) {
-        return process.env[key];
-    }
-    return undefined;
+/**
+ * Vite only replaces static `process.env.KEY` reads. Keep every browser env
+ * key in this map so production builds can still read by key without relying
+ * on a dynamic `process.env[key]` access that compiles to `{}`.
+ */
+const injectedEnv = {
+    NODE_ENV: process.env.NODE_ENV,
+    REACT_APP_ACTIVITY_FEED_ENABLED:
+        process.env.REACT_APP_ACTIVITY_FEED_ENABLED,
+    REACT_APP_AI_BASE_URL: process.env.REACT_APP_AI_BASE_URL,
+    REACT_APP_AI_COLUMN_READINESS_ENABLED:
+        process.env.REACT_APP_AI_COLUMN_READINESS_ENABLED,
+    REACT_APP_AI_ENABLED: process.env.REACT_APP_AI_ENABLED,
+    REACT_APP_AI_GHOST_TEXT_ENABLED:
+        process.env.REACT_APP_AI_GHOST_TEXT_ENABLED,
+    REACT_APP_AI_KNOWLEDGE_CUTOFF: process.env.REACT_APP_AI_KNOWLEDGE_CUTOFF,
+    REACT_APP_AI_MUTATION_PROPOSALS_ENABLED:
+        process.env.REACT_APP_AI_MUTATION_PROPOSALS_ENABLED,
+    REACT_APP_AI_USE_LOCAL: process.env.REACT_APP_AI_USE_LOCAL,
+    REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+    REACT_APP_BOARD_MINIMAP_ENABLED:
+        process.env.REACT_APP_BOARD_MINIMAP_ENABLED,
+    REACT_APP_BOTTOM_NAV_ENABLED: process.env.REACT_APP_BOTTOM_NAV_ENABLED,
+    REACT_APP_COPILOT_DOCK_ENABLED: process.env.REACT_APP_COPILOT_DOCK_ENABLED,
+    REACT_APP_TASK_PANEL_ROUTED: process.env.REACT_APP_TASK_PANEL_ROUTED
+};
+
+type EnvKey = keyof typeof injectedEnv;
+
+const readEnv = (key: EnvKey): string | undefined => {
+    const value = injectedEnv[key];
+    return value === "undefined" ? undefined : value;
 };
 
 /**
@@ -43,8 +70,7 @@ const readEnv = (key: string): string | undefined => {
  * `process.env.NODE_ENV` (set by Vite, CRA, and Jest) so the validation
  * logic works in both browser builds and Jest tests.
  */
-const isDevBuild = (): boolean =>
-    typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
+const isDevBuild = (): boolean => readEnv("NODE_ENV") !== "production";
 
 /**
  * Validate and normalize the AI base URL.
@@ -111,8 +137,7 @@ const apiBaseUrl = "/api/v1";
  */
 const rawAiBaseUrl = readEnv("REACT_APP_AI_BASE_URL") ?? "";
 const aiUseLocalFlag = readEnv("REACT_APP_AI_USE_LOCAL");
-const isTestEnv =
-    typeof process !== "undefined" && process.env?.NODE_ENV === "test";
+const isTestEnv = readEnv("NODE_ENV") === "test";
 const resolvedAiBaseUrlInput: string =
     rawAiBaseUrl.trim().length > 0
         ? rawAiBaseUrl

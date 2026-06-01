@@ -23,7 +23,7 @@
  *   previous releases are evicted lazily on the first new activation.
  */
 
-const CACHE_VERSION = "pulse-v3";
+const CACHE_VERSION = "pulse-v4";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const FONT_CACHE = `${CACHE_VERSION}-fonts`;
