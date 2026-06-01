@@ -102,6 +102,7 @@ export const ColumnContainer = styled.div`
     display: flex;
     flex: 1;
     min-height: 75%;
+    min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     padding-bottom: ${themeSpace.xs}px;
@@ -153,6 +154,8 @@ const ColumnsViewport = styled.div`
     flex: 1;
     isolation: isolate;
     min-height: 0;
+    min-width: 0;
+    overflow: hidden;
     position: relative;
 
     &::before,

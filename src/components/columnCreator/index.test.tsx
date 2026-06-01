@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
+import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 
 import ColumnCreator from ".";
 
@@ -227,6 +228,18 @@ describe("ColumnCreator", () => {
 
         expect(heights.length).toBeGreaterThan(0);
         expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+    });
+
+    it("keeps the collapsed desktop add-column slot compact enough to avoid clipping the board", () => {
+        renderCreator();
+        const button = screen.getByRole("button", { name: "Add column" });
+        const slot = button.parentElement;
+        expect(slot).not.toBeNull();
+
+        const styledClass = styledClassFor(slot as Element);
+        expect(styledClass).toBeTruthy();
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("min-width: 9rem");
     });
 
     /*

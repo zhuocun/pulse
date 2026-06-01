@@ -180,7 +180,7 @@ const INNER_PADDING = space.xxs;
 const Nav = styled.nav<{ $hidden: boolean; $minimized: boolean }>`
     align-items: stretch;
     /* Glass surface mirrors the header chrome. */
-    background: var(--glass-surface);
+    background: var(--glass-surface-strong);
     /* Wave 2 T4 — consume the global intensity lever so the
      * user-facing toggle (Clear / Regular / Solid) re-tunes this bar
      * along with the rest of the chrome. Pixel-identical to the prior

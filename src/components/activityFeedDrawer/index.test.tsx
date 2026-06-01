@@ -4,6 +4,10 @@ import { Provider } from "react-redux";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
+import {
+    coarseTouchTargetsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import { __resetActivityFeedUndoCallbacksForTests } from "../../utils/hooks/useActivityFeed";
 import { __resetAiLedgerUndoCallbacksForTests } from "../../utils/hooks/useAiLedger";
@@ -352,5 +356,16 @@ describe("ActivityFeedBell", () => {
         render(<ActivityFeedBell unreadCount={2} onClick={onClick} />);
         fireEvent.click(screen.getByTestId("activity-feed-bell"));
         expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("declares a 44 px target on coarse pointers", () => {
+        const onClick = jest.fn();
+        render(<ActivityFeedBell unreadCount={0} onClick={onClick} />);
+        const button = screen.getByTestId("activity-feed-bell");
+        const styledClass = styledClassFor(button);
+        expect(styledClass).toBeTruthy();
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 });

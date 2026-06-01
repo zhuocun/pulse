@@ -60,7 +60,7 @@ const Main = styled.main<{ $hasBottomNav: boolean }>`
      */
     padding-bottom: ${(props) =>
         props.$hasBottomNav
-            ? `calc(64px + env(safe-area-inset-bottom) + ${space.lg}px + ${space.sm}px)`
+            ? `calc(64px + env(safe-area-inset-bottom) + ${space.lg}px + ${space.sm}px + ${space.xxl}px)`
             : "0"};
 `;
 

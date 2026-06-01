@@ -307,6 +307,86 @@ select {
     }
 }
 
+@media (pointer: coarse) {
+    .ant-input-affix-wrapper,
+    input.ant-input,
+    textarea.ant-input,
+    .ant-select,
+    .ant-select-single .ant-select-selector,
+    .ant-drawer-close,
+    .ant-tag-checkable[role="button"] {
+        min-height: 44px;
+    }
+
+    .ant-select-single .ant-select-selector {
+        align-items: center;
+        height: auto !important;
+    }
+
+    .ant-select-input,
+    .ant-select-single .ant-select-selector .ant-select-input,
+    .ant-select-single .ant-select-selector .ant-select-selection-search-input {
+        height: 44px !important;
+        min-height: 44px !important;
+    }
+
+    .ant-drawer-close,
+    .ant-tag-checkable[role="button"] {
+        min-width: 44px;
+    }
+
+    .ant-switch {
+        background: transparent !important;
+        height: 44px;
+        min-height: 44px;
+        min-width: 56px;
+    }
+
+    .ant-switch::before {
+        background: var(--ant-color-fill, rgba(15, 23, 42, 0.15));
+        border-radius: 999px;
+        content: "";
+        height: 24px;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        width: 42px;
+    }
+
+    .ant-switch.ant-switch-checked::before {
+        background: var(--ant-color-primary, #ea580c);
+    }
+
+    .ant-switch:hover::before {
+        background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.2));
+    }
+
+    .ant-switch:active::before {
+        background: var(--ant-color-fill, rgba(15, 23, 42, 0.24));
+    }
+
+    .ant-switch.ant-switch-checked:hover::before {
+        background: var(--ant-color-primary-hover, #f97316);
+    }
+
+    .ant-switch.ant-switch-checked:active::before {
+        background: var(--ant-color-primary-active, #c2410c);
+    }
+
+    .ant-switch .ant-switch-handle {
+        height: 20px;
+        inset-inline-start: 8px;
+        top: 12px;
+        width: 20px;
+        z-index: 1;
+    }
+
+    .ant-switch.ant-switch-checked .ant-switch-handle {
+        inset-inline-start: calc(100% - 28px);
+    }
+}
+
 /*
  * Honor user motion preference. Components opting in to motion read
  * useReducedMotion() directly; this rule is a defense-in-depth.

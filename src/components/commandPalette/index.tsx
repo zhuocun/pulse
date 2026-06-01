@@ -86,13 +86,37 @@ const Row = styled.li<{ active: boolean }>`
     cursor: pointer;
     display: flex;
     gap: ${space.sm}px;
+    min-width: 0;
     padding: ${space.xs}px ${space.sm}px;
 `;
 
 const KindTag = styled(Tag)`
     && {
+        flex: 0 0 auto;
         font-size: ${fontSize.xs}px;
         margin-inline-end: 0;
+    }
+`;
+
+const EntryText = styled.span`
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: ${space.xxs}px ${space.xs}px;
+    min-width: 0;
+    overflow: hidden;
+`;
+
+const EntryLabel = styled.span`
+    font-weight: ${fontWeight.medium};
+    min-width: 0;
+    overflow-wrap: anywhere;
+`;
+
+const EntrySublabel = styled(Typography.Text)`
+    && {
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
 `;
 
@@ -739,25 +763,14 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                                             ]
                                         }
                                     </KindTag>
-                                    <span>
-                                        <span
-                                            style={{
-                                                fontWeight: fontWeight.medium
-                                            }}
-                                        >
-                                            {entry.label}
-                                        </span>
+                                    <EntryText>
+                                        <EntryLabel>{entry.label}</EntryLabel>
                                         {entry.sublabel ? (
-                                            <Typography.Text
-                                                style={{
-                                                    marginInlineStart: space.xs
-                                                }}
-                                                type="secondary"
-                                            >
+                                            <EntrySublabel type="secondary">
                                                 {entry.sublabel}
-                                            </Typography.Text>
+                                            </EntrySublabel>
                                         ) : null}
-                                    </span>
+                                    </EntryText>
                                 </Row>
                             );
                         })

@@ -140,6 +140,13 @@ const ActionsRow = styled.div`
  */
 const isSafeShareUrl = (s: string): boolean => /^https?:/i.test(s);
 
+const SHARE_TASK_NAME_MAX_LENGTH = 80;
+
+const truncateFallbackTaskName = (value: string): string =>
+    value.length > SHARE_TASK_NAME_MAX_LENGTH
+        ? `${value.slice(0, SHARE_TASK_NAME_MAX_LENGTH).trimEnd()}…`
+        : value;
+
 /**
  * Build the task name from the share payload. Prefers the explicit
  * `title`, falls back to a trimmed prefix of the shared `text`, and
@@ -157,8 +164,7 @@ const deriveTaskName = (params: {
     if (title) return title;
     const text = params.text?.trim();
     if (text) {
-        // Keep the name short; the full text still goes into the note.
-        return text.length > 80 ? `${text.slice(0, 80).trimEnd()}…` : text;
+        return truncateFallbackTaskName(text);
     }
     const url = params.url?.trim();
     if (url && isSafeShareUrl(url)) {

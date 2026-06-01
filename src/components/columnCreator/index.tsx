@@ -18,7 +18,7 @@ import useReactMutation from "../../utils/hooks/useReactMutation";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 
-const Slot = styled.div`
+const Slot = styled.div<{ $editing?: boolean }>`
     align-self: flex-start;
     display: flex;
     flex: 0 0 auto;
@@ -28,7 +28,7 @@ const Slot = styled.div`
     padding: ${space.xs}px 0;
 
     @media (min-width: ${breakpoints.md}px) {
-        min-width: 16rem;
+        min-width: ${(props) => (props.$editing ? "16rem" : "9rem")};
     }
 `;
 
@@ -159,7 +159,7 @@ const ColumnCreator: React.FC = () => {
     }
 
     return (
-        <Slot>
+        <Slot $editing>
             <Input
                 aria-label={microcopy.a11y.newColumnName}
                 autoComplete="off"

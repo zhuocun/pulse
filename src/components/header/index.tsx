@@ -587,6 +587,8 @@ const BrandLink = styled(NoPaddingButton)`
     @media (pointer: coarse) {
         && {
             height: 44px;
+            justify-content: center;
+            min-width: 44px;
         }
     }
 

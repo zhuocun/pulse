@@ -150,7 +150,8 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
                     style={{
                         display: "block",
                         fontSize: fontSize.sm,
-                        fontWeight: fontWeight.semibold
+                        fontWeight: fontWeight.semibold,
+                        overflowWrap: "anywhere"
                     }}
                 >
                     {nudge.summary}

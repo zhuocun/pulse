@@ -2,6 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import { Navigate } from "react-router";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import { ruleTextsFor, styledClassFor } from "../testUtils/styleRules";
+
 import ProjectDetailPage from "./projectDetail";
 
 jest.mock("../utils/hooks/useReactQuery", () => ({
@@ -153,6 +155,25 @@ describe("ProjectDetailPage", () => {
             const css = sheetText();
             expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
             expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+        });
+
+        it("declares coarse-pointer touch targets for breadcrumb and child-nav links", () => {
+            renderDetail("/projects/project-1/board");
+            const board = screen.getByRole("link", { name: "Board" });
+            const breadcrumbWrapper = screen
+                .getByTestId("project-detail-chrome")
+                .querySelector(".ant-breadcrumb")?.parentElement;
+            expect(breadcrumbWrapper).not.toBeNull();
+
+            const breadcrumbRuleText = ruleTextsFor(
+                styledClassFor(breadcrumbWrapper as Element) ?? ""
+            ).join("\n");
+            const childRuleText = ruleTextsFor(
+                styledClassFor(board) ?? ""
+            ).join("\n");
+
+            expect(breadcrumbRuleText).toContain("min-height: 44px");
+            expect(childRuleText).toContain("min-height: 44px");
         });
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {

@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
+import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -227,6 +228,18 @@ describe("Header", () => {
         // remains keyboard-focusable for parity with the navigating
         // state but a click is a no-op.
         expect(logo).not.toBeDisabled();
+    });
+
+    it("declares a full 44 px coarse-pointer target for the logo", () => {
+        renderHeader("/projects");
+        const logo = screen.getByRole("button", { name: /pulse home/i });
+        const styledClass = styledClassFor(logo);
+        expect(styledClass).toBeTruthy();
+
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("height: 44px");
+        expect(ruleText).toContain("min-width: 44px");
+        expect(ruleText).toContain("justify-content: center");
     });
 
     it("invokes setPreference when the inline theme IconButton is clicked", () => {

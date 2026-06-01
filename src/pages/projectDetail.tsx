@@ -216,6 +216,14 @@ const BreadcrumbWrapper = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
+    @media (pointer: coarse) {
+        && .ant-breadcrumb a {
+            align-items: center;
+            display: inline-flex;
+            min-height: 44px;
+        }
+    }
 `;
 
 const Body = styled.div`
@@ -258,7 +266,7 @@ const ChildNavLink = styled(NavLink)`
      * Phase 5 "Liquid Glass" Wave 2 — gel-flex on breadcrumb tabs.
      * Mirrors the header / bottom-tab gel-flex so every interactive
      * chrome surface in the app yields under press with the same
-     * cadence. transform-only; the 36 px min-height stays intact.
+     * cadence. transform-only; the tap target stays intact.
      */
     transition: transform var(--motion-gel-flex, 220ms)
         var(--easing-spring-snap, ease-out);
@@ -270,6 +278,10 @@ const ChildNavLink = styled(NavLink)`
      * everywhere rather than gated on coarse pointers.
      */
     min-height: 36px;
+
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
 
     &:hover,
     &:focus-visible {

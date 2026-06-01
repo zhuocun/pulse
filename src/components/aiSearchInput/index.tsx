@@ -144,6 +144,15 @@ const SearchRow = styled.div`
     }
 `;
 
+const ReformulationTag =
+    Tag.CheckableTag as unknown as React.ForwardRefExoticComponent<
+        Omit<React.HTMLAttributes<HTMLSpanElement>, "onChange"> & {
+            checked: boolean;
+            onChange?: (checked: boolean) => void;
+            children?: React.ReactNode;
+        } & React.RefAttributes<HTMLSpanElement>
+    >;
+
 const summarizeMatches = (
     matches: IAiSearchMatch[] | undefined
 ): MatchStrengthSummary | null => {
@@ -411,6 +420,11 @@ const AiSearchInput: React.FC<Props> = (props) => {
                   submit: microcopy.ai.findRelatedProjects
               };
 
+    const applyReformulation = (alt: string) => {
+        setDraft(alt);
+        void performSearch(alt);
+    };
+
     return (
         <div style={{ marginBottom: themeSpace.md }}>
             <CopilotRemoteConsentNotice route="search" />
@@ -626,16 +640,26 @@ const AiSearchInput: React.FC<Props> = (props) => {
                             <Space size={themeSpace.xs} wrap>
                                 <span>{microcopy.ai.didYouMean}</span>
                                 {reformulations.map((alt) => (
-                                    <Tag.CheckableTag
+                                    <ReformulationTag
                                         checked={false}
                                         key={alt}
-                                        onChange={() => {
-                                            setDraft(alt);
-                                            void performSearch(alt);
+                                        onChange={() => applyReformulation(alt)}
+                                        onKeyDown={(
+                                            event: React.KeyboardEvent<HTMLSpanElement>
+                                        ) => {
+                                            if (
+                                                event.key === "Enter" ||
+                                                event.key === " "
+                                            ) {
+                                                event.preventDefault();
+                                                applyReformulation(alt);
+                                            }
                                         }}
+                                        role="button"
+                                        tabIndex={0}
                                     >
                                         {alt}
-                                    </Tag.CheckableTag>
+                                    </ReformulationTag>
                                 ))}
                             </Space>
                         ) : null

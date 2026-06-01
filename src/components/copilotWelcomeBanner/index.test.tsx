@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import { microcopy } from "../../constants/microcopy";
+import {
+    coarseTouchTargetsFor,
+    ruleTextsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import CopilotWelcomeBanner from "./index";
 
 const KEY = "test:welcome";
@@ -54,6 +59,34 @@ describe("CopilotWelcomeBanner", () => {
         expect(
             screen.queryByText(microcopy.ai.welcomeBannerTitle)
         ).not.toBeInTheDocument();
+    });
+
+    it("declares coarse-pointer touch targets for banner actions", () => {
+        render(<CopilotWelcomeBanner storageKey={KEY} />);
+        const cta = screen.getByRole("button", {
+            name: microcopy.ai.welcomeBannerCta
+        });
+        const actionRail = cta.closest(".ant-space");
+        expect(actionRail).not.toBeNull();
+        const railRules = ruleTextsFor(
+            styledClassFor(actionRail as Element) ?? ""
+        ).join("\n");
+        expect(railRules).toContain("min-height: 44px");
+        expect(railRules).toContain("min-width: 44px");
+
+        const iconDismiss = screen
+            .getAllByRole("button", {
+                name: microcopy.ai.welcomeBannerDismiss
+            })
+            .find((button) => button.querySelector(".anticon-close"));
+        if (!iconDismiss) {
+            throw new Error("Missing icon dismiss button");
+        }
+        const iconClass = styledClassFor(iconDismiss);
+        expect(iconClass).toBeTruthy();
+        const { heights, widths } = coarseTouchTargetsFor(iconClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 
     it("dispatches `boardCopilot:openChat` with the canonical prompt when no onCta is supplied", () => {

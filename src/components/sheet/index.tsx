@@ -319,6 +319,13 @@ const CloseButton = styled.button`
     padding: 0;
     width: 32px;
 
+    @media (pointer: coarse) {
+        height: 44px;
+        min-height: 44px;
+        min-width: 44px;
+        width: 44px;
+    }
+
     &:hover {
         background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
     }

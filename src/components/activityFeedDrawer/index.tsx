@@ -10,7 +10,13 @@ import React, {
 } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    fontSize,
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import useActivityFeed, {
     type ActivityEvent
@@ -418,6 +424,25 @@ interface BellTriggerProps {
     onClick: () => void;
 }
 
+const BellButton = styled.button`
+    align-items: center;
+    background: transparent;
+    border: none;
+    border-radius: ${radius.md}px;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+    cursor: pointer;
+    display: inline-flex;
+    height: 36px;
+    justify-content: center;
+    padding: 0;
+    width: 36px;
+
+    @media (pointer: coarse) {
+        height: ${touchTargetCoarse}px;
+        width: ${touchTargetCoarse}px;
+    }
+`;
+
 /**
  * Bell-icon button used by the header. The accessible name follows the
  * one/other plural pattern documented in `aiActivityLog`: pick the right
@@ -438,24 +463,11 @@ export const ActivityFeedBell: React.FC<BellTriggerProps> = ({
                       : microcopy.activityFeed.bellAriaLabelOther
               ).replace("{count}", String(unreadCount));
     return (
-        <button
+        <BellButton
             aria-label={ariaLabel}
             data-testid="activity-feed-bell"
             onClick={onClick}
             type="button"
-            style={{
-                alignItems: "center",
-                background: "transparent",
-                border: "none",
-                borderRadius: radius.md,
-                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65))",
-                cursor: "pointer",
-                display: "inline-flex",
-                height: 36,
-                justifyContent: "center",
-                padding: 0,
-                width: 36
-            }}
         >
             <Badge
                 count={unreadCount}
@@ -465,7 +477,7 @@ export const ActivityFeedBell: React.FC<BellTriggerProps> = ({
             >
                 <BellOutlined aria-hidden style={{ fontSize: fontSize.md }} />
             </Badge>
-        </button>
+        </BellButton>
     );
 };
 

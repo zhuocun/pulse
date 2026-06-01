@@ -50,6 +50,17 @@ describe("NudgeCard", () => {
         );
     });
 
+    it("breaks long generated summary tokens instead of widening the card", () => {
+        const summary =
+            "https://example.com/really-long-generated-token-without-breaks-".repeat(
+                4
+            );
+        renderWith({ summary });
+        expect(screen.getByText(summary)).toHaveStyle({
+            overflowWrap: "anywhere"
+        });
+    });
+
     it("tracks a nudge.viewed analytics event on mount", () => {
         renderWith();
         expect(sink).toHaveBeenCalledWith(ANALYTICS_EVENTS.NUDGE_VIEWED, {

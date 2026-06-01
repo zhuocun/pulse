@@ -73,6 +73,9 @@ const SettingsList = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${space.md}px;
+    margin-inline: auto;
+    max-width: 48rem;
+    width: 100%;
 `;
 
 /*

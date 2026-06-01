@@ -340,9 +340,10 @@ describe("MainLayout", () => {
             // The padding-bottom token references env(safe-area-inset-
             // bottom) which jsdom resolves to 0px, so we inspect the
             // styled-component sheet for the formula instead of
-            // getComputedStyle. The Wave 2 padding adds the bar height
-            // (64) + the bottom gap (space.lg = 24) + breathing room
-            // (space.sm = 12) on top of the safe-area inset.
+            // getComputedStyle. The padding adds the bar height (64),
+            // the bottom gap (space.lg = 24), breathing room (space.sm = 12),
+            // and one viewport-edge buffer (space.xxl = 48) on top of the
+            // safe-area inset.
             const sheets = Array.from(document.styleSheets)
                 .map((sheet) => {
                     try {
@@ -355,10 +356,10 @@ describe("MainLayout", () => {
                 })
                 .join("\n");
             expect(main).not.toBeNull();
-            // The Wave 2 formula includes env(safe-area-inset-bottom)
-            // AND the additional 24+12 px gap.
+            // The formula includes env(safe-area-inset-bottom)
+            // AND the additional 24+12+48 px gap.
             expect(sheets).toMatch(
-                /calc\(64px \+ env\(safe-area-inset-bottom\) \+ 24px \+ 12px\)/
+                /calc\(64px \+ env\(safe-area-inset-bottom\) \+ 24px \+ 12px \+ 48px\)/
             );
         });
 

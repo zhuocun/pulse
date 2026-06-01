@@ -233,8 +233,18 @@ interface BriefRecommendationTitleProps {
 const BriefRecommendationTitle: React.FC<BriefRecommendationTitleProps> = ({
     detail
 }) => (
-    <span style={{ alignItems: "center", display: "inline-flex", gap: 6 }}>
-        <span>{`${microcopy.a11y.aiSuggestion}: ${microcopy.brief.recommendedNextStep}`}</span>
+    <span
+        style={{
+            alignItems: "center",
+            display: "inline-flex",
+            flexWrap: "wrap",
+            gap: 6,
+            minWidth: 0
+        }}
+    >
+        <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+            {`${microcopy.a11y.aiSuggestion}: ${microcopy.brief.recommendedNextStep}`}
+        </span>
         {detail && (
             <Tooltip title={microcopy.brief.strengthTooltips[detail.strength]}>
                 <Tag
@@ -262,12 +272,18 @@ const BriefRecommendationBody: React.FC<BriefRecommendationBodyProps> = ({
     const text = detail?.text ?? fallbackText;
     return (
         <div>
-            <Typography.Paragraph style={{ marginBottom: 4 }}>
+            <Typography.Paragraph
+                style={{ marginBottom: 4, overflowWrap: "anywhere" }}
+            >
                 {text}
             </Typography.Paragraph>
             {detail?.basis && (
                 <Typography.Paragraph
-                    style={{ fontSize: fontSize.xs, marginBottom: 4 }}
+                    style={{
+                        fontSize: fontSize.xs,
+                        marginBottom: 4,
+                        overflowWrap: "anywhere"
+                    }}
                     type="secondary"
                 >
                     {microcopy.brief.basisLabel.replace("{text}", detail.basis)}
@@ -282,7 +298,10 @@ const BriefRecommendationBody: React.FC<BriefRecommendationBodyProps> = ({
                             onClick={() => onOpenTask(source.taskId)}
                             style={{
                                 cursor: "pointer",
-                                marginInlineEnd: 0
+                                marginInlineEnd: 0,
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis"
                             }}
                             tabIndex={0}
                             onKeyDown={(event) => {

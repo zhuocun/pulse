@@ -9,6 +9,7 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
+import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 
 import CommandPalette from ".";
 
@@ -136,6 +137,22 @@ describe("CommandPalette", () => {
         expect(list).toBeInTheDocument();
         expect(screen.getByText("Roadmap")).toBeInTheDocument();
         expect(screen.getByText("Marketing")).toBeInTheDocument();
+    });
+
+    it("lets long entry labels and sublabels wrap instead of widening result rows", async () => {
+        renderPalette(true);
+        const label = await screen.findByText("Roadmap");
+        const sublabel = screen.getAllByText("Acme")[0];
+
+        const labelRuleText = ruleTextsFor(styledClassFor(label) ?? "").join(
+            "\n"
+        );
+        const sublabelRuleText = ruleTextsFor(
+            styledClassFor(sublabel) ?? ""
+        ).join("\n");
+
+        expect(labelRuleText).toContain("overflow-wrap: anywhere");
+        expect(sublabelRuleText).toContain("overflow-wrap: anywhere");
     });
 
     it("filters results as the user types", async () => {

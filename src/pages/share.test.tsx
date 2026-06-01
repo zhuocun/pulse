@@ -200,6 +200,22 @@ describe("SharePage", () => {
         expect(summary).toHaveTextContent("https://example.com/release");
     });
 
+    it("preserves long explicit titles in the task name and summary", () => {
+        wireQueries();
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+        const longTitle =
+            "Investigate a production incident with a very long unbroken title that would otherwise overflow the mobile task-name input";
+
+        renderShare(`/share?title=${encodeURIComponent(longTitle)}`);
+
+        expect(screen.getByLabelText(microcopy.fields.taskName)).toHaveValue(
+            longTitle
+        );
+        expect(screen.getByTestId("share-summary")).toHaveTextContent(
+            longTitle
+        );
+    });
+
     it("submits a task with the shared title + composed note when Create task is pressed", async () => {
         wireQueries();
         const mutateAsync = jest.fn().mockResolvedValue(undefined);

@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
+import { ruleTextsFor, styledClassFor } from "../testUtils/styleRules";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
@@ -105,6 +106,18 @@ describe("SettingsPage", () => {
         ).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-ai")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();
+    });
+
+    it("constrains the desktop settings list to a readable scan width", () => {
+        renderPage();
+        const list = screen.getByTestId("settings-row-theme").parentElement;
+        expect(list).not.toBeNull();
+        const styledClass = styledClassFor(list as Element);
+        expect(styledClass).toBeTruthy();
+
+        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
+        expect(ruleText).toContain("max-width: 48rem");
+        expect(ruleText).toContain("margin-inline: auto");
     });
 
     it("renders the three-palette color-theme picker", () => {

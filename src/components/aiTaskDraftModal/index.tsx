@@ -97,6 +97,36 @@ const DraftActionRow = styled.div`
     }
 `;
 
+const SamplePromptList = styled(Space)`
+    && {
+        margin-bottom: ${space.sm}px;
+        max-width: 100%;
+    }
+
+    && .ant-space-item {
+        max-width: 100%;
+    }
+`;
+
+const SamplePromptButton = styled(Button)`
+    && {
+        height: auto;
+        max-width: 100%;
+        text-align: left;
+        white-space: normal;
+    }
+
+    && > span {
+        overflow-wrap: anywhere;
+    }
+
+    @media (pointer: coarse) {
+        && {
+            min-height: ${touchTargetCoarse}px;
+        }
+    }
+`;
+
 /**
  * Form fields the AI draft populates. After Apply, each populated field
  * shows the "Suggested by Copilot" badge until the user edits it.
@@ -669,18 +699,18 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                 </Typography.Text>
             </Form.Item>
             {!prompt.trim() && (
-                <Space size={space.xs} style={{ marginBottom: space.sm }} wrap>
+                <SamplePromptList size={space.xs} wrap>
                     {samplePrompts.map((sample) => (
-                        <Button
+                        <SamplePromptButton
                             key={sample}
                             onClick={() => setPrompt(sample)}
                             size="small"
                             type="default"
                         >
                             {sample}
-                        </Button>
+                        </SamplePromptButton>
                     ))}
-                </Space>
+                </SamplePromptList>
             )}
             <DraftActionRow data-testid="ai-task-draft-action-row">
                 <Button

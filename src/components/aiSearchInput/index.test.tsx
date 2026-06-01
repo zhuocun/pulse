@@ -284,4 +284,40 @@ describe("AiSearchInput", () => {
         fireEvent.click(screen.getByLabelText("Clear AI search"));
         expect(setSemanticIds).toHaveBeenCalledWith(undefined);
     });
+
+    it("makes reformulation chips keyboard-reachable", async () => {
+        const setSemanticIds = jest.fn();
+        render(
+            <AiSearchInput
+                kind="tasks"
+                projectContext={projectContext}
+                semanticIds={undefined}
+                setSemanticIds={setSemanticIds}
+            />
+        );
+
+        fireEvent.change(
+            screen.getByRole("textbox", {
+                name: /Find related tasks with AI/i
+            }),
+            {
+                target: { value: "quantum entanglement" }
+            }
+        );
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.ai.findRelatedTasks
+            })
+        );
+
+        const reformulation = await screen.findByRole("button", {
+            name: "tasks about quantum entanglement"
+        });
+        expect(reformulation).toHaveAttribute("tabindex", "0");
+
+        fireEvent.keyDown(reformulation, { key: "Enter", code: "Enter" });
+        await waitFor(() => {
+            expect(setSemanticIds).toHaveBeenCalledTimes(2);
+        });
+    });
 });

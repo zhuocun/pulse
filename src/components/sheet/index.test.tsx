@@ -3,6 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 import React from "react";
 
+import {
+    coarseTouchTargetsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
@@ -168,6 +172,16 @@ describe("Sheet — animated phone branch", () => {
         const user = userEvent.setup();
         await user.click(screen.getByTestId("test-sheet-close"));
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("declares a 44 px close target on coarse pointers", () => {
+        render(<Harness />);
+        const close = screen.getByTestId("test-sheet-close");
+        const styledClass = styledClassFor(close);
+        expect(styledClass).toBeTruthy();
+        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
+        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
     });
 
     it("hides the close button when closable=false", () => {

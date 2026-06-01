@@ -5,7 +5,13 @@ import React from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    fontSize,
+    fontWeight,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 import AiSparkleIcon from "../aiSparkleIcon";
 import GlassPanel from "../glassPanel";
 
@@ -42,6 +48,24 @@ const Wrap = styled(GlassPanel)`
 const Body = styled.div`
     flex: 1 1 auto;
     min-width: 0;
+`;
+
+const BannerActions = styled(Space)`
+    @media (pointer: coarse) {
+        && .ant-btn {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
+`;
+
+const IconDismissButton = styled(Button)`
+    @media (pointer: coarse) {
+        && {
+            min-height: ${touchTargetCoarse}px;
+            min-width: ${touchTargetCoarse}px;
+        }
+    }
 `;
 
 interface CopilotWelcomeBannerProps {
@@ -128,16 +152,16 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
                 >
                     {microcopy.ai.welcomeBannerBody}
                 </Typography.Paragraph>
-                <Space size={space.xs}>
+                <BannerActions size={space.xs}>
                     <Button onClick={handleCta} size="small" type="primary">
                         {microcopy.ai.welcomeBannerCta}
                     </Button>
                     <Button onClick={dismiss} size="small" type="text">
                         {microcopy.ai.welcomeBannerDismiss}
                     </Button>
-                </Space>
+                </BannerActions>
             </Body>
-            <Button
+            <IconDismissButton
                 aria-label={microcopy.ai.welcomeBannerDismiss}
                 icon={<CloseOutlined />}
                 onClick={dismiss}
