@@ -236,11 +236,12 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         useAutonomyLevel(allowedAutonomy);
     const remoteHealthEnabled =
         environment.aiEnabled && !environment.aiUseLocalEngine;
+    const remoteHealthActive = remoteHealthEnabled && remoteAiConsentGranted;
     const { status: healthStatus } = useAgentHealth(
         environment.aiBaseUrl ?? "",
         {
             agentName: "chat-agent",
-            enabled: remoteHealthEnabled && remoteAiConsentGranted
+            enabled: remoteHealthActive
         }
     );
     const [input, setInput] = useState("");
@@ -925,7 +926,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
             </Space>
             <CopilotRemoteConsentNotice route="chat" />
             {/* Inline health status alert */}
-            {remoteHealthEnabled &&
+            {remoteHealthActive &&
                 (healthStatus === "degraded" || healthStatus === "offline") && (
                     <Alert
                         closable={healthStatus === "degraded"}
@@ -1868,7 +1869,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                 onSend={handleSend}
                 promptCharHintText={promptCharHintText}
                 promptCharHintWarning={promptCharHintWarning}
-                remoteHealthEnabled={remoteHealthEnabled}
+                remoteHealthEnabled={remoteHealthActive}
                 setInput={setInput}
             />
         </>

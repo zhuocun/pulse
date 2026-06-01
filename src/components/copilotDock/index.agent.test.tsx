@@ -225,6 +225,26 @@ describe("CopilotDock — remote agent path", () => {
         resetRemoteAiConsentForTests();
     });
 
+    it("does not show or enforce the offline health state before remote AI consent", () => {
+        resetRemoteAiConsentForTests();
+        renderControlled({ initialTab: "chat" });
+
+        expect(
+            screen.getByText(microcopy.ai.remoteConsentTitle)
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(microcopy.ai.healthOffline)
+        ).not.toBeInTheDocument();
+
+        fireEvent.change(
+            screen.getByLabelText(microcopy.a11y.messageBoardCopilot),
+            { target: { value: "What should I look at first?" } }
+        );
+        expect(
+            screen.getByRole("button", { name: microcopy.a11y.sendMessage })
+        ).toBeEnabled();
+    });
+
     /*
      * R-A H1 / R-A L2: switching from Brief → Chat → Brief while a brief
      * stream is in flight (or has rendered) must NOT re-dispatch
