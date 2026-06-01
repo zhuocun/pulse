@@ -835,6 +835,15 @@ const zhCN: Dictionary = {
         chatResponding: "看板 Copilot 正在回复。",
         healthOffline: "看板 Copilot 当前不可用。请稍后再试。",
         healthDegraded: "看板 Copilot 正在延迟响应。回复可能较慢或暂时不可用。",
+        healthIssueTemplate: "看板 Copilot 尚未就绪：{detail}",
+        healthWarningTemplate: "看板 Copilot 已降级：{detail}",
+        healthProviderUnreachableTemplate:
+            "看板 Copilot 无法连接 {provider}：{detail}",
+        healthProviderGeneric: "AI 提供方",
+        healthStubMode:
+            "看板 Copilot 已连接，但服务器正在使用 stub 提供方而不是真实 LLM。",
+        healthRealProviderNotReady:
+            "看板 Copilot 已连接，但没有真实 LLM 提供方就绪。",
         conversationTooLong: "对话过长。请开始新的会话，或尝试更短的消息。",
         conversationLongWarning:
             "当前对话已经较长。建议开始新的会话以保持回答质量。",

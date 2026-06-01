@@ -68,15 +68,25 @@ test("productionHealthIssues flags non-production readiness shape", () => {
         productionHealthIssues({
             checkpointerBackend: "memory",
             storeBackend: "postgres",
+            rateLimitBackend: "memory",
+            budgetBackend: "memory",
+            idempotencyBackend: "memory",
+            redisConfigured: false,
             jwtSecretSource: "ephemeral",
             multiInstanceSafe: false,
-            warnings: ["memory backend"]
+            warnings: ["memory backend"],
+            issues: ["provider missing"]
         }),
         [
             "checkpointerBackend is not postgres",
+            "rateLimitBackend is not redis",
+            "budgetBackend is not redis",
+            "idempotencyBackend is not redis",
+            "redisConfigured is not true",
             "jwtSecretSource is ephemeral",
             "multiInstanceSafe is false",
-            "health warnings present: memory backend"
+            "health warnings present: memory backend",
+            "health issues present: provider missing"
         ]
     );
 
@@ -84,9 +94,14 @@ test("productionHealthIssues flags non-production readiness shape", () => {
         productionHealthIssues({
             checkpointerBackend: "postgres",
             storeBackend: "postgres",
+            rateLimitBackend: " Redis ",
+            budgetBackend: "REDIS",
+            idempotencyBackend: "redis",
+            redisConfigured: true,
             jwtSecretSource: "env",
             multiInstanceSafe: true,
-            warnings: []
+            warnings: [],
+            issues: []
         }),
         []
     );
@@ -128,6 +143,10 @@ test("redact removes token-like fields from nested failure details", () => {
             authorization: "[redacted]",
             nested: { api_key: "[redacted]", ok: "visible" }
         }
+    );
+    assert.equal(
+        redact("redis://user:password@redis.example/0"),
+        "redis://[redacted]@redis.example/0"
     );
     assert.ok(new SmokeError("x") instanceof Error);
 });

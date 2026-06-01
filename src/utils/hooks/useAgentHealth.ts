@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
-import { pingAgent } from "../ai/agentHealth";
+import { type AgentPingResult, pingAgent } from "../ai/agentHealth";
 
 export type AgentHealthStatus = "ok" | "degraded" | "offline";
 
@@ -9,17 +9,25 @@ export interface UseAgentHealthState {
     status: AgentHealthStatus;
     latencyMs: number;
     lastChecked: number | null;
+    ready: boolean;
+    realProviderReady: boolean;
+    provider: string | null;
+    model: string | null;
+    stubMode: boolean;
+    issues: readonly string[];
+    warnings: readonly string[];
+    providerConnectivity?: AgentPingResult["providerConnectivity"];
 }
 
 const DEFAULT_INTERVAL_MS = 30_000;
 /** Latency above this is "degraded" even when the response was OK. */
 const DEGRADED_THRESHOLD_MS = 1500;
-// P2-I: TTFT percentile integration deferred to backend. Slow TTFT observations
-// are tracked via AGENT_TTFT_SLOW analytics events; the health hook monitors
-// the /health endpoint latency separately.
 
-const classify = (ok: boolean, latencyMs: number): AgentHealthStatus => {
-    if (!ok) return "offline";
+const classify = (result: AgentPingResult): AgentHealthStatus => {
+    if (!result.ready) return "offline";
+    if (!result.ok) return "degraded";
+    if (result.warnings.length > 0) return "degraded";
+    const { latencyMs } = result;
     if (latencyMs < 0 || latencyMs > DEGRADED_THRESHOLD_MS) return "degraded";
     return "ok";
 };
@@ -27,19 +35,33 @@ const classify = (ok: boolean, latencyMs: number): AgentHealthStatus => {
 const PRE_PROBE_STATE: UseAgentHealthState = {
     status: "degraded",
     latencyMs: -1,
-    lastChecked: null
+    lastChecked: null,
+    ready: false,
+    realProviderReady: false,
+    provider: null,
+    model: null,
+    stubMode: false,
+    issues: [],
+    warnings: []
 };
 const OFFLINE_STATE: UseAgentHealthState = {
     status: "offline",
     latencyMs: -1,
-    lastChecked: null
+    lastChecked: null,
+    ready: false,
+    realProviderReady: false,
+    provider: null,
+    model: null,
+    stubMode: false,
+    issues: [],
+    warnings: []
 };
 
 /**
  * Singleton poller shared across every active `useAgentHealth` consumer
  * for the same `(baseUrl, intervalMs)` pair. Without this, mounting the
  * hook in both the page header and the AI chat drawer doubled the probes
- * against `/api/v1/health` (two independent `setInterval` timers ticking
+ * against `/api/v1/health/ai?probe=true` (two independent timers ticking
  * at the same cadence with no coordination). Each consumer subscribes
  * with `useSyncExternalStore`; when the last subscriber unmounts the
  * timer is cleared and the entry is dropped so a stale Map can't pin
@@ -66,29 +88,49 @@ const notifySubscribers = (poller: SharedHealthPoller) => {
 };
 
 const probe = async (poller: SharedHealthPoller): Promise<void> => {
+    if (poller.controller !== null) return;
     const controller = new AbortController();
     poller.controller = controller;
     try {
-        const { ok, latencyMs } = await pingAgent(
-            poller.baseUrl,
-            controller.signal
-        );
+        const result = await pingAgent(poller.baseUrl, controller.signal);
         if (poller.controller !== controller) return;
         poller.state = {
-            status: classify(ok, latencyMs),
-            latencyMs,
-            lastChecked: Date.now()
+            status: classify(result),
+            latencyMs: result.latencyMs,
+            lastChecked: Date.now(),
+            ready: result.ready,
+            realProviderReady: result.realProviderReady,
+            provider: result.provider,
+            model: result.model,
+            stubMode: result.stubMode,
+            issues: result.issues,
+            warnings: result.warnings,
+            ...(result.providerConnectivity
+                ? { providerConnectivity: result.providerConnectivity }
+                : {})
         };
         notifySubscribers(poller);
     } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        if (poller.controller !== controller) return;
-        poller.state = {
-            status: "offline",
-            latencyMs: -1,
-            lastChecked: Date.now()
-        };
-        notifySubscribers(poller);
+        if (!(err instanceof Error && err.name === "AbortError")) {
+            if (poller.controller !== controller) return;
+            poller.state = {
+                status: "offline",
+                latencyMs: -1,
+                lastChecked: Date.now(),
+                ready: false,
+                realProviderReady: false,
+                provider: null,
+                model: null,
+                stubMode: false,
+                issues: [],
+                warnings: []
+            };
+            notifySubscribers(poller);
+        }
+    } finally {
+        if (poller.controller === controller) {
+            poller.controller = null;
+        }
     }
 };
 
@@ -155,7 +197,7 @@ const noopUnsubscribe = () => {
 };
 
 /**
- * Poll `/api/v1/health` and expose a coarse `ok / degraded / offline` status
+ * Poll `/api/v1/health/ai?probe=true` and expose availability status
  * (PRD §6.2). The hook is a no-op when `baseUrl` is empty (v1 fallback). It
  * cleans up on unmount and respects an optional polling interval.
  *
@@ -197,11 +239,11 @@ const useAgentHealth = (
 
     /**
      * Track the last status we fired AGENT_HEALTH_DEGRADED for so we only
-     * emit once per transition into a degraded/offline state (P2-5).
+     * emit once per transition into a degraded/offline state.
      * Null until the first real probe completes so the pre-probe synthetic
      * "degraded" initial state does not trigger the event. Kept per
      * consumer so each surface (header, chat drawer) reports its own
-     * `agentName` in analytics — the underlying ping is still shared.
+     * `agentName` in analytics; the underlying ping is still shared.
      */
     const lastFiredStatusRef = useRef<AgentHealthStatus | null>(null);
 

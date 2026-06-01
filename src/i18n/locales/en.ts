@@ -1002,6 +1002,15 @@ export const enSource = {
             "Board Copilot is currently unavailable. Try again later.",
         healthDegraded:
             "Board Copilot is experiencing delays. Responses may be slow or unavailable.",
+        healthIssueTemplate: "Board Copilot is not ready: {detail}",
+        healthWarningTemplate: "Board Copilot is degraded: {detail}",
+        healthProviderUnreachableTemplate:
+            "Board Copilot cannot reach {provider}: {detail}",
+        healthProviderGeneric: "the AI provider",
+        healthStubMode:
+            "Board Copilot is connected, but the server is using the stub provider instead of a real LLM.",
+        healthRealProviderNotReady:
+            "Board Copilot is connected, but no real LLM provider is ready.",
         conversationTooLong:
             "Conversation too long. Start a new session or try a shorter message.",
         conversationLongWarning:

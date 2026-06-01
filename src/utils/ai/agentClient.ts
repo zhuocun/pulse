@@ -333,20 +333,71 @@ export const clearAgentMetadataSessionCache = (): void => {
     metadataSessionCache.clear();
 };
 
-/**
- * Server health body shape on the wire (`/api/v1/health`). Both
- * snake_case fields (`status`, `agents_loaded`) and camelCase fields
- * (`ok`, `agentsLoaded`) are accepted because the Python server emits
- * both for backwards compatibility. We map either into the canonical
- * `AgentHealthResponse` so the rest of the app stays oblivious.
- */
-interface RawAgentHealthResponse {
-    status?: string;
-    ok?: boolean;
-    agents_loaded?: number;
-    agentsLoaded?: number;
-    latencyMs?: number;
-}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    value !== null && typeof value === "object" && !Array.isArray(value);
+
+const readBoolean = (
+    body: Record<string, unknown>,
+    keys: readonly string[]
+): boolean | undefined => {
+    for (const key of keys) {
+        const value = body[key];
+        if (typeof value === "boolean") return value;
+    }
+    return undefined;
+};
+
+const readNumber = (
+    body: Record<string, unknown>,
+    keys: readonly string[]
+): number | undefined => {
+    for (const key of keys) {
+        const value = body[key];
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+    }
+    return undefined;
+};
+
+const readString = (
+    body: Record<string, unknown>,
+    keys: readonly string[]
+): string | undefined => {
+    for (const key of keys) {
+        const value = body[key];
+        if (typeof value === "string") return value;
+    }
+    return undefined;
+};
+
+const readStringArray = (
+    body: Record<string, unknown>,
+    keys: readonly string[]
+): string[] => {
+    for (const key of keys) {
+        const value = body[key];
+        if (Array.isArray(value)) {
+            return value.filter(
+                (item): item is string => typeof item === "string"
+            );
+        }
+    }
+    return [];
+};
+
+const readProviderConnectivity = (
+    body: Record<string, unknown>
+): AgentHealthResponse["providerConnectivity"] => {
+    const raw = body.providerConnectivity ?? body.provider_connectivity;
+    if (!isRecord(raw)) return undefined;
+    const reachable = readBoolean(raw, ["reachable"]);
+    const detail = readString(raw, ["detail"]);
+    if (reachable === undefined || detail === undefined) return undefined;
+    return {
+        reachable,
+        detail,
+        checkedAt: readNumber(raw, ["checkedAt", "checked_at"]) ?? null
+    };
+};
 
 /**
  * Coerce the server-side health flag. Returns `undefined` (not `false`)
@@ -355,9 +406,13 @@ interface RawAgentHealthResponse {
  * collapses by precedence into `?? false ?? response.ok` and the third
  * branch is unreachable.
  */
-const inferOkFromBody = (body: RawAgentHealthResponse): boolean | undefined => {
-    if (typeof body.ok === "boolean") return body.ok;
-    if (typeof body.status === "string") return body.status === "ok";
+const inferOkFromBody = (
+    body: Record<string, unknown>
+): boolean | undefined => {
+    const explicitOk = readBoolean(body, ["ok"]);
+    if (explicitOk !== undefined) return explicitOk;
+    const status = readString(body, ["status"]);
+    if (status !== undefined) return status === "ok";
     return undefined;
 };
 
@@ -370,22 +425,47 @@ export const getAgentHealth = async ({
     const started = Date.now();
     let response: Response;
     try {
-        response = await fetch(`${trimSlash(baseUrl)}/api/v1/health`, {
-            headers: buildHeaders(headers),
-            method: "GET",
-            signal
-        });
+        response = await fetch(
+            `${trimSlash(baseUrl)}/api/v1/health/ai?probe=true`,
+            {
+                headers: buildHeaders(headers),
+                method: "GET",
+                signal
+            }
+        );
     } catch (err) {
         throw wrapNetworkError(err);
     }
     if (!response.ok) {
         throw await mapAgentErrorResponse(response);
     }
-    const json = (await response.json()) as RawAgentHealthResponse;
+    const json = await response.json();
+    const body = isRecord(json) ? json : {};
     const latencyMs = Date.now() - started;
+    const legacyOk = inferOkFromBody(body);
+    const ready = readBoolean(body, ["ready"]) ?? legacyOk ?? false;
+    const realProviderReady =
+        readBoolean(body, ["realProviderReady", "real_provider_ready"]) ??
+        legacyOk ??
+        ready;
+    const stubMode = readBoolean(body, ["stubMode", "stub_mode"]) ?? false;
+    const providerConnectivity = readProviderConnectivity(body);
     return {
-        ok: inferOkFromBody(json) ?? response.ok,
-        agentsLoaded: json.agentsLoaded ?? json.agents_loaded ?? 0,
-        latencyMs: json.latencyMs ?? latencyMs
+        ok: ready && realProviderReady,
+        agentsLoaded: readNumber(body, ["agentsLoaded", "agents_loaded"]) ?? 0,
+        latencyMs: readNumber(body, ["latencyMs"]) ?? latencyMs,
+        ready,
+        realProviderReady,
+        provider:
+            readString(body, [
+                "providerResolved",
+                "provider_resolved",
+                "provider"
+            ]) ?? null,
+        model: readString(body, ["model"]) ?? null,
+        stubMode,
+        issues: readStringArray(body, ["issues"]),
+        warnings: readStringArray(body, ["warnings"]),
+        ...(providerConnectivity ? { providerConnectivity } : {})
     };
 };

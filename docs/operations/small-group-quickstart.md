@@ -218,8 +218,10 @@ hardening) when any of these triggers fire:
   and `PROMETHEUS_METRICS=true`, ship spans to the collector of your
   choice, and add the Tier 9 alert rules from `deployment.md`.
 - You want pgvector-backed task similarity for `task-estimation-agent`
-  — see [`pgvector-task-embeddings.sql`](./pgvector-task-embeddings.sql)
-  and the matching env vars in `.env.example`.
+  — see [`pgvector-task-embeddings.sql`](./pgvector-task-embeddings.sql),
+  dry-run `python backend/scripts/backfill_task_embeddings.py --prune-deleted`, then run
+  `python backend/scripts/backfill_task_embeddings.py --execute --prune-deleted` before
+  setting `AGENT_VECTOR_SEARCH_ENABLED=true`.
 
 For anything not covered above, defer to
 [`docs/operations/deployment.md`](./deployment.md) — full env table,

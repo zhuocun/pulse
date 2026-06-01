@@ -133,6 +133,13 @@ const renderHeader = (
         status: "ok",
         latencyMs: 120,
         lastChecked: Date.now(),
+        ready: true,
+        realProviderReady: true,
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+        stubMode: false,
+        issues: [],
+        warnings: [],
         ...agentHealth
     });
 
@@ -427,25 +434,30 @@ describe("Header", () => {
 
             expect(
                 screen.queryByRole("img", {
-                    name: /AI backend is slow|AI backend is offline/i
+                    name: /Board Copilot/i
                 })
             ).not.toBeInTheDocument();
         });
 
-        it("renders the degraded badge with the correct aria-label when status is degraded", () => {
+        it("renders the degraded badge with precise readiness detail", () => {
             // Switch to remote mode for this test.
             envMod.default.aiUseLocalEngine = false;
             envMod.default.aiBaseUrl = "https://agents.example";
 
             renderHeader("/projects/p1/board", undefined, undefined, {
-                status: "degraded",
-                latencyMs: 2000,
-                lastChecked: Date.now()
+                status: "offline",
+                latencyMs: 120,
+                lastChecked: Date.now(),
+                ready: false,
+                realProviderReady: false,
+                issues: [
+                    "ANTHROPIC_API_KEY missing -- provider explicitly set to 'anthropic'"
+                ]
             });
 
             expect(
                 screen.getByRole("img", {
-                    name: /AI backend is slow \(degraded\)/i
+                    name: /Board Copilot is not ready: ANTHROPIC_API_KEY missing/i
                 })
             ).toBeInTheDocument();
         });

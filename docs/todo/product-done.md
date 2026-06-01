@@ -40,7 +40,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Backend core (FastAPI v1 shims + v2.1 LangGraph SSE) | §7.2 / v2.1 §5A | ✅ Shipped |
 | Backend release gates | — | ✅ **GA §1 closed in code:** real-provider chat tool calls dispatch through v2.1 FE interrupts; organic `requestMutationApproval` emits `mutation_proposal`; mutation journal HTTP + FE apply/undo path covered — [`release-todo.md`](release-todo.md) §1 |
 | Cross-provider chat failover (`with_fallbacks`, `AGENT_CHAT_MODEL_FAILOVER`) | [`release-todo.md`](release-todo.md) §2 | ✅ Anthropic/OpenAI retryable-error failover with OTel hooks; `tests/test_llm_failover.py` |
-| Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; operator embeddings backfill remains |
+| Optional pgvector vector search (`AGENT_VECTOR_SEARCH_ENABLED`, DDL + dimensions alignment) | [`release-todo.md`](release-todo.md) §4 | ✅ Estimation + search agents consume optional neighbours; resumable operator backfill entrypoint ships in `backend/scripts/backfill_task_embeddings.py` |
 | Polish-step JSON schema (`PolishStep`, `method="json_schema"` when supported) | [`release-todo.md`](release-todo.md) §5 | ✅ Provider-level polish validation ahead of FE validators |
 | Hermetic vs real-stack tests (`integration` marker, `RUN_INTEGRATION=1`) | [`release-todo.md`](release-todo.md) §6 | ✅ Default CI stays 100%-coverage hermetic; integration suite opt-in for ops |
 | Backend CI matrix + `workflow_dispatch` modes | [`release-todo.md`](release-todo.md) §7 | ✅ Workflow definitions; numeric evidence via reruns (not inline totals in status docs) |

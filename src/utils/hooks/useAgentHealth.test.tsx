@@ -56,6 +56,124 @@ describe("useAgentHealth", () => {
         });
         expect(result.current.latencyMs).toBeLessThanOrEqual(1500);
         expect(result.current.lastChecked).not.toBeNull();
+        expect(result.current.ready).toBe(true);
+        expect(result.current.realProviderReady).toBe(true);
+    });
+
+    it("reports degraded when the remote server is only stub-ready", async () => {
+        fetchSpy.mockResolvedValue(
+            okResponse({
+                ready: true,
+                realProviderReady: false,
+                stubMode: true,
+                provider: "stub",
+                latencyMs: 40,
+                warnings: [
+                    "Running in stub mode -- no real LLM provider configured"
+                ]
+            })
+        );
+
+        const { result } = renderHook(() =>
+            useAgentHealth("https://agents.example", { intervalMs: 60_000 })
+        );
+
+        await waitFor(() => {
+            expect(result.current.status).toBe("degraded");
+        });
+        expect(result.current.ready).toBe(true);
+        expect(result.current.realProviderReady).toBe(false);
+        expect(result.current.stubMode).toBe(true);
+        expect(result.current.provider).toBe("stub");
+        expect(result.current.warnings).toEqual([
+            "Running in stub mode -- no real LLM provider configured"
+        ]);
+    });
+
+    it("reports degraded when readiness returns warnings only", async () => {
+        fetchSpy.mockResolvedValue(
+            okResponse({
+                ready: true,
+                realProviderReady: true,
+                provider: "deepseek",
+                latencyMs: 40,
+                warnings: ["CORS_ORIGINS is localhost-only"]
+            })
+        );
+
+        const { result } = renderHook(() =>
+            useAgentHealth("https://agents.example", { intervalMs: 60_000 })
+        );
+
+        await waitFor(() => {
+            expect(result.current.status).toBe("degraded");
+        });
+        expect(result.current.warnings).toEqual([
+            "CORS_ORIGINS is localhost-only"
+        ]);
+    });
+
+    it("reports offline with readiness issues when the AI probe is not ready", async () => {
+        fetchSpy.mockResolvedValue(
+            okResponse({
+                ready: false,
+                realProviderReady: false,
+                providerResolved: "anthropic",
+                latencyMs: 90,
+                issues: [
+                    "Provider connectivity probe failed: authentication failed"
+                ],
+                providerConnectivity: {
+                    reachable: false,
+                    detail: "authentication failed",
+                    checkedAt: 1_717_200_000.123
+                }
+            })
+        );
+
+        const { result } = renderHook(() =>
+            useAgentHealth("https://agents.example", { intervalMs: 60_000 })
+        );
+
+        await waitFor(() => {
+            expect(result.current.status).toBe("offline");
+        });
+        expect(result.current.issues).toEqual([
+            "Provider connectivity probe failed: authentication failed"
+        ]);
+        expect(result.current.providerConnectivity).toEqual({
+            reachable: false,
+            detail: "authentication failed",
+            checkedAt: 1_717_200_000.123
+        });
+    });
+
+    it("does not overlap slow probes and aborts the in-flight probe on unmount", async () => {
+        jest.useFakeTimers();
+        const signals: AbortSignal[] = [];
+        fetchSpy.mockImplementation((_input, init?: RequestInit) => {
+            if (init?.signal instanceof AbortSignal) {
+                signals.push(init.signal);
+            }
+            return new Promise<Response>(() => {
+                // Keep the first probe pending until unmount.
+            });
+        });
+
+        const { unmount } = renderHook(() =>
+            useAgentHealth("https://agents.example", { intervalMs: 5_000 })
+        );
+
+        await waitFor(() => {
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        jest.advanceTimersByTime(15_000);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(signals).toHaveLength(1);
+
+        unmount();
+        expect(signals[0].aborted).toBe(true);
     });
 
     it("shares one poller across consumers with the same baseUrl + interval", async () => {
@@ -84,8 +202,8 @@ describe("useAgentHealth", () => {
             agentHealthSubscriberCountForTests("https://agents.example", 60_000)
         ).toBe(2);
 
-        // Unmounting one consumer must NOT tear the poller down — the other
-        // is still subscribed.
+        // Unmounting one consumer must NOT tear the poller down; the other
+        // consumer is still subscribed.
         drawer.unmount();
         expect(activeAgentHealthPollerCountForTests()).toBe(1);
         expect(
@@ -109,11 +227,6 @@ describe("useAgentHealth", () => {
     });
 
     describe("AGENT_HEALTH_DEGRADED analytics", () => {
-        afterEach(() => {
-            // Restore the analytics sink after each analytics test so other
-            // tests aren't affected.
-        });
-
         it("fires AGENT_HEALTH_DEGRADED once when status transitions to degraded", async () => {
             // Simulate a slow (degraded) response.
             fetchSpy.mockResolvedValue(

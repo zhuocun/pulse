@@ -198,6 +198,7 @@ const redact = (value) => {
     if (Array.isArray(value)) return value.map(redact);
     if (typeof value === "string") {
         return value
+            .replace(/\b((?:https?|rediss?):\/\/)[^@\s/]+@/gi, "$1[redacted]@")
             .replace(/(Bearer\s+)[^\s,;"]+/gi, "$1[redacted]")
             .replace(/(Token=)[^;\s,"]+/gi, "$1[redacted]")
             .replace(
@@ -370,11 +371,25 @@ const authHeaders = (aiToken) => ({
 
 const productionHealthIssues = (body) => {
     const issues = [];
+    const normalizeBackend = (value) =>
+        typeof value === "string" ? value.trim().toLowerCase() : "";
     if (body.checkpointerBackend !== "postgres") {
         issues.push("checkpointerBackend is not postgres");
     }
     if (body.storeBackend !== "postgres") {
         issues.push("storeBackend is not postgres");
+    }
+    if (normalizeBackend(body.rateLimitBackend) !== "redis") {
+        issues.push("rateLimitBackend is not redis");
+    }
+    if (normalizeBackend(body.budgetBackend) !== "redis") {
+        issues.push("budgetBackend is not redis");
+    }
+    if (normalizeBackend(body.idempotencyBackend) !== "redis") {
+        issues.push("idempotencyBackend is not redis");
+    }
+    if (body.redisConfigured !== true) {
+        issues.push("redisConfigured is not true");
     }
     if (body.jwtSecretSource === "ephemeral") {
         issues.push("jwtSecretSource is ephemeral");
@@ -383,10 +398,20 @@ const productionHealthIssues = (body) => {
         issues.push("multiInstanceSafe is false");
     }
     const warnings = Array.isArray(body.warnings)
-        ? body.warnings.filter((warning) => String(warning).trim())
+        ? body.warnings
+              .map((warning) => String(redact(warning)).trim())
+              .filter(Boolean)
         : [];
     if (warnings.length) {
         issues.push(`health warnings present: ${warnings.join("; ")}`);
+    }
+    const healthIssues = Array.isArray(body.issues)
+        ? body.issues
+              .map((issue) => String(redact(issue)).trim())
+              .filter(Boolean)
+        : [];
+    if (healthIssues.length) {
+        issues.push(`health issues present: ${healthIssues.join("; ")}`);
     }
     return issues;
 };
@@ -724,7 +749,12 @@ const main = async () => {
     let cleanupFailure = null;
 
     try {
-        logStep(`Checking AI readiness at ${config.baseUrl}`);
+        const displayBaseUrl = new URL(config.baseUrl);
+        displayBaseUrl.username = "";
+        displayBaseUrl.password = "";
+        logStep(
+            `Checking AI readiness at ${displayBaseUrl.toString().replace(/\/+$/, "")}`
+        );
         const health = await checkHealth(config);
         logStep(
             `AI health ready: provider=${health.provider}, model=${health.model}, realProviderReady=${health.realProviderReady}, checkpointer=${health.checkpointerBackend}, store=${health.storeBackend}`

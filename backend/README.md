@@ -88,6 +88,14 @@ for the full target-by-target guide (Vercel limits, Fly.io, Render,
 ECS / Cloud Run / Container Apps, dedicated uvicorn behind nginx),
 the production checklist, and post-deploy verification.
 
+Strict production AI deploys use Postgres for LangGraph checkpoint/store
+state and Redis for the full middleware trio:
+`RATE_LIMIT_BACKEND=redis`, `BUDGET_BACKEND=redis`,
+`IDEMPOTENCY_BACKEND=redis`, and `REDIS_URI`. Do not raise
+`UVICORN_WORKERS` or `WEB_CONCURRENCY` above `1` until all three Redis
+backends are configured; the app raises at boot when multi-worker mode
+is requested without that shared state.
+
 GA blockers, soft blockers, and the recommended internal-beta →
 design-partner → public-ship sequence live in
 [`../docs/todo/release-todo.md`](../docs/todo/release-todo.md).

@@ -134,8 +134,9 @@ What matters for SSE on Render:
 - Render's HTTP proxy buffers responses by default; FastAPI's
   `StreamingResponse` already sets `Cache-Control: no-cache` and the
   router emits `X-Accel-Buffering: no`, so chunks ship promptly.
-- Pin `numInstances: 1` (or use a Postgres-backed budget/rate-limit
-  store before scaling out) for the same reason as Fly.
+- Pin `numInstances: 1` until the Redis middleware trio is configured
+  with `REDIS_URI`; otherwise rate limits, budgets, and idempotency
+  are process-local.
 
 ### ECS / Cloud Run / Container Apps
 
@@ -157,11 +158,9 @@ production checklist). Knobs to verify:
 
 In every case: one uvicorn worker per container, scale out with
 multiple containers only after switching the agent backends to
-postgres.
+Postgres and the middleware trio to Redis.
 
 ### Dedicated uvicorn behind nginx
-
-For self-hosted deployments without a managed runtime:
 
 For self-hosted deployments without a managed runtime (default one worker;
 set `UVICORN_WORKERS` only after the Redis trio + `REDIS_URI` checklist
@@ -206,6 +205,7 @@ live.
 - [ ] `CORS_ORIGINS` set to the deployed FE origin (the `localhost` defaults will block every browser request from the real FE; the server logs a WARNING when it detects that case on a production-shaped host, see below).
 - [ ] EITHER `UUID` is set (≥32 chars; the server raises `RuntimeError` on shorter values), OR `MONGO_URI` is reachable so the lifespan can persist a bootstrapped secret in the `system_config` collection. On a hosted deploy (Vercel / Render / Fly / Railway / Kubernetes) the boot hard-fails with a platform-named error when BOTH are missing. Explicit `UUID` is recommended when you want a stable secret outside Mongo (e.g. to share with a legacy signer).
 - [ ] `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `DEEPSEEK_API_KEY` set. `langchain-anthropic` and `langchain-openai` are base dependencies; no extra install step is required. Without a key the catalog stays on the deterministic stub.
+- [ ] Optional pgvector search: `EMBEDDINGS_PROVIDER=openai`, `EMBEDDINGS_DIMENSIONS`, `AGENT_VECTOR_DIMENSIONS`, and `task_embeddings.embedding vector(n)` all match; `docs/operations/pgvector-task-embeddings.sql` has been applied; `python backend/scripts/backfill_task_embeddings.py --prune-deleted` dry-run and `python backend/scripts/backfill_task_embeddings.py --execute --prune-deleted` completed before `AGENT_VECTOR_SEARCH_ENABLED=true`.
 - [ ] `AGENT_BUDGET_MONTHLY_TOKEN_CAP` reviewed for the deployed tier. The default `1000000` is a placeholder.
 - [ ] `RATE_LIMIT_BACKEND=redis` and `BUDGET_BACKEND=redis` with a reachable `REDIS_URI`. The default `memory` backends keep their state per-process, so multi-worker / serverless deploys enforce `workers × cap` rather than `cap`, and a cold start zeroes the running tally. The Redis backends use server-side Lua scripts so check-and-mutate stays atomic across workers without a separate distributed lock. The published `requirements.txt` includes `redis>=5.0` so the production Dockerfile already has the integration; flip the env vars and provide a connection string.
 - [ ] `IDEMPOTENCY_BACKEND=redis` (same `REDIS_URI`). Without it, the FE's `Idempotency-Key` header is useless across multiple workers — a duplicate request landing on a different worker is not deduplicated, double-charging the budget.
@@ -220,6 +220,29 @@ live.
       assigns a default chat model per project on v1 + v2.1 routes;
       `X-Pulse-Model` still overrides when sent. Entries must satisfy
       `AGENT_CHAT_MODEL_ALLOWLIST` when that allowlist is non-empty.
+
+### Strict Redis-backed production path
+
+Use this path for the public production AI surface and for any deploy
+with more than one uvicorn worker, container, machine, or serverless
+instance. Bake the Redis client into the image (`requirements.txt`
+already does this) and set the whole middleware bundle together:
+
+```text
+RATE_LIMIT_BACKEND=redis
+BUDGET_BACKEND=redis
+IDEMPOTENCY_BACKEND=redis
+REDIS_URI=redis://<user>:<password>@<host>:6379/0
+```
+
+Keep `AGENT_CHECKPOINT_BACKEND=auto` and `AGENT_STORE_BACKEND=auto`
+with `AGENT_POSTGRES_URI` set, or set both explicitly to `postgres`.
+Do not mix Redis and memory middleware in production: rate limits,
+budget counters, and idempotency keys are one contract, and splitting
+one of them back to memory reintroduces per-process state. The backend
+hard-fails when `UVICORN_WORKERS` / `WEB_CONCURRENCY` is greater than
+`1` without the full Redis trio and warns on production-shaped hosts
+when any middleware backend is still memory-backed.
 
 ### Frontend env vars (production)
 
@@ -299,6 +322,22 @@ Run these checks after first deploy with a real `ANTHROPIC_API_KEY`, `OPENAI_API
   `PULSE_SMOKE_ALLOW_NON_PRODUCTION=true` for production; it only
   permits small-group/non-production health warnings, non-Postgres
   persistence, or an ephemeral JWT source.
+- Scheduled / manual GitHub smoke:
+  `.github/workflows/production-ai-smoke.yml` runs the same
+  `npm run smoke:ai:prod` script on `workflow_dispatch` and once per
+  day. It is secret-gated and skips without touching the network until
+  these repository secrets are configured:
+  `PULSE_PROD_AI_SMOKE_URL`, `PULSE_PROD_AI_SMOKE_EMAIL`, and
+  `PULSE_PROD_AI_SMOKE_PASSWORD`. The workflow forces
+  `PULSE_SMOKE_ALLOW_REGISTER=false`,
+  `PULSE_SMOKE_ALLOW_STUB=false`, and
+  `PULSE_SMOKE_ALLOW_NON_PRODUCTION=false`, so it only accepts the
+  strict production shape: real provider readiness, Postgres agent
+  persistence, stable JWT secret source, no health warnings, and the
+  Redis-backed middleware state described above. Optional repository
+  variables `PULSE_PROD_AI_SMOKE_PROJECT_NAME` and
+  `PULSE_PROD_AI_SMOKE_ORG` can pin the reusable project name without
+  storing extra secrets.
 - FE proxy smoke after the Vercel deploy:
   ```bash
   PULSE_BE_URL="https://<your-fe>.vercel.app" \
@@ -314,6 +353,8 @@ Run these checks after first deploy with a real `ANTHROPIC_API_KEY`, `OPENAI_API
   - `"realProviderReady": true`
   - `"providerConnectivity": { "reachable": true }`
   - `"checkpointerBackend"` and `"storeBackend"` show `"postgres"` (the `auto` default flipped because `AGENT_POSTGRES_URI` is set)
+  - `"rateLimitBackend"`, `"budgetBackend"`, and `"idempotencyBackend"` show `"redis"`
+  - `"redisConfigured": true`
   - `"jwtSecretSource"` is `"env"` (explicit UUID) or `"persisted"` (Mongo-bootstrapped) — never `"ephemeral"` in production
   - `"issues": []` is empty
   Example: `curl -s https://<your-be>/api/v1/health/ai?probe=true | jq .`

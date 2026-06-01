@@ -37,7 +37,11 @@ module.exports = {
         "\\.(css|less|sass|scss)$": "<rootDir>/src/test/styleMock.cjs"
     },
     setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
-    testPathIgnorePatterns: ["/node_modules/", "\\.cursor/skills/"],
+    testPathIgnorePatterns: [
+        "/node_modules/",
+        "\\.cursor/skills/",
+        "<rootDir>/scripts/production-ai-smoke.test.js"
+    ],
     testEnvironment: "jsdom",
     testEnvironmentOptions: {
         url: "http://localhost/"

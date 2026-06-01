@@ -197,6 +197,9 @@ def _ai_readiness_payload(
         settings.agent_store_backend,
         agent_postgres_uri=settings.agent_postgres_uri,
     )
+    rate_limit_backend = _canonical_middleware_backend(settings.rate_limit_backend)
+    budget_backend = _canonical_middleware_backend(settings.budget_backend)
+    idempotency_backend = _canonical_middleware_backend(settings.idempotency_backend)
     agent_postgres_uri_configured = bool(
         (settings.agent_postgres_uri or "").strip()
     )
@@ -240,11 +243,11 @@ def _ai_readiness_payload(
         memory_backends.append("AGENT_CHECKPOINT_BACKEND=memory")
     if store_resolved == "memory":
         memory_backends.append("AGENT_STORE_BACKEND=memory")
-    if settings.rate_limit_backend.strip().lower() == "memory":
+    if rate_limit_backend == "memory":
         memory_backends.append("RATE_LIMIT_BACKEND=memory")
-    if settings.budget_backend.strip().lower() == "memory":
+    if budget_backend == "memory":
         memory_backends.append("BUDGET_BACKEND=memory")
-    if settings.idempotency_backend.strip().lower() == "memory":
+    if idempotency_backend == "memory":
         memory_backends.append("IDEMPOTENCY_BACKEND=memory")
 
     multi_instance_safe = not (multi_instance and memory_backends)
@@ -309,9 +312,9 @@ def _ai_readiness_payload(
         "checkpointerBackend": checkpointer_resolved,
         "storeBackend": store_resolved,
         "agentPostgresUriConfigured": agent_postgres_uri_configured,
-        "rateLimitBackend": settings.rate_limit_backend,
-        "budgetBackend": settings.budget_backend,
-        "idempotencyBackend": settings.idempotency_backend,
+        "rateLimitBackend": rate_limit_backend,
+        "budgetBackend": budget_backend,
+        "idempotencyBackend": idempotency_backend,
         "redisConfigured": redis_configured,
         "vectorSearchEnabled": settings.agent_vector_search_enabled,
         "hostedPlatform": hosted_platform,
@@ -392,6 +395,10 @@ def _is_localhost_origin(origin: str) -> bool:
         return False
     candidate = f"[{host}]" if ":" in host else host
     return candidate in {"localhost", "127.0.0.1", "0.0.0.0", "[::1]"}
+
+
+def _canonical_middleware_backend(value: str) -> str:
+    return value.strip().lower() or "memory"
 
 
 @router.get("/ai", status_code=status.HTTP_200_OK)

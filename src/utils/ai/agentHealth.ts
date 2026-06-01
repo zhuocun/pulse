@@ -1,25 +1,41 @@
 import { getAgentHealth } from "./agentClient";
+import type { AgentHealthResponse } from "../../interfaces/agent";
+
+export type AgentPingResult = AgentHealthResponse;
+
+const unavailablePing: AgentPingResult = {
+    ok: false,
+    agentsLoaded: 0,
+    latencyMs: -1,
+    ready: false,
+    realProviderReady: false,
+    provider: null,
+    model: null,
+    stubMode: false,
+    issues: [],
+    warnings: []
+};
 
 /**
- * Best-effort health probe for the agent server. Returns an `ok` flag and
- * the round-trip latency in milliseconds; on any error we surface
- * `{ ok: false, latencyMs: -1 }` so callers can render a "degraded" badge
- * without re-implementing error mapping.
+ * Best-effort readiness probe for the agent server. Returns the structured
+ * AI-readiness payload plus round-trip latency; on any error we surface an
+ * offline-shaped result so callers can render availability without
+ * re-implementing error mapping.
  */
 export const pingAgent = async (
     baseUrl: string,
     signal?: AbortSignal
-): Promise<{ ok: boolean; latencyMs: number }> => {
-    if (!baseUrl) return { ok: false, latencyMs: -1 };
+): Promise<AgentPingResult> => {
+    if (!baseUrl) return unavailablePing;
     const started = Date.now();
     try {
         const result = await getAgentHealth({ baseUrl, signal });
         return {
-            ok: result.ok,
+            ...result,
             latencyMs: result.latencyMs ?? Date.now() - started
         };
     } catch (err) {
         if (err instanceof Error && err.name === "AbortError") throw err;
-        return { ok: false, latencyMs: -1 };
+        return unavailablePing;
     }
 };

@@ -1,0 +1,67 @@
+name: Production AI Smoke
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: "17 9 * * *"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: production-ai-smoke
+    cancel-in-progress: false
+
+jobs:
+    smoke:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Check smoke secrets
+              id: gate
+              shell: bash
+              env:
+                  PULSE_BE_URL: ${{ secrets.PULSE_PROD_AI_SMOKE_URL }}
+                  PULSE_SMOKE_EMAIL: ${{ secrets.PULSE_PROD_AI_SMOKE_EMAIL }}
+                  PULSE_SMOKE_PASSWORD: ${{ secrets.PULSE_PROD_AI_SMOKE_PASSWORD }}
+              run: |
+                  missing=()
+                  [[ -n "${PULSE_BE_URL}" ]] || missing+=("PULSE_PROD_AI_SMOKE_URL")
+                  [[ -n "${PULSE_SMOKE_EMAIL}" ]] || missing+=("PULSE_PROD_AI_SMOKE_EMAIL")
+                  [[ -n "${PULSE_SMOKE_PASSWORD}" ]] || missing+=("PULSE_PROD_AI_SMOKE_PASSWORD")
+
+                  if (( ${#missing[@]} > 0 )); then
+                      printf 'configured=false\n' >> "${GITHUB_OUTPUT}"
+                      printf '::notice::Production AI smoke skipped; configure required secrets: %s\n' "${missing[*]}"
+                      exit 0
+                  fi
+
+                  printf 'configured=true\n' >> "${GITHUB_OUTPUT}"
+
+            - uses: actions/checkout@v4
+              if: steps.gate.outputs.configured == 'true'
+
+            - uses: actions/setup-node@v4
+              if: steps.gate.outputs.configured == 'true'
+              with:
+                  node-version-file: ".nvmrc"
+
+            - name: Validate smoke runner
+              if: steps.gate.outputs.configured == 'true'
+              run: |
+                  npm run smoke:ai:prod:check
+                  npm run test:smoke:ai:prod
+
+            - name: Run production AI smoke
+              if: steps.gate.outputs.configured == 'true'
+              env:
+                  PULSE_BE_URL: ${{ secrets.PULSE_PROD_AI_SMOKE_URL }}
+                  PULSE_SMOKE_EMAIL: ${{ secrets.PULSE_PROD_AI_SMOKE_EMAIL }}
+                  PULSE_SMOKE_PASSWORD: ${{ secrets.PULSE_PROD_AI_SMOKE_PASSWORD }}
+                  PULSE_SMOKE_ALLOW_REGISTER: "false"
+                  PULSE_SMOKE_ALLOW_STUB: "false"
+                  PULSE_SMOKE_ALLOW_NON_PRODUCTION: "false"
+                  PULSE_SMOKE_CLEANUP_PROJECT: "false"
+                  PULSE_SMOKE_PROJECT_NAME: ${{ vars.PULSE_PROD_AI_SMOKE_PROJECT_NAME || 'Pulse Production AI Smoke' }}
+                  PULSE_SMOKE_ORG: ${{ vars.PULSE_PROD_AI_SMOKE_ORG || 'Pulse Operations' }}
+              run: npm run smoke:ai:prod

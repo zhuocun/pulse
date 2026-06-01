@@ -180,4 +180,16 @@ export interface AgentHealthResponse {
     ok: boolean;
     agentsLoaded: number;
     latencyMs: number;
+    ready: boolean;
+    realProviderReady: boolean;
+    provider: string | null;
+    model: string | null;
+    stubMode: boolean;
+    issues: string[];
+    warnings: string[];
+    providerConnectivity?: {
+        reachable: boolean;
+        detail: string;
+        checkedAt: number | null;
+    };
 }

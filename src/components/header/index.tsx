@@ -24,6 +24,7 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import { formatAgentHealthMessage } from "../../utils/ai/agentHealthCopy";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -517,24 +518,19 @@ const AgentStatusDot = styled.span<{ $status: "degraded" | "offline" }>`
  * level. Rendered only when aiEnabled is true and aiUseLocalEngine is false.
  */
 const AgentHealthBadge: React.FC = () => {
-    const { status } = useAgentHealth(environment.aiBaseUrl, {
+    const health = useAgentHealth(environment.aiBaseUrl, {
         enabled: !environment.aiUseLocalEngine && environment.aiEnabled
     });
+    const { status } = health;
+    if (health.lastChecked === null) return null;
     if (status !== "degraded" && status !== "offline") return null;
+    const label = formatAgentHealthMessage(health);
     return (
         <AgentStatusDot
             $status={status}
-            aria-label={
-                status === "offline"
-                    ? microcopy.ai.agentOffline
-                    : microcopy.ai.agentDegraded
-            }
+            aria-label={label}
             role="img"
-            title={
-                status === "offline"
-                    ? microcopy.ai.agentOffline
-                    : microcopy.ai.agentDegraded
-            }
+            title={label}
         />
     );
 };

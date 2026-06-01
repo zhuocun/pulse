@@ -38,6 +38,7 @@ import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
+import { formatAgentHealthMessage } from "../../utils/ai/agentHealthCopy";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { AgentBudgetError } from "../../utils/ai/agentErrors";
 import {
@@ -239,13 +240,11 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const remoteHealthEnabled =
         environment.aiEnabled && !environment.aiUseLocalEngine;
     const remoteHealthActive = remoteHealthEnabled && remoteAiConsentGranted;
-    const { status: healthStatus } = useAgentHealth(
-        environment.aiBaseUrl ?? "",
-        {
-            agentName: "chat-agent",
-            enabled: remoteHealthActive
-        }
-    );
+    const health = useAgentHealth(environment.aiBaseUrl ?? "", {
+        agentName: "chat-agent",
+        enabled: remoteHealthActive
+    });
+    const healthStatus = health.status;
     const [input, setInput] = useState("");
     const [feedback, setFeedback] = useState<ChatTurnFeedback[]>([]);
     const [expandedMessages, setExpandedMessages] = useState<Set<number>>(
@@ -930,14 +929,11 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
             <CopilotRemoteConsentNotice route="chat" />
             {/* Inline health status alert */}
             {remoteHealthActive &&
+                health.lastChecked !== null &&
                 (healthStatus === "degraded" || healthStatus === "offline") && (
                     <Alert
                         closable={healthStatus === "degraded"}
-                        message={
-                            healthStatus === "offline"
-                                ? microcopy.ai.healthOffline
-                                : microcopy.ai.healthDegraded
-                        }
+                        message={formatAgentHealthMessage(health)}
                         showIcon
                         style={{ marginBottom: space.sm }}
                         type={healthStatus === "offline" ? "error" : "warning"}

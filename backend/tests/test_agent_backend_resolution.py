@@ -213,3 +213,46 @@ def test_default_backends_with_uri_set_report_postgres_in_health_ai(
     assert body["checkpointerBackend"] == "postgres"
     assert body["storeBackend"] == "postgres"
     assert body["agentPostgresUriConfigured"] is True
+
+
+def test_health_ai_reports_canonical_middleware_backend_names(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_settings(
+        monkeypatch,
+        rate_limit_backend=" Redis ",
+        budget_backend="REDIS",
+        idempotency_backend="redis",
+        redis_uri="redis://example.invalid/0",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    assert response.status_code == HTTPStatus.OK
+    body = response.json()
+    assert body["rateLimitBackend"] == "redis"
+    assert body["budgetBackend"] == "redis"
+    assert body["idempotencyBackend"] == "redis"
+    assert body["rate_limit_backend"] == "redis"
+    assert body["budget_backend"] == "redis"
+    assert body["idempotency_backend"] == "redis"
+
+
+def test_health_ai_treats_blank_middleware_backend_names_as_memory(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_settings(
+        monkeypatch,
+        rate_limit_backend=" ",
+        budget_backend="",
+        idempotency_backend="\n",
+    )
+
+    response = client.get("/api/v1/health/ai")
+    assert response.status_code == HTTPStatus.OK
+    body = response.json()
+    assert body["rateLimitBackend"] == "memory"
+    assert body["budgetBackend"] == "memory"
+    assert body["idempotencyBackend"] == "memory"
+    assert body["rate_limit_backend"] == "memory"
+    assert body["budget_backend"] == "memory"
+    assert body["idempotency_backend"] == "memory"

@@ -139,9 +139,12 @@ unit tests).  Schema SQL: [`docs/operations/pgvector-task-embeddings.sql`](../op
 Match ``AGENT_VECTOR_DIMENSIONS`` / ``EMBEDDINGS_DIMENSIONS`` to the
 ``vector(n)`` column before enabling.  ``docker-compose.yml`` uses
 ``pgvector/pgvector:pg16`` so dev stacks can load the extension.  Operators
-must run a **backfill** (ETL into ``task_embeddings``) — runtime code does
-not auto-index Mongo tasks.  Quality remains suggestion-grade; disclosure in
-product copy still applies.
+must run the resumable **backfill** (dry-run first, then
+``python backend/scripts/backfill_task_embeddings.py --execute --prune-deleted``)
+because runtime code does not auto-index Mongo tasks.  The
+``--prune-deleted`` mode removes stale rows for tasks no longer present
+in Mongo before vector search is enabled. Quality remains
+suggestion-grade; disclosure in product copy still applies.
 
 ### ✅ 5. No structured-output validation  *(BE-only — Resolved 2026-05-10)*
 

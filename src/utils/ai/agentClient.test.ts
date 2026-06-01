@@ -632,10 +632,106 @@ describe("agentClient", () => {
             expect(out.ok).toBe(true);
             expect(out.agentsLoaded).toBe(3);
             expect(typeof out.latencyMs).toBe("number");
+            expect(fetchSpy).toHaveBeenCalledWith(
+                "https://agents.example/api/v1/health/ai?probe=true",
+                expect.objectContaining({ method: "GET" })
+            );
+        });
+
+        it("maps structured AI readiness diagnostics", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                okJsonResponse({
+                    ready: false,
+                    realProviderReady: false,
+                    providerResolved: "anthropic",
+                    model: "claude-sonnet-4-6",
+                    stubMode: false,
+                    agentsLoaded: 6,
+                    issues: [
+                        "Provider connectivity probe failed: authentication failed"
+                    ],
+                    warnings: ["CORS_ORIGINS is localhost-only"],
+                    providerConnectivity: {
+                        reachable: false,
+                        detail: "authentication failed",
+                        checkedAt: 1_717_200_000.123
+                    }
+                })
+            );
+
+            const out = await getAgentHealth({
+                baseUrl: "https://agents.example/"
+            });
+
+            expect(out).toMatchObject({
+                ok: false,
+                ready: false,
+                realProviderReady: false,
+                provider: "anthropic",
+                model: "claude-sonnet-4-6",
+                stubMode: false,
+                agentsLoaded: 6,
+                issues: [
+                    "Provider connectivity probe failed: authentication failed"
+                ],
+                warnings: ["CORS_ORIGINS is localhost-only"],
+                providerConnectivity: {
+                    reachable: false,
+                    detail: "authentication failed",
+                    checkedAt: 1_717_200_000.123
+                }
+            });
+        });
+
+        it("maps snake_case AI readiness diagnostics", async () => {
+            fetchSpy.mockResolvedValueOnce(
+                okJsonResponse({
+                    ready: true,
+                    real_provider_ready: true,
+                    provider_resolved: "deepseek",
+                    stub_mode: false,
+                    agents_loaded: 6,
+                    provider_connectivity: {
+                        reachable: true,
+                        detail: "",
+                        checked_at: 1_717_200_001
+                    }
+                })
+            );
+
+            const out = await getAgentHealth({
+                baseUrl: "https://agents.example"
+            });
+
+            expect(out).toMatchObject({
+                ok: true,
+                ready: true,
+                realProviderReady: true,
+                provider: "deepseek",
+                stubMode: false,
+                agentsLoaded: 6,
+                providerConnectivity: {
+                    reachable: true,
+                    detail: "",
+                    checkedAt: 1_717_200_001
+                }
+            });
+        });
+
+        it("treats malformed readiness bodies as not ready", async () => {
+            fetchSpy.mockResolvedValueOnce(okJsonResponse({}));
+
+            const out = await getAgentHealth({
+                baseUrl: "https://agents.example"
+            });
+
+            expect(out.ok).toBe(false);
+            expect(out.ready).toBe(false);
+            expect(out.realProviderReady).toBe(false);
+            expect(out.issues).toEqual([]);
         });
     });
 
-    // Fix 2 — Idempotency-Key header on agent requests.
     describe("Idempotency-Key header", () => {
         it("streamAgent sends an Idempotency-Key header", async () => {
             fetchSpy.mockResolvedValueOnce(
