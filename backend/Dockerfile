@@ -69,8 +69,9 @@ WORKDIR /app
 # Copy the prebuilt venv from the builder stage.
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy only application source so tests/docs/CI artifacts stay out of the image.
+# Copy only runtime source so tests/docs/CI artifacts stay out of the image.
 COPY app ./app
+COPY scripts ./scripts
 
 RUN chown -R app:app /app
 USER app

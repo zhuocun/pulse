@@ -9,8 +9,12 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-BACKEND = ROOT / "backend"
+SCRIPT = Path(__file__).resolve()
+BACKEND_CANDIDATES = (SCRIPT.parent.parent, SCRIPT.parent.parent.parent / "backend")
+BACKEND = next(
+    (candidate for candidate in BACKEND_CANDIDATES if (candidate / "app").is_dir()),
+    BACKEND_CANDIDATES[0],
+)
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
