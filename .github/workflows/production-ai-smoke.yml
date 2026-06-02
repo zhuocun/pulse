@@ -38,10 +38,10 @@ jobs:
 
                   printf 'configured=true\n' >> "${GITHUB_OUTPUT}"
 
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               if: steps.gate.outputs.configured == 'true'
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               if: steps.gate.outputs.configured == 'true'
               with:
                   node-version-file: ".nvmrc"
