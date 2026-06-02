@@ -318,6 +318,20 @@ select {
         min-height: 44px;
     }
 
+    /*
+     * The 44px min-height above also matches the <input> nested inside an
+     * affix wrapper (Input.Password, search inputs with a prefix/suffix).
+     * The wrapper itself already owns the 44px tap target and adds its own
+     * large-size vertical padding, so letting the inner input keep
+     * min-height:44px stacks padding on top of a 44px child — rendering the
+     * field visibly taller than a plain <Input> of the same size (the
+     * password box dwarfing the email box on /login). Let the wrapper alone
+     * drive the height; the inner input fills it.
+     */
+    .ant-input-affix-wrapper input.ant-input {
+        min-height: 0;
+    }
+
     .ant-select-single .ant-select-selector {
         align-items: center;
         height: auto !important;

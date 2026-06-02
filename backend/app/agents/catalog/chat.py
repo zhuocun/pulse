@@ -75,7 +75,9 @@ _CHAT_AGENT_PROMPT = (
     "or member data, call one of the listProjects / listMembers / "
     "getProject / listBoard / listTasks / getTask tools -- the FE will "
     "execute the call and return the result. Never invent ids or counts; "
-    "ground every factual claim in a tool result."
+    "ground every factual claim in a tool result. Report what a tool "
+    "returns in natural language -- never echo the raw tool-result JSON "
+    "or its internal id fields back to the viewer."
 )
 
 # COPILOT_IDENTITY is the shared system-prompt prefix; the chat-specific
