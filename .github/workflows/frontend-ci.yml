@@ -64,7 +64,7 @@ jobs:
             - run: npm ci
             - run: npm run prettier
             - name: ESLint (check only)
-              run: npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js
+              run: npx eslint src __json_server_mock__ eslint.config.mjs vite.config.ts jest.config.cjs babel.config.cjs commitlint.config.js --max-warnings 0
             - run: npm run typecheck
             - name: Jest
               env:
