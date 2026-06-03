@@ -516,6 +516,7 @@ export const enSource = {
         enableCopilotOnBoard: "Enable on this board",
         copilotMenuAsk: "Ask Copilot",
         copilotMenuBrief: "Board brief",
+        copilotMenuProjectOff: "Project AI off",
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project.",
         /*

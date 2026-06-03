@@ -452,6 +452,7 @@ const zhCN: Dictionary = {
         swipeHint: "滑动查看更多列",
         copilotMenuAsk: "询问 Copilot",
         copilotMenuBrief: "看板简报",
+        copilotMenuProjectOff: "关闭项目 AI",
         copilotProjectDisabledDescription:
             "在此看板隐藏看板 Copilot,并阻止此项目发起 AI 请求。",
         densityLabel: "看板密度",
