@@ -467,6 +467,7 @@ export const enSource = {
         optimisticReverted: "Couldn't save — your changes were reverted.",
         projectDeleted: "Project deleted",
         taskDeleted: "Task deleted",
+        columnDeleted: "Column deleted",
         likeFailed: "Couldn't update like. Please try again.",
         taskSaved: "Task saved",
         welcomeBack: "Welcome back!",

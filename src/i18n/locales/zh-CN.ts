@@ -415,6 +415,7 @@ const zhCN: Dictionary = {
         optimisticReverted: "保存失败 — 您的更改已撤销。",
         projectDeleted: "项目已删除",
         taskDeleted: "任务已删除",
+        columnDeleted: "列已删除",
         likeFailed: "点赞更新失败,请重试。",
         taskSaved: "任务已保存",
         welcomeBack: "欢迎回来!",

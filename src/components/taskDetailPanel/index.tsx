@@ -41,7 +41,9 @@ import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import useTaskPanelSiblings from "../../utils/hooks/useTaskPanelSiblings";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
+import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import ErrorBox from "../errorBox";
@@ -236,13 +238,39 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         undefined,
         (err) => setSaveError(err)
     );
+    // Name of the task currently being deleted, captured so the DELETE
+    // failure toast reads the right label. The error toast MUST fire from
+    // the mutation-level onError (below) rather than a per-`mutate`-call
+    // callback: the panel navigates to the board on delete, so its
+    // MutationObserver unmounts before the request settles and React
+    // Query skips per-call callbacks — only the mutation-level onError
+    // (and the optimistic rollback) survive the unmount.
+    const deletingTaskNameRef = useRef("");
     const { mutate: remove, isLoading: dLoading } = useReactMutation(
         "tasks",
         "DELETE",
         ["tasks", { projectId }],
         deleteTaskCallback,
+        () =>
+            message.error(
+                microcopy.feedback.couldntDeleteTask.replace(
+                    "{name}",
+                    deletingTaskNameRef.current
+                )
+            )
+    );
+    // Companion POST mutation used purely as the Undo closure: it
+    // re-creates the just-deleted task with the captured snapshot so an
+    // accidental delete is recoverable. Shares the board's tasks cache
+    // key so the optimistic re-create lands where the UI is reading.
+    const { mutateAsync: recreate } = useReactMutation(
+        "tasks",
+        "POST",
+        ["tasks", { projectId }],
+        newTaskCallback,
         () => {}
     );
+    const { show: showUndoToast } = useUndoToast();
     const { data: membersData } = useMembersList();
     const members = membersData ?? [];
 
@@ -408,37 +436,34 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         if (!editingTask) return;
         const taskName = editingTask.taskName;
         const id = taskId;
-        Modal.confirm({
-            centered: true,
-            okText: microcopy.confirm.deleteTask.confirmLabel,
-            cancelText: microcopy.actions.cancel,
-            okButtonProps: { danger: true },
-            title: microcopy.confirm.deleteTask.title,
-            content: microcopy.confirm.deleteTask.description,
-            onOk() {
-                // Clear dirty state synchronously so the blocker won't
-                // intercept any close-during-delete fallback (B-C1).
-                isFormDirtyRef.current = false;
-                setIsFormDirty(false);
-                form.resetFields();
-                remove(
-                    { taskId: id },
-                    {
-                        onSuccess: () => {
-                            message.success(microcopy.feedback.taskDeleted);
-                            closePanel();
-                        },
-                        onError: () =>
-                            message.error(
-                                microcopy.feedback.couldntDeleteTask.replace(
-                                    "{name}",
-                                    taskName
-                                )
-                            )
-                    }
+        // Capture the full task payload before the DELETE so the Undo
+        // closure can re-POST it. After the optimistic prune the cache no
+        // longer carries it.
+        const beforeState: ITask = { ...editingTask };
+        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
+        // and goes straight to an optimistic delete + Undo toast.
+        // Clear dirty state synchronously so the blocker won't intercept
+        // the close-during-delete navigation (B-C1).
+        isFormDirtyRef.current = false;
+        setIsFormDirty(false);
+        form.resetFields();
+        deletingTaskNameRef.current = taskName;
+        remove({ taskId: id });
+        showUndoToast({
+            description: microcopy.feedback.taskDeleted,
+            analyticsTag: "task.delete",
+            // The panel navigates to the board on `closePanel()` below, so
+            // it unmounts on this same action; keep the toast alive past
+            // unmount so the user still gets their Undo window. The inverse
+            // re-create runs through the persistent react-query client.
+            dismissOnUnmount: false,
+            undo: async () => {
+                await recreate(
+                    beforeState as unknown as Record<string, unknown>
                 );
             }
         });
+        closePanel();
     };
 
     // Seed the form whenever the resolved task changes (different
