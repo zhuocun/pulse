@@ -1,15 +1,18 @@
 import {
+    AppstoreOutlined,
     BulbOutlined,
     DownOutlined,
+    InboxOutlined,
     LogoutOutlined,
     MoonOutlined,
+    RobotOutlined,
     SunOutlined
 } from "@ant-design/icons";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import { Dropdown, MenuProps, Space, Switch, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
@@ -606,6 +609,112 @@ const SettingsRow = styled.div`
     min-width: 240px;
 `;
 
+/**
+ * Primary navigation landmark for non-phone chrome. On coarse-pointer
+ * viewports the routed `<BottomTabBar>` (mounted by MainLayout) owns the
+ * primary-navigation landmark; this header nav is suppressed there via the
+ * `isPhoneChrome` gate so only one "Primary navigation" landmark is ever
+ * present in the a11y tree. On laptop / desktop the bottom bar never mounts,
+ * so this is the only persistent way to move between the top-level
+ * destinations.
+ */
+const PrimaryNav = styled.nav`
+    align-items: center;
+    display: flex;
+    gap: ${space.xxs}px;
+    min-width: 0;
+
+    /*
+     * The tablet+ layout has room for the inline tabs; on the narrowest
+     * phones (where this nav would only render with a fine pointer in a
+     * small window) the labels would crowd the brand mark, so collapse the
+     * whole strip below sm and lean on the brand link / account dropdown.
+     */
+    @media (max-width: ${breakpoints.sm - 1}px) {
+        display: none;
+    }
+`;
+
+/**
+ * A single primary-nav link. `NavLink` emits `aria-current="page"` on the
+ * active route automatically; the `&[aria-current="page"]` selector gives
+ * that state a visible treatment (filled pill + stronger text) so the
+ * active destination reads at a glance, not only to assistive tech.
+ */
+const NavTab = styled(NavLink)`
+    align-items: center;
+    border-radius: ${radius.pill}px;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+    display: inline-flex;
+    font-size: ${fontSize.sm}px;
+    font-weight: ${fontWeight.medium};
+    gap: ${space.xxs}px;
+    height: 32px;
+    line-height: ${lineHeight.tight};
+    padding: 0 ${space.sm}px;
+    text-decoration: none;
+    transition:
+        background-color 120ms ease-out,
+        color 120ms ease-out;
+    white-space: nowrap;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
+    }
+
+    &[aria-current="page"] {
+        background: var(--ant-color-bg-text-active, rgba(15, 23, 42, 0.08));
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.95));
+        font-weight: ${fontWeight.semibold};
+    }
+
+    @media (pointer: coarse) {
+        height: 44px;
+    }
+
+    /* Below md the label drops to icon-only so three tabs fit beside the
+     * brand mark without pushing the right cluster off-screen. */
+    @media (max-width: ${breakpoints.md - 1}px) {
+        padding: 0 ${space.xs}px;
+    }
+`;
+
+const NavTabLabel = styled.span`
+    @media (max-width: ${breakpoints.md - 1}px) {
+        display: none;
+    }
+`;
+
+/**
+ * Top-level destinations surfaced in the header primary nav. Mirrors the
+ * routed `<BottomTabBar>` route tabs (minus the Search action and the
+ * Profile/Settings entry, which the account dropdown already covers) so the
+ * two navigation surfaces stay in sync. `end: false` on Projects keeps the
+ * tab active on nested board / project-detail routes.
+ */
+const PRIMARY_NAV_TABS = [
+    {
+        to: "/projects",
+        labelKey: "boards" as const,
+        icon: <AppstoreOutlined aria-hidden />,
+        end: false
+    },
+    {
+        to: "/inbox",
+        labelKey: "inbox" as const,
+        icon: <InboxOutlined aria-hidden />,
+        end: true
+    },
+    {
+        to: "/copilot",
+        labelKey: "copilot" as const,
+        icon: <RobotOutlined aria-hidden />,
+        end: true
+    }
+];
+
 const Header: React.FC = () => {
     const { user, logout } = useAuth();
     const {
@@ -750,6 +859,26 @@ const Header: React.FC = () => {
                 >
                     <BrandMark size="sm" />
                 </BrandLink>
+                {/*
+                 * Primary navigation. Suppressed in phone chrome where the
+                 * routed BottomTabBar owns the primary-navigation landmark —
+                 * gating on the same `useIsPhoneChrome` predicate keeps a
+                 * single "Primary navigation" landmark in the a11y tree.
+                 * Hidden when the contextual mobile title is centered so the
+                 * three flex thirds stay balanced.
+                 */}
+                {!isPhoneChrome && !titleCentered && (
+                    <PrimaryNav aria-label={microcopy.nav.desktopNavLabel}>
+                        {PRIMARY_NAV_TABS.map((tab) => (
+                            <NavTab end={tab.end} key={tab.to} to={tab.to}>
+                                {tab.icon}
+                                <NavTabLabel>
+                                    {microcopy.nav.tabs[tab.labelKey]}
+                                </NavTabLabel>
+                            </NavTab>
+                        ))}
+                    </PrimaryNav>
+                )}
             </LeftCluster>
             {mobileTitle !== null && (
                 <CenterTitle>

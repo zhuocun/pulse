@@ -238,6 +238,7 @@ export const enSource = {
      */
     nav: {
         primaryLandmarkLabel: "Primary",
+        desktopNavLabel: "Primary navigation",
         tabs: {
             boards: "Boards",
             inbox: "Inbox",

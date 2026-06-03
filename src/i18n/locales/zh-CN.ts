@@ -223,6 +223,7 @@ const zhCN: Dictionary = {
     },
     nav: {
         primaryLandmarkLabel: "主导航",
+        desktopNavLabel: "主导航栏",
         tabs: {
             boards: "看板",
             inbox: "收件箱",
