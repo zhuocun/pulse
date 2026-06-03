@@ -6,6 +6,7 @@ import {
     Input,
     type InputRef,
     MenuProps,
+    Modal,
     Tag,
     Tooltip,
     Typography
@@ -652,7 +653,18 @@ const DeleteDropDown: React.FC<{
     columnName: string;
     /** Full column snapshot — captured so Undo can re-create it. */
     column: IColumn;
-}> = ({ columnId, columnName, column }) => {
+    /**
+     * Whether the column currently holds any tasks. Column deletion
+     * cascades server-side (`board_service.delete` runs
+     * `delete_many(TASKS, { columnId })`) and the re-create POST mints a
+     * fresh column without those tasks — so a non-empty column delete has
+     * no honorable inverse. We gate on this to keep the §2.A.4 contract
+     * honest: empty columns get the optimistic-delete + Undo toast;
+     * non-empty columns fall back to a Modal.confirm (same reasoning that
+     * keeps project deletion on Modal.confirm).
+     */
+    hasTasks: boolean;
+}> = ({ columnId, columnName, column, hasTasks }) => {
     const { projectId } = useParams<{ projectId: string }>();
     const { mutate: remove } = useReactMutation(
         "boards",
@@ -677,11 +689,30 @@ const DeleteDropDown: React.FC<{
     );
     const { show: showUndoToast } = useUndoToast();
     const onDelete = (id: string) => {
+        if (hasTasks) {
+            // Non-empty column: the server cascade-deletes every task in
+            // the column and re-create cannot restore them, so an Undo we
+            // can't honor would lie to the user. Confirm instead (§2.A.4 —
+            // Modal.confirm is reserved for irreversible operations).
+            Modal.confirm({
+                centered: true,
+                okText: microcopy.confirm.deleteColumn.confirmLabel,
+                cancelText: microcopy.actions.cancel,
+                okButtonProps: { danger: true },
+                title: microcopy.confirm.deleteColumn.title,
+                content: microcopy.confirm.deleteColumn.description,
+                onOk() {
+                    remove({ columnId: id });
+                }
+            });
+            return;
+        }
         // Capture the full column payload BEFORE removal so the Undo
         // closure can POST it back. After the optimistic prune the cache
         // no longer carries it.
         const beforeState = column;
-        // Optimistic delete (§2.A.4) — reversible, so no Modal.confirm.
+        // Empty column — the delete is reversible (nothing cascades), so
+        // optimistic delete + Undo toast (§2.A.4), no Modal.confirm.
         remove({ columnId: id });
         showUndoToast({
             description: microcopy.feedback.columnDeleted,
@@ -1240,6 +1271,7 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                             column={column}
                             columnId={column._id}
                             columnName={column.columnName}
+                            hasTasks={tasks.length > 0}
                         />
                     </ColumnHeader>
                     <Drop

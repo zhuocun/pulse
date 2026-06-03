@@ -505,11 +505,12 @@ describe("Column", () => {
         ).toBeDisabled();
     });
 
-    it("deletes the column immediately (no confirm) and surfaces an Undo toast", async () => {
-        // §2.A.4 — column delete is reversible, so it skips Modal.confirm
-        // and goes straight to an optimistic delete + Undo toast.
+    it("deletes an empty column immediately (no confirm) and surfaces an Undo toast", async () => {
+        // §2.A.4 — an EMPTY column delete is reversible (nothing cascades),
+        // so it skips Modal.confirm and goes straight to an optimistic
+        // delete + Undo toast.
         const confirmSpy = jest.spyOn(Modal, "confirm");
-        renderColumn();
+        renderColumn({ tasks: [] });
 
         fireEvent.click(
             screen.getByRole("button", { name: /^delete column todo$/i })
@@ -528,8 +529,8 @@ describe("Column", () => {
         confirmSpy.mockRestore();
     });
 
-    it("re-creates the column via the POST mutation when Undo is clicked", async () => {
-        renderColumn();
+    it("re-creates the empty column via the POST mutation when Undo is clicked", async () => {
+        renderColumn({ tasks: [] });
 
         fireEvent.click(
             screen.getByRole("button", { name: /^delete column todo$/i })
@@ -546,8 +547,37 @@ describe("Column", () => {
         );
     });
 
-    it("leaves the delete in place when the Undo toast is never clicked", async () => {
-        renderColumn();
+    it("confirms before deleting a non-empty column and offers no Undo (cascade has no inverse)", async () => {
+        // A column that still holds tasks cascades server-side
+        // (board_service deletes every task with the columnId) and the
+        // re-create POST can't restore them — so §2.A.4 keeps it on
+        // Modal.confirm rather than promising an Undo we can't honor.
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                (config as { onOk?: () => void }).onOk?.();
+                return {} as ReturnType<typeof Modal.confirm>;
+            });
+        renderColumn(); // default render seeds column-1 with tasks
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete column todo$/i })
+        );
+
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+        // Confirming still deletes the column…
+        expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
+        // …but the reversible-delete affordances are absent.
+        expect(screen.queryByText("Column deleted")).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Undo" })
+        ).not.toBeInTheDocument();
+
+        confirmSpy.mockRestore();
+    });
+
+    it("leaves the empty-column delete in place when the Undo toast is never clicked", async () => {
+        renderColumn({ tasks: [] });
 
         fireEvent.click(
             screen.getByRole("button", { name: /^delete column todo$/i })
