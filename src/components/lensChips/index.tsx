@@ -18,15 +18,18 @@ import {
  * the lens layers on top of `taskName / coordinatorId / type / semanticIds`.
  *
  * Chip set:
- *   - Today      ── tasks due today (graceful-skip until `dueDate` ships)
- *   - This week  ── tasks due in the current ISO week (graceful-skip)
- *   - Mine       ── tasks assigned to the current user (functional today)
+ *   - Today      ── tasks due today (functional — M2 `dueDate` shipped)
+ *   - This week  ── tasks due in the current ISO week (functional)
+ *   - Mine       ── tasks assigned to the current user (functional)
  *   - At risk    ── tasks flagged by AI (graceful-skip until risk field)
  *
  * "Graceful-skip" lenses are still selectable, but their predicate is a
  * no-op (`() => true`) so the board renders unchanged. The chip shows a
  * small "AI" / "soon" badge so the user knows the lens is on the way and
- * not silently broken.
+ * not silently broken. With M2's `dueDate` field shipped, the Today /
+ * This-week lenses are now FUNCTIONAL (their predicates filter against
+ * `task.dueDate` in `lensPredicate.ts`); only "At risk" remains
+ * coming-soon until the AI risk score lands.
  *
  * Mutually exclusive: only one lens is active at a time. Re-clicking the
  * active lens clears it back to All.
@@ -42,15 +45,16 @@ const KNOWN_LENS_IDS: readonly LensId[] = [
 ];
 
 /**
- * Lenses whose data field is not yet on `ITask` (Phase 4 — see roadmap
- * §A7). Selecting one is a no-op predicate, but the chip surfaces a
- * "soon" hint so the user knows the lens exists in spec form.
+ * Lenses whose data field is not yet on `ITask`. Selecting one is a no-op
+ * predicate, but the chip surfaces a "soon" hint so the user knows the
+ * lens exists in spec form.
+ *
+ * M2 update: `dueDate` shipped, so "Today" and "This week" graduated to
+ * functional lenses (their predicates filter against `task.dueDate`).
+ * Only "At risk" remains here, gated on the AI risk score that hasn't
+ * landed yet.
  */
-const COMING_SOON_LENSES: ReadonlySet<LensId> = new Set([
-    "today",
-    "this-week",
-    "at-risk"
-]);
+const COMING_SOON_LENSES: ReadonlySet<LensId> = new Set(["at-risk"]);
 
 /**
  * Coerce a raw URL value into a `LensId`, or `null` if the string isn't

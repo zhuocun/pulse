@@ -156,6 +156,7 @@ export const enSource = {
         applyReadinessSuggestion: "Apply readiness suggestion for {field}",
         lensChips: "Board lenses",
         lensComingSoon: "Coming soon",
+        overdueTask: "Overdue — was due {date}",
         renameTask: "Rename task",
         columnReadinessReady: "{ready} of {total} tasks ready",
         columnReadinessGrooming:
@@ -313,15 +314,20 @@ export const enSource = {
         noOrganization: "No organization"
     },
     fields: {
+        assignees: "Assignees",
         column: "Column",
         coordinator: "Coordinator",
+        dueDate: "Due date",
         email: "Email",
         epic: "Epic",
+        labels: "Labels",
         manager: "Manager",
         notes: "Notes",
         organization: "Organization",
+        parentTask: "Parent task",
         password: "Password",
         projectName: "Project name",
+        startDate: "Start date",
         storyPoints: "Story points",
         taskName: "Task name",
         type: "Type",
@@ -341,6 +347,11 @@ export const enSource = {
         selectType: "Select a type",
         selectManager: "Select a manager",
         selectStoryPoints: "Select story points",
+        selectAssignees: "Select assignees",
+        selectLabels: "Select labels",
+        selectParentTask: "Select a parent task",
+        selectStartDate: "Select a start date",
+        selectDueDate: "Select a due date",
         createColumnName: "Create column name",
         whatNeedsToBeDone: "What needs to be done?",
         notesAcceptanceCriteria: "Notes / acceptance criteria",
@@ -595,6 +606,10 @@ export const enSource = {
         removedByOthersBody:
             "Your edits are still here. Discard them or save them as a new task to keep them.",
         discardEdits: "Discard edits"
+    },
+    taskCard: {
+        /** Visible chip text on an overdue card (paired with an icon, not colour-only). */
+        overdue: "Overdue"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",

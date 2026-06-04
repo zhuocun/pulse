@@ -1,6 +1,7 @@
 import {
     Alert,
     Button,
+    DatePicker,
     Form,
     Grid,
     Input,
@@ -10,16 +11,20 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
-import { useCallback, useEffect, useId, useState } from "react";
+import dayjs, { type Dayjs } from "dayjs";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
+import filterRequest from "../../utils/filterRequest";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
+import useLabels from "../../utils/hooks/useLabels";
 import useMembersList from "../../utils/hooks/useMembersList";
+import useProjectMembers from "../../utils/hooks/useProjectMembers";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -77,6 +82,63 @@ const STORY_POINT_OPTIONS = [1, 2, 3, 5, 8, 13].map((value) => ({
     label: `${value}`,
     value
 }));
+
+/**
+ * `startDate` / `dueDate` persist as date-only ISO strings (`YYYY-MM-DD`).
+ * AntD's `DatePicker` works in `Dayjs`, so we convert at the form boundary:
+ * `taskToFormValues` maps the stored string → a `Dayjs` for the control,
+ * and `normalizeDateFields` maps the `Dayjs` back to a `YYYY-MM-DD` string
+ * for the submit payload (and the `shallowEqual` dirty-check). Using
+ * date-only (not a full timestamp) keeps the value timezone-stable — the
+ * lens predicates compare local-calendar dates, so a midnight-straddling
+ * timestamp would drift the "Today"/"This week" buckets.
+ */
+const ISO_DATE_FORMAT = "YYYY-MM-DD";
+
+const DATE_FIELDS = ["startDate", "dueDate"] as const;
+
+const toDayjsOrUndefined = (value: unknown): Dayjs | undefined => {
+    if (!value) return undefined;
+    const parsed = dayjs(value as string);
+    return parsed.isValid() ? parsed : undefined;
+};
+
+type TaskFormValues = Omit<ITask, "startDate" | "dueDate"> & {
+    startDate?: Dayjs;
+    dueDate?: Dayjs;
+};
+
+/**
+ * Map an `ITask` into the shape AntD `Form` expects for THIS modal — every
+ * field passes through unchanged except the two date fields, which become
+ * `Dayjs` instances (or `undefined` when unset / unparsable) so the
+ * `DatePicker` controls bind correctly.
+ */
+const taskToFormValues = (task: ITask): TaskFormValues => ({
+    ...task,
+    startDate: toDayjsOrUndefined(task.startDate),
+    dueDate: toDayjsOrUndefined(task.dueDate)
+});
+
+/**
+ * Convert any `Dayjs` date-field values in a raw form payload back to
+ * date-only ISO strings, leaving every other field untouched. An empty /
+ * cleared picker is left as its falsy value (`undefined` / `null`), which
+ * `filterRequest` strips before the POST/PUT and which the dirty-check
+ * normalizes away too — so an unset date is simply absent from the payload.
+ */
+const normalizeDateFields = (
+    values: Record<string, unknown>
+): Record<string, unknown> => {
+    const next = { ...values };
+    DATE_FIELDS.forEach((field) => {
+        const value = next[field];
+        if (value && dayjs.isDayjs(value)) {
+            next[field] = value.format(ISO_DATE_FORMAT);
+        }
+    });
+    return next;
+};
 
 type TaskModalField =
     | "coordinatorId"
@@ -228,6 +290,52 @@ const TaskModal: React.FC<{
         Boolean(editingTaskId) && !placeholderId && tasksStillLoading;
     const { data: membersData } = useMembersList();
     const members = membersData ?? [];
+    // Project labels + project-member roster power the new richness
+    // pickers. Both are keyed per-project and disabled until `projectId`
+    // resolves (see the hooks). `useLabels` exposes the list for the
+    // tag-mode label Select; `useProjectMembers` hits
+    // `/projects/members` (the project roster) rather than `useMembersList`'s
+    // global `/users/members` directory, so the assignee picker offers
+    // only the people actually on this project.
+    const { labels: labelsData } = useLabels(projectId);
+    const labels = useMemo(() => labelsData ?? [], [labelsData]);
+    const { data: projectMembersData } = useProjectMembers(projectId);
+    // Guard against a non-array payload (errored / stubbed response sharing
+    // the query cache) so the assignee `.map` below never throws — mirrors
+    // the `Array.isArray` normalization `useLabels` / `useNotifications` do.
+    const projectMembers = useMemo(
+        () => (Array.isArray(projectMembersData) ? projectMembersData : []),
+        [projectMembersData]
+    );
+    // Parent-task options: every OTHER task in the project (a task can't be
+    // its own parent). Clearable + optional.
+    const parentTaskOptions = useMemo(
+        () =>
+            (tasks ?? [])
+                .filter((candidate) => candidate._id !== editingTaskId)
+                .map((candidate) => ({
+                    label: candidate.taskName,
+                    value: candidate._id
+                })),
+        [tasks, editingTaskId]
+    );
+    const labelOptions = useMemo(
+        () =>
+            labels.map((label) => ({
+                label: label.name,
+                value: label._id,
+                color: label.color
+            })),
+        [labels]
+    );
+    const assigneeOptions = useMemo(
+        () =>
+            projectMembers.map((member) => ({
+                label: member.username,
+                value: member._id
+            })),
+        [projectMembers]
+    );
 
     const onClose = useCallback(() => {
         form.resetFields();
@@ -276,17 +384,31 @@ const TaskModal: React.FC<{
             // so we never persist a half-validated payload.
             return;
         }
-        const fieldValues = form.getFieldsValue();
+        // Date pickers hand back `Dayjs` instances; normalize them to
+        // date-only ISO strings so the dirty-check and the persisted
+        // payload both carry the same string shape the backend stores.
+        const fieldValues = normalizeDateFields(form.getFieldsValue());
+        const rawName = fieldValues.taskName;
         const trimmedName =
-            typeof fieldValues.taskName === "string"
-                ? fieldValues.taskName.trim()
-                : fieldValues.taskName;
+            typeof rawName === "string" ? rawName.trim() : editingTask.taskName;
         const merged = {
             ...editingTask,
             ...fieldValues,
             taskName: trimmedName
-        };
-        if (shallowEqual(merged, editingTask)) {
+        } as ITask;
+        // Compare the FILTERED payloads. The form now registers optional
+        // fields (dates, labelIds, assigneeIds, parentTaskId) that read back
+        // as `undefined` / `null` / `""` when unset; `filterRequest` strips
+        // those void keys from both sides (exactly as the wire payload would
+        // be), so an untouched task with no richness still compares equal and
+        // closes without a needless PUT instead of tripping the key-count
+        // check.
+        if (
+            shallowEqual(
+                filterRequest(merged as unknown as Record<string, unknown>),
+                filterRequest(editingTask as unknown as Record<string, unknown>)
+            )
+        ) {
             closeModal();
             return;
         }
@@ -295,7 +417,11 @@ const TaskModal: React.FC<{
         // updated payload the original values would be lost.
         const beforeState: ITask = { ...editingTask };
         try {
-            await update(merged);
+            // `MutationParam` is an open string-indexed record; `ITask` is
+            // structurally compatible at runtime but its declared shape
+            // carries no index signature, hence the assertion (matches the
+            // `undoUpdate(beforeState …)` cast below).
+            await update(merged as unknown as Record<string, unknown>);
             setSaveError(null);
             message.success(microcopy.feedback.taskSaved);
             // Phase 4.3 — record the update into the activity feed only
@@ -386,7 +512,9 @@ const TaskModal: React.FC<{
         if (!editingTask) {
             return;
         }
-        form.setFieldsValue(editingTask);
+        // Convert the stored ISO date strings into `Dayjs` so the
+        // `DatePicker` controls bind (they reject bare strings).
+        form.setFieldsValue(taskToFormValues(editingTask));
     }, [form, editingTask]);
 
     useEffect(() => {
@@ -651,7 +779,11 @@ const TaskModal: React.FC<{
                     <ErrorBox error={saveError} />
                     <Form
                         form={form}
-                        initialValues={editingTask}
+                        initialValues={
+                            editingTask
+                                ? taskToFormValues(editingTask)
+                                : undefined
+                        }
                         layout="vertical"
                         onValuesChange={(changedValues) => {
                             setFormTick((tick) => tick + 1);
@@ -763,6 +895,128 @@ const TaskModal: React.FC<{
                                 placeholder={
                                     microcopy.placeholders.selectStoryPoints
                                 }
+                            />
+                        </Form.Item>
+                        {/*
+                         * M2 task-richness fields. All optional. Dates bind
+                         * as `Dayjs` (see `taskToFormValues` /
+                         * `normalizeDateFields`); labels / assignees are
+                         * multi-`Select`s whose values are id arrays; parent
+                         * is a clearable single `Select`. Every one flows
+                         * through the existing `onOk` submit payload (`merged`
+                         * → the `tasks` PUT) with no separate write path.
+                         */}
+                        <Form.Item
+                            label={microcopy.fields.startDate}
+                            name="startDate"
+                        >
+                            <DatePicker
+                                allowClear
+                                format={ISO_DATE_FORMAT}
+                                placeholder={
+                                    microcopy.placeholders.selectStartDate
+                                }
+                                style={{ width: "100%" }}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.dueDate}
+                            name="dueDate"
+                        >
+                            <DatePicker
+                                allowClear
+                                format={ISO_DATE_FORMAT}
+                                placeholder={
+                                    microcopy.placeholders.selectDueDate
+                                }
+                                style={{ width: "100%" }}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.labels}
+                            name="labelIds"
+                        >
+                            <Select
+                                allowClear
+                                mode="multiple"
+                                optionFilterProp="label"
+                                options={labelOptions}
+                                optionRender={(option) => (
+                                    <span
+                                        style={{
+                                            alignItems: "center",
+                                            display: "inline-flex",
+                                            gap: space.xs
+                                        }}
+                                    >
+                                        <span
+                                            aria-hidden
+                                            style={{
+                                                background:
+                                                    (
+                                                        option.data as {
+                                                            color?: string;
+                                                        }
+                                                    ).color ||
+                                                    "var(--ant-color-border, #d9d9d9)",
+                                                borderRadius: "50%",
+                                                display: "inline-block",
+                                                flex: "0 0 auto",
+                                                height: 10,
+                                                width: 10
+                                            }}
+                                        />
+                                        {option.label}
+                                    </span>
+                                )}
+                                placeholder={
+                                    microcopy.placeholders.selectLabels
+                                }
+                                tagRender={(tagProps) => {
+                                    const color = labels.find(
+                                        (item) => item._id === tagProps.value
+                                    )?.color;
+                                    return (
+                                        <Tag
+                                            closable={tagProps.closable}
+                                            color={color}
+                                            onClose={tagProps.onClose}
+                                            style={{
+                                                marginInlineEnd: space.xxs
+                                            }}
+                                        >
+                                            {tagProps.label}
+                                        </Tag>
+                                    );
+                                }}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.assignees}
+                            name="assigneeIds"
+                        >
+                            <Select
+                                allowClear
+                                mode="multiple"
+                                optionFilterProp="label"
+                                options={assigneeOptions}
+                                placeholder={
+                                    microcopy.placeholders.selectAssignees
+                                }
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.parentTask}
+                            name="parentTaskId"
+                        >
+                            <Select
+                                allowClear
+                                optionFilterProp="label"
+                                options={parentTaskOptions}
+                                placeholder={
+                                    microcopy.placeholders.selectParentTask
+                                }
+                                showSearch
                             />
                         </Form.Item>
                         {environment.aiGhostTextEnabled &&

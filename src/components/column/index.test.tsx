@@ -211,6 +211,7 @@ const renderColumn = ({
     boardAiOn = true,
     param = defaultParam,
     boardDensity = "comfortable",
+    labels = [],
     tasks = [
         task(),
         task({
@@ -233,6 +234,7 @@ const renderColumn = ({
     tasks?: ITask[];
     boardAiOn?: boolean;
     boardDensity?: "comfortable" | "compact";
+    labels?: ILabel[];
 } = {}) => {
     // The component calls `useReactMutation` three times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
@@ -265,6 +267,7 @@ const renderColumn = ({
                                 column={boardColumn}
                                 dragDisabledByFilters={dragDisabledByFilters}
                                 isDragDisabled={isDragDisabled}
+                                labels={labels}
                                 param={param}
                                 taskDragDisabled={taskDragDisabled}
                                 tasks={tasks}
@@ -1078,6 +1081,107 @@ describe("Column", () => {
                 }
             });
             expect(hasDensityInputRule).toBe(true);
+        });
+    });
+
+    // ── M2 task-richness card surfaces (overdue + label chips) ───────────
+    describe("M2 task-richness card surfaces", () => {
+        // Build past / today / future ISO date-only strings relative to the
+        // real "now" so the assertions hold regardless of run date.
+        const isoDate = (offsetDays: number) => {
+            const d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        };
+
+        const label = (overrides: Partial<ILabel> = {}): ILabel => ({
+            _id: "label-1",
+            projectId: "project-1",
+            name: "Backend",
+            color: "blue",
+            ...overrides
+        });
+
+        it("renders an overdue indicator (icon + visible text + a11y date) when dueDate is in the past", () => {
+            renderColumn({
+                tasks: [task({ dueDate: isoDate(-2) })]
+            });
+
+            const overdue = screen.getByTestId("task-card-overdue");
+            // Not colour-only: the visible word "Overdue" carries the signal.
+            expect(overdue).toHaveTextContent(/overdue/i);
+            // The accessible name surfaces the missed due date.
+            expect(overdue).toHaveAttribute(
+                "aria-label",
+                expect.stringContaining(isoDate(-2))
+            );
+        });
+
+        it("does NOT mark a task due today as overdue", () => {
+            renderColumn({
+                tasks: [task({ dueDate: isoDate(0) })]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-overdue")
+            ).not.toBeInTheDocument();
+        });
+
+        it("does NOT mark a future-dated or undated task as overdue", () => {
+            renderColumn({
+                tasks: [
+                    task({ _id: "future", dueDate: isoDate(5) }),
+                    task({ _id: "undated" })
+                ]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-overdue")
+            ).not.toBeInTheDocument();
+        });
+
+        it("renders label chips (name) for a task's labelIds resolved via the labels list", () => {
+            renderColumn({
+                labels: [
+                    label(),
+                    label({ _id: "label-2", name: "Urgent", color: "red" })
+                ],
+                tasks: [task({ labelIds: ["label-1", "label-2"] })]
+            });
+
+            expect(screen.getByText("Backend")).toBeInTheDocument();
+            expect(screen.getByText("Urgent")).toBeInTheDocument();
+        });
+
+        it("drops unknown label ids instead of rendering a blank chip", () => {
+            renderColumn({
+                labels: [label()],
+                tasks: [task({ labelIds: ["label-1", "deleted-label"] })]
+            });
+
+            // The known label renders…
+            expect(screen.getByText("Backend")).toBeInTheDocument();
+            // …and the label chip row holds exactly one chip (the unknown id
+            // is silently skipped).
+            const labelRow = screen
+                .getByText("Backend")
+                .closest("[aria-label]");
+            expect(labelRow).toHaveAttribute(
+                "aria-label",
+                microcopy.fields.labels
+            );
+        });
+
+        it("renders no label chips when the task has no labelIds", () => {
+            renderColumn({
+                labels: [label()],
+                tasks: [task()]
+            });
+
+            expect(screen.queryByText("Backend")).not.toBeInTheDocument();
         });
     });
 });

@@ -32,6 +32,7 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
 - [ ] **M4 — Frontend surfaces for M1–M3** (members tab, task fields,
   lensChips dueDate activation, notifications bell, comments UI).
   - [x] M4a: notifications bell + Inbox Mentions wiring (useNotifications, header bell)
+  - [x] M4b: task richness in board UI (dates, labels, assignees, sub-task parent, overdue + label chips, date lenses)
 - [ ] **M5 — Unified Copilot rail rebuild; action-capable command palette;
   shared saved views; cross-project search**.
 - [ ] **M6 — Reporting (velocity/WIP/throughput); admin AI-gating

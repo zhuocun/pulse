@@ -58,6 +58,7 @@ import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
+import useLabels from "../utils/hooks/useLabels";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
@@ -403,6 +404,10 @@ const BoardPage = () => {
         projectId
     });
     const { isLoading: mLoading, data: members } = useMembersList();
+    // Project labels, fetched once at the board level and threaded into each
+    // column → card so a card can resolve its `labelIds` to name + colour
+    // chips without an N-per-card fetch (mirrors how `members` is shared).
+    const { labels } = useLabels(projectId);
 
     const {
         data: tasks,
@@ -1103,6 +1108,7 @@ const BoardPage = () => {
                                                             column._id
                                                         }
                                                         members={members ?? []}
+                                                        labels={labels ?? []}
                                                         param={param}
                                                         onResetFilters={
                                                             resetBoardFilters
