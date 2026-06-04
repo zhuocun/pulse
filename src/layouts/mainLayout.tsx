@@ -5,7 +5,9 @@ import { Outlet } from "react-router";
 import BottomTabBar from "../components/bottomTabBar";
 import CopilotDockHost from "../components/copilotDock/copilotDockHost";
 import Header from "../components/header";
+import OnboardingTour from "../components/onboardingTour";
 import ProjectModal from "../components/projectModal";
+import ShortcutHelp from "../components/shortcutHelp";
 import { PageSpin } from "../components/status";
 import { TabBarAccessoryMount } from "../components/tabBarAccessory";
 import environment from "../constants/env";
@@ -137,6 +139,25 @@ const MainLayout = () => {
                 </Suspense>
             </Main>
             <ProjectModal />
+            {/*
+             * Phase 4.4 — first-login onboarding tour. Mounted once in the
+             * authenticated shell; it self-gates to a no-op when the user
+             * is unauthenticated, on an auth page, or has already dismissed
+             * it (the dismissed flag is persisted in localStorage). Honors
+             * `prefers-reduced-motion` internally. Never blocks the app or
+             * traps focus — closing / finishing / Esc all dismiss it.
+             */}
+            <OnboardingTour />
+            {/*
+             * Keyboard-shortcut help dialog (ui-todo §2.A.9, WCAG 3.2.6
+             * Consistent Help). Self-manages its open state: it registers a
+             * global `?` shortcut (suppressed while typing in a field) via
+             * `useShortcut` and lists the `SHORTCUTS` catalog grouped by
+             * scope. Mounted once here so the `?` hotkey works on every
+             * authenticated route, mirroring how the OnboardingTour is a
+             * single always-mounted overlay.
+             */}
+            <ShortcutHelp />
             {/*
              * R-A M1: persistent CopilotDock. Mounting the dock here
              * (above the routed `<Outlet />`) means navigating between

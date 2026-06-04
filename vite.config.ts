@@ -1,9 +1,14 @@
 import react from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig, loadEnv } from "vite";
 import svgr from "vite-plugin-svgr";
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "");
+    // Opt-in bundle-size report (ui-todo.md §2.C / §2.A.7 bundle budget).
+    // Off by default so normal `vite build` is unaffected; run
+    // `ANALYZE=true vite build` to emit dist/stats.html (gzip + treemap).
+    const analyze = (env.ANALYZE ?? process.env.ANALYZE) === "true";
     const apiUrl =
         env.REACT_APP_API_URL ||
         env.VITE_API_URL ||
@@ -133,6 +138,19 @@ export default defineConfig(({ mode }) => {
                 }
             }
         },
-        plugins: [react(), svgr()]
+        plugins: [
+            react(),
+            svgr(),
+            ...(analyze
+                ? [
+                      visualizer({
+                          filename: "dist/stats.html",
+                          gzipSize: true,
+                          brotliSize: true,
+                          template: "treemap"
+                      })
+                  ]
+                : [])
+        ]
     };
 });

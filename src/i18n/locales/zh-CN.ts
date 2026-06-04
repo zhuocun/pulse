@@ -100,6 +100,7 @@ const zhCN: Dictionary = {
         activeFilters: "当前筛选条件",
         removeFilter: "移除 {label} 筛选",
         sortProjects: "项目排序",
+        projectPagination: "项目列表分页",
         favoritedOnlyToggle: "仅显示已收藏的项目",
         saveCurrentAsDefault: "将当前筛选保存为默认",
         resetToSavedDefault: "重置筛选为已保存的默认",
@@ -107,6 +108,7 @@ const zhCN: Dictionary = {
         loadingPage: "正在加载页面",
         projects: "项目",
         searchProjectsByName: "按名称搜索项目",
+        searchProjectsPending: "正在筛选项目…",
         searchTasksByName: "按名称搜索任务",
         filterByManager: "按负责人筛选",
         filterByCoordinator: "按协调人筛选",
@@ -164,6 +166,28 @@ const zhCN: Dictionary = {
         columnDragHandle: "拖动以重新排序列",
         reorderDisabledByFilters:
             "筛选启用时暂停重新排序。清除筛选后即可拖动排序。"
+    },
+    shortcuts: {
+        dialogTitle: "键盘快捷键",
+        dialogDescription: "使用这些键盘快捷键加快你的操作。",
+        sequenceThen: "然后",
+        scopes: {
+            global: "全局",
+            projectPage: "项目页面",
+            board: "看板",
+            taskCard: "聚焦的任务卡片",
+            overlay: "弹窗与抽屉"
+        },
+        descriptions: {
+            openCommandPalette: "打开命令面板",
+            openShortcutHelp: "打开键盘快捷键帮助",
+            goToProjects: "前往项目",
+            goToBoard: "前往看板",
+            createTask: "在聚焦的列中创建任务",
+            closeOverlay: "关闭打开的弹窗或抽屉",
+            editTask: "为聚焦的任务打开编辑弹窗",
+            keyboardDragTask: "使用键盘拖动聚焦的任务"
+        }
     },
     labels: {
         members: "成员",
@@ -413,6 +437,12 @@ const zhCN: Dictionary = {
             title: "确认删除该任务?",
             description: "此操作无法撤销。",
             confirmLabel: "删除任务"
+        },
+        discardChanges: {
+            title: "放弃更改?",
+            description: "未保存的更改将会丢失。",
+            confirmLabel: "放弃",
+            cancelLabel: "继续编辑"
         }
     },
     feedback: {
@@ -501,7 +531,8 @@ const zhCN: Dictionary = {
     taskModal: {
         removedByOthersTitle: "此任务已被其他更改移除。",
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
-        discardEdits: "丢弃更改"
+        discardEdits: "丢弃更改",
+        aiAssistLabel: "AI 辅助"
     },
     taskCard: {
         overdue: "已逾期"
@@ -822,6 +853,8 @@ const zhCN: Dictionary = {
         revertToPrevious: "恢复至上一个值",
         showAlternatives: "查看其他选项",
         showRationale: "为什么?",
+        whyLabel: "为什么?",
+        whyPopoverTitle: "Copilot 为何这样建议",
         applyAnyway: "仍然应用",
         emptyChatLead:
             "提问关于此看板、任务或您的项目。回答仅基于应用中的只读数据。",
@@ -1051,7 +1084,13 @@ const zhCN: Dictionary = {
         title: "看板 Copilot 简报",
         headline: "看板上共有 {total} 个任务，其中 {inProgress} 个正在进行中。",
         recommendedNextStep: "推荐的下一步",
+        summaryTitle: "概览",
+        summaryTotalTasks: "任务总数",
+        summaryColumns: "列数",
+        summaryUnowned: "无负责人",
+        summaryContributors: "参与成员",
         countsPerColumn: "各列任务数",
+        countsBarAria: "{column}：{count} 个任务",
         largestUnstarted: "未启动的最大任务",
         unownedTasks: "无负责人的任务",
         workload: "工作负载",
@@ -1207,6 +1246,30 @@ const zhCN: Dictionary = {
     swipeActions: {
         favorite: "收藏",
         unfavorite: "取消收藏"
+    },
+    onboardingTour: {
+        next: "下一步",
+        previous: "上一步",
+        done: "完成",
+        skip: "跳过引导",
+        welcome: {
+            title: "欢迎使用 Pulse",
+            description:
+                "这是核心功能的快速引导。你可以随时跳过——它只会显示一次。"
+        },
+        navigation: {
+            title: "了解导航",
+            description: "随时从这里在看板、收件箱和 Copilot 之间切换。"
+        },
+        copilot: {
+            title: "认识 Board Copilot",
+            description:
+                "Board Copilot 可以起草任务、拆解工作，并回答关于看板的问题。你可以随时开启或关闭。"
+        },
+        account: {
+            title: "你的账户与设置",
+            description: "从账户菜单切换主题、更改语言并退出登录。"
+        }
     }
 };
 
