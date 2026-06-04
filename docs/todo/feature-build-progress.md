@@ -28,7 +28,7 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
 - [x] **M2 — Task & board richness (backend)**: due/start dates, labels,
   multi-assignee, sub-tasks (`parentTaskId`), per-column WIP limits, bulk
   task endpoint `PUT /api/v1/tasks/bulk`.
-- [ ] **M3 — Comments + @mentions; Notifications model + bell (backend)**.
+- [x] **M3 — Comments + @mentions; Notifications model + bell (backend)**.
 - [ ] **M4 — Frontend surfaces for M1–M3** (members tab, task fields,
   lensChips dueDate activation, notifications bell, comments UI).
 - [ ] **M5 — Unified Copilot rail rebuild; action-capable command palette;
