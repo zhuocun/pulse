@@ -352,67 +352,104 @@ const ProjectList: React.FC<Props> = ({
         [message, update]
     );
 
-    const onDelete = (projectId: string) => {
-        // Capture the full project payload BEFORE removal so the
-        // activity-feed undo closure can POST it back if the user
-        // changes their mind. After the mutation the dataSource has
-        // been pruned and the lookup would return undefined.
-        const beforeState = dataSource?.find(
-            (project) => project._id === projectId
-        );
-        const projectName = beforeState?.projectName ?? "";
-        Modal.confirm({
-            centered: true,
-            okText: microcopy.confirm.deleteProject.confirmLabel,
-            cancelText: microcopy.actions.cancel,
-            okButtonProps: { danger: true },
-            title: microcopy.confirm.deleteProject.title,
-            content: microcopy.confirm.deleteProject.description,
-            onOk() {
-                remove(
-                    { projectId },
-                    {
-                        onSuccess: () => {
-                            message.success(microcopy.feedback.projectDeleted);
-                            // Phase 4.3 — record the delete into the
-                            // activity feed only after the server
-                            // confirms the deletion, so a 5xx leaves
-                            // the feed clean. The 10s-window Undo
-                            // closure re-POSTs the captured project so
-                            // the user can recover from an accidental
-                            // delete.
-                            recordActivity({
-                                kind: "project",
-                                action: "delete",
-                                summary: microcopyString(
-                                    microcopy.activityFeed.descriptions
-                                        .projectDeleted
-                                ).replace("{name}", projectName),
-                                undo: beforeState
-                                    ? () => {
-                                          void undoDelete(
-                                              beforeState as unknown as Record<
-                                                  string,
-                                                  unknown
-                                              >
-                                          );
-                                      }
-                                    : undefined
-                            });
-                        },
-                        onError: () =>
-                            message.error(microcopy.feedback.saveFailed)
-                    }
-                );
-            }
-        });
-    };
+    const onDelete = useCallback(
+        (projectId: string) => {
+            // Capture the full project payload BEFORE removal so the
+            // activity-feed undo closure can POST it back if the user
+            // changes their mind. After the mutation the dataSource has
+            // been pruned and the lookup would return undefined.
+            const beforeState = dataSource?.find(
+                (project) => project._id === projectId
+            );
+            const projectName = beforeState?.projectName ?? "";
+            Modal.confirm({
+                centered: true,
+                okText: microcopy.confirm.deleteProject.confirmLabel,
+                cancelText: microcopy.actions.cancel,
+                okButtonProps: { danger: true },
+                title: microcopy.confirm.deleteProject.title,
+                content: microcopy.confirm.deleteProject.description,
+                onOk() {
+                    remove(
+                        { projectId },
+                        {
+                            onSuccess: () => {
+                                message.success(
+                                    microcopy.feedback.projectDeleted
+                                );
+                                // Phase 4.3 — record the delete into the
+                                // activity feed only after the server
+                                // confirms the deletion, so a 5xx leaves
+                                // the feed clean. The 10s-window Undo
+                                // closure re-POSTs the captured project so
+                                // the user can recover from an accidental
+                                // delete.
+                                recordActivity({
+                                    kind: "project",
+                                    action: "delete",
+                                    summary: microcopyString(
+                                        microcopy.activityFeed.descriptions
+                                            .projectDeleted
+                                    ).replace("{name}", projectName),
+                                    undo: beforeState
+                                        ? () => {
+                                              void undoDelete(
+                                                  beforeState as unknown as Record<
+                                                      string,
+                                                      unknown
+                                                  >
+                                              );
+                                          }
+                                        : undefined
+                                });
+                            },
+                            onError: () =>
+                                message.error(microcopy.feedback.saveFailed)
+                        }
+                    );
+                }
+            });
+        },
+        [dataSource, message, recordActivity, remove, undoDelete]
+    );
 
     const isLiked = (projectId: string): boolean => {
         const baseLiked = Boolean(user?.likedProjects?.includes(projectId));
         if (pendingLikeId === projectId) return !baseLiked;
         return baseLiked;
     };
+
+    /*
+     * Stable per-project handler cache. `ProjectCard` is `React.memo`'d,
+     * so passing a freshly-allocated `() => onLike(p._id)` arrow on every
+     * render (the old pattern) would change the prop identity on each
+     * keystroke in the search input and re-render every card — defeating
+     * the memo entirely. We bind each card's id-less callbacks once and
+     * reuse the same function refs across renders. The cache is keyed by
+     * project id and held in a ref so it survives re-renders; the bound
+     * closures only capture the (stable) `onLike` / `onDelete` /
+     * `startEditing` callbacks, never render-scoped state, so they never
+     * go stale. Cleaning up entries for deleted projects is unnecessary —
+     * the working set is bounded by the number of projects a session
+     * touches, and the cache dies with the component.
+     */
+    const getCardHandlers = useMemo(() => {
+        const cache = new Map<
+            string,
+            { onLike: () => void; onEdit: () => void; onDelete: () => void }
+        >();
+        return (projectId: string) => {
+            const existing = cache.get(projectId);
+            if (existing) return existing;
+            const handlers = {
+                onLike: () => onLike(projectId),
+                onEdit: () => startEditing(projectId),
+                onDelete: () => onDelete(projectId)
+            };
+            cache.set(projectId, handlers);
+            return handlers;
+        };
+    }, [onLike, onDelete, startEditing]);
 
     if (showSkeleton) {
         return (
@@ -486,18 +523,23 @@ const ProjectList: React.FC<Props> = ({
                 </SortRow>
             </Toolbar>
             <Grid role="list" aria-label={microcopy.a11y.projects}>
-                {pagedProjects.map((p) => (
-                    <div key={p._id} role="listitem">
-                        <ProjectCard
-                            liked={isLiked(p._id)}
-                            manager={members.find((m) => m._id === p.managerId)}
-                            onDelete={() => onDelete(p._id)}
-                            onEdit={() => startEditing(p._id)}
-                            onLike={() => onLike(p._id)}
-                            project={p}
-                        />
-                    </div>
-                ))}
+                {pagedProjects.map((p) => {
+                    const handlers = getCardHandlers(p._id);
+                    return (
+                        <div key={p._id} role="listitem">
+                            <ProjectCard
+                                liked={isLiked(p._id)}
+                                manager={members.find(
+                                    (m) => m._id === p.managerId
+                                )}
+                                onDelete={handlers.onDelete}
+                                onEdit={handlers.onEdit}
+                                onLike={handlers.onLike}
+                                project={p}
+                            />
+                        </div>
+                    );
+                })}
             </Grid>
             {/*
              * Only mount the pager once the list outgrows the smallest

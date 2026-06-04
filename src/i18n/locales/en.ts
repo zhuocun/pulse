@@ -112,6 +112,7 @@ export const enSource = {
         loadingPage: "Loading page",
         projects: "Projects",
         searchProjectsByName: "Search projects by name",
+        searchProjectsPending: "Filtering projects…",
         searchTasksByName: "Search tasks by name",
         filterByManager: "Filter by manager",
         filterByCoordinator: "Filter by coordinator",

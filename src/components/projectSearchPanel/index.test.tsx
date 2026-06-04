@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import ProjectSearchPanel from ".";
 
@@ -53,6 +53,10 @@ describe("ProjectSearchPanel", () => {
     });
 
     it("shows the current project name and updates it from the search input", () => {
+        // URL stays the source of truth: the input writes the new value to
+        // `setParam` on every keystroke (the projects page debounces the
+        // *refetch* off that param, not the URL write — see
+        // `pages/project.test.tsx`).
         const setParam = jest.fn();
         const param = { projectName: "Roadmap", managerId: "u1" };
 
@@ -77,6 +81,56 @@ describe("ProjectSearchPanel", () => {
             managerId: "u1",
             projectName: "Billing"
         });
+    });
+
+    /*
+     * Loading affordance (ui-todo §9). The "filtering…" spinner mirrors the
+     * 300 ms debounce the projects page applies before it refetches: it
+     * surfaces while the just-typed value has out-run the debounced one and
+     * clears once the window closes (the moment the page would fire the
+     * query). The filter/URL flow itself is untouched.
+     */
+    it("shows the filtering spinner while the debounce window is open, then clears it", () => {
+        jest.useFakeTimers();
+        try {
+            // At rest (value already settled at mount) → no spinner.
+            const { rerender } = render(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={{ projectName: "", managerId: "" }}
+                    setParam={jest.fn()}
+                />
+            );
+            expect(
+                screen.queryByLabelText("Filtering projects…")
+            ).not.toBeInTheDocument();
+
+            // A new committed value (the URL just changed from a keystroke)
+            // out-runs the debounced value → spinner shows.
+            rerender(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={{ projectName: "Bil", managerId: "" }}
+                    setParam={jest.fn()}
+                />
+            );
+            expect(
+                screen.getByLabelText("Filtering projects…")
+            ).toBeInTheDocument();
+
+            // Once the debounce window closes the spinner clears (the page
+            // would fire its refetch at this point).
+            act(() => {
+                jest.advanceTimersByTime(300);
+            });
+            expect(
+                screen.queryByLabelText("Filtering projects…")
+            ).not.toBeInTheDocument();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("shows the selected manager name when the manager id matches", () => {

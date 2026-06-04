@@ -11,6 +11,7 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import usePrefetchProject from "../../utils/hooks/usePrefetchProject";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactQuery from "../../utils/hooks/useReactQuery";
 import { NoPaddingButton } from "../projectList";
@@ -103,6 +104,14 @@ const ProjectPopover: React.FC = () => {
     const { openModal } = useProjectModal();
     const { data: projects } = useReactQuery<IProject[]>("projects");
     const navigate = useNavigate();
+    /*
+     * Prefetch-on-hover (ui-todo §2.A.7 / §9). Warm the board + tasks
+     * queries for the switcher entry the user is pointing at / focusing,
+     * exactly as the project cards do. Same hook → same query keys and
+     * fetchers the board route consumes, and the same once-per-id guard,
+     * so a flick through the switcher list doesn't spam the network.
+     */
+    const prefetchProject = usePrefetchProject();
 
     const content = (
         <ContentContainer>
@@ -116,6 +125,8 @@ const ProjectPopover: React.FC = () => {
                                 viewTransition: true
                             })
                         }
+                        onFocus={() => prefetchProject(project._id)}
+                        onMouseEnter={() => prefetchProject(project._id)}
                         type="text"
                     >
                         {project.projectName}

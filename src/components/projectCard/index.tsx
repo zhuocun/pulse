@@ -23,6 +23,7 @@ import {
     space
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
+import usePrefetchProject from "../../utils/hooks/usePrefetchProject";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
 import SwipeableRow, { type SwipeAction } from "../swipeableRow";
 import UserAvatar from "../userAvatar";
@@ -260,7 +261,7 @@ const formatDate = (raw?: string): string => {
  * 24 px body padding produced ~190 px tall cards even with a one-word
  * title. The current layout collapses to ~100 px in the same case.
  */
-const ProjectCard: React.FC<ProjectCardProps> = ({
+const ProjectCardComponent: React.FC<ProjectCardProps> = ({
     project,
     manager,
     liked,
@@ -269,6 +270,18 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onDelete
 }) => {
     const navigate = useNavigate();
+    /*
+     * Prefetch-on-hover (ui-todo §2.A.7 / §9). Warm the board + tasks
+     * queries the project's board route will consume as soon as the user
+     * signals intent — hovering or keyboard-focusing the card. The hook
+     * fires at most once per project id per session, so a stream of
+     * pointer-move events on the same card doesn't spam the network.
+     */
+    const prefetchProject = usePrefetchProject();
+    const warmProject = React.useCallback(
+        () => prefetchProject(project._id),
+        [prefetchProject, project._id]
+    );
     // Per-result strength badge (P1-2). Null when no AI search is active.
     const strength = getAiSearchStrength("projects", project._id);
     /*
@@ -333,7 +346,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     };
 
     return (
-        <Card>
+        <Card onFocus={warmProject} onMouseEnter={warmProject}>
             <SwipeableRow
                 data-testid="project-card-swipe"
                 leadingAction={favoriteAction}
@@ -493,5 +506,21 @@ export const ProjectCardSkeleton: React.FC = () => (
         </Body>
     </Card>
 );
+
+/**
+ * Memoized so a keystroke in the project search input (which re-renders
+ * `ProjectList`) does not re-render every card in the grid — only the
+ * cards whose props actually changed. The default shallow comparison is
+ * correct here as long as the parent passes stable props: `project` /
+ * `manager` are stable object refs from the query cache, `liked` is a
+ * primitive, and the `onLike` / `onEdit` / `onDelete` handlers are now
+ * id-keyed stable callbacks memoized in `ProjectList` (see the
+ * `useCallback`-backed `handle*` factories there). A divergence in any
+ * of those — e.g. reverting to inline arrow closures in the parent —
+ * would silently defeat this memo, so the parent's callback stability is
+ * load-bearing.
+ */
+const ProjectCard = React.memo(ProjectCardComponent);
+ProjectCard.displayName = "ProjectCard";
 
 export default ProjectCard;

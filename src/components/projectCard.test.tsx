@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
@@ -8,6 +9,17 @@ import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
 
 import ProjectCard from "./projectCard";
+
+/*
+ * The card warms the board queries on hover/focus via
+ * `usePrefetchProject`, which calls `useQueryClient()`. Wrap every render
+ * in a real `QueryClientProvider` so that hook resolves; retries are off
+ * so a prefetch's mock fetch failure can't dangle a timer past the test.
+ */
+const makeQueryClient = () =>
+    new QueryClient({
+        defaultOptions: { queries: { retry: false } }
+    });
 
 expect.extend(toHaveNoViolations);
 
@@ -155,9 +167,11 @@ describe("ProjectCard", () => {
             ...props
         };
         render(
-            <MemoryRouter>
-                <ProjectCard {...merged} />
-            </MemoryRouter>
+            <QueryClientProvider client={makeQueryClient()}>
+                <MemoryRouter>
+                    <ProjectCard {...merged} />
+                </MemoryRouter>
+            </QueryClientProvider>
         );
         return { onDelete, onEdit, onLike };
     };
@@ -305,6 +319,63 @@ describe("ProjectCard", () => {
         expect(heights).toContain(44);
     });
 
+    // Prefetch-on-hover (ui-todo §2.A.7 / §9). Hovering / focusing the card
+    // warms the exact queries the board route consumes — project, board
+    // columns, and tasks — so the board paints from cache on click. The
+    // guard fires at most once per project id per hover session.
+    it("prefetches the board queries on hover and focus, at most once", async () => {
+        const user = userEvent.setup();
+        const client = makeQueryClient();
+        const prefetchSpy = jest
+            .spyOn(client, "prefetchQuery")
+            .mockResolvedValue(undefined);
+
+        render(
+            <QueryClientProvider client={client}>
+                <MemoryRouter>
+                    <ProjectCard
+                        liked={false}
+                        manager={manager}
+                        onDelete={jest.fn()}
+                        onEdit={jest.fn()}
+                        onLike={jest.fn()}
+                        project={sampleProject}
+                    />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        const card = screen
+            .getByRole("link", { name: /^roadmap$/i })
+            .closest("article") as HTMLElement;
+
+        await user.hover(card);
+
+        // One prefetch per board-route query key, all carrying the project id.
+        const prefetchedKeys = prefetchSpy.mock.calls.map(
+            (call) => (call[0] as { queryKey: unknown[] }).queryKey
+        );
+        expect(prefetchedKeys).toEqual(
+            expect.arrayContaining([
+                ["projects", { projectId: "project-1" }],
+                ["boards", { projectId: "project-1" }],
+                ["tasks", { projectId: "project-1" }]
+            ])
+        );
+        const callsAfterFirstHover = prefetchSpy.mock.calls.length;
+        expect(callsAfterFirstHover).toBe(3);
+
+        // Re-hover + focus the same card: the once-per-id guard suppresses
+        // any further prefetch so a stream of pointer events can't spam the
+        // network.
+        await user.unhover(card);
+        await user.hover(card);
+        act(() => card.focus());
+        expect(prefetchSpy.mock.calls.length).toBe(callsAfterFirstHover);
+
+        prefetchSpy.mockRestore();
+    });
+
     it("keeps the project title as the primary link target", async () => {
         const user = userEvent.setup();
         renderCard();
@@ -371,9 +442,11 @@ describe("ProjectCard — phone swipe-to-action", () => {
             ...props
         };
         const { container } = render(
-            <MemoryRouter>
-                <ProjectCard {...merged} />
-            </MemoryRouter>
+            <QueryClientProvider client={makeQueryClient()}>
+                <MemoryRouter>
+                    <ProjectCard {...merged} />
+                </MemoryRouter>
+            </QueryClientProvider>
         );
         const swipe = screen.getByTestId("project-card-swipe");
         stubRowWidth(swipe);

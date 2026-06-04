@@ -108,6 +108,7 @@ const zhCN: Dictionary = {
         loadingPage: "正在加载页面",
         projects: "项目",
         searchProjectsByName: "按名称搜索项目",
+        searchProjectsPending: "正在筛选项目…",
         searchTasksByName: "按名称搜索任务",
         filterByManager: "按负责人筛选",
         filterByCoordinator: "按协调人筛选",

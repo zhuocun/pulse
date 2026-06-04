@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
     act,
     fireEvent,
@@ -63,6 +64,16 @@ jest.mock("antd", () => {
                 )
             )
     };
+});
+
+/*
+ * The grid's `ProjectCard` warms board queries on hover via
+ * `usePrefetchProject` → `useQueryClient()`, so every render needs a
+ * `QueryClientProvider`. One client per file is fine (no real fetches
+ * fire in these tests); retries off so nothing dangles.
+ */
+const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
 });
 
 const mockedUseAuth = useAuth as jest.Mock;
@@ -155,22 +166,24 @@ const renderList = ({
     );
 
     return render(
-        <Provider store={store}>
-            <MemoryRouter initialEntries={["/projects"]}>
-                <Routes>
-                    <Route
-                        path="/projects"
-                        element={
-                            <ProjectList
-                                dataSource={dataSource}
-                                loading={loading}
-                                members={members}
-                            />
-                        }
-                    />
-                </Routes>
-            </MemoryRouter>
-        </Provider>
+        <QueryClientProvider client={queryClient}>
+            <Provider store={store}>
+                <MemoryRouter initialEntries={["/projects"]}>
+                    <Routes>
+                        <Route
+                            path="/projects"
+                            element={
+                                <ProjectList
+                                    dataSource={dataSource}
+                                    loading={loading}
+                                    members={members}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </Provider>
+        </QueryClientProvider>
     );
 };
 
@@ -592,22 +605,27 @@ describe("ProjectList", () => {
         // Simulate a parent-driven filter change: a narrower dataSource.
         // The result-signature effect must yank the user back to page 1.
         rerender(
-            <Provider store={store}>
-                <MemoryRouter initialEntries={["/projects"]}>
-                    <Routes>
-                        <Route
-                            path="/projects"
-                            element={
-                                <ProjectList
-                                    dataSource={manyProjects(20).slice(0, 15)}
-                                    loading={false}
-                                    members={members}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </Provider>
+            <QueryClientProvider client={queryClient}>
+                <Provider store={store}>
+                    <MemoryRouter initialEntries={["/projects"]}>
+                        <Routes>
+                            <Route
+                                path="/projects"
+                                element={
+                                    <ProjectList
+                                        dataSource={manyProjects(20).slice(
+                                            0,
+                                            15
+                                        )}
+                                        loading={false}
+                                        members={members}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </Provider>
+            </QueryClientProvider>
         );
 
         const afterFilter = visibleProjectNames();
@@ -626,22 +644,24 @@ describe("ProjectList", () => {
         // populated page rather than a blank page-2 slice). The clamp
         // guard in render is what keeps the in-between render in range.
         rerender(
-            <Provider store={store}>
-                <MemoryRouter initialEntries={["/projects"]}>
-                    <Routes>
-                        <Route
-                            path="/projects"
-                            element={
-                                <ProjectList
-                                    dataSource={manyProjects(13)}
-                                    loading={false}
-                                    members={members}
-                                />
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </Provider>
+            <QueryClientProvider client={queryClient}>
+                <Provider store={store}>
+                    <MemoryRouter initialEntries={["/projects"]}>
+                        <Routes>
+                            <Route
+                                path="/projects"
+                                element={
+                                    <ProjectList
+                                        dataSource={manyProjects(13)}
+                                        loading={false}
+                                        members={members}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </Provider>
+            </QueryClientProvider>
         );
 
         const afterShrink = visibleProjectNames();

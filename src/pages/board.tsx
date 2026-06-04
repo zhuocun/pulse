@@ -366,6 +366,17 @@ const BoardCopilotSlot = styled.div`
 
 const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
 
+/*
+ * Shared frozen empty array. `Column` is `React.memo`'d, so handing it a
+ * freshly-allocated `[]` fallback on every board render (for an empty
+ * column's task bucket, or before `members` resolves) would change the
+ * prop identity each time and re-render the memoized column for nothing.
+ * One stable reference keeps the shallow prop comparison a no-op when the
+ * real data is genuinely empty.
+ */
+const EMPTY_TASKS: ITask[] = Object.freeze([]) as unknown as ITask[];
+const EMPTY_MEMBERS: IMember[] = Object.freeze([]) as unknown as IMember[];
+
 const boardTitle = (projectName?: string) =>
     projectName
         ? microcopy.board.titleWithName.replace("{name}", projectName)
@@ -403,6 +414,14 @@ const BoardPage = () => {
         projectId
     });
     const { isLoading: mLoading, data: members } = useMembersList();
+    /*
+     * Stable members reference for the memoized `Column`. `members` from
+     * the query is a stable ref once resolved, but is `undefined` while
+     * loading; coalescing to the shared frozen `EMPTY_MEMBERS` (rather
+     * than an inline `members ?? []`) keeps the prop identity steady
+     * across the renders before the fetch resolves.
+     */
+    const safeMembers = members ?? EMPTY_MEMBERS;
 
     const {
         data: tasks,
@@ -1096,13 +1115,13 @@ const BoardPage = () => {
                                                         tasks={
                                                             tasksByColumn.get(
                                                                 column._id
-                                                            ) ?? []
+                                                            ) ?? EMPTY_TASKS
                                                         }
                                                         column={column}
                                                         data-minimap-column-id={
                                                             column._id
                                                         }
-                                                        members={members ?? []}
+                                                        members={safeMembers}
                                                         param={param}
                                                         onResetFilters={
                                                             resetBoardFilters
