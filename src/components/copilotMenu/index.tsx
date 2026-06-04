@@ -16,9 +16,10 @@ import AiSparkleIcon from "../aiSparkleIcon";
  * (phone chrome) where the launcher lives inside the board's Liquid
  * Glass capsule and the text would push the four-segment toolbar past a
  * 390 px viewport. The button keeps an explicit `aria-label` so the
- * accessible name stays "Copilot" even when the text is hidden, matching
- * the icon-only collapse `MemberPopover` already ships in the same
- * capsule.
+ * accessible name stays "Copilot" even when the text is hidden. The
+ * `(pointer: coarse)` query mirrors the board's own phone-capsule gate
+ * (`useIsPhoneChrome`), so the label hides exactly when the launcher is
+ * inside the capsule and stays visible on the desktop bottom-tier slot.
  */
 const LauncherLabel = styled.span`
     @media (pointer: coarse) {
