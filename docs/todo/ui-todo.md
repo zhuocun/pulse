@@ -4,6 +4,8 @@
 
 **Update 2026-06-03 (branch `claude/implementation-status-review-qwr4d`):** a backlog-clearing batch shipped — (a) the `eslint-plugin-jsx-a11y` CI gate is now blocking (`--max-warnings 0`); (b) reversible **task** and **empty-column** deletes use an optimistic delete + Undo toast (§2.A.4), while non-empty columns and project deletion stay on `Modal.confirm` (cascade has no honorable inverse); (c) Phase 1.4 bare-heading cleanup in `copilotDock/ChatTabBody` → `Typography.Title`; (d) Phase 3.3 last `rgba` holdout in `sheet` confirmed as a `forced-colors` scrim (no contrast concern); (e) Phase 2.3 board declutter — two-tier header + consolidated `Copilot` launcher (`src/components/copilotMenu`); (f) Phase 2.1 desktop **primary nav** with `aria-current` active-route treatment (the avatar account menu + Members relocation were already in place per QW-12). Full gate green: tsc, ESLint `--max-warnings 0`, 2657 Jest tests, and `vite build`.
 
+**Update 2026-06-04 (same branch):** a second batch shipped — (a) Phase 2.2 **project-list pagination** (client-side AntD `<Pagination>`, size-changer, reset-on-filter, shrink-clamp; the **member-count/avatar-group** card context is deferred as a documented data-model gap — `IProject` carries no per-project membership and the list page fetches no per-project data, so it needs a new backend endpoint); (b) Phase 4.4 **first-login onboarding tour** (AntD `Tour`, auto-opens once, `localStorage` dismissed flag, reduced-motion aware, DOM-targeted with graceful centered fallback, resolves whichever nav landmark is mounted desktop/phone); (c) Phase 2.6 **task-modal split-pane** (two-column form + AI assist ≥768px desktop, `<Collapse>` below 768px, single-column on the phone Sheet) + (d) §2.A.1 reusable **unsaved-changes guard** (`useUnsavedChangesGuard`) wired into TaskModal/ProjectModal/AiTaskDraftModal (prompts on dirty close, never on save/delete). Full gate green again.
+
 **Release-tier scoping.** Most items in this doc are general-purpose UX work and **do not gate any Board Copilot release tier**. Priority is encoded by phase ordering (Phase 1 foundations → Phase 4 stretch). The handful of items that intersect with [`release-todo.md`](release-todo.md) carry an explicit `Gates:` callout — search for `Gates:` to surface them.
 
 ### Open backlog grouping (2026-05-11)
@@ -53,8 +55,8 @@ Every recommendation in this plan is anchored to one or more of these external r
 
 6. **Project list follow-through.**
    `src/components/projectList/index.tsx` and `src/components/projectCard/index.tsx` already replaced the old AntD table with responsive cards, a real heart toggle, `MoreOutlined` actions, skeletons, and an empty state. The remaining gaps are narrower:
-    - Cards surface the manager only; there is still no member-count / avatar-group context for quickly judging project scale.
-    - The grid renders the whole list; larger workspaces still need pagination or virtualization.
+    - Cards surface the manager only; there is still no member-count / avatar-group context for quickly judging project scale. **[Deferred 2026-06-04 — data-model gap: `IProject` has no per-project membership array, `users/members` is workspace-wide, and the list page fetches no per-project tasks; an honest count needs a new backend endpoint or an N+1 fetch. Manager avatar + org are the only honest per-project signals and are already shown.]**
+    - ~~The grid renders the whole list; larger workspaces still need pagination or virtualization.~~ **[Complete 2026-06-04: client-side AntD `<Pagination>` (12/page default, 12/24/48 size-changer, accessible name) mounts only when total > 12, resets to page 1 on filter/search/sort change, and clamps when the result set shrinks.]**
     - AI search and structured filters now share one shell, but the information architecture still blurs "semantic search mode" versus ordinary filtering.
 
 7. ~~**Board page — toolbar overload.**~~ **[Complete 2026-06-03 (Phase 2.3): the single overloaded row is split into two responsive tiers (top = title + chrome toolbar; bottom = search/filter rail + Copilot launcher, stacks below `md`), and the separate Brief/Ask buttons are consolidated into one `Copilot` launcher (`src/components/copilotMenu` — `Space.Compact` + `Dropdown`: Brief / Ask / divider / "Project AI off") with all board AI accessible names kept identical. The H1 loading state is a shape-matched `Skeleton.Input` (the `"..."` placeholder is gone).]**
@@ -190,7 +192,7 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 2. **Project list page (`src/pages/project.tsx`, `src/components/projectList`, `src/components/projectSearchPanel`).**
     - Keep the new card/grid treatment; do not regress back to a table-based layout just to add metadata.
     - Add member-count / avatar-group context to each card so project scale is scannable without opening the board.
-    - Add pagination or virtualization once project counts exceed a single screenful.
+    - ~~Add pagination or virtualization once project counts exceed a single screenful.~~ **[Complete 2026-06-04: client-side AntD `<Pagination>`; see §1.2 item 6.]**
     - Decide whether AI search stays inside the same filter shell or becomes a clearer dedicated search mode / row.
     - Preserve the shipped empty/loading/error states and the real optimistic heart toggle while iterating.
 
@@ -212,8 +214,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 5. ~~**Project detail shell (`src/pages/projectDetail.tsx`).**
    Decision: collapse the dedicated detail layout into the main shell. Replace the left aside with an in-header tabbed navigation (Board · Backlog · Reports). The "Projects" popover should move to a dedicated breadcrumb element (`Projects / {projectName}`) at the top-left of the page content, using AntD `Breadcrumb`. This kills the duplicated layout, fixes the broken `5 px` shadow at `src/pages/projectDetail.tsx:15`, and gives us room to add future tabs cheaply.~~ **[Shipped on branch `orch/todo-sweep-566b/fix-project-detail-shell`: single-column shell + `Breadcrumb` (tabbed IA / backlog / reports deferred — see §1.1 item 5 evidence).]**
 
-6. **Task edit modal (`src/components/taskModal/index.tsx`).** **[Partially complete; see §1.2 item 10.]**
-    - Move the form into a two-column layout at ≥ 768 px: left = the form, right = the AI assist panel. Below 768 px, stack and put the AI panel inside an `<Collapse>` so it does not push the form off-screen.
+6. **Task edit modal (`src/components/taskModal/index.tsx`).** **[Largely complete; see §1.2 item 10.]**
+    - ~~Move the form into a two-column layout at ≥ 768 px: left = the form, right = the AI assist panel. Below 768 px, stack and put the AI panel inside an `<Collapse>` so it does not push the form off-screen.~~ **[Complete 2026-06-04: `twoColumnAi` = `Row`/`Col` two-column on desktop ≥768px, `<Collapse>` below 768px, single-column on the phone `responsiveFormSheet` Sheet. The `AiTaskAssistPanel` node is shared across branches (no double-mount / double-fire).]**
     - ~~Move `Delete` into a proper `Modal.footer` slot.~~ **[Complete.]**
     - ~~Replace `"Edit Task"` with `"Edit · {taskName}"`.~~ **[Complete.]**
     - ~~Hard-code the canonical `Task` / `Bug` options instead of inferring them from the dataset (`:35–41`); the only correct list is the one the schema allows.~~ **[Complete.]**
@@ -297,8 +299,8 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
 3. **Activity / notifications drawer.**
    A shared `useActivityFeed` hook, surfaced as a bell icon in the header. Initially fed by local optimistic-update events so it can ship before any backend.
 
-4. **In-app onboarding.**
-   First-login tour that points at: Create project → Open board → Create task → Open Board Copilot. Two tooltips per screen, persisted as `dismissed` in `localStorage`.
+4. ~~**In-app onboarding.**~~ **[Complete 2026-06-04: `src/components/onboardingTour` (AntD `Tour`) auto-opens once on the first authenticated visit, persists a `pulse:onboarding:dismissed` flag in `localStorage`, honors `prefers-reduced-motion`, and targets existing DOM landmarks (primary nav — desktop or phone — account menu, brand) with graceful centered fallback when a target is absent. Mounted once in `mainLayout`.]**
+   First-login tour that points at navigation and Board Copilot. Persisted as `dismissed` in `localStorage`.
 
 5. **Inline-edit on task cards.**
    Click on the title to rename without opening the modal; press Esc to revert. Reuses the same mutation as the modal.
@@ -365,7 +367,7 @@ Form-level rules:
 - Disable the submit button only when the form is busy, not when invalid (let the click trigger validation so users discover what is wrong).
 - Show an **error summary** at the top with anchor links to fields, in addition to inline errors (GOV.UK pattern, also satisfies WCAG 3.3.1 / 3.3.3).
 - Trap focus inside the form's modal/drawer and restore it on close.
-- Confirm before discarding unsaved changes (`useUnsavedChangesGuard` hook reading from `Form.isFieldsTouched()`); applies to `TaskModal`, `ProjectModal`, `AiTaskDraftModal`.
+- ~~Confirm before discarding unsaved changes (`useUnsavedChangesGuard` hook reading from `Form.isFieldsTouched()`); applies to `TaskModal`, `ProjectModal`, `AiTaskDraftModal`.~~ **[Complete 2026-06-04: `useUnsavedChangesGuard` (declarative controlled `<Modal>`, reads dirty state live at close time) is wired into all three modals; Cancel/Esc/mask route through `requestClose` and prompt only when dirty; save/delete paths close directly without a false prompt.]**
 
 ### 2.A.2 Touch & mobile
 
