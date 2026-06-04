@@ -25,7 +25,7 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
   on task/board. Owner auto-membered; listing=owned+member-of (Python
   filter, FakeStore-safe). Tests: `backend/tests/test_rbac.py`. Gate green
   (ruff, 96% cov). Reviewed APPROVE (no escalation/IDOR/leak).
-- [ ] **M2 — Task & board richness (backend)**: due/start dates, labels,
+- [x] **M2 — Task & board richness (backend)**: due/start dates, labels,
   multi-assignee, sub-tasks (`parentTaskId`), per-column WIP limits, bulk
   task endpoint `PUT /api/v1/tasks/bulk`.
 - [ ] **M3 — Comments + @mentions; Notifications model + bell (backend)**.

@@ -6,7 +6,7 @@ from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
 from app.services.column_seed import DEFAULT_COLUMNS
 from app.services.project_service import ROLE_EDITOR, ROLE_VIEWER, can_access
-from app.validation import body_error, sorted_by_index
+from app.validation import body_error, sorted_by_index, validation_errors
 
 # Fields a manager may write via PUT /tasks. Repository-managed fields
 # (``_id`` / ``createdAt`` / ``updatedAt``) and ordering-managed fields
@@ -22,8 +22,21 @@ _TASK_UPDATE_FIELDS = frozenset(
         "coordinatorId",
         "columnId",
         "projectId",
+        "startDate",
+        "dueDate",
+        "labelIds",
+        "assigneeIds",
+        "parentTaskId",
     }
 )
+
+# Bulk-editable metadata: every PUT-writable field EXCEPT the positional
+# routing fields. ``columnId`` / ``projectId`` are deliberately excluded
+# so a bulk edit can never move a task between columns/projects (those
+# go through ``reorder`` / single ``update`` where index re-packing and
+# project re-validation happen). ``index`` is repository-managed and was
+# never in ``_TASK_UPDATE_FIELDS`` to begin with.
+_BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {"columnId", "projectId"}
 
 
 def _same_project(*items: Dict[str, Any]) -> bool:
@@ -47,11 +60,90 @@ def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _date_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]:
+    """Light ISO-date validation: when present and non-empty it must be a
+    string. We do not parse the calendar value here -- the column card and
+    brief render whatever string the client supplies, and a stricter
+    format check belongs at the edge, not in the write path."""
+
+    value = data.get(field)
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str):
+        return body_error(data, field, f"{field} must be an ISO date string")
+    return None
+
+
+def _id_list_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]:
+    """``labelIds`` / ``assigneeIds`` must be a list of strings when sent."""
+
+    if field not in data:
+        return None
+    value = data.get(field)
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) for item in value
+    ):
+        return body_error(data, field, f"{field} must be a list of ids")
+    return None
+
+
+def _metadata_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Shape checks shared by create + update for the new richness fields.
+
+    ``parentTaskId`` is intentionally excluded here: it needs the task's
+    own id and project context, so it is validated separately by the
+    create/update paths via ``_parent_task_error``."""
+
+    errors: List[Dict[str, Any]] = []
+    for field in ("startDate", "dueDate"):
+        error = _date_error(data, field)
+        if error is not None:
+            errors.append(error)
+    for field in ("labelIds", "assigneeIds"):
+        error = _id_list_error(data, field)
+        if error is not None:
+            errors.append(error)
+    return errors
+
+
+def _parent_task_error(
+    data: Dict[str, Any],
+    project_id: Optional[str],
+    task_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Validate ``parentTaskId`` against the task's project + own id.
+
+    The parent must exist, live in the same ``project_id`` as the child,
+    and not be the child itself (no self-parent). Clearing the parent
+    (``None`` / ``""``) is always allowed. One level of nesting is enough
+    for the board, so we stop at the self-reference guard rather than
+    walking an ancestor chain."""
+
+    if "parentTaskId" not in data:
+        return None
+    parent_id = data.get("parentTaskId")
+    if parent_id in (None, ""):
+        return None
+    if task_id is not None and str(parent_id) == str(task_id):
+        return body_error(data, "parentTaskId", "A task cannot be its own parent")
+    parent = repository.find_by_id(TASKS, str(parent_id))
+    if parent is None or str(parent.get("projectId")) != str(project_id):
+        return body_error(
+            data, "parentTaskId", "Parent task must exist in the same project"
+        )
+    return None
+
+
 def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if "storyPoints" not in data:
-        return []
-    error = _story_points_error(data)
-    return [error] if error is not None else []
+    errors = _metadata_errors(data)
+    if "storyPoints" in data:
+        error = _story_points_error(data)
+        if error is not None:
+            errors.append(error)
+    error = _parent_task_error(data, data.get("projectId"))
+    if error is not None:
+        errors.append(error)
+    return errors
 
 
 def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
@@ -95,6 +187,14 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
                 else 1
             ),
             "index": len(tasks),
+            # Richness fields are optional at the wire: scheduling defaults
+            # to empty strings and the id lists to empty so every reader
+            # sees a uniform shape without handling missing keys.
+            "startDate": data.get("startDate") or "",
+            "dueDate": data.get("dueDate") or "",
+            "labelIds": data.get("labelIds") or [],
+            "assigneeIds": data.get("assigneeIds") or [],
+            "parentTaskId": data.get("parentTaskId") or None,
         },
     )
     return "Task created"
@@ -145,7 +245,7 @@ def get(project_id: str, user_id: str) -> Union[List[Dict[str, Any]], str]:
 
 
 def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    errors = []
+    errors = _metadata_errors(data)
     if "taskName" in data:
         task_name = data.get("taskName")
         if not isinstance(task_name, str) or task_name == "":
@@ -182,6 +282,14 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     if not can_access(project_id, user_id, ROLE_EDITOR):
         return "Forbidden"
 
+    # ``parentTaskId`` needs the resolved project and the task's own id, so
+    # it cannot be checked in the stateless ``update_validation_errors``
+    # pass. Validate it here against the (possibly reassigned) project and
+    # raise a 400 body error on a self-parent or cross-project parent.
+    parent_error = _parent_task_error(data, project_id, task_id)
+    if parent_error is not None:
+        validation_errors([parent_error])
+
     payload = {key: value for key, value in data.items() if key in _TASK_UPDATE_FIELDS}
     repository.update_by_id(TASKS, task_id, payload)
     return "Task updated"
@@ -196,6 +304,11 @@ def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
     # Write path: editor or owner.
     if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
         return "Forbidden"
+    # Orphan, do NOT cascade: deleting a parent leaves its sub-tasks as
+    # top-level tasks rather than wiping a whole branch out from under the
+    # user. Exact-match query on ``parentTaskId`` (FakeStore-compatible).
+    for child in repository.find_many(TASKS, {"parentTaskId": task_id}):
+        repository.update_by_id(TASKS, str(child["_id"]), {"parentTaskId": None})
     column_id = task.get("columnId")
     deleted_index = task.get("index")
     repository.delete_by_id(TASKS, task_id)
@@ -269,3 +382,54 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
     for update in updates:
         repository.update_by_id(TASKS, update.item_id, update.changes)
     return "Task reordered"
+
+
+def bulk_update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+    """Apply one set of metadata ``changes`` to many tasks at once.
+
+    Only the non-positional subset of ``_TASK_UPDATE_FIELDS`` is editable
+    here (``_BULK_CHANGE_FIELDS`` excludes ``columnId`` / ``projectId``):
+    moving a task between columns or projects re-packs ``index`` and
+    re-validates routing, which a fan-out edit deliberately must not do.
+    Unknown / disallowed keys in ``changes`` are dropped rather than
+    rejected so a client can send a wider patch object and trust the
+    server to keep only the safe fields.
+
+    Returns ``None`` (router -> 404) if any id is missing, ``"Forbidden"``
+    if the caller lacks editor rights on any task's project, and only
+    applies anything once every task has passed both checks (all-or-nothing
+    on validation; the writes themselves are best-effort sequential).
+    """
+
+    task_ids = data.get("taskIds")
+    changes = data.get("changes")
+    if not isinstance(task_ids, list) or not task_ids:
+        return "Bad request"
+    if not isinstance(changes, dict):
+        return "Bad request"
+
+    filtered = {
+        key: value for key, value in changes.items() if key in _BULK_CHANGE_FIELDS
+    }
+    if not filtered:
+        return "Bad request"
+
+    # Load every target up front: a single unknown id fails the whole
+    # batch (404) before any write lands, so a typo can't partially apply.
+    tasks: List[Dict[str, Any]] = []
+    for task_id in task_ids:
+        task = repository.find_by_id(TASKS, str(task_id))
+        if task is None:
+            return None
+        tasks.append(task)
+
+    # Write path: editor or owner on EVERY task's project. Checked across
+    # the full set before mutating so a forbidden member can't slip an edit
+    # onto the tasks they do happen to control.
+    for task in tasks:
+        if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
+            return "Forbidden"
+
+    for task in tasks:
+        repository.update_by_id(TASKS, str(task["_id"]), filtered)
+    return "Tasks updated"

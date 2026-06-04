@@ -33,6 +33,7 @@ from app.routers import (
     auth,
     boards,
     health,
+    labels,
     projects,
     tasks,
     users,
@@ -757,6 +758,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
 app.include_router(boards.router, prefix="/api/v1/boards", tags=["boards"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(labels.router, prefix="/api/v1/labels", tags=["labels"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(ai_router.router, prefix="/api/v1/ai", tags=["ai-v1"])
 # Backwards-compatible alias for the legacy /api/ai prefix the shipped
