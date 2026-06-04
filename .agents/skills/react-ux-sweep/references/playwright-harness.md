@@ -1,20 +1,32 @@
 # Playwright harness for the UX sweep
 
-Recipes for the screenshot script. Reuse these verbatim — the four
-critical traps below cost a fix attempt each before they were
+Recipes for the screenshot script. Reuse these verbatim — the
+critical traps below each cost a fix attempt before they were
 documented.
 
 ## Environment
 
-- Vite dev server runs on `http://localhost:3000` after `npm start`.
-- Playwright lives at `/opt/node22/lib/node_modules/playwright/index.js`
-  as a CommonJS build. Import as:
-    ```js
-    import pw from "/opt/node22/lib/node_modules/playwright/index.js";
-    const { chromium } = pw;
+- Serve a **production build**, not the dev server: `npm run build --
+  --mode development` then `npx vite preview --port 4173`
+  (`http://localhost:4173`). The `development` mode keeps
+  `.env.development` so the local AI engine + feature flags render. A
+  dev server (`npm start`, port 3000) lazy-compiles route chunks on
+  first hit and can sit in its Suspense state forever under headless
+  automation.
+- Playwright is **not** installed and not pre-cached. Install it without
+  polluting the manifest and fetch a browser:
+    ```sh
+    npm i playwright --no-save
+    npx playwright install chromium
     ```
-- Chromium binaries are pre-installed under `/opt/pw-browsers/`. No
-  download step needed.
+- ESM resolves `import "playwright"` from the script file's own
+  directory. Put the capture script where `node_modules/playwright`
+  resolves — e.g. run `npm i playwright --no-save` in a scratch dir and
+  keep the script there, or symlink the repo's `node_modules` next to
+  it. Then:
+    ```js
+    import { chromium } from "playwright";
+    ```
 - The remote API at `https://pulse-python-server.vercel.app` returns
   403 from this environment, so mock everything inside Playwright.
 
@@ -22,9 +34,12 @@ documented.
 
 Mirror the **frontend's** intended contract, not
 `__json_server_mock__/db.json` (which predates the current shapes).
-Auth header is required on every endpoint except `/auth/*`. Pre-seed
-`localStorage.Token = "demo"` before navigating to authenticated
-routes.
+Auth is a single session probe: `authProvider.tsx` fires `GET
+/api/v1/users` unconditionally on boot and derives "logged in" from a
+cached user with an `_id` (the REST JWT rides an HttpOnly cookie JS
+can't read, so there is **no** `localStorage.Token` to seed). Return an
+`IUser` from `GET /users` to render the authenticated app; return `401`
+to keep guest pages (`/login`, `/register`) from redirecting.
 
 | Method       | Path                                | Response                                                          |
 | ------------ | ----------------------------------- | ----------------------------------------------------------------- |
@@ -74,10 +89,27 @@ IUser    = IMember & { jwt: string; likedProjects: string[] }
   not `?_id=p1`. Mocking the wrong key returns the array fallback and
   the board renders `" board"` with a leading space because
   `currentProject?.projectName` is undefined.
-- **Token only for authed routes.** `/login` and `/register` redirect
-  to `/projects` whenever `localStorage.Token` is set. Capture them in
-  a separate browser context that does not seed `Token`, otherwise
-  every "login" cell of the matrix shows the projects page.
+- **Guest routes need a 401 `GET /users`.** `/login` and `/register`
+  redirect to `/projects` whenever the `GET /users` probe returns a
+  user. Capture them in a separate context whose mock returns `401`
+  for `users`, otherwise every "login" cell of the matrix shows the
+  projects page.
+- **Mobile chrome is gated on `(pointer: coarse)`, not width.** The
+  bottom tab bar and the demoted phone header only mount when
+  `useIsPhoneChrome()` sees a coarse pointer. A bare `viewport: {width:
+  390}` desktop context renders the *desktop* header with no tab bar —
+  you'll screenshot a phone-width desktop layout and miss every phone
+  navigation bug. Pass `hasTouch: true, isMobile: true` on the mobile
+  context so `(pointer: coarse)` matches.
+- **Suppress the first-run overlays.** The onboarding tour and the
+  Copilot welcome banner auto-open on every fresh context and cover the
+  page (identical PNG hashes across distinct authed routes are the
+  tell). Seed their dismissed flags in an `addInitScript` before the
+  first navigation:
+    ```js
+    localStorage.setItem("pulse:onboarding:dismissed", "true");
+    localStorage.setItem("boardCopilot:onboarded", "1");
+    ```
 
 ## The matrix
 
