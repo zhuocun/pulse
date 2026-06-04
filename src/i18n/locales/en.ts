@@ -451,6 +451,12 @@ export const enSource = {
             title: "Delete this task?",
             description: "This action cannot be undone.",
             confirmLabel: "Delete task"
+        },
+        discardChanges: {
+            title: "Discard changes?",
+            description: "Your unsaved changes will be lost.",
+            confirmLabel: "Discard",
+            cancelLabel: "Keep editing"
         }
     },
     feedback: {
@@ -590,7 +596,8 @@ export const enSource = {
         removedByOthersTitle: "This task was removed by another change.",
         removedByOthersBody:
             "Your edits are still here. Discard them or save them as a new task to keep them.",
-        discardEdits: "Discard edits"
+        discardEdits: "Discard edits",
+        aiAssistLabel: "AI assist"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",

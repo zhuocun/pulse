@@ -377,6 +377,43 @@ describe("TaskModal", () => {
             expect(store.getState().overlays.editingTaskId).toBe(null)
         );
         expect(fetchMock).not.toHaveBeenCalled();
+        // §2.A.1 — a clean (untouched) close shows NO discard prompt.
+        expect(
+            screen.queryByRole("button", { name: "Discard" })
+        ).not.toBeInTheDocument();
+    });
+
+    it("prompts to discard before closing a dirty form, and only closes after confirming (§2.A.1)", async () => {
+        renderModal();
+
+        const nameField = await screen.findByDisplayValue("Build task");
+        // Touch the form so the unsaved-changes guard arms.
+        fireEvent.change(nameField, { target: { value: "Build task edited" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        // The modal must stay open behind the confirm prompt.
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
+        const keepEditing = await screen.findByRole("button", {
+            name: "Keep editing"
+        });
+        // "Keep editing" dismisses the prompt and leaves the modal open.
+        fireEvent.click(keepEditing);
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("button", { name: "Keep editing" })
+            ).not.toBeInTheDocument()
+        );
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
+
+        // Re-request close and confirm the discard this time.
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+        // No mutation fired — the edit was discarded, not saved.
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("deletes the editing task immediately (no confirm) and surfaces an Undo toast", async () => {

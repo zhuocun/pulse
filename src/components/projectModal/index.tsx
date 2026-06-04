@@ -8,6 +8,7 @@ import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import useUnsavedChangesGuard from "../../utils/hooks/useUnsavedChangesGuard";
 import deleteProjectCallback from "../../utils/optimisticUpdate/deleteProject";
 import ErrorBox from "../errorBox";
 import ResponsiveFormSheet from "../responsiveFormSheet";
@@ -74,6 +75,13 @@ const ProjectModal: React.FC = () => {
         form.resetFields();
         setSaveError(null);
     };
+    // §2.A.1 — guard the cancel / mask-close paths so a half-filled form
+    // isn't discarded without a prompt. A clean (untouched) form still
+    // closes immediately.
+    const { requestClose, confirmNode } = useUnsavedChangesGuard({
+        isDirty: () => form.isFieldsTouched(),
+        onConfirmDiscard: onClose
+    });
     const onFinish = async (input: {
         projectName: string;
         organization: string;
@@ -186,7 +194,7 @@ const ProjectModal: React.FC = () => {
                 justifyContent: "flex-end"
             }}
         >
-            <Button block={!screens.sm} onClick={onClose} size="large">
+            <Button block={!screens.sm} onClick={requestClose} size="large">
                 {microcopy.actions.cancel}
             </Button>
             <Button
@@ -203,122 +211,129 @@ const ProjectModal: React.FC = () => {
     );
 
     return (
-        <ResponsiveFormSheet
-            centered
-            destroyOnHidden={false}
-            footer={footer}
-            forceRender
-            onClose={onClose}
-            open={isModalOpened}
-            styles={{
-                body: {
-                    /*
-                     * Subtract `env(keyboard-inset-height)` so the modal
-                     * body shrinks above the iOS soft keyboard instead of
-                     * pushing the footer below the fold. Falls back to
-                     * `0px` on browsers without the env variable so the
-                     * desktop layout is unchanged. See QW-18 in
-                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
-                     *
-                     * The `max(80px, …)` wrapper clamps the result so the
-                     * body never collapses to a negative height in
-                     * landscape orientation with the keyboard up — a
-                     * 375 × 667 device in landscape reports `100dvh` ≈
-                     * 375 px and a ~260 px keyboard inset would otherwise
-                     * subtract past zero (Bug 6).
-                     */
-                    maxHeight:
-                        "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
-                    overflowY: "auto"
-                }
-            }}
-            title={modalTitle}
-            width={modalWidthCss(520)}
-        >
-            <Spin
-                aria-label={microcopy.a11y.loadingProject}
-                spinning={isLoading}
+        <>
+            {confirmNode}
+            <ResponsiveFormSheet
+                centered
+                destroyOnHidden={false}
+                footer={footer}
+                forceRender
+                onClose={requestClose}
+                open={isModalOpened}
+                styles={{
+                    body: {
+                        /*
+                         * Subtract `env(keyboard-inset-height)` so the modal
+                         * body shrinks above the iOS soft keyboard instead of
+                         * pushing the footer below the fold. Falls back to
+                         * `0px` on browsers without the env variable so the
+                         * desktop layout is unchanged. See QW-18 in
+                         * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                         *
+                         * The `max(80px, …)` wrapper clamps the result so the
+                         * body never collapses to a negative height in
+                         * landscape orientation with the keyboard up — a
+                         * 375 × 667 device in landscape reports `100dvh` ≈
+                         * 375 px and a ~260 px keyboard inset would otherwise
+                         * subtract past zero (Bug 6).
+                         */
+                        maxHeight:
+                            "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
+                        overflowY: "auto"
+                    }
+                }}
+                title={modalTitle}
+                width={modalWidthCss(520)}
             >
-                <Typography.Text
-                    style={{
-                        display: "block",
-                        fontSize: fontSize.sm,
-                        lineHeight: lineHeight.normal,
-                        marginBottom: space.md
-                    }}
-                    type="secondary"
+                <Spin
+                    aria-label={microcopy.a11y.loadingProject}
+                    spinning={isLoading}
                 >
-                    {isEditing
-                        ? microcopy.projectModal.editDescription
-                        : microcopy.projectModal.createDescription}
-                </Typography.Text>
-                <Form form={form} layout="vertical" onFinish={onFinish}>
-                    <ErrorBox error={saveError} />
-                    <Form.Item
-                        label={microcopy.fields.projectName}
-                        name="projectName"
-                        required
-                        rules={[
-                            {
-                                required: true,
-                                whitespace: true,
-                                message:
-                                    microcopy.validation.projectNameRequired
-                            }
-                        ]}
-                        validateTrigger={["onBlur", "onSubmit"]}
+                    <Typography.Text
+                        style={{
+                            display: "block",
+                            fontSize: fontSize.sm,
+                            lineHeight: lineHeight.normal,
+                            marginBottom: space.md
+                        }}
+                        type="secondary"
                     >
-                        <Input
-                            autoComplete="off"
-                            enterKeyHint="next"
-                            inputMode="text"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        label={microcopy.fields.organization}
-                        name="organization"
-                        required
-                        rules={[
-                            {
-                                required: true,
-                                whitespace: true,
-                                message:
-                                    microcopy.validation.organizationRequired
-                            }
-                        ]}
-                        validateTrigger={["onBlur", "onSubmit"]}
-                    >
-                        <Input
-                            autoComplete="organization"
-                            enterKeyHint="next"
-                            inputMode="text"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        label={microcopy.fields.manager}
-                        name="managerId"
-                        required
-                        rules={[
-                            {
-                                required: true,
-                                message: microcopy.validation.managerRequired
-                            }
-                        ]}
-                        validateTrigger={["onBlur", "onSubmit"]}
-                    >
-                        <Select
-                            options={(members ?? []).map((member) => ({
-                                label: member.username,
-                                value: member._id
-                            }))}
-                            placeholder={microcopy.placeholders.selectManager}
-                            showSearch
-                            optionFilterProp="label"
-                        />
-                    </Form.Item>
-                </Form>
-            </Spin>
-        </ResponsiveFormSheet>
+                        {isEditing
+                            ? microcopy.projectModal.editDescription
+                            : microcopy.projectModal.createDescription}
+                    </Typography.Text>
+                    <Form form={form} layout="vertical" onFinish={onFinish}>
+                        <ErrorBox error={saveError} />
+                        <Form.Item
+                            label={microcopy.fields.projectName}
+                            name="projectName"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    whitespace: true,
+                                    message:
+                                        microcopy.validation.projectNameRequired
+                                }
+                            ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
+                        >
+                            <Input
+                                autoComplete="off"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.organization}
+                            name="organization"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    whitespace: true,
+                                    message:
+                                        microcopy.validation
+                                            .organizationRequired
+                                }
+                            ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
+                        >
+                            <Input
+                                autoComplete="organization"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            label={microcopy.fields.manager}
+                            name="managerId"
+                            required
+                            rules={[
+                                {
+                                    required: true,
+                                    message:
+                                        microcopy.validation.managerRequired
+                                }
+                            ]}
+                            validateTrigger={["onBlur", "onSubmit"]}
+                        >
+                            <Select
+                                options={(members ?? []).map((member) => ({
+                                    label: member.username,
+                                    value: member._id
+                                }))}
+                                placeholder={
+                                    microcopy.placeholders.selectManager
+                                }
+                                showSearch
+                                optionFilterProp="label"
+                            />
+                        </Form.Item>
+                    </Form>
+                </Spin>
+            </ResponsiveFormSheet>
+        </>
     );
 };
 

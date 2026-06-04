@@ -1,9 +1,12 @@
 import {
     Alert,
     Button,
+    Col,
+    Collapse,
     Form,
     Grid,
     Input,
+    Row,
     Select,
     Spin,
     Tag,
@@ -21,9 +24,11 @@ import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import useUndoToast from "../../utils/hooks/useUndoToast";
+import useUnsavedChangesGuard from "../../utils/hooks/useUnsavedChangesGuard";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
@@ -157,6 +162,7 @@ const TaskModal: React.FC<{
     const { openTask } = useTaskPanelNavigation();
     const { enabled: aiEnabled } = useAiEnabled();
     const screens = Grid.useBreakpoint();
+    const isPhone = useIsPhoneChrome();
     const titleId = useId();
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
@@ -235,6 +241,13 @@ const TaskModal: React.FC<{
         setAppliedFieldOrigin({});
         closeModal();
     }, [closeModal, form]);
+
+    // §2.A.1 — guard the cancel / mask-close paths so unsaved edits aren't
+    // discarded without a prompt. An untouched form closes immediately.
+    const { requestClose, confirmNode } = useUnsavedChangesGuard({
+        isDirty: () => form.isFieldsTouched(),
+        onConfirmDiscard: onClose
+    });
 
     const markFieldAsCopilotApplied = useCallback((field: TaskModalField) => {
         setAppliedFieldOrigin((prev) => ({ ...prev, [field]: "copilot" }));
@@ -430,6 +443,226 @@ const TaskModal: React.FC<{
     const deleteDisabled =
         !editingTask || dLoading || isOptimisticPlaceholderId(editingTaskId);
 
+    const showAiAssist =
+        aiEnabled &&
+        boardAiOn &&
+        Boolean(editingTask) &&
+        Boolean(editingTaskId) &&
+        !isOptimisticPlaceholderId(editingTaskId);
+
+    const aiAssistNode =
+        showAiAssist && editingTaskId ? (
+            <AiTaskAssistPanel
+                excludeTaskId={editingTaskId}
+                onApplyStoryPoints={(value) => {
+                    markFieldAsCopilotApplied("storyPoints");
+                    form.setFieldsValue({ storyPoints: value });
+                    setFormTick((tick) => tick + 1);
+                }}
+                onApplySuggestion={(field, suggestion, options) => {
+                    if (
+                        !options?.replace &&
+                        suggestion !== undefined &&
+                        isTaskModalField(field)
+                    ) {
+                        markFieldAsCopilotApplied(field);
+                    }
+                    const current = form.getFieldValue(field) ?? "";
+                    if (options?.replace) {
+                        form.setFieldValue(field, suggestion);
+                    } else if (suggestion === undefined) {
+                        return;
+                    } else if (field === "note") {
+                        const appended = `${current}${
+                            current ? "\n\n" : ""
+                        }## Acceptance criteria\n- ${suggestion}`;
+                        form.setFieldsValue({ note: appended });
+                    } else {
+                        form.setFieldsValue({ [field]: suggestion });
+                    }
+                    setFormTick((tick) => tick + 1);
+                }}
+                onOpenSimilarTask={(taskId) => {
+                    // Flag-aware hand-off — TaskModal is only mounted when
+                    // the flag is off, so this branch is for symmetry with
+                    // TaskDetailPanel's twin handler.
+                    if (environment.taskPanelRouted) {
+                        openTask(taskId, projectId);
+                    } else {
+                        startEditing(taskId);
+                    }
+                }}
+                values={liveValues}
+            />
+        ) : null;
+
+    const formNode = (
+        <Form
+            form={form}
+            initialValues={editingTask}
+            layout="vertical"
+            onValuesChange={(changedValues) => {
+                setFormTick((tick) => tick + 1);
+                if (saveError) setSaveError(null);
+                clearOriginOnManualEdits(changedValues);
+            }}
+        >
+            <Form.Item
+                label={microcopy.fields.taskName}
+                name="taskName"
+                required
+                rules={[
+                    {
+                        required: true,
+                        whitespace: true,
+                        message: microcopy.validation.taskNameRequired
+                    }
+                ]}
+                validateTrigger={["onBlur", "onSubmit"]}
+            >
+                <Input
+                    autoComplete="off"
+                    enterKeyHint="next"
+                    inputMode="text"
+                />
+            </Form.Item>
+            <Form.Item
+                label={microcopy.fields.coordinator}
+                name="coordinatorId"
+                required
+                rules={[
+                    {
+                        required: true,
+                        message: microcopy.validation.coordinatorRequired
+                    }
+                ]}
+                validateTrigger={["onBlur", "onSubmit"]}
+            >
+                <Select
+                    options={members.map((member) => ({
+                        label: member.username,
+                        value: member._id
+                    }))}
+                    placeholder={microcopy.placeholders.selectCoordinator}
+                />
+            </Form.Item>
+            <Form.Item
+                label={microcopy.fields.type}
+                name="type"
+                required
+                rules={[
+                    {
+                        required: true,
+                        message: microcopy.validation.taskTypeRequired
+                    }
+                ]}
+                validateTrigger={["onBlur", "onSubmit"]}
+            >
+                <Select
+                    options={TASK_TYPE_OPTIONS}
+                    placeholder={microcopy.placeholders.selectType}
+                />
+            </Form.Item>
+            <Form.Item label={microcopy.fields.epic} name="epic">
+                <Input
+                    autoComplete="off"
+                    enterKeyHint="next"
+                    inputMode="text"
+                />
+            </Form.Item>
+            <Form.Item
+                label={
+                    <span
+                        style={{
+                            alignItems: "center",
+                            display: "inline-flex",
+                            gap: space.xs
+                        }}
+                    >
+                        {microcopy.fields.storyPoints}
+                        {appliedFieldOrigin.storyPoints === "copilot" ? (
+                            <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+                                {microcopy.ai.suggestedByCopilot}
+                            </Tag>
+                        ) : null}
+                    </span>
+                }
+                name="storyPoints"
+            >
+                <Select
+                    onChange={() => {
+                        setAppliedFieldOrigin((prev) => {
+                            if (!prev.storyPoints) return prev;
+                            const next = { ...prev };
+                            delete next.storyPoints;
+                            return next;
+                        });
+                    }}
+                    options={STORY_POINT_OPTIONS}
+                    placeholder={microcopy.placeholders.selectStoryPoints}
+                />
+            </Form.Item>
+            {environment.aiGhostTextEnabled && aiEnabled && boardAiOn ? (
+                <CopilotPrivacyDisclosure
+                    onAcknowledge={() => {
+                        // The HTML spec restricts the `storage` event to
+                        // *other* tabs, so the writer never sees its own
+                        // write. Without this dispatch the already-mounted
+                        // `<AiGhostText>` would only pick up consent on the
+                        // next modal close/reopen — which is exactly the
+                        // regression the reviewer flagged.
+                        const detail: AiPrivacyConsentEventDetail = {
+                            route: "task-note"
+                        };
+                        window.dispatchEvent(
+                            new CustomEvent(AI_PRIVACY_CONSENT_EVENT, {
+                                detail
+                            })
+                        );
+                    }}
+                    /*
+                     * Wave 4 follow-up: pass `route` so the disclosure
+                     * reads the task-note scope from `getAiDataScope` and
+                     * surfaces the ghost-text-specific data list (column /
+                     * task name / type / in-progress note text) instead of
+                     * the generic global summary. The explicit `storageKey`
+                     * is kept for the existing acknowledgement state — the
+                     * default resolved from `route` would match
+                     * (`boardCopilot:privacyShown:task-note`) but pinning
+                     * the key here documents the contract for the test
+                     * fixtures that pre-set it.
+                     */
+                    route="task-note"
+                    storageKey="boardCopilot:privacyShown:task-note"
+                />
+            ) : null}
+            <Form.Item label={microcopy.fields.notes} name="note">
+                {environment.aiGhostTextEnabled && aiEnabled && boardAiOn ? (
+                    <AiGhostTextNoteField
+                        columnId={editingTask?.columnId}
+                        projectId={projectId}
+                        taskName={liveValues.taskName}
+                        type={liveValues.type === "Bug" ? "Bug" : "Task"}
+                    />
+                ) : (
+                    <Input.TextArea
+                        autoComplete="off"
+                        enterKeyHint="done"
+                        inputMode="text"
+                        placeholder={
+                            microcopy.placeholders.notesAcceptanceCriteria
+                        }
+                        rows={4}
+                    />
+                )}
+            </Form.Item>
+        </Form>
+    );
+
+    // Phase 2.6 — two-column split-pane only on the DESKTOP Modal branch at
+    // >= md (768px). The phone Sheet (isPhone) always stays single-column.
+    const twoColumnAi = Boolean(aiAssistNode) && !isPhone && screens.md;
+
     const titleText = editingTask?.taskName
         ? `${microcopy.actions.editTask} · ${editingTask.taskName}`
         : microcopy.actions.editTask;
@@ -488,7 +721,7 @@ const TaskModal: React.FC<{
         </Button>
     );
     const cancelButton = (
-        <Button block={!screens.sm} onClick={onClose} size="large">
+        <Button block={!screens.sm} onClick={requestClose} size="large">
             {microcopy.actions.cancel}
         </Button>
     );
@@ -556,345 +789,157 @@ const TaskModal: React.FC<{
     );
 
     return (
-        <ResponsiveFormSheet
-            centered
-            forceRender
-            footer={footerNode}
-            onClose={onClose}
-            ariaLabelledBy={titleId}
-            data-testid="task-modal"
-            title={titleNode}
-            open={modalOpen}
-            styles={{
-                body: {
-                    /*
-                     * Phone widths render the title across two lines and
-                     * stack three full-height buttons in the footer
-                     * (Save / Cancel / Delete), which together consume
-                     * roughly 280 px of chrome — well over the 220 px the
-                     * desktop layout reserves. Without a tighter cap the
-                     * footer falls below the viewport on a 390 × 844
-                     * device and the destructive Delete control becomes
-                     * unreachable without scrolling the page behind the
-                     * modal. The extra `env(keyboard-inset-height)`
-                     * subtraction keeps the footer above the iOS soft
-                     * keyboard when it opens — see QW-18 in
-                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
-                     *
-                     * The phone branch wraps the calc in `max(80px, …)` so
-                     * the maxHeight never goes negative on landscape
-                     * orientation when the keyboard is up — a 375 × 667
-                     * iPhone in landscape with `interactive-widget=resizes-
-                     * content` reports `100dvh` ≈ 375 px, then the 320 px
-                     * chrome reserve plus a ~260 px keyboard inset would
-                     * push the result well past zero and collapse the
-                     * modal body. The 80 px floor leaves at least a sliver
-                     * of scrollable content in pathological cases (Bug 6).
-                     */
-                    maxHeight: screens.sm
-                        ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
-                        : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
-                    overflowY: "auto"
-                }
-            }}
-            width={modalWidthCss(640)}
-        >
-            <div style={{ position: "relative", width: "100%" }}>
-                {awaitingTaskResolution ? (
-                    <div
-                        style={{
-                            alignItems: "center",
-                            display: "flex",
-                            justifyContent: "center",
-                            marginBlock: space.xxl,
-                            minHeight: space.xxl * 3,
-                            width: "100%"
-                        }}
-                    >
-                        <Spin
-                            aria-label={microcopy.a11y.loadingBoard}
-                            size="large"
-                        />
-                    </div>
-                ) : null}
-                <div hidden={awaitingTaskResolution}>
-                    {taskMissingAfterLoad ? (
-                        <Alert
-                            action={
-                                <Button
-                                    danger
-                                    onClick={onClose}
-                                    size="small"
-                                    type="text"
-                                >
-                                    {microcopy.taskModal.discardEdits}
-                                </Button>
-                            }
-                            description={
-                                microcopy.taskModal.removedByOthersBody
-                            }
-                            message={microcopy.taskModal.removedByOthersTitle}
-                            role="alert"
-                            showIcon
-                            style={{ marginBlockEnd: space.md }}
-                            type="warning"
-                        />
+        <>
+            {confirmNode}
+            <ResponsiveFormSheet
+                centered
+                forceRender
+                footer={footerNode}
+                onClose={requestClose}
+                ariaLabelledBy={titleId}
+                data-testid="task-modal"
+                title={titleNode}
+                open={modalOpen}
+                styles={{
+                    body: {
+                        /*
+                         * Phone widths render the title across two lines and
+                         * stack three full-height buttons in the footer
+                         * (Save / Cancel / Delete), which together consume
+                         * roughly 280 px of chrome — well over the 220 px the
+                         * desktop layout reserves. Without a tighter cap the
+                         * footer falls below the viewport on a 390 × 844
+                         * device and the destructive Delete control becomes
+                         * unreachable without scrolling the page behind the
+                         * modal. The extra `env(keyboard-inset-height)`
+                         * subtraction keeps the footer above the iOS soft
+                         * keyboard when it opens — see QW-18 in
+                         * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                         *
+                         * The phone branch wraps the calc in `max(80px, …)` so
+                         * the maxHeight never goes negative on landscape
+                         * orientation when the keyboard is up — a 375 × 667
+                         * iPhone in landscape with `interactive-widget=resizes-
+                         * content` reports `100dvh` ≈ 375 px, then the 320 px
+                         * chrome reserve plus a ~260 px keyboard inset would
+                         * push the result well past zero and collapse the
+                         * modal body. The 80 px floor leaves at least a sliver
+                         * of scrollable content in pathological cases (Bug 6).
+                         */
+                        maxHeight: screens.sm
+                            ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
+                            : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
+                        overflowY: "auto"
+                    }
+                }}
+                width={modalWidthCss(640)}
+            >
+                <div style={{ position: "relative", width: "100%" }}>
+                    {awaitingTaskResolution ? (
+                        <div
+                            style={{
+                                alignItems: "center",
+                                display: "flex",
+                                justifyContent: "center",
+                                marginBlock: space.xxl,
+                                minHeight: space.xxl * 3,
+                                width: "100%"
+                            }}
+                        >
+                            <Spin
+                                aria-label={microcopy.a11y.loadingBoard}
+                                size="large"
+                            />
+                        </div>
                     ) : null}
-                    {/* TODO(ui-ux-comprehensive-review-2026-05 · §"Critical
-                     * bugs that ship today" · Bug 3): pair this banner
-                     * with a "Save as new" CTA that POSTs the dirty
-                     * fields through the existing create-task mutation
-                     * once the routed-task-panel refactor (A2) lands.
-                     * The Discard button above is the minimum viable
-                     * recovery — the data-loss bug is closed; the more
-                     * complete UX awaits the panel rewrite. */}
-                    <ErrorBox error={saveError} />
-                    <Form
-                        form={form}
-                        initialValues={editingTask}
-                        layout="vertical"
-                        onValuesChange={(changedValues) => {
-                            setFormTick((tick) => tick + 1);
-                            if (saveError) setSaveError(null);
-                            clearOriginOnManualEdits(changedValues);
-                        }}
-                    >
-                        <Form.Item
-                            label={microcopy.fields.taskName}
-                            name="taskName"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    whitespace: true,
-                                    message:
-                                        microcopy.validation.taskNameRequired
+                    <div hidden={awaitingTaskResolution}>
+                        {taskMissingAfterLoad ? (
+                            <Alert
+                                action={
+                                    <Button
+                                        danger
+                                        onClick={onClose}
+                                        size="small"
+                                        type="text"
+                                    >
+                                        {microcopy.taskModal.discardEdits}
+                                    </Button>
                                 }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Input
-                                autoComplete="off"
-                                enterKeyHint="next"
-                                inputMode="text"
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={microcopy.fields.coordinator}
-                            name="coordinatorId"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    message:
-                                        microcopy.validation.coordinatorRequired
+                                description={
+                                    microcopy.taskModal.removedByOthersBody
                                 }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Select
-                                options={members.map((member) => ({
-                                    label: member.username,
-                                    value: member._id
-                                }))}
-                                placeholder={
-                                    microcopy.placeholders.selectCoordinator
+                                message={
+                                    microcopy.taskModal.removedByOthersTitle
                                 }
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={microcopy.fields.type}
-                            name="type"
-                            required
-                            rules={[
-                                {
-                                    required: true,
-                                    message:
-                                        microcopy.validation.taskTypeRequired
-                                }
-                            ]}
-                            validateTrigger={["onBlur", "onSubmit"]}
-                        >
-                            <Select
-                                options={TASK_TYPE_OPTIONS}
-                                placeholder={microcopy.placeholders.selectType}
-                            />
-                        </Form.Item>
-                        <Form.Item label={microcopy.fields.epic} name="epic">
-                            <Input
-                                autoComplete="off"
-                                enterKeyHint="next"
-                                inputMode="text"
-                            />
-                        </Form.Item>
-                        <Form.Item
-                            label={
-                                <span
-                                    style={{
-                                        alignItems: "center",
-                                        display: "inline-flex",
-                                        gap: space.xs
-                                    }}
-                                >
-                                    {microcopy.fields.storyPoints}
-                                    {appliedFieldOrigin.storyPoints ===
-                                    "copilot" ? (
-                                        <Tag
-                                            color="purple"
-                                            style={{ marginInlineEnd: 0 }}
-                                        >
-                                            {microcopy.ai.suggestedByCopilot}
-                                        </Tag>
-                                    ) : null}
-                                </span>
-                            }
-                            name="storyPoints"
-                        >
-                            <Select
-                                onChange={() => {
-                                    setAppliedFieldOrigin((prev) => {
-                                        if (!prev.storyPoints) return prev;
-                                        const next = { ...prev };
-                                        delete next.storyPoints;
-                                        return next;
-                                    });
-                                }}
-                                options={STORY_POINT_OPTIONS}
-                                placeholder={
-                                    microcopy.placeholders.selectStoryPoints
-                                }
-                            />
-                        </Form.Item>
-                        {environment.aiGhostTextEnabled &&
-                        aiEnabled &&
-                        boardAiOn ? (
-                            <CopilotPrivacyDisclosure
-                                onAcknowledge={() => {
-                                    // The HTML spec restricts the
-                                    // `storage` event to *other* tabs, so
-                                    // the writer never sees its own
-                                    // write. Without this dispatch the
-                                    // already-mounted `<AiGhostText>`
-                                    // would only pick up consent on the
-                                    // next modal close/reopen — which is
-                                    // exactly the regression the reviewer
-                                    // flagged.
-                                    const detail: AiPrivacyConsentEventDetail =
-                                        { route: "task-note" };
-                                    window.dispatchEvent(
-                                        new CustomEvent(
-                                            AI_PRIVACY_CONSENT_EVENT,
-                                            { detail }
-                                        )
-                                    );
-                                }}
-                                /*
-                                 * Wave 4 follow-up: pass `route` so the
-                                 * disclosure reads the task-note scope
-                                 * from `getAiDataScope` and surfaces
-                                 * the ghost-text-specific data list
-                                 * (column / task name / type / in-
-                                 * progress note text) instead of the
-                                 * generic global summary. The explicit
-                                 * `storageKey` is kept for the existing
-                                 * acknowledgement state — the default
-                                 * resolved from `route` would match
-                                 * (`boardCopilot:privacyShown:task-note`)
-                                 * but pinning the key here documents
-                                 * the contract for the test fixtures
-                                 * that pre-set it.
-                                 */
-                                route="task-note"
-                                storageKey="boardCopilot:privacyShown:task-note"
+                                role="alert"
+                                showIcon
+                                style={{ marginBlockEnd: space.md }}
+                                type="warning"
                             />
                         ) : null}
-                        <Form.Item label={microcopy.fields.notes} name="note">
-                            {environment.aiGhostTextEnabled &&
-                            aiEnabled &&
-                            boardAiOn ? (
-                                <AiGhostTextNoteField
-                                    columnId={editingTask?.columnId}
-                                    projectId={projectId}
-                                    taskName={liveValues.taskName}
-                                    type={
-                                        liveValues.type === "Bug"
-                                            ? "Bug"
-                                            : "Task"
-                                    }
-                                />
-                            ) : (
-                                <Input.TextArea
-                                    autoComplete="off"
-                                    enterKeyHint="done"
-                                    inputMode="text"
-                                    placeholder={
-                                        microcopy.placeholders
-                                            .notesAcceptanceCriteria
-                                    }
-                                    rows={4}
-                                />
-                            )}
-                        </Form.Item>
-                    </Form>
-                    {aiEnabled &&
-                        boardAiOn &&
-                        editingTask &&
-                        editingTaskId &&
-                        !isOptimisticPlaceholderId(editingTaskId) && (
-                            <AiTaskAssistPanel
-                                excludeTaskId={editingTaskId}
-                                onApplyStoryPoints={(value) => {
-                                    markFieldAsCopilotApplied("storyPoints");
-                                    form.setFieldsValue({ storyPoints: value });
-                                    setFormTick((tick) => tick + 1);
-                                }}
-                                onApplySuggestion={(
-                                    field,
-                                    suggestion,
-                                    options
-                                ) => {
-                                    if (
-                                        !options?.replace &&
-                                        suggestion !== undefined &&
-                                        isTaskModalField(field)
-                                    ) {
-                                        markFieldAsCopilotApplied(field);
-                                    }
-                                    const current =
-                                        form.getFieldValue(field) ?? "";
-                                    if (options?.replace) {
-                                        form.setFieldValue(field, suggestion);
-                                    } else if (suggestion === undefined) {
-                                        return;
-                                    } else if (field === "note") {
-                                        const appended = `${current}${
-                                            current ? "\n\n" : ""
-                                        }## Acceptance criteria\n- ${suggestion}`;
-                                        form.setFieldsValue({ note: appended });
-                                    } else {
-                                        form.setFieldsValue({
-                                            [field]: suggestion
-                                        });
-                                    }
-                                    setFormTick((tick) => tick + 1);
-                                }}
-                                onOpenSimilarTask={(taskId) => {
-                                    // Flag-aware hand-off — TaskModal is
-                                    // only mounted when the flag is off,
-                                    // so this branch is for symmetry with
-                                    // TaskDetailPanel's twin handler.
-                                    if (environment.taskPanelRouted) {
-                                        openTask(taskId, projectId);
-                                    } else {
-                                        startEditing(taskId);
-                                    }
-                                }}
-                                values={liveValues}
-                            />
+                        {/* TODO(ui-ux-comprehensive-review-2026-05 · §"Critical
+                         * bugs that ship today" · Bug 3): pair this banner
+                         * with a "Save as new" CTA that POSTs the dirty
+                         * fields through the existing create-task mutation
+                         * once the routed-task-panel refactor (A2) lands.
+                         * The Discard button above is the minimum viable
+                         * recovery — the data-loss bug is closed; the more
+                         * complete UX awaits the panel rewrite. */}
+                        <ErrorBox error={saveError} />
+                        {/*
+                         * Phase 2.6 split-pane.
+                         *   - Desktop Modal, >= md (768px): form left, AI assist
+                         *     right, as two Row/Col columns (`twoColumnAi`).
+                         *   - Desktop Modal, < md: single column; the AI panel
+                         *     stacks below the form inside a Collapse so the
+                         *     long panel can't push the form off-screen.
+                         *   - Phone (isPhone): the form already renders inside
+                         *     the bottom Sheet, which stays single-column — the
+                         *     panel simply follows the form in normal flow.
+                         * `aiAssistNode` / `formNode` are byte-identical across
+                         * every branch, so the debounced estimate/readiness
+                         * calls, the apply handlers, and the Copilot provenance
+                         * wiring are untouched — only the container differs.
+                         */}
+                        {twoColumnAi ? (
+                            <Row gutter={space.lg}>
+                                <Col flex="1 1 0" style={{ minWidth: 0 }}>
+                                    {formNode}
+                                </Col>
+                                <Col flex="0 0 280px" style={{ minWidth: 0 }}>
+                                    {aiAssistNode}
+                                </Col>
+                            </Row>
+                        ) : (
+                            <>
+                                {formNode}
+                                {aiAssistNode ? (
+                                    isPhone ? (
+                                        aiAssistNode
+                                    ) : (
+                                        <Collapse
+                                            defaultActiveKey={["ai-assist"]}
+                                            ghost
+                                            items={[
+                                                {
+                                                    key: "ai-assist",
+                                                    label: microcopy.taskModal
+                                                        .aiAssistLabel,
+                                                    children: aiAssistNode
+                                                }
+                                            ]}
+                                            style={{
+                                                marginBlockStart: space.sm
+                                            }}
+                                        />
+                                    )
+                                ) : null}
+                            </>
                         )}
+                    </div>
                 </div>
-            </div>
-        </ResponsiveFormSheet>
+            </ResponsiveFormSheet>
+        </>
     );
 };
 

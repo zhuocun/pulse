@@ -401,6 +401,12 @@ const zhCN: Dictionary = {
             title: "确认删除该任务?",
             description: "此操作无法撤销。",
             confirmLabel: "删除任务"
+        },
+        discardChanges: {
+            title: "放弃更改?",
+            description: "未保存的更改将会丢失。",
+            confirmLabel: "放弃",
+            cancelLabel: "继续编辑"
         }
     },
     feedback: {
@@ -489,7 +495,8 @@ const zhCN: Dictionary = {
     taskModal: {
         removedByOthersTitle: "此任务已被其他更改移除。",
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
-        discardEdits: "丢弃更改"
+        discardEdits: "丢弃更改",
+        aiAssistLabel: "AI 辅助"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",

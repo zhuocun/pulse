@@ -378,6 +378,10 @@ describe("ProjectModal", () => {
         });
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
+        // §2.A.1 — a touched form prompts before discarding. Confirm the
+        // discard to proceed with the close + reset.
+        fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
+
         await waitFor(() =>
             expect(screen.getByTestId("location")).toHaveTextContent("")
         );

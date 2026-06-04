@@ -41,6 +41,7 @@ import useAuth from "../../utils/hooks/useAuth";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useUndoToast from "../../utils/hooks/useUndoToast";
+import useUnsavedChangesGuard from "../../utils/hooks/useUnsavedChangesGuard";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import AiConfidenceIndicator from "../aiConfidenceIndicator";
 import AiSparkleIcon from "../aiSparkleIcon";
@@ -620,460 +621,503 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
           )
         : 0;
 
+    /*
+     * §2.A.1 — guard the cancel / mask-close paths. "Dirty" here is wider
+     * than a touched form: an unsubmitted prompt, an applied single draft,
+     * or a pending breakdown selection all represent work the user could
+     * lose. The `discard` is the parent `onClose` prop — the open→close
+     * effect (`reset()`) still runs the form reset AND `remoteAbort()`, so
+     * in-flight AI work is aborted on close exactly as before. Successful
+     * create paths call `onClose` directly (below) so they never prompt.
+     */
+    const { requestClose, confirmNode } = useUnsavedChangesGuard({
+        isDirty: () =>
+            Boolean(prompt.trim()) ||
+            breakdownMode ||
+            breakdownItems.length > 0 ||
+            Boolean(activeSuggestion) ||
+            form.isFieldsTouched(),
+        onConfirmDiscard: onClose
+    });
+
     return (
-        <ResponsiveFormSheet
-            data-testid="ai-task-draft-modal"
-            destroyOnHidden
-            footer={null}
-            onClose={onClose}
-            open={open}
-            styles={{
-                body: {
-                    /*
-                     * Subtract `env(keyboard-inset-height)` so the modal
-                     * body shrinks above the iOS soft keyboard instead of
-                     * pushing the footer below the fold. Falls back to
-                     * `0px` on browsers without the env variable so the
-                     * desktop layout is unchanged. See QW-18 in
-                     * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
-                     *
-                     * The `max(80px, …)` wrapper clamps the result so the
-                     * body never collapses to a negative height in
-                     * landscape orientation with the keyboard up — a
-                     * 375 × 667 device in landscape reports `100dvh` ≈
-                     * 375 px and a ~260 px keyboard inset would otherwise
-                     * subtract past zero (Bug 6).
-                     */
-                    maxHeight:
-                        "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
-                    overflowY: "auto"
+        <>
+            {confirmNode}
+            <ResponsiveFormSheet
+                data-testid="ai-task-draft-modal"
+                destroyOnHidden
+                footer={null}
+                onClose={requestClose}
+                open={open}
+                styles={{
+                    body: {
+                        /*
+                         * Subtract `env(keyboard-inset-height)` so the modal
+                         * body shrinks above the iOS soft keyboard instead of
+                         * pushing the footer below the fold. Falls back to
+                         * `0px` on browsers without the env variable so the
+                         * desktop layout is unchanged. See QW-18 in
+                         * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+                         *
+                         * The `max(80px, …)` wrapper clamps the result so the
+                         * body never collapses to a negative height in
+                         * landscape orientation with the keyboard up — a
+                         * 375 × 667 device in landscape reports `100dvh` ≈
+                         * 375 px and a ~260 px keyboard inset would otherwise
+                         * subtract past zero (Bug 6).
+                         */
+                        maxHeight:
+                            "max(80px, calc(100dvh - 220px - env(keyboard-inset-height, 0px)))",
+                        overflowY: "auto"
+                    }
+                }}
+                title={
+                    <Space align="center" size={space.xs} wrap>
+                        <AiSparkleIcon aria-hidden />
+                        <span style={{ fontWeight: 600 }}>
+                            {microcopy.actions.draftWithAi}
+                        </span>
+                        <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
+                        {/*
+                         * EngineModeTag now mounts once in the global header.
+                         */}
+                    </Space>
                 }
-            }}
-            title={
-                <Space align="center" size={space.xs} wrap>
-                    <AiSparkleIcon aria-hidden />
-                    <span style={{ fontWeight: 600 }}>
-                        {microcopy.actions.draftWithAi}
-                    </span>
-                    <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    {/*
-                     * EngineModeTag now mounts once in the global header.
-                     */}
-                </Space>
-            }
-            width={modalWidthCss(640)}
-        >
-            <CopilotRemoteConsentNotice route="task-draft" />
-            <CopilotPrivacyDisclosure
-                route="task-draft"
-                storageKey="boardCopilot:draftPrivacyShown"
-            />
-            <Form.Item label={microcopy.placeholders.describeWork}>
-                <TextArea
-                    aria-label={microcopy.a11y.taskPrompt}
-                    autoComplete="off"
-                    enterKeyHint="go"
-                    inputMode="text"
-                    maxLength={1000}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (
-                            (event.metaKey || event.ctrlKey) &&
-                            event.key === "Enter" &&
-                            prompt.trim()
-                        ) {
-                            event.preventDefault();
-                            void onDraft();
-                        }
-                    }}
-                    placeholder={microcopy.placeholders.taskPromptExample}
-                    rows={3}
-                    showCount
-                    value={prompt}
+                width={modalWidthCss(640)}
+            >
+                <CopilotRemoteConsentNotice route="task-draft" />
+                <CopilotPrivacyDisclosure
+                    route="task-draft"
+                    storageKey="boardCopilot:draftPrivacyShown"
                 />
-                <Typography.Text
-                    style={{ display: "block", marginTop: 4 }}
-                    type="secondary"
-                >
-                    {isMacLike() ? "⌘⏎" : "Ctrl+Enter"} to draft.
-                </Typography.Text>
-            </Form.Item>
-            {!prompt.trim() && (
-                <SamplePromptList size={space.xs} wrap>
-                    {samplePrompts.map((sample) => (
-                        <SamplePromptButton
-                            key={sample}
-                            onClick={() => setPrompt(sample)}
-                            size="small"
-                            type="default"
-                        >
-                            {sample}
-                        </SamplePromptButton>
-                    ))}
-                </SamplePromptList>
-            )}
-            <DraftActionRow data-testid="ai-task-draft-action-row">
-                <Button
-                    aria-label={microcopy.a11y.draftTaskWithCopilot}
-                    disabled={
-                        !prompt.trim() ||
-                        (isRemote ? activeIsLoading : draftAi.isLoading)
-                    }
-                    onClick={onDraft}
-                    type="primary"
-                >
-                    {(isRemote ? activeIsLoading : draftAi.isLoading) ? (
-                        <Spin size="small" />
-                    ) : (
-                        microcopy.actions.draftTask
-                    )}
-                </Button>
-                <Select<BreakdownAxis>
-                    aria-label={microcopy.a11y.breakdownAxisLabel}
-                    onChange={onBreakdownAxisChange}
-                    options={BREAKDOWN_AXES.map((axis) => ({
-                        label: (
-                            <Tooltip
-                                title={microcopy.ai.breakdownAxes[axis].tooltip}
-                            >
-                                {microcopy.ai.breakdownAxes[axis].label}
-                            </Tooltip>
-                        ),
-                        value: axis
-                    }))}
-                    value={breakdownAxis}
-                />
-                <Button
-                    aria-label={microcopy.a11y.breakPromptIntoSubtasks}
-                    disabled={
-                        !prompt.trim() ||
-                        (isRemote ? activeIsLoading : breakdownAi.isLoading)
-                    }
-                    onClick={() => onBreakdown()}
-                >
-                    {(isRemote ? activeIsLoading : breakdownAi.isLoading) ? (
-                        <Spin size="small" />
-                    ) : (
-                        microcopy.actions.breakDown
-                    )}
-                </Button>
-                {(Boolean(activeSuggestion) || breakdownMode) && (
-                    <Tooltip title={microcopy.ai.regenerateLabel}>
-                        <Button
-                            aria-label={microcopy.ai.regenerateLabel}
-                            disabled={
-                                isRemote
-                                    ? activeIsLoading
-                                    : draftAi.isLoading || breakdownAi.isLoading
+                <Form.Item label={microcopy.placeholders.describeWork}>
+                    <TextArea
+                        aria-label={microcopy.a11y.taskPrompt}
+                        autoComplete="off"
+                        enterKeyHint="go"
+                        inputMode="text"
+                        maxLength={1000}
+                        onChange={(event) => setPrompt(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (
+                                (event.metaKey || event.ctrlKey) &&
+                                event.key === "Enter" &&
+                                prompt.trim()
+                            ) {
+                                event.preventDefault();
+                                void onDraft();
                             }
-                            icon={<ReloadOutlined aria-hidden />}
-                            onClick={handleRegenerate}
-                        />
-                    </Tooltip>
-                )}
-            </DraftActionRow>
-
-            {activeError && (
-                <Alert
-                    action={
-                        draftErrorView.retryable ? (
-                            <Button
-                                onClick={handleRegenerate}
-                                size="small"
-                                type="link"
-                            >
-                                {microcopy.ai.retryLabel}
-                            </Button>
-                        ) : null
-                    }
-                    showIcon
-                    style={{ marginBottom: space.md }}
-                    title={draftErrorView.heading}
-                    description={draftErrorView.body || undefined}
-                    type={draftErrorView.severity}
-                />
-            )}
-
-            {bulkProgress && (
-                <Progress
-                    aria-label={microcopy.a11y.creatingSubtasks}
-                    format={() =>
-                        microcopy.ai.bulkProgressFormat
-                            .replace("{current}", String(bulkProgress.current))
-                            .replace("{total}", String(bulkProgress.total))
-                    }
-                    percent={breakdownProgressPercent}
-                    status="active"
-                    style={{ marginBottom: space.md }}
-                />
-            )}
-
-            {showForm && activeSuggestion && (
-                <Form
-                    form={form}
-                    initialValues={activeSuggestion}
-                    layout="vertical"
-                    onFinish={onSubmitSingle}
-                    onValuesChange={(changed) => {
-                        Object.keys(changed).forEach(handleFieldEdit);
-                    }}
-                >
-                    <Alert
-                        showIcon
-                        style={{ marginBottom: space.sm }}
-                        title={
-                            <span>
-                                {`${microcopy.a11y.aiSuggestion} · ${microcopy.ai.reviewAndEdit}`}{" "}
-                                <AiConfidenceIndicator
-                                    confidence={activeSuggestion.confidence}
-                                />
-                            </span>
-                        }
-                        description={activeSuggestion.rationale}
-                        type="info"
+                        }}
+                        placeholder={microcopy.placeholders.taskPromptExample}
+                        rows={3}
+                        showCount
+                        value={prompt}
                     />
-                    <Form.Item
-                        extra={
-                            aiFields.has("taskName") && (
-                                <AiSuggestedBadge compact />
-                            )
+                    <Typography.Text
+                        style={{ display: "block", marginTop: 4 }}
+                        type="secondary"
+                    >
+                        {isMacLike() ? "⌘⏎" : "Ctrl+Enter"} to draft.
+                    </Typography.Text>
+                </Form.Item>
+                {!prompt.trim() && (
+                    <SamplePromptList size={space.xs} wrap>
+                        {samplePrompts.map((sample) => (
+                            <SamplePromptButton
+                                key={sample}
+                                onClick={() => setPrompt(sample)}
+                                size="small"
+                                type="default"
+                            >
+                                {sample}
+                            </SamplePromptButton>
+                        ))}
+                    </SamplePromptList>
+                )}
+                <DraftActionRow data-testid="ai-task-draft-action-row">
+                    <Button
+                        aria-label={microcopy.a11y.draftTaskWithCopilot}
+                        disabled={
+                            !prompt.trim() ||
+                            (isRemote ? activeIsLoading : draftAi.isLoading)
                         }
-                        label={microcopy.fields.taskName}
-                        name="taskName"
-                        required
-                        rules={[
-                            {
-                                required: true,
-                                whitespace: true,
-                                message: microcopy.validation.taskNameRequired
+                        onClick={onDraft}
+                        type="primary"
+                    >
+                        {(isRemote ? activeIsLoading : draftAi.isLoading) ? (
+                            <Spin size="small" />
+                        ) : (
+                            microcopy.actions.draftTask
+                        )}
+                    </Button>
+                    <Select<BreakdownAxis>
+                        aria-label={microcopy.a11y.breakdownAxisLabel}
+                        onChange={onBreakdownAxisChange}
+                        options={BREAKDOWN_AXES.map((axis) => ({
+                            label: (
+                                <Tooltip
+                                    title={
+                                        microcopy.ai.breakdownAxes[axis].tooltip
+                                    }
+                                >
+                                    {microcopy.ai.breakdownAxes[axis].label}
+                                </Tooltip>
+                            ),
+                            value: axis
+                        }))}
+                        value={breakdownAxis}
+                    />
+                    <Button
+                        aria-label={microcopy.a11y.breakPromptIntoSubtasks}
+                        disabled={
+                            !prompt.trim() ||
+                            (isRemote ? activeIsLoading : breakdownAi.isLoading)
+                        }
+                        onClick={() => onBreakdown()}
+                    >
+                        {(
+                            isRemote ? activeIsLoading : breakdownAi.isLoading
+                        ) ? (
+                            <Spin size="small" />
+                        ) : (
+                            microcopy.actions.breakDown
+                        )}
+                    </Button>
+                    {(Boolean(activeSuggestion) || breakdownMode) && (
+                        <Tooltip title={microcopy.ai.regenerateLabel}>
+                            <Button
+                                aria-label={microcopy.ai.regenerateLabel}
+                                disabled={
+                                    isRemote
+                                        ? activeIsLoading
+                                        : draftAi.isLoading ||
+                                          breakdownAi.isLoading
+                                }
+                                icon={<ReloadOutlined aria-hidden />}
+                                onClick={handleRegenerate}
+                            />
+                        </Tooltip>
+                    )}
+                </DraftActionRow>
+
+                {activeError && (
+                    <Alert
+                        action={
+                            draftErrorView.retryable ? (
+                                <Button
+                                    onClick={handleRegenerate}
+                                    size="small"
+                                    type="link"
+                                >
+                                    {microcopy.ai.retryLabel}
+                                </Button>
+                            ) : null
+                        }
+                        showIcon
+                        style={{ marginBottom: space.md }}
+                        title={draftErrorView.heading}
+                        description={draftErrorView.body || undefined}
+                        type={draftErrorView.severity}
+                    />
+                )}
+
+                {bulkProgress && (
+                    <Progress
+                        aria-label={microcopy.a11y.creatingSubtasks}
+                        format={() =>
+                            microcopy.ai.bulkProgressFormat
+                                .replace(
+                                    "{current}",
+                                    String(bulkProgress.current)
+                                )
+                                .replace("{total}", String(bulkProgress.total))
+                        }
+                        percent={breakdownProgressPercent}
+                        status="active"
+                        style={{ marginBottom: space.md }}
+                    />
+                )}
+
+                {showForm && activeSuggestion && (
+                    <Form
+                        form={form}
+                        initialValues={activeSuggestion}
+                        layout="vertical"
+                        onFinish={onSubmitSingle}
+                        onValuesChange={(changed) => {
+                            Object.keys(changed).forEach(handleFieldEdit);
+                        }}
+                    >
+                        <Alert
+                            showIcon
+                            style={{ marginBottom: space.sm }}
+                            title={
+                                <span>
+                                    {`${microcopy.a11y.aiSuggestion} · ${microcopy.ai.reviewAndEdit}`}{" "}
+                                    <AiConfidenceIndicator
+                                        confidence={activeSuggestion.confidence}
+                                    />
+                                </span>
                             }
-                        ]}
-                        validateTrigger={["onBlur", "onSubmit"]}
-                    >
-                        <Input
-                            autoComplete="off"
-                            enterKeyHint="next"
-                            inputMode="text"
+                            description={activeSuggestion.rationale}
+                            type="info"
                         />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("type") && <AiSuggestedBadge compact />
-                        }
-                        label={microcopy.fields.type}
-                        name="type"
-                    >
-                        <Select
-                            options={[
+                        <Form.Item
+                            extra={
+                                aiFields.has("taskName") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.taskName}
+                            name="taskName"
+                            required
+                            rules={[
                                 {
-                                    label: microcopy.options.taskTypes.task,
-                                    value: "Task"
-                                },
-                                {
-                                    label: microcopy.options.taskTypes.bug,
-                                    value: "Bug"
+                                    required: true,
+                                    whitespace: true,
+                                    message:
+                                        microcopy.validation.taskNameRequired
                                 }
                             ]}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("epic") && <AiSuggestedBadge compact />
-                        }
-                        label={microcopy.fields.epic}
-                        name="epic"
-                    >
-                        <Input
-                            autoComplete="off"
-                            enterKeyHint="next"
-                            inputMode="text"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("storyPoints") && (
-                                <AiSuggestedBadge compact />
-                            )
-                        }
-                        label={microcopy.fields.storyPoints}
-                        name="storyPoints"
-                    >
-                        <Select
-                            options={[1, 2, 3, 5, 8, 13].map((value) => ({
-                                label: `${value}`,
-                                value
-                            }))}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("columnId") && (
-                                <AiSuggestedBadge compact />
-                            )
-                        }
-                        label={microcopy.fields.column}
-                        name="columnId"
-                    >
-                        <Select
-                            options={columns.map((column) => ({
-                                label: column.columnName,
-                                value: column._id
-                            }))}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("coordinatorId") && (
-                                <AiSuggestedBadge compact />
-                            )
-                        }
-                        label={microcopy.fields.coordinator}
-                        name="coordinatorId"
-                    >
-                        <Select
-                            options={members.map((member) => ({
-                                label: member.username,
-                                value: member._id
-                            }))}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        extra={
-                            aiFields.has("note") && <AiSuggestedBadge compact />
-                        }
-                        label={microcopy.fields.notes}
-                        name="note"
-                    >
-                        <TextArea
-                            autoComplete="off"
-                            enterKeyHint="done"
-                            inputMode="text"
-                            rows={4}
-                        />
-                    </Form.Item>
-                    <div
-                        style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: space.xs,
-                            justifyContent: "flex-end"
-                        }}
-                    >
-                        <Button onClick={onClose}>
-                            {microcopy.actions.cancel}
-                        </Button>
-                        <Button
-                            htmlType="submit"
-                            loading={creating}
-                            type="primary"
+                            validateTrigger={["onBlur", "onSubmit"]}
                         >
-                            {microcopy.actions.createTask}
-                        </Button>
-                    </div>
-                </Form>
-            )}
-
-            {breakdownMode && breakdownItems.length > 0 && (
-                <div aria-label={microcopy.a11y.subtaskBreakdown}>
-                    <Alert
-                        showIcon
-                        style={{ marginBottom: space.sm }}
-                        title={`${microcopy.a11y.aiSuggestion}: ${microcopy.ai.pickSubtasks}`}
-                        description={microcopy.ai.breakdownAxisInfo.replace(
-                            "{label}",
-                            microcopy.ai.breakdownAxes[breakdownAxis].label
-                        )}
-                        type="info"
-                    />
-                    {breakdownItems.map((item, index) => {
-                        const column = columns.find(
-                            (col) => col._id === item.columnId
-                        );
-                        const owner = members.find(
-                            (member) => member._id === item.coordinatorId
-                        );
-                        return (
-                            <div
-                                key={`${item.taskName}-${index}`}
-                                style={{
-                                    alignItems: "center",
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: space.xs,
-                                    marginBottom: space.xs
-                                }}
+                            <Input
+                                autoComplete="off"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("type") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.type}
+                            name="type"
+                        >
+                            <Select
+                                options={[
+                                    {
+                                        label: microcopy.options.taskTypes.task,
+                                        value: "Task"
+                                    },
+                                    {
+                                        label: microcopy.options.taskTypes.bug,
+                                        value: "Bug"
+                                    }
+                                ]}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("epic") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.epic}
+                            name="epic"
+                        >
+                            <Input
+                                autoComplete="off"
+                                enterKeyHint="next"
+                                inputMode="text"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("storyPoints") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.storyPoints}
+                            name="storyPoints"
+                        >
+                            <Select
+                                options={[1, 2, 3, 5, 8, 13].map((value) => ({
+                                    label: `${value}`,
+                                    value
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("columnId") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.column}
+                            name="columnId"
+                        >
+                            <Select
+                                options={columns.map((column) => ({
+                                    label: column.columnName,
+                                    value: column._id
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("coordinatorId") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.coordinator}
+                            name="coordinatorId"
+                        >
+                            <Select
+                                options={members.map((member) => ({
+                                    label: member.username,
+                                    value: member._id
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            extra={
+                                aiFields.has("note") && (
+                                    <AiSuggestedBadge compact />
+                                )
+                            }
+                            label={microcopy.fields.notes}
+                            name="note"
+                        >
+                            <TextArea
+                                autoComplete="off"
+                                enterKeyHint="done"
+                                inputMode="text"
+                                rows={4}
+                            />
+                        </Form.Item>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: space.xs,
+                                justifyContent: "flex-end"
+                            }}
+                        >
+                            <Button onClick={requestClose}>
+                                {microcopy.actions.cancel}
+                            </Button>
+                            <Button
+                                htmlType="submit"
+                                loading={creating}
+                                type="primary"
                             >
-                                <Checkbox
-                                    aria-label={microcopy.a11y.includeSubtask.replace(
-                                        "{name}",
-                                        item.taskName
-                                    )}
-                                    checked={breakdownChecked[index]}
-                                    onChange={(event) => {
-                                        const next = [...breakdownChecked];
-                                        next[index] = event.target.checked;
-                                        setBreakdownChecked(next);
-                                    }}
-                                />
-                                <span
-                                    style={{
-                                        flex: "1 1 12rem",
-                                        minWidth: 0,
-                                        overflowWrap: "anywhere"
-                                    }}
-                                >
-                                    {item.taskName}
-                                </span>
-                                {column && (
-                                    <Tag color="default">
-                                        {column.columnName}
-                                    </Tag>
-                                )}
-                                {owner && <Tag>{owner.username}</Tag>}
-                                <Tag style={{ marginInlineEnd: 0 }}>
-                                    {microcopy.brief.ptsCount.replace(
-                                        "{count}",
-                                        String(item.storyPoints)
-                                    )}
-                                </Tag>
-                                <Tag
-                                    color={item.type === "Bug" ? "red" : "blue"}
-                                    style={{ marginInlineEnd: 0 }}
-                                >
-                                    {item.type === "Bug"
-                                        ? microcopy.options.taskTypes.bug
-                                        : microcopy.options.taskTypes.task}
-                                </Tag>
-                            </div>
-                        );
-                    })}
-                    <div
-                        style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: space.xs,
-                            justifyContent: "flex-end",
-                            marginTop: space.sm
-                        }}
-                    >
-                        <Button onClick={onClose}>
-                            {microcopy.actions.cancel}
-                        </Button>
-                        <Button
-                            disabled={breakdownChecked.every((value) => !value)}
-                            loading={creating}
-                            onClick={onSubmitBreakdown}
-                            type="primary"
-                        >
-                            {microcopy.counts.createNSubtasks.replace(
-                                "{count}",
-                                String(breakdownChecked.filter(Boolean).length)
+                                {microcopy.actions.createTask}
+                            </Button>
+                        </div>
+                    </Form>
+                )}
+
+                {breakdownMode && breakdownItems.length > 0 && (
+                    <div aria-label={microcopy.a11y.subtaskBreakdown}>
+                        <Alert
+                            showIcon
+                            style={{ marginBottom: space.sm }}
+                            title={`${microcopy.a11y.aiSuggestion}: ${microcopy.ai.pickSubtasks}`}
+                            description={microcopy.ai.breakdownAxisInfo.replace(
+                                "{label}",
+                                microcopy.ai.breakdownAxes[breakdownAxis].label
                             )}
-                        </Button>
+                            type="info"
+                        />
+                        {breakdownItems.map((item, index) => {
+                            const column = columns.find(
+                                (col) => col._id === item.columnId
+                            );
+                            const owner = members.find(
+                                (member) => member._id === item.coordinatorId
+                            );
+                            return (
+                                <div
+                                    key={`${item.taskName}-${index}`}
+                                    style={{
+                                        alignItems: "center",
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: space.xs,
+                                        marginBottom: space.xs
+                                    }}
+                                >
+                                    <Checkbox
+                                        aria-label={microcopy.a11y.includeSubtask.replace(
+                                            "{name}",
+                                            item.taskName
+                                        )}
+                                        checked={breakdownChecked[index]}
+                                        onChange={(event) => {
+                                            const next = [...breakdownChecked];
+                                            next[index] = event.target.checked;
+                                            setBreakdownChecked(next);
+                                        }}
+                                    />
+                                    <span
+                                        style={{
+                                            flex: "1 1 12rem",
+                                            minWidth: 0,
+                                            overflowWrap: "anywhere"
+                                        }}
+                                    >
+                                        {item.taskName}
+                                    </span>
+                                    {column && (
+                                        <Tag color="default">
+                                            {column.columnName}
+                                        </Tag>
+                                    )}
+                                    {owner && <Tag>{owner.username}</Tag>}
+                                    <Tag style={{ marginInlineEnd: 0 }}>
+                                        {microcopy.brief.ptsCount.replace(
+                                            "{count}",
+                                            String(item.storyPoints)
+                                        )}
+                                    </Tag>
+                                    <Tag
+                                        color={
+                                            item.type === "Bug" ? "red" : "blue"
+                                        }
+                                        style={{ marginInlineEnd: 0 }}
+                                    >
+                                        {item.type === "Bug"
+                                            ? microcopy.options.taskTypes.bug
+                                            : microcopy.options.taskTypes.task}
+                                    </Tag>
+                                </div>
+                            );
+                        })}
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: space.xs,
+                                justifyContent: "flex-end",
+                                marginTop: space.sm
+                            }}
+                        >
+                            <Button onClick={requestClose}>
+                                {microcopy.actions.cancel}
+                            </Button>
+                            <Button
+                                disabled={breakdownChecked.every(
+                                    (value) => !value
+                                )}
+                                loading={creating}
+                                onClick={onSubmitBreakdown}
+                                type="primary"
+                            >
+                                {microcopy.counts.createNSubtasks.replace(
+                                    "{count}",
+                                    String(
+                                        breakdownChecked.filter(Boolean).length
+                                    )
+                                )}
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            )}
-        </ResponsiveFormSheet>
+                )}
+            </ResponsiveFormSheet>
+        </>
     );
 };
 

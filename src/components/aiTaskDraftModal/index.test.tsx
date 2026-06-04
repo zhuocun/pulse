@@ -246,6 +246,9 @@ describe("AiTaskDraftModal", () => {
         fireEvent.click(screen.getByLabelText("Draft task with Copilot"));
         // The Cancel button only appears once draft is submitted; close via X always works
         fireEvent.click(screen.getByRole("button", { name: /close/i }));
+        // §2.A.1 — a dirty draft (typed prompt) prompts before closing.
+        // Confirm the discard to proceed.
+        fireEvent.click(screen.getByRole("button", { name: "Discard" }));
         expect(onClose).toHaveBeenCalled();
         expect(fetchMock).not.toHaveBeenCalled();
     });
