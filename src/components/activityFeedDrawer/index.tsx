@@ -1,4 +1,4 @@
-import { BellOutlined, CheckOutlined } from "@ant-design/icons";
+import { CheckOutlined, HistoryOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Badge, Button, Empty, Typography } from "antd";
 import React, {
@@ -404,7 +404,10 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
             open={open}
             title={
                 <span>
-                    <BellOutlined aria-hidden style={{ marginInlineEnd: 8 }} />
+                    <HistoryOutlined
+                        aria-hidden
+                        style={{ marginInlineEnd: 8 }}
+                    />
                     {drawerTitle}
                 </span>
             }
@@ -475,7 +478,10 @@ export const ActivityFeedBell: React.FC<BellTriggerProps> = ({
                 offset={[-2, 2]}
                 size="small"
             >
-                <BellOutlined aria-hidden style={{ fontSize: fontSize.md }} />
+                <HistoryOutlined
+                    aria-hidden
+                    style={{ fontSize: fontSize.md }}
+                />
             </Badge>
         </BellButton>
     );
