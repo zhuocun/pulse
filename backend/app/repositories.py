@@ -73,6 +73,27 @@ TABLE_FIELDS = {
         "createdAt",
         "updatedAt",
     },
+    database.COMMENTS: {
+        "_id",
+        "taskId",
+        "projectId",
+        "authorId",
+        "body",
+        "mentions",
+        "createdAt",
+        "updatedAt",
+    },
+    database.NOTIFICATIONS: {
+        "_id",
+        "userId",
+        "kind",
+        "refId",
+        "projectId",
+        "summary",
+        "isRead",
+        "createdAt",
+        "updatedAt",
+    },
 }
 
 TABLES = tuple(TABLE_FIELDS.keys())

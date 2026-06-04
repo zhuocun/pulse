@@ -10,7 +10,15 @@ from app import database
 from app import main
 from app import security
 from app.config import settings
-from app.database import COLUMNS, LABELS, PROJECTS, TASKS, USERS
+from app.database import (
+    COLUMNS,
+    COMMENTS,
+    LABELS,
+    NOTIFICATIONS,
+    PROJECTS,
+    TASKS,
+    USERS,
+)
 from app.middleware.budget import BudgetTracker, get_budget_tracker
 from app.middleware.rate_limit import RateLimiter, get_rate_limiter
 from app.routers import health as health_router
@@ -110,6 +118,8 @@ class FakeStore:
             COLUMNS: [],
             TASKS: [],
             LABELS: [],
+            COMMENTS: [],
+            NOTIFICATIONS: [],
             # ``system_config`` is the schema-less collection owned by
             # :mod:`app.system_config` (persisted JWT secret etc.) -- it
             # has no per-table field allowlist and uses sentinel string
