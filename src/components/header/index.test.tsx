@@ -17,6 +17,7 @@ import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
+import useNotifications from "../../utils/hooks/useNotifications";
 import { __resetActivityFeedUndoCallbacksForTests } from "../../utils/hooks/useActivityFeed";
 
 import { microcopy } from "../../constants/microcopy";
@@ -39,6 +40,11 @@ jest.mock("../../utils/hooks/useAuth");
 jest.mock("../../utils/hooks/useAiEnabled");
 jest.mock("../../utils/hooks/useAgentHealth");
 jest.mock("../../utils/hooks/useColorScheme");
+// The header reads `useNotifications().unreadCount` for the notifications
+// bell. The hook itself goes through React Query / the api layer (covered
+// by `useNotifications.test.tsx`); here we stub it so the header renders
+// without a `QueryClientProvider` and we keep control of the badge count.
+jest.mock("../../utils/hooks/useNotifications");
 jest.mock("react-router", () => {
     const actual = jest.requireActual("react-router");
     return {
@@ -72,6 +78,9 @@ const mockedUseColorScheme = useColorScheme as jest.MockedFunction<
 >;
 const mockedUseNavigate = useNavigate as jest.MockedFunction<
     typeof useNavigate
+>;
+const mockedUseNotifications = useNotifications as jest.MockedFunction<
+    typeof useNotifications
 >;
 
 const user = (overrides: Partial<IUser> = {}): IUser => ({
@@ -129,6 +138,14 @@ const renderHeader = (
         setPreference: jest.fn(),
         ...colorScheme
     });
+    mockedUseNotifications.mockReturnValue({
+        notifications: [],
+        unreadCount: 0,
+        isLoading: false,
+        markRead: jest.fn(),
+        markAllRead: jest.fn(),
+        isMutating: false
+    });
     mockedUseAgentHealth.mockReturnValue({
         status: "ok",
         latencyMs: 120,
@@ -163,6 +180,17 @@ describe("Header", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // Safe default for `useNotifications` so tests that render
+        // `<Header />` directly (without going through `renderHeader`)
+        // still get a valid hook return after `clearAllMocks`.
+        mockedUseNotifications.mockReturnValue({
+            notifications: [],
+            unreadCount: 0,
+            isLoading: false,
+            markRead: jest.fn(),
+            markAllRead: jest.fn(),
+            isMutating: false
+        });
         // Clear the activity feed before each test so the bell badge
         // count starts at zero. Otherwise a feed populated by a
         // previous test leaks into the next.

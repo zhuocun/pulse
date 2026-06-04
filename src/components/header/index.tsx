@@ -34,7 +34,9 @@ import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import useNotifications from "../../utils/hooks/useNotifications";
 import ActivityFeedDrawer, { ActivityFeedBell } from "../activityFeedDrawer";
+import NotificationDrawer, { NotificationBell } from "../notificationBell";
 import BrandMark from "../brandMark";
 import EngineModeTag from "../engineModeTag";
 import GlassIntensitySelect from "../glassIntensitySelect";
@@ -735,6 +737,16 @@ const Header: React.FC = () => {
     const { unreadCount } = useActivityFeed();
     const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
     /*
+     * Notifications (backend Notifications feature). A second bell beside
+     * the activity-feed bell, backed by the server's persisted
+     * notifications. Like the activity bell it stays visible on every
+     * viewport (including phone chrome) so notifications are reachable
+     * without the demoted dropdown; the drawer body mounts once below the
+     * header chrome.
+     */
+    const { unreadCount: notificationUnreadCount } = useNotifications();
+    const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+    /*
      * Phase 3 A3 — phone demotion. The flag-gated `bottomNavEnabled`
      * env switch composes with the shared `useIsPhoneChrome` predicate
      * so the right-cluster only hides when (a) the bottom-tab chassis
@@ -911,6 +923,17 @@ const Header: React.FC = () => {
                     />
                 )}
                 {/*
+                 * Notifications bell (backend Notifications feature).
+                 * Sits beside the activity-feed bell and is likewise
+                 * visible on every viewport so server notifications stay
+                 * reachable from anywhere; its drawer mounts below the
+                 * header chrome.
+                 */}
+                <NotificationBell
+                    unreadCount={notificationUnreadCount}
+                    onClick={() => setNotificationDrawerOpen((prev) => !prev)}
+                />
+                {/*
                  * Phone-demotion wrapper. With the bottom-tab chassis
                  * active (Phase 3 A3, flag default ON), theme + account
                  * controls move to the routed Settings page reachable
@@ -981,6 +1004,10 @@ const Header: React.FC = () => {
                     onClose={() => setActivityDrawerOpen(false)}
                 />
             )}
+            <NotificationDrawer
+                open={notificationDrawerOpen}
+                onClose={() => setNotificationDrawerOpen(false)}
+            />
         </PageHeader>
     );
 };

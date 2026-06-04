@@ -7,10 +7,51 @@ import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
 import { activityFeedActions } from "../store/reducers/activityFeedSlice";
 import { __resetActivityFeedUndoCallbacksForTests } from "../utils/hooks/useActivityFeed";
+import useNotifications from "../utils/hooks/useNotifications";
 
 import InboxPage from "./inbox";
 
 expect.extend(toHaveNoViolations);
+
+/*
+ * The Inbox's Mentions section reads server notifications through
+ * `useNotifications`, which hits React Query / the api layer. The page
+ * suite renders the real `InboxPage` without a `QueryClientProvider`, so
+ * we mock the hook and drive its `notifications` payload directly — the
+ * hook's own fetch / mark-read behaviour is covered by
+ * `useNotifications.test.tsx`. Default: no notifications (so the existing
+ * activity-only cases see an empty Mentions section).
+ */
+jest.mock("../utils/hooks/useNotifications");
+
+const mockedUseNotifications = useNotifications as jest.MockedFunction<
+    typeof useNotifications
+>;
+
+const setNotifications = (notifications: INotification[] | undefined) => {
+    mockedUseNotifications.mockReturnValue({
+        notifications,
+        unreadCount: (notifications ?? []).filter((n) => !n.isRead).length,
+        isLoading: false,
+        markRead: jest.fn(),
+        markAllRead: jest.fn(),
+        isMutating: false
+    });
+};
+
+const buildMention = (
+    overrides: Partial<INotification> = {}
+): INotification => ({
+    _id: "ntf-1",
+    userId: "u-1",
+    kind: "mention",
+    refId: "task-1",
+    projectId: "proj-1",
+    summary: "Alice mentioned you in “Ship inbox”",
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    ...overrides
+});
 
 /*
  * Canonical AntD browser mocks. The grouped `SettingsSection` chrome
@@ -75,6 +116,9 @@ describe("InboxPage", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // Default: no server notifications. Individual cases override via
+        // `setNotifications` before rendering.
+        setNotifications([]);
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
         });
@@ -216,6 +260,131 @@ describe("InboxPage", () => {
 
         it("has no axe violations", async () => {
             seedEvent({ id: "evt-1", summary: "Created task “A11y check”" });
+            const { container } = renderPage();
+            const results = await axe(container);
+            expect(results).toHaveNoViolations();
+        });
+    });
+
+    describe("Mentions section (server notifications)", () => {
+        it("renders the grouped sections when only mentions exist (no activity)", () => {
+            setNotifications([buildMention()]);
+            renderPage();
+
+            // Mentions data alone lifts the page out of the all-empty
+            // page-level fallback into the grouped three-section layout.
+            expect(
+                screen.queryByTestId("inbox-empty-state")
+            ).not.toBeInTheDocument();
+            expect(
+                screen.getByTestId("inbox-section-mentions")
+            ).toBeInTheDocument();
+        });
+
+        it("renders each mention's summary inside the Mentions section", () => {
+            setNotifications([
+                buildMention({
+                    _id: "ntf-1",
+                    summary: "Alice mentioned you in “Ship inbox”"
+                }),
+                buildMention({
+                    _id: "ntf-2",
+                    refId: "task-2",
+                    summary: "Bob mentioned you in “Fix bug”"
+                })
+            ]);
+            renderPage();
+
+            const mentions = screen.getByTestId("inbox-section-mentions");
+            expect(
+                within(mentions).getByText(
+                    "Alice mentioned you in “Ship inbox”"
+                )
+            ).toBeInTheDocument();
+            expect(
+                within(mentions).getByText("Bob mentioned you in “Fix bug”")
+            ).toBeInTheDocument();
+            expect(
+                within(mentions).getAllByTestId("inbox-mention-row")
+            ).toHaveLength(2);
+        });
+
+        it("links a mention with a projectId to that project's board", () => {
+            setNotifications([
+                buildMention({ projectId: "proj-42", refId: "task-7" })
+            ]);
+            renderPage();
+
+            const row = screen.getByTestId("inbox-mention-row");
+            // Router <Link> renders an <a href>; the affordance points at
+            // the (always-valid) project board where the task lives.
+            expect(row.tagName).toBe("A");
+            expect(row).toHaveAttribute("href", "/projects/proj-42/board");
+            expect(row).toHaveAttribute("data-ref-id", "task-7");
+        });
+
+        it("renders a non-linked mention row when projectId is absent", () => {
+            setNotifications([
+                buildMention({
+                    projectId: undefined,
+                    summary: "No project ref"
+                })
+            ]);
+            renderPage();
+
+            const row = screen.getByTestId("inbox-mention-row");
+            expect(row.tagName).not.toBe("A");
+            expect(within(row).getByText("No project ref")).toBeInTheDocument();
+        });
+
+        it("ignores non-mention notification kinds", () => {
+            setNotifications([
+                buildMention({ _id: "m-1", summary: "A real mention" }),
+                buildMention({
+                    _id: "x-1",
+                    kind: "assignment",
+                    summary: "Not a mention"
+                })
+            ]);
+            renderPage();
+
+            const mentions = screen.getByTestId("inbox-section-mentions");
+            expect(
+                within(mentions).getAllByTestId("inbox-mention-row")
+            ).toHaveLength(1);
+            expect(
+                within(mentions).getByText("A real mention")
+            ).toBeInTheDocument();
+            expect(
+                within(mentions).queryByText("Not a mention")
+            ).not.toBeInTheDocument();
+        });
+
+        it("keeps the Mentions empty copy when activity exists but no mentions", () => {
+            seedEvent({ id: "evt-1", summary: "Some activity" });
+            setNotifications([]);
+            renderPage();
+
+            const mentions = screen.getByTestId("inbox-section-mentions");
+            expect(
+                within(mentions).getByText(
+                    microcopy.inbox.sections.mentions.empty
+                )
+            ).toBeInTheDocument();
+            expect(
+                within(mentions).queryByTestId("inbox-mention-row")
+            ).not.toBeInTheDocument();
+        });
+
+        it("has no axe violations with mentions rendered", async () => {
+            setNotifications([
+                buildMention({ _id: "ntf-1" }),
+                buildMention({
+                    _id: "ntf-2",
+                    projectId: undefined,
+                    summary: "Projectless mention"
+                })
+            ]);
             const { container } = renderPage();
             const results = await axe(container);
             expect(results).toHaveNoViolations();

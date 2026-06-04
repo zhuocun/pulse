@@ -259,7 +259,12 @@ export const enSource = {
             },
             mentions: {
                 title: "Mentions",
-                empty: "No mentions yet."
+                empty: "No mentions yet.",
+                // Accessible name for a mention row's "view task" link. The
+                // consumer interpolates the mention summary so screen-reader
+                // users hear what they're navigating to.
+                viewTask: "View task",
+                itemAriaLabel: "Mention: {summary}. View task."
             },
             activity: {
                 title: "Activity"
@@ -680,6 +685,35 @@ export const enSource = {
             projectUpdated: "Updated project “{name}”",
             projectDeleted: "Deleted project “{name}”"
         }
+    },
+    /*
+     * Notification bell (backend Notifications feature). Distinct from the
+     * session-only `activityFeed` above: these strings drive the header
+     * bell + drawer that surface server-persisted notifications (mentions,
+     * etc.) the user can mark read. The bell aria-label follows the same
+     * one/other plural pattern as `activityFeed` — the consumer picks the
+     * key off the unread count and interpolates `{count}` (no ICU plural
+     * syntax because the codebase has no formatter).
+     */
+    notifications: {
+        bellAriaLabelZero: "Notifications, none unread",
+        bellAriaLabelOne: "Notifications, {count} unread",
+        bellAriaLabelOther: "Notifications, {count} unread",
+        drawerTitle: "Notifications",
+        drawerCloseLabel: "Close notifications",
+        markAllRead: "Mark all as read",
+        markAllReadAriaLabel: "Mark all notifications as read",
+        markReadAriaLabel: "Mark as read: {summary}",
+        empty: "You're all caught up. New notifications will show up here.",
+        // Relative-time ticker (same shape as `activityFeed.relative*`) so
+        // the bell speaks the app's shared temporal language.
+        relativeJustNow: "just now",
+        relativeOneMinute: "1 min ago",
+        relativeMinutes: "{count} min ago",
+        relativeOneHour: "1 hour ago",
+        relativeHours: "{count} hours ago",
+        relativeOneDay: "1 day ago",
+        relativeDays: "{count} days ago"
     },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",

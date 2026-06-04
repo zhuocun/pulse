@@ -243,7 +243,9 @@ const zhCN: Dictionary = {
             },
             mentions: {
                 title: "提及",
-                empty: "暂无提及。"
+                empty: "暂无提及。",
+                viewTask: "查看任务",
+                itemAriaLabel: "提及:{summary}。查看任务。"
             },
             activity: {
                 title: "活动"
@@ -562,6 +564,24 @@ const zhCN: Dictionary = {
             projectUpdated: "已更新项目 “{name}”",
             projectDeleted: "已删除项目 “{name}”"
         }
+    },
+    notifications: {
+        bellAriaLabelZero: "通知,暂无未读",
+        bellAriaLabelOne: "通知,{count} 条未读",
+        bellAriaLabelOther: "通知,{count} 条未读",
+        drawerTitle: "通知",
+        drawerCloseLabel: "关闭通知",
+        markAllRead: "全部标记为已读",
+        markAllReadAriaLabel: "将所有通知标记为已读",
+        markReadAriaLabel: "标记为已读:{summary}",
+        empty: "您已查看全部通知。新通知会显示在这里。",
+        relativeJustNow: "刚刚",
+        relativeOneMinute: "1 分钟前",
+        relativeMinutes: "{count} 分钟前",
+        relativeOneHour: "1 小时前",
+        relativeHours: "{count} 小时前",
+        relativeOneDay: "1 天前",
+        relativeDays: "{count} 天前"
     },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
