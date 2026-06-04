@@ -3,6 +3,7 @@ import {
     Alert,
     Button,
     Card,
+    Divider,
     Skeleton,
     Space,
     Tag,
@@ -15,7 +16,13 @@ import { useParams } from "react-router-dom";
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    accent,
+    fontSize,
+    fontWeight,
+    radius,
+    space
+} from "../../theme/tokens";
 import { confidenceBand } from "../../utils/ai/confidenceBand";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
@@ -751,12 +758,23 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                     )}
                     {estimateData && (
                         <div>
+                            {/*
+                             * Load-bearing estimate block. Pulled into its
+                             * own tinted, rounded container so the number +
+                             * confidence + Apply always read as the primary
+                             * output of the panel rather than the first line
+                             * of an undifferentiated wall of text (§1.2.12).
+                             */}
                             <div
                                 style={{
                                     alignItems: "center",
+                                    background: accent.bgSubtle,
+                                    borderRadius: radius.sm,
                                     display: "flex",
-                                    gap: space.xs,
-                                    flexWrap: "wrap"
+                                    gap: space.sm,
+                                    flexWrap: "wrap",
+                                    paddingBlock: space.xs,
+                                    paddingInline: space.sm
                                 }}
                             >
                                 <span
@@ -768,7 +786,8 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                     )}
                                     style={{
                                         fontSize: fontSize.xxl,
-                                        fontWeight: 600
+                                        fontWeight: fontWeight.semibold,
+                                        lineHeight: 1
                                     }}
                                 >
                                     {estimateData.storyPoints}
@@ -779,6 +798,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                         microcopy.ai.estimateConfidenceTooltip
                                     )}
                                 />
+                                <span style={{ flex: "1 1 auto" }} />
                                 <Button
                                     aria-label={asMicrocopyString(
                                         microcopy.ai.applyPointsAria
@@ -828,42 +848,75 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                             </span>
                                         }
                                         showIcon
-                                        style={{ marginBottom: space.xs }}
+                                        style={{
+                                            marginBlockStart: space.xs,
+                                            marginBlockEnd: space.xs
+                                        }}
                                         type="info"
                                     />
                                 )}
                             {values.storyPoints !== undefined &&
                                 values.storyPoints ===
                                     estimateData.storyPoints && (
-                                    <AiSuggestedBadge
-                                        onRevert={() => {
-                                            const prev =
-                                                previousPointsRef.current;
-                                            if (
-                                                prev !== undefined &&
-                                                prev !== null
-                                            ) {
-                                                onApplyStoryPoints(
-                                                    prev as StoryPoints
-                                                );
-                                            }
-                                        }}
-                                        rationale={estimateData.rationale}
-                                        style={{ marginInlineEnd: space.xs }}
-                                    />
+                                    <div style={{ marginBlockStart: space.xs }}>
+                                        <AiSuggestedBadge
+                                            onRevert={() => {
+                                                const prev =
+                                                    previousPointsRef.current;
+                                                if (
+                                                    prev !== undefined &&
+                                                    prev !== null
+                                                ) {
+                                                    onApplyStoryPoints(
+                                                        prev as StoryPoints
+                                                    );
+                                                }
+                                            }}
+                                            rationale={estimateData.rationale}
+                                            style={{
+                                                marginInlineEnd: space.xs
+                                            }}
+                                        />
+                                    </div>
                                 )}
                             {estimateData.similar.length > 0 && (
-                                <div>
-                                    <strong>
+                                <section
+                                    aria-label={asMicrocopyString(
+                                        microcopy.ai.similarTasks
+                                    )}
+                                >
+                                    <Divider
+                                        style={{
+                                            marginBlock: space.sm
+                                        }}
+                                    />
+                                    <Typography.Text
+                                        strong
+                                        style={{
+                                            display: "block",
+                                            marginBlockEnd: space.xxs
+                                        }}
+                                    >
                                         {asMicrocopyString(
                                             microcopy.ai.similarTasks
                                         )}
-                                    </strong>
-                                    <ul style={{ paddingLeft: space.lg }}>
+                                    </Typography.Text>
+                                    <ul
+                                        style={{
+                                            margin: 0,
+                                            paddingInlineStart: space.lg
+                                        }}
+                                    >
                                         {estimateData.similar.map((entry) => {
                                             const task = taskById(entry._id);
                                             return (
-                                                <li key={entry._id}>
+                                                <li
+                                                    key={entry._id}
+                                                    style={{
+                                                        marginBlockEnd:
+                                                            space.xxs
+                                                    }}
+                                                >
                                                     <Button
                                                         onClick={() =>
                                                             onOpenSimilarTask(
@@ -887,13 +940,15 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                             );
                                         })}
                                     </ul>
-                                </div>
+                                </section>
                             )}
                         </div>
                     )}
                 </div>
 
-                <div style={{ marginTop: space.md }}>
+                <Divider style={{ marginBlock: space.md }} />
+
+                <div>
                     <SectionHeading
                         right={
                             readinessData &&

@@ -126,6 +126,30 @@ describe("BoardBriefDrawer", () => {
         expect(screen.getByText(/Recommended next step/)).toBeInTheDocument();
     });
 
+    it("renders an at-a-glance summary card with derived totals", async () => {
+        renderDrawer(true);
+        // Wait for the brief to render.
+        await screen.findByText(/2 tasks on the board/);
+        // The summary card titles itself "At a glance" and surfaces the
+        // derived per-board stats (total tasks, columns, unowned,
+        // contributors). All come from the brief payload, no new data.
+        expect(screen.getByText(/At a glance/)).toBeInTheDocument();
+        expect(screen.getByText("Total tasks")).toBeInTheDocument();
+        expect(screen.getByText("Columns")).toBeInTheDocument();
+        expect(screen.getByText("Contributors")).toBeInTheDocument();
+    });
+
+    it("renders per-column count bars with accessible group labels", async () => {
+        renderDrawer(true);
+        await screen.findByText(/2 tasks on the board/);
+        // The counts-per-column section is now a lightweight inline bar
+        // visualization: each column is a labelled group "{column}: {n}
+        // tasks" rather than a flat table row.
+        const todoBar = await screen.findByLabelText(/Todo: 2 tasks/);
+        expect(todoBar).toBeInTheDocument();
+        expect(screen.getByLabelText(/Done: 0 tasks/)).toBeInTheDocument();
+    });
+
     it("opens a task in the existing task modal when a brief item is clicked", async () => {
         const startEditing = jest.fn();
         mockedUseTaskModal.mockReturnValue({

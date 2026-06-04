@@ -7,10 +7,11 @@ import styled from "@emotion/styled";
 import {
     Alert,
     Button,
+    Card,
+    Divider,
     List,
     Skeleton,
     Space,
-    Table,
     Tag,
     Tooltip,
     Typography
@@ -24,7 +25,15 @@ import {
     BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS,
     BRIEF_CACHE_TTL_MS
 } from "../../theme/aiTokens";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import {
+    easing,
+    fontSize,
+    fontWeight,
+    lineHeight,
+    motion,
+    radius,
+    space
+} from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
@@ -67,21 +76,36 @@ const ActivatableListItem = styled(List.Item)`
 
 const WorkloadRow = styled(List.Item)`
     && {
-        flex-wrap: wrap;
-        gap: ${space.xs}px;
+        align-items: stretch;
+        flex-direction: column;
+        gap: ${space.xxs}px;
     }
+`;
+
+/**
+ * Top line of a workload row: the contributor name (semibold, primary
+ * read) sits opposite its open-count / points tags so the username and the
+ * metrics no longer collapse into one undifferentiated line (§1.2.12).
+ */
+const WorkloadHead = styled.div`
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xs}px;
+    justify-content: space-between;
 `;
 
 const WorkloadName = styled.span`
     flex: 1 1 auto;
-    font-weight: ${fontWeight.medium};
+    font-weight: ${fontWeight.semibold};
+    min-width: 0;
+    overflow-wrap: anywhere;
 `;
 
 const WorkloadBarWrap = styled.div`
     background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-    border-radius: 999px;
+    border-radius: ${radius.pill}px;
     height: 6px;
-    margin-top: 4px;
     overflow: hidden;
     width: 100%;
 `;
@@ -93,8 +117,68 @@ const WorkloadBar = styled.div<{ overloaded: boolean }>`
             : "var(--color-copilot-grad-mid, #EA580C)"};
     height: 100%;
     transform-origin: left;
-    transition: transform 320ms ease-out;
+    transition: transform ${motion.long}ms ${easing.standard};
     width: 100%;
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+`;
+
+/**
+ * Compact stat-tile grid for the "At a glance" summary card. Auto-fits as
+ * many tiles per row as fit at a 96px min, so the four stats wrap cleanly
+ * on the narrow drawer / dock surface without magic breakpoints.
+ */
+const SummaryGrid = styled.div`
+    display: grid;
+    gap: ${space.sm}px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+`;
+
+const SummaryTile = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${space.xxs}px;
+`;
+
+const SummaryValue = styled.span`
+    font-size: ${fontSize.xl}px;
+    font-weight: ${fontWeight.semibold};
+    line-height: ${lineHeight.tight};
+`;
+
+/**
+ * Per-column count visualization. A lightweight token-colored bar sized by
+ * proportion of the busiest column — NOT a charting dependency (§1.2.12).
+ */
+const CountRow = styled.div`
+    align-items: center;
+    display: grid;
+    gap: ${space.sm}px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+    padding-block: ${space.xxs}px;
+`;
+
+const CountBarTrack = styled.div`
+    background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
+    border-radius: ${radius.pill}px;
+    height: 8px;
+    overflow: hidden;
+    width: 100%;
+`;
+
+const CountBarFill = styled.div`
+    background: var(--color-copilot-grad-mid, #ea580c);
+    border-radius: ${radius.pill}px;
+    height: 100%;
+    transform-origin: left;
+    transition: transform ${motion.long}ms ${easing.standard};
+    width: 100%;
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
 `;
 
 export interface BriefTabBodyProps {
@@ -779,6 +863,31 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
         return sum / briefData.workload.length;
     }, [briefData]);
 
+    // At-a-glance summary stats, all derived from the brief payload (no new
+    // data fetched). Feeds the top summary card + the per-column bar scaling.
+    const summary = useMemo(() => {
+        if (!briefData) {
+            return { totalTasks: 0, columns: 0, unowned: 0, contributors: 0 };
+        }
+        return {
+            totalTasks: briefData.counts.reduce(
+                (acc, entry) => acc + entry.count,
+                0
+            ),
+            columns: briefData.counts.length,
+            unowned: briefData.unowned.length,
+            contributors: briefData.workload.length
+        };
+    }, [briefData]);
+
+    const maxColumnCount = useMemo(() => {
+        if (!briefData || briefData.counts.length === 0) return 0;
+        return briefData.counts.reduce(
+            (max, entry) => Math.max(max, entry.count),
+            0
+        );
+    }, [briefData]);
+
     const boardBriefRecommendationKey = useMemo(() => {
         if (!briefData?.recommendation) return "";
         const embedded = extractSuggestionRunId(remoteBriefSuggestion?.payload);
@@ -885,6 +994,42 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                     <Typography.Title level={3} style={{ marginTop: 0 }}>
                         {headline}
                     </Typography.Title>
+                    <Card
+                        size="small"
+                        style={{ marginBottom: space.md }}
+                        title={microcopy.brief.summaryTitle}
+                    >
+                        <SummaryGrid>
+                            <SummaryTile>
+                                <SummaryValue>
+                                    {summary.totalTasks}
+                                </SummaryValue>
+                                <Typography.Text type="secondary">
+                                    {microcopy.brief.summaryTotalTasks}
+                                </Typography.Text>
+                            </SummaryTile>
+                            <SummaryTile>
+                                <SummaryValue>{summary.columns}</SummaryValue>
+                                <Typography.Text type="secondary">
+                                    {microcopy.brief.summaryColumns}
+                                </Typography.Text>
+                            </SummaryTile>
+                            <SummaryTile>
+                                <SummaryValue>{summary.unowned}</SummaryValue>
+                                <Typography.Text type="secondary">
+                                    {microcopy.brief.summaryUnowned}
+                                </Typography.Text>
+                            </SummaryTile>
+                            <SummaryTile>
+                                <SummaryValue>
+                                    {summary.contributors}
+                                </SummaryValue>
+                                <Typography.Text type="secondary">
+                                    {microcopy.brief.summaryContributors}
+                                </Typography.Text>
+                            </SummaryTile>
+                        </SummaryGrid>
+                    </Card>
                     {briefData.recommendation && (
                         <Alert
                             action={
@@ -936,28 +1081,49 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                     <SectionHeading>
                         {microcopy.brief.countsPerColumn}
                     </SectionHeading>
-                    <Table
-                        columns={[
-                            {
-                                dataIndex: "columnName",
-                                key: "columnName",
-                                title: microcopy.brief.column
-                            },
-                            {
-                                align: "right",
-                                dataIndex: "count",
-                                key: "count",
-                                title: microcopy.brief.tasks
-                            }
-                        ]}
-                        dataSource={briefData.counts.map((entry) => ({
-                            ...entry,
-                            key: entry.columnId
-                        }))}
-                        pagination={false}
-                        size="small"
-                        style={{ marginBottom: space.md }}
-                    />
+                    <div style={{ marginBottom: space.md }}>
+                        {briefData.counts.map((entry) => {
+                            const ratio =
+                                maxColumnCount > 0
+                                    ? entry.count / maxColumnCount
+                                    : 0;
+                            return (
+                                <CountRow
+                                    aria-label={microcopy.brief.countsBarAria
+                                        .replace("{column}", entry.columnName)
+                                        .replace(
+                                            "{count}",
+                                            String(entry.count)
+                                        )}
+                                    key={entry.columnId}
+                                    role="group"
+                                >
+                                    <Typography.Text
+                                        ellipsis
+                                        style={{ minWidth: 0 }}
+                                    >
+                                        {entry.columnName}
+                                    </Typography.Text>
+                                    <CountBarTrack aria-hidden>
+                                        <CountBarFill
+                                            style={{
+                                                transform: `scaleX(${ratio})`
+                                            }}
+                                        />
+                                    </CountBarTrack>
+                                    <Typography.Text
+                                        strong
+                                        style={{
+                                            fontVariantNumeric: "tabular-nums"
+                                        }}
+                                    >
+                                        {entry.count}
+                                    </Typography.Text>
+                                </CountRow>
+                            );
+                        })}
+                    </div>
+                    <Divider style={{ marginBlock: space.md }} />
 
                     <SectionHeading>
                         {microcopy.brief.largestUnstarted}
@@ -995,6 +1161,8 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                         />
                     )}
 
+                    <Divider style={{ marginBlock: space.md }} />
+
                     <SectionHeading>
                         {microcopy.brief.unownedTasks}
                     </SectionHeading>
@@ -1019,6 +1187,8 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                         />
                     )}
 
+                    <Divider style={{ marginBlock: space.md }} />
+
                     <SectionHeading>{microcopy.brief.workload}</SectionHeading>
                     {briefData.workload.length === 0 ? (
                         <Typography.Text type="secondary">
@@ -1038,27 +1208,35 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                 const overloaded = ratio > 1.2;
                                 return (
                                     <WorkloadRow>
-                                        <WorkloadName>
-                                            {item.username}
-                                        </WorkloadName>
-                                        <span>
-                                            <Tag style={{ marginInlineEnd: 0 }}>
-                                                {microcopy.brief.openCount.replace(
-                                                    "{count}",
-                                                    String(item.openTasks)
-                                                )}
-                                            </Tag>{" "}
-                                            <Tag
-                                                color="blue"
-                                                style={{ marginInlineEnd: 0 }}
-                                            >
-                                                {microcopy.brief.ptsCount.replace(
-                                                    "{count}",
-                                                    String(item.openPoints)
-                                                )}
-                                            </Tag>
-                                        </span>
-                                        <WorkloadBarWrap>
+                                        <WorkloadHead>
+                                            <WorkloadName>
+                                                {item.username}
+                                            </WorkloadName>
+                                            <Space size={space.xxs}>
+                                                <Tag
+                                                    style={{
+                                                        marginInlineEnd: 0
+                                                    }}
+                                                >
+                                                    {microcopy.brief.openCount.replace(
+                                                        "{count}",
+                                                        String(item.openTasks)
+                                                    )}
+                                                </Tag>
+                                                <Tag
+                                                    color="blue"
+                                                    style={{
+                                                        marginInlineEnd: 0
+                                                    }}
+                                                >
+                                                    {microcopy.brief.ptsCount.replace(
+                                                        "{count}",
+                                                        String(item.openPoints)
+                                                    )}
+                                                </Tag>
+                                            </Space>
+                                        </WorkloadHead>
+                                        <WorkloadBarWrap aria-hidden>
                                             <WorkloadBar
                                                 overloaded={overloaded}
                                                 style={{

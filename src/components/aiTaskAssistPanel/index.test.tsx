@@ -3,7 +3,8 @@ import {
     fireEvent,
     render,
     screen,
-    waitFor
+    waitFor,
+    within
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useEffect } from "react";
@@ -203,6 +204,24 @@ describe("AiTaskAssistPanel", () => {
             "taskName",
             expect.any(String)
         );
+    });
+
+    it("groups the similar tasks into a distinct labelled section", async () => {
+        mountPanel({
+            values: { taskName: "Investigate flaky login bug" }
+        });
+        advanceBy(1000);
+        // The similar-tasks list is now its own <section> with an
+        // accessible name, separated from the load-bearing estimate block
+        // (§1.2.12) so it reads as a scannable region rather than a
+        // trailing wall of text.
+        const section = await screen.findByRole("region", {
+            name: /Similar tasks/i
+        });
+        expect(section).toBeInTheDocument();
+        expect(
+            within(section).getByRole("button", { name: /Old login bug/i })
+        ).toBeInTheDocument();
     });
 
     it("opens a similar task when its button is clicked", async () => {
