@@ -177,6 +177,34 @@ export const enSource = {
         reorderDisabledByFilters:
             "Reordering is paused while filters are active. Clear filters to reorder."
     },
+    /*
+     * Keyboard shortcut catalog (ui-todo §2.A.9). The dialog reads its
+     * accessible name + scope headings from here; `descriptions.*` maps to
+     * the stable shortcut ids in `src/constants/shortcuts.ts`. Scope labels
+     * group the catalog in the help dialog.
+     */
+    shortcuts: {
+        dialogTitle: "Keyboard shortcuts",
+        dialogDescription: "Speed up your work with these keyboard shortcuts.",
+        sequenceThen: "then",
+        scopes: {
+            global: "Global",
+            projectPage: "Project page",
+            board: "Board",
+            taskCard: "Focused task card",
+            overlay: "Modal & drawer"
+        },
+        descriptions: {
+            openCommandPalette: "Open the command palette",
+            openShortcutHelp: "Open keyboard shortcut help",
+            goToProjects: "Go to projects",
+            goToBoard: "Go to board",
+            createTask: "Create a task in the focused column",
+            closeOverlay: "Close the open modal or drawer",
+            editTask: "Open the edit modal for the focused task",
+            keyboardDragTask: "Drag the focused task with the keyboard"
+        }
+    },
     settings: {
         darkMode: "Dark mode",
         toggleDarkMode: "Toggle dark mode",

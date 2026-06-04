@@ -77,6 +77,26 @@ jest.mock("../components/onboardingTour", () => {
     };
 });
 
+/*
+ * Mock the keyboard-shortcut help dialog as a sentinel (same single-mount
+ * contract as the tour). The real component registers a global `?` listener
+ * and renders an AntD Modal; the sentinel keeps these layout-shape tests
+ * focused on "the layout reserves exactly one slot" — the dialog's behavior
+ * is covered by its own spec.
+ */
+jest.mock("../components/shortcutHelp", () => {
+    const React = require("react");
+    return {
+        __esModule: true,
+        default: () =>
+            React.createElement(
+                "div",
+                { "data-testid": "shortcut-help-mock" },
+                "ShortcutHelp"
+            )
+    };
+});
+
 // Mock the environment module so individual tests can flip the
 // bottomNavEnabled flag and matchMedia so AntD's Grid.useBreakpoint can
 // resolve to phone-mode (every query returns matches=false → md=false).
@@ -438,6 +458,42 @@ describe("MainLayout", () => {
             expect(screen.getAllByTestId("onboarding-tour-mock")).toHaveLength(
                 1
             );
+        });
+    });
+
+    /*
+     * ui-todo §2.A.9 — keyboard-shortcut help dialog mount. Like the tour,
+     * the layout reserves exactly one always-mounted slot for it (it
+     * self-gates its open state via the global `?` shortcut), so it must
+     * mount once regardless of viewport chrome.
+     */
+    describe("ShortcutHelp mount (ui-todo §2.A.9)", () => {
+        it("mounts the shortcut help dialog exactly once on phone chrome", () => {
+            installMatchMediaPhone();
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(screen.getAllByTestId("shortcut-help-mock")).toHaveLength(1);
+        });
+
+        it("mounts the shortcut help dialog exactly once on desktop chrome", () => {
+            installMatchMediaDesktop();
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(screen.getAllByTestId("shortcut-help-mock")).toHaveLength(1);
         });
     });
 });

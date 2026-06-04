@@ -165,6 +165,28 @@ const zhCN: Dictionary = {
         reorderDisabledByFilters:
             "筛选启用时暂停重新排序。清除筛选后即可拖动排序。"
     },
+    shortcuts: {
+        dialogTitle: "键盘快捷键",
+        dialogDescription: "使用这些键盘快捷键加快你的操作。",
+        sequenceThen: "然后",
+        scopes: {
+            global: "全局",
+            projectPage: "项目页面",
+            board: "看板",
+            taskCard: "聚焦的任务卡片",
+            overlay: "弹窗与抽屉"
+        },
+        descriptions: {
+            openCommandPalette: "打开命令面板",
+            openShortcutHelp: "打开键盘快捷键帮助",
+            goToProjects: "前往项目",
+            goToBoard: "前往看板",
+            createTask: "在聚焦的列中创建任务",
+            closeOverlay: "关闭打开的弹窗或抽屉",
+            editTask: "为聚焦的任务打开编辑弹窗",
+            keyboardDragTask: "使用键盘拖动聚焦的任务"
+        }
+    },
     labels: {
         members: "成员",
         teamMembers: "团队成员",
