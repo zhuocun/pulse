@@ -3,12 +3,28 @@ import {
     FileTextOutlined,
     MessageOutlined
 } from "@ant-design/icons";
+import styled from "@emotion/styled";
 import { Badge, Button, Dropdown, Space } from "antd";
 import type { MenuProps } from "antd";
 import React from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import AiSparkleIcon from "../aiSparkleIcon";
+
+/**
+ * Visible launcher label. Collapses to icon-only under a coarse pointer
+ * (phone chrome) where the launcher lives inside the board's Liquid
+ * Glass capsule and the text would push the four-segment toolbar past a
+ * 390 px viewport. The button keeps an explicit `aria-label` so the
+ * accessible name stays "Copilot" even when the text is hidden, matching
+ * the icon-only collapse `MemberPopover` already ships in the same
+ * capsule.
+ */
+const LauncherLabel = styled.span`
+    @media (pointer: coarse) {
+        display: none;
+    }
+`;
 
 interface CopilotMenuProps {
     /** Opens the AI chat ("Ask") drawer — the primary-button action. */
@@ -76,11 +92,14 @@ const CopilotMenu: React.FC<CopilotMenuProps> = ({
         >
             <Space.Compact>
                 <Button
+                    aria-label={microcopy.labels.copilotShort}
                     icon={<AiSparkleIcon aria-hidden />}
                     onClick={onAsk}
                     type="default"
                 >
-                    {microcopy.labels.copilotShort}
+                    <LauncherLabel>
+                        {microcopy.labels.copilotShort}
+                    </LauncherLabel>
                 </Button>
                 <Dropdown
                     menu={{ items }}
