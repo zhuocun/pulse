@@ -16,12 +16,15 @@ This document is sufficient to implement a client without reading source code.
 7. [SSE Event Format (Agents Stream)](#7-sse-event-format-agents-stream)
 8. [Auth](#8-auth)
 9. [Users](#9-users)
-10. [Projects](#10-projects)
+10. [Projects (and Members)](#10-projects-and-members)
 11. [Boards (Columns)](#11-boards-columns)
 12. [Tasks](#12-tasks)
-13. [Health](#13-health)
-14. [AI v1 (`/api/v1/ai/*`)](#14-ai-v1-apiv1ai)
-15. [Agents v2.1 (`/api/v1/agents/*`)](#15-agents-v21-apiv1agents)
+13. [Labels](#13-labels)
+14. [Comments](#14-comments)
+15. [Notifications](#15-notifications)
+16. [Health](#16-health)
+17. [AI v1 (`/api/v1/ai/*`)](#17-ai-v1-apiv1ai-and-legacy-apiai)
+18. [Agents v2.1 (`/api/v1/agents/*`)](#18-agents-v21-apiv1agents)
 
 ---
 
@@ -31,7 +34,7 @@ This document is sufficient to implement a client without reading source code.
 https://<host>
 ```
 
-All endpoints are served over HTTPS in production. No version prefix is required for Auth, Users, Projects, Boards, and Tasks — they all live under `/api/v1/`. The legacy alias `/api/ai/*` (without `v1`) mirrors the AI v1 router exactly and is kept for backward compatibility with the shipped React client; new integrations should use `/api/v1/ai/*`.
+All endpoints are served over HTTPS in production. No version prefix is required for Auth, Users, Projects (and Members), Boards, Tasks, Labels, Comments, and Notifications — they all live under `/api/v1/`. The legacy alias `/api/ai/*` (without `v1`) mirrors the AI v1 router exactly and is kept for backward compatibility with the shipped React client; new integrations should use `/api/v1/ai/*`.
 
 CORS is controlled by `CORS_ORIGINS` (comma-separated) and `CORS_ORIGIN_REGEX`. Credentialed requests are allowed. Allowed headers include `Authorization`, `Content-Type`, `X-Request-Id`, `X-Pulse-Model`, `Idempotency-Key`, and `Accept`. Exposed response headers include `X-Request-Id`, `Deprecation`, `Sunset`, `Retry-After`, and `Idempotent-Replay`.
 
@@ -541,17 +544,39 @@ Toggle a project in the authenticated user's liked-projects list (idempotent tog
 
 ---
 
-## 10. Projects
+## 10. Projects (and Members)
 
-Base path: `/api/v1/projects`
+Base path: `/api/v1/projects` (project CRUD) and `/api/v1/projects/members` (membership).
 
-All project endpoints require a valid JWT. Project access is restricted to the project manager (the user who created it, or to whom ownership was transferred).
+All project endpoints require a valid JWT.
+
+### Access Model (RBAC)
+
+Project access is governed by **role-based access control**, not a single manager. Membership is stored **inline** on the project document as `memberIds`: a list of `{"userId": "<id>", "role": "<role>"}` rows.
+
+Roles are **totally ordered**: `owner > editor > viewer` (ranks `3 > 2 > 1`). A gate expressed as a minimum role passes for any role whose rank is ≥ the gate's rank:
+
+- **`viewer`** — read project, board, tasks, labels, comments; create comments.
+- **`editor`** — everything `viewer` can do, plus create/update/delete columns, tasks (incl. bulk + reorder), and labels.
+- **`owner`** — everything `editor` can do, plus manage members (add / change-role / remove).
+
+Each project also has a `managerId` — the user who created it (or to whom ownership was transferred). The manager is an **owner-equivalent root of trust** with two special properties:
+
+1. **Short-circuit access.** A caller whose id equals `managerId` is treated as owner-level **even if `memberIds` is empty or missing** — so a project can never be locked out of its own creator, and legacy single-owner project documents (which predate `memberIds`) still authorize correctly.
+2. **Immutable membership.** The manager's own roster entry cannot be added, demoted, or removed through the member endpoints (see [Project Members](#project-members)). Changing the manager is a separate operation — `managerId` on `PUT /projects` (ownership transfer), not a roster edit.
+
+Two altitudes are stricter than plain `owner`:
+
+- **`PUT /projects` and `DELETE /projects` require strict `managerId == caller`** — owner-level membership is **not** sufficient; even another `owner` member is rejected with `403`.
+- An owner-level member (including one promoted from a plain member) otherwise has full administrative reach within the project (e.g. they may moderate comments — see [§14](#14-comments)).
+
+The serialized project document includes `memberIds`; the manager-only `PUT` body cannot write `memberIds` (it is managed exclusively through the member endpoints).
 
 ---
 
 ### POST /api/v1/projects/
 
-Create a new project. The authenticated user becomes the manager.
+Create a new project. The authenticated user becomes the manager and is seeded as an `owner` member; the three default columns ("To Do", "In Progress", "Done") are created at the same time.
 
 **Auth:** Required.
 
@@ -568,6 +593,8 @@ Create a new project. The authenticated user becomes the manager.
 |---|---|---|
 | `projectName` | string | Required, non-empty |
 | `organization` | string | Required, non-empty |
+
+> **`managerId` is never read from the body.** It is derived from the JWT `sub` claim (anti-confused-deputy). Any `managerId` supplied in the body is ignored. On success the project is seeded with `memberIds: [{"userId": "<caller>", "role": "owner"}]`.
 
 **Response — 201 Created:**
 
@@ -587,7 +614,7 @@ Create a new project. The authenticated user becomes the manager.
 
 ### GET /api/v1/projects/
 
-Retrieve one or more projects visible to the authenticated manager.
+Retrieve one or more projects the authenticated caller can access (`viewer`-level or above).
 
 **Auth:** Required.
 
@@ -595,11 +622,11 @@ Retrieve one or more projects visible to the authenticated manager.
 
 | Parameter | Type | Notes |
 |---|---|---|
-| `projectId` | string | Optional. Fetch a single project by ID. Returns 403 if the caller is not the manager. |
-| `projectName` | string | Optional. Filter by name (exact match). |
-| `managerId` | string | Optional. Must equal the authenticated user's ID; otherwise 403. |
+| `projectId` | string | Optional. Fetch a single project by ID. Returns `403` if the caller lacks `viewer` access (this is also how a cross-tenant probe is rejected). |
+| `projectName` | string | Optional. Filter the list by name (exact match). |
+| `managerId` | string | Optional. Must equal the authenticated user's ID; any other value short-circuits to `403` before any lookup. |
 
-When no parameters are provided, all projects belonging to the authenticated user are returned.
+When no `projectId` is given, the list of every project the caller can access (as manager or member) is returned. Visibility is computed in the application layer: the candidate set is fetched with a flat filter and each row is checked with the `viewer` access rule, so the list never leaks a project the caller is not a member of.
 
 **Response — 200 OK** (list query):
 
@@ -609,7 +636,11 @@ When no parameters are provided, all projects belonging to the authenticated use
     "_id": "64a1f2e3b4c5d6e7f8a9b0c2",
     "projectName": "Acme Backlog",
     "organization": "Acme Corp",
-    "managerId": "64a1f2e3b4c5d6e7f8a9b0c1"
+    "managerId": "64a1f2e3b4c5d6e7f8a9b0c1",
+    "memberIds": [
+      {"userId": "64a1f2e3b4c5d6e7f8a9b0c1", "role": "owner"},
+      {"userId": "64b2a3d4c5e6f7a8b9c0d1e2", "role": "editor"}
+    ]
   }
 ]
 ```
@@ -621,7 +652,10 @@ When no parameters are provided, all projects belonging to the authenticated use
   "_id": "64a1f2e3b4c5d6e7f8a9b0c2",
   "projectName": "Acme Backlog",
   "organization": "Acme Corp",
-  "managerId": "64a1f2e3b4c5d6e7f8a9b0c1"
+  "managerId": "64a1f2e3b4c5d6e7f8a9b0c1",
+  "memberIds": [
+    {"userId": "64a1f2e3b4c5d6e7f8a9b0c1", "role": "owner"}
+  ]
 }
 ```
 
@@ -631,16 +665,16 @@ When no parameters are provided, all projects belonging to the authenticated use
 |---|---|
 | 200 | Project(s) found |
 | 401 | Missing or invalid JWT |
-| 403 | `projectId` belongs to another manager, or `managerId` does not match caller |
+| 403 | `projectId` is not accessible to the caller, or `managerId` does not match caller |
 | 404 | No matching project(s) found |
 
 ---
 
 ### PUT /api/v1/projects/
 
-Update a project. Only the manager may update.
+Update a project's name, organization, or manager (ownership transfer). **Manager-only** — the caller's id must equal the project's current `managerId`; owner-level membership is not sufficient.
 
-**Auth:** Required (must be manager of the project).
+**Auth:** Required (must be the project manager — strict `managerId == caller`).
 
 **Request body:**
 
@@ -658,7 +692,9 @@ Update a project. Only the manager may update.
 | `_id` | string | Required — identifies the project to update |
 | `projectName` | string | Optional |
 | `organization` | string | Optional |
-| `managerId` | string | Optional — transfers ownership; the target user must exist |
+| `managerId` | string | Optional — transfers ownership; the target user must exist (else `404 "Manager not found"`) |
+
+Only `{projectName, organization, managerId}` are writable. **`memberIds` is not writable here** — any `memberIds` (or other unknown) key in the body is ignored. A `managerId` change is an ownership transfer: the new manager must be an existing user, but is otherwise validated against the `users` collection only (the roster is not rewritten by this call).
 
 **Response — 200 OK:**
 
@@ -673,16 +709,16 @@ Update a project. Only the manager may update.
 | 200 | Updated successfully |
 | 400 | `_id` missing from body |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
-| 404 | Project not found, or `managerId` references a non-existent user |
+| 403 | Caller is not the project manager (`managerId != caller`) |
+| 404 | Project not found, or `managerId` references a non-existent user (`"Manager not found"`) |
 
 ---
 
 ### DELETE /api/v1/projects/
 
-Delete a project and all its columns and tasks (cascading deletion).
+Delete a project and all its columns and tasks (cascading deletion, leaves-first: tasks → columns → project). **Manager-only** — strict `managerId == caller`.
 
-**Auth:** Required (must be manager of the project).
+**Auth:** Required (must be the project manager — strict `managerId == caller`).
 
 **Query parameter:**
 
@@ -703,26 +739,24 @@ Delete a project and all its columns and tasks (cascading deletion).
 | 200 | Project deleted |
 | 400 | `projectId` not provided or other bad request |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller is not the project manager (`managerId != caller`) |
 | 404 | Project not found |
 
 ---
 
-## 11. Boards (Columns)
+### Project Members
 
-Base path: `/api/v1/boards`
+Base path: `/api/v1/projects/members`.
 
-Board endpoints manage columns on a project board. All require a valid JWT and the caller must be the project manager.
-
-When a project has no columns, `GET /api/v1/boards/` seeds three default columns ("To Do", "In Progress", "Done") before returning.
+Manage the project's RBAC roster. The roster **read** requires `viewer`; all **mutations** require `owner`. Every mutation refuses to touch the `managerId` row (see the access model above): a request targeting the manager returns `400 "Bad request"`.
 
 ---
 
-### GET /api/v1/boards/
+#### GET /api/v1/projects/members
 
-Retrieve all columns for a project, sorted by `index`.
+Retrieve the project's member roster (resolved against the user directory).
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`viewer` on the project).
 
 **Query parameter:**
 
@@ -734,11 +768,172 @@ Retrieve all columns for a project, sorted by `index`.
 
 ```json
 [
-  {"_id": "col_a", "columnName": "To Do",      "projectId": "proj_abc", "index": 0},
-  {"_id": "col_b", "columnName": "In Progress", "projectId": "proj_abc", "index": 1},
-  {"_id": "col_c", "columnName": "Done",        "projectId": "proj_abc", "index": 2}
+  {"_id": "64a1f2e3b4c5d6e7f8a9b0c1", "username": "alice", "email": "alice@example.com", "role": "owner"},
+  {"_id": "64b2a3d4c5e6f7a8b9c0d1e2", "username": "bob",   "email": "bob@example.com",   "role": "editor"}
 ]
 ```
+
+Each row is `{_id, username, email, role}`. A member whose underlying user has been deleted (a dangling reference) is **skipped** rather than emitted as a half-populated row.
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Roster returned |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `viewer` access to the project |
+| 404 | Project not found |
+
+---
+
+#### POST /api/v1/projects/members
+
+Add a member, or update an existing member's role (idempotent upsert).
+
+**Auth:** Required (`owner` on the project).
+
+**Request body:**
+
+```json
+{
+  "projectId": "64a1f2e3b4c5d6e7f8a9b0c2",
+  "userId": "64b2a3d4c5e6f7a8b9c0d1e2",
+  "role": "editor"
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required, non-empty |
+| `userId` | string | Required, non-empty; must reference an existing user |
+| `role` | string | Required; one of `"owner"`, `"editor"`, `"viewer"` |
+
+If `userId` is already a member, this **updates their role** (no duplicate row is created). Adding the `managerId` is rejected — the manager is already an immutable owner.
+
+**Response — 201 Created:**
+
+```json
+"Member added"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 201 | Member added or role updated |
+| 400 | Missing `projectId`/`userId`/`role`, invalid `role`, or `userId` equals the `managerId` (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `owner` access to the project |
+| 404 | Project not found, or `userId` references a non-existent user (`"Member not found"`) |
+
+---
+
+#### PUT /api/v1/projects/members
+
+Change an existing member's role.
+
+**Auth:** Required (`owner` on the project).
+
+**Request body:**
+
+```json
+{
+  "projectId": "64a1f2e3b4c5d6e7f8a9b0c2",
+  "userId": "64b2a3d4c5e6f7a8b9c0d1e2",
+  "role": "viewer"
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required, non-empty |
+| `userId` | string | Required, non-empty; must already be a member |
+| `role` | string | Required; one of `"owner"`, `"editor"`, `"viewer"` |
+
+**Response — 200 OK:**
+
+```json
+"Member updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Role updated |
+| 400 | Missing `projectId`/`userId`/`role`, invalid `role`, or `userId` equals the `managerId` (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `owner` access to the project |
+| 404 | Project not found, or `userId` is not a member (`"Member not found"`) |
+
+---
+
+#### DELETE /api/v1/projects/members
+
+Remove a member from the project.
+
+**Auth:** Required (`owner` on the project).
+
+**Query parameters:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `projectId` | string | Required |
+| `userId` | string | Required — the member to remove |
+
+**Response — 200 OK:**
+
+```json
+"Member removed"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Member removed |
+| 400 | `userId` not provided, or `userId` equals the `managerId` (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `owner` access to the project |
+| 404 | Project not found, or `userId` is not a member (`"Member not found"`) |
+
+---
+
+## 11. Boards (Columns)
+
+Base path: `/api/v1/boards`
+
+Board endpoints manage columns on a project board. All require a valid JWT. **Reads require `viewer`** access to the project; **writes (create / update / reorder / delete) require `editor`** (see the [Access Model](#access-model-rbac) in §10).
+
+**Default-column seeding (self-healing).** When a project has no columns, the three default columns ("To Do", "In Progress", "Done") are seeded lazily before returning. This happens both at project-create time and on the first `GET`/`POST` to `/api/v1/boards/`, so legacy projects that predate create-time seeding self-heal on first board access. Seeded columns have no explicit `wipLimit`, which reads as "no limit" (equivalent to `0`).
+
+Each column carries a `wipLimit` — a per-column work-in-progress cap. See [WIP-limit semantics](#wip-limit-semantics) below.
+
+---
+
+### GET /api/v1/boards/
+
+Retrieve all columns for a project, sorted by `index`.
+
+**Auth:** Required (`viewer` on the project).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `projectId` | string | Required |
+
+**Response — 200 OK:**
+
+```json
+[
+  {"_id": "col_a", "columnName": "To Do",       "projectId": "proj_abc", "index": 0, "wipLimit": 0},
+  {"_id": "col_b", "columnName": "In Progress", "projectId": "proj_abc", "index": 1, "wipLimit": 3},
+  {"_id": "col_c", "columnName": "Done",        "projectId": "proj_abc", "index": 2, "wipLimit": 0}
+]
+```
+
+(Columns seeded as defaults may omit `wipLimit` entirely; treat a missing `wipLimit` as `0` / no limit.)
 
 **Status codes:**
 
@@ -747,23 +942,38 @@ Retrieve all columns for a project, sorted by `index`.
 | 200 | Columns returned (auto-seeded if none existed) |
 | 400 | `projectId` not provided |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `viewer` access to the project |
 | 404 | Project not found |
+
+---
+
+### WIP-limit semantics
+
+`wipLimit` is a **non-negative integer** that caps the number of in-progress tasks a column should hold. **`0` means "no limit."** It is consumed by the AI drift detector but owned by this layer.
+
+Validation (applied on `POST` and `PUT`):
+
+- Must be an `int`. A JSON boolean is rejected (in the underlying type system `bool` is an `int` subclass, so it is excluded explicitly).
+- Floats (`1.5`) and numeric strings (`"5"`) are rejected as non-integers.
+- Negative values are rejected.
+
+A failed check returns `400` with the validation envelope (`param: "wipLimit"`). The check runs at the router and again defensively in the service.
 
 ---
 
 ### POST /api/v1/boards/
 
-Add a new column to a project board.
+Add a new column to a project board. The new column is appended (its `index` is the current column count).
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the project).
 
 **Request body:**
 
 ```json
 {
   "columnName": "Review",
-  "projectId": "proj_abc"
+  "projectId": "proj_abc",
+  "wipLimit": 3
 }
 ```
 
@@ -771,6 +981,7 @@ Add a new column to a project board.
 |---|---|---|
 | `columnName` | string | Required, non-empty |
 | `projectId` | string | Required, non-empty |
+| `wipLimit` | integer | Optional. Non-negative integer; `0` = no limit (default when omitted). See [WIP-limit semantics](#wip-limit-semantics). |
 
 **Response — 201 Created:**
 
@@ -783,18 +994,60 @@ Add a new column to a project board.
 | Code | Condition |
 |---|---|
 | 201 | Column created |
-| 400 | Validation errors (missing `columnName` or `projectId`) |
+| 400 | Validation errors (missing `columnName`/`projectId`, or invalid `wipLimit`) |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the project |
 | 404 | Project not found |
+
+---
+
+### PUT /api/v1/boards/
+
+Rename a column and/or change its WIP limit.
+
+**Auth:** Required (`editor` on the column's project).
+
+**Request body:**
+
+```json
+{
+  "_id": "col_b",
+  "columnName": "In Review",
+  "wipLimit": 5
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the column |
+| `columnName` | string | Optional; non-empty when present |
+| `wipLimit` | integer | Optional. Non-negative integer; `0` = no limit. See [WIP-limit semantics](#wip-limit-semantics). |
+
+Only `{columnName, wipLimit}` are writable. **`projectId` and `index` are not writable** — a column cannot be re-parented or repositioned via this call (use `PUT /api/v1/boards/orders` to reposition). Any other key in the body is ignored.
+
+**Response — 200 OK:**
+
+```json
+"Column updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Updated successfully |
+| 400 | `_id` missing, empty `columnName`, or invalid `wipLimit` |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the column's project |
+| 404 | Column not found |
 
 ---
 
 ### PUT /api/v1/boards/orders
 
-Reorder columns on a board (move `fromId` relative to `referenceId`).
+Reorder columns on a board (move `fromId` relative to `referenceId`). Both columns must belong to the same project; the surviving indices are re-packed contiguously.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the project).
 
 **Request body:**
 
@@ -824,16 +1077,16 @@ Reorder columns on a board (move `fromId` relative to `referenceId`).
 |---|---|
 | 200 | Reordered successfully |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
-| 404 | One or both column IDs not found |
+| 403 | Caller lacks `editor` access to the project |
+| 404 | One or both column IDs not found, the columns are in different projects, or the move is invalid |
 
 ---
 
 ### DELETE /api/v1/boards/
 
-Delete a column and all its tasks.
+Delete a column **and all tasks in it**, then re-pack the remaining columns' `index` values so they stay contiguous.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the column's project).
 
 **Query parameter:**
 
@@ -851,10 +1104,10 @@ Delete a column and all its tasks.
 
 | Code | Condition |
 |---|---|
-| 200 | Column deleted |
+| 200 | Column deleted (its tasks deleted; sibling indices re-packed) |
 | 400 | `columnId` not provided |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the column's project |
 | 404 | Column not found |
 
 ---
@@ -863,9 +1116,23 @@ Delete a column and all its tasks.
 
 Base path: `/api/v1/tasks`
 
-All task endpoints require a valid JWT and the caller must be the project manager.
+All task endpoints require a valid JWT. **Reads require `viewer`** access to the project; **writes (create / update / delete / bulk / reorder) require `editor`** (see the [Access Model](#access-model-rbac) in §10).
 
-When a project has no tasks, `GET /api/v1/tasks/` seeds a single default task in the "To Do" column (or the first available column if "To Do" does not exist).
+When a project has columns but no tasks, `GET /api/v1/tasks/` seeds a single `"Default Task"` in the "To Do" column (or the lowest-index column if "To Do" does not exist).
+
+### Task fields
+
+Beyond the base fields (`taskName`, `type`, `epic`, `storyPoints`, `note`, `columnId`, `coordinatorId`), a task carries five **richness** fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `startDate` | string | ISO date string, or `""`. Default `""`. Stored verbatim — the server does **not** parse the calendar value. |
+| `dueDate` | string | ISO date string, or `""`. Default `""`. Stored verbatim. |
+| `labelIds` | string[] | List of label `_id` strings. Default `[]`. |
+| `assigneeIds` | string[] | **Additional** assignees beyond the primary `coordinatorId`. List of user-id strings. Default `[]`. |
+| `parentTaskId` | string \| null | Parent task `_id` for a sub-task, or `null` for a top-level task. Default `null`. One level of nesting only (see [Sub-tasks](#sub-tasks-parenttaskid)). |
+
+`coordinatorId` remains the **primary** assignee (a single user id); `assigneeIds` is the additional list.
 
 ---
 
@@ -873,7 +1140,7 @@ When a project has no tasks, `GET /api/v1/tasks/` seeds a single default task in
 
 Retrieve all tasks for a project, sorted by `index` within each column.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`viewer` on the project).
 
 **Query parameter:**
 
@@ -895,7 +1162,12 @@ Retrieve all tasks for a project, sorted by `index` within each column.
     "columnId": "col_a",
     "projectId": "proj_abc",
     "coordinatorId": "64a1f2e3b4c5d6e7f8a9b0c1",
-    "index": 0
+    "index": 0,
+    "startDate": "2026-06-01",
+    "dueDate": "2026-06-15",
+    "labelIds": ["label_bug", "label_p1"],
+    "assigneeIds": ["64b2a3d4c5e6f7a8b9c0d1e2"],
+    "parentTaskId": null
   }
 ]
 ```
@@ -907,16 +1179,16 @@ Retrieve all tasks for a project, sorted by `index` within each column.
 | 200 | Tasks returned (auto-seeded if none existed) |
 | 400 | `projectId` not provided |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `viewer` access to the project |
 | 404 | Project not found or no columns exist |
 
 ---
 
 ### POST /api/v1/tasks/
 
-Create a new task.
+Create a new task. Only the routing/identity fields (`projectId`, `columnId`, `taskName`) are required at the wire; the rest take sensible defaults so a quick-add can post a minimal body.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the project).
 
 **Request body:**
 
@@ -929,7 +1201,12 @@ Create a new task.
   "epic": "Auth",
   "storyPoints": 3,
   "note": "Must support SSO.",
-  "coordinatorId": "64a1f2e3b4c5d6e7f8a9b0c1"
+  "coordinatorId": "64a1f2e3b4c5d6e7f8a9b0c1",
+  "startDate": "2026-06-01",
+  "dueDate": "2026-06-15",
+  "labelIds": ["label_bug"],
+  "assigneeIds": ["64b2a3d4c5e6f7a8b9c0d1e2"],
+  "parentTaskId": null
 }
 ```
 
@@ -938,11 +1215,16 @@ Create a new task.
 | `projectId` | string | Required, non-empty |
 | `columnId` | string | Required, non-empty; must belong to `projectId` |
 | `taskName` | string | Required, non-empty |
-| `type` | string | Required, non-empty |
-| `epic` | string | Required, non-empty |
-| `storyPoints` | number | Required |
-| `note` | string | Required, non-empty |
-| `coordinatorId` | string | Optional; if provided, must be a valid user ID |
+| `coordinatorId` | string | Required; must reference an existing user (the primary assignee) |
+| `type` | string | Optional; defaults to `"Task"` |
+| `epic` | string | Optional; defaults to `""` |
+| `note` | string | Optional; defaults to `""` |
+| `storyPoints` | number | Optional; defaults to `1`. When present, must be a positive finite number (see [Field validation](#field-validation)). |
+| `startDate` | string | Optional; ISO date string or `""`. Default `""`. |
+| `dueDate` | string | Optional; ISO date string or `""`. Default `""`. |
+| `labelIds` | string[] | Optional; list of strings. Default `[]`. |
+| `assigneeIds` | string[] | Optional; list of strings. Default `[]`. |
+| `parentTaskId` | string \| null | Optional; parent task `_id` or `null`. Default `null`. Validated per [Sub-tasks](#sub-tasks-parenttaskid). |
 
 **Response — 201 Created:**
 
@@ -955,17 +1237,17 @@ Create a new task.
 | Code | Condition |
 |---|---|
 | 201 | Task created |
-| 400 | Missing required fields or `columnId` does not belong to `projectId` |
+| 400 | Missing required fields; `columnId` does not belong to `projectId`; `coordinatorId` does not reference an existing user; or a richness/`storyPoints`/`parentTaskId` value fails validation |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the project |
 
 ---
 
 ### PUT /api/v1/tasks/
 
-Update a task.
+Update a task. Every field except `_id` and the ordering-managed `index` is writable, including the five richness fields. Reassigning `projectId`/`columnId` is allowed but the target column must belong to the (possibly new) project.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the task's **current** project **and** on the target project if `projectId` is being reassigned).
 
 **Request body:**
 
@@ -974,21 +1256,30 @@ Update a task.
   "_id": "task_001",
   "taskName": "Implement login page (revised)",
   "storyPoints": 5,
-  "columnId": "col_b"
+  "columnId": "col_b",
+  "labelIds": ["label_bug", "label_p1"],
+  "assigneeIds": ["64b2a3d4c5e6f7a8b9c0d1e2"],
+  "dueDate": "2026-06-20",
+  "parentTaskId": "task_000"
 }
 ```
 
 | Field | Type | Rules |
 |---|---|---|
 | `_id` | string | Required — identifies the task |
-| `taskName` | string | Optional |
+| `taskName` | string | Optional; non-empty when present |
 | `type` | string | Optional |
 | `epic` | string | Optional |
-| `storyPoints` | number | Optional |
+| `storyPoints` | number | Optional; positive finite number when present (see [Field validation](#field-validation)) |
 | `note` | string | Optional |
-| `columnId` | string | Optional; if changed, must belong to the same project |
-| `projectId` | string | Optional |
-| `coordinatorId` | string | Optional; must be a valid user ID if provided |
+| `columnId` | string | Optional; if changed, must belong to the task's project |
+| `projectId` | string | Optional; reassigns the task — `editor` is re-checked on the target project and the column must belong to it |
+| `coordinatorId` | string | Optional; must reference an existing user |
+| `startDate` | string | Optional; ISO date string or `""` |
+| `dueDate` | string | Optional; ISO date string or `""` |
+| `labelIds` | string[] | Optional; list of strings |
+| `assigneeIds` | string[] | Optional; list of strings |
+| `parentTaskId` | string \| null | Optional; validated per [Sub-tasks](#sub-tasks-parenttaskid). `null`/`""` clears the parent. |
 
 **Response — 200 OK:**
 
@@ -1001,17 +1292,44 @@ Update a task.
 | Code | Condition |
 |---|---|
 | 200 | Updated successfully |
+| 400 | A field fails validation (e.g. empty `taskName`, bad `storyPoints`/dates/id-lists, or an invalid `parentTaskId`) |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the task's current or target project |
 | 404 | Task not found, or referenced column/project/coordinator does not exist |
+
+> A non-existent `_id` returns `404` (the task is resolved before the access check). `400` validation errors that come from the stateless body-shape pass (e.g. bad date / id-list / `storyPoints` / empty `taskName`) are returned before the task is loaded.
+
+---
+
+### Field validation
+
+These rules apply to `POST /api/v1/tasks/`, `PUT /api/v1/tasks/`, and `PUT /api/v1/tasks/bulk` (on the change set). A failed check returns `400` with the validation envelope.
+
+| Field | Rule |
+|---|---|
+| `storyPoints` | Must be a positive **finite** number. A JSON boolean, `NaN`/`Infinity`, and values `<= 0` are rejected. |
+| `startDate` / `dueDate` | When present and non-empty, must be a **string**. The server does not parse the calendar value — format is the client's responsibility. |
+| `labelIds` / `assigneeIds` | When present, must be a **list of strings**. |
+| `taskName` (update) | When present, must be a non-empty string. |
+| `parentTaskId` | See [Sub-tasks](#sub-tasks-parenttaskid). |
+
+### Sub-tasks (`parentTaskId`)
+
+A task may reference a parent via `parentTaskId`. When set to a non-empty value it is validated:
+
+- The parent task must **exist**.
+- The parent must live in the **same project** as the child.
+- The parent must **not be the task itself** (no self-parent).
+
+Clearing the parent (`null` or `""`) is always allowed. Only **one level** of nesting is supported — the server does not walk an ancestor chain, so it does not prevent deeper graphs beyond the immediate self-reference guard; the board treats parentage as a single level. On parent **deletion**, children are **orphaned to top-level** (their `parentTaskId` is set to `null`); they are never cascade-deleted (see `DELETE` below).
 
 ---
 
 ### DELETE /api/v1/tasks/
 
-Delete a task.
+Delete a task. Its sub-tasks (children referencing it as `parentTaskId`) are **orphaned to top-level** rather than deleted, and the remaining tasks in the column have their `index` values re-packed contiguously.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the task's project).
 
 **Query parameter:**
 
@@ -1029,18 +1347,68 @@ Delete a task.
 
 | Code | Condition |
 |---|---|
-| 200 | Task deleted |
-| 400 | `taskId` not provided or task not found |
+| 200 | Task deleted (children orphaned; sibling indices re-packed) |
+| 400 | `taskId` not provided |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the task's project |
+| 404 | Task not found |
+
+---
+
+### PUT /api/v1/tasks/bulk
+
+Apply one set of metadata `changes` to many tasks at once (fan-out edit).
+
+**Auth:** Required (`editor` on **every** target task's project — checked across the whole set **before any write**).
+
+**Request body:**
+
+```json
+{
+  "taskIds": ["task_001", "task_002", "task_003"],
+  "changes": {
+    "type": "bug",
+    "epic": "Hotfix",
+    "storyPoints": 2,
+    "labelIds": ["label_p1"],
+    "assigneeIds": ["64b2a3d4c5e6f7a8b9c0d1e2"],
+    "dueDate": "2026-06-30"
+  }
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `taskIds` | string[] | Required, non-empty list of task ids |
+| `changes` | object | Required, non-empty object of fields to apply to every listed task |
+
+**Editable subset.** `changes` may set any task field **except `columnId` and `projectId`** (and the ordering-managed `index`) — positional/routing moves must go through `PUT /api/v1/tasks/orders` or a single `PUT /api/v1/tasks/`, where index re-packing and project re-validation happen. **Unknown or disallowed keys in `changes` are silently dropped**, so a client may send a wider patch object and trust the server to keep only the safe fields. If, after dropping disallowed keys, nothing editable remains, the request is a `400`.
+
+**All-or-nothing on validation.** Every target id is resolved up front: **a single unknown id fails the whole batch with `404`** before anything is written. The same invariants the single-task path enforces are re-run on the change set (`storyPoints`, dates, id-lists, `coordinatorId` existence, and `parentTaskId` same-project/not-self per target task). The access check runs on every task's project before any mutation, so a member who lacks `editor` on even one target cannot slip edits onto the tasks they do control.
+
+**Response — 200 OK:**
+
+```json
+"Tasks updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | All listed tasks updated |
+| 400 | `taskIds` missing/empty, `changes` not an object, no editable keys remain, or a change-set value fails validation |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to one or more target tasks' projects |
+| 404 | One or more `taskIds` do not exist |
 
 ---
 
 ### PUT /api/v1/tasks/orders
 
-Reorder tasks within or across columns.
+Reorder tasks within or across columns. All referenced tasks/columns must belong to the same project.
 
-**Auth:** Required (must be project manager).
+**Auth:** Required (`editor` on the project).
 
 **Request body:**
 
@@ -1075,11 +1443,427 @@ Reorder tasks within or across columns.
 | 200 | Reordered successfully |
 | 400 | Missing IDs, columns not in the same project, or stale reference IDs |
 | 401 | Missing or invalid JWT |
-| 403 | Caller is not the project manager |
+| 403 | Caller lacks `editor` access to the project |
 
 ---
 
-## 13. Health
+## 13. Labels
+
+Base path: `/api/v1/labels`
+
+Labels are per-project tags applied to tasks (via a task's `labelIds`). **Reads require `viewer`**; **writes (create / update / delete) require `editor`** (see the [Access Model](#access-model-rbac) in §10).
+
+---
+
+### GET /api/v1/labels/
+
+List a project's labels.
+
+**Auth:** Required (`viewer` on the project).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `projectId` | string | Required |
+
+**Response — 200 OK:**
+
+```json
+[
+  {"_id": "label_bug", "projectId": "proj_abc", "name": "Bug",      "color": "#e03131"},
+  {"_id": "label_p1",  "projectId": "proj_abc", "name": "Priority", "color": "#888888"}
+]
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Labels returned |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `viewer` access to the project |
+| 404 | Project not found |
+
+---
+
+### POST /api/v1/labels/
+
+Create a label on a project.
+
+**Auth:** Required (`editor` on the project).
+
+**Request body:**
+
+```json
+{
+  "projectId": "proj_abc",
+  "name": "Bug",
+  "color": "#e03131"
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required, non-empty |
+| `name` | string | Required, non-empty string |
+| `color` | string | Optional; must be a string when present. Defaults to `"#888888"`. |
+
+**Response — 201 Created:**
+
+```json
+"Label created"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 201 | Label created |
+| 400 | `name` missing/empty/non-string, or `color` is non-string (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the project |
+| 404 | Project not found |
+
+---
+
+### PUT /api/v1/labels/
+
+Update a label's name and/or color.
+
+**Auth:** Required (`editor` on the label's project).
+
+**Request body:**
+
+```json
+{
+  "_id": "label_bug",
+  "name": "Defect",
+  "color": "#c92a2a"
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the label |
+| `name` | string | Optional; non-empty string when present |
+| `color` | string | Optional; must be a string when present |
+
+Only `{name, color}` are writable — **`projectId` is immutable** (a label cannot be moved between projects). Any other key in the body is ignored.
+
+**Response — 200 OK:**
+
+```json
+"Label updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Updated successfully |
+| 400 | Empty/non-string `name`, or non-string `color` (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the label's project |
+| 404 | Label not found |
+
+---
+
+### DELETE /api/v1/labels/
+
+Delete a label. The deleted id is **cascade-stripped** from every same-project task's `labelIds`, so the board never renders a dangling chip.
+
+**Auth:** Required (`editor` on the label's project).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `labelId` | string | Required |
+
+**Response — 200 OK:**
+
+```json
+"Label deleted"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Label deleted (id stripped from every referencing task) |
+| 400 | `labelId` not provided |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the label's project |
+| 404 | Label not found |
+
+---
+
+## 14. Comments
+
+Base path: `/api/v1/comments`
+
+Comments are threaded on a task. A comment's project is **derived from the task**, not the request body — so a client cannot file a comment under a project the task does not belong to. **Viewing and creating** require `viewer` on the task's project ("viewers are participants too"); **editing** is **author-only**; **deleting** is allowed for the **author or the project manager** (owner-level).
+
+A comment can carry `@mentions` that fan out into notifications (see [Mention notifications](#mention-notifications)).
+
+---
+
+### GET /api/v1/comments/
+
+List a task's comments, oldest-first.
+
+**Auth:** Required (`viewer` on the task's project).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `taskId` | string | Required |
+
+**Response — 200 OK:**
+
+```json
+[
+  {
+    "_id": "comment_001",
+    "taskId": "task_001",
+    "projectId": "proj_abc",
+    "authorId": "64a1f2e3b4c5d6e7f8a9b0c1",
+    "body": "Picking this up.",
+    "mentions": []
+  },
+  {
+    "_id": "comment_002",
+    "taskId": "task_001",
+    "projectId": "proj_abc",
+    "authorId": "64b2a3d4c5e6f7a8b9c0d1e2",
+    "body": "Thanks @alice — needs the SSO bits first.",
+    "mentions": ["64a1f2e3b4c5d6e7f8a9b0c1"]
+  }
+]
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Comments returned (oldest-first) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `viewer` access to the task's project |
+| 404 | `taskId` not provided, or task not found |
+
+---
+
+### POST /api/v1/comments/
+
+Create a comment on a task and fan out mention notifications.
+
+**Auth:** Required (`viewer` on the task's project).
+
+**Request body:**
+
+```json
+{
+  "taskId": "task_001",
+  "body": "Thanks @alice — needs the SSO bits first.",
+  "mentions": ["64a1f2e3b4c5d6e7f8a9b0c1"]
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `taskId` | string | Required, non-empty; identifies the task (and, transitively, the project) |
+| `body` | string | Required, non-empty string |
+| `mentions` | string[] | Optional; an explicit list of mentioned user-id strings. **Not parsed from `body` text.** Malformed/non-list values are treated as empty. |
+
+`projectId` is **never read from the body** — it is taken from the task. See [Mention notifications](#mention-notifications) for how `mentions` are processed.
+
+**Response — 201 Created:**
+
+```json
+"Comment created"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 201 | Comment created |
+| 400 | `taskId` or `body` missing/empty, or an otherwise invalid request (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `viewer` access to the task's project |
+| 404 | Task not found |
+
+---
+
+### Mention notifications
+
+`mentions` is an explicit list supplied in the request body — the server does **not** parse `@handles` out of `body`. The list is stored on the comment (as `mentions`), then a `"mention"` notification is fanned out to each **unique** mentioned user, but **only if** that user:
+
+1. **exists** in the user directory, **and**
+2. is a **project member** (has at least `viewer` access to the comment's project), **and**
+3. is **not** the comment author.
+
+Ids failing any check are **skipped silently** — a typo'd, non-member, or self mention is a no-op, never an error, so a bad mention never fails the comment write. The notification's summary is `"<authorId> mentioned you"` and its `refId` is the **taskId**. (See [§15 Notifications](#15-notifications).)
+
+---
+
+### PUT /api/v1/comments/
+
+Edit a comment's body. **Author-only.**
+
+**Auth:** Required (caller must be the comment's `authorId`).
+
+**Request body:**
+
+```json
+{
+  "_id": "comment_002",
+  "body": "Thanks — needs the SSO bits first (edited)."
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the comment |
+| `body` | string | Required, non-empty string |
+
+Only `body` is writable. **Mentions are not re-processed on edit** — editing never re-sends mention notifications, so recipients are not re-spammed.
+
+**Response — 200 OK:**
+
+```json
+"Comment updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Updated successfully |
+| 400 | `body` missing/empty (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | Caller is not the comment's author |
+| 404 | Comment not found |
+
+---
+
+### DELETE /api/v1/comments/
+
+Delete a comment. Allowed for the **author** or the **project manager** (owner-level). Ordinary members cannot delete others' comments.
+
+**Auth:** Required (author, or owner-level on the comment's project).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `commentId` | string | Required |
+
+**Response — 200 OK:**
+
+```json
+"Comment deleted"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Comment deleted |
+| 400 | `commentId` not provided |
+| 401 | Missing or invalid JWT |
+| 403 | Caller is neither the author nor an owner-level member of the project |
+| 404 | Comment not found |
+
+---
+
+## 15. Notifications
+
+Base path: `/api/v1/notifications`
+
+Notifications are **strictly user-scoped**: a row belongs to exactly one recipient (`userId`), and being the addressee is the entire permission model — there is no project-level authorization on a notification. There is **no producer/POST endpoint**; notifications are created internally (today only the `"mention"` kind, from comment @mentions — see [§14](#14-comments)).
+
+---
+
+### GET /api/v1/notifications/
+
+Retrieve the authenticated caller's own notifications, newest-first.
+
+**Auth:** Required (self-only).
+
+**Request:** No parameters. There are **no query parameters** — a caller can never request another user's inbox.
+
+**Response — 200 OK:**
+
+```json
+[
+  {
+    "_id": "notif_002",
+    "userId": "64a1f2e3b4c5d6e7f8a9b0c1",
+    "kind": "mention",
+    "refId": "task_001",
+    "projectId": "proj_abc",
+    "summary": "64b2a3d4c5e6f7a8b9c0d1e2 mentioned you",
+    "isRead": false
+  }
+]
+```
+
+Rows are ordered by `createdAt` descending (most recent first). `kind` is currently always `"mention"`; `refId` points at the referenced task.
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Notifications returned |
+| 401 | Missing or invalid JWT |
+
+---
+
+### PUT /api/v1/notifications/
+
+Mark a notification (or all of the caller's notifications) as read.
+
+**Auth:** Required (self-only).
+
+**Request body** — exactly one of:
+
+```json
+{"_id": "notif_002"}
+```
+
+```json
+{"markAll": true}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `markAll` | boolean | When `true`, marks every one of the caller's unread notifications read. |
+| `_id` | string | When `markAll` is not `true`, marks the single notification read. The row must belong to the caller. |
+
+**Response — 200 OK:**
+
+```json
+"Notification updated"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Marked read (one, or all) |
+| 400 | Neither `markAll: true` nor a non-empty `_id` was supplied (`"Bad request"`) |
+| 401 | Missing or invalid JWT |
+| 403 | The `_id` references a notification owned by another user (`"Forbidden"`) |
+| 404 | The `_id` references a notification that does not exist |
+
+> The single-id path is the only cross-user guard and is deliberately strict: a **foreign** notification is `403 "Forbidden"` (it exists, the caller just may not touch it), whereas a **nonexistent** id is `404`. The `markAll` path only ever scans the caller's own rows.
+
+---
+
+## 16. Health
 
 ### GET /api/v1/health
 
@@ -1214,7 +1998,7 @@ each one has a snake_case twin (e.g. `providerResolved` ↔
 
 ---
 
-## 14. AI v1 (`/api/v1/ai/*` and legacy `/api/ai/*`)
+## 17. AI v1 (`/api/v1/ai/*` and legacy `/api/ai/*`)
 
 Base path: `/api/v1/ai`
 
@@ -1223,7 +2007,7 @@ Legacy alias also mounted at `/api/ai` (no `v1`) for backward compatibility with
 All AI v1 endpoints:
 
 - Require a valid JWT.
-- Enforce the project-manager gate (caller must be manager of the project identified in the payload's `context.project._id`).
+- Enforce the project-manager gate on the project identified in the payload's `context.project._id`. This gate is **owner-level** access (it passes for the `managerId` and for any owner-level member — see the [Access Model](#access-model-rbac) in §10); `editor`/`viewer` members do not pass.
 - Enforce the per-agent rate limit (default 60/min, 600/hr) and per-project monthly token budget.
 - Apply server-side redaction to free-text `prompt` and `messages[].content` (role `user`) before the content is passed to any LLM (see `app/tools/redaction`).
 - Honour the `Idempotency-Key` header.
@@ -1723,13 +2507,13 @@ When `kind == "tool_calls"`, the FE executes each named tool against its own cli
 
 ---
 
-## 15. Agents v2.1 (`/api/v1/agents/*`)
+## 18. Agents v2.1 (`/api/v1/agents/*`)
 
 Base path: `/api/v1/agents`
 
 The agents router is **registry-driven**: any agent registered in `app.agents.registry` before boot is automatically listed, invokable, and streamable. The shipped catalog includes: `board-brief-agent`, `task-drafting-agent`, `task-estimation-agent`, `triage-agent`, `search-agent`, `chat-agent`.
 
-All agent endpoints require a valid JWT. Policy gates — project AI disable flag, project manager check, rate limit, and token budget — are enforced on every invocation and streaming call.
+All agent endpoints require a valid JWT. Policy gates — project AI disable flag, project manager check, rate limit, and token budget — are enforced on every invocation and streaming call. The project-manager check is **owner-level** access (the `managerId` or any owner-level member passes — see the [Access Model](#access-model-rbac) in §10).
 
 ### Shadow Agents
 

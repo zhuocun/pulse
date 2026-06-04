@@ -106,6 +106,7 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 | `POST`   | `/api/v1/projects`      | `projectModal`                                                                    | `{ projectName, organization }` (1)                              | `string` (`"Project created"`) |
 | `PUT`    | `/api/v1/projects`      | `projectModal`                                                                    | `{ _id, projectName, organization, managerId? }`                 | `string` (`"Project updated"`) |
 | `DELETE` | `/api/v1/projects`      | `projectList`                                                                     | `?projectId=…`                                                   | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/projects/members` | `useProjectMembers` → `taskModal` (assignee picker)                            | `?projectId=…`                                                   | `IProjectMember[]` (2)         |
 | `GET`    | `/api/v1/boards`        | `board.tsx`, `useDragEnd`, `chatTools.listBoard`                                  | `?projectId=…`                                                   | `IColumn[]`                    |
 | `POST`   | `/api/v1/boards`        | `columnCreator`                                                                   | `{ projectId, columnName }`                                      | `string` (`"Column created"`)  |
 | `DELETE` | `/api/v1/boards`        | `column/index.tsx`                                                                | `?columnId=…`                                                    | `string` (acknowledgement)     |
@@ -115,8 +116,15 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 | `PUT`    | `/api/v1/tasks`         | `taskModal`                                                                       | task fields with `_id`                                           | `string` (`"Task updated"`)    |
 | `DELETE` | `/api/v1/tasks`         | `taskModal`                                                                       | `?taskId=…`                                                      | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/tasks/orders`  | `useDragEnd`                                                                      | `{ fromId, referenceId, fromColumnId, referenceColumnId, type }` | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/labels`        | `useLabels` → `board.tsx` (card chips), `taskModal` (label picker)                | `?projectId=…`                                                   | `ILabel[]` (3)                 |
+| `GET`    | `/api/v1/notifications` | `useNotifications` → `notificationBell`, `header`, `inbox.tsx`                    | — (no params; caller's own inbox)                                | `INotification[]`              |
+| `PUT`    | `/api/v1/notifications` | `useNotifications` → `notificationBell`                             | `{ _id }` (mark one) or `{ markAll: true }` (mark all)           | `string` (acknowledgement)     |
 
 (1) `projectModal` form state includes `managerId` and the FE sends it on both `POST` and `PUT`. The server silently ignores it on `POST` (the manager is derived from the JWT subject — see `app/services/project_service.py`) and only honours it on `PUT` for ownership transfer. Mutating endpoints on `projects`, `boards`, and `tasks` return a bare acknowledgement string (e.g. `"Project created"`, `"Task updated"`); they do NOT echo the resource. Callers that need the new document must re-`GET` it or invalidate the React Query cache.
+
+(2) `/api/v1/projects/members` is the project **roster**, distinct from the global `/api/v1/users/members` directory (row above). The FE only ever **reads** it — `useProjectMembers` issues the `GET`; the `POST` / `PUT` / `DELETE` member-management verbs exist server-side (see [`backend.md`](backend.md)) but have **no FE caller** (no member-management UI ships today). `IProjectMember` adds `role` to the `IMember` shape, but `role` is not rendered anywhere — the roster is consumed only to populate the `taskModal` assignee picker.
+
+(3) `useLabels` exposes `createLabel` (a `POST /api/v1/labels`), but it has **no UI caller** — labels are read-only on the FE (chips on cards + the `taskModal` apply picker). The label `PUT` / `DELETE` verbs likewise exist server-side but are not consumed. Two further server-side surfaces have **no FE caller at all** and so are intentionally absent from this table: the comments CRUD (`/api/v1/comments` — there is no `useComments` hook and no comment component) and the bulk task edit (`PUT /api/v1/tasks/bulk` — there is no multi-select / bulk-edit UI). See [`backend.md`](backend.md) for those server contracts.
 
 ### AI v1 (`/api/ai/`)
 
@@ -289,6 +297,70 @@ const useAuth: () => {
 - `isAuthenticated` is derived from the cached `user._id`; the REST JWT is in an HttpOnly cookie and is not readable from JavaScript.
 - `logout()` asks the backend to clear the cookie, clears the narrow AI proxy token and query cache, and navigates to `/login`.
 - `refreshUser()` is owned by `AuthProvider`'s unconditional `GET /users` probe; a 401 leaves the cache empty and route guards redirect to `/login`.
+
+---
+
+### `useNotifications`
+
+_Source: `src/utils/hooks/useNotifications.ts:46`_
+
+```ts
+const useNotifications: () => {
+    notifications: INotification[] | undefined;
+    unreadCount: number;
+    isLoading: boolean;
+    markRead: (id: string) => void;
+    markAllRead: () => void;
+    isMutating: boolean;
+};
+```
+
+The notifications inbox hook (consumer side; the producer — comment @mentions — has no FE UI yet). Used by `notificationBell`, the header badge, and `inbox.tsx`.
+
+- Reads `GET /api/v1/notifications` via `useReactQuery("notifications")` (no params — the server always scopes the list to the caller; newest-first).
+- `unreadCount` is derived client-side as the number of `!isRead` rows — it drives the bell badge.
+- `markRead(id)` PUTs `{ _id }`; `markAllRead()` PUTs `{ markAll: true }`. Both go through one `useReactMutation("notifications", "PUT", ["notifications"])` and invalidate the list on success (no optimistic callback), so the list and `unreadCount` re-settle to the server truth.
+- `notifications` is normalized via `Array.isArray` — a non-array payload (e.g. the mark-read string ack sharing the query cache) resolves to `undefined` rather than throwing in `.filter`/`.map` consumers.
+
+---
+
+### `useLabels`
+
+_Source: `src/utils/hooks/useLabels.ts:60`_
+
+```ts
+const useLabels: (projectId: string | undefined) => {
+    labels: ILabel[] | undefined;
+    isLoading: boolean;
+    createLabel: (input: { name: string; color?: string }) => Promise<unknown>;
+    isCreating: boolean;
+};
+```
+
+The project-labels hook. Used by `board.tsx` (to resolve card label chips) and the `taskModal` label picker.
+
+- Reads `GET /api/v1/labels?projectId=…` via `useReactQuery`, keyed per-project (`["labels", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`.
+- `createLabel` POSTs `/api/v1/labels` with `{ projectId, name, color? }` via `useReactMutation`, invalidating that project's list on success. **`createLabel` has no UI caller today** — labels are read/apply-only on the FE (no create/edit/delete management surface); the function exists for a future labels UI.
+- `labels` is normalized via `Array.isArray` (a non-array payload resolves to `undefined`).
+- The label `PUT` (update) and `DELETE` verbs exist server-side but this hook does not expose or call them.
+
+---
+
+### `useProjectMembers`
+
+_Source: `src/utils/hooks/useProjectMembers.ts:38`_
+
+```ts
+const useProjectMembers: (
+    projectId: string | undefined
+) => UseQueryResult<IProjectMember[]> & { isIdle: boolean };
+```
+
+Reads the **project roster** — `GET /api/v1/projects/members?projectId=…` — via `useReactQuery<IProjectMember[]>`, keyed per-project (`["projects/members", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`. Returns the raw `useReactQuery` result (no wrapper object); callers read `.data`.
+
+Its sole consumer is the `taskModal` assignee picker (`assigneeIds`). `IProjectMember` adds `role` to `IMember`, but `role` is not rendered anywhere.
+
+**Not to be confused with `useMembersList`** (`src/utils/hooks/useMembersList.ts`), which reads the **global** user directory `GET /api/v1/users/members` (returns `IMember[]`, no `role`) and backs the coordinator picker and `memberPopover`. `useProjectMembers` is "who is on this project"; `useMembersList` is "every user in the system".
 
 ---
 
@@ -1692,17 +1764,23 @@ low-risk undoable mutations immediately with a toast-based undo.
 
 _Sources: `src/interfaces/`_
 
-| Interface     | Key fields                                                                                                  | Source         |
-| ------------- | ----------------------------------------------------------------------------------------------------------- | -------------- |
-| `ITask`       | `_id`, `columnId`, `coordinatorId`, `epic`, `taskName`, `type`, `note`, `projectId`, `storyPoints`, `index` | `task.d.ts`    |
-| `IColumn`     | `_id`, `columnName`, `projectId`, `index`                                                                   | `column.d.ts`  |
-| `IProject`    | `_id`, `projectName`, `managerId`, `organization`, `createdAt?`                                             | `project.d.ts` |
-| `IMember`     | `_id`, `username`, `email`                                                                                  | `member.d.ts`  |
-| `IUser`       | extends `IMember`, adds `likedProjects: string[]`, `ai_jwt?: string`                                        | `user.d.ts`    |
-| `IError`      | `error: { msg: string }[] \| string`                                                                        | `error.d.ts`   |
-| `StoryPoints` | `1 \| 2 \| 3 \| 5 \| 8 \| 13`                                                                               | `ai.d.ts`      |
+| Interface        | Key fields                                                                                                  | Source               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | -------------------- |
+| `ITask`          | `_id`, `columnId`, `coordinatorId`, `epic`, `taskName`, `type`, `note`, `projectId`, `storyPoints`, `index`, `startDate?`, `dueDate?`, `labelIds?: string[]`, `assigneeIds?: string[]`, `parentTaskId?: string \| null` | `task.d.ts`    |
+| `IColumn`        | `_id`, `columnName`, `projectId`, `index`, `wipLimit?: number`                                              | `column.d.ts`        |
+| `IProject`       | `_id`, `projectName`, `managerId`, `organization`, `createdAt?`                                             | `project.d.ts`       |
+| `IProjectMember` | extends `IMember`, adds `role: string`                                                                      | `projectMember.d.ts` |
+| `IComment`       | `_id`, `taskId`, `projectId`, `authorId`, `body`, `mentions: string[]`, `createdAt?`                        | `comment.d.ts`       |
+| `INotification`  | `_id`, `userId`, `kind`, `refId`, `projectId?`, `summary`, `isRead`, `createdAt?`                           | `notification.d.ts`  |
+| `ILabel`         | `_id`, `projectId`, `name`, `color`, `createdAt?`                                                           | `label.d.ts`         |
+| `IMember`        | `_id`, `username`, `email`                                                                                  | `member.d.ts`        |
+| `IUser`          | extends `IMember`, adds `likedProjects: string[]`, `ai_jwt?: string`                                        | `user.d.ts`          |
+| `IError`         | `error: { msg: string }[] \| string`                                                                        | `error.d.ts`         |
+| `StoryPoints`    | `1 \| 2 \| 3 \| 5 \| 8 \| 13`                                                                               | `ai.d.ts`            |
 
 `IUser.ai_jwt` may be present in `POST /auth/login` responses and is copied into `sessionStorage` for remote AI calls. `GET /users` and `PUT /users/likes` intentionally omit tokens; the REST session stays in the HttpOnly `Token` cookie.
+
+The five `ITask` "richness" fields (`startDate`, `dueDate`, `labelIds`, `assigneeIds`, `parentTaskId`) and `IColumn.wipLimit` are all **optional** in the type. They are fully editable in the legacy `taskModal` (the live surface) but are **not** rendered by the routed `taskDetailPanel`, and `wipLimit` is referenced by no component — see the hook notes and the coverage map in [`../prd/core-collaboration.md`](../prd/core-collaboration.md) §10. Project membership is **not** carried inline on `IProject`: the roster is a separate `IProjectMember[]` fetched from `GET /projects/members` (it adds `role` to the `IMember` shape; `role` is typed as a free `string` and is currently never rendered).
 
 ---
 
