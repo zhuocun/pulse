@@ -4,14 +4,15 @@ from app.database import COLUMNS, PROJECTS, TASKS
 from app.domain.ordering import column_reorder_updates
 from app.repositories import repository
 from app.services.column_seed import ensure_default_columns
-from app.services.project_service import is_project_manager
+from app.services.project_service import ROLE_EDITOR, ROLE_VIEWER, can_access
 from app.validation import sorted_by_index
 
 
 def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]:
     if repository.find_by_id(PROJECTS, project_id) is None:
         return None
-    if not is_project_manager(project_id, user_id):
+    # Read path: any member (viewer and up) may load the board.
+    if not can_access(project_id, user_id, ROLE_VIEWER):
         return "Forbidden"
 
     columns = ensure_default_columns(project_id)
@@ -24,7 +25,8 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
         return None
-    if not is_project_manager(project_id, user_id):
+    # Write path: editor or owner.
+    if not can_access(project, user_id, ROLE_EDITOR):
         return "Forbidden"
 
     columns = ensure_default_columns(project_id)
@@ -50,7 +52,8 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
         return None
     if from_column.get("projectId") != reference_column.get("projectId"):
         return None
-    if not is_project_manager(str(from_column.get("projectId")), user_id):
+    # Write path: editor or owner.
+    if not can_access(str(from_column.get("projectId")), user_id, ROLE_EDITOR):
         return "Forbidden"
 
     columns = repository.find_many(COLUMNS, {"projectId": from_column["projectId"]})
@@ -67,7 +70,8 @@ def remove(column_id: str, user_id: str) -> Optional[str]:
     column = repository.find_by_id(COLUMNS, column_id)
     if column is None:
         return None
-    if not is_project_manager(str(column.get("projectId")), user_id):
+    # Write path: editor or owner.
+    if not can_access(str(column.get("projectId")), user_id, ROLE_EDITOR):
         return "Forbidden"
     project_id = column.get("projectId")
     deleted_index = column.get("index")

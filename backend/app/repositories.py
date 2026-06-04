@@ -22,6 +22,11 @@ TABLE_FIELDS = {
         "projectName",
         "organization",
         "managerId",
+        # RBAC membership: a list of ``{"userId": str, "role": str}``
+        # objects (roles: owner > editor > viewer). Optional on read so
+        # pre-existing manager-only project docs keep deserializing; the
+        # ``managerId`` is always treated as owner-level regardless.
+        "memberIds",
         "createdAt",
         "updatedAt",
     },

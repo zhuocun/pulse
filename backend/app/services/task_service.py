@@ -5,7 +5,7 @@ from app.database import COLUMNS, PROJECTS, TASKS, USERS
 from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
 from app.services.column_seed import DEFAULT_COLUMNS
-from app.services.project_service import is_project_manager
+from app.services.project_service import ROLE_EDITOR, ROLE_VIEWER, can_access
 from app.validation import body_error, sorted_by_index
 
 # Fields a manager may write via PUT /tasks. Repository-managed fields
@@ -68,7 +68,8 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
         or str(column.get("projectId")) != str(project_id)
     ):
         return None
-    if not is_project_manager(project_id, user_id):
+    # Write path: editor or owner.
+    if not can_access(project, user_id, ROLE_EDITOR):
         return "Forbidden"
 
     tasks = repository.find_many(TASKS, {"columnId": column_id})
@@ -102,7 +103,8 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
 def get(project_id: str, user_id: str) -> Union[List[Dict[str, Any]], str]:
     if repository.find_by_id(PROJECTS, project_id) is None:
         return "Project not found"
-    if not is_project_manager(project_id, user_id):
+    # Read path: any member (viewer and up) may load the task list.
+    if not can_access(project_id, user_id, ROLE_VIEWER):
         return "Forbidden"
 
     columns = repository.find_many(COLUMNS, {"projectId": project_id})
@@ -160,7 +162,9 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     task = repository.find_by_id(TASKS, task_id or "")
     if not task_id or task is None:
         return None
-    if not is_project_manager(task.get("projectId"), user_id):
+    # Write path: editor or owner (checked against the task's current
+    # project, then re-checked below against the target project).
+    if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
         return "Forbidden"
 
     project_id = data.get("projectId", task.get("projectId"))
@@ -174,7 +178,8 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
         or str(column.get("projectId")) != str(project_id)
     ):
         return None
-    if not is_project_manager(project_id, user_id):
+    # Write path: editor or owner on the (possibly reassigned) project.
+    if not can_access(project_id, user_id, ROLE_EDITOR):
         return "Forbidden"
 
     payload = {key: value for key, value in data.items() if key in _TASK_UPDATE_FIELDS}
@@ -188,7 +193,8 @@ def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
     task = repository.find_by_id(TASKS, task_id)
     if task is None:
         return None
-    if not is_project_manager(task.get("projectId"), user_id):
+    # Write path: editor or owner.
+    if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
         return "Forbidden"
     column_id = task.get("columnId")
     deleted_index = task.get("index")
@@ -234,7 +240,8 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
         related.append(reference_task)
     if not _same_project(*related):
         return None
-    if not is_project_manager(from_task.get("projectId"), user_id):
+    # Write path: editor or owner.
+    if not can_access(from_task.get("projectId"), user_id, ROLE_EDITOR):
         return "Forbidden"
     if str(from_task.get("columnId")) != str(from_column_id) or (
         reference_task is not None
