@@ -22,6 +22,11 @@ TABLE_FIELDS = {
         "projectName",
         "organization",
         "managerId",
+        # RBAC membership: a list of ``{"userId": str, "role": str}``
+        # objects (roles: owner > editor > viewer). Optional on read so
+        # pre-existing manager-only project docs keep deserializing; the
+        # ``managerId`` is always treated as owner-level regardless.
+        "memberIds",
         "createdAt",
         "updatedAt",
     },
@@ -30,6 +35,10 @@ TABLE_FIELDS = {
         "columnName",
         "projectId",
         "index",
+        # Per-column WIP limit (int). 0 / missing / negative means "no
+        # limit". The drift detector already honours ``wipLimit``; this
+        # field lets the board actually set it.
+        "wipLimit",
         "createdAt",
         "updatedAt",
     },
@@ -44,6 +53,44 @@ TABLE_FIELDS = {
         "projectId",
         "storyPoints",
         "index",
+        # Scheduling: ISO-8601 date strings (or null / empty).
+        "startDate",
+        "dueDate",
+        # Free labels: a list of label ``_id`` strings (see LABELS).
+        "labelIds",
+        # Additional assignees beyond the single ``coordinatorId`` primary.
+        "assigneeIds",
+        # Sub-tasks: the ``_id`` of the parent task (null / empty = top-level).
+        "parentTaskId",
+        "createdAt",
+        "updatedAt",
+    },
+    database.LABELS: {
+        "_id",
+        "projectId",
+        "name",
+        "color",
+        "createdAt",
+        "updatedAt",
+    },
+    database.COMMENTS: {
+        "_id",
+        "taskId",
+        "projectId",
+        "authorId",
+        "body",
+        "mentions",
+        "createdAt",
+        "updatedAt",
+    },
+    database.NOTIFICATIONS: {
+        "_id",
+        "userId",
+        "kind",
+        "refId",
+        "projectId",
+        "summary",
+        "isRead",
         "createdAt",
         "updatedAt",
     },

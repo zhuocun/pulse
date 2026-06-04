@@ -1,4 +1,8 @@
-import { HolderOutlined, MoreOutlined } from "@ant-design/icons";
+import {
+    ClockCircleOutlined,
+    HolderOutlined,
+    MoreOutlined
+} from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Badge,
@@ -11,6 +15,7 @@ import {
     Tooltip,
     Typography
 } from "antd";
+import dayjs from "dayjs";
 import React from "react";
 import { useParams } from "react-router-dom";
 
@@ -408,6 +413,64 @@ const EpicTag = styled(Tag)`
 `;
 
 /**
+ * Row of label chips above the card title. Wraps so a task with several
+ * labels stacks cleanly inside the column width instead of overflowing.
+ */
+const LabelRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${space.xxs}px;
+    margin-bottom: ${space.xs}px;
+`;
+
+const LabelChip = styled(Tag)`
+    && {
+        font-size: ${fontSize.xs}px;
+        font-weight: ${fontWeight.medium};
+        margin: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+`;
+
+/**
+ * Overdue indicator on the card footer. Deliberately NOT colour-only: it
+ * pairs a clock glyph with the visible word "Overdue" (and an aria-label
+ * carrying the missed due date) so it reads for colour-blind and
+ * screen-reader users alike (WCAG 1.4.1). The danger tint is a secondary,
+ * reinforcing signal — never the sole carrier of meaning.
+ */
+const OverdueChip = styled.span`
+    align-items: center;
+    color: var(--ant-color-error, #dc2626);
+    display: inline-flex;
+    font-weight: ${fontWeight.semibold};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
+ * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
+ * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
+ * lens predicates, so a task due "today" is NOT overdue and a midnight-
+ * straddling timestamp can't flip the verdict by timezone. A task with no
+ * `dueDate` (or an unparsable one) is never overdue. Done-column semantics
+ * aren't modeled on `IColumn` (no `isDone` flag), so we use the brief's
+ * simpler date-only rule.
+ */
+const isTaskOverdue = (
+    dueDate: string | undefined,
+    now: Date = new Date()
+): boolean => {
+    if (!dueDate) return false;
+    const due = dayjs(dueDate);
+    if (!due.isValid()) return false;
+    return due.startOf("day").isBefore(dayjs(now).startOf("day"));
+};
+
+/**
  * Column header — sticky-pinned against the parent TaskContainer so a
  * user scrolling a tall task list always sees the column name + count
  * + readiness pill + more-actions menu. Phase 4.6 of `ui-todo.md`.
@@ -772,6 +835,12 @@ const DeleteDropDown: React.FC<{
 type TaskCardProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
     task: ITask;
     members: IMember[];
+    /**
+     * Project labels, used to resolve `task.labelIds` → name + colour chips.
+     * Optional so callers that don't render labels (or haven't loaded them)
+     * simply omit the chip row.
+     */
+    labels?: ILabel[];
     onOpen?: () => void;
     isMock?: boolean;
     /** Reordering is paused by active filters — advisory affordance only. */
@@ -783,6 +852,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         {
             task,
             members,
+            labels,
             onOpen,
             isMock,
             dragDisabledByFilters,
@@ -794,6 +864,19 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const { projectId } = useParams<{ projectId: string }>();
         const coordinator = members.find((m) => m._id === task.coordinatorId);
         const isBug = task.type === "Bug";
+        // Resolve the task's label ids to the project's label objects (name
+        // + colour). Unknown ids (a label deleted since the task was tagged)
+        // are dropped rather than rendered as a blank chip. Order follows
+        // `task.labelIds` so the chips are stable across renders.
+        const taskLabels = (task.labelIds ?? [])
+            .map((id) => (labels ?? []).find((label) => label._id === id))
+            .filter((label): label is ILabel => Boolean(label));
+        const overdue = isTaskOverdue(task.dueDate);
+        const overdueLabel = task.dueDate
+            ? formatTemplate(microcopy.a11y.overdueTask as string, {
+                  date: task.dueDate
+              })
+            : "";
         // Read per-result strength from the AI search cache (P1-2). Returns
         // null when no semantic filter is active, so the badge stays out of
         // the way during normal browsing.
@@ -990,6 +1073,19 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         {task.epic}
                     </EpicTag>
                 ) : null}
+                {taskLabels.length > 0 ? (
+                    <LabelRow aria-label={microcopy.fields.labels}>
+                        {taskLabels.map((label) => (
+                            <LabelChip
+                                color={label.color}
+                                key={label._id}
+                                variant="filled"
+                            >
+                                {label.name}
+                            </LabelChip>
+                        ))}
+                    </LabelRow>
+                ) : null}
                 {editing ? (
                     <CardTitle
                         // The Input is a button child — every pointer/
@@ -1068,6 +1164,15 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         </span>
                     </TaskTypeBadge>
                     <CardMeta>
+                        {overdue ? (
+                            <OverdueChip
+                                aria-label={overdueLabel}
+                                data-testid="task-card-overdue"
+                            >
+                                <ClockCircleOutlined aria-hidden />
+                                <span>{microcopy.taskCard.overdue}</span>
+                            </OverdueChip>
+                        ) : null}
                         {strength ? (
                             <AiMatchStrengthBadge strength={strength} />
                         ) : null}
@@ -1136,6 +1241,8 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
     dragDisabledByFilters?: boolean;
     boardAiOn?: boolean;
     members?: IMember[];
+    /** Project labels, threaded down to each card to resolve `labelIds`. */
+    labels?: ILabel[];
     onResetFilters?: () => void;
 };
 
@@ -1150,6 +1257,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             dragDisabledByFilters = false,
             boardAiOn = true,
             members = [],
+            labels = [],
             onResetFilters,
             ...props
         },
@@ -1300,6 +1408,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                             showFilterPausedHint
                                         }
                                         isMock={!hasPersistedTaskId}
+                                        labels={labels}
                                         members={members}
                                         onOpen={
                                             hasPersistedTaskId

@@ -3,4 +3,5 @@ interface IColumn {
     columnName: string;
     projectId: string;
     index: number;
+    wipLimit?: number;
 }

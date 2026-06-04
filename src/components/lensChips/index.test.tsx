@@ -44,17 +44,41 @@ describe("LensChips", () => {
         );
     });
 
-    it("renders coming-soon chips as disabled (aria-disabled, no aria-pressed)", () => {
+    it("renders the remaining coming-soon chip (At risk) as disabled (aria-disabled, no aria-pressed)", () => {
         render(<LensChips active={null} onChange={jest.fn()} />);
 
-        const today = screen.getByRole("button", { name: /today/i });
-        expect(today).toHaveAttribute("aria-disabled", "true");
-        expect(today).not.toHaveAttribute("aria-pressed");
+        // "At risk" is the only lens still gated on an unshipped field
+        // (the AI risk score); it stays disabled.
+        const atRisk = screen.getByRole("button", { name: /at risk/i });
+        expect(atRisk).toHaveAttribute("aria-disabled", "true");
+        expect(atRisk).not.toHaveAttribute("aria-pressed");
 
         // The functional "Mine" lens is NOT disabled.
         const mine = screen.getByRole("button", { name: /mine/i });
         expect(mine).not.toHaveAttribute("aria-disabled");
         expect(mine).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("renders the now-functional date lenses (Today, This week) as enabled and toggleable", () => {
+        // M2 — `dueDate` shipped, so these graduated from coming-soon to
+        // functional: enabled, with a real pressed state, no "soon" badge.
+        render(<LensChips active={null} onChange={jest.fn()} />);
+
+        const today = screen.getByRole("button", { name: /today/i });
+        const week = screen.getByRole("button", { name: /this week/i });
+
+        expect(today).not.toHaveAttribute("aria-disabled");
+        expect(today).toHaveAttribute("aria-pressed", "false");
+        expect(week).not.toHaveAttribute("aria-disabled");
+        expect(week).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("marks an active date lens with aria-pressed=true", () => {
+        render(<LensChips active="this-week" onChange={jest.fn()} />);
+
+        expect(
+            screen.getByRole("button", { name: /this week/i })
+        ).toHaveAttribute("aria-pressed", "true");
     });
 
     it("clicks a chip → calls onChange with its lens id", async () => {
@@ -68,14 +92,25 @@ describe("LensChips", () => {
         expect(onChange).toHaveBeenCalledTimes(1);
     });
 
-    it("clicking a coming-soon chip is a no-op (no onChange)", async () => {
+    it("clicking the coming-soon chip (At risk) is a no-op (no onChange)", async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+        render(<LensChips active={null} onChange={onChange} />);
+
+        await user.click(screen.getByRole("button", { name: /at risk/i }));
+
+        expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("clicking a now-functional date chip (Today) calls onChange with its lens id", async () => {
         const user = userEvent.setup();
         const onChange = jest.fn();
         render(<LensChips active={null} onChange={onChange} />);
 
         await user.click(screen.getByRole("button", { name: /today/i }));
 
-        expect(onChange).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenCalledWith("today");
+        expect(onChange).toHaveBeenCalledTimes(1);
     });
 
     it("clicks the active chip → calls onChange(null) to clear back to All", async () => {
@@ -101,15 +136,17 @@ describe("LensChips", () => {
         expect(screen.getByTestId("active-lens")).toHaveTextContent("none");
     });
 
-    it("clicking a coming-soon chip leaves the controlled lens unchanged", async () => {
+    it("clicking the coming-soon chip (At risk) leaves the controlled lens unchanged", async () => {
         const user = userEvent.setup();
         render(<ControlledLens initial="mine" />);
 
-        await user.click(screen.getByRole("button", { name: /today/i }));
+        await user.click(screen.getByRole("button", { name: /at risk/i }));
         expect(screen.getByTestId("active-lens")).toHaveTextContent("mine");
     });
 
-    it("shows a coming-soon badge on graceful-skip lenses (Today, This week, At risk)", () => {
+    it("shows a coming-soon badge only on the remaining graceful-skip lens (At risk)", () => {
+        // M2 — Today / This week graduated to functional, so their "soon"
+        // badge is gone; only At risk (unshipped AI risk score) keeps it.
         render(<LensChips active={null} onChange={jest.fn()} />);
 
         const today = screen.getByRole("button", { name: /today/i });
@@ -117,29 +154,32 @@ describe("LensChips", () => {
         const risk = screen.getByRole("button", { name: /at risk/i });
         const mine = screen.getByRole("button", { name: /mine/i });
 
-        expect(today.textContent).toMatch(/soon/i);
-        expect(week.textContent).toMatch(/soon/i);
+        expect(today.textContent).not.toMatch(/soon/i);
+        expect(week.textContent).not.toMatch(/soon/i);
         expect(risk.textContent).toMatch(/soon/i);
         expect(mine.textContent).not.toMatch(/soon/i);
     });
 
-    it("supports keyboard nav: Tab to a functional chip then Enter triggers onChange", async () => {
+    it("supports keyboard nav: Tab to the first (now-functional) chip then Enter triggers onChange", async () => {
         const user = userEvent.setup();
         const onChange = jest.fn();
         render(<LensChips active={null} onChange={onChange} />);
 
-        // The coming-soon chips stay in tab order (discoverable) but do
-        // not activate; tab past them to the functional "Mine" lens.
+        // "Today" is the first chip and is now functional (M2): Enter fires.
         await user.tab();
         expect(screen.getByRole("button", { name: /today/i })).toHaveFocus();
         await user.keyboard("{Enter}");
-        expect(onChange).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenCalledWith("today");
 
+        // Tab to the remaining coming-soon chip ("At risk", the last chip):
+        // it stays in tab order (discoverable) but Enter does not activate.
+        onChange.mockClear();
         await user.tab();
         await user.tab();
-        expect(screen.getByRole("button", { name: /mine/i })).toHaveFocus();
+        await user.tab();
+        expect(screen.getByRole("button", { name: /at risk/i })).toHaveFocus();
         await user.keyboard("{Enter}");
-        expect(onChange).toHaveBeenCalledWith("mine");
+        expect(onChange).not.toHaveBeenCalled();
     });
 
     it("supports Space to activate as well as Enter (button-default semantics)", () => {

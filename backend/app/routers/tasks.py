@@ -92,6 +92,25 @@ def remove_task(
     api_error(status.HTTP_400_BAD_REQUEST, result)
 
 
+@router.put("/bulk", status_code=status.HTTP_200_OK)
+def bulk_update_tasks(
+    data: Dict[str, Any] = Body(default_factory=dict),
+    payload: Dict[str, Any] = Depends(current_user_payload),
+) -> str:
+    # Fan-out metadata edit. ``task_service.bulk_update`` filters the
+    # ``changes`` object down to the safe (non-positional) field set, so
+    # ``columnId`` / ``projectId`` / ``index`` here are silently dropped
+    # rather than honoured -- positional moves go through PUT /tasks/orders.
+    result = task_service.bulk_update(data, current_user_id(payload))
+    if result is None:
+        api_error(status.HTTP_404_NOT_FOUND, "Task not found")
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    if result != "Tasks updated":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
+    return result
+
+
 @router.put("/orders", status_code=status.HTTP_200_OK)
 def reorder_tasks(
     data: Dict[str, Any] = Body(default_factory=dict),

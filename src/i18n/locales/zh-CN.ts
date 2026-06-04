@@ -154,6 +154,7 @@ const zhCN: Dictionary = {
         applyReadinessSuggestion: "应用 {field} 的就绪建议",
         lensChips: "看板视图",
         lensComingSoon: "敬请期待",
+        overdueTask: "已逾期 — 截止于 {date}",
         renameTask: "重命名任务",
         columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
         columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理",
@@ -267,7 +268,9 @@ const zhCN: Dictionary = {
             },
             mentions: {
                 title: "提及",
-                empty: "暂无提及。"
+                empty: "暂无提及。",
+                viewTask: "查看任务",
+                itemAriaLabel: "提及:{summary}。查看任务。"
             },
             activity: {
                 title: "活动"
@@ -301,15 +304,20 @@ const zhCN: Dictionary = {
             "请在设置中启用看板 Copilot 以使用 Copilot 选项卡。"
     },
     fields: {
+        assignees: "负责人员",
         column: "列",
         coordinator: "协调人",
+        dueDate: "截止日期",
         email: "邮箱",
         epic: "史诗",
+        labels: "标签",
         manager: "负责人",
         notes: "备注",
         organization: "组织",
+        parentTask: "父任务",
         password: "密码",
         projectName: "项目名称",
+        startDate: "开始日期",
         storyPoints: "故事点",
         taskName: "任务名称",
         type: "类型",
@@ -329,6 +337,11 @@ const zhCN: Dictionary = {
         selectType: "请选择类型",
         selectManager: "请选择负责人",
         selectStoryPoints: "请选择故事点",
+        selectAssignees: "请选择负责人员",
+        selectLabels: "请选择标签",
+        selectParentTask: "请选择父任务",
+        selectStartDate: "请选择开始日期",
+        selectDueDate: "请选择截止日期",
         createColumnName: "新建列名称",
         whatNeedsToBeDone: "需要完成什么?",
         notesAcceptanceCriteria: "备注 / 验收标准",
@@ -521,6 +534,9 @@ const zhCN: Dictionary = {
         discardEdits: "丢弃更改",
         aiAssistLabel: "AI 辅助"
     },
+    taskCard: {
+        overdue: "已逾期"
+    },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",
         confirmDiscardBody: "对此任务的编辑将会丢失。",
@@ -593,6 +609,24 @@ const zhCN: Dictionary = {
             projectUpdated: "已更新项目 “{name}”",
             projectDeleted: "已删除项目 “{name}”"
         }
+    },
+    notifications: {
+        bellAriaLabelZero: "通知,暂无未读",
+        bellAriaLabelOne: "通知,{count} 条未读",
+        bellAriaLabelOther: "通知,{count} 条未读",
+        drawerTitle: "通知",
+        drawerCloseLabel: "关闭通知",
+        markAllRead: "全部标记为已读",
+        markAllReadAriaLabel: "将所有通知标记为已读",
+        markReadAriaLabel: "标记为已读:{summary}",
+        empty: "您已查看全部通知。新通知会显示在这里。",
+        relativeJustNow: "刚刚",
+        relativeOneMinute: "1 分钟前",
+        relativeMinutes: "{count} 分钟前",
+        relativeOneHour: "1 小时前",
+        relativeHours: "{count} 小时前",
+        relativeOneDay: "1 天前",
+        relativeDays: "{count} 天前"
     },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",

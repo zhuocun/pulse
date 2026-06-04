@@ -58,6 +58,7 @@ import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
+import useLabels from "../utils/hooks/useLabels";
 import useMembersList from "../utils/hooks/useMembersList";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
@@ -376,6 +377,7 @@ const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
  */
 const EMPTY_TASKS: ITask[] = Object.freeze([]) as unknown as ITask[];
 const EMPTY_MEMBERS: IMember[] = Object.freeze([]) as unknown as IMember[];
+const EMPTY_LABELS: ILabel[] = Object.freeze([]) as unknown as ILabel[];
 
 const boardTitle = (projectName?: string) =>
     projectName
@@ -414,14 +416,20 @@ const BoardPage = () => {
         projectId
     });
     const { isLoading: mLoading, data: members } = useMembersList();
+    // Project labels, fetched once at the board level and threaded into each
+    // column → card so a card can resolve its `labelIds` to name + colour
+    // chips without an N-per-card fetch (mirrors how `members` is shared).
+    const { labels } = useLabels(projectId);
     /*
      * Stable members reference for the memoized `Column`. `members` from
      * the query is a stable ref once resolved, but is `undefined` while
      * loading; coalescing to the shared frozen `EMPTY_MEMBERS` (rather
      * than an inline `members ?? []`) keeps the prop identity steady
-     * across the renders before the fetch resolves.
+     * across the renders before the fetch resolves. `safeLabels` mirrors
+     * this for the labels thread.
      */
     const safeMembers = members ?? EMPTY_MEMBERS;
+    const safeLabels = labels ?? EMPTY_LABELS;
 
     const {
         data: tasks,
@@ -1122,6 +1130,7 @@ const BoardPage = () => {
                                                             column._id
                                                         }
                                                         members={safeMembers}
+                                                        labels={safeLabels}
                                                         param={param}
                                                         onResetFilters={
                                                             resetBoardFilters

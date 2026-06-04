@@ -133,6 +133,13 @@ const renderModal = (
          * closed.
          */
         editingTaskId?: string | null;
+        /** Project labels to seed the `["labels", …]` cache (label picker). */
+        labels?: ILabel[];
+        /**
+         * Project members to seed the `["projects/members", …]` cache
+         * (assignee picker). Distinct from the global `members` directory.
+         */
+        projectMembers?: IProjectMember[];
     } = {}
 ) => {
     const route = options.route ?? "/projects/project-1/board";
@@ -161,6 +168,20 @@ const renderModal = (
         }
     });
     queryClient.setQueryData(["users/members"], members);
+    // M2 task-richness pickers read project labels + the project-member
+    // roster. Seed both per-project caches (fresh, via the hooks' 5-min
+    // staleTime) so they serve from cache and add NO extra `fetch` calls —
+    // the existing strict `toHaveBeenCalledTimes(1)` assertions below count
+    // only the task PUT/DELETE. Tests that exercise the pickers pass
+    // `labels` / `projectMembers` to override the empty defaults.
+    queryClient.setQueryData(
+        ["labels", { projectId: "project-1" }],
+        options.labels ?? []
+    );
+    queryClient.setQueryData(
+        ["projects/members", { projectId: "project-1" }],
+        options.projectMembers ?? []
+    );
 
     return render(
         <Provider store={store}>
@@ -1038,6 +1059,225 @@ describe("TaskModal", () => {
             expect(events[0].kind).toBe("task");
             expect(events[0].action).toBe("delete");
             expect(events[0].summary).toContain("Build task");
+        });
+    });
+
+    // ── M2 task-richness fields ──────────────────────────────────────────
+    describe("M2 richness fields (dates, labels, assignees, parent)", () => {
+        const labelFixtures: ILabel[] = [
+            {
+                _id: "label-1",
+                projectId: "project-1",
+                name: "Backend",
+                color: "blue"
+            },
+            {
+                _id: "label-2",
+                projectId: "project-1",
+                name: "Frontend",
+                color: "geekblue"
+            }
+        ];
+        const projectMemberFixtures: IProjectMember[] = [
+            {
+                _id: "member-1",
+                email: "alice@example.com",
+                username: "Alice",
+                role: "manager"
+            },
+            {
+                _id: "member-2",
+                email: "bob@example.com",
+                username: "Bob",
+                role: "coordinator"
+            }
+        ];
+
+        const lastPutBody = () => {
+            const putCall = fetchMock.mock.calls.find(
+                ([, init]) =>
+                    (init as RequestInit | undefined)?.method === "PUT"
+            );
+            return JSON.parse(
+                (putCall?.[1] as RequestInit)?.body as string
+            ) as Record<string, unknown>;
+        };
+
+        it("renders the new field controls (start/due date, labels, assignees, parent task)", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+
+            expect(
+                await screen.findByDisplayValue("Build task")
+            ).toBeInTheDocument();
+            // Labelled Form.Items surface their field labels.
+            expect(screen.getByText("Start date")).toBeInTheDocument();
+            expect(screen.getByText("Due date")).toBeInTheDocument();
+            expect(screen.getByText("Labels")).toBeInTheDocument();
+            expect(screen.getByText("Assignees")).toBeInTheDocument();
+            expect(screen.getByText("Parent task")).toBeInTheDocument();
+        });
+
+        it("offers project labels in the label picker (name + colour source)", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // Open the Labels multi-select and assert both project labels
+            // appear as options.
+            const labelsSelect = screen.getByRole("combobox", {
+                name: /labels/i
+            });
+            fireEvent.mouseDown(labelsSelect);
+            expect(
+                (await screen.findAllByText("Backend")).length
+            ).toBeGreaterThan(0);
+            expect(
+                (await screen.findAllByText("Frontend")).length
+            ).toBeGreaterThan(0);
+        });
+
+        it("offers PROJECT members (not the global directory) in the assignee picker", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: [
+                    {
+                        _id: "member-9",
+                        email: "carol@example.com",
+                        username: "Carol",
+                        role: "coordinator"
+                    }
+                ]
+            });
+            await screen.findByDisplayValue("Build task");
+
+            const assigneesSelect = screen.getByRole("combobox", {
+                name: /assignees/i
+            });
+            fireEvent.mouseDown(assigneesSelect);
+            // The project roster (Carol) drives this picker, distinct from
+            // the global `users/members` directory that powers Coordinator.
+            expect(
+                (await screen.findAllByText("Carol")).length
+            ).toBeGreaterThan(0);
+        });
+
+        it("excludes the editing task itself from the parent-task options", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            const parentSelect = screen.getByRole("combobox", {
+                name: /parent task/i
+            });
+            fireEvent.mouseDown(parentSelect);
+            // "Fix bug" (task-2) is selectable; the current task ("Build
+            // task", task-1) must not list itself as a parent option.
+            await screen.findByText("Fix bug");
+            const optionContents = Array.from(
+                document.querySelectorAll(".ant-select-item-option-content")
+            ).map((el) => el.textContent);
+            expect(optionContents).toContain("Fix bug");
+            // A task can't be its own parent — the editing task is filtered
+            // out of the option list.
+            expect(optionContents).not.toContain("Build task");
+        });
+
+        it("includes labels, assignees, and parent in the PUT payload on save", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // Pick a label.
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /labels/i })
+            );
+            fireEvent.click(await screen.findByText("Backend"));
+
+            // Pick an assignee.
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /assignees/i })
+            );
+            fireEvent.click(await screen.findByText("Bob"));
+
+            // Pick a parent task.
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /parent task/i })
+            );
+            fireEvent.click(await screen.findByText("Fix bug"));
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body).toEqual(
+                expect.objectContaining({
+                    _id: "task-1",
+                    labelIds: ["label-1"],
+                    assigneeIds: ["member-2"],
+                    parentTaskId: "task-2"
+                })
+            );
+        });
+
+        it("serializes a chosen due date as a YYYY-MM-DD string in the PUT payload", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // AntD DatePicker accepts typed input; type a date then confirm
+            // with Enter so the picker commits the value.
+            const dueInput = screen.getByPlaceholderText(
+                "Select a due date"
+            ) as HTMLInputElement;
+            fireEvent.mouseDown(dueInput);
+            fireEvent.change(dueInput, { target: { value: "2026-12-25" } });
+            fireEvent.keyDown(dueInput, { key: "Enter", code: "Enter" });
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body.dueDate).toBe("2026-12-25");
+        });
+
+        it("seeds the date pickers from the task's stored ISO date strings", async () => {
+            renderModal({
+                initialTasks: [
+                    task({ startDate: "2026-03-01", dueDate: "2026-03-15" })
+                ],
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The stored ISO strings round-trip into the picker inputs.
+            expect(screen.getByDisplayValue("2026-03-01")).toBeInTheDocument();
+            expect(screen.getByDisplayValue("2026-03-15")).toBeInTheDocument();
         });
     });
 });

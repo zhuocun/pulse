@@ -5,28 +5,34 @@ import type { LensId } from "./index";
  *
  * Returns a `(task) => boolean` filter for the active lens, or `() => true`
  * (no-op) when no lens is active or the lens depends on an `ITask` field
- * that hasn't shipped yet (`dueDate`, AI risk score — Phase 4 roadmap).
+ * that hasn't shipped yet (AI risk score).
  *
  * Predicate semantics:
  *   - `mine`       — task.coordinatorId === currentUserId (functional;
  *                    no-op when current user is unresolved)
  *   - `today`      — task.dueDate falls on the local-calendar "today",
  *                    compared as a `YYYY-MM-DD` string in the runtime
- *                    timezone (graceful-skip until dueDate ships)
+ *                    timezone (functional — M2 `dueDate` shipped)
  *   - `this-week`  — task.dueDate within current ISO week, Mon-Sun
- *                    (graceful-skip)
- *   - `at-risk`    — task.aiRisk in {"high", "medium"} (graceful skip)
+ *                    (functional)
+ *   - `at-risk`    — task.aiRisk in {"high", "medium"} (graceful skip
+ *                    until the AI risk score ships)
  *
- * The "graceful skip" lenses still appear in the chip row so the spec
- * surfaces; selecting them just returns every task. UX-wise the chip
- * carries a "soon" badge so the user is not misled into thinking the
- * lens is broken.
+ * A task with no `dueDate` is treated as matching the date lenses (a
+ * date filter can't exclude a task that carries no date), so those
+ * lenses narrow the board to dated-and-in-range tasks plus the undated
+ * backlog rather than hiding undated work outright. The remaining
+ * "graceful skip" lens (`at-risk`) still appears in the chip row so the
+ * spec surfaces; selecting it returns every task and the chip carries a
+ * "soon" badge so the user is not misled into thinking the lens is broken.
  */
 
 type LensTask = Pick<ITask, "coordinatorId"> & {
-    /** Phase 4 — not on `ITask` yet. */
+    /** M2 — date-only ISO string on `ITask`; widened here so the predicate
+     * also accepts the timestamp / Date shapes that historical fixtures and
+     * callers may pass. */
     dueDate?: string | number | Date | null;
-    /** Phase 4 — AI risk classification. */
+    /** Not on `ITask` yet — AI risk classification. */
     aiRisk?: "low" | "medium" | "high" | null;
 };
 
@@ -93,7 +99,8 @@ export const buildLensPredicate = ({
     if (lens === "today") {
         const today = localDateString(now);
         return (task) => {
-            if (!task.dueDate) return true; // Phase 4 — graceful skip.
+            // Undated tasks can't be excluded by a date filter — pass them.
+            if (!task.dueDate) return true;
             const parsed = new Date(task.dueDate);
             if (Number.isNaN(parsed.getTime())) return true;
             return localDateString(parsed) === today;

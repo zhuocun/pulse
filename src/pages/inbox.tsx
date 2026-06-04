@@ -1,6 +1,7 @@
 import styled from "@emotion/styled";
 import { Typography } from "antd";
 import { useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router";
 
 import { KIND_ICON } from "../components/activityKindIcon";
 import EmptyState from "../components/emptyState";
@@ -10,6 +11,7 @@ import { microcopy, microcopyString } from "../constants/microcopy";
 import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import { formatRelativeTime } from "../utils/formatRelativeTime";
 import useActivityFeed from "../utils/hooks/useActivityFeed";
+import useNotifications from "../utils/hooks/useNotifications";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
@@ -19,18 +21,20 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * header + opaque rounded group + inset hairline dividers) so the page
  * speaks the same visual language as the settings surface.
  *
- * Only Activity carries real data: the session-only `useActivityFeed`
- * log (task / column / project / AI changes), rendered with the same
- * row presentation as the activity drawer — a per-kind icon, the event
- * summary, and a relative timestamp. Triage and Mentions are honest
- * structural empty-states: triage nudges surface on each board's
- * Copilot (no board context exists on this standalone page) and there
- * is no mentions data model yet.
+ * Activity carries the session-only `useActivityFeed` log (task / column
+ * / project / AI changes), rendered with the same row presentation as the
+ * activity drawer — a per-kind icon, the event summary, and a relative
+ * timestamp. Mentions carries the server's `kind === "mention"`
+ * notifications (`useNotifications`), each rendered with its summary and a
+ * link to the referenced task's board. Triage stays an honest structural
+ * empty-state: triage nudges surface on each board's Copilot, and no
+ * board context exists on this standalone page.
  *
- * All-empty UX: a fresh inbox with no Activity events does NOT render
- * three sad empty sections — it falls back to the single page-level
- * `EmptyState`. Once Activity has at least one event, the grouped
- * sections render (with Triage / Mentions showing their empty copy).
+ * All-empty UX: a fresh inbox with no Activity events AND no mentions does
+ * NOT render three sad empty sections — it falls back to the single
+ * page-level `EmptyState`. Once Activity or Mentions has at least one
+ * entry, the grouped sections render (with the empty sections showing
+ * their quiet empty copy).
  */
 
 /**
@@ -121,6 +125,43 @@ const SectionEmpty = styled.div`
 `;
 
 /*
+ * A single mention row. When the mention carries a `projectId` the whole
+ * row is a router `<Link>` to that project's board (the always-valid task
+ * landing — the routed task-panel deep link is flag-gated, the board is
+ * not); without one it degrades to a plain row. Reuses the activity row's
+ * body anatomy (summary + a quiet sub-line) so the two sections share a
+ * visual rhythm.
+ */
+const mentionRowStyles = `
+    align-items: flex-start;
+    display: flex;
+    gap: ${space.sm}px;
+    padding: ${space.sm}px ${space.md}px;
+    text-decoration: none;
+    width: 100%;
+`;
+
+const MentionRow = styled.div`
+    ${mentionRowStyles}
+`;
+
+const MentionLink = styled(Link)`
+    ${mentionRowStyles}
+    color: inherit;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
+    }
+`;
+
+const MentionAction = styled.span`
+    color: var(--ant-color-link, #1677ff);
+    flex: 0 0 auto;
+    font-size: ${fontSize.sm}px;
+`;
+
+/*
  * The grouped sections cap their width and centre on desktop so the
  * rows don't sprawl across an ultra-wide monitor — the route is
  * reachable everywhere even though the bottom tab bar that links it is
@@ -137,6 +178,22 @@ const InboxPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.inbox), false);
 
     const { events, markAllRead, unreadCount } = useActivityFeed();
+    const { notifications } = useNotifications();
+
+    /*
+     * Mentions section data — the server's `kind === "mention"`
+     * notifications, newest first. The backend already returns the
+     * caller's notifications newest-first, so no re-sort is needed; we
+     * filter defensively in a memo so the list identity is stable across
+     * renders that don't change the underlying notifications.
+     */
+    const mentions = useMemo(
+        () =>
+            (notifications ?? []).filter(
+                (notification) => notification.kind === "mention"
+            ),
+        [notifications]
+    );
 
     /*
      * Mark-as-read on view (mirrors the drawer's mark-read-on-close):
@@ -171,11 +228,11 @@ const InboxPage = () => {
     );
 
     /*
-     * All-empty fallback: with no Activity events (Triage / Mentions are
-     * always structurally empty here) we render the single page-level
+     * All-empty fallback: with no Activity events AND no mentions (Triage
+     * is always structurally empty here) we render the single page-level
      * empty state rather than three sad empty sections.
      */
-    if (sortedEvents.length === 0) {
+    if (sortedEvents.length === 0 && mentions.length === 0) {
         return (
             <PageContainer>
                 <PageHeading level={1}>{microcopy.inbox.heading}</PageHeading>
@@ -206,9 +263,55 @@ const InboxPage = () => {
                     data-testid="inbox-section-mentions"
                     header={microcopy.inbox.sections.mentions.title}
                 >
-                    <SectionEmpty data-testid="inbox-mentions-empty">
-                        {microcopy.inbox.sections.mentions.empty}
-                    </SectionEmpty>
+                    {mentions.length === 0 ? (
+                        <SectionEmpty data-testid="inbox-mentions-empty">
+                            {microcopy.inbox.sections.mentions.empty}
+                        </SectionEmpty>
+                    ) : (
+                        mentions.map((mention) => {
+                            const body = (
+                                <>
+                                    <EventBody>
+                                        <EventSummary>
+                                            {mention.summary}
+                                        </EventSummary>
+                                    </EventBody>
+                                    {mention.projectId && (
+                                        <MentionAction aria-hidden>
+                                            {
+                                                microcopy.inbox.sections
+                                                    .mentions.viewTask
+                                            }
+                                        </MentionAction>
+                                    )}
+                                </>
+                            );
+                            return mention.projectId ? (
+                                <MentionLink
+                                    key={mention._id}
+                                    aria-label={microcopyString(
+                                        microcopy.inbox.sections.mentions
+                                            .itemAriaLabel
+                                    ).replace("{summary}", mention.summary)}
+                                    data-mention-id={mention._id}
+                                    data-ref-id={mention.refId}
+                                    data-testid="inbox-mention-row"
+                                    to={`/projects/${mention.projectId}/board`}
+                                >
+                                    {body}
+                                </MentionLink>
+                            ) : (
+                                <MentionRow
+                                    key={mention._id}
+                                    data-mention-id={mention._id}
+                                    data-ref-id={mention.refId}
+                                    data-testid="inbox-mention-row"
+                                >
+                                    {body}
+                                </MentionRow>
+                            );
+                        })
+                    )}
                 </SettingsSection>
                 <SettingsSection
                     data-testid="inbox-section-activity"
