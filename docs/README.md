@@ -19,6 +19,22 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
   limits, rich tasks (dates, labels, assignees, sub-tasks) + bulk edit,
   labels, comments + @mentions, notifications. The substrate the AI
   PRDs build on; includes an honest frontend-coverage map.
+- [`prd/work-management-depth.md`](prd/work-management-depth.md) —
+  proposed (net-new) work-management depth: task priority,
+  dependencies/blockers, lifecycle + archive/trash, recurring tasks,
+  project/task templates, custom fields, milestones/iterations,
+  alternate views (list/table/calendar/timeline) + swimlanes, and
+  AI-assisted prioritization, dependency hints, and duplicate detection.
+- [`prd/collaboration-notifications.md`](prd/collaboration-notifications.md)
+  — proposed collaboration & notifications depth:
+  watchers/subscriptions, broader notification kinds + `actorId` +
+  per-kind preferences, email/web-push delivery, comment
+  reactions/threads/edit-history, and a per-task activity timeline.
+- [`prd/accounts-organizations.md`](prd/accounts-organizations.md) —
+  proposed accounts & multi-tenancy: first-class
+  organizations/workspaces, teams, invite-by-email onboarding, guest
+  role + public read-only share links, account/profile management, and
+  an enterprise platform horizon.
 - [`prd/v2.1-agent.md`](prd/v2.1-agent.md) — current backend / wire
   contract: named LangGraph agents, two-level autonomy, FE↔BE tool
   calling via interrupts.

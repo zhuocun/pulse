@@ -50,6 +50,25 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
 - [ ] **M8 — Bets: autopilot lanes; org-wide audit history; "plan this
   sprint"**.
 
+### Proposed completeness PRDs (not yet milestoned)
+A later research + brainstorm pass produced three forward-looking PRDs that
+specify net-new completeness features (backend + frontend both unbuilt).
+They are proposals, not scheduled milestones, and were deliberately scoped
+to avoid duplicating M5–M8 or the excluded list below.
+- [`../prd/work-management-depth.md`](../prd/work-management-depth.md) —
+  task priority, dependencies/blockers, lifecycle + archive/trash,
+  recurring tasks, templates, custom fields, milestones/iterations,
+  alternate views (list/table/calendar/timeline) + swimlanes, and
+  AI-assisted prioritization/dependency/duplicate detection.
+- [`../prd/collaboration-notifications.md`](../prd/collaboration-notifications.md)
+  — watchers/subscriptions, notification breadth + `actorId` +
+  preferences, email/web-push delivery, comment reactions/threads/edit
+  history, and a per-task activity timeline.
+- [`../prd/accounts-organizations.md`](../prd/accounts-organizations.md) —
+  organizations/workspaces, teams, invite-by-email onboarding, guest
+  role + public read-only links, account/profile management, and a
+  platform horizon (SSO/SCIM/PAT/billing).
+
 ### Open decisions (carry forward)
 - AI/agent routes (`ai.py`, `agents.py`) remain owner-gated. Decide in the
   AI milestone whether editors should get AI access (`can_access(...,
