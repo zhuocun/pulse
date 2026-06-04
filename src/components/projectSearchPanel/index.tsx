@@ -1,6 +1,11 @@
-import { SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import {
+    LoadingOutlined,
+    SearchOutlined,
+    StarFilled,
+    StarOutlined
+} from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Select, Tooltip } from "antd";
+import { Button, Input, Select, Spin, Tooltip } from "antd";
 import React, { useMemo } from "react";
 
 import { microcopy } from "../../constants/microcopy";
@@ -12,7 +17,18 @@ import {
     space
 } from "../../theme/tokens";
 import useAppMessage from "../../utils/hooks/useAppMessage";
+import useDebounce from "../../utils/hooks/useDebounce";
 import FilterChips, { FilterChip } from "../filterChips";
+
+/*
+ * Mirrors the 300 ms `useDebounce(param, 300)` the projects page applies
+ * before it refetches (see `pages/project.tsx`): the URL updates on every
+ * keystroke (source of truth, deep-linkable), but the network refetch is
+ * debounced. We re-derive the same window here purely to drive the
+ * "filtering…" spinner so the affordance appears for exactly as long as a
+ * fetch is actually pending — we do NOT re-debounce the filter itself.
+ */
+const SEARCH_DEBOUNCE_MS = 300;
 
 export interface ProjectSearchParam {
     projectName: string | null;
@@ -213,6 +229,21 @@ const ProjectSearchPanel: React.FC<Props> = ({
         (u) => u._id === param.managerId
     )?.username;
 
+    /*
+     * Loading affordance for the project-name search (ui-todo §9). The
+     * URL stays the single source of truth: `onChange` writes
+     * `param.projectName` immediately so the input is controlled by the
+     * URL and the change is deep-linkable / back-button-safe. The projects
+     * page debounces that param by 300 ms before it refetches; we re-derive
+     * the same debounce here ONLY to know when a refetch is still pending
+     * (the live value has out-run the debounced one) so we can show a
+     * subtle spinner. We never gate the actual filter on this — that would
+     * double-debounce and fight the page's own `useDebounce`.
+     */
+    const liveQuery = param.projectName ?? "";
+    const debouncedQuery = useDebounce(liveQuery, SEARCH_DEBOUNCE_MS);
+    const searchPending = Boolean(liveQuery) && debouncedQuery !== liveQuery;
+
     const chips: FilterChip[] = useMemo(() => {
         const active: FilterChip[] = [];
         if (param.projectName) {
@@ -318,8 +349,33 @@ const ProjectSearchPanel: React.FC<Props> = ({
                                 }}
                             />
                         }
+                        suffix={
+                            searchPending ? (
+                                <Spin
+                                    aria-label={
+                                        microcopy.a11y.searchProjectsPending
+                                    }
+                                    indicator={
+                                        <LoadingOutlined aria-hidden spin />
+                                    }
+                                    size="small"
+                                />
+                            ) : (
+                                // Reserve the suffix slot even at rest so
+                                // toggling the spinner doesn't shift the
+                                // input's text width (a tiny CLS guard on
+                                // the control itself).
+                                <span
+                                    aria-hidden
+                                    style={{
+                                        display: "inline-block",
+                                        inlineSize: `${fontSize.md}px`
+                                    }}
+                                />
+                            )
+                        }
                         type="search"
-                        value={param.projectName ?? ""}
+                        value={liveQuery}
                     />
                 </FlexInput>
                 <FlexSelect>

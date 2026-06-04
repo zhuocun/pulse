@@ -5,6 +5,7 @@
     "scripts": {
         "start": "vite --host 0.0.0.0 --port 3000",
         "build": "vite build",
+        "analyze": "ANALYZE=true vite build",
         "test": "jest",
         "typecheck": "tsc --noEmit",
         "prepare": "husky",
@@ -67,6 +68,7 @@
         "jest-axe": "^10.0.0",
         "jest-environment-jsdom": "^30.3.0",
         "prettier": "^3.8.3",
+        "rollup-plugin-visualizer": "^5.14.0",
         "typescript": "^6.0.3",
         "vite": "^8.0.10",
         "vite-plugin-svgr": "^5.2.0",

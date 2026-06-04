@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 
@@ -77,10 +78,19 @@ const renderProjectPopover = () => {
 
     window.history.pushState({}, "Projects", "/projects");
 
+    // The switcher rows warm board queries on hover via
+    // `usePrefetchProject` → `useQueryClient()` (not mocked here), so a
+    // real `QueryClientProvider` must wrap the tree.
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } }
+    });
+
     render(
-        <BrowserRouter>
-            <ProjectPopover />
-        </BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+                <ProjectPopover />
+            </BrowserRouter>
+        </QueryClientProvider>
     );
 
     return { openModal };

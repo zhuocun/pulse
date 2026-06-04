@@ -377,6 +377,43 @@ describe("TaskModal", () => {
             expect(store.getState().overlays.editingTaskId).toBe(null)
         );
         expect(fetchMock).not.toHaveBeenCalled();
+        // §2.A.1 — a clean (untouched) close shows NO discard prompt.
+        expect(
+            screen.queryByRole("button", { name: "Discard" })
+        ).not.toBeInTheDocument();
+    });
+
+    it("prompts to discard before closing a dirty form, and only closes after confirming (§2.A.1)", async () => {
+        renderModal();
+
+        const nameField = await screen.findByDisplayValue("Build task");
+        // Touch the form so the unsaved-changes guard arms.
+        fireEvent.change(nameField, { target: { value: "Build task edited" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        // The modal must stay open behind the confirm prompt.
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
+        const keepEditing = await screen.findByRole("button", {
+            name: "Keep editing"
+        });
+        // "Keep editing" dismisses the prompt and leaves the modal open.
+        fireEvent.click(keepEditing);
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("button", { name: "Keep editing" })
+            ).not.toBeInTheDocument()
+        );
+        expect(store.getState().overlays.editingTaskId).toBe("task-1");
+
+        // Re-request close and confirm the discard this time.
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+        // No mutation fired — the edit was discarded, not saved.
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("deletes the editing task immediately (no confirm) and surfaces an Undo toast", async () => {
@@ -834,8 +871,11 @@ describe("TaskModal", () => {
                 /Apply readiness suggestion for epic/
             );
             fireEvent.click(epicSuggestion);
+            // After Apply the Epic label carries the "Suggested by Copilot"
+            // provenance badge, so match the label by prefix rather than
+            // exact text.
             expect(
-                (screen.getByLabelText("Epic") as HTMLInputElement).value
+                (screen.getByLabelText(/^Epic/) as HTMLInputElement).value
             ).toBeTruthy();
             expect(taskNameInput).toBeInTheDocument();
         } finally {
@@ -877,6 +917,52 @@ describe("TaskModal", () => {
                 )
             ).not.toBeInTheDocument()
         );
+    });
+
+    it("shows a copilot badge on a non-story-points field after a readiness Apply and clears it after manual edit", async () => {
+        jest.useFakeTimers();
+        try {
+            renderModal();
+            const taskNameInput = (await screen.findByDisplayValue(
+                "Build task"
+            )) as HTMLInputElement;
+            // A short name triggers a deterministic taskName readiness issue.
+            fireEvent.change(taskNameInput, { target: { value: "Hi" } });
+            act(() => {
+                jest.advanceTimersByTime(1000);
+            });
+            const taskNameSuggestion = await screen.findByLabelText(
+                /Apply readiness suggestion for taskName/
+            );
+            act(() => {
+                fireEvent.click(taskNameSuggestion);
+            });
+
+            const taskNameLabel = () =>
+                screen
+                    .getByText("Task name")
+                    .closest("label") as HTMLLabelElement;
+            await waitFor(() =>
+                expect(
+                    within(taskNameLabel()).queryByText("Suggested by Copilot")
+                ).toBeInTheDocument()
+            );
+
+            // Manual edit clears the provenance badge.
+            act(() => {
+                fireEvent.change(
+                    screen.getByLabelText(/^Task name/) as HTMLInputElement,
+                    { target: { value: "Hand-written name" } }
+                );
+            });
+            await waitFor(() =>
+                expect(
+                    within(taskNameLabel()).queryByText("Suggested by Copilot")
+                ).not.toBeInTheDocument()
+            );
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("restores the previous field value when undoing a readiness suggestion", async () => {

@@ -1057,6 +1057,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                             alt=""
                             aria-hidden
                             height={14}
+                            loading="lazy"
                             src={isBug ? bugIcon : taskIcon}
                             width={14}
                         />
@@ -1138,7 +1139,7 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
     onResetFilters?: () => void;
 };
 
-const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
+const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
     (
         {
             column,
@@ -1373,6 +1374,23 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
     }
 );
 
+ColumnComponent.displayName = "Column";
+
+/**
+ * Memoized so board-level state changes that don't touch a column's own
+ * props — opening the Copilot drawer, toggling project AI, the refresh
+ * spinner, the swipe-hint dismissal — don't re-render every column (and,
+ * transitively, every task card) on the board. The board now hands each
+ * column stable prop refs: the per-column `tasks` bucket comes from a
+ * memoized `Map`, `members` is the shared `EMPTY_MEMBERS` fallback or the
+ * stable query ref, `param` is `useMemo`'d in `useUrl`, and
+ * `onResetFilters` is `useCallback`'d. A real change — a search keystroke
+ * (new `param`), a drag reorder (new `tasks`), or a member load — still
+ * flows through because those refs genuinely change. The DnD `Drag`
+ * wrapper spreads its own props onto the cloned element, but those are
+ * forwarded via `...props` and only change when drag state actually does.
+ */
+const Column = React.memo(ColumnComponent);
 Column.displayName = "Column";
 
 export default Column;

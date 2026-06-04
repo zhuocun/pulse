@@ -104,6 +104,7 @@ export const enSource = {
         activeFilters: "Active filters",
         removeFilter: "Remove {label} filter",
         sortProjects: "Sort projects",
+        projectPagination: "Project list pages",
         favoritedOnlyToggle: "Show only favorited projects",
         saveCurrentAsDefault: "Save current filters as default",
         resetToSavedDefault: "Reset filters to saved default",
@@ -111,6 +112,7 @@ export const enSource = {
         loadingPage: "Loading page",
         projects: "Projects",
         searchProjectsByName: "Search projects by name",
+        searchProjectsPending: "Filtering projects…",
         searchTasksByName: "Search tasks by name",
         filterByManager: "Filter by manager",
         filterByCoordinator: "Filter by coordinator",
@@ -175,6 +177,34 @@ export const enSource = {
         columnDragHandle: "Drag to reorder column",
         reorderDisabledByFilters:
             "Reordering is paused while filters are active. Clear filters to reorder."
+    },
+    /*
+     * Keyboard shortcut catalog (ui-todo §2.A.9). The dialog reads its
+     * accessible name + scope headings from here; `descriptions.*` maps to
+     * the stable shortcut ids in `src/constants/shortcuts.ts`. Scope labels
+     * group the catalog in the help dialog.
+     */
+    shortcuts: {
+        dialogTitle: "Keyboard shortcuts",
+        dialogDescription: "Speed up your work with these keyboard shortcuts.",
+        sequenceThen: "then",
+        scopes: {
+            global: "Global",
+            projectPage: "Project page",
+            board: "Board",
+            taskCard: "Focused task card",
+            overlay: "Modal & drawer"
+        },
+        descriptions: {
+            openCommandPalette: "Open the command palette",
+            openShortcutHelp: "Open keyboard shortcut help",
+            goToProjects: "Go to projects",
+            goToBoard: "Go to board",
+            createTask: "Create a task in the focused column",
+            closeOverlay: "Close the open modal or drawer",
+            editTask: "Open the edit modal for the focused task",
+            keyboardDragTask: "Drag the focused task with the keyboard"
+        }
     },
     settings: {
         darkMode: "Dark mode",
@@ -450,6 +480,12 @@ export const enSource = {
             title: "Delete this task?",
             description: "This action cannot be undone.",
             confirmLabel: "Delete task"
+        },
+        discardChanges: {
+            title: "Discard changes?",
+            description: "Your unsaved changes will be lost.",
+            confirmLabel: "Discard",
+            cancelLabel: "Keep editing"
         }
     },
     feedback: {
@@ -589,7 +625,8 @@ export const enSource = {
         removedByOthersTitle: "This task was removed by another change.",
         removedByOthersBody:
             "Your edits are still here. Discard them or save them as a new task to keep them.",
-        discardEdits: "Discard edits"
+        discardEdits: "Discard edits",
+        aiAssistLabel: "AI assist"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",
@@ -945,6 +982,8 @@ export const enSource = {
         revertToPrevious: "Revert to previous",
         showAlternatives: "Show alternatives",
         showRationale: "Why this?",
+        whyLabel: "Why?",
+        whyPopoverTitle: "Why Copilot suggested this",
         applyAnyway: "Apply anyway",
         emptyChatLead:
             "Ask about this board, tasks, or your projects. Answers use read-only data from the app.",
@@ -1208,7 +1247,13 @@ export const enSource = {
         title: "Board Copilot brief",
         headline: "{total} tasks on the board, {inProgress} in progress.",
         recommendedNextStep: "Recommended next step",
+        summaryTitle: "At a glance",
+        summaryTotalTasks: "Total tasks",
+        summaryColumns: "Columns",
+        summaryUnowned: "Unowned",
+        summaryContributors: "Contributors",
         countsPerColumn: "Counts per column",
+        countsBarAria: "{column}: {count} tasks",
         largestUnstarted: "Largest unstarted",
         unownedTasks: "Unowned tasks",
         workload: "Workload",
@@ -1396,6 +1441,40 @@ export const enSource = {
     swipeActions: {
         favorite: "Favorite",
         unfavorite: "Unfavorite"
+    },
+    /*
+     * Phase 4.4 — first-login onboarding tour. A lightweight, one-shot
+     * AntD <Tour> that introduces the primary navigation and Board
+     * Copilot on the first authenticated visit, then never auto-shows
+     * again. Copy stays short and welcoming — this is a nicety, not a
+     * blocking modal. `next` / `previous` / `done` / `skip` override the
+     * AntD Tour locale defaults so both languages read consistently.
+     */
+    onboardingTour: {
+        next: "Next",
+        previous: "Back",
+        done: "Done",
+        skip: "Skip tour",
+        welcome: {
+            title: "Welcome to Pulse",
+            description:
+                "Here is a quick tour of the essentials. You can skip it anytime — it only shows once."
+        },
+        navigation: {
+            title: "Find your way around",
+            description:
+                "Jump between your boards, inbox, and Copilot from here whenever you need to."
+        },
+        copilot: {
+            title: "Meet Board Copilot",
+            description:
+                "Board Copilot drafts tasks, breaks down work, and answers questions about your boards. Turn it on or off anytime."
+        },
+        account: {
+            title: "Your account and settings",
+            description:
+                "Switch themes, change language, and sign out from your account menu."
+        }
     }
 } as const;
 
