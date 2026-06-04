@@ -100,6 +100,7 @@ const zhCN: Dictionary = {
         activeFilters: "当前筛选条件",
         removeFilter: "移除 {label} 筛选",
         sortProjects: "项目排序",
+        projectPagination: "项目列表分页",
         favoritedOnlyToggle: "仅显示已收藏的项目",
         saveCurrentAsDefault: "将当前筛选保存为默认",
         resetToSavedDefault: "重置筛选为已保存的默认",

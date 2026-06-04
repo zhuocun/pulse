@@ -530,4 +530,138 @@ describe("ProjectList", () => {
             container.querySelectorAll(".ant-skeleton").length
         ).toBeGreaterThan(0);
     });
+
+    /*
+     * Pagination coverage (Phase 2.2 §1.2 item 6). The grid caps at 12
+     * cards per page; the helper below mints a sortable, name-ordered
+     * fixture so the assertions can reason about which slice is visible.
+     */
+    const manyProjects = (count: number): IProject[] =>
+        Array.from({ length: count }, (_, idx) => {
+            // Zero-pad so name-asc string ordering matches numeric order
+            // (Project 02 < Project 10).
+            const n = String(idx + 1).padStart(2, "0");
+            return project({
+                _id: `project-${n}`,
+                projectName: `Project ${n}`,
+                // Descending createdAt so the default `createdAt-desc`
+                // sort keeps "Project 01" first.
+                createdAt: `2026-04-${String(28 - idx).padStart(2, "0")}T00:00:00.000Z`
+            });
+        });
+
+    const visibleProjectNames = () =>
+        screen.getAllByRole("link").map((link) => link.textContent);
+
+    it("does not render the pager when the list fits on one page", () => {
+        renderList({ dataSource: manyProjects(12) });
+
+        expect(
+            screen.queryByRole("listitem", { name: /pagination/i })
+        ).not.toBeInTheDocument();
+        // AntD pagination exposes a navigation landmark; absent here.
+        expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+        expect(visibleProjectNames()).toHaveLength(12);
+    });
+
+    it("caps the grid at the default page size and paginates the rest", () => {
+        renderList({ dataSource: manyProjects(20) });
+
+        // First page shows the first 12 (createdAt-desc => Project 01..12).
+        const firstPage = visibleProjectNames();
+        expect(firstPage).toHaveLength(12);
+        expect(firstPage[0]).toBe("Project 01");
+        expect(firstPage[11]).toBe("Project 12");
+        expect(screen.queryByText("Project 13")).not.toBeInTheDocument();
+
+        // Jump to page 2 — the remaining 8 cards render.
+        fireEvent.click(screen.getByTitle("2"));
+
+        const secondPage = visibleProjectNames();
+        expect(secondPage).toHaveLength(8);
+        expect(secondPage[0]).toBe("Project 13");
+        expect(screen.queryByText("Project 01")).not.toBeInTheDocument();
+    });
+
+    it("resets to page 1 when the filtered result set changes", () => {
+        const { rerender } = renderList({ dataSource: manyProjects(20) });
+
+        fireEvent.click(screen.getByTitle("2"));
+        expect(visibleProjectNames()[0]).toBe("Project 13");
+
+        // Simulate a parent-driven filter change: a narrower dataSource.
+        // The result-signature effect must yank the user back to page 1.
+        rerender(
+            <Provider store={store}>
+                <MemoryRouter initialEntries={["/projects"]}>
+                    <Routes>
+                        <Route
+                            path="/projects"
+                            element={
+                                <ProjectList
+                                    dataSource={manyProjects(20).slice(0, 15)}
+                                    loading={false}
+                                    members={members}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </Provider>
+        );
+
+        const afterFilter = visibleProjectNames();
+        expect(afterFilter[0]).toBe("Project 01");
+        expect(afterFilter).toHaveLength(12);
+    });
+
+    it("never renders an out-of-range (empty) page after the set shrinks", () => {
+        const { rerender } = renderList({ dataSource: manyProjects(20) });
+
+        fireEvent.click(screen.getByTitle("2"));
+        expect(visibleProjectNames()[0]).toBe("Project 13");
+
+        // Shrink to 13 projects. A different ID set trips the
+        // result-signature reset back to page 1 (so the user lands on a
+        // populated page rather than a blank page-2 slice). The clamp
+        // guard in render is what keeps the in-between render in range.
+        rerender(
+            <Provider store={store}>
+                <MemoryRouter initialEntries={["/projects"]}>
+                    <Routes>
+                        <Route
+                            path="/projects"
+                            element={
+                                <ProjectList
+                                    dataSource={manyProjects(13)}
+                                    loading={false}
+                                    members={members}
+                                />
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </Provider>
+        );
+
+        const afterShrink = visibleProjectNames();
+        // Page 1 of the 13-item set: a full grid of 12, never empty.
+        expect(afterShrink).toHaveLength(12);
+        expect(afterShrink[0]).toBe("Project 01");
+    });
+
+    it("widens the page through the size changer", async () => {
+        renderList({ dataSource: manyProjects(20) });
+
+        expect(visibleProjectNames()).toHaveLength(12);
+
+        // Open the page-size select and pick 24 / page so the whole set fits.
+        fireEvent.mouseDown(
+            screen.getByRole("combobox", { name: /page size/i })
+        );
+        const option = await screen.findByText(/24 \/ page/i);
+        fireEvent.click(option);
+
+        expect(visibleProjectNames()).toHaveLength(20);
+    });
 });

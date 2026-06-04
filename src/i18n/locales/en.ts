@@ -104,6 +104,7 @@ export const enSource = {
         activeFilters: "Active filters",
         removeFilter: "Remove {label} filter",
         sortProjects: "Sort projects",
+        projectPagination: "Project list pages",
         favoritedOnlyToggle: "Show only favorited projects",
         saveCurrentAsDefault: "Save current filters as default",
         resetToSavedDefault: "Reset filters to saved default",

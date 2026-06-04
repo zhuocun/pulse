@@ -1,7 +1,7 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Modal, Select } from "antd";
-import { useCallback, useMemo, useState } from "react";
+import { Button, Modal, Pagination, Select } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
@@ -110,8 +110,34 @@ const Grid = styled.div`
     }
 `;
 
+/*
+ * Pagination footer pinned below the grid. Centred on phones (where the
+ * compact AntD pagination would otherwise sit hard against the left
+ * edge) and right-aligned from sm up so it reads as a footer control
+ * rather than competing with the cards for the leading edge.
+ */
+const PaginationRow = styled.div`
+    display: flex;
+    justify-content: center;
+    margin-top: ${space.xs}px;
+
+    @media (min-width: ${breakpoints.sm}px) {
+        justify-content: flex-end;
+    }
+`;
+
 const SKELETON_KEY_PREFIX = "__skeleton__";
 const SKELETON_COUNT = 6;
+
+/*
+ * Client-side pagination (Phase 2.2 §1.2 item 6). The grid renders an
+ * unbounded number of cards otherwise, so a workspace with hundreds of
+ * projects paints every card on first load. Twelve fills three to four
+ * grid rows on desktop without crowding; the size-changer lets power
+ * users widen the page to 24 / 48 when they want a denser scan.
+ */
+const DEFAULT_PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [12, 24, 48];
 
 const buildSortOptions = (): { label: string; value: ProjectListSort }[] => [
     {
@@ -265,6 +291,50 @@ const ProjectList: React.FC<Props> = ({
         [dataSource, sortOrder, likedSet]
     );
 
+    /*
+     * Client-side pagination. `page` is 1-based to match AntD's
+     * `<Pagination current>` contract. We keep both page + pageSize in
+     * local state because they're view-only concerns — they never need
+     * to round-trip the URL or the server.
+     */
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const total = sortedProjects.length;
+
+    /*
+     * Reset to the first page whenever the underlying result set changes
+     * shape — a new filter, a search keystroke, or a sort that reorders
+     * the list. We key the effect on the ordered list of IDs so that a
+     * pure re-fetch returning the same projects in the same order does
+     * NOT yank the user back to page 1, but any add / remove / reorder /
+     * filter does. (Sorting is the deliberate edge case: reordering
+     * within the same set still resets, which matches the "I changed how
+     * I'm looking at this" mental model.)
+     */
+    const resultSignature = sortedProjects.map((p) => p._id).join("|");
+    useEffect(() => {
+        setPage(1);
+    }, [resultSignature]);
+
+    /*
+     * Clamp the current page if the total shrank below it (e.g. a delete
+     * emptied the last page, or the user grew the page size). Derived in
+     * render so the slice below is always in-range even on the render
+     * where `total` just dropped — the reset effect above only fires on
+     * a signature change, which a same-set deletion may not trigger
+     * before this paints.
+     */
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, pageCount);
+    const pagedProjects = useMemo(
+        () =>
+            sortedProjects.slice(
+                (safePage - 1) * pageSize,
+                (safePage - 1) * pageSize + pageSize
+            ),
+        [sortedProjects, safePage, pageSize]
+    );
+
     const onLike = useCallback(
         (projectId: string) => {
             setPendingLikeId(projectId);
@@ -416,7 +486,7 @@ const ProjectList: React.FC<Props> = ({
                 </SortRow>
             </Toolbar>
             <Grid role="list" aria-label={microcopy.a11y.projects}>
-                {sortedProjects.map((p) => (
+                {pagedProjects.map((p) => (
                     <div key={p._id} role="listitem">
                         <ProjectCard
                             liked={isLiked(p._id)}
@@ -429,6 +499,32 @@ const ProjectList: React.FC<Props> = ({
                     </div>
                 ))}
             </Grid>
+            {/*
+             * Only mount the pager once the list outgrows the smallest
+             * page size — a workspace with a single grid-row of projects
+             * doesn't need a "1" footer button. The size-changer lets
+             * power users widen the page; AntD reads `current` from
+             * `safePage` so a shrink-clamp (last page deleted) is
+             * reflected without a flash of an empty grid.
+             */}
+            {total > PAGE_SIZE_OPTIONS[0] ? (
+                <PaginationRow>
+                    <Pagination
+                        aria-label={microcopy.a11y.projectPagination}
+                        current={safePage}
+                        onChange={(nextPage, nextSize) => {
+                            setPage(nextPage);
+                            if (nextSize !== pageSize) setPageSize(nextSize);
+                        }}
+                        pageSize={pageSize}
+                        pageSizeOptions={PAGE_SIZE_OPTIONS}
+                        responsive
+                        showSizeChanger
+                        size="small"
+                        total={total}
+                    />
+                </PaginationRow>
+            ) : null}
         </ListSurface>
     );
 };
