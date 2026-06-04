@@ -17,12 +17,11 @@ from app.services import label_service
 from tests.conftest import FakeStore
 
 
-# ``label_service`` imports ``repository`` at module top-level, the same
-# way the other services do, but it is not in ``conftest.SERVICE_MODULES``
-# (which we must not edit). Without this patch its ``repository`` name
-# would still point at the real Mongo singleton and every call would try
-# to reach a live cluster. Re-bind it to the per-test ``FakeStore`` the
-# rest of the app already uses so labels share one consistent store.
+# ``label_service`` is registered in ``conftest.SERVICE_MODULES``, so the
+# ``store`` fixture already rebinds its module-level ``repository`` to the
+# per-test ``FakeStore``. This autouse fixture is a belt-and-suspenders
+# re-bind to that same store -- redundant but harmless, kept so this file
+# is self-contained if the service is ever dropped from SERVICE_MODULES.
 @pytest.fixture(autouse=True)
 def _patch_label_repository(store: FakeStore, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(label_service, "repository", store)

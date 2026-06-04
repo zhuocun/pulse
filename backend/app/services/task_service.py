@@ -430,6 +430,31 @@ def bulk_update(data: Dict[str, Any], user_id: str) -> Optional[str]:
         if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
             return "Forbidden"
 
+    # Bulk must enforce the same field invariants as the single-task path
+    # -- it is not a back door around date/label shape, story points,
+    # coordinator existence, or parent-task validation.
+    shape_errors = _metadata_errors(filtered)
+    if "storyPoints" in filtered:
+        story_error = _story_points_error(filtered)
+        if story_error is not None:
+            shape_errors.append(story_error)
+    if shape_errors:
+        return "Bad request"
+    if "coordinatorId" in filtered and (
+        not filtered["coordinatorId"]
+        or repository.find_by_id(USERS, str(filtered["coordinatorId"])) is None
+    ):
+        return "Bad request"
+    if "parentTaskId" in filtered:
+        # The parent must be same-project as each target and not the
+        # target itself -- enforced per task, not just for the first.
+        for task in tasks:
+            if (
+                _parent_task_error(filtered, task.get("projectId"), str(task["_id"]))
+                is not None
+            ):
+                return "Bad request"
+
     for task in tasks:
         repository.update_by_id(TASKS, str(task["_id"]), filtered)
     return "Tasks updated"

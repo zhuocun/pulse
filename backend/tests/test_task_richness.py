@@ -564,3 +564,69 @@ def test_bulk_update_empty_task_ids_is_400(
         headers=auth_headers(owner["jwt"]),
     )
     assert response.status_code == 400, response.text
+
+
+# ---------------------------------------------------------------------------
+# Bulk update enforces the same invariants as the single-task path
+# ---------------------------------------------------------------------------
+
+
+def test_bulk_update_rejects_invalid_parent_and_coordinator(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+    create_task(client, owner["jwt"], project_id, column["_id"], owner["_id"])
+    task = get_tasks(client, owner["jwt"], project_id)[0]
+
+    def bulk(changes: Dict[str, Any]) -> Any:
+        return client.put(
+            "/api/v1/tasks/bulk",
+            json={"taskIds": [task["_id"]], "changes": changes},
+            headers=auth_headers(owner["jwt"]),
+        )
+
+    # A non-existent parent, a self-parent, and a dangling coordinator are
+    # each rejected (400) -- bulk is not a back door around the validators.
+    assert bulk({"parentTaskId": "does-not-exist"}).status_code == 400
+    assert bulk({"parentTaskId": task["_id"]}).status_code == 400
+    assert bulk({"coordinatorId": "ghost-user"}).status_code == 400
+
+    # None of the rejected calls mutated the task.
+    refreshed = get_tasks(client, owner["jwt"], project_id)[0]
+    assert refreshed.get("parentTaskId") in (None, "")
+    assert refreshed["coordinatorId"] == owner["_id"]
+
+
+def test_bulk_update_mixed_project_is_forbidden(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner_a = register_and_login(client, "owner_a", "owner_a@example.com")
+    owner_b = register_and_login(client, "owner_b", "owner_b@example.com")
+    editor = register_and_login(client, "editor", "editor@example.com")
+
+    project_a = create_project(client, owner_a["jwt"], name="A")
+    project_b = create_project(client, owner_b["jwt"], name="B")
+    add_member(client, owner_a["jwt"], project_a, editor["_id"], "editor")
+
+    col_a = first_column(client, owner_a["jwt"], project_a)
+    col_b = first_column(client, owner_b["jwt"], project_b)
+    create_task(client, owner_a["jwt"], project_a, col_a["_id"], owner_a["_id"])
+    create_task(client, owner_b["jwt"], project_b, col_b["_id"], owner_b["_id"])
+    task_a = get_tasks(client, owner_a["jwt"], project_a)[0]
+    task_b = get_tasks(client, owner_b["jwt"], project_b)[0]
+
+    # Editor on A but a non-member of B: a bulk spanning both is forbidden
+    # and mutates neither task (editor required on EVERY task's project).
+    response = client.put(
+        "/api/v1/tasks/bulk",
+        json={
+            "taskIds": [task_a["_id"], task_b["_id"]],
+            "changes": {"dueDate": "2026-12-31"},
+        },
+        headers=auth_headers(editor["jwt"]),
+    )
+    assert response.status_code == 403
+    assert get_tasks(client, owner_a["jwt"], project_a)[0].get("dueDate") in (None, "")
+    assert get_tasks(client, owner_b["jwt"], project_b)[0].get("dueDate") in (None, "")
