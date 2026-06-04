@@ -61,14 +61,23 @@ const findBrandTarget: TargetResolver = () => {
 };
 
 /**
- * Resolves the primary navigation landmark (`<nav aria-label="Primary">`
- * — the bottom tab bar on phone chrome). Absent on desktop / fine-pointer
- * surfaces, so this step degrades to a centered card there.
+ * Resolves the primary navigation landmark. Two landmarks can carry it
+ * depending on chrome: the desktop header nav (`aria-label` =
+ * `nav.desktopNavLabel`) on fine-pointer surfaces, and the bottom tab bar
+ * (`aria-label` = `nav.primaryLandmarkLabel`) on phone chrome. We try
+ * whichever is mounted, so the navigation step spotlights a real element
+ * on both surfaces; if neither is present the step degrades to a centered
+ * card.
  */
 const findPrimaryNavTarget: TargetResolver = () => {
     if (typeof document === "undefined") return null;
-    return document.querySelector<HTMLElement>(
-        `nav[aria-label="${microcopy.nav.primaryLandmarkLabel}"]`
+    return (
+        document.querySelector<HTMLElement>(
+            `nav[aria-label="${microcopy.nav.desktopNavLabel}"]`
+        ) ??
+        document.querySelector<HTMLElement>(
+            `nav[aria-label="${microcopy.nav.primaryLandmarkLabel}"]`
+        )
     );
 };
 
