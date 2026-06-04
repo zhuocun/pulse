@@ -4,6 +4,14 @@ Implementation of the feature set from the completeness review/brainstorm,
 built in dependency-ordered milestones. Each milestone is reviewed +
 gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
 
+> **As-built docs:** M1–M4 (RBAC/membership, task & board richness, comments
+> + @mentions, notifications, and the shipped frontend surfaces) are now
+> documented as the authoritative contract in
+> [`../prd/core-collaboration.md`](../prd/core-collaboration.md), with the HTTP
+> details in [`../api/backend.md`](../api/backend.md) /
+> [`../api/frontend.md`](../api/frontend.md). This tracker is the forward
+> build-out roadmap (the remaining M4 FE work + M5–M8).
+
 ## Gate commands (must pass per milestone)
 - Backend lint: `cd backend && .venv/bin/ruff check .`
 - Backend tests: `cd backend && env -u DEEPSEEK_API_KEY COVERAGE_FILE=/tmp/cov .venv/bin/python -m pytest`
