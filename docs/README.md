@@ -39,6 +39,11 @@ the whole backlog without folder-hopping.
 - [`todo/product-done.md`](todo/product-done.md) — implementation
   changelog: what has shipped, per-feature inventory,
   acceptance-criteria status.
+- [`todo/feature-build-progress.md`](todo/feature-build-progress.md) —
+  dependency-ordered milestone tracker for the collaboration/completeness
+  build-out: M1–M4 shipped (documented as-built in
+  [`prd/core-collaboration.md`](prd/core-collaboration.md)); M5–M8 are the
+  forward roadmap.
 
 ## Operations
 
