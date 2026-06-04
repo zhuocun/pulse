@@ -1397,6 +1397,40 @@ export const enSource = {
     swipeActions: {
         favorite: "Favorite",
         unfavorite: "Unfavorite"
+    },
+    /*
+     * Phase 4.4 — first-login onboarding tour. A lightweight, one-shot
+     * AntD <Tour> that introduces the primary navigation and Board
+     * Copilot on the first authenticated visit, then never auto-shows
+     * again. Copy stays short and welcoming — this is a nicety, not a
+     * blocking modal. `next` / `previous` / `done` / `skip` override the
+     * AntD Tour locale defaults so both languages read consistently.
+     */
+    onboardingTour: {
+        next: "Next",
+        previous: "Back",
+        done: "Done",
+        skip: "Skip tour",
+        welcome: {
+            title: "Welcome to Pulse",
+            description:
+                "Here is a quick tour of the essentials. You can skip it anytime — it only shows once."
+        },
+        navigation: {
+            title: "Find your way around",
+            description:
+                "Jump between your boards, inbox, and Copilot from here whenever you need to."
+        },
+        copilot: {
+            title: "Meet Board Copilot",
+            description:
+                "Board Copilot drafts tasks, breaks down work, and answers questions about your boards. Turn it on or off anytime."
+        },
+        account: {
+            title: "Your account and settings",
+            description:
+                "Switch themes, change language, and sign out from your account menu."
+        }
     }
 } as const;
 

@@ -56,6 +56,27 @@ jest.mock("../components/tabBarAccessory", () => {
     };
 });
 
+/*
+ * Mock the onboarding tour as a sentinel so the layout's single-mount
+ * contract can be asserted without dragging in the tour's auth / route /
+ * localStorage gating (those are covered by the component's own spec).
+ * The real component is a no-op when unauthenticated, but the sentinel
+ * keeps these layout-shape tests focused on "the layout reserves exactly
+ * one slot for it".
+ */
+jest.mock("../components/onboardingTour", () => {
+    const React = require("react");
+    return {
+        __esModule: true,
+        default: () =>
+            React.createElement(
+                "div",
+                { "data-testid": "onboarding-tour-mock" },
+                "OnboardingTour"
+            )
+    };
+});
+
 // Mock the environment module so individual tests can flip the
 // bottomNavEnabled flag and matchMedia so AntD's Grid.useBreakpoint can
 // resolve to phone-mode (every query returns matches=false → md=false).
@@ -378,6 +399,45 @@ describe("MainLayout", () => {
             expect(
                 screen.queryByTestId("tab-bar-accessory-mount-mock")
             ).not.toBeInTheDocument();
+        });
+    });
+
+    /*
+     * Phase 4.4 — onboarding tour mount. The layout reserves exactly one
+     * slot for the tour regardless of viewport (it self-gates internally),
+     * so it must mount once on both phone and desktop chrome.
+     */
+    describe("OnboardingTour mount (Phase 4.4)", () => {
+        it("mounts the onboarding tour exactly once on phone chrome", () => {
+            installMatchMediaPhone();
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(screen.getAllByTestId("onboarding-tour-mock")).toHaveLength(
+                1
+            );
+        });
+
+        it("mounts the onboarding tour exactly once on desktop chrome", () => {
+            installMatchMediaDesktop();
+            render(
+                <MemoryRouter>
+                    <Routes>
+                        <Route element={<MainLayout />}>
+                            <Route index element={<div>page</div>} />
+                        </Route>
+                    </Routes>
+                </MemoryRouter>
+            );
+            expect(screen.getAllByTestId("onboarding-tour-mock")).toHaveLength(
+                1
+            );
         });
     });
 });

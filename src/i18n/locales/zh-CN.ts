@@ -1174,6 +1174,30 @@ const zhCN: Dictionary = {
     swipeActions: {
         favorite: "收藏",
         unfavorite: "取消收藏"
+    },
+    onboardingTour: {
+        next: "下一步",
+        previous: "上一步",
+        done: "完成",
+        skip: "跳过引导",
+        welcome: {
+            title: "欢迎使用 Pulse",
+            description:
+                "这是核心功能的快速引导。你可以随时跳过——它只会显示一次。"
+        },
+        navigation: {
+            title: "了解导航",
+            description: "随时从这里在看板、收件箱和 Copilot 之间切换。"
+        },
+        copilot: {
+            title: "认识 Board Copilot",
+            description:
+                "Board Copilot 可以起草任务、拆解工作，并回答关于看板的问题。你可以随时开启或关闭。"
+        },
+        account: {
+            title: "你的账户与设置",
+            description: "从账户菜单切换主题、更改语言并退出登录。"
+        }
     }
 };
 
