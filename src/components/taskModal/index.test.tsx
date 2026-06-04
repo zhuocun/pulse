@@ -6,7 +6,7 @@ import {
     waitFor,
     within
 } from "@testing-library/react";
-import { Modal } from "antd";
+import { message } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -218,6 +218,12 @@ describe("TaskModal", () => {
 
     afterEach(() => {
         setActiveLocale(DEFAULT_LOCALE);
+        // The Undo toast lives in a global AntD message container that
+        // outlives unmount (10 s window); tear it down so a leaked "Undo"
+        // button never bleeds into a sibling test's queries.
+        act(() => {
+            message.destroy();
+        });
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
             store.dispatch(aiLedgerActions.clearAiLedger());
@@ -373,103 +379,82 @@ describe("TaskModal", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("confirms before deleting the editing task", async () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
-        try {
-            renderModal();
+    it("deletes the editing task immediately (no confirm) and surfaces an Undo toast", async () => {
+        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
+        // and goes straight to an optimistic DELETE + Undo toast.
+        renderModal();
 
-            expect(
-                await screen.findByDisplayValue("Build task")
-            ).toBeInTheDocument();
-            fireEvent.click(
-                screen.getByRole("button", { name: /^delete build task$/i })
-            );
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
 
-            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-            expect(confirmSpy).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    content: "This action cannot be undone.",
-                    title: "Delete this task?"
-                })
-            );
-            expect(fetchMock.mock.calls[0][0]).toContain(
-                "/api/v1/tasks?taskId=task-1"
-            );
-            expect(fetchMock.mock.calls[0][1]).toEqual(
-                expect.objectContaining({ method: "DELETE" })
-            );
-            await waitFor(() =>
-                expect(store.getState().overlays.editingTaskId).toBe(null)
-            );
-        } finally {
-            confirmSpy.mockRestore();
-        }
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        expect(fetchMock.mock.calls[0][0]).toContain(
+            "/api/v1/tasks?taskId=task-1"
+        );
+        expect(fetchMock.mock.calls[0][1]).toEqual(
+            expect.objectContaining({ method: "DELETE" })
+        );
+        // The modal closes right away and a toast offers a real,
+        // focusable Undo button.
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+        expect(await screen.findByText("Task deleted")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Undo" })
+        ).toBeInTheDocument();
     });
 
-    it("keeps the modal open when task deletion is cancelled", async () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation(() => {
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
-        try {
-            renderModal();
+    it("re-creates the task via a POST when the Undo toast is clicked", async () => {
+        renderModal();
 
-            expect(
-                await screen.findByDisplayValue("Build task")
-            ).toBeInTheDocument();
-            fireEvent.click(
-                screen.getByRole("button", { name: /^delete build task$/i })
-            );
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
 
-            expect(confirmSpy).toHaveBeenCalled();
-            expect(fetchMock).not.toHaveBeenCalled();
-            expect(store.getState().overlays.editingTaskId).toBe("task-1");
-            expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
-        } finally {
-            confirmSpy.mockRestore();
-        }
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        // Undo replays the inverse mutation: a POST that re-creates the
+        // just-deleted task with its captured snapshot.
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        expect(fetchMock.mock.calls[1][1]).toEqual(
+            expect.objectContaining({ method: "POST" })
+        );
     });
 
-    it("keeps the modal open if deleting the task fails", async () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
+    it("surfaces an error toast (and still closes the modal) when the delete fails", async () => {
         fetchMock.mockResolvedValue(
             response({ error: "Delete failed on server" }, false)
         );
-        try {
-            renderModal();
+        renderModal();
 
-            expect(
-                await screen.findByDisplayValue("Build task")
-            ).toBeInTheDocument();
-            fireEvent.click(
-                screen.getByRole("button", { name: /^delete build task$/i })
-            );
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
 
-            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-            expect(store.getState().overlays.editingTaskId).toBe("task-1");
-        } finally {
-            confirmSpy.mockRestore();
-        }
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        // The optimistic delete closes the modal, and the failure surfaces
+        // a task-specific error message.
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+        expect(
+            await screen.findByText("Couldn't delete Build task.")
+        ).toBeInTheDocument();
     });
 
     it("allows deleting the last saved task but still disables delete for optimistic tasks", async () => {
@@ -949,35 +934,24 @@ describe("TaskModal", () => {
     });
 
     it("records an activity-feed event when a task is deleted (Phase 4.3 integration)", async () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
-        try {
-            renderModal();
+        renderModal();
 
-            expect(
-                await screen.findByDisplayValue("Build task")
-            ).toBeInTheDocument();
-            fireEvent.click(
-                screen.getByRole("button", { name: /^delete build task$/i })
-            );
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
 
-            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-            await waitFor(() => {
-                const events = store.getState().activityFeed.events;
-                expect(events).toHaveLength(1);
-                expect(events[0].kind).toBe("task");
-                expect(events[0].action).toBe("delete");
-                expect(events[0].summary).toContain("Build task");
-            });
-        } finally {
-            confirmSpy.mockRestore();
-        }
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        // The transient Undo toast is the immediate recovery path; the
+        // activity feed keeps a longer-lived record + undo alongside it.
+        await waitFor(() => {
+            const events = store.getState().activityFeed.events;
+            expect(events).toHaveLength(1);
+            expect(events[0].kind).toBe("task");
+            expect(events[0].action).toBe("delete");
+            expect(events[0].summary).toContain("Build task");
+        });
     });
 });

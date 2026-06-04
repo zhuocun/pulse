@@ -16,8 +16,10 @@ import useAppMessage from "./useAppMessage";
  *     the user clicks Undo within the window.
  *
  * The hook returns a `show()` function the surface calls right after the
- * primary action lands. On unmount it tears down any in-flight toast so
- * a hidden component never resolves an undo.
+ * primary action lands. By default, on unmount it tears down any
+ * in-flight toast so a hidden component never resolves an undo — opt out
+ * with `dismissOnUnmount: false` for surfaces that navigate away on the
+ * same action that raised the toast (see the option doc below).
  */
 export interface UndoToastOptions {
     /** Sentence shown before the Undo link. */
@@ -31,6 +33,19 @@ export interface UndoToastOptions {
     analyticsTag?: string;
     /** Override the 10-second window for tests. */
     durationMs?: number;
+    /**
+     * Whether the hook's unmount cleanup tears down this toast. Defaults
+     * to `true`, which suits surfaces that stay mounted alongside the
+     * toast (the copilot estimate flow, the task modal): if they unmount,
+     * the toast goes with them so a hidden component can't resolve an
+     * undo. Set to `false` for surfaces that DELIBERATELY navigate away on
+     * the same action that raised the toast (e.g. the routed task panel
+     * closing to the board) — the toast must outlive the unmounting
+     * surface so the user still gets their Undo window. The inverse
+     * mutation still runs because it is bound to the persistent
+     * react-query client, not the component instance.
+     */
+    dismissOnUnmount?: boolean;
 }
 
 interface ShowResult {
@@ -46,16 +61,22 @@ const useUndoToast = (): {
     // static fallback for tests that render without `<App>`).
     const message = useAppMessage();
     const dismissRef = useRef<(() => void) | null>(null);
+    // Mirrors the latest `dismissOnUnmount` choice so the unmount cleanup
+    // (which is bound once) reads the current intent without re-running.
+    const dismissOnUnmountRef = useRef(true);
 
     useEffect(
         () => () => {
-            dismissRef.current?.();
+            if (dismissOnUnmountRef.current) {
+                dismissRef.current?.();
+            }
         },
         []
     );
 
     const show = useCallback(
         (options: UndoToastOptions): ShowResult => {
+            dismissOnUnmountRef.current = options.dismissOnUnmount ?? true;
             const duration = (options.durationMs ?? UNDO_WINDOW_MS) / 1000;
             const key = `undo-${Date.now()}`;
             let undone = false;

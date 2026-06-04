@@ -238,6 +238,7 @@ export const enSource = {
      */
     nav: {
         primaryLandmarkLabel: "Primary",
+        desktopNavLabel: "Primary navigation",
         tabs: {
             boards: "Boards",
             inbox: "Inbox",
@@ -467,6 +468,7 @@ export const enSource = {
         optimisticReverted: "Couldn't save — your changes were reverted.",
         projectDeleted: "Project deleted",
         taskDeleted: "Task deleted",
+        columnDeleted: "Column deleted",
         likeFailed: "Couldn't update like. Please try again.",
         taskSaved: "Task saved",
         welcomeBack: "Welcome back!",
@@ -514,6 +516,7 @@ export const enSource = {
         enableCopilotOnBoard: "Enable on this board",
         copilotMenuAsk: "Ask Copilot",
         copilotMenuBrief: "Board brief",
+        copilotMenuProjectOff: "Project AI off",
         copilotProjectDisabledDescription:
             "Hides Board Copilot on this board and blocks AI requests for this project.",
         /*

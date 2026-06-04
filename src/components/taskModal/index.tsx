@@ -4,7 +4,6 @@ import {
     Form,
     Grid,
     Input,
-    Modal,
     Select,
     Spin,
     Tag,
@@ -24,6 +23,7 @@ import useMembersList from "../../utils/hooks/useMembersList";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
@@ -200,6 +200,7 @@ const TaskModal: React.FC<{
         () => {}
     );
     const { record: recordActivity } = useActivityFeed();
+    const { show: showUndoToast } = useUndoToast();
     const editingTask = tasks?.find((task) => task._id === editingTaskId);
     const tasksStillLoading = tasks === undefined;
     const placeholderId = Boolean(
@@ -331,56 +332,54 @@ const TaskModal: React.FC<{
         }
         const taskName = editingTask.taskName;
         const taskId = editingTaskId;
-        // Capture the full task payload before the DELETE so the
-        // activity-feed undo can re-POST it via the create mutation.
+        // Capture the full task payload before the DELETE so the Undo
+        // toast (and the activity-feed undo) can re-POST it via the
+        // create mutation. After the optimistic prune the cache no
+        // longer carries it.
         const beforeState: ITask = { ...editingTask };
-        Modal.confirm({
-            centered: true,
-            okText: microcopy.confirm.deleteTask.confirmLabel,
-            cancelText: microcopy.actions.cancel,
-            okButtonProps: { danger: true },
-            title: microcopy.confirm.deleteTask.title,
-            content: microcopy.confirm.deleteTask.description,
-            onOk() {
-                remove(
-                    { taskId },
-                    {
-                        onSuccess: () => {
-                            message.success(microcopy.feedback.taskDeleted);
-                            // Phase 4.3 — record the delete into the
-                            // activity feed only after the server
-                            // confirms. The undo closure re-POSTs the
-                            // captured task so the user can recover from
-                            // an accidental destructive action.
-                            recordActivity({
-                                kind: "task",
-                                action: "delete",
-                                summary: microcopyString(
-                                    microcopy.activityFeed.descriptions
-                                        .taskDeleted
-                                ).replace("{name}", taskName),
-                                undo: () => {
-                                    void recreate(
-                                        beforeState as unknown as Record<
-                                            string,
-                                            unknown
-                                        >
-                                    );
-                                }
-                            });
-                            onClose();
-                        },
-                        onError: () =>
-                            message.error(
-                                microcopy.feedback.couldntDeleteTask.replace(
-                                    "{name}",
-                                    taskName
-                                )
-                            )
-                    }
+        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
+        // and goes straight to an optimistic delete + Undo toast. The
+        // undo closure re-creates the just-deleted task with the captured
+        // snapshot so an accidental delete is recoverable within the
+        // window; once the window lapses the delete stands.
+        remove(
+            { taskId },
+            {
+                onError: () =>
+                    message.error(
+                        microcopy.feedback.couldntDeleteTask.replace(
+                            "{name}",
+                            taskName
+                        )
+                    )
+            }
+        );
+        showUndoToast({
+            description: microcopy.feedback.taskDeleted,
+            analyticsTag: "task.delete",
+            undo: async () => {
+                await recreate(
+                    beforeState as unknown as Record<string, unknown>
                 );
             }
         });
+        // Phase 4.3 — also record the delete into the activity feed so the
+        // bell-icon log keeps a longer-lived recovery path beyond the
+        // transient toast window. Both undo paths replay the same captured
+        // snapshot through the create mutation.
+        recordActivity({
+            kind: "task",
+            action: "delete",
+            summary: microcopyString(
+                microcopy.activityFeed.descriptions.taskDeleted
+            ).replace("{name}", taskName),
+            undo: () => {
+                void recreate(
+                    beforeState as unknown as Record<string, unknown>
+                );
+            }
+        });
+        onClose();
     };
 
     useEffect(() => {

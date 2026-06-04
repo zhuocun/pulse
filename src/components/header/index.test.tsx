@@ -194,6 +194,50 @@ describe("Header", () => {
         expect(screen.getByText(/hi, alice/i)).toBeInTheDocument();
     });
 
+    /*
+     * Primary navigation (desktop / non-phone chrome). The header exposes a
+     * `<nav>` landmark with NavLinks to the top-level destinations; the
+     * active route carries `aria-current="page"` via NavLink. The bottom-tab
+     * bar owns this landmark in phone chrome, so the header nav is suppressed
+     * there (see the phone-demotion suite for the coarse-pointer predicate).
+     */
+    describe("primary navigation", () => {
+        const primaryNav = () =>
+            screen.getByRole("navigation", { name: /primary navigation/i });
+
+        it("renders Projects, Inbox, and Copilot as real links", () => {
+            renderHeader("/projects");
+            const nav = primaryNav();
+            expect(nav).toBeInTheDocument();
+            expect(
+                screen.getByRole("link", { name: /boards/i })
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("link", { name: /inbox/i })
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("link", { name: /copilot/i })
+            ).toBeInTheDocument();
+        });
+
+        it("marks the active route with aria-current=page", () => {
+            renderHeader("/projects");
+            expect(
+                screen.getByRole("link", { name: /boards/i })
+            ).toHaveAttribute("aria-current", "page");
+            expect(
+                screen.getByRole("link", { name: /inbox/i })
+            ).not.toHaveAttribute("aria-current", "page");
+        });
+
+        it("keeps Boards active on nested board routes (end=false)", () => {
+            renderHeader("/projects/p1/board");
+            expect(
+                screen.getByRole("link", { name: /boards/i })
+            ).toHaveAttribute("aria-current", "page");
+        });
+    });
+
     it("hosts a single EngineModeTag in the app chrome when AI is enabled (Cross-cutting #8 dedup)", () => {
         renderHeader();
 
@@ -705,11 +749,21 @@ describe("Header", () => {
 
         it("does not render the contextual title on desktop chrome", () => {
             // Default mocks report a fine pointer, so `useIsPhoneChrome` is
-            // false and the title third never mounts.
+            // false and the centered-title third never mounts. The desktop
+            // primary-nav DOES render a "Boards" link in this chrome, so the
+            // assertion targets the contextual-title node specifically: any
+            // "Boards" text that is NOT inside the primary-nav link. The
+            // contextual title is a plain `<span>` while the nav entry is an
+            // anchor (`role="link"`), so scoping to the non-link occurrence
+            // isolates the title we mean to assert is absent.
             renderHeader("/projects");
-            expect(
-                screen.queryByText(microcopy.nav.tabs.boards)
-            ).not.toBeInTheDocument();
+            const boardsTexts = screen.queryAllByText(
+                microcopy.nav.tabs.boards
+            );
+            const contextualTitle = boardsTexts.filter(
+                (node) => node.closest("a") === null
+            );
+            expect(contextualTitle).toHaveLength(0);
         });
     });
 

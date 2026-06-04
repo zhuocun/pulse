@@ -7,7 +7,7 @@ import {
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Modal } from "antd";
+import { message, Modal } from "antd";
 import { Provider } from "react-redux";
 import { Outlet, RouterProvider, createMemoryRouter } from "react-router-dom";
 
@@ -227,6 +227,15 @@ describe("TaskDetailPanel", () => {
         installAntdBrowserMocks();
     });
 
+    afterEach(() => {
+        // The Undo toast lives in a global AntD message container that
+        // outlives unmount (10 s window); tear it down so a leaked "Undo"
+        // button never bleeds into a sibling test's queries.
+        act(() => {
+            message.destroy();
+        });
+    });
+
     beforeEach(() => {
         fetchMock.mockReset();
         // The tasks endpoint resolves to an ITask[]. The members
@@ -338,16 +347,10 @@ describe("TaskDetailPanel", () => {
         );
     });
 
-    it("deletes the task via the same DELETE mutation as TaskModal", async () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
+    it("deletes the task immediately (no confirm) and surfaces an Undo toast", async () => {
+        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
+        // and goes straight to an optimistic DELETE + Undo toast.
+        const confirmSpy = jest.spyOn(Modal, "confirm");
 
         renderPanelAt("/projects/project-1/board/task/task-1");
         await screen.findByText(/edit task · build task/i);
@@ -362,6 +365,8 @@ describe("TaskDetailPanel", () => {
             );
             expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
         });
+        // No confirm dialog fired for the reversible delete.
+        expect(confirmSpy).not.toHaveBeenCalled();
         const deleteCall = fetchMock.mock.calls.find(
             (call) => (call[1] as RequestInit | undefined)?.method === "DELETE"
         )!;
@@ -370,7 +375,34 @@ describe("TaskDetailPanel", () => {
         // carries the right task id.
         expect(deleteCall[0]).toContain("/api/v1/tasks");
         expect(deleteCall[0]).toContain("taskId=task-1");
+        // The toast announces the delete and offers a real Undo button.
+        expect(await screen.findByText("Task deleted")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Undo" })
+        ).toBeInTheDocument();
         confirmSpy.mockRestore();
+    });
+
+    it("re-creates the task via a POST when the Undo toast is clicked", async () => {
+        renderPanelAt("/projects/project-1/board/task/task-1");
+        await screen.findByText(/edit task · build task/i);
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete build task$/i })
+        );
+
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        // Undo replays the inverse mutation: a POST re-creating the task.
+        await waitFor(() => {
+            const postCalls = fetchMock.mock.calls.filter(
+                (call) =>
+                    (call[1] as RequestInit | undefined)?.method === "POST"
+            );
+            expect(postCalls.length).toBeGreaterThanOrEqual(1);
+        });
     });
 
     it("shows the Bug 3 removed-by-others banner when the task vanishes mid-edit (Bug 3 still resolved)", async () => {
@@ -646,7 +678,7 @@ describe("TaskDetailPanel", () => {
         );
     });
 
-    it("keeps the panel open and surfaces the error when DELETE fails (B-T1)", async () => {
+    it("surfaces the error (and still closes the panel) when DELETE fails (B-T1)", async () => {
         const messageErrorSpy = jest
             .spyOn(
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -654,15 +686,6 @@ describe("TaskDetailPanel", () => {
                 "error"
             )
             .mockImplementation(() => undefined);
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
         fetchMock.mockImplementation(async (input, init) => {
             const url = typeof input === "string" ? input : input.toString();
             const method = (init as RequestInit | undefined)?.method;
@@ -695,16 +718,18 @@ describe("TaskDetailPanel", () => {
             screen.getByRole("button", { name: /^delete build task$/i })
         );
 
-        // The DELETE failure path fires `message.error` — assert the
-        // spy was called and the panel stayed at the task route.
+        // The optimistic delete closes the panel to the board route
+        // immediately; the failure surfaces a task-specific error toast
+        // (the optimistic-update layer rolls the task back into the cache).
         await waitFor(() => {
             expect(messageErrorSpy).toHaveBeenCalled();
         });
-        expect(router.state.location.pathname).toBe(
-            "/projects/project-1/board/task/task-1"
+        await waitFor(() =>
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board"
+            )
         );
 
-        confirmSpy.mockRestore();
         messageErrorSpy.mockRestore();
     });
 

@@ -38,7 +38,9 @@ import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
+import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
 import ColumnReadinessPill from "../columnReadinessPill";
@@ -646,27 +648,85 @@ const dotForColumn = (id: string): string => {
     return STATUS_PALETTE[Math.abs(hash) % STATUS_PALETTE.length];
 };
 
-const DeleteDropDown: React.FC<{ columnId: string; columnName: string }> = ({
-    columnId,
-    columnName
-}) => {
+const DeleteDropDown: React.FC<{
+    columnId: string;
+    columnName: string;
+    /** Full column snapshot — captured so Undo can re-create it. */
+    column: IColumn;
+    /**
+     * Whether the column currently holds any tasks. Column deletion
+     * cascades server-side (`board_service.delete` runs
+     * `delete_many(TASKS, { columnId })`) and the re-create POST mints a
+     * fresh column without those tasks — so a non-empty column delete has
+     * no honorable inverse. We gate on this to keep the §2.A.4 contract
+     * honest: empty columns get the optimistic-delete + Undo toast;
+     * non-empty columns fall back to a Modal.confirm (same reasoning that
+     * keeps project deletion on Modal.confirm).
+     */
+    hasTasks: boolean;
+}> = ({ columnId, columnName, column, hasTasks }) => {
     const { projectId } = useParams<{ projectId: string }>();
     const { mutate: remove } = useReactMutation(
         "boards",
         "DELETE",
         ["boards", { projectId }],
-        deleteColumnCallback
+        deleteColumnCallback,
+        // Suppress useReactMutation's auto-revert toast; the toast+Undo
+        // surface below owns the user-visible feedback for this delete.
+        () => {}
     );
+    // Companion POST mutation used purely as the Undo closure: it
+    // re-creates the just-deleted column with the captured snapshot so an
+    // accidental delete is recoverable. Fire-and-forget — the empty
+    // onError keeps useReactMutation's auto-toast suppressed because the
+    // user already initiated the Undo deliberately.
+    const { mutateAsync: undoDelete } = useReactMutation(
+        "boards",
+        "POST",
+        ["boards", { projectId }],
+        newColumnCallback,
+        () => {}
+    );
+    const { show: showUndoToast } = useUndoToast();
     const onDelete = (id: string) => {
-        Modal.confirm({
-            centered: true,
-            okText: microcopy.confirm.deleteColumn.confirmLabel,
-            cancelText: microcopy.actions.cancel,
-            okButtonProps: { danger: true },
-            title: microcopy.confirm.deleteColumn.title,
-            content: microcopy.confirm.deleteColumn.description,
-            onOk() {
-                remove({ columnId: id });
+        if (hasTasks) {
+            // Non-empty column: the server cascade-deletes every task in
+            // the column and re-create cannot restore them, so an Undo we
+            // can't honor would lie to the user. Confirm instead (§2.A.4 —
+            // Modal.confirm is reserved for irreversible operations).
+            Modal.confirm({
+                centered: true,
+                okText: microcopy.confirm.deleteColumn.confirmLabel,
+                cancelText: microcopy.actions.cancel,
+                okButtonProps: { danger: true },
+                title: microcopy.confirm.deleteColumn.title,
+                content: microcopy.confirm.deleteColumn.description,
+                onOk() {
+                    remove({ columnId: id });
+                }
+            });
+            return;
+        }
+        // Capture the full column payload BEFORE removal so the Undo
+        // closure can POST it back. After the optimistic prune the cache
+        // no longer carries it.
+        const beforeState = column;
+        // Empty column — the delete is reversible (nothing cascades), so
+        // optimistic delete + Undo toast (§2.A.4), no Modal.confirm.
+        remove({ columnId: id });
+        showUndoToast({
+            description: microcopy.feedback.columnDeleted,
+            analyticsTag: "column.delete",
+            // The optimistic delete prunes this column from the board, so
+            // this Column instance unmounts on the same action; keep the
+            // toast alive past unmount so the user still gets their Undo
+            // window. The inverse re-create runs through the persistent
+            // react-query client.
+            dismissOnUnmount: false,
+            undo: async () => {
+                await undoDelete(
+                    beforeState as unknown as Record<string, unknown>
+                );
             }
         });
     };
@@ -1208,8 +1268,10 @@ const Column = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                             <ColumnReadinessPill report={readinessReport} />
                         </span>
                         <DeleteDropDown
+                            column={column}
                             columnId={column._id}
                             columnName={column.columnName}
+                            hasTasks={tasks.length > 0}
                         />
                     </ColumnHeader>
                     <Drop

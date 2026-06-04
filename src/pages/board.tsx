@@ -1,33 +1,28 @@
 import {
     CloseOutlined,
-    FileTextOutlined,
-    MessageOutlined,
     ReloadOutlined,
     SettingOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Alert,
-    Badge,
     Button,
-    Dropdown,
     Popover,
     Skeleton,
     Space,
     Switch,
     Typography
 } from "antd";
-import type { MenuProps } from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
-import AiSparkleIcon from "../components/aiSparkleIcon";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import BoardMinimap from "../components/boardMinimap";
 import Column from "../components/column";
+import CopilotMenu from "../components/copilotMenu";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
 import ColumnCreator from "../components/columnCreator";
 import { Drag, Drop, DropChild } from "../components/dragAndDrop";
@@ -329,6 +324,44 @@ const BoardActions = styled.div`
         flex: 0 0 auto;
         justify-content: flex-end;
     }
+`;
+
+/**
+ * Bottom tier of the two-tier board header. Holds the search/filter rail
+ * and the Copilot action launcher. On narrow viewports the launcher stacks
+ * below the search rail (column direction); from md upwards they share a
+ * row with the search rail growing to fill and the launcher hugging the
+ * trailing edge. No fixed min-widths so the row reflows cleanly below the
+ * 1024px breakpoint where the old single-row header used to wrap
+ * unpredictably.
+ */
+const BoardBottomTier = styled.div`
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: ${themeSpace.sm}px;
+
+    @media (min-width: ${breakpoints.md}px) {
+        align-items: flex-start;
+        flex-direction: row;
+    }
+`;
+
+const BoardSearchSlot = styled.div`
+    flex: 1 1 auto;
+    min-width: 0;
+`;
+
+/**
+ * Trailing slot in the bottom tier that carries the desktop Copilot
+ * launcher. Hidden on phone chrome, where the launcher lives inside the
+ * top-tier Liquid Glass capsule instead (iOS 26 toolbar idiom).
+ */
+const BoardCopilotSlot = styled.div`
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: ${themeSpace.xs}px;
 `;
 
 const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
@@ -746,287 +779,226 @@ const BoardPage = () => {
         <DragDropContext onDragEnd={onDragEnd}>
             <BoardShell>
                 {boardAiOn && <CopilotWelcomeBanner />}
-                <BoardHeader>
-                    <Row
-                        between
-                        style={{
-                            alignItems: "flex-start",
-                            flexWrap: "wrap",
-                            gap: themeSpace.sm,
-                            rowGap: themeSpace.xs
-                        }}
-                    >
-                        {pLoading ? (
-                            <span
-                                aria-label={microcopy.a11y.loadingProjectName}
-                                role="status"
-                                style={{ flex: "1 1 auto", minWidth: 0 }}
-                            >
-                                <Skeleton.Input
-                                    active
-                                    size="large"
-                                    style={{ maxWidth: "100%", width: 240 }}
-                                />
-                            </span>
-                        ) : (
-                            <BoardTitle level={1}>
-                                {boardTitle(currentProject?.projectName)}
-                            </BoardTitle>
-                        )}
-                        <BoardActions>
-                            {/*
-                             * Phone clusters these controls into a single
-                             * Liquid Glass capsule (iOS 26 toolbar idiom).
-                             * Desktop renders them in the plain flex row.
-                             * The cluster flattens the fragment so each
-                             * control becomes its own focusable slot.
-                             */}
-                            {(() => {
-                                const toolbarControls = (
-                                    <>
-                                        {isPhone && (
-                                            <Button
-                                                aria-label={
-                                                    microcopy.actions.refresh
-                                                }
-                                                data-testid="board-refresh"
-                                                icon={
-                                                    <ReloadOutlined
-                                                        aria-hidden
-                                                    />
-                                                }
-                                                loading={boardRefreshing}
-                                                onClick={handleRefresh}
-                                                type="text"
-                                            />
-                                        )}
-                                        <MemberPopover />
-                                        {aiEnabled && (
-                                            <>
-                                                {boardAiOn && (
-                                                    <>
-                                                        {/* P1-A: CopilotMenu — consolidated AI entry point */}
-                                                        <Dropdown
-                                                            menu={{
-                                                                items: [
-                                                                    {
-                                                                        key: "ask",
-                                                                        label: microcopy
-                                                                            .board
-                                                                            .copilotMenuAsk,
-                                                                        icon: (
-                                                                            <MessageOutlined
-                                                                                aria-hidden
-                                                                            />
-                                                                        ),
-                                                                        onClick:
-                                                                            () =>
-                                                                                openChatDrawer()
-                                                                    },
-                                                                    {
-                                                                        key: "brief",
-                                                                        label: microcopy
-                                                                            .board
-                                                                            .copilotMenuBrief,
-                                                                        icon: (
-                                                                            <FileTextOutlined
-                                                                                aria-hidden
-                                                                            />
-                                                                        ),
-                                                                        onClick:
-                                                                            () =>
-                                                                                openBriefDrawer()
-                                                                    }
-                                                                ] satisfies MenuProps["items"]
-                                                            }}
-                                                            placement="bottomRight"
-                                                            trigger={["click"]}
-                                                        >
-                                                            {/*
-                                                             * Phase 4 A8 — launcher badge
-                                                             * advertises unread Inbox
-                                                             * nudges produced by the
-                                                             * triage agent. The count
-                                                             * comes from Redux (owned by
-                                                             * `CopilotDockHost`) so the
-                                                             * Button doesn't need to
-                                                             * subscribe to the agent.
-                                                             * `count={0}` hides the dot
-                                                             * automatically — AntD's
-                                                             * Badge collapses to nothing
-                                                             * when count is falsy.
-                                                             */}
-                                                            <Badge
-                                                                aria-label={
-                                                                    copilotUnreadAriaLabel
-                                                                }
-                                                                count={
-                                                                    copilotInboxUnread
-                                                                }
-                                                                data-testid="copilot-launcher-badge"
-                                                                offset={[-4, 4]}
-                                                                size="small"
-                                                            >
-                                                                <Button
-                                                                    aria-label={
-                                                                        microcopy
-                                                                            .a11y
-                                                                            .boardCopilotMenu
-                                                                    }
-                                                                    icon={
-                                                                        <AiSparkleIcon
-                                                                            aria-hidden
-                                                                        />
-                                                                    }
-                                                                    type="default"
-                                                                >
-                                                                    {
-                                                                        microcopy
-                                                                            .labels
-                                                                            .copilotShort
-                                                                    }
-                                                                </Button>
-                                                            </Badge>
-                                                        </Dropdown>
-                                                    </>
-                                                )}
-                                                <Popover
-                                                    content={
-                                                        <Space
-                                                            direction="vertical"
-                                                            size={themeSpace.xs}
-                                                            style={{
-                                                                maxWidth: 280,
-                                                                width: "100%"
-                                                            }}
-                                                        >
-                                                            <Typography.Text type="secondary">
-                                                                {
-                                                                    microcopy.ai
-                                                                        .copilotLabel
-                                                                }
-                                                            </Typography.Text>
-                                                            <div
-                                                                style={{
-                                                                    alignItems:
-                                                                        "center",
-                                                                    display:
-                                                                        "flex",
-                                                                    gap: themeSpace.sm,
-                                                                    justifyContent:
-                                                                        "space-between"
-                                                                }}
-                                                            >
-                                                                <span>
-                                                                    {
-                                                                        microcopy
-                                                                            .board
-                                                                            .enableCopilotOnBoard
-                                                                    }
-                                                                </span>
-                                                                <Switch
-                                                                    aria-label={
-                                                                        microcopy
-                                                                            .a11y
-                                                                            .boardCopilotProjectToggle
-                                                                    }
-                                                                    checked={
-                                                                        !aiDisabledForProject
-                                                                    }
-                                                                    onChange={(
-                                                                        checked
-                                                                    ) =>
-                                                                        setProjectAiDisabled(
-                                                                            !checked
-                                                                        )
-                                                                    }
-                                                                    size="small"
-                                                                />
-                                                            </div>
-                                                            <Typography.Text
-                                                                style={{
-                                                                    fontSize:
-                                                                        fontSize.xs
-                                                                }}
-                                                                type="secondary"
-                                                            >
-                                                                {
-                                                                    microcopy
-                                                                        .board
-                                                                        .copilotProjectDisabledDescription
-                                                                }
-                                                            </Typography.Text>
-                                                        </Space>
-                                                    }
-                                                    placement="bottomRight"
-                                                    trigger={["click"]}
-                                                >
-                                                    <Button
-                                                        aria-label={
-                                                            microcopy.a11y
-                                                                .boardCopilotSettings
-                                                        }
-                                                        icon={
-                                                            <SettingOutlined
-                                                                aria-hidden
-                                                            />
-                                                        }
-                                                        type="text"
-                                                    />
-                                                </Popover>
-                                            </>
-                                        )}
-                                    </>
-                                );
-                                return isPhone ? (
-                                    <GlassActionCluster
-                                        data-testid="board-actions-cluster"
-                                        reducedMotion={reducedMotion}
+                {(() => {
+                    /*
+                     * Two-tier board header (ui-todo §1.2 item 7). The old
+                     * single overloaded row wrapped unpredictably around
+                     * 1024px. We split it into:
+                     *   - Top tier: project name + chrome toolbar (members,
+                     *     per-project "Project AI" switch, phone-only
+                     *     refresh).
+                     *   - Bottom tier: the search/filter rail + the Copilot
+                     *     action launcher.
+                     * On phone chrome the whole toolbar (including the
+                     * Copilot launcher) collapses into the shared Liquid
+                     * Glass capsule, so we render the launcher there and
+                     * skip the desktop bottom-tier slot.
+                     */
+                    const copilotMenuEl = boardAiOn ? (
+                        <CopilotMenu
+                            inboxUnread={copilotInboxUnread}
+                            onAsk={() => openChatDrawer()}
+                            onBrief={() => openBriefDrawer()}
+                            onProjectOff={() => setProjectAiDisabled(true)}
+                            unreadAriaLabel={copilotUnreadAriaLabel}
+                        />
+                    ) : null;
+
+                    const projectAiSwitch = aiEnabled ? (
+                        <Popover
+                            content={
+                                <Space
+                                    direction="vertical"
+                                    size={themeSpace.xs}
+                                    style={{ maxWidth: 280, width: "100%" }}
+                                >
+                                    <Typography.Text type="secondary">
+                                        {microcopy.ai.copilotLabel}
+                                    </Typography.Text>
+                                    <div
+                                        style={{
+                                            alignItems: "center",
+                                            display: "flex",
+                                            gap: themeSpace.sm,
+                                            justifyContent: "space-between"
+                                        }}
                                     >
-                                        {toolbarControls}
-                                    </GlassActionCluster>
-                                ) : (
-                                    toolbarControls
-                                );
-                            })()}
-                        </BoardActions>
-                    </Row>
-                </BoardHeader>
-                <LensChips
-                    active={activeLens}
-                    onChange={(next) =>
-                        setParam(
-                            { lens: next ?? undefined },
-                            { viewTransition: true }
-                        )
-                    }
-                />
-                <TaskSearchPanel
-                    tasks={visibleTasks}
-                    param={param}
-                    setParam={setParam}
-                    members={members}
-                    loading={tLoading || mLoading}
-                    aiSearchSlot={
-                        boardAiOn && aiProjectContext ? (
-                            <div
-                                style={{
-                                    flexBasis: "100%",
-                                    marginBottom: themeSpace.sm
-                                }}
-                            >
-                                <AiSearchInput
-                                    kind="tasks"
-                                    projectContext={aiProjectContext}
-                                    semanticIds={param.semanticIds}
-                                    setSemanticIds={(value) =>
-                                        setParam({ semanticIds: value })
-                                    }
+                                        <span>
+                                            {
+                                                microcopy.board
+                                                    .enableCopilotOnBoard
+                                            }
+                                        </span>
+                                        <Switch
+                                            aria-label={
+                                                microcopy.a11y
+                                                    .boardCopilotProjectToggle
+                                            }
+                                            checked={!aiDisabledForProject}
+                                            onChange={(checked) =>
+                                                setProjectAiDisabled(!checked)
+                                            }
+                                            size="small"
+                                        />
+                                    </div>
+                                    <Typography.Text
+                                        style={{ fontSize: fontSize.xs }}
+                                        type="secondary"
+                                    >
+                                        {
+                                            microcopy.board
+                                                .copilotProjectDisabledDescription
+                                        }
+                                    </Typography.Text>
+                                </Space>
+                            }
+                            placement="bottomRight"
+                            trigger={["click"]}
+                        >
+                            <Button
+                                aria-label={microcopy.a11y.boardCopilotSettings}
+                                icon={<SettingOutlined aria-hidden />}
+                                type="text"
+                            />
+                        </Popover>
+                    ) : null;
+
+                    /*
+                     * Phone clusters every chrome control — including the
+                     * Copilot launcher — into one capsule (4 slots: refresh,
+                     * members, Copilot, settings). Desktop keeps the Copilot
+                     * launcher out of the top tier so it can anchor the
+                     * bottom tier beside the search rail.
+                     */
+                    const topTierControls = (
+                        <>
+                            {isPhone && (
+                                <Button
+                                    aria-label={microcopy.actions.refresh}
+                                    data-testid="board-refresh"
+                                    icon={<ReloadOutlined aria-hidden />}
+                                    loading={boardRefreshing}
+                                    onClick={handleRefresh}
+                                    type="text"
                                 />
-                            </div>
-                        ) : undefined
-                    }
-                />
+                            )}
+                            <MemberPopover />
+                            {isPhone && copilotMenuEl}
+                            {projectAiSwitch}
+                        </>
+                    );
+
+                    return (
+                        <>
+                            <BoardHeader>
+                                <Row
+                                    between
+                                    style={{
+                                        alignItems: "flex-start",
+                                        flexWrap: "wrap",
+                                        gap: themeSpace.sm,
+                                        rowGap: themeSpace.xs
+                                    }}
+                                >
+                                    {pLoading ? (
+                                        <span
+                                            aria-label={
+                                                microcopy.a11y
+                                                    .loadingProjectName
+                                            }
+                                            role="status"
+                                            style={{
+                                                flex: "1 1 auto",
+                                                minWidth: 0
+                                            }}
+                                        >
+                                            <Skeleton.Input
+                                                active
+                                                size="large"
+                                                style={{
+                                                    maxWidth: "100%",
+                                                    width: 240
+                                                }}
+                                            />
+                                        </span>
+                                    ) : (
+                                        <BoardTitle level={1}>
+                                            {boardTitle(
+                                                currentProject?.projectName
+                                            )}
+                                        </BoardTitle>
+                                    )}
+                                    <BoardActions>
+                                        {isPhone ? (
+                                            <GlassActionCluster
+                                                data-testid="board-actions-cluster"
+                                                reducedMotion={reducedMotion}
+                                            >
+                                                {topTierControls}
+                                            </GlassActionCluster>
+                                        ) : (
+                                            topTierControls
+                                        )}
+                                    </BoardActions>
+                                </Row>
+                            </BoardHeader>
+                            <BoardBottomTier>
+                                <BoardSearchSlot>
+                                    <LensChips
+                                        active={activeLens}
+                                        onChange={(next) =>
+                                            setParam(
+                                                { lens: next ?? undefined },
+                                                { viewTransition: true }
+                                            )
+                                        }
+                                    />
+                                    <TaskSearchPanel
+                                        tasks={visibleTasks}
+                                        param={param}
+                                        setParam={setParam}
+                                        members={members}
+                                        loading={tLoading || mLoading}
+                                        aiSearchSlot={
+                                            boardAiOn && aiProjectContext ? (
+                                                <div
+                                                    style={{
+                                                        flexBasis: "100%",
+                                                        marginBottom:
+                                                            themeSpace.sm
+                                                    }}
+                                                >
+                                                    <AiSearchInput
+                                                        kind="tasks"
+                                                        projectContext={
+                                                            aiProjectContext
+                                                        }
+                                                        semanticIds={
+                                                            param.semanticIds
+                                                        }
+                                                        setSemanticIds={(
+                                                            value
+                                                        ) =>
+                                                            setParam({
+                                                                semanticIds:
+                                                                    value
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
+                                            ) : undefined
+                                        }
+                                    />
+                                </BoardSearchSlot>
+                                {!isPhone && copilotMenuEl && (
+                                    <BoardCopilotSlot>
+                                        {copilotMenuEl}
+                                    </BoardCopilotSlot>
+                                )}
+                            </BoardBottomTier>
+                        </>
+                    );
+                })()}
                 {bError || tError ? (
                     <Alert
                         action={

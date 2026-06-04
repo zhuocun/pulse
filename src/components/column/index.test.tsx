@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Modal } from "antd";
+import { message, Modal } from "antd";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -171,6 +171,7 @@ const defaultParam: TaskSearchParam = {
 };
 
 const removeColumn = jest.fn();
+const recreateColumn = jest.fn().mockResolvedValue(undefined);
 const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
@@ -233,14 +234,21 @@ const renderColumn = ({
     boardAiOn?: boolean;
     boardDensity?: "comfortable" | "compact";
 } = {}) => {
-    // The component calls `useReactMutation` twice: once for the column
-    // delete (endpoint="boards") and once for the task rename
-    // (endpoint="tasks"). Route by the first arg so the two mutations
-    // don't collide in test assertions.
-    mockedUseReactMutation.mockImplementation((endPoint: string) =>
-        endPoint === "tasks"
-            ? { mutate: updateTask, isLoading: false }
-            : { mutate: removeColumn, isLoading: false }
+    // The component calls `useReactMutation` three times: the column
+    // DELETE (endpoint="boards", method="DELETE"), the column re-create
+    // used by the Undo toast (endpoint="boards", method="POST"), and the
+    // inline task rename (endpoint="tasks"). Route by the first two args
+    // so the mutations don't collide in test assertions.
+    mockedUseReactMutation.mockImplementation(
+        (endPoint: string, method: string) => {
+            if (endPoint === "tasks") {
+                return { mutate: updateTask, isLoading: false };
+            }
+            if (method === "POST") {
+                return { mutateAsync: recreateColumn, isLoading: false };
+            }
+            return { mutate: removeColumn, isLoading: false };
+        }
     );
     mockedUseTaskModal.mockReturnValue({ startEditing });
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
@@ -274,6 +282,15 @@ describe("Column", () => {
         jest.clearAllMocks();
         mockedEnvironment.taskPanelRouted = false;
         mockedEnvironment.aiColumnReadinessEnabled = false;
+    });
+
+    afterEach(() => {
+        // The Undo toast lives in a global AntD message container that
+        // outlives unmount (10 s window); tear it down so a leaked "Undo"
+        // button never bleeds into a sibling test's queries.
+        act(() => {
+            message.destroy();
+        });
     });
 
     it("advertises the keyboard-drag hint on a card while reordering is allowed", () => {
@@ -488,31 +505,89 @@ describe("Column", () => {
         ).toBeDisabled();
     });
 
-    it("confirms column deletion before calling the delete mutation", () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
-        renderColumn();
+    it("deletes an empty column immediately (no confirm) and surfaces an Undo toast", async () => {
+        // §2.A.4 — an EMPTY column delete is reversible (nothing cascades),
+        // so it skips Modal.confirm and goes straight to an optimistic
+        // delete + Undo toast.
+        const confirmSpy = jest.spyOn(Modal, "confirm");
+        renderColumn({ tasks: [] });
 
         fireEvent.click(
             screen.getByRole("button", { name: /^delete column todo$/i })
         );
 
-        expect(confirmSpy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                content: "This action cannot be undone.",
-                title: "Delete this column?"
-            })
-        );
+        expect(confirmSpy).not.toHaveBeenCalled();
         expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
 
+        // The toast announces the delete and offers a real, focusable
+        // Undo button.
+        expect(await screen.findByText("Column deleted")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Undo" })
+        ).toBeInTheDocument();
+
         confirmSpy.mockRestore();
+    });
+
+    it("re-creates the empty column via the POST mutation when Undo is clicked", async () => {
+        renderColumn({ tasks: [] });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete column todo$/i })
+        );
+
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        // Undo replays the inverse mutation with the captured snapshot.
+        expect(recreateColumn).toHaveBeenCalledWith(
+            expect.objectContaining({ _id: "column-1", columnName: "Todo" })
+        );
+    });
+
+    it("confirms before deleting a non-empty column and offers no Undo (cascade has no inverse)", async () => {
+        // A column that still holds tasks cascades server-side
+        // (board_service deletes every task with the columnId) and the
+        // re-create POST can't restore them — so §2.A.4 keeps it on
+        // Modal.confirm rather than promising an Undo we can't honor.
+        const confirmSpy = jest
+            .spyOn(Modal, "confirm")
+            .mockImplementation((config) => {
+                (config as { onOk?: () => void }).onOk?.();
+                return {} as ReturnType<typeof Modal.confirm>;
+            });
+        renderColumn(); // default render seeds column-1 with tasks
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete column todo$/i })
+        );
+
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+        // Confirming still deletes the column…
+        expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
+        // …but the reversible-delete affordances are absent.
+        expect(screen.queryByText("Column deleted")).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Undo" })
+        ).not.toBeInTheDocument();
+
+        confirmSpy.mockRestore();
+    });
+
+    it("leaves the empty-column delete in place when the Undo toast is never clicked", async () => {
+        renderColumn({ tasks: [] });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^delete column todo$/i })
+        );
+
+        await screen.findByText("Column deleted");
+        // No Undo click — the optimistic delete stands and the inverse
+        // mutation is never fired.
+        expect(removeColumn).toHaveBeenCalledTimes(1);
+        expect(recreateColumn).not.toHaveBeenCalled();
     });
 
     it("filters tasks by semanticIds when set", () => {
@@ -593,7 +668,6 @@ describe("Column", () => {
     });
 
     it("disables delete for the optimistic mock column", () => {
-        const confirmSpy = jest.spyOn(Modal, "confirm");
         renderColumn({
             boardColumn: column({ _id: "mock", columnName: "Mock" })
         });
@@ -604,10 +678,10 @@ describe("Column", () => {
         expect(deleteButton).toBeDisabled();
         fireEvent.click(deleteButton);
 
-        expect(confirmSpy).not.toHaveBeenCalled();
+        // The placeholder column has no server id yet, so the delete (and
+        // therefore the Undo toast) never fires.
         expect(removeColumn).not.toHaveBeenCalled();
-
-        confirmSpy.mockRestore();
+        expect(screen.queryByText("Column deleted")).not.toBeInTheDocument();
     });
 
     it("does NOT render the readiness pill when the env flag is off (default)", () => {

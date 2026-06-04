@@ -711,7 +711,9 @@ const smokeChatStream = async (config, aiToken, projectId) => {
         clearTimeout(timeout);
         try {
             reader.releaseLock();
-        } catch {}
+        } catch {
+            // intentionally ignored
+        }
     }
 
     if (!doneSeen) {

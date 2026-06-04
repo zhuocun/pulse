@@ -1137,8 +1137,9 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                             return lines.map((line, li) => {
                                 if (/^### /.test(line)) {
                                     return (
-                                        <h3
+                                        <Typography.Title
                                             key={li}
+                                            level={3}
                                             style={{
                                                 fontSize: fontSize.sm,
                                                 fontWeight: fontWeight.semibold,
@@ -1146,13 +1147,14 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                             }}
                                         >
                                             {line.replace(/^### /, "")}
-                                        </h3>
+                                        </Typography.Title>
                                     );
                                 }
                                 if (/^## /.test(line)) {
                                     return (
-                                        <h3
+                                        <Typography.Title
                                             key={li}
+                                            level={3}
                                             style={{
                                                 fontSize: fontSize.sm,
                                                 fontWeight: fontWeight.semibold,
@@ -1160,13 +1162,14 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                             }}
                                         >
                                             {line.replace(/^## /, "")}
-                                        </h3>
+                                        </Typography.Title>
                                     );
                                 }
                                 if (/^# /.test(line)) {
                                     return (
-                                        <h3
+                                        <Typography.Title
                                             key={li}
+                                            level={3}
                                             style={{
                                                 fontSize: fontSize.sm,
                                                 fontWeight: fontWeight.semibold,
@@ -1174,7 +1177,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                             }}
                                         >
                                             {line.replace(/^# /, "")}
-                                        </h3>
+                                        </Typography.Title>
                                     );
                                 }
                                 const parts: React.ReactNode[] = [];
