@@ -35,6 +35,10 @@ TABLE_FIELDS = {
         "columnName",
         "projectId",
         "index",
+        # Per-column WIP limit (int). 0 / missing / negative means "no
+        # limit". The drift detector already honours ``wipLimit``; this
+        # field lets the board actually set it.
+        "wipLimit",
         "createdAt",
         "updatedAt",
     },
@@ -49,6 +53,23 @@ TABLE_FIELDS = {
         "projectId",
         "storyPoints",
         "index",
+        # Scheduling: ISO-8601 date strings (or null / empty).
+        "startDate",
+        "dueDate",
+        # Free labels: a list of label ``_id`` strings (see LABELS).
+        "labelIds",
+        # Additional assignees beyond the single ``coordinatorId`` primary.
+        "assigneeIds",
+        # Sub-tasks: the ``_id`` of the parent task (null / empty = top-level).
+        "parentTaskId",
+        "createdAt",
+        "updatedAt",
+    },
+    database.LABELS: {
+        "_id",
+        "projectId",
+        "name",
+        "color",
         "createdAt",
         "updatedAt",
     },

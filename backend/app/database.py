@@ -14,6 +14,7 @@ USERS = "users"
 PROJECTS = "projects"
 COLUMNS = "columns"
 TASKS = "tasks"
+LABELS = "labels"
 AGENT_MUTATION_JOURNAL = "agent_mutation_journal"
 # Schema-less collection owned by :mod:`app.system_config` -- the
 # canonical row today is ``{_id: "jwt_secret", value: <hex>}``; Mongo's
