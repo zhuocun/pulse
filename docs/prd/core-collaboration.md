@@ -309,7 +309,7 @@ Card rendering (`src/components/column/index.tsx`, `TaskCard`):
 - An **overdue chip** renders from `dueDate` (date-only "strictly before today" rule, paired with a glyph + visible "Overdue" text + aria-label — not colour-only).
 - The card **avatar still uses the single `coordinatorId`**, not `assigneeIds`. There is **no sub-task hierarchy view** on cards, and the count badge has no WIP signal (§5.5).
 
-Bulk edit: **there is no board-level bulk-edit / multi-select UI.** The only thing resembling "bulk" in the app is the AI subtask **batch-create** in `aiTaskDraftModal` — a different feature in a different layer. The `PUT /tasks/bulk` endpoint has **no non-AI caller**.
+Bulk edit: **there is no board-level bulk-edit / multi-select UI.** The only thing resembling "bulk" in the app is the AI subtask **batch-create** in `aiTaskDraftModal` — a different feature in a different layer, and it posts tasks individually rather than through this endpoint. `PUT /tasks/bulk` itself has **no FE caller at all**.
 
 ---
 
@@ -443,7 +443,7 @@ The single, auditable map. Legend per §2.3.
 | Task overdue — chip on cards             | ✅        | `TaskCard` overdue chip (from `dueDate`).                                                 |
 | Additional assignees on cards            | 🔧        | Cards show only the single `coordinatorId` avatar; `assigneeIds` not surfaced.           |
 | Sub-task hierarchy view                  | 🔧        | Parent is editable in `TaskModal`; no hierarchy/tree view on cards or elsewhere.         |
-| Task bulk update (`PUT /tasks/bulk`)     | 🔧        | **No UI.** No board multi-select; endpoint has no non-AI caller.                          |
+| Task bulk update (`PUT /tasks/bulk`)     | 🔧        | **No UI.** No board multi-select; endpoint has no FE caller at all.                       |
 | Labels — list + apply                    | 🟡        | Read via `useLabels`; applied via `TaskModal` picker; chips on cards.                     |
 | Labels — create/edit/delete UI           | 🔧        | **No UI.** `createLabel` has zero callers; no labels page/modal.                          |
 | Comments (CRUD + thread)                 | 🔧        | **No UI.** No `useComments` hook, no comment component; no thread on either task surface. |
@@ -514,7 +514,7 @@ The existing API docs predate this layer and **contradict** the shipped behaviou
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | [`../api/backend.md`](../api/backend.md) §10 | "Project access is restricted to the project manager (the user who created it…)."                                                       | RBAC with `owner/editor/viewer` membership; the manager is one (immutable) root of trust, not the only accessor (§3). |
 | [`../api/backend.md`](../api/backend.md) §10–§12 | Documents a **flat** task (no `startDate`/`dueDate`/`labelIds`/`assigneeIds`/`parentTaskId`), columns **without** `wipLimit`, and **no** member / label / comment / notification / bulk endpoints. | Full richness model (§6), `wipLimit` (§5), and the member/label/comment/notification/bulk surfaces (§4, §6–§9). |
-| [`../api/frontend.md`](../api/frontend.md)   | The domain-interface table (`ITask`/`IProject`/`IColumn`) is likewise stale (pre-richness, pre-`memberIds`, pre-`wipLimit`).             | Interfaces carry the richness / membership / WIP fields (Appendix B + §10). |
+| [`../api/frontend.md`](../api/frontend.md)   | The domain-interface table (`ITask`/`IProject`/`IColumn`) is stale (`ITask` pre-richness, `IColumn` pre-`wipLimit`) and omits the separate `IProjectMember` roster interface.             | `ITask` carries the richness fields and `IColumn` carries `wipLimit`; the project roster is modeled by a separate `IProjectMember` (with `role`), not inline on `IProject` (Appendix B + §10). |
 
 Recommendation: reconcile both `../api/*.md` documents against this PRD in a follow-up. (This document does not edit them.)
 

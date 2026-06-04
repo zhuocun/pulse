@@ -14,6 +14,11 @@ gotchas live in [`AGENTS.md`](../AGENTS.md).
 
 ## Product / PRD
 
+- [`prd/core-collaboration.md`](prd/core-collaboration.md) — the non-AI
+  product core (as-built): projects + RBAC/membership, boards + WIP
+  limits, rich tasks (dates, labels, assignees, sub-tasks) + bulk edit,
+  labels, comments + @mentions, notifications. The substrate the AI
+  PRDs build on; includes an honest frontend-coverage map.
 - [`prd/v2.1-agent.md`](prd/v2.1-agent.md) — current backend / wire
   contract: named LangGraph agents, two-level autonomy, FE↔BE tool
   calling via interrupts.
