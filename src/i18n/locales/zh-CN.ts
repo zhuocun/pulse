@@ -796,6 +796,8 @@ const zhCN: Dictionary = {
         revertToPrevious: "恢复至上一个值",
         showAlternatives: "查看其他选项",
         showRationale: "为什么?",
+        whyLabel: "为什么?",
+        whyPopoverTitle: "Copilot 为何这样建议",
         applyAnyway: "仍然应用",
         emptyChatLead:
             "提问关于此看板、任务或您的项目。回答仅基于应用中的只读数据。",

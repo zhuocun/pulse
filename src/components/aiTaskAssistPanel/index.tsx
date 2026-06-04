@@ -31,6 +31,7 @@ import useUndoToast from "../../utils/hooks/useUndoToast";
 import AiConfidenceIndicator from "../aiConfidenceIndicator";
 import AiSparkleIcon from "../aiSparkleIcon";
 import AiSuggestedBadge from "../aiSuggestedBadge";
+import AiWhyPopover from "../aiWhyPopover";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import GlassPanel from "../glassPanel";
@@ -804,13 +805,13 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                         {microcopy.ai.showAlternatives}
                                     </Button>
                                 )}
+                                <AiWhyPopover
+                                    ariaContext={asMicrocopyString(
+                                        microcopy.ai.suggestedStoryPoints
+                                    )}
+                                    rationale={estimateData.rationale}
+                                />
                             </div>
-                            <Typography.Paragraph
-                                style={{ margin: `${space.xxs}px 0` }}
-                                type="secondary"
-                            >
-                                {estimateData.rationale}
-                            </Typography.Paragraph>
                             {showAlternative &&
                                 estimateData.similar.length > 1 && (
                                     <Alert

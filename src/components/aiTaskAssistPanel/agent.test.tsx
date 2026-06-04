@@ -8,7 +8,13 @@
  *
  * Mirrors the pattern from boardBriefDrawer/agent.test.tsx.
  */
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 import { useEffect, useMemo, useState } from "react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -217,9 +223,12 @@ describe("AiTaskAssistPanel — remote agent path", () => {
                 screen.getByLabelText(/Suggested story points: 5/i)
             ).toBeInTheDocument()
         );
-        // Rationale text
+        // Rationale text is now disclosed via the "Why?" affordance.
+        fireEvent.click(screen.getByRole("button", { name: /^Why\?/ }));
         expect(
-            screen.getByText(/Similar to other medium authentication tasks\./)
+            await screen.findByText(
+                /Similar to other medium authentication tasks\./
+            )
         ).toBeInTheDocument();
         expect(screen.getByRole("status")).toHaveTextContent(
             /Suggestion ready\./i

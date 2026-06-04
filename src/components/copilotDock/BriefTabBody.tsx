@@ -36,6 +36,7 @@ import useAppMessage from "../../utils/hooks/useAppMessage";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import AiWhyPopover from "../aiWhyPopover";
 import CitationChip from "../citationChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
@@ -255,6 +256,12 @@ const BriefRecommendationTitle: React.FC<BriefRecommendationTitleProps> = ({
                 </Tag>
             </Tooltip>
         )}
+        {detail?.basis ? (
+            <AiWhyPopover
+                ariaContext={String(microcopy.brief.recommendedNextStep)}
+                rationale={detail.basis}
+            />
+        ) : null}
     </span>
 );
 
@@ -277,18 +284,6 @@ const BriefRecommendationBody: React.FC<BriefRecommendationBodyProps> = ({
             >
                 {text}
             </Typography.Paragraph>
-            {detail?.basis && (
-                <Typography.Paragraph
-                    style={{
-                        fontSize: fontSize.xs,
-                        marginBottom: 4,
-                        overflowWrap: "anywhere"
-                    }}
-                    type="secondary"
-                >
-                    {microcopy.brief.basisLabel.replace("{text}", detail.basis)}
-                </Typography.Paragraph>
-            )}
             {detail && detail.sources.length > 0 && (
                 <Space size={4} wrap>
                     {detail.sources.map((source) => (

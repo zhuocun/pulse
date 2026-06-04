@@ -871,8 +871,11 @@ describe("TaskModal", () => {
                 /Apply readiness suggestion for epic/
             );
             fireEvent.click(epicSuggestion);
+            // After Apply the Epic label carries the "Suggested by Copilot"
+            // provenance badge, so match the label by prefix rather than
+            // exact text.
             expect(
-                (screen.getByLabelText("Epic") as HTMLInputElement).value
+                (screen.getByLabelText(/^Epic/) as HTMLInputElement).value
             ).toBeTruthy();
             expect(taskNameInput).toBeInTheDocument();
         } finally {
@@ -914,6 +917,52 @@ describe("TaskModal", () => {
                 )
             ).not.toBeInTheDocument()
         );
+    });
+
+    it("shows a copilot badge on a non-story-points field after a readiness Apply and clears it after manual edit", async () => {
+        jest.useFakeTimers();
+        try {
+            renderModal();
+            const taskNameInput = (await screen.findByDisplayValue(
+                "Build task"
+            )) as HTMLInputElement;
+            // A short name triggers a deterministic taskName readiness issue.
+            fireEvent.change(taskNameInput, { target: { value: "Hi" } });
+            act(() => {
+                jest.advanceTimersByTime(1000);
+            });
+            const taskNameSuggestion = await screen.findByLabelText(
+                /Apply readiness suggestion for taskName/
+            );
+            act(() => {
+                fireEvent.click(taskNameSuggestion);
+            });
+
+            const taskNameLabel = () =>
+                screen
+                    .getByText("Task name")
+                    .closest("label") as HTMLLabelElement;
+            await waitFor(() =>
+                expect(
+                    within(taskNameLabel()).queryByText("Suggested by Copilot")
+                ).toBeInTheDocument()
+            );
+
+            // Manual edit clears the provenance badge.
+            act(() => {
+                fireEvent.change(
+                    screen.getByLabelText(/^Task name/) as HTMLInputElement,
+                    { target: { value: "Hand-written name" } }
+                );
+            });
+            await waitFor(() =>
+                expect(
+                    within(taskNameLabel()).queryByText("Suggested by Copilot")
+                ).not.toBeInTheDocument()
+            );
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("restores the previous field value when undoing a readiness suggestion", async () => {

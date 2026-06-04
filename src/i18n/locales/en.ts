@@ -953,6 +953,8 @@ export const enSource = {
         revertToPrevious: "Revert to previous",
         showAlternatives: "Show alternatives",
         showRationale: "Why this?",
+        whyLabel: "Why?",
+        whyPopoverTitle: "Why Copilot suggested this",
         applyAnyway: "Apply anyway",
         emptyChatLead:
             "Ask about this board, tasks, or your projects. Answers use read-only data from the app.",

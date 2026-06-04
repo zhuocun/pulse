@@ -112,6 +112,32 @@ const isTaskModalField = (field: string): field is TaskModalField =>
  * `Input.TextArea` had (placeholder, rows, inputMode, etc.) — they just
  * move through the adapter unchanged.
  */
+/**
+ * A Form.Item label that appends a "Suggested by Copilot" provenance tag
+ * when the field's most recent value came from an AI Apply (§2.A.8). The
+ * tag clears as soon as the user edits the field (see
+ * `clearOriginOnManualEdits`).
+ */
+const FieldLabelWithProvenance: React.FC<{
+    label: React.ReactNode;
+    suggested: boolean;
+}> = ({ label, suggested }) => (
+    <span
+        style={{
+            alignItems: "center",
+            display: "inline-flex",
+            gap: space.xs
+        }}
+    >
+        {label}
+        {suggested ? (
+            <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+                {microcopy.ai.suggestedByCopilot}
+            </Tag>
+        ) : null}
+    </span>
+);
+
 const AiGhostTextNoteField: React.FC<{
     value?: string;
     onChange?: (event: { target: { value: string } }) => void;
@@ -508,7 +534,12 @@ const TaskModal: React.FC<{
             }}
         >
             <Form.Item
-                label={microcopy.fields.taskName}
+                label={
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.taskName}
+                        suggested={appliedFieldOrigin.taskName === "copilot"}
+                    />
+                }
                 name="taskName"
                 required
                 rules={[
@@ -527,7 +558,14 @@ const TaskModal: React.FC<{
                 />
             </Form.Item>
             <Form.Item
-                label={microcopy.fields.coordinator}
+                label={
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.coordinator}
+                        suggested={
+                            appliedFieldOrigin.coordinatorId === "copilot"
+                        }
+                    />
+                }
                 name="coordinatorId"
                 required
                 rules={[
@@ -547,7 +585,12 @@ const TaskModal: React.FC<{
                 />
             </Form.Item>
             <Form.Item
-                label={microcopy.fields.type}
+                label={
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.type}
+                        suggested={appliedFieldOrigin.type === "copilot"}
+                    />
+                }
                 name="type"
                 required
                 rules={[
@@ -563,7 +606,15 @@ const TaskModal: React.FC<{
                     placeholder={microcopy.placeholders.selectType}
                 />
             </Form.Item>
-            <Form.Item label={microcopy.fields.epic} name="epic">
+            <Form.Item
+                label={
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.epic}
+                        suggested={appliedFieldOrigin.epic === "copilot"}
+                    />
+                }
+                name="epic"
+            >
                 <Input
                     autoComplete="off"
                     enterKeyHint="next"
@@ -572,20 +623,10 @@ const TaskModal: React.FC<{
             </Form.Item>
             <Form.Item
                 label={
-                    <span
-                        style={{
-                            alignItems: "center",
-                            display: "inline-flex",
-                            gap: space.xs
-                        }}
-                    >
-                        {microcopy.fields.storyPoints}
-                        {appliedFieldOrigin.storyPoints === "copilot" ? (
-                            <Tag color="purple" style={{ marginInlineEnd: 0 }}>
-                                {microcopy.ai.suggestedByCopilot}
-                            </Tag>
-                        ) : null}
-                    </span>
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.storyPoints}
+                        suggested={appliedFieldOrigin.storyPoints === "copilot"}
+                    />
                 }
                 name="storyPoints"
             >
@@ -636,7 +677,15 @@ const TaskModal: React.FC<{
                     storageKey="boardCopilot:privacyShown:task-note"
                 />
             ) : null}
-            <Form.Item label={microcopy.fields.notes} name="note">
+            <Form.Item
+                label={
+                    <FieldLabelWithProvenance
+                        label={microcopy.fields.notes}
+                        suggested={appliedFieldOrigin.note === "copilot"}
+                    />
+                }
+                name="note"
+            >
                 {environment.aiGhostTextEnabled && aiEnabled && boardAiOn ? (
                     <AiGhostTextNoteField
                         columnId={editingTask?.columnId}
