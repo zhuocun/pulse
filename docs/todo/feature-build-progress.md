@@ -75,7 +75,9 @@ escalation), both fixed before landing.
 **[`work-management-depth.md`](../prd/work-management-depth.md)**
 - [x] Persisted done-category on `columns` (done-ness source of truth) — `46d6798c`
 - [x] Task `priority` enum + board badge + lens chips — `9e4691de`
-- [ ] Lifecycle: `completedAt` + archive/trash soft-delete + list default-exclude
+- [x] Lifecycle — `completedAt` auto-stamp on tasks (server-managed; done-category transitions on create/update/reorder) — `8268c533`
+- [ ] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude (WMD-L2)
+- [ ] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude (WMD-L3)
 - [ ] Dependencies / derived `blockedBy` + move-to-done gate
 - [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
