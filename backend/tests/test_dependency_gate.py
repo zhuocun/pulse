@@ -711,3 +711,39 @@ def test_member_cannot_toggle_gate_via_put_projects(
     assert response.status_code == 403, response.text
     # The flag was not written.
     assert "enforceDependencyGate" not in store.find_by_id(PROJECTS, project_id)
+
+
+# ---------------------------------------------------------------------------
+# 11. a dangling prerequisite (the prereq task was hard-purged) is skipped,
+#     so it no longer blocks a move into done.
+# ---------------------------------------------------------------------------
+
+
+def test_purged_prerequisite_does_not_block(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    todo = column_named(client, owner["jwt"], project_id, "To Do")
+    done = column_named(client, owner["jwt"], project_id, "Done")
+    set_category(store, done["_id"], "done")
+
+    blocked, prereq = seed_blocked_with_prereq(
+        client, store, owner, project_id, todo, prereq_done=False, done_column=done
+    )
+
+    # Hard-purge the prerequisite so its id dangles in ``Blocked.dependsOn``.
+    response = client.delete(
+        f"/api/v1/tasks/?taskId={prereq['_id']}&purge=true",
+        headers=auth_headers(owner["jwt"]),
+    )
+    assert response.status_code == 200, response.text
+    assert store.find_by_id(TASKS, str(prereq["_id"])) is None
+
+    # The only prerequisite no longer resolves, so the gate skips it and the
+    # move into done is allowed -- a dangling id never blocks.
+    assert (
+        task_service.reorder(reorder_body(blocked, todo, done), owner["_id"])
+        == "Task reordered"
+    )
+    assert stored_task(store, str(blocked["_id"]))["columnId"] == str(done["_id"])

@@ -79,7 +79,8 @@ escalation), both fixed before landing.
 - [x] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude — `68553cbb`
 - [x] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude — `d0a7c85e`
 - [x] Dependencies — `dependsOn` prerequisite edges + acyclic (cycle-rejecting) validation, bulk-excluded (L-DEP-A) — `fa1ce79a`
-- [ ] Dependencies — move-to-done gate (`force` override) + `enforceDependencyGate` project flag + derived blocked signal (L-DEP-B)
+- [x] Dependencies — move-to-done gate (`force` override) + `enforceDependencyGate` project flag (L-DEP-B) — `99313869`
+- [ ] Dependencies — derived blocked signal on `GET /tasks` (unfinished prerequisites; powers the §4.5 badge) (L-DEP-C)
 - [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
@@ -117,6 +118,10 @@ slice that consumes it.
   and counts soft-deleted ones too, so a trashed org-scoped project blocks
   tenant teardown until purged/restored. Defensible for now; revisit (add a
   `deletedAt is None` filter?) when org write paths mature (WMD-L3 reviewer note).
+- The dependency move-to-done gate counts a soft-deleted/archived prerequisite
+  (still in a non-done column) as unfinished, so it blocks (conservative; `force`
+  + `enforceDependencyGate` are escape hatches). Decide whether a trashed prereq
+  should stop blocking — 2-line guard if so (L-DEP-B reviewer note).
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable
