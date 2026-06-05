@@ -60,24 +60,44 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
 - [ ] **M8 — Bets: autopilot lanes; org-wide audit history; "plan this
   sprint"**.
 
-### Proposed completeness PRDs (not yet milestoned)
-A later research + brainstorm pass produced three forward-looking PRDs that
-specify net-new completeness features (backend + frontend both unbuilt).
-They are proposals, not scheduled milestones, and were deliberately scoped
-to avoid duplicating M5–M8 or the excluded list below.
-- [`../prd/work-management-depth.md`](../prd/work-management-depth.md) —
-  task priority, dependencies/blockers, lifecycle + archive/trash,
-  recurring tasks, templates, custom fields, milestones/iterations,
-  alternate views (list/table/calendar/timeline) + swimlanes, and
-  AI-assisted prioritization/dependency/duplicate detection.
-- [`../prd/collaboration-notifications.md`](../prd/collaboration-notifications.md)
-  — watchers/subscriptions, notification breadth + `actorId` +
-  preferences, email/web-push delivery, comment reactions/threads/edit
-  history, and a per-task activity timeline.
-- [`../prd/accounts-organizations.md`](../prd/accounts-organizations.md) —
-  organizations/workspaces, teams, invite-by-email onboarding, guest
-  role + public read-only links, account/profile management, and a
-  platform horizon (SSO/SCIM/PAT/billing).
+### Completeness PRD implementation (in progress)
+Implementation of the three completeness PRDs began on this branch as a
+sequence of independently reviewed + gated + pushed slices (separate from
+the M5–M8 track). Cross-target order: additive/foundational slices first,
+the organizations tenancy layer early (it owns the access model the rest
+leans on), then broader work-management depth, with recurrence / AI assists
+/ email delivery last (they add new runtime deps). Each slice runs
+worker → independent reviewer → gate (ruff/pytest + tsc/eslint/jest/
+prettier) → commit. The review gate has already caught two real bugs a
+green test run hid (a DOM-global type collision; an org-admin privilege
+escalation), both fixed before landing.
+
+**[`work-management-depth.md`](../prd/work-management-depth.md)**
+- [x] Persisted done-category on `columns` (done-ness source of truth) — `46d6798c`
+- [x] Task `priority` enum + board badge + lens chips — `9e4691de`
+- [ ] Lifecycle: `completedAt` + archive/trash soft-delete + list default-exclude
+- [ ] Dependencies / derived `blockedBy` + move-to-done gate
+- [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
+- [ ] Custom fields (scoped allowlist relaxation); project/task templates
+- [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
+- [ ] Recurring tasks + scheduler (new runtime dep — sequenced last)
+
+**[`accounts-organizations.md`](../prd/accounts-organizations.md)**
+- [x] `guest` role at rank 0, below viewer (no `can_access` rewrite) — `70e081fb`
+- [x] Organizations tenancy spine: new `organizations` collection + parallel `can_access_org`, dark/additive — `4eb250bd`
+- [ ] `organizationId` on projects + tenant-scoped listing (null-org fallback) + backfill
+- [ ] Org/teams frontend (switcher, settings, roster); invite-by-email onboarding
+- [ ] Public read-only share links; account/profile management
+- [ ] Platform horizon (SSO/OIDC, SCIM, PAT, billing) — high-level
+
+**[`collaboration-notifications.md`](../prd/collaboration-notifications.md)** — not started
+- [ ] Watchers/subscriptions; notification breadth + `actorId` + per-kind prefs
+- [ ] Comment reactions / threads / edit-history; per-task activity timeline
+- [ ] Transactional email + web-push delivery (infra-heavy — later)
+
+**Also pending — M5 saved-views server model:** work-management-depth
+defers saved-view *persistence* to M5, built just before the alternate-views
+slice that consumes it.
 
 ### Open decisions (carry forward)
 - AI/agent routes (`ai.py`, `agents.py`) remain owner-gated. Decide in the
