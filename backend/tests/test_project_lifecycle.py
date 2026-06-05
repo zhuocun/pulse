@@ -342,6 +342,17 @@ def test_non_manager_member_forbidden_on_remove_restore_archive(
     # A non-manager's forbidden archive must not even reach body validation --
     # a non-bool flag still yields Forbidden, not Bad request (no probing).
     assert project_service.archive(project_id, editor["_id"], "yes") == "Forbidden"
+
+    # Strictly stronger: an OWNER-role member also passes ``can_access(OWNER)``
+    # yet is NOT the project manager, so a managerId gate (rather than a
+    # ``can_access(OWNER)`` check) must still Forbid them on every lifecycle
+    # op -- this is what distinguishes manager-only from owner-level RBAC.
+    coowner = register_and_login(client, "coowner", "coowner@example.com")
+    add_member(client, manager["jwt"], project_id, coowner["_id"], "owner")
+    assert project_service.remove(project_id, coowner["_id"]) == "Forbidden"
+    assert project_service.restore(project_id, coowner["_id"]) == "Forbidden"
+    assert project_service.archive(project_id, coowner["_id"], True) == "Forbidden"
+
     # None of these touched the project.
     assert stored_project(project_id).get("deletedAt") is None
     assert stored_project(project_id).get("archivedAt") is None

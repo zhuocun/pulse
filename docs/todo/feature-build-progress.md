@@ -77,7 +77,7 @@ escalation), both fixed before landing.
 - [x] Task `priority` enum + board badge + lens chips — `9e4691de`
 - [x] Lifecycle — `completedAt` auto-stamp on tasks (server-managed; done-category transitions on create/update/reorder) — `8268c533`
 - [x] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude — `68553cbb`
-- [ ] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude (WMD-L3)
+- [x] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude — `d0a7c85e`
 - [ ] Dependencies / derived `blockedBy` + move-to-done gate
 - [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
@@ -112,6 +112,10 @@ slice that consumes it.
   trashed task still occupies an `index` slot (benign — no corruption, since
   soft-delete skips the re-pack). Revisit when the trash/board views land
   (WMD-L2 reviewer note).
+- Org delete refuses while the org still owns projects (`organization_service`)
+  and counts soft-deleted ones too, so a trashed org-scoped project blocks
+  tenant teardown until purged/restored. Defensible for now; revisit (add a
+  `deletedAt is None` filter?) when org write paths mature (WMD-L3 reviewer note).
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable
