@@ -85,7 +85,8 @@ escalation), both fixed before landing.
 **[`accounts-organizations.md`](../prd/accounts-organizations.md)**
 - [x] `guest` role at rank 0, below viewer (no `can_access` rewrite) — `70e081fb`
 - [x] Organizations tenancy spine: new `organizations` collection + parallel `can_access_org`, dark/additive — `4eb250bd`
-- [ ] `organizationId` on projects + tenant-scoped listing (null-org fallback) + backfill
+- [x] `organizationId` on projects + org-gated create + tenant-scoped listing (null-org fallback) — `f30efe87`
+- [ ] String→entity backfill script (distinct-scan → mint orgs → stamp `projects.organizationId`; idempotent, non-destructive)
 - [ ] Org/teams frontend (switcher, settings, roster); invite-by-email onboarding
 - [ ] Public read-only share links; account/profile management
 - [ ] Platform horizon (SSO/OIDC, SCIM, PAT, billing) — high-level

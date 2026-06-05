@@ -90,7 +90,7 @@ def can_access(
     return ROLE_RANK[role] >= threshold
 
 
-def _viewer_org_ids(viewer_id) -> set[str]:
+def _viewer_org_ids(viewer_id: str) -> set[str]:
     # The orgs the caller belongs to (any role). Membership is inline so it
     # is filtered in Python, exactly like the project membership scan; an
     # indexed members.userId query is the future server-side optimization.
@@ -101,7 +101,7 @@ def _viewer_org_ids(viewer_id) -> set[str]:
     }
 
 
-def _org_visible(project, viewer_org_ids) -> bool:
+def _org_visible(project: Dict[str, Any], viewer_org_ids: set[str]) -> bool:
     org_id = project.get("organizationId")
     if org_id is None:
         return True   # null-org / legacy / personal project: visible to its
