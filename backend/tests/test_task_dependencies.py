@@ -449,6 +449,56 @@ def test_valid_non_cyclic_chain_accepted(
 
 
 # ---------------------------------------------------------------------------
+# 6b. Diamond (shared descendant) is accepted -- it is NOT a cycle
+# ---------------------------------------------------------------------------
+
+
+def test_diamond_shared_descendant_accepted(
+    client: TestClient, store: FakeStore
+) -> None:
+    """A shared descendant is NOT a cycle. Build the diamond A->B, A->C,
+    B->D, C->D, then add E->A: the cycle walk from A reaches D via BOTH B and
+    C (exercising the visited-node de-dup), and A does not reach E, so the
+    edge is accepted. A naive shared-reachability check would wrongly reject
+    this; the directional "does d reach task_id" check does not."""
+
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+
+    for name in ("A", "B", "C", "D", "E"):
+        create_task(
+            client, owner["jwt"], project_id, column["_id"], owner["_id"], taskName=name
+        )
+    task = {
+        name: named_task(client, owner["jwt"], project_id, name)
+        for name in ("A", "B", "C", "D", "E")
+    }
+
+    # Build the diamond beneath A: A->B, A->C, B->D, C->D (all forward edges).
+    for source, deps in (("B", ["D"]), ("C", ["D"]), ("A", ["B", "C"])):
+        assert (
+            update_task(
+                client, owner["jwt"], task[source], project_id, column["_id"],
+                owner["_id"], dependsOn=[task[dep]["_id"] for dep in deps],
+            ).status_code
+            == 200
+        )
+
+    # E -> A: the walk from A traverses the diamond (D reached via both B and
+    # C), A does not reach E, so the edge is ACCEPTED -- a shared descendant
+    # is not a cycle.
+    accepted = update_task(
+        client, owner["jwt"], task["E"], project_id, column["_id"], owner["_id"],
+        dependsOn=[task["A"]["_id"]],
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert named_task(client, owner["jwt"], project_id, "E")["dependsOn"] == [
+        task["A"]["_id"]
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 7. bulk_update drops ``dependsOn`` (excluded from _BULK_CHANGE_FIELDS)
 # ---------------------------------------------------------------------------
 

@@ -78,7 +78,8 @@ escalation), both fixed before landing.
 - [x] Lifecycle — `completedAt` auto-stamp on tasks (server-managed; done-category transitions on create/update/reorder) — `8268c533`
 - [x] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude — `68553cbb`
 - [x] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude — `d0a7c85e`
-- [ ] Dependencies / derived `blockedBy` + move-to-done gate
+- [x] Dependencies — `dependsOn` prerequisite edges + acyclic (cycle-rejecting) validation, bulk-excluded (L-DEP-A) — `fa1ce79a`
+- [ ] Dependencies — move-to-done gate (`force` override) + `enforceDependencyGate` project flag + derived blocked signal (L-DEP-B)
 - [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
