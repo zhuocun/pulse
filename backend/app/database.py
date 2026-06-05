@@ -48,6 +48,10 @@ def ensure_indexes() -> None:
     # Backs the org-scoped project listing (PRD 10.4): the tenant-scope
     # filter resolves a project's owning org by ``organizationId``.
     collection(PROJECTS).create_index("organizationId")
+    # Backs the per-project default-exclude scan (PRD §5.4/§5.5, AC-W21):
+    # GET /tasks loads a project's tasks then filters out trashed/archived
+    # ones in Python, so this compound index keeps that read cheap.
+    collection(TASKS).create_index([("projectId", 1), ("deletedAt", 1), ("archivedAt", 1)])
 
 
 def collection(name: str) -> Collection:

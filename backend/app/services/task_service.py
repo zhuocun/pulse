@@ -232,7 +232,25 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Task created"
 
 
-def get(project_id: str, user_id: str) -> Union[List[Dict[str, Any]], str]:
+def get(
+    project_id: str,
+    user_id: str,
+    *,
+    include_archived: bool = False,
+    include_trashed: bool = False,
+) -> Union[List[Dict[str, Any]], str]:
+    """Load a project's tasks, excluding archived/trashed ones by default.
+
+    Trashed (``deletedAt`` set) and archived (``archivedAt`` set) tasks are
+    filtered OUT in Python unless ``include_trashed`` / ``include_archived``
+    opt them back in (PRD §5.4/§5.5, AC-W9/W10/W11). The zero-tasks
+    default-seed decision is made against the RAW task set, so a project
+    whose only tasks are trashed/archived is NOT re-seeded (the row still
+    exists, it is merely hidden). Filtering is done in Python because the
+    repository/FakeStore only support exact-equality queries (no operator
+    dicts).
+    """
+
     if repository.find_by_id(PROJECTS, project_id) is None:
         return "Project not found"
     # Read path: any member (viewer and up) may load the task list.
@@ -273,7 +291,15 @@ def get(project_id: str, user_id: str) -> Union[List[Dict[str, Any]], str]:
         )
         tasks = repository.find_many(TASKS, {"projectId": project_id})
 
-    return repository.serialize_documents(sorted_by_index(tasks))
+    # Default-exclude trashed/archived in Python (exact-equality store can't
+    # express ``{"deletedAt": {"$ne": null}}``); the opt-in flags widen it.
+    visible = [
+        task
+        for task in tasks
+        if (include_trashed or task.get("deletedAt") is None)
+        and (include_archived or task.get("archivedAt") is None)
+    ]
+    return repository.serialize_documents(sorted_by_index(visible))
 
 
 def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -343,7 +369,9 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Task updated"
 
 
-def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(
+    task_id: Optional[str], user_id: str, purge: bool = False
+) -> Optional[str]:
     if task_id is None:
         return "Lack of task information"
     task = repository.find_by_id(TASKS, task_id)
@@ -352,9 +380,20 @@ def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
     # Write path: editor or owner.
     if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
         return "Forbidden"
-    # Orphan, do NOT cascade: deleting a parent leaves its sub-tasks as
-    # top-level tasks rather than wiping a whole branch out from under the
-    # user. Exact-match query on ``parentTaskId`` (FakeStore-compatible).
+
+    if not purge:
+        # Default: soft delete (move to trash, PRD §5.5). Stamp ``deletedAt``
+        # and leave everything else intact -- children are NOT orphaned and
+        # sibling indexes are NOT re-packed, so a later ``restore`` brings the
+        # task (and its sub-tree links / position) back losslessly. The
+        # cascade + re-pack are deferred to the hard ``purge`` below.
+        repository.update_by_id(TASKS, task_id, {"deletedAt": now()})
+        return "Task deleted"
+
+    # ``purge=True``: legacy hard delete. Orphan, do NOT cascade: deleting a
+    # parent leaves its sub-tasks as top-level tasks rather than wiping a
+    # whole branch out from under the user. Exact-match query on
+    # ``parentTaskId`` (FakeStore-compatible).
     for child in repository.find_many(TASKS, {"parentTaskId": task_id}):
         repository.update_by_id(TASKS, str(child["_id"]), {"parentTaskId": None})
     column_id = task.get("columnId")
@@ -372,6 +411,57 @@ def remove(task_id: Optional[str], user_id: str) -> Optional[str]:
                     TASKS, str(sibling["_id"]), {"index": sibling_index - 1}
                 )
     return "Task deleted"
+
+
+def restore(task_id: Optional[str], user_id: str) -> Optional[str]:
+    """Un-trash / un-archive a task (PRD §5.4/§5.5).
+
+    Clears BOTH ``deletedAt`` and ``archivedAt`` so a restore from trash
+    brings the task all the way back to the active board in one step.
+    Returns ``None`` (router -> 404) when the id is missing/unknown,
+    ``"Forbidden"`` when the caller lacks editor rights, else
+    ``"Task restored"``.
+    """
+
+    if task_id is None:
+        return None
+    task = repository.find_by_id(TASKS, task_id)
+    if task is None:
+        return None
+    # Write path: editor or owner.
+    if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
+        return "Forbidden"
+    repository.update_by_id(TASKS, task_id, {"deletedAt": None, "archivedAt": None})
+    return "Task restored"
+
+
+def archive(task_id: Optional[str], user_id: str, archived: Any) -> Optional[str]:
+    """Archive / unarchive a task (PRD §5.4).
+
+    Stamps ``archivedAt`` (archive) or clears it (unarchive) based on the
+    boolean ``archived`` flag. Existence + access are checked BEFORE the
+    body is validated so a non-member cannot probe a task's existence via a
+    malformed payload. Returns ``None`` (router -> 404) when the id is
+    missing/unknown, ``"Forbidden"`` when the caller lacks editor rights,
+    ``"Bad request"`` when ``archived`` is not a bool, else
+    ``"Task archived"``.
+    """
+
+    if task_id is None:
+        return None
+    task = repository.find_by_id(TASKS, task_id)
+    if task is None:
+        return None
+    # Write path: editor or owner -- checked before body validation so a
+    # non-member can't probe existence with a malformed ``archived``.
+    if not can_access(task.get("projectId"), user_id, ROLE_EDITOR):
+        return "Forbidden"
+    if not isinstance(archived, bool):
+        return "Bad request"
+    repository.update_by_id(
+        TASKS, task_id, {"archivedAt": now() if archived else None}
+    )
+    return "Task archived"
 
 
 def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:

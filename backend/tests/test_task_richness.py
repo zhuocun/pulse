@@ -335,8 +335,12 @@ def test_deleting_parent_orphans_children_without_deleting_them(
         )
         assert created.status_code == 201, created.text
 
+    # ``purge=true`` exercises the hard delete: orphan-on-delete + index
+    # re-pack only run on a purge (the soft-delete default leaves children
+    # parented and indexes intact so a restore is lossless).
     delete = client.delete(
-        f"/api/v1/tasks/?taskId={parent['_id']}", headers=auth_headers(owner["jwt"])
+        f"/api/v1/tasks/?taskId={parent['_id']}&purge=true",
+        headers=auth_headers(owner["jwt"]),
     )
     assert delete.status_code == 200, delete.text
     assert delete.json() == "Task deleted"

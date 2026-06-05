@@ -87,6 +87,13 @@ TABLE_FIELDS = {
         # when it leaves. Never client-written -- ``task_service`` sets it
         # after the PUT allowlist filter so a client-sent value is dropped.
         "completedAt",
+        # Soft-archive / soft-delete (trash) markers (PRD §5.4 / §5.5):
+        # tz-aware ``datetime`` (serialized to ISO on read) or ``null``.
+        # ``null`` means active; ``archivedAt`` set hides the task from the
+        # board, ``deletedAt`` set moves it to trash. Both are managed only
+        # by the archive/trash/restore endpoints, never via PUT /tasks.
+        "archivedAt",
+        "deletedAt",
         "createdAt",
         "updatedAt",
     },

@@ -938,10 +938,13 @@ def test_delete_each_task_repacks_sibling_indexes(client: TestClient) -> None:
         ]
         if len(tasks) <= 1:
             break
-        # Delete an interior task so the repack actually runs.
+        # Delete an interior task so the repack actually runs. ``purge=true``
+        # is required: the sibling index re-pack only runs on a hard delete
+        # (the soft-delete default leaves indexes untouched for a lossless
+        # restore).
         target = sorted(tasks, key=lambda task: task["index"])[len(tasks) // 2]
         response = client.delete(
-            f"/api/v1/tasks/?taskId={target['_id']}", headers=headers
+            f"/api/v1/tasks/?taskId={target['_id']}&purge=true", headers=headers
         )
         assert response.status_code == HTTPStatus.OK
         survivors = [
@@ -1189,7 +1192,9 @@ def test_repeated_delete_of_same_task_returns_400_after_first(
     """Tasks delete handler responds 200 then 404 for stale ids.
 
     Task deletion now matches project and board deletion: stale resource
-    ids are not found, not malformed.
+    ids are not found, not malformed. The first call hard-purges
+    (``purge=true``) so the row is actually gone; every repeat then hits a
+    missing id and 404s (a soft delete would keep the row and 200 forever).
     """
 
     logged_in = register_and_login(client)
@@ -1197,7 +1202,7 @@ def test_repeated_delete_of_same_task_returns_400_after_first(
     headers = auth_headers(logged_in["jwt"])
 
     response = client.delete(
-        f"/api/v1/tasks/?taskId={ids['task_id']}", headers=headers
+        f"/api/v1/tasks/?taskId={ids['task_id']}&purge=true", headers=headers
     )
     assert response.status_code == HTTPStatus.OK
     for _ in range(8):

@@ -13,13 +13,22 @@ router = APIRouter()
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_tasks(
     projectId: Optional[str] = Query(default=None),
+    includeArchived: bool = Query(default=False),
+    includeTrashed: bool = Query(default=False),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> List[Dict[str, Any]]:
     if projectId is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Lack of project information")
 
     user_id = current_user_id(payload)
-    result = task_service.get(projectId, user_id)
+    # Archived/trashed tasks are excluded by default (PRD §5.4/§5.5); the
+    # opt-in flags widen the read so the archive/trash views can show them.
+    result = task_service.get(
+        projectId,
+        user_id,
+        include_archived=includeArchived,
+        include_trashed=includeTrashed,
+    )
     if isinstance(result, str):
         if result == "Column not found":
             api_error(status.HTTP_404_NOT_FOUND, result)
@@ -80,9 +89,14 @@ def update_task(
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_task(
     taskId: Optional[str] = Query(default=None),
+    purge: bool = Query(default=False),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> str:
-    result = task_service.remove(taskId, current_user_id(payload))
+    # Default DELETE soft-deletes (moves the task to trash, PRD §5.5);
+    # ``?purge=true`` keeps the legacy hard delete (orphan children +
+    # re-pack indexes). Both return "Task deleted" so the contract is
+    # unchanged.
+    result = task_service.remove(taskId, current_user_id(payload), purge=purge)
     if result == "Task deleted":
         return result
     if result == "Forbidden":
@@ -90,6 +104,41 @@ def remove_task(
     if result is None:
         api_error(status.HTTP_404_NOT_FOUND, "Task not found")
     api_error(status.HTTP_400_BAD_REQUEST, result)
+
+
+@router.put("/restore", status_code=status.HTTP_200_OK)
+def restore_task(
+    data: Dict[str, Any] = Body(default_factory=dict),
+    payload: Dict[str, Any] = Depends(current_user_payload),
+) -> str:
+    # Un-trash / un-archive a task (PRD §5.4/§5.5): clears both markers so a
+    # restore from trash brings the task all the way back to the board.
+    result = task_service.restore(data.get("_id"), current_user_id(payload))
+    if result == "Task restored":
+        return result
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    api_error(status.HTTP_404_NOT_FOUND, "Task not found")
+
+
+@router.put("/archive", status_code=status.HTTP_200_OK)
+def archive_task(
+    data: Dict[str, Any] = Body(default_factory=dict),
+    payload: Dict[str, Any] = Depends(current_user_payload),
+) -> str:
+    # Archive / unarchive a task (PRD §5.4). Existence + access are checked
+    # inside the service BEFORE ``archived`` is validated so a non-member
+    # cannot probe a task's existence via a malformed body.
+    result = task_service.archive(
+        data.get("_id"), current_user_id(payload), data.get("archived")
+    )
+    if result == "Task archived":
+        return result
+    if result == "Bad request":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    api_error(status.HTTP_404_NOT_FOUND, "Task not found")
 
 
 @router.put("/bulk", status_code=status.HTTP_200_OK)

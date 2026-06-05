@@ -335,7 +335,12 @@ def test_default_task_is_created_when_project_has_columns_but_no_tasks(
     ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
     headers = auth_headers(logged_in["jwt"])
 
-    client.delete(f"/api/v1/tasks/?taskId={ids['task_id']}", headers=headers)
+    # ``purge=true`` so the row is actually removed: the zero-tasks
+    # default-seed keys off the RAW task set, and a soft-deleted (trashed)
+    # task still counts, so a plain DELETE would not re-seed.
+    client.delete(
+        f"/api/v1/tasks/?taskId={ids['task_id']}&purge=true", headers=headers
+    )
     response = client.get(
         f"/api/v1/tasks/?projectId={ids['project_id']}", headers=headers
     )
@@ -851,7 +856,14 @@ def test_tasks_router_handles_non_column_service_error(
     client: TestClient, monkeypatch
 ) -> None:
     logged_in = register_and_login(client)
-    monkeypatch.setattr(task_service, "get", lambda project_id, user_id: "Bad request")
+    # ``get`` now takes keyword-only ``include_archived`` / ``include_trashed``
+    # (the router forwards the GET query flags); accept + ignore them so the
+    # stub still exercises the non-"Column not found" -> 400 mapping.
+    monkeypatch.setattr(
+        task_service,
+        "get",
+        lambda project_id, user_id, **_flags: "Bad request",
+    )
 
     response = client.get(
         "/api/v1/tasks/?projectId=project-id",
