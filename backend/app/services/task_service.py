@@ -1,7 +1,7 @@
 import math
 from typing import Any, Dict, List, Optional, Union
 
-from app.database import COLUMNS, PROJECTS, TASKS, USERS
+from app.database import COLUMNS, PROJECTS, TASKS, USERS, now
 from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
 from app.services.column_seed import DEFAULT_COLUMNS
@@ -222,6 +222,11 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             # Urgency defaults to ``"none"`` so every reader sees a uniform
             # shape; a validated non-default value (PRD §3.2) overrides it.
             "priority": data.get("priority") or "none",
+            # completedAt is server-managed (PRD 5.3 / AC-W8): set when the task
+            # sits in a done-category column, else null. Never client-written.
+            # Reusing be_tools._is_done_column's legacy name-fallback is a later
+            # refinement.
+            "completedAt": now() if column.get("category") == "done" else None,
         },
     )
     return "Task created"
@@ -321,6 +326,19 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
         validation_errors([parent_error])
 
     payload = {key: value for key, value in data.items() if key in _TASK_UPDATE_FIELDS}
+    # completedAt is server-managed (PRD 5.3 / AC-W8) and never client-written:
+    # set it AFTER the allowlist filter (so a client-sent ``completedAt`` in the
+    # body is dropped) against the destination ``column`` already resolved above.
+    # Stamp on entering done, clear on leaving; leave an existing stamp untouched
+    # while the task stays done (we record WHEN it was completed, not last-touched).
+    # Reading ``column.get("category") == "done"`` directly mirrors
+    # be_tools._is_done_column; reusing its legacy name-fallback is a later refinement.
+    target_done = column.get("category") == "done"
+    already_completed = task.get("completedAt") is not None
+    if target_done and not already_completed:
+        payload["completedAt"] = now()
+    elif not target_done and already_completed:
+        payload["completedAt"] = None
     repository.update_by_id(TASKS, task_id, payload)
     return "Task updated"
 
@@ -411,6 +429,23 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
     for update in updates:
         repository.update_by_id(TASKS, update.item_id, update.changes)
+
+    # completedAt is server-managed (PRD 5.3 / AC-W8): reconcile the moved task
+    # against its DESTINATION column. ``task_reorder_updates`` rewrites the moved
+    # task's ``columnId`` to the reference column only on a cross-column move (a
+    # same-column reorder touches ``index`` alone), so resolve the destination
+    # AUTHORITATIVELY from the moved task's own ``columnId`` after the updates are
+    # applied rather than assuming ``reference_column``. Reusing
+    # be_tools._is_done_column's legacy name-fallback is a later refinement.
+    moved = repository.find_by_id(TASKS, str(from_task["_id"]))
+    if moved is not None:
+        dest_column = repository.find_by_id(COLUMNS, str(moved.get("columnId") or ""))
+        dest_done = dest_column is not None and dest_column.get("category") == "done"
+        already_completed = moved.get("completedAt") is not None
+        if dest_done and not already_completed:
+            repository.update_by_id(TASKS, str(moved["_id"]), {"completedAt": now()})
+        elif not dest_done and already_completed:
+            repository.update_by_id(TASKS, str(moved["_id"]), {"completedAt": None})
     return "Task reordered"
 
 

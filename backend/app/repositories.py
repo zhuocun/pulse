@@ -81,6 +81,12 @@ TABLE_FIELDS = {
         # derived rank (urgent=4 … none=0) drives sorting server-side and is
         # never stored.
         "priority",
+        # Completion stamp: a tz-aware ``datetime`` (serialized to an ISO
+        # string on read) or ``null``. Server-managed (PRD §5.3 / AC-W8):
+        # set when the task enters a ``category=="done"`` column and cleared
+        # when it leaves. Never client-written -- ``task_service`` sets it
+        # after the PUT allowlist filter so a client-sent value is dropped.
+        "completedAt",
         "createdAt",
         "updatedAt",
     },
