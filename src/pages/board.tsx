@@ -906,8 +906,8 @@ const BoardPage = () => {
 
                     /*
                      * Phone clusters every chrome control — including the
-                     * Copilot launcher — into one capsule (4 slots: refresh,
-                     * members, Copilot, settings). Desktop keeps the Copilot
+                     * Copilot launcher — into one capsule (5 slots: refresh,
+                     * members, trash, Copilot, settings). Desktop keeps the Copilot
                      * launcher out of the top tier so it can anchor the
                      * bottom tier beside the search rail.
                      */

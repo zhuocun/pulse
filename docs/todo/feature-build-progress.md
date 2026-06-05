@@ -102,7 +102,8 @@ escalation), both fixed before landing.
 
 **Frontend surfaces — making the landed backend visible**
 - [x] Dependency "blocked" badge on board cards (consumes derived `blockedBy`) (FE-1) — `92b4ebef`
-- [ ] Task lifecycle UI — archive/trash actions + Trash/Archive view + restore (FE-2)
+- [x] Lifecycle UI — Trash drawer: list soft-deleted tasks + restore + permanent-delete (FE-2) — `20c145a5`
+- [ ] Lifecycle UI — Archive tab/view + archive/unarchive action (FE-2b)
 - [x] Dependency editor — `dependsOn` multi-select in the task modal + read-only "Blocks" inverse (FE-3) — `f2465d4e`
 - [ ] `completedAt` "completed" card styling (FE-4)
 
