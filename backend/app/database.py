@@ -45,6 +45,9 @@ def ensure_indexes() -> None:
     # filters in Python) cheap once it moves server-side.
     collection(ORGANIZATIONS).create_index("slug", unique=True)
     collection(ORGANIZATIONS).create_index("members.userId")
+    # Backs the org-scoped project listing (PRD 10.4): the tenant-scope
+    # filter resolves a project's owning org by ``organizationId``.
+    collection(PROJECTS).create_index("organizationId")
 
 
 def collection(name: str) -> Collection:

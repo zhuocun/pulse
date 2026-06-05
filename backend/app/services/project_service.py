@@ -1,8 +1,13 @@
 from typing import Any, Dict, List, Optional, Union
 
-from app.database import COLUMNS, PROJECTS, TASKS, USERS
+from app.database import COLUMNS, ORGANIZATIONS, PROJECTS, TASKS, USERS
 from app.repositories import repository
 from app.services.column_seed import ensure_default_columns
+from app.services.organization_service import (
+    ORG_ROLE_ADMIN,
+    ORG_ROLE_MEMBER,
+    can_access_org,
+)
 from app.validation import clean_filter
 
 # Fields a manager may update via PUT /projects. ``_id`` is keyed
@@ -85,6 +90,27 @@ def can_access(
     return ROLE_RANK[role] >= threshold
 
 
+def _viewer_org_ids(viewer_id) -> set[str]:
+    # The orgs the caller belongs to (any role). Membership is inline so it
+    # is filtered in Python, exactly like the project membership scan; an
+    # indexed members.userId query is the future server-side optimization.
+    return {
+        str(org["_id"])
+        for org in repository.find_many(ORGANIZATIONS, clean_filter({}))
+        if can_access_org(org, viewer_id, ORG_ROLE_MEMBER)
+    }
+
+
+def _org_visible(project, viewer_org_ids) -> bool:
+    org_id = project.get("organizationId")
+    if org_id is None:
+        return True   # null-org / legacy / personal project: visible to its
+                      # members exactly as before (back-compat fallback that
+                      # lets tenant-scoping land ahead of the string->entity
+                      # backfill without hiding any existing project)
+    return str(org_id) in viewer_org_ids
+
+
 def is_project_manager(project_id: Optional[str], user_id: Optional[str]) -> bool:
     # Owner-level gate. Delegates to ``can_access`` but the manager check
     # inside it remains True even when ``memberIds`` is absent, so the
@@ -97,19 +123,39 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     # the caller for the request to succeed, so the field was attack
     # surface with no upside. We now derive the manager from the JWT
     # subject, eliminating an entire class of confused-deputy bugs.
-    project_id = repository.insert_one(
-        PROJECTS,
-        {
-            "projectName": data["projectName"],
-            "organization": data["organization"],
-            "managerId": user_id,
-            # Seed the creator as an owner-level member so membership is
-            # uniform from day one: ``memberIds`` always includes the
-            # manager and authz can reason purely about it (the manager
-            # short-circuit in ``can_access`` is belt-and-suspenders).
-            "memberIds": [{"userId": user_id, "role": ROLE_OWNER}],
-        },
-    )
+    #
+    # ``organizationId`` is OPTIONAL: when present the project is scoped
+    # to that tenant, when absent it stays a legacy / personal project
+    # exactly as before. We are in a dual-write window, so the ``organization``
+    # string above is still written unconditionally and must not break.
+    document: Dict[str, Any] = {
+        "projectName": data["projectName"],
+        "organization": data["organization"],
+        "managerId": user_id,
+        # Seed the creator as an owner-level member so membership is
+        # uniform from day one: ``memberIds`` always includes the
+        # manager and authz can reason purely about it (the manager
+        # short-circuit in ``can_access`` is belt-and-suspenders).
+        "memberIds": [{"userId": user_id, "role": ROLE_OWNER}],
+    }
+
+    organization_id = data.get("organizationId")
+    if organization_id is not None:
+        org = repository.find_by_id(ORGANIZATIONS, str(organization_id))
+        if org is None:
+            return "Bad request"            # dangling org reference -> client error
+        # Org-scoped creation is gated at org_admin+ per the
+        # accounts-organizations PRD 3.3: only an org_admin or org_owner
+        # may stand up a project inside a tenant. Letting plain members
+        # create org projects behind a ``settings`` opt-in is a deliberate
+        # later refinement and is intentionally NOT in this slice.
+        if not can_access_org(org, user_id, ORG_ROLE_ADMIN):
+            return "Forbidden"              # only org_admin+ may create projects in an org
+        # Only attach the key once validated, so the absent case inserts
+        # exactly the same shape as today (no ``organizationId`` key).
+        document["organizationId"] = str(organization_id)
+
+    project_id = repository.insert_one(PROJECTS, document)
     ensure_default_columns(str(project_id))
     return "Project created"
 
@@ -127,6 +173,13 @@ def get(
     any membership role on it (owner/editor/viewer). Query parameters are
     still restricted so a client cannot pass another user's ``managerId``
     or probe by name across tenants.
+
+    The LISTING (no ``project_id``) is additionally tenant-scoped: an
+    org-scoped project is only enumerated for callers who belong to its
+    org, while a null-org (legacy / personal) project keeps its old
+    members-only visibility via the back-compat fallback in
+    ``_org_visible``. Direct-by-id access below is deliberately NOT
+    org-scoped -- we narrow enumeration, not direct reads.
     """
 
     if project_id is not None:
@@ -146,10 +199,15 @@ def get(
     # role check in Python. An indexed ``memberIds.userId`` query is a
     # future perf optimization; at single-tenant scale a scan is fine.
     query = clean_filter({"projectName": project_name})
+    # The set of orgs the caller belongs to, resolved once for the whole
+    # scan so tenant-scoping costs a single org enumeration rather than
+    # one per project row.
+    viewer_org_ids = _viewer_org_ids(viewer_id)
     projects = [
         doc
         for doc in repository.find_many(PROJECTS, query)
         if can_access(doc, viewer_id, ROLE_VIEWER)
+        and _org_visible(doc, viewer_org_ids)
     ]
     return repository.serialize_documents(projects)
 

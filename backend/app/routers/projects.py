@@ -25,7 +25,16 @@ def create_project(
     if errors:
         validation_errors(errors)
 
-    return project_service.create(data, current_user_id(payload))
+    # ``create`` now validates an optional ``organizationId`` and can
+    # return sentinels, so map them before returning (mirroring the
+    # update/delete handlers). ``api_error`` raises, so on success the
+    # "Project created" string returns with the 201 above.
+    result = project_service.create(data, current_user_id(payload))
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    if result == "Bad request":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
+    return result
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
