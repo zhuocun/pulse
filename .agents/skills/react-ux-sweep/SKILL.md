@@ -11,10 +11,17 @@ The screenshot matrix is the discovery loop — don't skip it because
 
 ## Loop
 
-1. **Set up.** `npm install`, then `npm start` in the background (Vite,
-   port 3000). The remote API is blocked from this environment and the
-   `__json_server_mock__/` middleware does not run under json-server v1,
-   so mock every endpoint inside Playwright.
+1. **Set up.** `npm install`. Playwright is **not** a project dependency
+   and is not pre-installed — add it without touching the manifest
+   (`npm i playwright --no-save`) and fetch a browser
+   (`npx playwright install chromium`). Capture against a **production
+   build** served by `vite preview`, not the dev server: `npm run build
+   -- --mode development` (the `development` mode keeps `.env.development`
+   so the local AI engine and feature flags stay on), then `npx vite
+   preview --port 4173`. Dev-server route chunks lazy-compile on first
+   hit and can hang in their Suspense state under headless automation.
+   The remote API is blocked from this environment, so mock every
+   endpoint inside Playwright.
 2. **Read the references** before writing the script:
     - `references/playwright-harness.md` — mock contract, viewport
       matrix, traps, skeleton script. Use the recipe verbatim.
