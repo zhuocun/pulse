@@ -83,6 +83,12 @@ TABLE_FIELDS = {
         "assigneeIds",
         # Sub-tasks: the ``_id`` of the parent task (null / empty = top-level).
         "parentTaskId",
+        # Prerequisites: a ``list[str]`` of same-project task ids this task is
+        # blocked by (the tasks that must be done first). Default ``[]``;
+        # validated by ``task_service._depends_on_error`` to exist, stay
+        # in-project, exclude self, and remain ACYCLIC (a DAG of arbitrary
+        # depth -- distinct from the one-level ``parentTaskId`` tree).
+        "dependsOn",
         # Urgency/importance: one of ``"none"`` / ``"low"`` / ``"medium"`` /
         # ``"high"`` / ``"urgent"``. Default ``"none"``; validated by
         # ``task_service._priority_error`` against the five-member enum. A

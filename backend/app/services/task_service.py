@@ -27,6 +27,7 @@ _TASK_UPDATE_FIELDS = frozenset(
         "labelIds",
         "assigneeIds",
         "parentTaskId",
+        "dependsOn",
         "priority",
     }
 )
@@ -36,8 +37,12 @@ _TASK_UPDATE_FIELDS = frozenset(
 # so a bulk edit can never move a task between columns/projects (those
 # go through ``reorder`` / single ``update`` where index re-packing and
 # project re-validation happen). ``index`` is repository-managed and was
-# never in ``_TASK_UPDATE_FIELDS`` to begin with.
-_BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {"columnId", "projectId"}
+# never in ``_TASK_UPDATE_FIELDS`` to begin with. ``dependsOn`` is also
+# excluded (AC-W5): fanning one prerequisite set across many tasks is
+# almost always wrong and makes the per-task cycle check ambiguous (the
+# same edge added to N tasks could close a cycle for some and not others),
+# so dependency edges are set one task at a time via single ``update``.
+_BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {"columnId", "projectId", "dependsOn"}
 
 
 def _same_project(*items: Dict[str, Any]) -> bool:
@@ -155,6 +160,72 @@ def _parent_task_error(
     return None
 
 
+def _depends_on_error(
+    data: Dict[str, Any],
+    project_id: Optional[str],
+    task_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Validate ``dependsOn`` (the prerequisite edge-list) for one task.
+
+    Present-only, like ``_priority_error`` / ``_parent_task_error``: skipped
+    unless the key is sent. The value must be a ``list`` of ``str`` task ids;
+    each id must reference a task that EXISTS in the SAME ``project_id`` and
+    must not be the task ITSELF (no self-dependency, checked only when
+    ``task_id`` is known). ``dependsOn`` is a DAG (arbitrary depth, distinct
+    from the one-level ``parentTaskId`` tree), so adding ``task_id -> d`` for
+    each ``d`` must keep the graph ACYCLIC (AC-W4): the cycle guard only runs
+    when ``task_id`` is not None because a brand-new task on create has no
+    inbound edges yet, so no cycle is reachable. Returns the FIRST error found
+    (single ``body_error``, matching the other validators' shape) or ``None``
+    when every id passes."""
+
+    if "dependsOn" not in data:
+        return None
+    depends_on = data.get("dependsOn")
+    if not isinstance(depends_on, list) or any(
+        not isinstance(item, str) for item in depends_on
+    ):
+        return body_error(data, "dependsOn", "dependsOn must be a list of task ids")
+
+    # Shape + existence/same-project + self checks per id (cheap, no scan).
+    for dependency_id in depends_on:
+        if task_id is not None and str(dependency_id) == str(task_id):
+            return body_error(
+                data, "dependsOn", "A task cannot depend on itself"
+            )
+        dependency = repository.find_by_id(TASKS, str(dependency_id))
+        if dependency is None or str(dependency.get("projectId")) != str(project_id):
+            return body_error(
+                data, "dependsOn", "Dependency must exist in the same project"
+            )
+
+    # Cycle guard: only meaningful once the task exists and can be reached.
+    # Build the project's ``dependsOn`` graph once via a single exact-equality
+    # scan (FakeStore/Mongo accept ``{"projectId": ...}``; no operator dicts).
+    # Adding ``task_id -> d`` closes a cycle iff ``d`` already (transitively)
+    # depends on ``task_id``, so DFS from each ``d`` along ``dependsOn`` and
+    # reject if ``task_id`` is reachable. A visited set bounds the walk.
+    if task_id is not None:
+        graph = {
+            str(task["_id"]): [str(edge) for edge in (task.get("dependsOn") or [])]
+            for task in repository.find_many(TASKS, {"projectId": project_id})
+        }
+        for dependency_id in depends_on:
+            stack = [str(dependency_id)]
+            visited: set[str] = set()
+            while stack:
+                current = stack.pop()
+                if current == str(task_id):
+                    return body_error(
+                        data, "dependsOn", "Dependency cycle detected"
+                    )
+                if current in visited:
+                    continue
+                visited.add(current)
+                stack.extend(graph.get(current, []))
+    return None
+
+
 def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     errors = _metadata_errors(data)
     if "storyPoints" in data:
@@ -167,6 +238,11 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     error = _parent_task_error(data, data.get("projectId"))
     if error is not None:
         errors.append(error)
+    # ``task_id`` is None: a not-yet-created task has no inbound edges, so this
+    # only enforces existence/same-project/shape -- no cycle is possible yet.
+    depends_on_error = _depends_on_error(data, data.get("projectId"))
+    if depends_on_error is not None:
+        errors.append(depends_on_error)
     return errors
 
 
@@ -219,6 +295,9 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             "labelIds": data.get("labelIds") or [],
             "assigneeIds": data.get("assigneeIds") or [],
             "parentTaskId": data.get("parentTaskId") or None,
+            # Prerequisite edge-list defaults to empty so every reader sees a
+            # uniform shape; a validated non-empty list (AC-W4) overrides it.
+            "dependsOn": data.get("dependsOn") or [],
             # Urgency defaults to ``"none"`` so every reader sees a uniform
             # shape; a validated non-default value (PRD §3.2) overrides it.
             "priority": data.get("priority") or "none",
@@ -350,6 +429,14 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     parent_error = _parent_task_error(data, project_id, task_id)
     if parent_error is not None:
         validation_errors([parent_error])
+
+    # ``dependsOn`` likewise needs the resolved project + the task's own id
+    # (for the self-edge and cycle guards), so it is validated here -- not in
+    # the stateless ``update_validation_errors`` -- and raises a 400 before the
+    # write on a self/cross-project/non-existent/cyclic dependency.
+    dep_error = _depends_on_error(data, project_id, task_id)
+    if dep_error is not None:
+        validation_errors([dep_error])
 
     payload = {key: value for key, value in data.items() if key in _TASK_UPDATE_FIELDS}
     # completedAt is server-managed (PRD 5.3 / AC-W8) and never client-written:
