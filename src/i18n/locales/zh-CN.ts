@@ -310,6 +310,7 @@ const zhCN: Dictionary = {
         assignees: "负责人员",
         column: "列",
         coordinator: "协调人",
+        dependsOn: "依赖于",
         dueDate: "截止日期",
         email: "邮箱",
         epic: "史诗",
@@ -343,6 +344,7 @@ const zhCN: Dictionary = {
         selectPriority: "请选择优先级",
         selectStoryPoints: "请选择故事点",
         selectAssignees: "请选择负责人员",
+        selectDependencies: "选择前置任务",
         selectLabels: "请选择标签",
         selectParentTask: "请选择父任务",
         selectStartDate: "请选择开始日期",
@@ -557,7 +559,8 @@ const zhCN: Dictionary = {
         removedByOthersTitle: "此任务已被其他更改移除。",
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
         discardEdits: "丢弃更改",
-        aiAssistLabel: "AI 辅助"
+        aiAssistLabel: "AI 辅助",
+        blocksLabel: "阻塞"
     },
     taskCard: {
         overdue: "已逾期",

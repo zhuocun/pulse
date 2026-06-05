@@ -350,6 +350,7 @@ export const enSource = {
         assignees: "Assignees",
         column: "Column",
         coordinator: "Coordinator",
+        dependsOn: "Depends on",
         dueDate: "Due date",
         email: "Email",
         epic: "Epic",
@@ -383,6 +384,7 @@ export const enSource = {
         selectPriority: "Select a priority",
         selectStoryPoints: "Select story points",
         selectAssignees: "Select assignees",
+        selectDependencies: "Select prerequisite tasks",
         selectLabels: "Select labels",
         selectParentTask: "Select a parent task",
         selectStartDate: "Select a start date",
@@ -668,7 +670,8 @@ export const enSource = {
         removedByOthersBody:
             "Your edits are still here. Discard them or save them as a new task to keep them.",
         discardEdits: "Discard edits",
-        aiAssistLabel: "AI assist"
+        aiAssistLabel: "AI assist",
+        blocksLabel: "Blocks"
     },
     taskCard: {
         /** Visible chip text on an overdue card (paired with an icon, not colour-only). */

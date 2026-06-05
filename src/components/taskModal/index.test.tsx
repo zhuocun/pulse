@@ -1338,4 +1338,158 @@ describe("TaskModal", () => {
             expect(screen.getByDisplayValue("2026-03-15")).toBeInTheDocument();
         });
     });
+
+    // ── FE-3 dependency editor (PRD §4.5) ────────────────────────────────
+    describe("dependency editor (dependsOn + read-only Blocks)", () => {
+        const lastPutBody = () => {
+            const putCall = fetchMock.mock.calls.find(
+                ([, init]) =>
+                    (init as RequestInit | undefined)?.method === "PUT"
+            );
+            return JSON.parse(
+                (putCall?.[1] as RequestInit)?.body as string
+            ) as Record<string, unknown>;
+        };
+
+        it("seeds the dependsOn multi-select with the task's current prerequisites and sends an edited value in the PUT body", async () => {
+            // task-1 already depends on task-2 ("Fix bug"); a third task is
+            // added so there is something else to pick.
+            renderModal({
+                initialTasks: [
+                    task({ dependsOn: ["task-2"] }),
+                    task({ _id: "task-2", taskName: "Fix bug", type: "Bug" }),
+                    task({ _id: "task-3", taskName: "Write docs" })
+                ]
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The seeded prerequisite renders as a selected tag inside the
+            // "Depends on" control (not merely as an option in the dropdown).
+            const dependsOnCombobox = screen.getByRole("combobox", {
+                name: /depends on/i
+            });
+            const dependsOnControl = dependsOnCombobox.closest(
+                ".ant-select"
+            ) as HTMLElement;
+            expect(
+                within(dependsOnControl).getByText("Fix bug")
+            ).toBeInTheDocument();
+
+            // Add a second prerequisite and save.
+            fireEvent.mouseDown(dependsOnCombobox);
+            fireEvent.click(await screen.findByText("Write docs"));
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body._id).toBe("task-1");
+            expect(body.dependsOn).toEqual(["task-2", "task-3"]);
+        });
+
+        it("surfaces a backend 400 (cycle) on save and keeps the modal open", async () => {
+            // The backend rejects a self / cross-project / cycle-forming
+            // dependency edit with a 400 `{ error: … }`; the existing
+            // ErrorBox path must render it without closing the modal.
+            fetchMock.mockReset();
+            fetchMock.mockResolvedValue(
+                response({ error: "Dependency cycle detected" }, false)
+            );
+            renderModal({
+                initialTasks: [
+                    task(),
+                    task({ _id: "task-2", taskName: "Fix bug", type: "Bug" })
+                ]
+            });
+            await screen.findByDisplayValue("Build task");
+
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /depends on/i })
+            );
+            fireEvent.click(await screen.findByText("Fix bug"));
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    screen.getByText(/dependency cycle detected/i)
+                ).toBeInTheDocument()
+            );
+            // Modal stays open so the user can correct the edit.
+            expect(store.getState().overlays.editingTaskId).toBe("task-1");
+        });
+
+        it("renders the read-only Blocks list for tasks that depend on this one", async () => {
+            // task-2 lists task-1 among its prerequisites, so the inverse
+            // (computed client-side) shows task-2 under "Blocks" when editing
+            // task-1.
+            renderModal({
+                initialTasks: [
+                    task(),
+                    task({
+                        _id: "task-2",
+                        taskName: "Fix bug",
+                        type: "Bug",
+                        dependsOn: ["task-1"]
+                    })
+                ]
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The "Blocks" section header renders…
+            const blocksLabel = screen.getByText("Blocks");
+            expect(blocksLabel).toBeInTheDocument();
+            // …and the dependent task is listed as a read-only chip beneath it.
+            const blocksItem = blocksLabel.closest(".ant-form-item");
+            expect(blocksItem).not.toBeNull();
+            expect(
+                within(blocksItem as HTMLElement).getByText("Fix bug")
+            ).toBeInTheDocument();
+        });
+
+        it("clearing all dependencies sends dependsOn: [] so the backend removes the edges", async () => {
+            // Regression guard: a cleared multi-select must reach the wire as
+            // an empty array (not be dropped), or the backend keeps the stale
+            // edges and the "clear" silently no-ops.
+            renderModal({
+                initialTasks: [
+                    task({ dependsOn: ["task-2"] }),
+                    task({ _id: "task-2", taskName: "Fix bug", type: "Bug" })
+                ]
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // Remove the only selected prerequisite tag ("Fix bug") so the
+            // dependsOn value becomes [].
+            const dependsOnControl = screen
+                .getByRole("combobox", { name: /depends on/i })
+                .closest(".ant-select") as HTMLElement;
+            const removeTag = dependsOnControl.querySelector(
+                ".ant-select-selection-item-remove"
+            );
+            expect(removeTag).not.toBeNull();
+            fireEvent.click(removeTag as Element);
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body._id).toBe("task-1");
+            // The cleared value reaches the wire as [] (not dropped), so the
+            // backend removes the dependency edges.
+            expect(body.dependsOn).toEqual([]);
+        });
+    });
 });

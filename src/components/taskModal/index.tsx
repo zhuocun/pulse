@@ -138,6 +138,11 @@ const taskToFormValues = (task: ITask): TaskFormValues => ({
     ...task,
     startDate: toDayjsOrUndefined(task.startDate),
     dueDate: toDayjsOrUndefined(task.dueDate)
+    // `dependsOn` is seeded by the `...task` spread above (same as
+    // `labelIds` / `assigneeIds`): an absent value stays `undefined` (which
+    // `filterRequest` strips on both sides of the dirty-check, so an
+    // untouched task fires no needless PUT), while an explicit cleared `[]`
+    // is kept and reaches the wire so the backend removes the edges.
 });
 
 /**
@@ -162,6 +167,7 @@ const normalizeDateFields = (
 
 type TaskModalField =
     | "coordinatorId"
+    | "dependsOn"
     | "epic"
     | "note"
     | "storyPoints"
@@ -174,7 +180,8 @@ const TASK_MODAL_FIELDS: readonly TaskModalField[] = [
     "type",
     "epic",
     "coordinatorId",
-    "storyPoints"
+    "storyPoints",
+    "dependsOn"
 ];
 
 const isTaskModalField = (field: string): field is TaskModalField =>
@@ -360,6 +367,37 @@ const TaskModal: React.FC<{
         () =>
             (tasks ?? [])
                 .filter((candidate) => candidate._id !== editingTaskId)
+                .map((candidate) => ({
+                    label: candidate.taskName,
+                    value: candidate._id
+                })),
+        [tasks, editingTaskId]
+    );
+    // Dependency options (PRD §4.5): the same-project tasks this one may
+    // depend on — every OTHER task (a task can't depend on itself). Mirrors
+    // `parentTaskOptions`; the backend rejects a self / cross-project /
+    // cycle-forming edit with a 400 that surfaces through `ErrorBox`.
+    const dependencyOptions = useMemo(
+        () =>
+            (tasks ?? [])
+                .filter((candidate) => candidate._id !== editingTaskId)
+                .map((candidate) => ({
+                    label: candidate.taskName,
+                    value: candidate._id
+                })),
+        [tasks, editingTaskId]
+    );
+    // Inverse of `dependsOn`, computed client-side from the project task
+    // list: the tasks that list THIS task among their prerequisites — i.e.
+    // the tasks this one blocks. Read-only; nothing here is persisted.
+    const blocksOptions = useMemo(
+        () =>
+            (tasks ?? [])
+                .filter(
+                    (candidate) =>
+                        Array.isArray(candidate.dependsOn) &&
+                        candidate.dependsOn.includes(editingTaskId as string)
+                )
                 .map((candidate) => ({
                     label: candidate.taskName,
                     value: candidate._id
@@ -897,6 +935,50 @@ const TaskModal: React.FC<{
                     showSearch
                 />
             </Form.Item>
+            {/*
+             * Dependency editor (PRD §4.5). Distinct from `parentTaskId`
+             * (containment): `dependsOn` is the set of prerequisite tasks
+             * that must finish before this one — an ordering edge. Rides the
+             * same `merged` → `tasks` PUT as every other field (no separate
+             * write path); a self / cross-project / cycle-forming edit is
+             * rejected by the backend with a 400 that `ErrorBox` surfaces.
+             */}
+            <Form.Item label={microcopy.fields.dependsOn} name="dependsOn">
+                <Select
+                    allowClear
+                    mode="multiple"
+                    onClear={() => form.setFieldsValue({ dependsOn: [] })}
+                    optionFilterProp="label"
+                    options={dependencyOptions}
+                    placeholder={microcopy.placeholders.selectDependencies}
+                />
+            </Form.Item>
+            {/*
+             * Read-only inverse: the tasks that depend on THIS one (computed
+             * client-side from the project list, not persisted). Shown only
+             * when something actually blocks on this task, rendered as the
+             * same `Tag` idiom the label/title chips use.
+             */}
+            {blocksOptions.length > 0 ? (
+                <Form.Item label={microcopy.taskModal.blocksLabel}>
+                    <div
+                        style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: space.xxs
+                        }}
+                    >
+                        {blocksOptions.map((option) => (
+                            <Tag
+                                key={option.value}
+                                style={{ marginInlineEnd: 0 }}
+                            >
+                                {option.label}
+                            </Tag>
+                        ))}
+                    </div>
+                </Form.Item>
+            ) : null}
             {environment.aiGhostTextEnabled && aiEnabled && boardAiOn ? (
                 <CopilotPrivacyDisclosure
                     onAcknowledge={() => {
