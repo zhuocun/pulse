@@ -76,7 +76,7 @@ escalation), both fixed before landing.
 - [x] Persisted done-category on `columns` (done-ness source of truth) — `46d6798c`
 - [x] Task `priority` enum + board badge + lens chips — `9e4691de`
 - [x] Lifecycle — `completedAt` auto-stamp on tasks (server-managed; done-category transitions on create/update/reorder) — `8268c533`
-- [ ] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude (WMD-L2)
+- [x] Lifecycle — task archive/trash soft-delete + restore/archive endpoints + `GET /tasks` default-exclude — `68553cbb`
 - [ ] Lifecycle — project archive/trash soft-delete + restore/archive + `GET /projects` default-exclude (WMD-L3)
 - [ ] Dependencies / derived `blockedBy` + move-to-done gate
 - [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
@@ -108,6 +108,10 @@ slice that consumes it.
   ROLE_EDITOR)`).
 - `memberIds` returned in `GET /projects`. Consider a derived `myRole`
   field during FE integration instead of the raw list.
+- Reorder/board ordering does not exclude soft-deleted/archived tasks, so a
+  trashed task still occupies an `index` slot (benign — no corruption, since
+  soft-delete skips the re-pack). Revisit when the trash/board views land
+  (WMD-L2 reviewer note).
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable
