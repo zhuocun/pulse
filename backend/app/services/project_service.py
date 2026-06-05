@@ -15,7 +15,12 @@ from app.validation import clean_filter
 # working) but ``createdAt`` / ``updatedAt`` must never be reassigned
 # from a request body. ``memberIds`` is managed exclusively through the
 # dedicated member endpoints, never via a raw PUT body.
-_PROJECT_UPDATE_FIELDS = frozenset({"projectName", "organization", "managerId"})
+# ``enforceDependencyGate`` (optional ``bool``, default-ON when absent) lets
+# a manager toggle the §4.3 dependency move-to-done gate via this PUT; it is
+# deliberately NOT written on create, so absent means the gate is ON.
+_PROJECT_UPDATE_FIELDS = frozenset(
+    {"projectName", "organization", "managerId", "enforceDependencyGate"}
+)
 
 # Role-based access control. Roles are totally ordered (owner > editor >
 # viewer > guest); a gate expressed as ``min_role`` passes for any role

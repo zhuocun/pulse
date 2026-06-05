@@ -34,6 +34,12 @@ TABLE_FIELDS = {
         # tripping the field allowlist. Whitelisting a field never forces
         # it onto a document, so existing project behaviour is unchanged.
         "organizationId",
+        # Optional ``bool``: default-ON when absent. Only an explicit
+        # ``False`` disables the §4.3 dependency move-to-done gate for the
+        # project (``task_service._dependency_gate_blocks``). A manager may
+        # toggle it via PUT /projects (see ``_PROJECT_UPDATE_FIELDS``); it is
+        # never written on create, so an absent value keeps the gate ON.
+        "enforceDependencyGate",
         # Soft-archive / soft-delete (trash) markers (PRD §5.4 / §5.5):
         # tz-aware ``datetime`` (serialized to ISO on read) or ``null``.
         # ``null`` means active; ``archivedAt`` set hides the project from

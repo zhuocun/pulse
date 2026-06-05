@@ -83,6 +83,8 @@ def update_task(
         api_error(status.HTTP_404_NOT_FOUND, "Task not found")
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
+    if result == "Blocked by dependencies":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
     return result
 
 
@@ -170,4 +172,6 @@ def reorder_tasks(
         api_error(status.HTTP_400_BAD_REQUEST, "Bad request")
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
+    if result == "Blocked by dependencies":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
     return result

@@ -226,6 +226,38 @@ def _depends_on_error(
     return None
 
 
+def _dependency_gate_blocks(
+    depends_on: Optional[List[Any]],
+    project_id: Optional[str],
+    source_column: Optional[Dict[str, Any]],
+    target_column: Optional[Dict[str, Any]],
+    force: bool,
+) -> bool:
+    """True if a move should be gated: entering a done column (source not
+    done, target done) while >=1 prerequisite in ``depends_on`` is unfinished
+    (its own column is not done), the project's gate is not disabled, and the
+    caller did not pass ``force``. PRD work-management-depth §4.3 / AC-W6."""
+    if force:
+        return False
+    if (target_column or {}).get("category") != "done":
+        return False                       # not moving into a done column
+    if (source_column or {}).get("category") == "done":
+        return False                       # already done -> not a transition
+    project = repository.find_by_id(PROJECTS, str(project_id or ""))
+    if project is not None and project.get("enforceDependencyGate") is False:
+        return False                       # gate explicitly disabled for project
+    for dependency_id in depends_on or []:
+        dependency = repository.find_by_id(TASKS, str(dependency_id))
+        if dependency is None:
+            continue                       # dangling prerequisite -> ignore
+        dependency_column = repository.find_by_id(
+            COLUMNS, str(dependency.get("columnId") or "")
+        )
+        if (dependency_column or {}).get("category") != "done":
+            return True                    # an unfinished prerequisite blocks the move
+    return False
+
+
 def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     errors = _metadata_errors(data)
     if "storyPoints" in data:
@@ -438,6 +470,19 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     if dep_error is not None:
         validation_errors([dep_error])
 
+    # Dependency move-to-done gate (PRD §4.3 / AC-W6): reject a move INTO a
+    # done column while an unfinished prerequisite remains, unless ``force``
+    # is sent or the project disabled the gate. ``column`` is the already
+    # resolved TARGET column; ``effective_depends_on`` honors a simultaneous
+    # ``dependsOn`` change in the same PUT (the validated value just checked
+    # above) rather than the stale stored edges.
+    source_column = repository.find_by_id(COLUMNS, str(task.get("columnId") or ""))
+    effective_depends_on = data.get("dependsOn", task.get("dependsOn"))
+    if _dependency_gate_blocks(
+        effective_depends_on, project_id, source_column, column, bool(data.get("force"))
+    ):
+        return "Blocked by dependencies"
+
     payload = {key: value for key, value in data.items() if key in _TASK_UPDATE_FIELDS}
     # completedAt is server-managed (PRD 5.3 / AC-W8) and never client-written:
     # set it AFTER the allowlist filter (so a client-sent ``completedAt`` in the
@@ -586,6 +631,20 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
         and str(reference_task.get("columnId")) != str(reference_column_id)
     ):
         return None
+
+    # Dependency move-to-done gate (PRD §4.3 / AC-W6): reject a drag INTO a
+    # done column while an unfinished prerequisite remains, unless ``force``
+    # is sent or the project disabled the gate. ``from_column`` is the source
+    # and ``reference_column`` the destination (matching the L1 destination
+    # resolution); a within-done reorder is NOT gated (source already done).
+    if _dependency_gate_blocks(
+        from_task.get("dependsOn"),
+        from_task.get("projectId"),
+        from_column,
+        reference_column,
+        bool(data.get("force")),
+    ):
+        return "Blocked by dependencies"
 
     from_column_tasks = repository.find_many(TASKS, {"columnId": from_column_id})
     reference_column_tasks = repository.find_many(
