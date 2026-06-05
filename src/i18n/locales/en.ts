@@ -767,6 +767,34 @@ export const enSource = {
         relativeOneDay: "1 day ago",
         relativeDays: "{count} days ago"
     },
+    /*
+     * Task comments + @mentions (M4 — backend Collaboration feature).
+     * The thread mounts inside the task modal: a list of comments plus a
+     * composer with a member-mention picker. A mention produces a
+     * `notifications` row for each valid mentioned member, which is why
+     * this surface is the producer the notification bell consumes. Button
+     * verbs reuse `actions.*` (edit / delete / save / cancel); only the
+     * comments-specific labels, aria-names, and error copy live here.
+     */
+    comments: {
+        heading: "Comments",
+        empty: "No comments yet. Start the conversation.",
+        placeholder: "Write a comment…",
+        mentionLabel: "Mention",
+        mentionPlaceholder: "Mention teammates",
+        post: "Post comment",
+        posting: "Posting…",
+        deleteConfirmTitle: "Delete this comment?",
+        listAriaLabel: "Comments",
+        editAriaLabel: "Edit comment",
+        deleteAriaLabel: "Delete comment",
+        loadError: "Couldn't load comments. Please try again.",
+        postError: "Couldn't post your comment. Please try again.",
+        editError: "Couldn't save your changes. Please try again.",
+        deleteError: "Couldn't delete the comment. Please try again.",
+        you: "You",
+        unknownAuthor: "Unknown user"
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",

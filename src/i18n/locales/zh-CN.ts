@@ -628,6 +628,25 @@ const zhCN: Dictionary = {
         relativeOneDay: "1 天前",
         relativeDays: "{count} 天前"
     },
+    comments: {
+        heading: "评论",
+        empty: "暂无评论。来发表第一条吧。",
+        placeholder: "写下评论…",
+        mentionLabel: "提及",
+        mentionPlaceholder: "提及团队成员",
+        post: "发表评论",
+        posting: "发表中…",
+        deleteConfirmTitle: "确认删除此评论?",
+        listAriaLabel: "评论",
+        editAriaLabel: "编辑评论",
+        deleteAriaLabel: "删除评论",
+        loadError: "无法加载评论,请重试。",
+        postError: "无法发表评论,请重试。",
+        editError: "无法保存更改,请重试。",
+        deleteError: "无法删除评论,请重试。",
+        you: "你",
+        unknownAuthor: "未知用户"
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
