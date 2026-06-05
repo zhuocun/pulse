@@ -27,6 +27,13 @@ TABLE_FIELDS = {
         # pre-existing manager-only project docs keep deserializing; the
         # ``managerId`` is always treated as owner-level regardless.
         "memberIds",
+        # Owning tenant (see ORGANIZATIONS). Not yet written by any
+        # project flow -- registered now only so the organization
+        # service's forward-compat delete guard can run its
+        # ``find_many(PROJECTS, {"organizationId": ...})`` lookup without
+        # tripping the field allowlist. Whitelisting a field never forces
+        # it onto a document, so existing project behaviour is unchanged.
+        "organizationId",
         "createdAt",
         "updatedAt",
     },
@@ -103,6 +110,20 @@ TABLE_FIELDS = {
         "projectId",
         "summary",
         "isRead",
+        "createdAt",
+        "updatedAt",
+    },
+    database.ORGANIZATIONS: {
+        "_id",
+        "name",
+        # Globally-unique public handle for the tenant.
+        "slug",
+        # Org RBAC membership: a list of ``{"userId": str, "role": str}``
+        # objects (roles: org_owner > org_admin > member). Managed only
+        # through the dedicated member endpoints, never a raw PUT body.
+        "members",
+        # Free-form tenant settings blob (opaque to the service today).
+        "settings",
         "createdAt",
         "updatedAt",
     },

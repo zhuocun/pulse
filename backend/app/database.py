@@ -17,6 +17,7 @@ TASKS = "tasks"
 LABELS = "labels"
 COMMENTS = "comments"
 NOTIFICATIONS = "notifications"
+ORGANIZATIONS = "organizations"
 AGENT_MUTATION_JOURNAL = "agent_mutation_journal"
 # Schema-less collection owned by :mod:`app.system_config` -- the
 # canonical row today is ``{_id: "jwt_secret", value: <hex>}``; Mongo's
@@ -39,6 +40,11 @@ def ensure_indexes() -> None:
     collection(AGENT_MUTATION_JOURNAL).create_index(
         [("user_id", 1), ("proposal_id", 1)], unique=True
     )
+    # Tenant slug is the public org handle and must be globally unique;
+    # the membership index keeps the "orgs I belong to" scan (which today
+    # filters in Python) cheap once it moves server-side.
+    collection(ORGANIZATIONS).create_index("slug", unique=True)
+    collection(ORGANIZATIONS).create_index("members.userId")
 
 
 def collection(name: str) -> Collection:

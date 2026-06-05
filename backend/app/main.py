@@ -36,6 +36,7 @@ from app.routers import (
     health,
     labels,
     notifications,
+    organizations,
     projects,
     tasks,
     users,
@@ -758,6 +759,9 @@ def legacy_health(request: Request) -> Dict[str, Any]:
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(
+    organizations.router, prefix="/api/v1/organizations", tags=["organizations"]
+)
 app.include_router(boards.router, prefix="/api/v1/boards", tags=["boards"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(labels.router, prefix="/api/v1/labels", tags=["labels"])

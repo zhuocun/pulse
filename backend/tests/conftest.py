@@ -15,6 +15,7 @@ from app.database import (
     COMMENTS,
     LABELS,
     NOTIFICATIONS,
+    ORGANIZATIONS,
     PROJECTS,
     TASKS,
     USERS,
@@ -29,6 +30,7 @@ from app.services import (
     comment_service,
     label_service,
     notification_service,
+    organization_service,
     project_service,
     task_service,
     user_service,
@@ -102,6 +104,7 @@ SERVICE_MODULES = [
     comment_service,
     label_service,
     notification_service,
+    organization_service,
     project_service,
     task_service,
     user_service,
@@ -124,6 +127,7 @@ class FakeStore:
             LABELS: [],
             COMMENTS: [],
             NOTIFICATIONS: [],
+            ORGANIZATIONS: [],
             # ``system_config`` is the schema-less collection owned by
             # :mod:`app.system_config` (persisted JWT secret etc.) -- it
             # has no per-table field allowlist and uses sentinel string
