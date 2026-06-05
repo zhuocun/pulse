@@ -630,3 +630,154 @@ def test_bulk_update_mixed_project_is_forbidden(
     assert response.status_code == 403
     assert get_tasks(client, owner_a["jwt"], project_a)[0].get("dueDate") in (None, "")
     assert get_tasks(client, owner_b["jwt"], project_b)[0].get("dueDate") in (None, "")
+
+
+# ---------------------------------------------------------------------------
+# Task priority (PRD §3, AC-W1 / AC-W2): an additive enum on tasks.
+# ---------------------------------------------------------------------------
+
+
+def test_priority_defaults_to_none(client: TestClient, store: FakeStore) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+
+    # A create that omits ``priority`` lands the ``"none"`` default so every
+    # reader (card badge, lens) sees a uniform shape (PRD §3.2 / AC-W1).
+    assert (
+        create_task(
+            client, owner["jwt"], project_id, column["_id"], owner["_id"]
+        ).status_code
+        == 201
+    )
+    task = get_tasks(client, owner["jwt"], project_id)[0]
+    assert task["priority"] == "none"
+
+
+def test_priority_accepted_on_create_and_update(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+
+    # Every enum value is accepted on create.
+    created = create_task(
+        client,
+        owner["jwt"],
+        project_id,
+        column["_id"],
+        owner["_id"],
+        priority="high",
+    )
+    assert created.status_code == 201, created.text
+    task = get_tasks(client, owner["jwt"], project_id)[0]
+    assert task["priority"] == "high"
+
+    # PUT can move it across the enum (PRD AC-W2 — settable via PUT /tasks).
+    update = client.put(
+        "/api/v1/tasks/",
+        json={
+            "_id": task["_id"],
+            "projectId": project_id,
+            "columnId": column["_id"],
+            "coordinatorId": owner["_id"],
+            "taskName": task["taskName"],
+            "type": "Task",
+            "storyPoints": 1,
+            "priority": "urgent",
+        },
+        headers=auth_headers(owner["jwt"]),
+    )
+    assert update.status_code == 200, update.text
+    assert get_tasks(client, owner["jwt"], project_id)[0]["priority"] == "urgent"
+
+
+def test_invalid_priority_rejected_on_create_and_update(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+
+    # A value outside the five-member enum is a 400 on create (AC-W1).
+    bad_create = create_task(
+        client,
+        owner["jwt"],
+        project_id,
+        column["_id"],
+        owner["_id"],
+        priority="critical",
+    )
+    assert bad_create.status_code == 400, bad_create.text
+
+    # ...and on update.
+    create_task(client, owner["jwt"], project_id, column["_id"], owner["_id"])
+    task = get_tasks(client, owner["jwt"], project_id)[0]
+    bad_update = client.put(
+        "/api/v1/tasks/",
+        json={
+            "_id": task["_id"],
+            "projectId": project_id,
+            "columnId": column["_id"],
+            "coordinatorId": owner["_id"],
+            "taskName": task["taskName"],
+            "type": "Task",
+            "storyPoints": 1,
+            "priority": "CRITICAL",
+        },
+        headers=auth_headers(owner["jwt"]),
+    )
+    assert bad_update.status_code == 400, bad_update.text
+    # The rejected update did not mutate the stored priority.
+    assert get_tasks(client, owner["jwt"], project_id)[0]["priority"] == "none"
+
+
+def test_priority_is_bulk_settable(client: TestClient, store: FakeStore) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+
+    for name in ("T1", "T2"):
+        create_task(
+            client,
+            owner["jwt"],
+            project_id,
+            column["_id"],
+            owner["_id"],
+            taskName=name,
+        )
+    target_ids = [task["_id"] for task in get_tasks(client, owner["jwt"], project_id)]
+    assert len(target_ids) == 2
+
+    # ``priority`` joins ``_BULK_CHANGE_FIELDS`` (PRD AC-W2): a fan-out edit
+    # sets it across many tasks at once.
+    response = client.put(
+        "/api/v1/tasks/bulk",
+        json={"taskIds": target_ids, "changes": {"priority": "medium"}},
+        headers=auth_headers(owner["jwt"]),
+    )
+    assert response.status_code == 200, response.text
+    refreshed = {task["_id"]: task for task in get_tasks(client, owner["jwt"], project_id)}
+    for task_id in target_ids:
+        assert refreshed[task_id]["priority"] == "medium"
+
+
+def test_bulk_update_rejects_invalid_priority(
+    client: TestClient, store: FakeStore
+) -> None:
+    owner = register_and_login(client, "owner", "owner@example.com")
+    project_id = create_project(client, owner["jwt"])
+    column = first_column(client, owner["jwt"], project_id)
+    create_task(client, owner["jwt"], project_id, column["_id"], owner["_id"])
+    task = get_tasks(client, owner["jwt"], project_id)[0]
+
+    # Bulk is not a back door around the enum validator (AC-W1 + AC-W2).
+    response = client.put(
+        "/api/v1/tasks/bulk",
+        json={"taskIds": [task["_id"]], "changes": {"priority": "sky-high"}},
+        headers=auth_headers(owner["jwt"]),
+    )
+    assert response.status_code == 400, response.text
+    # The rejected bulk edit left the default untouched.
+    assert get_tasks(client, owner["jwt"], project_id)[0]["priority"] == "none"

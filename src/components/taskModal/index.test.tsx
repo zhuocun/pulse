@@ -1125,6 +1125,59 @@ describe("TaskModal", () => {
             expect(screen.getByText("Parent task")).toBeInTheDocument();
         });
 
+        it("renders the priority Select with the localized enum options", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The Form.Item surfaces its "Priority" label…
+            expect(screen.getByText("Priority")).toBeInTheDocument();
+
+            // …and opening the Select lists the localized enum options.
+            const prioritySelect = screen.getByRole("combobox", {
+                name: /priority/i
+            });
+            fireEvent.mouseDown(prioritySelect);
+            expect(
+                (await screen.findAllByText("Urgent")).length
+            ).toBeGreaterThan(0);
+            expect((await screen.findAllByText("High")).length).toBeGreaterThan(
+                0
+            );
+        });
+
+        it("includes the chosen priority in the PUT payload on save", async () => {
+            renderModal({
+                labels: labelFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /priority/i })
+            );
+            fireEvent.click(await screen.findByText("Urgent"));
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            expect(lastPutBody()).toEqual(
+                expect.objectContaining({
+                    _id: "task-1",
+                    priority: "urgent"
+                })
+            );
+        });
+
         it("offers project labels in the label picker (name + colour source)", async () => {
             renderModal({
                 labels: labelFixtures,

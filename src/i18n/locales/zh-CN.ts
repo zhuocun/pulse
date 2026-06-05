@@ -155,6 +155,7 @@ const zhCN: Dictionary = {
         applyReadinessSuggestion: "应用 {field} 的就绪建议",
         lensChips: "看板视图",
         lensComingSoon: "敬请期待",
+        priorityTask: "优先级:{priority}",
         overdueTask: "已逾期 — 截止于 {date}",
         renameTask: "重命名任务",
         columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
@@ -317,6 +318,7 @@ const zhCN: Dictionary = {
         organization: "组织",
         parentTask: "父任务",
         password: "密码",
+        priority: "优先级",
         projectName: "项目名称",
         startDate: "开始日期",
         storyPoints: "故事点",
@@ -337,6 +339,7 @@ const zhCN: Dictionary = {
         selectCoordinator: "请选择协调人",
         selectType: "请选择类型",
         selectManager: "请选择负责人",
+        selectPriority: "请选择优先级",
         selectStoryPoints: "请选择故事点",
         selectAssignees: "请选择负责人员",
         selectLabels: "请选择标签",
@@ -370,6 +373,15 @@ const zhCN: Dictionary = {
             todo: "待办",
             in_progress: "进行中",
             done: "已完成"
+        },
+        // 任务优先级枚举标签(PRD §3)。以存储的 `TaskPriorityLevel` 值为键,
+        // 任务弹窗的选择器与卡片徽标读取同一字典;`none` 为默认值且不渲染徽标。
+        priorities: {
+            none: "无",
+            low: "低",
+            medium: "中",
+            high: "高",
+            urgent: "紧急"
         }
     },
     counts: {
@@ -423,10 +435,14 @@ const zhCN: Dictionary = {
         today: "今天",
         thisWeek: "本周",
         mine: "我的",
+        highPriority: "高优先级",
+        urgent: "紧急",
         atRisk: "存在风险",
         todayTooltip: "今天到期的任务",
         thisWeekTooltip: "本周内（周一至周日）到期的任务",
         mineTooltip: "你作为协调人的任务",
+        highPriorityTooltip: "高或紧急优先级的任务",
+        urgentTooltip: "紧急优先级的任务",
         atRiskTooltip: "AI 标记为高或中风险的任务",
         comingSoonBadge: "敬请期待"
     },

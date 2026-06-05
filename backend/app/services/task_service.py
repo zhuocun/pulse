@@ -27,6 +27,7 @@ _TASK_UPDATE_FIELDS = frozenset(
         "labelIds",
         "assigneeIds",
         "parentTaskId",
+        "priority",
     }
 )
 
@@ -57,6 +58,26 @@ def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return body_error(
             data, "storyPoints", "Story points must be a positive number"
         )
+    return None
+
+
+# Allowed ``priority`` enum values, lowest → highest urgency. The derived
+# rank (urgent=4 … none=0) used for sorting is the index into this tuple; it
+# is computed server-side only and never stored (PRD §3.2).
+_PRIORITY_VALUES = ("none", "low", "medium", "high", "urgent")
+
+
+def _priority_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """``priority`` must be one of the five-member enum when sent.
+
+    Mirrors ``_story_points_error``: only checked when the key is present,
+    rejects any value outside the enum with the standard ``"Bad request"``
+    400 body error (PRD AC-W1)."""
+
+    if "priority" not in data:
+        return None
+    if data.get("priority") not in _PRIORITY_VALUES:
+        return body_error(data, "priority", "Bad request")
     return None
 
 
@@ -140,6 +161,9 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         error = _story_points_error(data)
         if error is not None:
             errors.append(error)
+    priority_error = _priority_error(data)
+    if priority_error is not None:
+        errors.append(priority_error)
     error = _parent_task_error(data, data.get("projectId"))
     if error is not None:
         errors.append(error)
@@ -195,6 +219,9 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             "labelIds": data.get("labelIds") or [],
             "assigneeIds": data.get("assigneeIds") or [],
             "parentTaskId": data.get("parentTaskId") or None,
+            # Urgency defaults to ``"none"`` so every reader sees a uniform
+            # shape; a validated non-default value (PRD §3.2) overrides it.
+            "priority": data.get("priority") or "none",
         },
     )
     return "Task created"
@@ -254,6 +281,9 @@ def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         error = _story_points_error(data)
         if error is not None:
             errors.append(error)
+    priority_error = _priority_error(data)
+    if priority_error is not None:
+        errors.append(priority_error)
     return errors
 
 
@@ -438,6 +468,9 @@ def bulk_update(data: Dict[str, Any], user_id: str) -> Optional[str]:
         story_error = _story_points_error(filtered)
         if story_error is not None:
             shape_errors.append(story_error)
+    priority_error = _priority_error(filtered)
+    if priority_error is not None:
+        shape_errors.append(priority_error)
     if shape_errors:
         return "Bad request"
     if "coordinatorId" in filtered and (

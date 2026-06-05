@@ -68,6 +68,12 @@ TABLE_FIELDS = {
         "assigneeIds",
         # Sub-tasks: the ``_id`` of the parent task (null / empty = top-level).
         "parentTaskId",
+        # Urgency/importance: one of ``"none"`` / ``"low"`` / ``"medium"`` /
+        # ``"high"`` / ``"urgent"``. Default ``"none"``; validated by
+        # ``task_service._priority_error`` against the five-member enum. A
+        # derived rank (urgent=4 … none=0) drives sorting server-side and is
+        # never stored.
+        "priority",
         "createdAt",
         "updatedAt",
     },

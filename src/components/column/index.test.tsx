@@ -1183,5 +1183,33 @@ describe("Column", () => {
 
             expect(screen.queryByText("Backend")).not.toBeInTheDocument();
         });
+
+        it("renders a priority badge (icon + visible label + a11y) for a prioritised task", () => {
+            renderColumn({
+                tasks: [task({ priority: "urgent" })]
+            });
+
+            const badge = screen.getByTestId("task-card-priority");
+            // Not colour-only: the visible enum label carries the signal.
+            expect(badge).toHaveTextContent(/urgent/i);
+            // The accessible name surfaces the priority level.
+            expect(badge).toHaveAttribute(
+                "aria-label",
+                expect.stringMatching(/urgent/i)
+            );
+        });
+
+        it("renders NO priority badge for a none / unset priority", () => {
+            renderColumn({
+                tasks: [
+                    task({ _id: "p-none", priority: "none" }),
+                    task({ _id: "p-unset" })
+                ]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-priority")
+            ).not.toBeInTheDocument();
+        });
     });
 });

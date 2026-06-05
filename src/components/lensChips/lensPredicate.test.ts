@@ -169,6 +169,42 @@ describe("buildLensPredicate", () => {
         });
     });
 
+    describe("priority-high lens (functional — priority enum shipped)", () => {
+        it("matches tasks at high OR urgent priority", () => {
+            const predicate = buildLensPredicate({
+                lens: "priority-high",
+                currentUserId: "u-self"
+            });
+            expect(predicate(task({ priority: "high" }))).toBe(true);
+            expect(predicate(task({ priority: "urgent" }))).toBe(true);
+        });
+
+        it("rejects tasks below high priority (and unset/none)", () => {
+            const predicate = buildLensPredicate({
+                lens: "priority-high",
+                currentUserId: "u-self"
+            });
+            expect(predicate(task({ priority: "medium" }))).toBe(false);
+            expect(predicate(task({ priority: "low" }))).toBe(false);
+            expect(predicate(task({ priority: "none" }))).toBe(false);
+            // Exclusionary (unlike the date lenses): an unprioritised task
+            // is hidden, not passed through.
+            expect(predicate(task())).toBe(false);
+        });
+    });
+
+    describe("priority-urgent lens (functional)", () => {
+        it("matches only urgent tasks", () => {
+            const predicate = buildLensPredicate({
+                lens: "priority-urgent",
+                currentUserId: "u-self"
+            });
+            expect(predicate(task({ priority: "urgent" }))).toBe(true);
+            expect(predicate(task({ priority: "high" }))).toBe(false);
+            expect(predicate(task())).toBe(false);
+        });
+    });
+
     describe("at-risk lens (graceful-skip until risk field ships)", () => {
         it("treats tasks without aiRisk as matching", () => {
             const predicate = buildLensPredicate({

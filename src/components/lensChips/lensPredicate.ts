@@ -15,6 +15,9 @@ import type { LensId } from "./index";
  *                    timezone (functional — M2 `dueDate` shipped)
  *   - `this-week`  — task.dueDate within current ISO week, Mon-Sun
  *                    (functional)
+ *   - `priority-high`   — task.priority in {"high", "urgent"} (functional —
+ *                    the `priority` enum shipped; exclusionary, like `mine`)
+ *   - `priority-urgent` — task.priority === "urgent" (functional)
  *   - `at-risk`    — task.aiRisk in {"high", "medium"} (graceful skip
  *                    until the AI risk score ships)
  *
@@ -27,7 +30,7 @@ import type { LensId } from "./index";
  * "soon" badge so the user is not misled into thinking the lens is broken.
  */
 
-type LensTask = Pick<ITask, "coordinatorId"> & {
+type LensTask = Pick<ITask, "coordinatorId" | "priority"> & {
     /** M2 — date-only ISO string on `ITask`; widened here so the predicate
      * also accepts the timestamp / Date shapes that historical fixtures and
      * callers may pass. */
@@ -115,6 +118,22 @@ export const buildLensPredicate = ({
             if (Number.isNaN(ts)) return true;
             return ts >= start && ts < end;
         };
+    }
+
+    if (lens === "priority-high") {
+        // "High priority" reads as "anything worth bumping up the queue",
+        // so it surfaces both `high` AND `urgent` — the same widen-not-
+        // narrow choice the `at-risk` lens makes. Unlike the date lenses,
+        // a priority filter is exclusionary (it answers "show me the
+        // high-priority work"), so non-matching tasks are hidden rather
+        // than passed through.
+        return (task) => task.priority === "high" || task.priority === "urgent";
+    }
+
+    if (lens === "priority-urgent") {
+        // The narrowest triage view: only the tasks explicitly flagged
+        // `urgent`.
+        return (task) => task.priority === "urgent";
     }
 
     if (lens === "at-risk") {

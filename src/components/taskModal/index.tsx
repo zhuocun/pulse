@@ -90,6 +90,20 @@ const STORY_POINT_OPTIONS = [1, 2, 3, 5, 8, 13].map((value) => ({
 }));
 
 /**
+ * Priority `Select` options (PRD §3.4). The value list is the single-sourced
+ * `TaskPriorityLevel` union so the modal, the card badge, and the lens can never
+ * drift; the labels come from the localized `options.priorities` dictionary.
+ * `none` is included so a task can be explicitly de-prioritised back to the
+ * default (which renders no card badge).
+ */
+const PRIORITY_OPTIONS: { label: string; value: TaskPriorityLevel }[] = (
+    ["none", "low", "medium", "high", "urgent"] as const
+).map((value) => ({
+    label: microcopy.options.priorities[value],
+    value
+}));
+
+/**
  * `startDate` / `dueDate` persist as date-only ISO strings (`YYYY-MM-DD`).
  * AntD's `DatePicker` works in `Dayjs`, so we convert at the form boundary:
  * `taskToFormValues` maps the stored string → a `Dayjs` for the control,
@@ -772,6 +786,18 @@ const TaskModal: React.FC<{
                     }}
                     options={STORY_POINT_OPTIONS}
                     placeholder={microcopy.placeholders.selectStoryPoints}
+                />
+            </Form.Item>
+            {/*
+             * Priority (PRD §3). A single-select enum that rides the same
+             * `merged` → `tasks` PUT payload as every other richness field;
+             * no separate write path. Sits beside story points as the other
+             * single-value triage signal.
+             */}
+            <Form.Item label={microcopy.fields.priority} name="priority">
+                <Select
+                    options={PRIORITY_OPTIONS}
+                    placeholder={microcopy.placeholders.selectPriority}
                 />
             </Form.Item>
             {/*

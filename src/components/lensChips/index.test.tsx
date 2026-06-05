@@ -81,6 +81,41 @@ describe("LensChips", () => {
         ).toHaveAttribute("aria-pressed", "true");
     });
 
+    it("renders the priority lenses (High priority, Urgent) as functional, enabled, and toggleable", () => {
+        // The `priority` enum shipped, so these are functional lenses:
+        // enabled, real pressed state, no "soon" badge.
+        render(<LensChips active={null} onChange={jest.fn()} />);
+
+        const high = screen.getByRole("button", { name: /high priority/i });
+        const urgent = screen.getByRole("button", { name: /^urgent$/i });
+
+        expect(high).not.toHaveAttribute("aria-disabled");
+        expect(high).toHaveAttribute("aria-pressed", "false");
+        expect(high.textContent).not.toMatch(/soon/i);
+        expect(urgent).not.toHaveAttribute("aria-disabled");
+        expect(urgent).toHaveAttribute("aria-pressed", "false");
+        expect(urgent.textContent).not.toMatch(/soon/i);
+    });
+
+    it("marks an active priority lens with aria-pressed=true", () => {
+        render(<LensChips active="priority-high" onChange={jest.fn()} />);
+
+        expect(
+            screen.getByRole("button", { name: /high priority/i })
+        ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("clicking a priority chip calls onChange with its lens id", async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+        render(<LensChips active={null} onChange={onChange} />);
+
+        await user.click(screen.getByRole("button", { name: /^urgent$/i }));
+
+        expect(onChange).toHaveBeenCalledWith("priority-urgent");
+        expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
     it("clicks a chip → calls onChange with its lens id", async () => {
         const user = userEvent.setup();
         const onChange = jest.fn();
@@ -173,7 +208,11 @@ describe("LensChips", () => {
 
         // Tab to the remaining coming-soon chip ("At risk", the last chip):
         // it stays in tab order (discoverable) but Enter does not activate.
+        // Chip order: Today, This week, Mine, High priority, Urgent, At risk
+        // — five tabs from "Today" lands on the trailing "At risk" chip.
         onChange.mockClear();
+        await user.tab();
+        await user.tab();
         await user.tab();
         await user.tab();
         await user.tab();
@@ -214,6 +253,8 @@ describe("parseLensId", () => {
         expect(parseLensId("today")).toBe("today");
         expect(parseLensId("this-week")).toBe("this-week");
         expect(parseLensId("mine")).toBe("mine");
+        expect(parseLensId("priority-high")).toBe("priority-high");
+        expect(parseLensId("priority-urgent")).toBe("priority-urgent");
         expect(parseLensId("at-risk")).toBe("at-risk");
     });
 

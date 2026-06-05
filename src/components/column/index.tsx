@@ -1,5 +1,6 @@
 import {
     ClockCircleOutlined,
+    FlagFilled,
     HolderOutlined,
     MoreOutlined
 } from "@ant-design/icons";
@@ -452,6 +453,36 @@ const OverdueChip = styled.span`
 `;
 
 /**
+ * Priority indicator on the card footer (PRD §3.4). Like `OverdueChip`, it is
+ * deliberately NOT colour-only: a flag glyph pairs with the visible priority
+ * label and an `aria-label` so the signal reads for colour-blind and
+ * screen-reader users alike (WCAG 1.4.1). The tint is a secondary, reinforcing
+ * cue that scales with urgency. `priority === "none"` (or absent) renders
+ * nothing — the badge only appears once a task is deliberately prioritised.
+ */
+const PriorityBadge = styled.span<{ $tint: string }>`
+    align-items: center;
+    color: ${(p) => p.$tint};
+    display: inline-flex;
+    font-weight: ${fontWeight.semibold};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
+ * Per-priority tint, escalating low → urgent. `none` is absent from the map
+ * because that branch renders no badge at all. The glyph is identical across
+ * levels (a flag); the visible label + aria-label disambiguate, so colour is
+ * never the sole carrier of meaning.
+ */
+const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
+    low: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+    medium: "var(--ant-color-info, #2563eb)",
+    high: "var(--ant-color-warning, #d97706)",
+    urgent: "var(--ant-color-error, #dc2626)"
+};
+
+/**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
  * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
  * lens predicates, so a task due "today" is NOT overdue and a midnight-
@@ -877,6 +908,15 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                   date: task.dueDate
               })
             : "";
+        // Priority badge (PRD §3.4): `none` / absent renders nothing, so the
+        // badge only surfaces once a task is deliberately prioritised. The
+        // label is read from the localized `options.priorities` dictionary
+        // and reinforced by `PRIORITY_TINT`. Narrowing to the non-`none`
+        // union here lets both maps index the priority safely (single-source
+        // `TaskPriorityLevel`).
+        const priority: TaskPriorityLevel | undefined = task.priority;
+        const activePriority: Exclude<TaskPriorityLevel, "none"> | null =
+            priority !== undefined && priority !== "none" ? priority : null;
         // Read per-result strength from the AI search cache (P1-2). Returns
         // null when no semantic filter is active, so the badge stays out of
         // the way during normal browsing.
@@ -1164,6 +1204,30 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         </span>
                     </TaskTypeBadge>
                     <CardMeta>
+                        {activePriority ? (
+                            <PriorityBadge
+                                $tint={PRIORITY_TINT[activePriority]}
+                                aria-label={formatTemplate(
+                                    microcopy.a11y.priorityTask as string,
+                                    {
+                                        priority:
+                                            microcopy.options.priorities[
+                                                activePriority
+                                            ]
+                                    }
+                                )}
+                                data-testid="task-card-priority"
+                            >
+                                <FlagFilled aria-hidden />
+                                <span>
+                                    {
+                                        microcopy.options.priorities[
+                                            activePriority
+                                        ]
+                                    }
+                                </span>
+                            </PriorityBadge>
+                        ) : null}
                         {overdue ? (
                             <OverdueChip
                                 aria-label={overdueLabel}

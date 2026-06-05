@@ -35,12 +35,20 @@ import {
  * active lens clears it back to All.
  */
 
-export type LensId = "today" | "this-week" | "mine" | "at-risk";
+export type LensId =
+    | "today"
+    | "this-week"
+    | "mine"
+    | "priority-high"
+    | "priority-urgent"
+    | "at-risk";
 
 const KNOWN_LENS_IDS: readonly LensId[] = [
     "today",
     "this-week",
     "mine",
+    "priority-high",
+    "priority-urgent",
     "at-risk"
 ];
 
@@ -180,6 +188,16 @@ const LensChips: React.FC<LensChipsProps> = ({ active, onChange }) => {
                 id: "mine" as const,
                 label: microcopy.lenses.mine,
                 tooltip: microcopy.lenses.mineTooltip
+            },
+            {
+                id: "priority-high" as const,
+                label: microcopy.lenses.highPriority,
+                tooltip: microcopy.lenses.highPriorityTooltip
+            },
+            {
+                id: "priority-urgent" as const,
+                label: microcopy.lenses.urgent,
+                tooltip: microcopy.lenses.urgentTooltip
             },
             {
                 id: "at-risk" as const,

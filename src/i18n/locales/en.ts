@@ -159,6 +159,7 @@ export const enSource = {
         applyReadinessSuggestion: "Apply readiness suggestion for {field}",
         lensChips: "Board lenses",
         lensComingSoon: "Coming soon",
+        priorityTask: "Priority: {priority}",
         overdueTask: "Overdue — was due {date}",
         renameTask: "Rename task",
         columnReadinessReady: "{ready} of {total} tasks ready",
@@ -357,6 +358,7 @@ export const enSource = {
         organization: "Organization",
         parentTask: "Parent task",
         password: "Password",
+        priority: "Priority",
         projectName: "Project name",
         startDate: "Start date",
         storyPoints: "Story points",
@@ -377,6 +379,7 @@ export const enSource = {
         selectCoordinator: "Select a coordinator",
         selectType: "Select a type",
         selectManager: "Select a manager",
+        selectPriority: "Select a priority",
         selectStoryPoints: "Select story points",
         selectAssignees: "Select assignees",
         selectLabels: "Select labels",
@@ -421,6 +424,16 @@ export const enSource = {
             todo: "To do",
             in_progress: "In progress",
             done: "Done"
+        },
+        // Task priority enum labels (PRD §3). Keyed by the stored
+        // `TaskPriorityLevel` value so the modal Select and the card badge read
+        // the same dictionary; `none` is the default and renders no badge.
+        priorities: {
+            none: "None",
+            low: "Low",
+            medium: "Medium",
+            high: "High",
+            urgent: "Urgent"
         }
     },
     counts: {
@@ -482,10 +495,14 @@ export const enSource = {
         today: "Today",
         thisWeek: "This week",
         mine: "Mine",
+        highPriority: "High priority",
+        urgent: "Urgent",
         atRisk: "At risk",
         todayTooltip: "Tasks due today",
         thisWeekTooltip: "Tasks due in this ISO week (Mon–Sun)",
         mineTooltip: "Tasks where you're the coordinator",
+        highPriorityTooltip: "Tasks at high or urgent priority",
+        urgentTooltip: "Tasks at urgent priority",
         atRiskTooltip: "Tasks AI-flagged as high or medium risk",
         comingSoonBadge: "Soon"
     },
