@@ -107,9 +107,12 @@ describe("ColumnCreator", () => {
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/boards");
+        // The create payload now carries the column ``category`` (the
+        // persisted "done" source of truth); it defaults to "todo".
         expect(fetchMock.mock.calls[0][1]).toEqual(
             expect.objectContaining({
                 body: JSON.stringify({
+                    category: "todo",
                     columnName: "QA",
                     projectId: "project-1"
                 }),
@@ -120,6 +123,49 @@ describe("ColumnCreator", () => {
             expect(
                 screen.getByRole("button", { name: "Add column" })
             ).toBeInTheDocument()
+        );
+    });
+
+    it("defaults the category picker to To do and sends it on create", async () => {
+        renderCreator();
+        await expandIntoInput();
+
+        // The category Select is rendered alongside the name input and
+        // starts on the default "To do" (todo) bucket.
+        expect(
+            screen.getByRole("combobox", { name: "New column category" })
+        ).toBeInTheDocument();
+        expect(screen.getByTitle("To do")).toBeInTheDocument();
+    });
+
+    it("sends the chosen category in the create payload", async () => {
+        renderCreator();
+        const input = await expandIntoInput();
+
+        fireEvent.change(input, { target: { value: "Shipped" } });
+
+        // Open the category picker and pick the "Done" bucket.
+        fireEvent.mouseDown(
+            screen.getByRole("combobox", { name: "New column category" })
+        );
+        fireEvent.click(await screen.findByText("Done"));
+
+        fireEvent.keyDown(input, {
+            charCode: 13,
+            code: "Enter",
+            key: "Enter"
+        });
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        expect(fetchMock.mock.calls[0][1]).toEqual(
+            expect.objectContaining({
+                body: JSON.stringify({
+                    category: "done",
+                    columnName: "Shipped",
+                    projectId: "project-1"
+                }),
+                method: "POST"
+            })
         );
     });
 

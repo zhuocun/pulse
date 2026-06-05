@@ -118,6 +118,7 @@ export const enSource = {
         filterByCoordinator: "Filter by coordinator",
         filterByType: "Filter by type",
         newColumnName: "New column name",
+        newColumnCategory: "New column category",
         newTaskName: "New task name",
         taskPrompt: "Task prompt",
         breakdownAxisLabel: "Breakdown axis",
@@ -413,6 +414,13 @@ export const enSource = {
         taskTypes: {
             task: "Task",
             bug: "Bug"
+        },
+        // Per-column "done" semantics shown in the column-create picker.
+        // The stored ``category`` is the source of truth for done-ness.
+        columnCategories: {
+            todo: "To do",
+            in_progress: "In progress",
+            done: "Done"
         }
     },
     counts: {
@@ -832,7 +840,8 @@ export const enSource = {
         roles: {
             owner: "Owner",
             editor: "Editor",
-            viewer: "Viewer"
+            viewer: "Viewer",
+            guest: "Guest"
         }
     },
     aiActivityLog: {

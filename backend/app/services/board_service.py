@@ -12,7 +12,12 @@ from app.validation import body_error, sorted_by_index
 # ordering-managed ``index`` and routing ``projectId`` are excluded so a
 # malformed PUT body cannot corrupt position, reparent the column, or
 # rewrite history. Keep aligned with ``TABLE_FIELDS[COLUMNS]``.
-_COLUMN_UPDATE_FIELDS = frozenset({"columnName", "wipLimit"})
+_COLUMN_UPDATE_FIELDS = frozenset({"columnName", "wipLimit", "category"})
+
+# Allowed values for a column's persisted "done" semantics. ``category``
+# is the stored source of truth for done-ness (see ``be_tools``); a create
+# body that omits it defaults to ``"todo"``.
+_COLUMN_CATEGORIES = frozenset({"todo", "in_progress", "done"})
 
 
 def _wip_limit_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -37,17 +42,43 @@ def _wip_limit_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Body errors for POST /boards (only ``wipLimit`` is checked here).
+def _category_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Validate ``category`` when present: one of the allowed labels.
 
-    ``columnName`` / ``projectId`` presence is enforced by the router's
-    ``required_body_errors``; this guards the optional ``wipLimit``.
+    Mirrors ``_wip_limit_error`` in return/sentinel style -- returns a
+    ``body_error`` dict on a bad value (so callers can collect it) or
+    ``None`` when valid. ``category`` is the stored source of truth for a
+    column's done-ness; only ``"todo"`` / ``"in_progress"`` / ``"done"``
+    are accepted.
     """
 
-    if "wipLimit" not in data:
-        return []
-    error = _wip_limit_error(data)
-    return [error] if error is not None else []
+    category = data.get("category")
+    if category not in _COLUMN_CATEGORIES:
+        return body_error(
+            data, "category", "Category must be one of todo, in_progress, done"
+        )
+    return None
+
+
+def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Body errors for POST /boards (optional ``wipLimit`` / ``category``).
+
+    ``columnName`` / ``projectId`` presence is enforced by the router's
+    ``required_body_errors``; this guards the optional ``wipLimit`` and
+    ``category``. ``category`` is only checked when supplied -- an absent
+    one defaults to ``"todo"`` in ``create``.
+    """
+
+    errors: List[Dict[str, Any]] = []
+    if "wipLimit" in data:
+        error = _wip_limit_error(data)
+        if error is not None:
+            errors.append(error)
+    if "category" in data:
+        error = _category_error(data)
+        if error is not None:
+            errors.append(error)
+    return errors
 
 
 def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -64,6 +95,10 @@ def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         error = _wip_limit_error(data)
         if error is not None:
             errors.append(error)
+    if "category" in data:
+        error = _category_error(data)
+        if error is not None:
+            errors.append(error)
     return errors
 
 
@@ -76,7 +111,14 @@ def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]
 
     columns = ensure_default_columns(project_id)
 
-    return repository.serialize_documents(sorted_by_index(columns))
+    serialized = repository.serialize_documents(sorted_by_index(columns))
+    # Derived read alias: expose ``isDone`` computed from the stored
+    # ``category`` so the FE / drift detector can read done-ness without
+    # re-deriving it. Computed only -- it is not stored and not part of
+    # ``TABLE_FIELDS[COLUMNS]``.
+    for column in serialized:
+        column["isDone"] = column.get("category") == "done"
+    return serialized
 
 
 def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
@@ -91,12 +133,16 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     columns = ensure_default_columns(project_id)
 
     # ``wipLimit`` is optional on the wire; default 0 ("no limit" per the
-    # detector contract). Re-validate defensively so a direct service
-    # caller cannot persist a malformed value even if the router's
-    # ``create_validation_errors`` gate is bypassed.
+    # detector contract). ``category`` is also optional; default ``"todo"``
+    # (a freshly added column is not a done bucket). Re-validate defensively
+    # so a direct service caller cannot persist a malformed value even if
+    # the router's ``create_validation_errors`` gate is bypassed.
     if "wipLimit" in data and _wip_limit_error(data) is not None:
         return "Bad request"
+    if "category" in data and _category_error(data) is not None:
+        return "Bad request"
     wip_limit = data["wipLimit"] if "wipLimit" in data else 0
+    category = data["category"] if "category" in data else "todo"
 
     repository.insert_one(
         COLUMNS,
@@ -105,13 +151,14 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             "projectId": project_id,
             "index": len(columns),
             "wipLimit": wip_limit,
+            "category": category,
         },
     )
     return "Column created"
 
 
 def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
-    """Update a column's ``columnName`` and/or ``wipLimit``.
+    """Update a column's ``columnName``, ``wipLimit`` and/or ``category``.
 
     Returns ``None`` (missing column), ``"Forbidden"`` (caller lacks
     editor on the column's project), ``"Bad request"`` (missing ``_id`` or

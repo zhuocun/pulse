@@ -39,6 +39,12 @@ TABLE_FIELDS = {
         # limit". The drift detector already honours ``wipLimit``; this
         # field lets the board actually set it.
         "wipLimit",
+        # Per-column "done" semantics: one of ``"todo"`` / ``"in_progress"``
+        # / ``"done"``. The stored source of truth for done-ness (replacing
+        # the locale-fragile column-name heuristic); ``be_tools`` prefers
+        # ``category == "done"`` and only falls back to the name match when
+        # the field is absent on legacy column docs.
+        "category",
         "createdAt",
         "updatedAt",
     },

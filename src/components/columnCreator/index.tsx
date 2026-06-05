@@ -1,6 +1,6 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Input } from "antd";
+import { Input, Select } from "antd";
 import type { InputRef } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -18,6 +18,15 @@ import useReactMutation from "../../utils/hooks/useReactMutation";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 
+// Persisted "done" semantics for a column. ``category`` is the stored
+// source of truth for done-ness (the board echoes a derived ``isDone``);
+// a freshly created column defaults to ``"todo"``.
+type ColumnCategory = NonNullable<IColumn["category"]>;
+
+const DEFAULT_CATEGORY: ColumnCategory = "todo";
+
+const CATEGORY_OPTIONS: ColumnCategory[] = ["todo", "in_progress", "done"];
+
 const Slot = styled.div<{ $editing?: boolean }>`
     align-self: flex-start;
     display: flex;
@@ -30,6 +39,17 @@ const Slot = styled.div<{ $editing?: boolean }>`
     @media (min-width: ${breakpoints.md}px) {
         min-width: ${(props) => (props.$editing ? "16rem" : "9rem")};
     }
+`;
+
+// Stacks the name input above the category picker while the creator is
+// expanded. The parent ``Slot`` is a row flex container, so the fields
+// need their own column wrapper to sit one above the other and stretch to
+// the slot width.
+const EditingFields = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${space.xs}px;
+    width: 100%;
 `;
 
 const AddColumnButton = styled.button`
@@ -79,6 +99,7 @@ const AddColumnButton = styled.button`
  */
 const ColumnCreator: React.FC = () => {
     const [columnName, setColumnName] = useState("");
+    const [category, setCategory] = useState<ColumnCategory>(DEFAULT_CATEGORY);
     const [editing, setEditing] = useState(false);
     const inputRef = useRef<InputRef>(null);
     const { projectId } = useParams<{ projectId: string }>();
@@ -104,6 +125,7 @@ const ColumnCreator: React.FC = () => {
     const collapse = useCallback(() => {
         setEditing(false);
         setColumnName("");
+        setCategory(DEFAULT_CATEGORY);
     }, []);
 
     const submit = async () => {
@@ -114,9 +136,11 @@ const ColumnCreator: React.FC = () => {
         }
         setColumnName("");
         const created = await mutateAsync({
+            category,
             columnName: trimmed,
             projectId
         });
+        setCategory(DEFAULT_CATEGORY);
         setEditing(false);
         // Phase 4.3 — record column create into the activity feed.
         // The 10s-window Undo closure DELETEs the just-created column
@@ -160,28 +184,41 @@ const ColumnCreator: React.FC = () => {
 
     return (
         <Slot $editing>
-            <Input
-                aria-label={microcopy.a11y.newColumnName}
-                autoComplete="off"
-                disabled={isLoading}
-                enterKeyHint="done"
-                inputMode="text"
-                onBlur={() => {
-                    if (!columnName.trim()) collapse();
-                }}
-                onChange={(e) => setColumnName(e.target.value)}
-                onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                        event.preventDefault();
-                        collapse();
-                    }
-                }}
-                onPressEnter={submit}
-                placeholder={microcopy.placeholders.createColumnName}
-                ref={inputRef}
-                size="large"
-                value={columnName}
-            />
+            <EditingFields>
+                <Input
+                    aria-label={microcopy.a11y.newColumnName}
+                    autoComplete="off"
+                    disabled={isLoading}
+                    enterKeyHint="done"
+                    inputMode="text"
+                    onBlur={() => {
+                        if (!columnName.trim()) collapse();
+                    }}
+                    onChange={(e) => setColumnName(e.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                            event.preventDefault();
+                            collapse();
+                        }
+                    }}
+                    onPressEnter={submit}
+                    placeholder={microcopy.placeholders.createColumnName}
+                    ref={inputRef}
+                    size="large"
+                    value={columnName}
+                />
+                <Select<ColumnCategory>
+                    aria-label={microcopy.a11y.newColumnCategory}
+                    disabled={isLoading}
+                    onChange={setCategory}
+                    options={CATEGORY_OPTIONS.map((value) => ({
+                        label: microcopy.options.columnCategories[value],
+                        value
+                    }))}
+                    size="large"
+                    value={category}
+                />
+            </EditingFields>
         </Slot>
     );
 };

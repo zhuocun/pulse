@@ -322,8 +322,18 @@ _DONE_COLUMN_NAMES = frozenset(
 
 
 def _is_done_column(col: dict[str, Any]) -> bool:
-    """Return True if ``col`` should be excluded from WIP overflow detection."""
+    """Return True if ``col`` should be excluded from WIP overflow detection.
 
+    The persisted ``category`` is the source of truth for done-ness: when
+    present it wins outright (``category == "done"`` => done, anything else
+    => not done). Only when ``category`` is absent -- legacy column docs
+    seeded before this field existed -- do we fall back to the previous
+    ``isDone``/locale-aware name heuristic so existing boards keep working.
+    """
+
+    category = col.get("category")
+    if category is not None:
+        return category == "done"
     if col.get("isDone") is True:
         return True
     name = (col.get("name") or "").strip().lower()

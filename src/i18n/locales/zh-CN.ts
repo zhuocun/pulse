@@ -114,6 +114,7 @@ const zhCN: Dictionary = {
         filterByCoordinator: "按协调人筛选",
         filterByType: "按类型筛选",
         newColumnName: "新列名称",
+        newColumnCategory: "新列类别",
         newTaskName: "新任务名称",
         taskPrompt: "任务提示词",
         breakdownAxisLabel: "拆分维度",
@@ -362,6 +363,13 @@ const zhCN: Dictionary = {
         taskTypes: {
             task: "任务",
             bug: "缺陷"
+        },
+        // 列的“完成”语义，显示在新建列的选择器中。
+        // 持久化的 ``category`` 是判断完成状态的依据。
+        columnCategories: {
+            todo: "待办",
+            in_progress: "进行中",
+            done: "已完成"
         }
     },
     counts: {
@@ -671,7 +679,8 @@ const zhCN: Dictionary = {
         roles: {
             owner: "所有者",
             editor: "编辑者",
-            viewer: "查看者"
+            viewer: "查看者",
+            guest: "访客"
         }
     },
     aiActivityLog: {
