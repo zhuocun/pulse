@@ -42,6 +42,7 @@ const zhCN: Dictionary = {
         loginCta: "登录账号",
         refresh: "刷新",
         resetFilters: "重置筛选",
+        restore: "恢复",
         retry: "重试",
         save: "保存",
         saveAsDefault: "保存为默认",
@@ -489,6 +490,10 @@ const zhCN: Dictionary = {
         columnDeleted: "列已删除",
         likeFailed: "点赞更新失败,请重试。",
         taskSaved: "任务已保存",
+        taskRestored: "任务已恢复",
+        taskRestoreFailed: "无法恢复任务,请重试。",
+        taskPurged: "任务已永久删除",
+        taskPurgeFailed: "无法永久删除任务,请重试。",
         welcomeBack: "欢迎回来!",
         loginFailedNoToken: "登录响应中缺少会话令牌,请重试。",
         loginCouldNotPersistSession:
@@ -637,6 +642,25 @@ const zhCN: Dictionary = {
             projectCreated: "已创建项目 “{name}”",
             projectUpdated: "已更新项目 “{name}”",
             projectDeleted: "已删除项目 “{name}”"
+        }
+    },
+    trashDrawer: {
+        triggerLabel: "回收站",
+        triggerAriaLabel: "打开回收站",
+        drawerTitle: "回收站",
+        empty: {
+            title: "回收站为空",
+            description:
+                "已删除的任务会出现在这里。恢复后可放回看板,或将其永久删除。"
+        },
+        restore: "恢复",
+        restoreAriaLabel: "恢复任务 “{name}”",
+        deletePermanently: "永久删除",
+        deletePermanentlyAriaLabel: "永久删除任务 “{name}”",
+        confirm: {
+            title: "永久删除该任务?",
+            description: "此操作无法撤销。",
+            confirmLabel: "永久删除"
         }
     },
     notifications: {

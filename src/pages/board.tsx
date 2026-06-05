@@ -1,5 +1,6 @@
 import {
     CloseOutlined,
+    DeleteOutlined,
     ReloadOutlined,
     SettingOutlined
 } from "@ant-design/icons";
@@ -34,6 +35,7 @@ import MemberPopover from "../components/memberPopover";
 import Row from "../components/row";
 import TaskModal from "../components/taskModal";
 import TaskSearchPanel from "../components/taskSearchPanel";
+import TrashDrawer from "../components/trashDrawer";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import {
@@ -65,6 +67,7 @@ import useReducedMotion from "../utils/hooks/useReducedMotion";
 import useTaskModal from "../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../utils/hooks/useTaskPanelNavigation";
 import useTitle from "../utils/hooks/useTitle";
+import useTrashDrawer from "../utils/hooks/useTrashDrawer";
 import useUrl from "../utils/hooks/useUrl";
 import { isOptimisticPlaceholderId } from "../utils/optimisticClientId";
 
@@ -569,6 +572,17 @@ const BoardPage = () => {
         pendingPrompt: chatInitialPrompt
     } = useAiChatDrawer();
     /*
+     * Trash drawer (work-management-depth §5.4/§5.6). Open/close lives on
+     * the overlays slice like the rest of the family; the drawer itself
+     * is a core (non-AI) surface so it mounts unconditionally below,
+     * alongside the always-on TaskModal.
+     */
+    const {
+        open: trashOpen,
+        openDrawer: openTrashDrawer,
+        closeDrawer: closeTrashDrawer
+    } = useTrashDrawer();
+    /*
      * Phase 4 A8 — launcher badge subscription. `inboxUnreadCount` is
      * a pure projection of the triage agent's nudge buffer (owned by
      * `CopilotDockHost`), so this Button doesn't mount the agent —
@@ -910,6 +924,15 @@ const BoardPage = () => {
                                 />
                             )}
                             <MemberPopover />
+                            <Button
+                                aria-label={
+                                    microcopy.trashDrawer.triggerAriaLabel
+                                }
+                                data-testid="board-trash"
+                                icon={<DeleteOutlined aria-hidden />}
+                                onClick={() => openTrashDrawer()}
+                                type="text"
+                            />
                             {isPhone && copilotMenuEl}
                             {projectAiSwitch}
                         </>
@@ -1162,6 +1185,17 @@ const BoardPage = () => {
                 {!environment.taskPanelRouted && (
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
+                {/*
+                 * Trash drawer is a core (non-AI) recovery surface, so —
+                 * unlike the AI drawers below — it mounts unconditionally
+                 * (like the TaskModal above). Its list query is disabled
+                 * while closed, so the mount is cheap.
+                 */}
+                <TrashDrawer
+                    onClose={closeTrashDrawer}
+                    open={trashOpen}
+                    projectId={projectId}
+                />
                 {/*
                  * When the CopilotDock flag is on, the dock is mounted
                  * by `CopilotDockHost` inside `MainLayout` so it

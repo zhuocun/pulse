@@ -11,6 +11,7 @@ describe("overlaysSlice", () => {
             editingTaskId: null,
             chatDrawer: { open: false, pendingPrompt: null },
             boardBriefOpen: false,
+            trashDrawerOpen: false,
             aiDraftActiveColumnId: null,
             copilotDock: {
                 open: false,
@@ -85,6 +86,19 @@ describe("overlaysSlice", () => {
         expect(closed.boardBriefOpen).toBe(false);
     });
 
+    it("openTrashDrawer / closeTrashDrawer flip the trashDrawerOpen flag", () => {
+        const opened = overlaysSlice.reducer(
+            initialState,
+            overlaysActions.openTrashDrawer()
+        );
+        expect(opened.trashDrawerOpen).toBe(true);
+        const closed = overlaysSlice.reducer(
+            opened,
+            overlaysActions.closeTrashDrawer()
+        );
+        expect(closed.trashDrawerOpen).toBe(false);
+    });
+
     it("openAiDraft sets aiDraftActiveColumnId; closeAiDraft clears it", () => {
         const opened = overlaysSlice.reducer(
             initialState,
@@ -103,6 +117,7 @@ describe("overlaysSlice", () => {
             editingTaskId: "t-1",
             chatDrawer: { open: true, pendingPrompt: "hi" },
             boardBriefOpen: true,
+            trashDrawerOpen: true,
             aiDraftActiveColumnId: "c-1",
             copilotDock: {
                 open: true,
@@ -117,6 +132,7 @@ describe("overlaysSlice", () => {
         );
         expect(next.editingTaskId).toBe("t-1");
         expect(next.boardBriefOpen).toBe(true);
+        expect(next.trashDrawerOpen).toBe(true);
         expect(next.aiDraftActiveColumnId).toBe("c-1");
         expect(next.copilotDock).toEqual({
             open: true,

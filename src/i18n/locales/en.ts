@@ -39,6 +39,7 @@ export const enSource = {
         loginCta: "Log in to your account",
         refresh: "Refresh",
         resetFilters: "Reset filters",
+        restore: "Restore",
         retry: "Retry",
         save: "Save",
         /*
@@ -551,6 +552,11 @@ export const enSource = {
         columnDeleted: "Column deleted",
         likeFailed: "Couldn't update like. Please try again.",
         taskSaved: "Task saved",
+        taskRestored: "Task restored",
+        taskRestoreFailed: "Couldn't restore the task. Please try again.",
+        taskPurged: "Task permanently deleted",
+        taskPurgeFailed:
+            "Couldn't permanently delete the task. Please try again.",
         welcomeBack: "Welcome back!",
         loginFailedNoToken:
             "Login response was missing a session token. Please try again.",
@@ -767,6 +773,33 @@ export const enSource = {
             projectCreated: "Created project “{name}”",
             projectUpdated: "Updated project “{name}”",
             projectDeleted: "Deleted project “{name}”"
+        }
+    },
+    /*
+     * Trash drawer (work-management-depth §5.4/§5.6). A read-only,
+     * board-scoped list of soft-deleted tasks. Each row offers Restore
+     * (un-delete) and a guarded "Delete permanently" (purge). The
+     * `restoreAriaLabel` / `deletePermanentlyAriaLabel` carry the task
+     * name so screen-reader users can tell the per-row buttons apart;
+     * call sites interpolate `{name}` via `String#replace`.
+     */
+    trashDrawer: {
+        triggerLabel: "Trash",
+        triggerAriaLabel: "Open trash",
+        drawerTitle: "Trash",
+        empty: {
+            title: "Trash is empty",
+            description:
+                "Deleted tasks land here. Restore one to put it back on the board, or delete it permanently."
+        },
+        restore: "Restore",
+        restoreAriaLabel: "Restore task “{name}”",
+        deletePermanently: "Delete permanently",
+        deletePermanentlyAriaLabel: "Permanently delete task “{name}”",
+        confirm: {
+            title: "Delete this task permanently?",
+            description: "This can't be undone.",
+            confirmLabel: "Delete permanently"
         }
     },
     /*

@@ -245,6 +245,7 @@ const renderBoard = (route = "/projects/project-1/board") => {
     store.dispatch(overlaysActions.closeTaskModal());
     store.dispatch(overlaysActions.closeChatDrawer());
     store.dispatch(overlaysActions.closeBoardBrief());
+    store.dispatch(overlaysActions.closeTrashDrawer());
     store.dispatch(overlaysActions.closeAiDraft());
 
     return render(
@@ -739,14 +740,18 @@ describe("BoardPage", () => {
             expect(cluster).toContainElement(
                 screen.getByTestId("board-refresh")
             );
+            // The Trash entry point is a core (non-AI) control clustered
+            // alongside the rest.
+            expect(cluster).toContainElement(screen.getByTestId("board-trash"));
             // Each leaf control gets its OWN slot so the hairline
             // separators paint between adjacent controls. board.tsx passes
             // the controls inside a (nested) fragment, which the cluster
             // must flatten — a single collapsed slot would paint no
-            // dividers. Refresh + Members + Copilot + Settings = 4 slots.
+            // dividers. Refresh + Members + Trash + Copilot + Settings = 5
+            // slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")
-            ).toHaveLength(4);
+            ).toHaveLength(5);
             // The controls remain individually focusable inside the
             // capsule — the shared glass background is purely visual.
             const settings = screen.getByRole("button", {
@@ -780,6 +785,36 @@ describe("BoardPage", () => {
             expect(
                 screen.queryByTestId("board-refresh")
             ).not.toBeInTheDocument();
+        });
+    });
+
+    describe("Trash drawer entry point (work-management-depth §5.4/§5.6)", () => {
+        it("renders a Trash button in the BoardActions row that opens the drawer", async () => {
+            renderBoard();
+            await screen.findByText("Roadmap board");
+
+            // Closed by default — the drawer body is not mounted.
+            expect(
+                screen.queryByTestId("trash-drawer-body")
+            ).not.toBeInTheDocument();
+
+            const trashButton = screen.getByTestId("board-trash");
+            expect(trashButton).toHaveAccessibleName(/open trash/i);
+            fireEvent.click(trashButton);
+
+            // The drawer opens and lists the project's trashed tasks. The
+            // shared fetch mock returns the default task fixtures for the
+            // `?includeTrashed=true` GET, so the body surfaces rows.
+            expect(
+                await screen.findByTestId("trash-drawer-body")
+            ).toBeInTheDocument();
+            await waitFor(() =>
+                expect(
+                    screen.getAllByTestId("trash-drawer-row").length
+                ).toBeGreaterThan(0)
+            );
+            // The drawer's open state is owned by the overlays slice.
+            expect(store.getState().overlays.trashDrawerOpen).toBe(true);
         });
     });
 });

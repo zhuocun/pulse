@@ -56,6 +56,14 @@ interface OverlaysState {
     editingTaskId: string | null;
     chatDrawer: ChatDrawerState;
     boardBriefOpen: boolean;
+    /**
+     * Work-management-depth §5.4/§5.6 — open/close flag for the board
+     * Trash drawer (the read-only list of soft-deleted tasks with
+     * Restore / permanent-Delete actions). Lives on the overlays slice
+     * for the same iOS-Safari cross-subtree-propagation reason as the
+     * rest of the family — see `utils/hooks/_createOverlayHook.ts`.
+     */
+    trashDrawerOpen: boolean;
     aiDraftActiveColumnId: string | null;
     copilotDock: CopilotDockState;
 }
@@ -64,6 +72,7 @@ const initialState: OverlaysState = {
     editingTaskId: null,
     chatDrawer: { open: false, pendingPrompt: null },
     boardBriefOpen: false,
+    trashDrawerOpen: false,
     aiDraftActiveColumnId: null,
     copilotDock: {
         open: false,
@@ -100,6 +109,12 @@ export const overlaysSlice = createSlice({
         },
         closeBoardBrief(state) {
             state.boardBriefOpen = false;
+        },
+        openTrashDrawer(state) {
+            state.trashDrawerOpen = true;
+        },
+        closeTrashDrawer(state) {
+            state.trashDrawerOpen = false;
         },
         openAiDraft(state, action: PayloadAction<string>) {
             state.aiDraftActiveColumnId = action.payload;
