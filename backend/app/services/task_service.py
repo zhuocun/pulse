@@ -360,6 +360,14 @@ def get(
     exists, it is merely hidden). Filtering is done in Python because the
     repository/FakeStore only support exact-equality queries (no operator
     dicts).
+
+    Each returned task is annotated with a derived ``blockedBy`` (PRD
+    §4.2/§4.5, AC-W4): the subset of its ``dependsOn`` whose prerequisites
+    are still UNFINISHED (resolve to an in-project task sitting in a non-done
+    column). It is computed on read from the already-fetched columns/tasks --
+    not stored, not in ``TABLE_FIELDS`` -- using the same done-resolution and
+    dangling-skip as the move-to-done gate, so the §4.5 blocked badge and the
+    gate agree.
     """
 
     if repository.find_by_id(PROJECTS, project_id) is None:
@@ -410,7 +418,26 @@ def get(
         if (include_trashed or task.get("deletedAt") is None)
         and (include_archived or task.get("archivedAt") is None)
     ]
-    return repository.serialize_documents(sorted_by_index(visible))
+    serialized = repository.serialize_documents(sorted_by_index(visible))
+    # Derived ``blockedBy`` (PRD §4.2/§4.5): a task's UNFINISHED prerequisites --
+    # the ``dependsOn`` ids that resolve to an in-project task sitting in a
+    # non-done column. Computed on read (not stored), resolved exactly like the
+    # move-to-done gate so the badge and the gate agree; a dangling id (no longer
+    # a project task) is skipped, never counted as blocking.
+    category_by_column = {
+        str(column["_id"]): column.get("category") for column in columns
+    }
+    column_by_task = {
+        str(task["_id"]): str(task.get("columnId") or "") for task in tasks
+    }
+    for task in serialized:
+        task["blockedBy"] = [
+            str(dependency_id)
+            for dependency_id in (task.get("dependsOn") or [])
+            if str(dependency_id) in column_by_task
+            and category_by_column.get(column_by_task[str(dependency_id)]) != "done"
+        ]
+    return serialized
 
 
 def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
