@@ -43,6 +43,7 @@ import AiGhostText, {
     type AiPrivacyConsentEventDetail
 } from "../aiGhostText";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
+import CommentsThread from "../commentsThread";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
 import ErrorBox from "../errorBox";
 import ResponsiveFormSheet from "../responsiveFormSheet";
@@ -1212,6 +1213,23 @@ const TaskModal: React.FC<{
                                 ) : null}
                             </>
                         )}
+                        {/*
+                         * Comments + @mentions thread. Mounted below the
+                         * form + AI assist for a real (persisted) task only —
+                         * an optimistic placeholder has no server comments,
+                         * and the thread keys its query off the concrete
+                         * task id. The roster + author resolution need
+                         * `projectId`, so we also gate on it being known.
+                         */}
+                        {editingTask &&
+                        editingTaskId &&
+                        !placeholderId &&
+                        projectId ? (
+                            <CommentsThread
+                                projectId={projectId}
+                                taskId={editingTaskId}
+                            />
+                        ) : null}
                     </div>
                 </div>
             </ResponsiveFormSheet>

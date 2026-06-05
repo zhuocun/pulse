@@ -136,6 +136,10 @@ const renderModal = () => {
         ["projects/members", { projectId: "project-1" }],
         []
     );
+    // M4 comments thread mounts for a real task — seed its per-task cache
+    // (fresh, via the 30s staleTime) so it adds no extra `fetch` to the
+    // strict count assertions in this suite.
+    queryClient.setQueryData(["comments", { taskId: "task-1" }], []);
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>

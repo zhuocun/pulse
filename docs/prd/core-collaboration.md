@@ -189,7 +189,16 @@ All three mutations refuse to touch the `managerId` row (§3.3): target == manag
 
 `_id`, `projectName`, `organization`, `managerId`, `memberIds` (`[{ userId, role }]`), `createdAt`, `updatedAt`.
 
-### 4.5 Frontend status — 🟡 Partial (no membership UI)
+### 4.5 Frontend status — ✅ Shipped (member management UI)
+
+> **Update (M4):** the gap described below is now closed. A `Members`
+> surface ships at `/projects/:projectId/members` (`ProjectMembersManager`
+> + `useProjectMemberMutations`): it renders the roster with each member's
+> `role`, and an owner can add members (from the global directory), change
+> roles, and remove members. The manager (`managerId`) row is immutable in
+> the UI (disabled controls + badge) mirroring the server invariant, and
+> the whole surface is read-only for non-owners. The paragraph below
+> documents the pre-M4 state for history.
 
 - **No member-management UI exists.** `ProjectModal` (`src/components/projectModal/index.tsx`) has only name / organization / **manager picker** — no add / remove / change-role controls anywhere in the app. The manager picker is sourced from the **global** `useMembersList` (`GET /users/members`), not the project roster.
 - **No Members tab.** The project-detail child nav (`src/pages/projectDetail.tsx`) is **Board + Reports only**.
@@ -366,7 +375,17 @@ Mentions are supplied as an explicit **list in the request body** — they are *
 
 `_id`, `taskId`, `projectId`, `authorId`, `body`, `mentions`, `createdAt`, `updatedAt`.
 
-### 8.5 Frontend status — 🔧 Backend-only (no UI)
+### 8.5 Frontend status — 🟡 Partial (comments UI on the legacy task surface)
+
+> **Update (M4):** a comment thread now ships. `useComments` +
+> `CommentsThread` (list / create / edit / delete) are mounted in
+> `TaskModal` (the live, default task surface): viewers can comment,
+> authors can edit their own comment, and the author or a project owner
+> can delete. A mention multi-select lets the author notify project
+> members; a mention-bearing create invalidates the notifications query,
+> so the §9 bell badge now has a real producer. Still open: the routed
+> `TaskDetailPanel` does not yet host the thread. The paragraph below
+> documents the pre-M4 state for history.
 
 There is **no comment UI of any kind.** The `IComment` interface exists, but there is **no `useComments` hook** and **no comment component** (verified). Neither task surface (`TaskModal`, `TaskDetailPanel`) renders a comment thread. Comments — and therefore @mention notifications — can only be created today by calling the API directly. (Note: when a mention notification *is* produced by some client, the **notifications inbox in §9 does render it** — the consumer side is wired even though the producer side has no UI.)
 
@@ -433,8 +452,8 @@ The single, auditable map. Legend per §2.3.
 | ---------------------------------------- | --------- | ---------------------------------------------------------------------------------------- |
 | Project CRUD                             | ✅        | `ProjectModal` (create/edit name·org·manager); project list; project-detail shell.       |
 | Ownership transfer (`PUT managerId`)     | 🟡        | Manager picker exists in `ProjectModal` edit; no dedicated transfer flow.                |
-| Project member roster (read)             | 🟡        | Read once by `useProjectMembers` → `TaskModal` assignee picker; `role` never rendered.   |
-| Project member add/change-role/remove    | 🔧        | **No UI.** No Members tab, no controls anywhere.                                          |
+| Project member roster (read)             | ✅        | `ProjectMembersManager` renders the roster + `role`; also read by the `TaskModal` assignee picker. |
+| Project member add/change-role/remove    | ✅        | `ProjectMembersManager` at `/projects/:projectId/members` (owner-gated add / change-role / remove; manager row immutable; read-only for non-owners). |
 | Columns: create/rename/delete/reorder    | ✅        | `ColumnCreator`, column header, drag-reorder.                                             |
 | Column WIP limit (`wipLimit`)            | 🔧        | **No control.** Modeled in `IColumn`; referenced by no component. Plain count badge only.|
 | Task CRUD (base fields)                  | ✅        | `TaskModal` and `TaskDetailPanel`; cards; inline title rename.                            |
@@ -446,8 +465,8 @@ The single, auditable map. Legend per §2.3.
 | Task bulk update (`PUT /tasks/bulk`)     | 🔧        | **No UI.** No board multi-select; endpoint has no FE caller at all.                       |
 | Labels — list + apply                    | 🟡        | Read via `useLabels`; applied via `TaskModal` picker; chips on cards.                     |
 | Labels — create/edit/delete UI           | 🔧        | **No UI.** `createLabel` has zero callers; no labels page/modal.                          |
-| Comments (CRUD + thread)                 | 🔧        | **No UI.** No `useComments` hook, no comment component; no thread on either task surface. |
-| @mentions (producer)                     | 🔧        | **No UI.** Mentions are an API-only input today.                                          |
+| Comments (CRUD + thread)                 | 🟡        | `useComments` + `CommentsThread` (list/create/edit/delete) mounted in `TaskModal` (legacy surface); not yet on the routed `TaskDetailPanel`. |
+| @mentions (producer)                     | ✅        | Mention multi-select in `CommentsThread`; a mention-bearing create invalidates the notifications query so the bell badge refreshes.                                          |
 | Notifications inbox (consumer)           | ✅        | `notificationBell` + `inbox.tsx` Mentions section + `useNotifications`.                   |
 
 ---
@@ -493,12 +512,12 @@ Unbuilt FE work and natural extension points. None of these are server-side gaps
 
 | Gap                                            | What's missing (FE)                                                                              | Extension point                                                  |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| ⬜ Member management                            | A Members tab / panel with add, change-role, remove; render `IProjectMember.role`.               | `useProjectMembers` already reads the roster; add mutations + a `projects/members` UI. |
+| ✅ Member management                            | Shipped (M4): `ProjectMembersManager` at `/projects/:projectId/members` — owner-gated add / change-role / remove; manager row immutable; read-only for non-owners. | `useProjectMemberMutations` over `projects/members`. |
 | ⬜ WIP-limit control                            | A WIP input on column create/edit; an overflow indicator on the column header.                   | `wipLimit` is modeled and validated; wire `board` PUT + a header badge. |
 | ⬜ Task richness on the routed panel            | Port the five richness fields from `TaskModal` into `TaskDetailPanel` before flipping `taskPanelRouted`. | Field set already exists in `TaskModal`; copy into the panel body. |
 | ⬜ Bulk edit UI                                 | Board multi-select + a fan-out edit affordance calling `PUT /tasks/bulk`.                         | Endpoint is complete (§6.2.1) with no caller.                   |
 | ⬜ Label management UI                          | A labels page/modal with create/edit/delete; wire the existing `createLabel`.                    | `useLabels.createLabel` exists with zero callers.               |
-| ⬜ Comments + @mentions UI                      | A `useComments` hook + a comment thread component on the task surface(s); a mention composer.     | Full comment/notification backend (§8–§9) awaits a producer UI. |
+| ✅ Comments + @mentions UI                      | Shipped (M4) on `TaskModal`: `useComments` + `CommentsThread` (list/create/edit/delete) with a mention multi-select. Remaining: port to the routed `TaskDetailPanel`. | `useComments`; mention-bearing create invalidates the notifications query. |
 | ⬜ Assignees / sub-tasks on cards               | Render `assigneeIds` (avatar stack) and a sub-task hierarchy/tree view.                           | Cards already resolve `labelIds`; same threading applies.       |
 | ⬜ Notification kinds beyond `mention`          | `kind` is free-form; new kinds (assignment, due-soon, mention-on-edit) need producers + FE rows.  | `notification_service.create` is generic and extensible.        |
 

@@ -37,6 +37,7 @@ const ProjectPage = lazy(() => import("../pages/project"));
 const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
 const ReportsPage = lazy(() => import("../pages/reports"));
+const MembersPage = lazy(() => import("../pages/members"));
 const SharePage = lazy(() => import("../pages/share"));
 const InboxPage = lazy(() => import("../pages/inbox"));
 const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
@@ -328,6 +329,19 @@ const routes = [
                                       path: "board",
                                       element: <BoardPage />
                                   },
+                            /*
+                             * M4 project members surface. Sibling of
+                             * board / reports under the project detail
+                             * shell so the in-project nav can point at
+                             * a "Members" entry. The page is a thin
+                             * shell around `ProjectMembersManager`,
+                             * which owns the roster + owner-gated add /
+                             * change-role / remove controls.
+                             */
+                            {
+                                path: "members",
+                                element: <MembersPage />
+                            },
                             /*
                              * Phase 4.7 reports landing. Placeholder
                              * surface — establishes the URL + nav
