@@ -2,7 +2,8 @@ import {
     ClockCircleOutlined,
     FlagFilled,
     HolderOutlined,
-    MoreOutlined
+    MoreOutlined,
+    StopOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
@@ -483,6 +484,24 @@ const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
 };
 
 /**
+ * Blocked indicator on the card footer (PRD §4.5). Like `PriorityBadge` and
+ * `OverdueChip`, it is deliberately NOT colour-only: a stop glyph pairs with
+ * the visible "Blocked" label and an `aria-label` so the signal reads for
+ * colour-blind and screen-reader users alike (WCAG 1.4.1). The badge renders
+ * only when the server-derived `task.blockedBy` array is non-empty — i.e. the
+ * task has ≥1 unfinished prerequisite — so a task with no dependencies (or one
+ * whose prerequisites are all done) shows nothing.
+ */
+const BlockedBadge = styled.span`
+    align-items: center;
+    color: var(--ant-color-error, #dc2626);
+    display: inline-flex;
+    font-weight: ${fontWeight.semibold};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
  * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
  * lens predicates, so a task due "today" is NOT overdue and a midnight-
@@ -917,6 +936,12 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const priority: TaskPriorityLevel | undefined = task.priority;
         const activePriority: Exclude<TaskPriorityLevel, "none"> | null =
             priority !== undefined && priority !== "none" ? priority : null;
+        // Blocked badge (PRD §4.5): the server returns `blockedBy` — the ids of
+        // this task's UNFINISHED prerequisites — on `GET /tasks`. A non-empty
+        // array means the task can't start yet, so the badge surfaces; an
+        // empty/absent array renders nothing. Read-only signal in this slice.
+        const blocked =
+            Array.isArray(task.blockedBy) && task.blockedBy.length > 0;
         // Read per-result strength from the AI search cache (P1-2). Returns
         // null when no semantic filter is active, so the badge stays out of
         // the way during normal browsing.
@@ -1204,6 +1229,17 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         </span>
                     </TaskTypeBadge>
                     <CardMeta>
+                        {blocked ? (
+                            <BlockedBadge
+                                aria-label={
+                                    microcopy.a11y.blockedTask as string
+                                }
+                                data-testid="task-card-blocked"
+                            >
+                                <StopOutlined aria-hidden />
+                                <span>{microcopy.taskCard.blocked}</span>
+                            </BlockedBadge>
+                        ) : null}
                         {activePriority ? (
                             <PriorityBadge
                                 $tint={PRIORITY_TINT[activePriority]}

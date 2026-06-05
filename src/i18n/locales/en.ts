@@ -161,6 +161,7 @@ export const enSource = {
         lensComingSoon: "Coming soon",
         priorityTask: "Priority: {priority}",
         overdueTask: "Overdue — was due {date}",
+        blockedTask: "Blocked by an unfinished prerequisite task",
         renameTask: "Rename task",
         columnReadinessReady: "{ready} of {total} tasks ready",
         columnReadinessGrooming:
@@ -671,7 +672,9 @@ export const enSource = {
     },
     taskCard: {
         /** Visible chip text on an overdue card (paired with an icon, not colour-only). */
-        overdue: "Overdue"
+        overdue: "Overdue",
+        /** Visible chip text on a blocked card (paired with an icon, not colour-only). */
+        blocked: "Blocked"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",

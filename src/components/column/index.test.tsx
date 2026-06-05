@@ -1211,5 +1211,35 @@ describe("Column", () => {
                 screen.queryByTestId("task-card-priority")
             ).not.toBeInTheDocument();
         });
+
+        it("renders a blocked badge (icon + visible label + a11y) when blockedBy is non-empty", () => {
+            // `blockedBy` is the server-derived list of UNFINISHED prerequisite
+            // ids (PRD §4.5); a non-empty array means the task is blocked.
+            renderColumn({
+                tasks: [task({ blockedBy: ["task-99"] })]
+            });
+
+            const badge = screen.getByTestId("task-card-blocked");
+            // Not colour-only: the visible word "Blocked" carries the signal.
+            expect(badge).toHaveTextContent(/blocked/i);
+            // The accessible name explains why the task is flagged.
+            expect(badge).toHaveAttribute(
+                "aria-label",
+                microcopy.a11y.blockedTask as string
+            );
+        });
+
+        it("renders NO blocked badge when blockedBy is empty or absent", () => {
+            renderColumn({
+                tasks: [
+                    task({ _id: "b-empty", blockedBy: [] }),
+                    task({ _id: "b-absent" })
+                ]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-blocked")
+            ).not.toBeInTheDocument();
+        });
     });
 });

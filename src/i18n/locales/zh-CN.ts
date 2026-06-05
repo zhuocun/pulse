@@ -157,6 +157,7 @@ const zhCN: Dictionary = {
         lensComingSoon: "敬请期待",
         priorityTask: "优先级:{priority}",
         overdueTask: "已逾期 — 截止于 {date}",
+        blockedTask: "被未完成的前置任务阻塞",
         renameTask: "重命名任务",
         columnReadinessReady: "{total} 个任务中已就绪 {ready} 个",
         columnReadinessGrooming: "{total} 个任务中已就绪 {ready} 个 — 需要整理",
@@ -559,7 +560,8 @@ const zhCN: Dictionary = {
         aiAssistLabel: "AI 辅助"
     },
     taskCard: {
-        overdue: "已逾期"
+        overdue: "已逾期",
+        blocked: "已阻塞"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",

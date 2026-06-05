@@ -24,4 +24,8 @@ interface ITask {
     assigneeIds?: string[];
     parentTaskId?: string | null;
     priority?: TaskPriorityLevel;
+    /** Stored prerequisite task ids — the tasks this one depends on (PRD §4.5). Sent by the client; the dependency editor lands in a later slice. */
+    dependsOn?: string[];
+    /** Server-derived ids of this task's UNFINISHED prerequisites (PRD §4.5). Returned by `GET /tasks`, never sent by the client; a non-empty array means the task is blocked. */
+    blockedBy?: string[];
 }
