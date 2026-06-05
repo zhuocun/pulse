@@ -795,6 +795,46 @@ export const enSource = {
         you: "You",
         unknownAuthor: "Unknown user"
     },
+    /*
+     * Project member management (M4 — backend Collaboration feature).
+     * The Members surface lists the project roster with each member's
+     * role and lets a project owner add members from the global user
+     * directory, change roles, and remove members. The manager row is
+     * immutable server-side (the project's `managerId` cannot be
+     * demoted or removed), so the UI disables those controls and shows
+     * a badge + hint. Read-only viewers see the roster as tags with no
+     * controls. Button verbs that already exist (`actions.cancel`) are
+     * reused; only the members-specific labels, aria-names, role names,
+     * and error copy live here.
+     */
+    members: {
+        heading: "Members",
+        addHeading: "Add a member",
+        addUserPlaceholder: "Select a user",
+        addRolePlaceholder: "Select a role",
+        addButton: "Add member",
+        adding: "Adding…",
+        remove: "Remove",
+        removeConfirmTitle: "Remove {name} from this project?",
+        changeRoleAriaLabel: "Change role for {name}",
+        removeAriaLabel: "Remove {name}",
+        managerBadge: "Manager",
+        managerImmutableHint:
+            "The project manager's role can't be changed or removed.",
+        readOnlyHint: "Only a project owner can manage members.",
+        empty: "No members yet.",
+        loadError: "Couldn't load members. Please try again.",
+        addError: "Couldn't add the member. Please try again.",
+        updateError: "Couldn't update the role. Please try again.",
+        removeError: "Couldn't remove the member. Please try again.",
+        noAddableUsers: "Everyone in your directory is already a member.",
+        listAriaLabel: "Project members",
+        roles: {
+            owner: "Owner",
+            editor: "Editor",
+            viewer: "Viewer"
+        }
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",
@@ -869,7 +909,15 @@ export const enSource = {
          * before the project query resolves.
          */
         reports: "Reports",
-        reportsWithProject: "Reports · {project}"
+        reportsWithProject: "Reports · {project}",
+        /*
+         * M4 project members surface. Mirrors the reports title pattern:
+         * the project name is interpolated at the page level (see
+         * `pages/members.tsx`); the bare "Members" form is the fallback
+         * before the project query resolves.
+         */
+        members: "Members",
+        membersWithProject: "Members · {project}"
     },
     empty: {
         projects: {

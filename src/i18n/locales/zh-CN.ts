@@ -647,6 +647,33 @@ const zhCN: Dictionary = {
         you: "你",
         unknownAuthor: "未知用户"
     },
+    members: {
+        heading: "成员",
+        addHeading: "添加成员",
+        addUserPlaceholder: "选择用户",
+        addRolePlaceholder: "选择角色",
+        addButton: "添加成员",
+        adding: "添加中…",
+        remove: "移除",
+        removeConfirmTitle: "确认将 {name} 从此项目移除?",
+        changeRoleAriaLabel: "更改 {name} 的角色",
+        removeAriaLabel: "移除 {name}",
+        managerBadge: "负责人",
+        managerImmutableHint: "项目负责人的角色无法更改或移除。",
+        readOnlyHint: "只有项目所有者才能管理成员。",
+        empty: "暂无成员。",
+        loadError: "无法加载成员,请重试。",
+        addError: "无法添加成员,请重试。",
+        updateError: "无法更新角色,请重试。",
+        removeError: "无法移除成员,请重试。",
+        noAddableUsers: "目录中的所有用户都已是成员。",
+        listAriaLabel: "项目成员",
+        roles: {
+            owner: "所有者",
+            editor: "编辑者",
+            viewer: "查看者"
+        }
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
@@ -708,7 +735,9 @@ const zhCN: Dictionary = {
          * 详见 `pages/reports.tsx`。在项目查询完成前回退到无名版本。
          */
         reports: "报告",
-        reportsWithProject: "报告 · {project}"
+        reportsWithProject: "报告 · {project}",
+        members: "成员",
+        membersWithProject: "成员 · {project}"
     },
     empty: {
         projects: {

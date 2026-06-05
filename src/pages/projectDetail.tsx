@@ -349,7 +349,11 @@ const ProjectDetailPage = () => {
     const segments = pathname.split("/").filter(Boolean);
     const activeChild = segments[segments.length - 1];
     const childCrumbTitle =
-        activeChild === "reports" ? microcopy.breadcrumb.reports : null;
+        activeChild === "reports"
+            ? microcopy.breadcrumb.reports
+            : activeChild === "members"
+              ? microcopy.labels.members
+              : null;
 
     /*
      * Browser tab title mirrors the current project. Leaf child
@@ -365,7 +369,8 @@ const ProjectDetailPage = () => {
      * Reports route skips so its own `useTitle("Reports · {project}")`
      * commits last and sticks.
      */
-    const shellOwnsTitle = activeChild !== "reports";
+    const shellOwnsTitle =
+        activeChild !== "reports" && activeChild !== "members";
     const shellTitle = project?.projectName ?? microcopy.labels.project;
     useEffect(() => {
         if (!shellOwnsTitle) return;
@@ -441,6 +446,13 @@ const ProjectDetailPage = () => {
                             viewTransition
                         >
                             {microcopy.labels.board}
+                        </ChildNavLink>
+                        <ChildNavLink
+                            end
+                            to={`/projects/${projectId}/members`}
+                            viewTransition
+                        >
+                            {microcopy.labels.members}
                         </ChildNavLink>
                         <ChildNavLink
                             end

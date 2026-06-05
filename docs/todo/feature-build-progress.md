@@ -37,10 +37,20 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
   multi-assignee, sub-tasks (`parentTaskId`), per-column WIP limits, bulk
   task endpoint `PUT /api/v1/tasks/bulk`.
 - [x] **M3 — Comments + @mentions; Notifications model + bell (backend)**.
-- [ ] **M4 — Frontend surfaces for M1–M3** (members tab, task fields,
+- [x] **M4 — Frontend surfaces for M1–M3** (members tab, task fields,
   lensChips dueDate activation, notifications bell, comments UI).
   - [x] M4a: notifications bell + Inbox Mentions wiring (useNotifications, header bell)
   - [x] M4b: task richness in board UI (dates, labels, assignees, sub-task parent, overdue + label chips, date lenses)
+  - [x] M4c: comments + @mentions UI — `useComments` hook + `CommentsThread`
+    mounted in `TaskModal` (list/create/edit/delete; author-only edit,
+    author-or-owner delete; mention multi-select fans out to the
+    notifications bell by invalidating the notifications query on a
+    mention-bearing create). Closes the producer side of the
+    notifications loop (M4a was the consumer).
+  - [x] M4d: project member management UI — `/projects/:projectId/members`
+    route + `ProjectMembersManager` (roster with roles; owner-gated add /
+    change-role / remove; manager row immutable; read-only for
+    non-owners) + `useProjectMemberMutations`.
 - [ ] **M5 — Unified Copilot rail rebuild; action-capable command palette;
   shared saved views; cross-project search**.
 - [ ] **M6 — Reporting (velocity/WIP/throughput); admin AI-gating
