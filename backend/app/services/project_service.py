@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
-from app.database import COLUMNS, ORGANIZATIONS, PROJECTS, TASKS, USERS
+from app.database import COLUMNS, ORGANIZATIONS, PROJECTS, TASKS, USERS, now
 from app.repositories import repository
 from app.services.column_seed import ensure_default_columns
 from app.services.organization_service import (
@@ -166,6 +166,8 @@ def get(
     manager_id: Optional[str],
     *,
     viewer_id: str,
+    include_archived: bool = False,
+    include_trashed: bool = False,
 ) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]], str]]:
     """Return projects visible to ``viewer_id`` (the authenticated caller).
 
@@ -180,6 +182,15 @@ def get(
     members-only visibility via the back-compat fallback in
     ``_org_visible``. Direct-by-id access below is deliberately NOT
     org-scoped -- we narrow enumeration, not direct reads.
+
+    The LISTING also default-excludes trashed (``deletedAt`` set) and
+    archived (``archivedAt`` set) projects (PRD §5.4/§5.5, AC-W9/W10/W11);
+    ``include_trashed`` / ``include_archived`` opt them back in. Filtering
+    is done in Python because the repository/FakeStore only support
+    exact-equality queries (no operator dicts). The single-get branch is
+    deliberately NOT filtered: a direct-by-id read of a trashed/archived
+    project still returns it (mirroring task single-get) so the restore /
+    archive flows can load the row.
     """
 
     if project_id is not None:
@@ -208,6 +219,8 @@ def get(
         for doc in repository.find_many(PROJECTS, query)
         if can_access(doc, viewer_id, ROLE_VIEWER)
         and _org_visible(doc, viewer_org_ids)
+        and (include_trashed or doc.get("deletedAt") is None)
+        and (include_archived or doc.get("archivedAt") is None)
     ]
     return repository.serialize_documents(projects)
 
@@ -233,7 +246,11 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Project updated"
 
 
-def remove(project_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(
+    project_id: Optional[str], user_id: str, purge: bool = False
+) -> Optional[str]:
+    # Project deletion is MANAGER-ONLY (the historical gate): only the
+    # ``managerId`` may delete, restore, or archive -- not an editor member.
     if project_id is None:
         return "Bad request"
     project = repository.find_by_id(PROJECTS, project_id)
@@ -241,14 +258,69 @@ def remove(project_id: Optional[str], user_id: str) -> Optional[str]:
         return "Project not found"
     if str(project.get("managerId")) != str(user_id):
         return "Forbidden"
-    # Deletion order: leaves first so a partial failure leaves a
-    # well-formed (read-only) project rather than orphaned columns or
-    # tasks. Multi-backend transactions are out of scope; this ordering
-    # at least keeps retries idempotent.
+
+    if not purge:
+        # Default: soft delete (move the project to trash, PRD §5.5). Stamp
+        # ``deletedAt`` and leave the project's tasks + columns intact so a
+        # later ``restore`` brings the whole project back losslessly. The
+        # cascade is deferred to the hard ``purge`` below.
+        repository.update_by_id(PROJECTS, project_id, {"deletedAt": now()})
+        return "Project deleted"
+
+    # ``purge=True``: legacy hard cascade. Deletion order: leaves first so a
+    # partial failure leaves a well-formed (read-only) project rather than
+    # orphaned columns or tasks. Multi-backend transactions are out of
+    # scope; this ordering at least keeps retries idempotent.
     repository.delete_many(TASKS, {"projectId": project_id})
     repository.delete_many(COLUMNS, {"projectId": project_id})
     repository.delete_by_id(PROJECTS, project_id)
     return "Project deleted"
+
+
+def restore(project_id: Optional[str], user_id: str) -> Optional[str]:
+    """Un-trash / un-archive a project (PRD §5.4/§5.5). MANAGER-ONLY.
+
+    Clears BOTH ``deletedAt`` and ``archivedAt`` so a restore from trash
+    brings the project all the way back to the active listing in one step.
+    Returns ``"Project not found"`` (router -> 404) when the id is
+    missing/unknown, ``"Forbidden"`` when the caller is not the manager,
+    else ``"Project restored"``.
+    """
+
+    project = repository.find_by_id(PROJECTS, project_id or "")
+    if project is None:
+        return "Project not found"
+    if str(project.get("managerId")) != str(user_id):
+        return "Forbidden"
+    repository.update_by_id(
+        PROJECTS, str(project["_id"]), {"deletedAt": None, "archivedAt": None}
+    )
+    return "Project restored"
+
+
+def archive(project_id: Optional[str], user_id: str, archived: Any) -> Optional[str]:
+    """Archive / unarchive a project (PRD §5.4). MANAGER-ONLY.
+
+    Stamps ``archivedAt`` (archive) or clears it (unarchive) based on the
+    boolean ``archived`` flag. Existence + access are checked BEFORE the
+    body is validated so a non-manager cannot probe a project's existence
+    via a malformed payload. Returns ``"Project not found"`` (router ->
+    404) when the id is missing/unknown, ``"Forbidden"`` when the caller is
+    not the manager, ``"Bad request"`` when ``archived`` is not a bool,
+    else ``"Project archived"``.
+    """
+
+    project = repository.find_by_id(PROJECTS, project_id or "")
+    if project is None:
+        return "Project not found"
+    if str(project.get("managerId")) != str(user_id):
+        return "Forbidden"
+    if not isinstance(archived, bool):
+        return "Bad request"
+    repository.update_by_id(
+        PROJECTS, str(project["_id"]), {"archivedAt": now() if archived else None}
+    )
+    return "Project archived"
 
 
 # ---------------------------------------------------------------------------

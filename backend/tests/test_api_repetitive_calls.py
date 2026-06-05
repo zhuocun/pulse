@@ -576,6 +576,13 @@ def test_repeated_delete_of_same_project_returns_404_after_first(
     The FE sometimes fires a delete twice (debounce flake); the second
     must not crash. A regression that 500'd the second call would
     surface as a "scary" red banner on a benign user action.
+
+    Uses ``purge=true`` so the row is actually removed: a plain DELETE now
+    soft-deletes (the project row survives with ``deletedAt`` stamped), so a
+    repeated plain DELETE would re-soft-delete the still-present row and keep
+    returning 200 -- the hard purge is what makes the second call a genuine
+    404. The soft-delete-then-restore idempotency is covered separately in
+    ``test_project_lifecycle``.
     """
 
     logged_in = register_and_login(client)
@@ -583,7 +590,7 @@ def test_repeated_delete_of_same_project_returns_404_after_first(
     headers = auth_headers(logged_in["jwt"])
 
     response = client.delete(
-        f"/api/v1/projects/?projectId={ids['project_id']}",
+        f"/api/v1/projects/?projectId={ids['project_id']}&purge=true",
         headers=headers,
     )
     assert response.status_code == HTTPStatus.OK
@@ -591,7 +598,7 @@ def test_repeated_delete_of_same_project_returns_404_after_first(
 
     for _ in range(8):
         response = client.delete(
-            f"/api/v1/projects/?projectId={ids['project_id']}",
+            f"/api/v1/projects/?projectId={ids['project_id']}&purge=true",
             headers=headers,
         )
         assert response.status_code == HTTPStatus.NOT_FOUND
@@ -1266,8 +1273,11 @@ def test_project_delete_cascades_under_heavy_fixture(
     assert len(store.find_many(COLUMNS, {"projectId": ids["project_id"]})) >= 9
     assert len(store.find_many(TASKS, {"projectId": ids["project_id"]})) >= 21
 
+    # ``purge=true`` exercises the legacy hard cascade: a plain DELETE now
+    # only soft-deletes (stamps ``deletedAt``, leaving every column + task
+    # row intact), so the full wipe asserted below is the purge path.
     response = client.delete(
-        f"/api/v1/projects/?projectId={ids['project_id']}", headers=headers
+        f"/api/v1/projects/?projectId={ids['project_id']}&purge=true", headers=headers
     )
     assert response.status_code == HTTPStatus.OK
     assert store.find_many(COLUMNS, {"projectId": ids["project_id"]}) == []

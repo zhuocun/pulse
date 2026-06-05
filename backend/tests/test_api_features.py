@@ -1122,8 +1122,12 @@ def test_project_delete_cascades_columns_and_tasks(
     ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
     headers = auth_headers(logged_in["jwt"])
 
+    # ``purge=true`` so the legacy hard cascade runs: a plain DELETE now
+    # soft-deletes (stamps ``deletedAt`` and leaves the project's columns +
+    # tasks intact so a restore is lossless), so the cascade that wipes the
+    # child rows is the purge path (PRD §5.4/§5.5).
     response = client.delete(
-        f"/api/v1/projects/?projectId={ids['project_id']}",
+        f"/api/v1/projects/?projectId={ids['project_id']}&purge=true",
         headers=headers,
     )
 

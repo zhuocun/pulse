@@ -42,13 +42,21 @@ def get_projects(
     projectName: Optional[str] = Query(default=None),
     managerId: Optional[str] = Query(default=None),
     projectId: Optional[str] = Query(default=None),
+    includeArchived: bool = Query(default=False),
+    includeTrashed: bool = Query(default=False),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> Union[Dict[str, Any], list]:
+    # Archived/trashed projects are excluded from the LISTING by default
+    # (PRD §5.4/§5.5); the opt-in flags widen the enumeration so the
+    # archive/trash views can show them. A direct-by-id read is never
+    # filtered, so the flags are inert when ``projectId`` is supplied.
     result = project_service.get(
         projectId,
         projectName,
         managerId,
         viewer_id=current_user_id(payload),
+        include_archived=includeArchived,
+        include_trashed=includeTrashed,
     )
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
@@ -75,9 +83,14 @@ def update_project(
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_project(
     projectId: Optional[str] = Query(default=None),
+    purge: bool = Query(default=False),
     payload: Dict[str, Any] = Depends(current_user_payload),
 ) -> str:
-    result = project_service.remove(projectId, current_user_id(payload))
+    # Default DELETE soft-deletes (moves the project to trash, PRD §5.5);
+    # ``?purge=true`` keeps the legacy hard cascade (delete the project plus
+    # its columns + tasks). Both return "Project deleted" so the contract is
+    # unchanged. Project deletion is MANAGER-ONLY (gated in the service).
+    result = project_service.remove(projectId, current_user_id(payload), purge=purge)
     if result == "Project deleted":
         return result
     if result == "Project not found":
@@ -85,6 +98,44 @@ def remove_project(
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
     api_error(status.HTTP_400_BAD_REQUEST, result or "Bad request")
+
+
+@router.put("/restore", status_code=status.HTTP_200_OK)
+def restore_project(
+    data: Dict[str, Any] = Body(default_factory=dict),
+    payload: Dict[str, Any] = Depends(current_user_payload),
+) -> str:
+    # Un-trash / un-archive a project (PRD §5.4/§5.5): clears both markers so
+    # a restore from trash brings the project all the way back to the active
+    # listing. MANAGER-ONLY (gated in the service). Body key ``projectId``
+    # matches the DELETE query param + the member endpoints.
+    result = project_service.restore(data.get("projectId"), current_user_id(payload))
+    if result == "Project restored":
+        return result
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    api_error(status.HTTP_404_NOT_FOUND, result or "Project not found")
+
+
+@router.put("/archive", status_code=status.HTTP_200_OK)
+def archive_project(
+    data: Dict[str, Any] = Body(default_factory=dict),
+    payload: Dict[str, Any] = Depends(current_user_payload),
+) -> str:
+    # Archive / unarchive a project (PRD §5.4). MANAGER-ONLY. Existence +
+    # access are checked inside the service BEFORE ``archived`` is validated
+    # so a non-manager cannot probe a project's existence via a malformed
+    # body. Body key ``projectId`` matches the member endpoints.
+    result = project_service.archive(
+        data.get("projectId"), current_user_id(payload), data.get("archived")
+    )
+    if result == "Project archived":
+        return result
+    if result == "Bad request":
+        api_error(status.HTTP_400_BAD_REQUEST, result)
+    if result == "Forbidden":
+        api_error(status.HTTP_403_FORBIDDEN, result)
+    api_error(status.HTTP_404_NOT_FOUND, result or "Project not found")
 
 
 # ---------------------------------------------------------------------------

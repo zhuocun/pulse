@@ -34,6 +34,14 @@ TABLE_FIELDS = {
         # tripping the field allowlist. Whitelisting a field never forces
         # it onto a document, so existing project behaviour is unchanged.
         "organizationId",
+        # Soft-archive / soft-delete (trash) markers (PRD §5.4 / §5.5):
+        # tz-aware ``datetime`` (serialized to ISO on read) or ``null``.
+        # ``null`` means active; ``archivedAt`` set hides the project from
+        # the default ``GET /projects`` listing, ``deletedAt`` set moves it
+        # to trash. Both are managed ONLY by the archive/trash/restore
+        # endpoints, never via a raw PUT /projects body.
+        "archivedAt",
+        "deletedAt",
         "createdAt",
         "updatedAt",
     },
