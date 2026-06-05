@@ -103,7 +103,7 @@ escalation), both fixed before landing.
 **Frontend surfaces — making the landed backend visible**
 - [x] Dependency "blocked" badge on board cards (consumes derived `blockedBy`) (FE-1) — `92b4ebef`
 - [ ] Task lifecycle UI — archive/trash actions + Trash/Archive view + restore (FE-2)
-- [ ] Dependency editor — manage `dependsOn` in the task modal + read-only "Blocks" inverse (FE-3)
+- [x] Dependency editor — `dependsOn` multi-select in the task modal + read-only "Blocks" inverse (FE-3) — `f2465d4e`
 - [ ] `completedAt` "completed" card styling (FE-4)
 
 **Also pending — M5 saved-views server model:** work-management-depth
