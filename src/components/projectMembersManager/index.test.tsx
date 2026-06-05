@@ -285,6 +285,38 @@ describe("ProjectMembersManager", () => {
         );
     });
 
+    it("renders a guest member's role as a localized badge", () => {
+        // Viewed by a non-owner so every role renders as a read-only tag;
+        // the guest tier (rank 0, below viewer) must surface its own label.
+        setRoster({
+            data: [
+                ...roster,
+                {
+                    _id: "user-grace",
+                    username: "grace",
+                    email: "g@x.io",
+                    role: "guest"
+                }
+            ]
+        });
+        setUser("user-bob"); // editor → read-only roster, roles as tags
+        renderManager();
+        expect(
+            within(rowFor("user-grace")).getByTestId("member-role-tag")
+        ).toHaveTextContent(microcopy.members.roles.guest);
+    });
+
+    it("offers guest among the add-member role options", async () => {
+        renderManager();
+        const roleSelect = screen.getByTestId("member-add-role");
+        fireEvent.mouseDown(within(roleSelect).getByRole("combobox"));
+        expect(
+            await screen.findByText(microcopy.members.roles.guest, {
+                selector: ".ant-select-item-option-content"
+            })
+        ).toBeInTheDocument();
+    });
+
     it("only offers directory users who aren't already on the roster", async () => {
         renderManager();
         const userSelect = screen.getByTestId("member-add-user");

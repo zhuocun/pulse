@@ -13,13 +13,17 @@ from app.validation import clean_filter
 _PROJECT_UPDATE_FIELDS = frozenset({"projectName", "organization", "managerId"})
 
 # Role-based access control. Roles are totally ordered (owner > editor >
-# viewer); a gate expressed as ``min_role`` passes for any role whose
-# rank is >= the gate's rank.
+# viewer > guest); a gate expressed as ``min_role`` passes for any role
+# whose rank is >= the gate's rank. ``guest`` (rank 0) sits below every
+# existing gate — including the viewer-gated reads — so it is a recorded
+# membership with no read or write right (it fails ``can_access`` for any
+# ``min_role`` and so is excluded from listings, the roster, and writes).
 ROLE_OWNER = "owner"
 ROLE_EDITOR = "editor"
 ROLE_VIEWER = "viewer"
-VALID_ROLES = frozenset({ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER})
-ROLE_RANK = {ROLE_VIEWER: 1, ROLE_EDITOR: 2, ROLE_OWNER: 3}
+ROLE_GUEST = "guest"
+VALID_ROLES = frozenset({ROLE_OWNER, ROLE_EDITOR, ROLE_VIEWER, ROLE_GUEST})
+ROLE_RANK = {ROLE_GUEST: 0, ROLE_VIEWER: 1, ROLE_EDITOR: 2, ROLE_OWNER: 3}
 
 
 def _resolve_project(

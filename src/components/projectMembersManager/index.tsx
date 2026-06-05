@@ -46,8 +46,13 @@ import UserAvatar from "../userAvatar";
 
 const PROJECT_QUERY = "projects" as const;
 
-type ProjectRole = "owner" | "editor" | "viewer";
-const ROLE_ORDER: readonly ProjectRole[] = ["owner", "editor", "viewer"];
+type ProjectRole = "owner" | "editor" | "viewer" | "guest";
+const ROLE_ORDER: readonly ProjectRole[] = [
+    "owner",
+    "editor",
+    "viewer",
+    "guest"
+];
 const DEFAULT_NEW_ROLE: ProjectRole = "viewer";
 
 const Wrapper = styled.section`
@@ -251,7 +256,12 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
     );
 
     const roleLabel = useCallback((role: string): string => {
-        if (role === "owner" || role === "editor" || role === "viewer") {
+        if (
+            role === "owner" ||
+            role === "editor" ||
+            role === "viewer" ||
+            role === "guest"
+        ) {
             return microcopyString(microcopy.members.roles[role]);
         }
         return role;
