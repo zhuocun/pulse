@@ -100,6 +100,12 @@ escalation), both fixed before landing.
 - [ ] Comment reactions / threads / edit-history; per-task activity timeline
 - [ ] Transactional email + web-push delivery (infra-heavy — later)
 
+**Frontend surfaces — making the landed backend visible**
+- [x] Dependency "blocked" badge on board cards (consumes derived `blockedBy`) (FE-1) — `92b4ebef`
+- [ ] Task lifecycle UI — archive/trash actions + Trash/Archive view + restore (FE-2)
+- [ ] Dependency editor — manage `dependsOn` in the task modal + read-only "Blocks" inverse (FE-3)
+- [ ] `completedAt` "completed" card styling (FE-4)
+
 **Also pending — M5 saved-views server model:** work-management-depth
 defers saved-view *persistence* to M5, built just before the alternate-views
 slice that consumes it.
