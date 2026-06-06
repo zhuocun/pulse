@@ -83,7 +83,9 @@ escalation), both fixed before landing.
 - [x] Dependencies — derived `blockedBy` signal on `GET /tasks` (unfinished prerequisites; powers the §4.5 badge) (L-DEP-C) — `40d0f262`
 - [x] Milestones — project-scoped `milestones` collection + CRUD (viewer-read/editor-write); `/api/v1/milestones` router + comprehensive RBAC/validation tests (backend) — `143866e4`
 - [x] Task→milestone assignment backend (`task.milestoneId` scalar FK + same-project validation + FK-null delete-cascade; bulk-excluded) — `293f3b30`
-- [ ] Milestone FE surface (milestone select in the task modal; milestone management UI)
+- [ ] Milestone FE surface (recon `a0a1f195` mapped the integration):
+  - [x] FE-MS-1: milestone manager (list/create/edit/delete) — `/projects/:projectId/milestones` route + nav tab + `useMilestones`/`useMilestoneMutations` + `IMilestone`; editor-gated writes (fail-closed `canManage`). No task-modal clear wrinkle — `83cc9d6b`
+  - [ ] FE-MS-2: task-modal milestone single-select (mirror `parentTaskId`) + card milestone chip (thread `milestones` board→column→card like `labels`; `Column` is memoized → frozen stable ref). MUST handle the scalar-FK clear-semantics caveat (see carry-forward).
 - [ ] Iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
@@ -145,6 +147,19 @@ slice that consumes it.
   tsc/eslint/prettier/smoke but NOT jest, so a broken consumer test slips
   through. The trash filter (`a43afd70`) broke `board.test.tsx`'s trash-button
   test (its fixtures set no `deletedAt`); caught + fixed in `e31adf95`.
+- FE clear-semantics for nullable scalar FKs (`task.milestoneId`,
+  `parentTaskId`): `filterRequest` (`utils/filterRequest.ts`) strips
+  `null`/`undefined`/`""` from every request body (used by
+  useReactMutation/useReactQuery), so a task-modal single-select cleared to
+  null reaches the wire as an ABSENT KEY, and the task PUT
+  (`_TASK_UPDATE_FIELDS` filter) treats absent = unchanged → the FK silently
+  reverts on refetch. Multi-selects dodge this (`[]` is non-void, like
+  `dependsOn`); a scalar FK has no non-void "empty" sentinel. So FE-MS-2
+  (task-modal milestone select) must add a targeted escape hatch to send an
+  explicit `milestoneId: null` past `filterRequest` (or a backend
+  clear-sentinel), and should check whether `parentTaskId` clear has the same
+  latent gap. The milestone MANAGER (FE-MS-1) sidesteps this entirely (it
+  drives milestone CRUD, not the task PUT). Recon: `a0a1f195`.
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable
