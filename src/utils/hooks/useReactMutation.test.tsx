@@ -252,6 +252,46 @@ describe("useReactMutation", () => {
         });
     });
 
+    it("preserves an explicit null for a key listed in preserveNullKeys", async () => {
+        const queryClient = createQueryClient();
+        apiMock.mockResolvedValue({ _id: "t1" });
+
+        const { result } = renderHook(
+            () =>
+                useReactMutation(
+                    "tasks",
+                    "PUT",
+                    ["tasks"],
+                    undefined,
+                    undefined,
+                    undefined,
+                    ["milestoneId"]
+                ),
+            {
+                wrapper: createWrapper(queryClient)
+            }
+        );
+
+        await act(async () => {
+            await result.current.mutateAsync({
+                _id: "t1",
+                milestoneId: null,
+                parentTaskId: null
+            });
+        });
+
+        // The opt-in `milestoneId: null` survives to the wire so the backend
+        // CLEARS it; an un-listed void key (`parentTaskId: null`) is still
+        // stripped by the default path.
+        expect(apiMock).toHaveBeenCalledWith("tasks", {
+            data: {
+                _id: "t1",
+                milestoneId: null
+            },
+            method: "PUT"
+        });
+    });
+
     it("converts mutation errors before calling onError", async () => {
         const queryClient = createQueryClient();
         const onError = jest.fn();

@@ -1415,6 +1415,49 @@ describe("TaskModal", () => {
                 })
             );
         });
+
+        it("clearing a set milestone sends milestoneId: null so the backend unassigns it", async () => {
+            // Regression guard: the milestone single-select clears to
+            // `undefined`, which `filterRequest` would normally strip — leaving
+            // the key absent so the backend treats the assignment as unchanged.
+            // The modal opts `milestoneId` into `preserveNullKeys` and maps the
+            // cleared value to an explicit `null`, so the cleared assignment
+            // reaches the wire and the backend CLEARS it.
+            renderModal({
+                initialTasks: [task({ milestoneId: "milestone-1" })],
+                labels: labelFixtures,
+                milestones: milestoneFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The picker is seeded with the task's current milestone ("Beta
+            // launch"); click the allow-clear button to unset it.
+            const milestoneControl = screen
+                .getByRole("combobox", { name: /milestone/i })
+                .closest(".ant-select") as HTMLElement;
+            const clearButton =
+                milestoneControl.querySelector(".ant-select-clear");
+            expect(clearButton).not.toBeNull();
+            fireEvent.mouseDown(clearButton as Element);
+            fireEvent.click(clearButton as Element);
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body._id).toBe("task-1");
+            // The cleared milestone reaches the wire as an explicit `null`
+            // (not dropped), so the backend unassigns it.
+            expect(body.milestoneId).toBeNull();
+        });
     });
 
     // ── FE-3 dependency editor (PRD §4.5) ────────────────────────────────

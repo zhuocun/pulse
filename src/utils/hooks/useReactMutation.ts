@@ -33,7 +33,12 @@ const useReactMutation = <D>(
     queryKey?: QueryKey | string,
     callback?: OptimisticUpdateCallback,
     onError?: (err: Error) => void,
-    setCache?: boolean
+    setCache?: boolean,
+    // Opt-in escape hatch threaded straight into `filterRequest`: keys listed
+    // here survive as long as their value isn't `undefined` (so an explicit
+    // `null`/`""` reaches the wire to CLEAR the field). Omitting it (every
+    // existing caller) leaves the default void-stripping untouched.
+    preserveNullKeys?: readonly string[]
 ) => {
     // AntD v6: the static `message` import warns it can't read dynamic
     // theme. `useAppMessage()` returns a theme-aware instance (with a
@@ -45,7 +50,7 @@ const useReactMutation = <D>(
     const mutation = useMutation<D, unknown, MutationParam, MutationContext>({
         mutationFn: async (param) =>
             (await api(endPoint, {
-                data: filterRequest(param || {}),
+                data: filterRequest(param || {}, preserveNullKeys),
                 method
             })) as D,
         onMutate: callback

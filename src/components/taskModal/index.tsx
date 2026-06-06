@@ -285,7 +285,13 @@ const TaskModal: React.FC<{
         "PUT",
         ["tasks", { projectId }],
         undefined,
-        (err) => setSaveError(err)
+        (err) => setSaveError(err),
+        // `setCache` stays default; the trailing `["milestoneId"]` opts that
+        // one key into `filterRequest`'s preserve path so a cleared
+        // (`null`) milestone reaches the PUT and the backend CLEARS the
+        // assignment instead of treating the stripped/absent key as unchanged.
+        undefined,
+        ["milestoneId"]
     );
     const { mutate: remove, isLoading: dLoading } = useReactMutation(
         "tasks",
@@ -505,6 +511,12 @@ const TaskModal: React.FC<{
             ...fieldValues,
             taskName: trimmedName
         } as ITask;
+        // The milestone single-select clears to `undefined`; convert to an
+        // explicit `null` so the (opt-in `preserveNullKeys`) PUT carries
+        // `milestoneId: null` and the backend CLEARS the assignment (a
+        // stripped/absent key would leave it unchanged). Harmless when already
+        // unassigned (null → backend no-op).
+        merged.milestoneId = merged.milestoneId ?? null;
         // Compare the FILTERED payloads. The form now registers optional
         // fields (dates, labelIds, assigneeIds, parentTaskId) that read back
         // as `undefined` / `null` / `""` when unset; `filterRequest` strips
