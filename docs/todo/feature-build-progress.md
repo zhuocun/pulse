@@ -85,7 +85,7 @@ escalation), both fixed before landing.
 - [x] Task→milestone assignment backend (`task.milestoneId` scalar FK + same-project validation + FK-null delete-cascade; bulk-excluded) — `293f3b30`
 - [ ] Milestone FE surface (recon `a0a1f195` mapped the integration):
   - [x] FE-MS-1: milestone manager (list/create/edit/delete) — `/projects/:projectId/milestones` route + nav tab + `useMilestones`/`useMilestoneMutations` + `IMilestone`; editor-gated writes (fail-closed `canManage`). No task-modal clear wrinkle — `83cc9d6b`
-  - [ ] FE-MS-2: task-modal milestone single-select (mirror `parentTaskId`) + card milestone chip (thread `milestones` board→column→card like `labels`; `Column` is memoized → frozen stable ref). MUST handle the scalar-FK clear-semantics caveat (see carry-forward).
+  - [x] FE-MS-2: task-modal milestone single-select (mirrors `parentTaskId`) + restrained card milestone chip (threads `milestones` board→column→card via a frozen memo-safe ref; chip gated on a RESOLVED milestone so a dangling id shows nothing). Clear-semantics inherited from `parentTaskId` (the `preserveNullKeys` fix remains a follow-up) — `bab07964`
 - [ ] Iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
