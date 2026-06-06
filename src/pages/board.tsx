@@ -1,6 +1,7 @@
 import {
     CloseOutlined,
     DeleteOutlined,
+    InboxOutlined,
     ReloadOutlined,
     SettingOutlined
 } from "@ant-design/icons";
@@ -20,6 +21,7 @@ import { useParams } from "react-router-dom";
 
 import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
+import ArchiveDrawer from "../components/archiveDrawer";
 import BoardBriefDrawer from "../components/boardBriefDrawer";
 import BoardMinimap from "../components/boardMinimap";
 import Column from "../components/column";
@@ -56,6 +58,7 @@ import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
+import useArchiveDrawer from "../utils/hooks/useArchiveDrawer";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
@@ -583,6 +586,17 @@ const BoardPage = () => {
         closeDrawer: closeTrashDrawer
     } = useTrashDrawer();
     /*
+     * Archive drawer (work-management-depth §5.4/§5.6). Open/close lives on
+     * the overlays slice like the rest of the family; the drawer itself is a
+     * core (non-AI) surface so it mounts unconditionally below, alongside the
+     * always-on TaskModal and TrashDrawer.
+     */
+    const {
+        open: archiveOpen,
+        openDrawer: openArchiveDrawer,
+        closeDrawer: closeArchiveDrawer
+    } = useArchiveDrawer();
+    /*
      * Phase 4 A8 — launcher badge subscription. `inboxUnreadCount` is
      * a pure projection of the triage agent's nudge buffer (owned by
      * `CopilotDockHost`), so this Button doesn't mount the agent —
@@ -906,10 +920,10 @@ const BoardPage = () => {
 
                     /*
                      * Phone clusters every chrome control — including the
-                     * Copilot launcher — into one capsule (5 slots: refresh,
-                     * members, trash, Copilot, settings). Desktop keeps the Copilot
-                     * launcher out of the top tier so it can anchor the
-                     * bottom tier beside the search rail.
+                     * Copilot launcher — into one capsule (6 slots: refresh,
+                     * members, trash, archive, Copilot, settings). Desktop keeps
+                     * the Copilot launcher out of the top tier so it can anchor
+                     * the bottom tier beside the search rail.
                      */
                     const topTierControls = (
                         <>
@@ -931,6 +945,15 @@ const BoardPage = () => {
                                 data-testid="board-trash"
                                 icon={<DeleteOutlined aria-hidden />}
                                 onClick={() => openTrashDrawer()}
+                                type="text"
+                            />
+                            <Button
+                                aria-label={
+                                    microcopy.archiveDrawer.triggerAriaLabel
+                                }
+                                data-testid="board-archive"
+                                icon={<InboxOutlined aria-hidden />}
+                                onClick={() => openArchiveDrawer()}
                                 type="text"
                             />
                             {isPhone && copilotMenuEl}
@@ -1194,6 +1217,17 @@ const BoardPage = () => {
                 <TrashDrawer
                     onClose={closeTrashDrawer}
                     open={trashOpen}
+                    projectId={projectId}
+                />
+                {/*
+                 * Archive drawer is a core (non-AI) recovery surface, so —
+                 * like the TrashDrawer above — it mounts unconditionally
+                 * (its list query is disabled while closed, so the mount is
+                 * cheap).
+                 */}
+                <ArchiveDrawer
+                    onClose={closeArchiveDrawer}
+                    open={archiveOpen}
                     projectId={projectId}
                 />
                 {/*

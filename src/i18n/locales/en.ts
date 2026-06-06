@@ -558,6 +558,8 @@ export const enSource = {
         taskPurged: "Task permanently deleted",
         taskPurgeFailed:
             "Couldn't permanently delete the task. Please try again.",
+        taskUnarchived: "Task unarchived",
+        taskUnarchiveFailed: "Couldn't unarchive the task. Please try again.",
         welcomeBack: "Welcome back!",
         loginFailedNoToken:
             "Login response was missing a session token. Please try again.",
@@ -797,6 +799,25 @@ export const enSource = {
         },
         restore: "Restore",
         restoreAriaLabel: "Restore task “{name}”",
+        deletePermanently: "Delete permanently",
+        deletePermanentlyAriaLabel: "Permanently delete task “{name}”",
+        confirm: {
+            title: "Delete this task permanently?",
+            description: "This can't be undone.",
+            confirmLabel: "Delete permanently"
+        }
+    },
+    archiveDrawer: {
+        triggerLabel: "Archive",
+        triggerAriaLabel: "Open archive",
+        drawerTitle: "Archive",
+        empty: {
+            title: "Archive is empty",
+            description:
+                "Archived tasks land here. Unarchive one to put it back on the board, or delete it permanently."
+        },
+        unarchive: "Unarchive",
+        unarchiveAriaLabel: "Unarchive task “{name}”",
         deletePermanently: "Delete permanently",
         deletePermanentlyAriaLabel: "Permanently delete task “{name}”",
         confirm: {

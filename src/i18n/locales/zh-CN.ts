@@ -495,6 +495,8 @@ const zhCN: Dictionary = {
         taskRestoreFailed: "无法恢复任务,请重试。",
         taskPurged: "任务已永久删除",
         taskPurgeFailed: "无法永久删除任务,请重试。",
+        taskUnarchived: "任务已取消归档",
+        taskUnarchiveFailed: "无法取消归档任务,请重试。",
         welcomeBack: "欢迎回来!",
         loginFailedNoToken: "登录响应中缺少会话令牌,请重试。",
         loginCouldNotPersistSession:
@@ -657,6 +659,25 @@ const zhCN: Dictionary = {
         },
         restore: "恢复",
         restoreAriaLabel: "恢复任务 “{name}”",
+        deletePermanently: "永久删除",
+        deletePermanentlyAriaLabel: "永久删除任务 “{name}”",
+        confirm: {
+            title: "永久删除该任务?",
+            description: "此操作无法撤销。",
+            confirmLabel: "永久删除"
+        }
+    },
+    archiveDrawer: {
+        triggerLabel: "归档",
+        triggerAriaLabel: "打开归档",
+        drawerTitle: "归档",
+        empty: {
+            title: "归档为空",
+            description:
+                "已归档的任务会出现在这里。取消归档后可放回看板,或将其永久删除。"
+        },
+        unarchive: "取消归档",
+        unarchiveAriaLabel: "取消归档任务 “{name}”",
         deletePermanently: "永久删除",
         deletePermanentlyAriaLabel: "永久删除任务 “{name}”",
         confirm: {

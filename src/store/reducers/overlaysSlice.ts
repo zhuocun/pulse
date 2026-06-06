@@ -64,6 +64,14 @@ interface OverlaysState {
      * rest of the family — see `utils/hooks/_createOverlayHook.ts`.
      */
     trashDrawerOpen: boolean;
+    /**
+     * Work-management-depth §5.4/§5.6 — open/close flag for the board
+     * Archive drawer (the read-only list of archived tasks with
+     * Unarchive / permanent-Delete actions). Lives on the overlays slice
+     * for the same iOS-Safari cross-subtree-propagation reason as the
+     * rest of the family — see `utils/hooks/_createOverlayHook.ts`.
+     */
+    archiveDrawerOpen: boolean;
     aiDraftActiveColumnId: string | null;
     copilotDock: CopilotDockState;
 }
@@ -73,6 +81,7 @@ const initialState: OverlaysState = {
     chatDrawer: { open: false, pendingPrompt: null },
     boardBriefOpen: false,
     trashDrawerOpen: false,
+    archiveDrawerOpen: false,
     aiDraftActiveColumnId: null,
     copilotDock: {
         open: false,
@@ -115,6 +124,12 @@ export const overlaysSlice = createSlice({
         },
         closeTrashDrawer(state) {
             state.trashDrawerOpen = false;
+        },
+        openArchiveDrawer(state) {
+            state.archiveDrawerOpen = true;
+        },
+        closeArchiveDrawer(state) {
+            state.archiveDrawerOpen = false;
         },
         openAiDraft(state, action: PayloadAction<string>) {
             state.aiDraftActiveColumnId = action.payload;

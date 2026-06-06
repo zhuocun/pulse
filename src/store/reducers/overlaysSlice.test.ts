@@ -12,6 +12,7 @@ describe("overlaysSlice", () => {
             chatDrawer: { open: false, pendingPrompt: null },
             boardBriefOpen: false,
             trashDrawerOpen: false,
+            archiveDrawerOpen: false,
             aiDraftActiveColumnId: null,
             copilotDock: {
                 open: false,
@@ -118,6 +119,7 @@ describe("overlaysSlice", () => {
             chatDrawer: { open: true, pendingPrompt: "hi" },
             boardBriefOpen: true,
             trashDrawerOpen: true,
+            archiveDrawerOpen: true,
             aiDraftActiveColumnId: "c-1",
             copilotDock: {
                 open: true,
@@ -133,6 +135,7 @@ describe("overlaysSlice", () => {
         expect(next.editingTaskId).toBe("t-1");
         expect(next.boardBriefOpen).toBe(true);
         expect(next.trashDrawerOpen).toBe(true);
+        expect(next.archiveDrawerOpen).toBe(true);
         expect(next.aiDraftActiveColumnId).toBe("c-1");
         expect(next.copilotDock).toEqual({
             open: true,

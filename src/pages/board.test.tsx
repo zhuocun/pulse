@@ -246,6 +246,7 @@ const renderBoard = (route = "/projects/project-1/board") => {
     store.dispatch(overlaysActions.closeChatDrawer());
     store.dispatch(overlaysActions.closeBoardBrief());
     store.dispatch(overlaysActions.closeTrashDrawer());
+    store.dispatch(overlaysActions.closeArchiveDrawer());
     store.dispatch(overlaysActions.closeAiDraft());
 
     return render(
@@ -740,18 +741,21 @@ describe("BoardPage", () => {
             expect(cluster).toContainElement(
                 screen.getByTestId("board-refresh")
             );
-            // The Trash entry point is a core (non-AI) control clustered
-            // alongside the rest.
+            // The Trash + Archive entry points are core (non-AI) controls
+            // clustered alongside the rest.
             expect(cluster).toContainElement(screen.getByTestId("board-trash"));
+            expect(cluster).toContainElement(
+                screen.getByTestId("board-archive")
+            );
             // Each leaf control gets its OWN slot so the hairline
             // separators paint between adjacent controls. board.tsx passes
             // the controls inside a (nested) fragment, which the cluster
             // must flatten — a single collapsed slot would paint no
-            // dividers. Refresh + Members + Trash + Copilot + Settings = 5
-            // slots.
+            // dividers. Refresh + Members + Trash + Archive + Copilot +
+            // Settings = 6 slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")
-            ).toHaveLength(5);
+            ).toHaveLength(6);
             // The controls remain individually focusable inside the
             // capsule — the shared glass background is purely visual.
             const settings = screen.getByRole("button", {
@@ -790,6 +794,35 @@ describe("BoardPage", () => {
 
     describe("Trash drawer entry point (work-management-depth §5.4/§5.6)", () => {
         it("renders a Trash button in the BoardActions row that opens the drawer", async () => {
+            // The trash drawer filters its widened `?includeTrashed=true`
+            // response to only `deletedAt`-set rows, so the default board
+            // fixtures (all active) would surface zero rows. Return a
+            // genuinely-trashed task for the trash GET while keeping the
+            // active fixtures for the board's own `?projectId=…` GET.
+            const trashedTask = task({
+                _id: "trashed-1",
+                taskName: "Trashed task",
+                deletedAt: "2026-01-01T00:00:00.000Z"
+            });
+            fetchMock.mockImplementation((input) => {
+                const url = String(input);
+                if (url.includes("users/members")) {
+                    return Promise.resolve(response(members));
+                }
+                if (url.includes("projects")) {
+                    return Promise.resolve(response(project()));
+                }
+                if (url.includes("boards")) {
+                    return Promise.resolve(response(defaultColumns));
+                }
+                if (url.includes("includeTrashed")) {
+                    return Promise.resolve(response([trashedTask]));
+                }
+                if (url.includes("tasks")) {
+                    return Promise.resolve(response(defaultTasks));
+                }
+                return Promise.resolve(response({}));
+            });
             renderBoard();
             await screen.findByText("Roadmap board");
 
@@ -803,8 +836,8 @@ describe("BoardPage", () => {
             fireEvent.click(trashButton);
 
             // The drawer opens and lists the project's trashed tasks. The
-            // shared fetch mock returns the default task fixtures for the
-            // `?includeTrashed=true` GET, so the body surfaces rows.
+            // `?includeTrashed=true` GET returns one trashed fixture, so the
+            // body surfaces a row.
             expect(
                 await screen.findByTestId("trash-drawer-body")
             ).toBeInTheDocument();
