@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
-from app.database import MILESTONES, PROJECTS
+from app.database import MILESTONES, PROJECTS, TASKS
 from app.repositories import repository
 from app.services.project_service import ROLE_EDITOR, ROLE_VIEWER, can_access
 
@@ -106,7 +106,12 @@ def remove(milestone_id: Optional[str], user_id: str) -> Optional[str]:
     if not can_access(project_id, user_id, ROLE_EDITOR):
         return "Forbidden"
 
-    # Plain hard delete -- task->milestone assignment (and any cascade) is a
-    # separate follow-up slice, so nothing else references this row yet.
+    # FK-null cascade: any task assigned to this milestone (``task.milestoneId``)
+    # must not be left pointing at a deleted row, so NULL the reference on every
+    # such task first. Exact-equality query (FakeStore/Mongo compatible); valid
+    # because ``milestoneId`` is in ``TABLE_FIELDS[TASKS]``. Then hard-delete the
+    # milestone itself.
+    for task in repository.find_many(TASKS, {"milestoneId": milestone_id}):
+        repository.update_by_id(TASKS, str(task["_id"]), {"milestoneId": None})
     repository.delete_by_id(MILESTONES, milestone_id)
     return "Milestone deleted"

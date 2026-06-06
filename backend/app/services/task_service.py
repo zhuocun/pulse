@@ -1,7 +1,7 @@
 import math
 from typing import Any, Dict, List, Optional, Union
 
-from app.database import COLUMNS, PROJECTS, TASKS, USERS, now
+from app.database import COLUMNS, MILESTONES, PROJECTS, TASKS, USERS, now
 from app.domain.ordering import task_reorder_updates
 from app.repositories import repository
 from app.services.column_seed import DEFAULT_COLUMNS
@@ -28,6 +28,7 @@ _TASK_UPDATE_FIELDS = frozenset(
         "assigneeIds",
         "parentTaskId",
         "dependsOn",
+        "milestoneId",
         "priority",
     }
 )
@@ -42,7 +43,15 @@ _TASK_UPDATE_FIELDS = frozenset(
 # almost always wrong and makes the per-task cycle check ambiguous (the
 # same edge added to N tasks could close a cycle for some and not others),
 # so dependency edges are set one task at a time via single ``update``.
-_BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {"columnId", "projectId", "dependsOn"}
+# ``milestoneId`` is likewise excluded for now: bulk milestone assignment
+# is a deliberate follow-up, so the per-task same-project validation stays
+# simple and assignments go one task at a time via single ``update``.
+_BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {
+    "columnId",
+    "projectId",
+    "dependsOn",
+    "milestoneId",
+}
 
 
 def _same_project(*items: Dict[str, Any]) -> bool:
@@ -160,6 +169,30 @@ def _parent_task_error(
     return None
 
 
+def _milestone_error(
+    data: Dict[str, Any], project_id: Optional[str]
+) -> Optional[Dict[str, Any]]:
+    """Validate ``milestoneId`` (a scalar FK onto ``milestones``).
+
+    Mirrors ``_parent_task_error``: present-only (skipped unless the key is
+    sent), clearing the assignment (``None`` / ``""``) is always allowed, and
+    a non-empty value must reference a milestone that EXISTS in the SAME
+    ``project_id`` as the task. There is no self-reference guard (a milestone
+    is not a task), so unlike ``_parent_task_error`` it needs no ``task_id``."""
+
+    if "milestoneId" not in data:
+        return None
+    milestone_id = data.get("milestoneId")
+    if milestone_id in (None, ""):
+        return None  # clearing the assignment is always allowed
+    milestone = repository.find_by_id(MILESTONES, str(milestone_id))
+    if milestone is None or str(milestone.get("projectId")) != str(project_id):
+        return body_error(
+            data, "milestoneId", "Milestone must exist in the same project"
+        )
+    return None
+
+
 def _depends_on_error(
     data: Dict[str, Any],
     project_id: Optional[str],
@@ -270,6 +303,9 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     error = _parent_task_error(data, data.get("projectId"))
     if error is not None:
         errors.append(error)
+    milestone_error = _milestone_error(data, data.get("projectId"))
+    if milestone_error is not None:
+        errors.append(milestone_error)
     # ``task_id`` is None: a not-yet-created task has no inbound edges, so this
     # only enforces existence/same-project/shape -- no cycle is possible yet.
     depends_on_error = _depends_on_error(data, data.get("projectId"))
@@ -327,6 +363,10 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
             "labelIds": data.get("labelIds") or [],
             "assigneeIds": data.get("assigneeIds") or [],
             "parentTaskId": data.get("parentTaskId") or None,
+            # Optional milestone FK defaults to ``None`` (unassigned) so every
+            # reader sees a uniform shape; a validated same-project value (set
+            # via ``_milestone_error``) overrides it. Mirrors ``parentTaskId``.
+            "milestoneId": data.get("milestoneId") or None,
             # Prerequisite edge-list defaults to empty so every reader sees a
             # uniform shape; a validated non-empty list (AC-W4) overrides it.
             "dependsOn": data.get("dependsOn") or [],
@@ -488,6 +528,14 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     parent_error = _parent_task_error(data, project_id, task_id)
     if parent_error is not None:
         validation_errors([parent_error])
+
+    # ``milestoneId`` needs the resolved (possibly reassigned) project too --
+    # the body may omit ``projectId`` and fall back to the task's own -- so it
+    # is validated here, not in the stateless ``update_validation_errors``, and
+    # raises a 400 before the write on a cross-project / non-existent milestone.
+    milestone_error = _milestone_error(data, project_id)
+    if milestone_error is not None:
+        validation_errors([milestone_error])
 
     # ``dependsOn`` likewise needs the resolved project + the task's own id
     # (for the self-edge and cycle guards), so it is validated here -- not in

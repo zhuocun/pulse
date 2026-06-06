@@ -89,6 +89,10 @@ TABLE_FIELDS = {
         "assigneeIds",
         # Sub-tasks: the ``_id`` of the parent task (null / empty = top-level).
         "parentTaskId",
+        # Optional FK onto ``milestones``; same-project, validated on
+        # create/update by ``task_service._milestone_error`` and NULLed when
+        # the milestone is deleted (``milestone_service.remove`` cascade).
+        "milestoneId",
         # Prerequisites: a ``list[str]`` of same-project task ids this task is
         # blocked by (the tasks that must be done first). Default ``[]``;
         # validated by ``task_service._depends_on_error`` to exist, stay
