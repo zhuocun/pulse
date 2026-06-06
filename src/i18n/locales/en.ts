@@ -338,6 +338,7 @@ export const enSource = {
     },
     labels: {
         members: "Members",
+        milestones: "Milestones",
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
@@ -924,6 +925,45 @@ export const enSource = {
             guest: "Guest"
         }
     },
+    /**
+     * FE-MS-1 project milestones surface. Mirrors the `members.*` shape:
+     * a manager title, the add-form labels / placeholders, the lifecycle
+     * state options, the delete confirm, the empty / load-error copy, and
+     * the create / update / delete / failure feedback toasts.
+     */
+    milestones: {
+        heading: "Milestones",
+        addHeading: "Add a milestone",
+        addNamePlaceholder: "Milestone name",
+        addDescriptionPlaceholder: "Description (optional)",
+        startDatePlaceholder: "Start date",
+        dueDatePlaceholder: "Due date",
+        statePlaceholder: "State",
+        addButton: "Add milestone",
+        adding: "Adding…",
+        save: "Save",
+        saving: "Saving…",
+        cancel: "Cancel",
+        edit: "Edit",
+        editAriaLabel: "Edit {name}",
+        delete: "Delete",
+        deleteConfirmTitle: "Delete {name}?",
+        deleteAriaLabel: "Delete {name}",
+        empty: "No milestones yet.",
+        loadError: "Couldn't load milestones. Please try again.",
+        listAriaLabel: "Project milestones",
+        dateRange: "{start} → {due}",
+        states: {
+            open: "Open",
+            closed: "Closed"
+        },
+        created: "Milestone created.",
+        updated: "Milestone updated.",
+        deleted: "Milestone deleted.",
+        createError: "Couldn't create the milestone. Please try again.",
+        updateError: "Couldn't update the milestone. Please try again.",
+        deleteError: "Couldn't delete the milestone. Please try again."
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",
@@ -1006,7 +1046,15 @@ export const enSource = {
          * before the project query resolves.
          */
         members: "Members",
-        membersWithProject: "Members · {project}"
+        membersWithProject: "Members · {project}",
+        /*
+         * FE-MS-1 project milestones surface. Same pattern as members:
+         * the project name is interpolated at the page level (see
+         * `pages/milestones.tsx`); the bare "Milestones" form is the
+         * fallback before the project query resolves.
+         */
+        milestones: "Milestones",
+        milestonesWithProject: "Milestones · {project}"
     },
     empty: {
         projects: {

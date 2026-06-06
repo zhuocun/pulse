@@ -196,6 +196,7 @@ const zhCN: Dictionary = {
     },
     labels: {
         members: "成员",
+        milestones: "里程碑",
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
@@ -751,6 +752,39 @@ const zhCN: Dictionary = {
             guest: "访客"
         }
     },
+    milestones: {
+        heading: "里程碑",
+        addHeading: "添加里程碑",
+        addNamePlaceholder: "里程碑名称",
+        addDescriptionPlaceholder: "描述(可选)",
+        startDatePlaceholder: "开始日期",
+        dueDatePlaceholder: "截止日期",
+        statePlaceholder: "状态",
+        addButton: "添加里程碑",
+        adding: "添加中…",
+        save: "保存",
+        saving: "保存中…",
+        cancel: "取消",
+        edit: "编辑",
+        editAriaLabel: "编辑 {name}",
+        delete: "删除",
+        deleteConfirmTitle: "确认删除 {name}?",
+        deleteAriaLabel: "删除 {name}",
+        empty: "暂无里程碑。",
+        loadError: "无法加载里程碑,请重试。",
+        listAriaLabel: "项目里程碑",
+        dateRange: "{start} → {due}",
+        states: {
+            open: "进行中",
+            closed: "已关闭"
+        },
+        created: "里程碑已创建。",
+        updated: "里程碑已更新。",
+        deleted: "里程碑已删除。",
+        createError: "无法创建里程碑,请重试。",
+        updateError: "无法更新里程碑,请重试。",
+        deleteError: "无法删除里程碑,请重试。"
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
@@ -814,7 +848,13 @@ const zhCN: Dictionary = {
         reports: "报告",
         reportsWithProject: "报告 · {project}",
         members: "成员",
-        membersWithProject: "成员 · {project}"
+        membersWithProject: "成员 · {project}",
+        /*
+         * FE-MS-1 项目里程碑页面。与成员页一致:项目名称在页面层级插入
+         * (详见 `pages/milestones.tsx`),在项目查询完成前回退到无名版本。
+         */
+        milestones: "里程碑",
+        milestonesWithProject: "里程碑 · {project}"
     },
     empty: {
         projects: {

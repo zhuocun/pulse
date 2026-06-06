@@ -164,7 +164,7 @@ describe("routes", () => {
         );
     });
 
-    it("nests an index redirect, the board route, the members route, and the reports route below project detail", () => {
+    it("nests an index redirect, the board route, the members route, the milestones route, and the reports route below project detail", () => {
         const protectedBranch = routes[0].children?.[3];
         const projectDetailRoute = protectedBranch?.children?.find(
             (route) => route.path === "projects/:projectId"
@@ -174,8 +174,9 @@ describe("routes", () => {
         // redirect (Navigate to "board"). The previous `useEffect`
         // force-redirect inside `ProjectDetailPage` was removed in QW-11.
         // Phase 4.7 added `reports` alongside `board`; M4 adds `members`
-        // between them so the project detail nav has three sibling
-        // surfaces to point at (Board, Members, Reports).
+        // between them; FE-MS-1 adds `milestones` after members so the
+        // project detail nav has four sibling surfaces to point at
+        // (Board, Members, Milestones, Reports).
         const children = projectDetailRoute?.children ?? [];
         expect(children[0] && "index" in children[0] && children[0].index).toBe(
             true
@@ -183,6 +184,7 @@ describe("routes", () => {
         expect(children.slice(1).map((route) => route.path)).toEqual([
             "board",
             "members",
+            "milestones",
             "reports"
         ]);
     });

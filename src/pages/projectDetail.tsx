@@ -353,7 +353,9 @@ const ProjectDetailPage = () => {
             ? microcopy.breadcrumb.reports
             : activeChild === "members"
               ? microcopy.labels.members
-              : null;
+              : activeChild === "milestones"
+                ? microcopy.labels.milestones
+                : null;
 
     /*
      * Browser tab title mirrors the current project. Leaf child
@@ -370,7 +372,9 @@ const ProjectDetailPage = () => {
      * commits last and sticks.
      */
     const shellOwnsTitle =
-        activeChild !== "reports" && activeChild !== "members";
+        activeChild !== "reports" &&
+        activeChild !== "members" &&
+        activeChild !== "milestones";
     const shellTitle = project?.projectName ?? microcopy.labels.project;
     useEffect(() => {
         if (!shellOwnsTitle) return;
@@ -453,6 +457,13 @@ const ProjectDetailPage = () => {
                             viewTransition
                         >
                             {microcopy.labels.members}
+                        </ChildNavLink>
+                        <ChildNavLink
+                            end
+                            to={`/projects/${projectId}/milestones`}
+                            viewTransition
+                        >
+                            {microcopy.labels.milestones}
                         </ChildNavLink>
                         <ChildNavLink
                             end

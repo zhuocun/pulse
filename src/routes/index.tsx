@@ -38,6 +38,7 @@ const ProjectDetailPage = lazy(() => import("../pages/projectDetail"));
 const BoardPage = lazy(() => import("../pages/board"));
 const ReportsPage = lazy(() => import("../pages/reports"));
 const MembersPage = lazy(() => import("../pages/members"));
+const MilestonesPage = lazy(() => import("../pages/milestones"));
 const SharePage = lazy(() => import("../pages/share"));
 const InboxPage = lazy(() => import("../pages/inbox"));
 const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
@@ -341,6 +342,19 @@ const routes = [
                             {
                                 path: "members",
                                 element: <MembersPage />
+                            },
+                            /*
+                             * FE-MS-1 project milestones surface. Sibling
+                             * of board / members / reports under the
+                             * project detail shell so the in-project nav
+                             * can point at a "Milestones" entry. The page
+                             * is a thin shell around `MilestonesManager`,
+                             * which owns the list + editor-gated create /
+                             * edit / delete controls.
+                             */
+                            {
+                                path: "milestones",
+                                element: <MilestonesPage />
                             },
                             /*
                              * Phase 4.7 reports landing. Placeholder
