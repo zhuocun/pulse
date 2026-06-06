@@ -27,6 +27,7 @@ import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useLabels from "../../utils/hooks/useLabels";
 import useMembersList from "../../utils/hooks/useMembersList";
+import useMilestones from "../../utils/hooks/useMilestones";
 import useProjectMembers from "../../utils/hooks/useProjectMembers";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
@@ -353,6 +354,11 @@ const TaskModal: React.FC<{
     // only the people actually on this project.
     const { labels: labelsData } = useLabels(projectId);
     const labels = useMemo(() => labelsData ?? [], [labelsData]);
+    // Project milestones power the clearable single-select milestone picker.
+    // Keyed per-project + disabled until `projectId` resolves (see the hook);
+    // `task.milestoneId` rides the same `merged` → `tasks` PUT as every other
+    // richness field — same shape/path as `parentTaskId`, no separate write.
+    const { data: milestones } = useMilestones(projectId);
     const { data: projectMembersData } = useProjectMembers(projectId);
     // Guard against a non-array payload (errored / stubbed response sharing
     // the query cache) so the assignee `.map` below never throws — mirrors
@@ -372,6 +378,17 @@ const TaskModal: React.FC<{
                     value: candidate._id
                 })),
         [tasks, editingTaskId]
+    );
+    // Milestone options: the project's milestones (single-select, clearable).
+    // Mirrors `parentTaskOptions` — `task.milestoneId` is the same
+    // `string | null` FK shape and rides the identical `tasks` PUT path.
+    const milestoneOptions = useMemo(
+        () =>
+            (milestones ?? []).map((m) => ({
+                label: m.name,
+                value: m._id
+            })),
+        [milestones]
     );
     // Dependency options (PRD §4.5): the same-project tasks this one may
     // depend on — every OTHER task (a task can't depend on itself). Mirrors
@@ -932,6 +949,29 @@ const TaskModal: React.FC<{
                     optionFilterProp="label"
                     options={parentTaskOptions}
                     placeholder={microcopy.placeholders.selectParentTask}
+                    showSearch
+                />
+            </Form.Item>
+            {/*
+             * Milestone (PRD milestones). A clearable single `Select` that
+             * MIRRORS the `parentTaskId` field above — `task.milestoneId` is
+             * the same `string | null` FK shape and rides the same `merged`
+             * → `tasks` PUT (no separate write path). Clear-semantics are
+             * intentionally inherited from `parentTaskId` (a cleared `null`
+             * is stripped by `filterRequest`, so the PUT leaves the field
+             * unchanged); a milestone delete clears assignments via the
+             * backend cascade so users are never stuck.
+             */}
+            <Form.Item
+                data-testid="task-modal-milestone"
+                label={microcopy.fields.milestone}
+                name="milestoneId"
+            >
+                <Select
+                    allowClear
+                    optionFilterProp="label"
+                    options={milestoneOptions}
+                    placeholder={microcopy.placeholders.selectMilestone}
                     showSearch
                 />
             </Form.Item>

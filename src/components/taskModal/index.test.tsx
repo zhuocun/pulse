@@ -136,6 +136,11 @@ const renderModal = (
         /** Project labels to seed the `["labels", …]` cache (label picker). */
         labels?: ILabel[];
         /**
+         * Project milestones to seed the `["milestones", …]` cache (milestone
+         * picker). Mirrors `labels`.
+         */
+        milestones?: IMilestone[];
+        /**
          * Project members to seed the `["projects/members", …]` cache
          * (assignee picker). Distinct from the global `members` directory.
          */
@@ -177,6 +182,10 @@ const renderModal = (
     queryClient.setQueryData(
         ["labels", { projectId: "project-1" }],
         options.labels ?? []
+    );
+    queryClient.setQueryData(
+        ["milestones", { projectId: "project-1" }],
+        options.milestones ?? []
     );
     queryClient.setQueryData(
         ["projects/members", { projectId: "project-1" }],
@@ -1097,6 +1106,18 @@ describe("TaskModal", () => {
                 role: "coordinator"
             }
         ];
+        const milestoneFixtures: IMilestone[] = [
+            {
+                _id: "milestone-1",
+                projectId: "project-1",
+                name: "Beta launch"
+            },
+            {
+                _id: "milestone-2",
+                projectId: "project-1",
+                name: "GA release"
+            }
+        ];
 
         const lastPutBody = () => {
             const putCall = fetchMock.mock.calls.find(
@@ -1336,6 +1357,63 @@ describe("TaskModal", () => {
             // The stored ISO strings round-trip into the picker inputs.
             expect(screen.getByDisplayValue("2026-03-01")).toBeInTheDocument();
             expect(screen.getByDisplayValue("2026-03-15")).toBeInTheDocument();
+        });
+
+        it("offers the project's milestones in the milestone picker", async () => {
+            renderModal({
+                labels: labelFixtures,
+                milestones: milestoneFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // The Form.Item surfaces its "Milestone" label…
+            expect(screen.getByText("Milestone")).toBeInTheDocument();
+
+            // …and opening the Select lists the project's milestones.
+            const milestoneSelect = screen.getByRole("combobox", {
+                name: /milestone/i
+            });
+            fireEvent.mouseDown(milestoneSelect);
+            expect(
+                (await screen.findAllByText("Beta launch")).length
+            ).toBeGreaterThan(0);
+            expect(
+                (await screen.findAllByText("GA release")).length
+            ).toBeGreaterThan(0);
+        });
+
+        it("includes the chosen milestone in the PUT payload on save", async () => {
+            renderModal({
+                labels: labelFixtures,
+                milestones: milestoneFixtures,
+                projectMembers: projectMemberFixtures
+            });
+            await screen.findByDisplayValue("Build task");
+
+            // Pick a milestone — `milestoneId` rides the same `tasks` PUT as
+            // `parentTaskId`, no separate write path.
+            fireEvent.mouseDown(
+                screen.getByRole("combobox", { name: /milestone/i })
+            );
+            fireEvent.click(await screen.findByText("Beta launch"));
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            expect(lastPutBody()).toEqual(
+                expect.objectContaining({
+                    _id: "task-1",
+                    milestoneId: "milestone-1"
+                })
+            );
         });
     });
 

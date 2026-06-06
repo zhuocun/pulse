@@ -127,11 +127,12 @@ const renderModal = () => {
             }
         ]
     );
-    // M2 — the modal's label / assignee pickers read these per-project
-    // caches. Seed them empty (fresh, via the hooks' staleTime) so they
-    // serve from cache and add no extra `fetch` calls to the strict count
-    // assertions in this suite.
+    // M2 — the modal's label / assignee / milestone pickers read these
+    // per-project caches. Seed them empty (fresh, via the hooks' staleTime)
+    // so they serve from cache and add no extra `fetch` calls to the strict
+    // count assertions in this suite.
     queryClient.setQueryData(["labels", { projectId: "project-1" }], []);
+    queryClient.setQueryData(["milestones", { projectId: "project-1" }], []);
     queryClient.setQueryData(
         ["projects/members", { projectId: "project-1" }],
         []

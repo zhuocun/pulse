@@ -65,6 +65,7 @@ import useDragEnd from "../utils/hooks/useDragEnd";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useLabels from "../utils/hooks/useLabels";
 import useMembersList from "../utils/hooks/useMembersList";
+import useMilestones from "../utils/hooks/useMilestones";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
 import useTaskModal from "../utils/hooks/useTaskModal";
@@ -384,6 +385,9 @@ const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
 const EMPTY_TASKS: ITask[] = Object.freeze([]) as unknown as ITask[];
 const EMPTY_MEMBERS: IMember[] = Object.freeze([]) as unknown as IMember[];
 const EMPTY_LABELS: ILabel[] = Object.freeze([]) as unknown as ILabel[];
+const EMPTY_MILESTONES: IMilestone[] = Object.freeze(
+    []
+) as unknown as IMilestone[];
 
 const boardTitle = (projectName?: string) =>
     projectName
@@ -426,6 +430,10 @@ const BoardPage = () => {
     // column → card so a card can resolve its `labelIds` to name + colour
     // chips without an N-per-card fetch (mirrors how `members` is shared).
     const { labels } = useLabels(projectId);
+    // Project milestones, fetched once at the board level and threaded into
+    // each column → card so a card can resolve its `milestoneId` to a
+    // milestone badge without an N-per-card fetch (mirrors `labels`).
+    const { data: milestones } = useMilestones(projectId);
     /*
      * Stable members reference for the memoized `Column`. `members` from
      * the query is a stable ref once resolved, but is `undefined` while
@@ -436,6 +444,9 @@ const BoardPage = () => {
      */
     const safeMembers = members ?? EMPTY_MEMBERS;
     const safeLabels = labels ?? EMPTY_LABELS;
+    // Frozen fallback for the memoized `Column` (see `safeLabels`): a fresh
+    // `[]` each render would change the prop identity and defeat the memo.
+    const safeMilestones = milestones ?? EMPTY_MILESTONES;
 
     const {
         data: tasks,
@@ -1177,6 +1188,9 @@ const BoardPage = () => {
                                                         }
                                                         members={safeMembers}
                                                         labels={safeLabels}
+                                                        milestones={
+                                                            safeMilestones
+                                                        }
                                                         param={param}
                                                         onResetFilters={
                                                             resetBoardFilters

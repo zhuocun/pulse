@@ -523,6 +523,34 @@ const CompletedBadge = styled.span`
 `;
 
 /**
+ * Milestone indicator on the card footer (PRD milestones). Unlike the
+ * priority / overdue / blocked chips it is NOT an alarm — a milestone is a
+ * neutral planning grouping, so it uses a restrained secondary tint (no
+ * danger / warning colour). A flag glyph pairs with the visible milestone
+ * name and an `aria-label` so the signal still reads for colour-blind and
+ * screen-reader users alike (WCAG 1.4.1). The badge renders only when
+ * `task.milestoneId` resolves against a passed milestone — an unset or
+ * dangling id shows nothing (see the gate on the card). The name can be
+ * long, so it truncates with an ellipsis rather than wrapping the footer.
+ */
+const MilestoneBadge = styled.span`
+    align-items: center;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
+    display: inline-flex;
+    font-weight: ${fontWeight.medium};
+    gap: ${space.xxs}px;
+    max-width: 12ch;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+
+    > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+`;
+
+/**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
  * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
  * lens predicates, so a task due "today" is NOT overdue and a midnight-
@@ -912,6 +940,12 @@ type TaskCardProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
      * simply omit the chip row.
      */
     labels?: ILabel[];
+    /**
+     * Project milestones, used to resolve `task.milestoneId` → a milestone
+     * badge. Optional so callers that don't render the badge (or haven't
+     * loaded them) simply omit it.
+     */
+    milestones?: IMilestone[];
     onOpen?: () => void;
     isMock?: boolean;
     /** Reordering is paused by active filters — advisory affordance only. */
@@ -924,6 +958,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             task,
             members,
             labels,
+            milestones,
             onOpen,
             isMock,
             dragDisabledByFilters,
@@ -974,6 +1009,19 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const completedLabel = completed
             ? formatTemplate(microcopy.a11y.completedTask as string, {
                   date: dayjs(task.completedAt).format("YYYY-MM-DD")
+              })
+            : "";
+        // Milestone badge (PRD milestones): resolve `task.milestoneId` against
+        // the project's milestones (threaded board → column → card, same as
+        // labels). An unset id — or one that no longer resolves (the milestone
+        // was deleted since assignment) — renders nothing, so the chip is
+        // gated on both the id AND a resolved milestone below.
+        const milestone = (milestones ?? []).find(
+            (m) => m._id === task.milestoneId
+        );
+        const milestoneLabel = milestone
+            ? formatTemplate(microcopy.a11y.milestoneTask as string, {
+                  name: milestone.name
               })
             : "";
         // Read per-result strength from the AI search cache (P1-2). Returns
@@ -1316,6 +1364,16 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                 <span>{microcopy.taskCard.overdue}</span>
                             </OverdueChip>
                         ) : null}
+                        {task.milestoneId && milestone ? (
+                            <MilestoneBadge
+                                aria-label={milestoneLabel}
+                                data-testid="task-card-milestone"
+                                title={milestone.name}
+                            >
+                                <FlagFilled aria-hidden />
+                                <span>{milestone.name}</span>
+                            </MilestoneBadge>
+                        ) : null}
                         {strength ? (
                             <AiMatchStrengthBadge strength={strength} />
                         ) : null}
@@ -1386,6 +1444,8 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
     members?: IMember[];
     /** Project labels, threaded down to each card to resolve `labelIds`. */
     labels?: ILabel[];
+    /** Project milestones, threaded down to each card to resolve `milestoneId`. */
+    milestones?: IMilestone[];
     onResetFilters?: () => void;
 };
 
@@ -1401,6 +1461,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             boardAiOn = true,
             members = [],
             labels = [],
+            milestones = [],
             onResetFilters,
             ...props
         },
@@ -1553,6 +1614,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                         isMock={!hasPersistedTaskId}
                                         labels={labels}
                                         members={members}
+                                        milestones={milestones}
                                         onOpen={
                                             hasPersistedTaskId
                                                 ? () => startEditing(task._id)

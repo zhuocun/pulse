@@ -212,6 +212,7 @@ const renderColumn = ({
     param = defaultParam,
     boardDensity = "comfortable",
     labels = [],
+    milestones = [],
     tasks = [
         task(),
         task({
@@ -235,6 +236,7 @@ const renderColumn = ({
     boardAiOn?: boolean;
     boardDensity?: "comfortable" | "compact";
     labels?: ILabel[];
+    milestones?: IMilestone[];
 } = {}) => {
     // The component calls `useReactMutation` three times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
@@ -268,6 +270,7 @@ const renderColumn = ({
                                 dragDisabledByFilters={dragDisabledByFilters}
                                 isDragDisabled={isDragDisabled}
                                 labels={labels}
+                                milestones={milestones}
                                 param={param}
                                 taskDragDisabled={taskDragDisabled}
                                 tasks={tasks}
@@ -1295,6 +1298,55 @@ describe("Column", () => {
             ).toBeInTheDocument();
             expect(
                 screen.queryByTestId("task-card-overdue")
+            ).not.toBeInTheDocument();
+        });
+
+        const milestone = (
+            overrides: Partial<IMilestone> = {}
+        ): IMilestone => ({
+            _id: "milestone-1",
+            projectId: "project-1",
+            name: "Beta launch",
+            ...overrides
+        });
+
+        it("renders a milestone badge (icon + visible name + a11y) when milestoneId resolves against the milestones list", () => {
+            renderColumn({
+                milestones: [milestone()],
+                tasks: [task({ milestoneId: "milestone-1" })]
+            });
+
+            const badge = screen.getByTestId("task-card-milestone");
+            // Not colour-only: the visible milestone name carries the signal.
+            expect(badge).toHaveTextContent("Beta launch");
+            // The accessible name surfaces the milestone name.
+            expect(badge).toHaveAttribute(
+                "aria-label",
+                microcopy.a11y.milestoneTask.replace("{name}", "Beta launch")
+            );
+        });
+
+        it("renders NO milestone badge when the task has no milestoneId", () => {
+            renderColumn({
+                milestones: [milestone()],
+                tasks: [task()]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-milestone")
+            ).not.toBeInTheDocument();
+        });
+
+        it("renders NO milestone badge when milestoneId does not resolve against the milestones list", () => {
+            // A dangling id (the milestone was deleted since assignment) must
+            // render nothing rather than a blank chip.
+            renderColumn({
+                milestones: [milestone()],
+                tasks: [task({ milestoneId: "deleted-milestone" })]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-milestone")
             ).not.toBeInTheDocument();
         });
     });

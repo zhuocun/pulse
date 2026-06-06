@@ -23,6 +23,8 @@ interface ITask {
     labelIds?: string[];
     assigneeIds?: string[];
     parentTaskId?: string | null;
+    /** Optional FK onto a project milestone (PRD milestones). Client-settable via the task modal; same shape/path as parentTaskId. */
+    milestoneId?: string | null;
     priority?: TaskPriorityLevel;
     /** Stored prerequisite task ids — the tasks this one depends on (PRD §4.5). Sent by the client; the dependency editor lands in a later slice. */
     dependsOn?: string[];
