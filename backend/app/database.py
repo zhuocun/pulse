@@ -15,6 +15,7 @@ PROJECTS = "projects"
 COLUMNS = "columns"
 TASKS = "tasks"
 LABELS = "labels"
+MILESTONES = "milestones"
 COMMENTS = "comments"
 NOTIFICATIONS = "notifications"
 ORGANIZATIONS = "organizations"
@@ -48,6 +49,9 @@ def ensure_indexes() -> None:
     # Backs the org-scoped project listing (PRD 10.4): the tenant-scope
     # filter resolves a project's owning org by ``organizationId``.
     collection(PROJECTS).create_index("organizationId")
+    # Backs the project-scoped milestone listing: GET /milestones loads a
+    # project's milestones via ``find_many(MILESTONES, {"projectId": ...})``.
+    collection(MILESTONES).create_index("projectId")
     # Backs the per-project default-exclude scan (PRD §5.4/§5.5, AC-W21):
     # GET /tasks loads a project's tasks then filters out trashed/archived
     # ones in Python, so this compound index keeps that read cheap.

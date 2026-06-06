@@ -125,6 +125,23 @@ TABLE_FIELDS = {
         "createdAt",
         "updatedAt",
     },
+    database.MILESTONES: {
+        "_id",
+        # Owning project; the milestone is scoped to it and the project's
+        # RBAC (viewer reads, editor writes) gates every operation. The
+        # project-scoped listing filters on this exact-match field.
+        "projectId",
+        "name",
+        # Optional free-text; defaults to "" on create.
+        "description",
+        # Optional ISO-8601 date strings (or null) bounding the milestone.
+        "startDate",
+        "dueDate",
+        # Lifecycle: one of ``"open"`` / ``"closed"``. Defaults to "open".
+        "state",
+        "createdAt",
+        "updatedAt",
+    },
     database.COMMENTS: {
         "_id",
         "taskId",

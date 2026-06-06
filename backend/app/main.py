@@ -35,6 +35,7 @@ from app.routers import (
     comments,
     health,
     labels,
+    milestones,
     notifications,
     organizations,
     projects,
@@ -765,6 +766,9 @@ app.include_router(
 app.include_router(boards.router, prefix="/api/v1/boards", tags=["boards"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(labels.router, prefix="/api/v1/labels", tags=["labels"])
+app.include_router(
+    milestones.router, prefix="/api/v1/milestones", tags=["milestones"]
+)
 app.include_router(comments.router, prefix="/api/v1/comments", tags=["comments"])
 app.include_router(
     notifications.router, prefix="/api/v1/notifications", tags=["notifications"]
