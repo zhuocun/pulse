@@ -26,6 +26,10 @@ const task = (overrides: Partial<ITask> = {}): ITask => ({
     _id: "task-1",
     columnId: "column-1",
     coordinatorId: "member-1",
+    // The default fixture is a genuinely TRASHED task — `deletedAt` set — so
+    // it survives the drawer's only-trashed filter (the live `GET` widens to
+    // active + trashed; the drawer drops rows whose `deletedAt` is unset).
+    deletedAt: "2026-01-01T00:00:00.000Z",
     epic: "Feature",
     index: 0,
     note: "No note",
@@ -145,6 +149,29 @@ describe("TrashDrawer", () => {
         expect(
             screen.queryByTestId("trash-drawer-empty")
         ).not.toBeInTheDocument();
+    });
+
+    it("filters OUT active rows the widened GET returns (only deletedAt-set tasks render)", async () => {
+        // `GET /tasks?includeTrashed=true` WIDENS the result to active +
+        // trashed (the flag opts trashed rows IN, it does not scope the list to
+        // only-trashed), so the drawer MUST drop any row whose `deletedAt` is
+        // unset — otherwise live board tasks would appear in the trash. Seed an
+        // active task (deletedAt null) next to a trashed one; only the trashed
+        // row may render.
+        renderDrawer({}, [
+            task({
+                _id: "active-1",
+                taskName: "Active board task",
+                deletedAt: null
+            }),
+            task({ _id: "trashed-1", taskName: "Genuinely trashed" })
+        ]);
+
+        expect(
+            await screen.findByText("Genuinely trashed")
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Active board task")).not.toBeInTheDocument();
+        expect(screen.getAllByTestId("trash-drawer-row")).toHaveLength(1);
     });
 
     it("issues GET /tasks?projectId=…&includeTrashed=true when opened", async () => {

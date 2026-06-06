@@ -131,7 +131,15 @@ const TrashDrawer: React.FC<TrashDrawerProps> = ({
         undefined,
         open && Boolean(projectId)
     );
-    const trashedTasks = data ?? [];
+    /*
+     * Filter to only genuinely-trashed rows. `GET /tasks?includeTrashed=true`
+     * WIDENS the response to active + trashed (the flag opts trashed rows IN;
+     * it does NOT scope the list to only-trashed — see `ITask.deletedAt`), so
+     * without this guard every live board task would surface in the trash.
+     */
+    const trashedTasks = (data ?? []).filter((trashedTask) =>
+        Boolean(trashedTask.deletedAt)
+    );
 
     /*
      * Both mutations invalidate the `["tasks"]` PREFIX (not a specific
