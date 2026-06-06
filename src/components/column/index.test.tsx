@@ -1241,5 +1241,61 @@ describe("Column", () => {
                 screen.queryByTestId("task-card-blocked")
             ).not.toBeInTheDocument();
         });
+
+        it("renders a completed badge (icon + visible label + dated a11y) when completedAt is set", () => {
+            // `completedAt` is a server-managed timestamp (PRD §3 lifecycle);
+            // a truthy value means the task currently sits in a done-category
+            // column, so the badge surfaces. We use a DATE-ONLY fixture so the
+            // assertion is timezone-proof: dayjs parses a bare `YYYY-MM-DD` as
+            // LOCAL midnight, so `.format("YYYY-MM-DD")` round-trips to the same
+            // literal in every runner TZ (a full UTC instant would roll to the
+            // prev/next calendar day under far-west/-east offsets).
+            renderColumn({
+                tasks: [task({ completedAt: "2026-01-15" })]
+            });
+
+            const badge = screen.getByTestId("task-card-completed");
+            // Not colour-only: the visible word "Completed" carries the signal.
+            expect(badge).toHaveTextContent(/completed/i);
+            // The accessible name surfaces the (date-only) completion date.
+            expect(badge).toHaveAttribute(
+                "aria-label",
+                microcopy.a11y.completedTask.replace("{date}", "2026-01-15")
+            );
+        });
+
+        it("renders NO completed badge when completedAt is absent or null", () => {
+            renderColumn({
+                tasks: [
+                    task({ _id: "c-null", completedAt: null }),
+                    task({ _id: "c-absent" })
+                ]
+            });
+
+            expect(
+                screen.queryByTestId("task-card-completed")
+            ).not.toBeInTheDocument();
+        });
+
+        it("a completed task does not also show the overdue chip", () => {
+            // A finished task is neither overdue nor blocked, so the completed
+            // badge supersedes the (contradictory) overdue chip even when the
+            // task carries a past dueDate.
+            renderColumn({
+                tasks: [
+                    task({
+                        completedAt: "2026-01-15",
+                        dueDate: isoDate(-2)
+                    })
+                ]
+            });
+
+            expect(
+                screen.getByTestId("task-card-completed")
+            ).toBeInTheDocument();
+            expect(
+                screen.queryByTestId("task-card-overdue")
+            ).not.toBeInTheDocument();
+        });
     });
 });

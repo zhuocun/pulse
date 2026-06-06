@@ -28,4 +28,6 @@ interface ITask {
     dependsOn?: string[];
     /** Server-derived ids of this task's UNFINISHED prerequisites (PRD §4.5). Returned by `GET /tasks`, never sent by the client; a non-empty array means the task is blocked. */
     blockedBy?: string[];
+    /** Server-managed completion timestamp (ISO). Set when the task enters a done-category column, cleared (null) when it leaves (PRD §3 lifecycle). Returned by `GET /tasks`; never sent by the client. A truthy value means the task is done. */
+    completedAt?: string | null;
 }

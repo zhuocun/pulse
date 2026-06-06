@@ -1,4 +1,5 @@
 import {
+    CheckCircleFilled,
     ClockCircleOutlined,
     FlagFilled,
     HolderOutlined,
@@ -502,6 +503,26 @@ const BlockedBadge = styled.span`
 `;
 
 /**
+ * Completed indicator on the card footer (PRD §3 lifecycle). Like its sibling
+ * badges it is NOT colour-only: a filled check glyph pairs with the visible
+ * "Completed" label and a dated `aria-label` so the signal reads for colour-
+ * blind and screen-reader users alike (WCAG 1.4.1). The badge renders only
+ * when the server-managed `task.completedAt` is set — i.e. the task currently
+ * sits in a done-category column; the server clears the field the moment the
+ * task leaves, so the card and the badge stay in lockstep. A completed task
+ * supersedes the "Blocked"/"Overdue" chips (a finished task is neither), so
+ * those are gated off below when `completed` is true.
+ */
+const CompletedBadge = styled.span`
+    align-items: center;
+    color: var(--ant-color-success, #16a34a);
+    display: inline-flex;
+    font-weight: ${fontWeight.semibold};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
  * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
  * lens predicates, so a task due "today" is NOT overdue and a midnight-
@@ -942,6 +963,19 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         // empty/absent array renders nothing. Read-only signal in this slice.
         const blocked =
             Array.isArray(task.blockedBy) && task.blockedBy.length > 0;
+        // Completed badge (PRD §3 lifecycle): the server sets `completedAt`
+        // (an ISO timestamp) while the task sits in a done-category column and
+        // clears it on exit, so a truthy value is an authoritative "this task
+        // is done" signal. Guard `Boolean(task.completedAt)` BEFORE handing the
+        // value to dayjs — `dayjs(undefined)` is "now" and would render a bogus
+        // date — then validate it parses before formatting.
+        const completed =
+            Boolean(task.completedAt) && dayjs(task.completedAt).isValid();
+        const completedLabel = completed
+            ? formatTemplate(microcopy.a11y.completedTask as string, {
+                  date: dayjs(task.completedAt).format("YYYY-MM-DD")
+              })
+            : "";
         // Read per-result strength from the AI search cache (P1-2). Returns
         // null when no semantic filter is active, so the badge stays out of
         // the way during normal browsing.
@@ -1229,7 +1263,16 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         </span>
                     </TaskTypeBadge>
                     <CardMeta>
-                        {blocked ? (
+                        {completed ? (
+                            <CompletedBadge
+                                aria-label={completedLabel}
+                                data-testid="task-card-completed"
+                            >
+                                <CheckCircleFilled aria-hidden />
+                                <span>{microcopy.taskCard.completed}</span>
+                            </CompletedBadge>
+                        ) : null}
+                        {blocked && !completed ? (
                             <BlockedBadge
                                 aria-label={
                                     microcopy.a11y.blockedTask as string
@@ -1264,7 +1307,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                 </span>
                             </PriorityBadge>
                         ) : null}
-                        {overdue ? (
+                        {overdue && !completed ? (
                             <OverdueChip
                                 aria-label={overdueLabel}
                                 data-testid="task-card-overdue"
