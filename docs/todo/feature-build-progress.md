@@ -81,7 +81,9 @@ escalation), both fixed before landing.
 - [x] Dependencies — `dependsOn` prerequisite edges + acyclic (cycle-rejecting) validation, bulk-excluded (L-DEP-A) — `fa1ce79a`
 - [x] Dependencies — move-to-done gate (`force` override) + `enforceDependencyGate` project flag (L-DEP-B) — `99313869`
 - [x] Dependencies — derived `blockedBy` signal on `GET /tasks` (unfinished prerequisites; powers the §4.5 badge) (L-DEP-C) — `40d0f262`
-- [ ] Milestones/iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
+- [x] Milestones — project-scoped `milestones` collection + CRUD (viewer-read/editor-write); `/api/v1/milestones` router + comprehensive RBAC/validation tests (backend) — `143866e4`
+- [ ] Task→milestone assignment (`task.milestoneId` + same-project validation + delete-cascade); milestone FE surface
+- [ ] Iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
 - [ ] Recurring tasks + scheduler (new runtime dep — sequenced last)
@@ -103,9 +105,10 @@ escalation), both fixed before landing.
 **Frontend surfaces — making the landed backend visible**
 - [x] Dependency "blocked" badge on board cards (consumes derived `blockedBy`) (FE-1) — `92b4ebef`
 - [x] Lifecycle UI — Trash drawer: list soft-deleted tasks + restore + permanent-delete (FE-2) — `20c145a5`
-- [ ] Lifecycle UI — Archive tab/view + archive/unarchive action (FE-2b)
+  - [x] FE-2 FIX — filter the widened `?includeTrashed=true` list to `deletedAt`-set rows (active tasks were surfacing as trash) + repair the board trash-button test the filter broke — `a43afd70` / `e31adf95`
+- [x] Lifecycle UI — Archive drawer: list archived tasks + unarchive (dedicated `PUT /tasks/archive {archived:false}`) + permanent-delete (FE-2b) — `e31adf95`
 - [x] Dependency editor — `dependsOn` multi-select in the task modal + read-only "Blocks" inverse (FE-3) — `f2465d4e`
-- [ ] `completedAt` "completed" card styling (FE-4)
+- [x] `completedAt` "completed" card styling — success badge; supersedes blocked/overdue (FE-4) — `7845b883`
 
 **Also pending — M5 saved-views server model:** work-management-depth
 defers saved-view *persistence* to M5, built just before the alternate-views
@@ -129,6 +132,18 @@ slice that consumes it.
   (still in a non-done column) as unfinished, so it blocks (conservative; `force`
   + `enforceDependencyGate` are escape hatches). Decide whether a trashed prereq
   should stop blocking — 2-line guard if so (L-DEP-B reviewer note).
+- `GET /tasks` `includeTrashed`/`includeArchived` flags WIDEN the result
+  (active + hidden); they do NOT scope it to only-hidden, so the Trash /
+  Archive drawers filter the widened list client-side on `deletedAt` /
+  `archivedAt` (documented on `ITask`). A task that is BOTH trashed AND
+  archived is invisible in both drawers (each query excludes the other
+  marker) — UI-unreachable today (no path sets both); revisit if a "move to
+  trash from archive" action lands.
+- Process: an FE change to a SHARED/rendered component must run the FULL jest
+  suite, not just the component's own test — the pre-commit hook runs
+  tsc/eslint/prettier/smoke but NOT jest, so a broken consumer test slips
+  through. The trash filter (`a43afd70`) broke `board.test.tsx`'s trash-button
+  test (its fixtures set no `deletedAt`); caught + fixed in `e31adf95`.
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable
