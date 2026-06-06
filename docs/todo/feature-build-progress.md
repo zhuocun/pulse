@@ -82,7 +82,8 @@ escalation), both fixed before landing.
 - [x] Dependencies — move-to-done gate (`force` override) + `enforceDependencyGate` project flag (L-DEP-B) — `99313869`
 - [x] Dependencies — derived `blockedBy` signal on `GET /tasks` (unfinished prerequisites; powers the §4.5 badge) (L-DEP-C) — `40d0f262`
 - [x] Milestones — project-scoped `milestones` collection + CRUD (viewer-read/editor-write); `/api/v1/milestones` router + comprehensive RBAC/validation tests (backend) — `143866e4`
-- [ ] Task→milestone assignment (`task.milestoneId` + same-project validation + delete-cascade); milestone FE surface
+- [x] Task→milestone assignment backend (`task.milestoneId` scalar FK + same-project validation + FK-null delete-cascade; bulk-excluded) — `293f3b30`
+- [ ] Milestone FE surface (milestone select in the task modal; milestone management UI)
 - [ ] Iterations; queryable/paginated `GET /tasks` + list/table/calendar/timeline views + swimlanes
 - [ ] Custom fields (scoped allowlist relaxation); project/task templates
 - [ ] AI assists (priority / dependency / duplicate, reusing `task_estimation`)
