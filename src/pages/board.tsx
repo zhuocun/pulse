@@ -952,7 +952,9 @@ const BoardPage = () => {
                                                       : microcopy.board
                                                             .copilotMenuProjectOff,
                                                   icon: (
-                                                      <SettingOutlined aria-hidden />
+                                                      <SettingOutlined
+                                                          aria-hidden
+                                                      />
                                                   ),
                                                   onClick: () =>
                                                       setProjectAiDisabled(

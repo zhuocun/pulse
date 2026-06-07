@@ -920,7 +920,9 @@ const Header: React.FC = () => {
                     !(environment.bottomNavEnabled && isPhoneChrome) && (
                         <ActivityFeedBell
                             unreadCount={unreadCount}
-                            onClick={() => setActivityDrawerOpen((prev) => !prev)}
+                            onClick={() =>
+                                setActivityDrawerOpen((prev) => !prev)
+                            }
                         />
                     )}
                 {/*

@@ -7,7 +7,15 @@ import {
     SunOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Card, Collapse, Segmented, Space, Switch, Typography } from "antd";
+import {
+    Button,
+    Card,
+    Collapse,
+    Segmented,
+    Space,
+    Switch,
+    Typography
+} from "antd";
 
 import ColorThemeSelect from "../components/colorThemeSelect";
 import PageContainer from "../components/pageContainer";

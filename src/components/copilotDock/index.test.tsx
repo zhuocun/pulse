@@ -374,9 +374,9 @@ describe("CopilotDock", () => {
             (node.textContent ?? "").includes(microcopy.a11y.aiBadge as string)
         );
         expect(headerAiBadges).toHaveLength(0);
-        expect(
-            document.getElementById("copilot-dock-title")
-        ).toHaveTextContent(microcopy.copilotDock.title as string);
+        expect(document.getElementById("copilot-dock-title")).toHaveTextContent(
+            microcopy.copilotDock.title as string
+        );
     });
 
     it("invokes onClose when the mask is clicked on desktop (dirty-state-safe close)", () => {

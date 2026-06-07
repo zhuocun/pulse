@@ -187,9 +187,7 @@ describe("LensChips", () => {
         await user.tab();
         await user.tab();
         await user.tab();
-        expect(
-            screen.getByRole("button", { name: /^urgent$/i })
-        ).toHaveFocus();
+        expect(screen.getByRole("button", { name: /^urgent$/i })).toHaveFocus();
         await user.keyboard("{Enter}");
         expect(onChange).toHaveBeenCalledWith("priority-urgent");
     });
