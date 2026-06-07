@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.errors import NodeCancelledError
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
@@ -903,7 +904,8 @@ def test_chat_agent_propagates_cancellation_through_provider_call() -> None:
 
     The defensive try/except around ``bound.ainvoke`` re-raises
     ``asyncio.CancelledError`` and ``GeneratorExit`` so cooperative shutdown
-    still propagates correctly.
+    still propagates correctly. LangGraph wraps node-raised
+    ``CancelledError`` as ``NodeCancelledError`` (LSD-1507).
     """
     import app.agents.catalog.chat as chat_mod
 
@@ -931,7 +933,7 @@ def test_chat_agent_propagates_cancellation_through_provider_call() -> None:
                 config=cfg,
             )
 
-        with pytest.raises(asyncio.CancelledError):
+        with pytest.raises((asyncio.CancelledError, NodeCancelledError)):
             asyncio.run(run())
     finally:
         chat_mod.is_stub_model = original_is_stub

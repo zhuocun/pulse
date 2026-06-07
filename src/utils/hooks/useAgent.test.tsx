@@ -120,14 +120,18 @@ describe("useAgent", () => {
                 {
                     type: "messages",
                     ns: ["root"],
-                    data: [{ content: "Here are your projects: ", type: "ai" }, {}]
+                    data: [
+                        { content: "Here are your projects: ", type: "ai" },
+                        {}
+                    ]
                 },
                 {
                     type: "messages",
                     ns: ["root"],
                     data: [
                         {
-                            content: '{"projects":[{"id":"p1","name":"Alpha"}]}',
+                            content:
+                                '{"projects":[{"id":"p1","name":"Alpha"}]}',
                             type: "tool"
                         },
                         {}
