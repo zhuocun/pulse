@@ -125,22 +125,28 @@ const Toolbar = styled.div`
 `;
 
 const StatRail = styled.div`
-    display: grid;
+    display: none;
     gap: ${space.xs}px;
-    /*
-     * On the narrowest viewports (≤ 360 px) three columns leave each card
-     * around 95 px, which crowds the labels and clips the values. Drop to a
-     * single horizontal row of three smaller cards instead, then expand to
-     * three full columns at sm+. The grid-template-columns at base width
-     * uses minmax(0, 1fr) so labels stay fully visible on every Android
-     * width down to 320 px.
-     */
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-bottom: ${space.md}px;
 
     @media (min-width: ${breakpoints.sm}px) {
+        display: grid;
         gap: ${space.sm}px;
         margin-bottom: ${space.lg}px;
+    }
+`;
+
+const CompactStatsLine = styled(Typography.Text)`
+    && {
+        display: block;
+        margin-bottom: ${space.sm}px;
+    }
+
+    @media (min-width: ${breakpoints.sm}px) {
+        && {
+            display: none;
+        }
     }
 `;
 
@@ -596,6 +602,9 @@ const ProjectPage = () => {
                         </Button>
                     </Toolbar>
                 </PageHeader>
+                <CompactStatsLine type="secondary">
+                    {statsAnnouncement}
+                </CompactStatsLine>
                 {/*
                  * Stat rail. `aria-busy` (was previously `aria-hidden`) lets
                  * the region stay in the AT tree during load — the visible

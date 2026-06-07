@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
 
@@ -135,6 +136,12 @@ describe("TaskModal onOpenSimilarTask", () => {
         expect(
             await screen.findByDisplayValue("Build task")
         ).toBeInTheDocument();
+        const aiAssistToggle = screen.getByText(
+            microcopy.taskModal.aiAssistLabel as string
+        );
+        fireEvent.click(
+            aiAssistToggle.closest(".ant-collapse-header") ?? aiAssistToggle
+        );
         fireEvent.click(screen.getByText("Open similar (test stub)"));
 
         await waitFor(() => {

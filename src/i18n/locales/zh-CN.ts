@@ -540,6 +540,11 @@ const zhCN: Dictionary = {
         densityLabel: "看板密度",
         densityComfortable: "宽松",
         densityCompact: "紧凑",
+        filtersToggle: "筛选",
+        filtersToggleAria: "搜索和筛选任务",
+        smartSearchToggle: "智能搜索",
+        smartSearchToggleAria: "切换 AI 智能搜索",
+        moreActionsAria: "更多看板操作",
         presets: {
             saveAction: "保存当前筛选为预设…",
             saveAriaLabel: "保存当前筛选为预设",
@@ -572,6 +577,8 @@ const zhCN: Dictionary = {
         removedByOthersBody: "您的编辑仍在此。请丢弃或保存为新任务以保留更改。",
         discardEdits: "丢弃更改",
         aiAssistLabel: "AI 辅助",
+        moreDetails: "更多详情",
+        moreActionsAria: "更多任务操作",
         blocksLabel: "阻塞"
     },
     taskCard: {

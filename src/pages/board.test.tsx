@@ -721,15 +721,9 @@ describe("BoardPage", () => {
             await screen.findByText("Roadmap board");
 
             const cluster = await screen.findByTestId("board-actions-cluster");
-            // The Copilot launcher badge + the Settings cog both live
-            // INSIDE the capsule on phone.
+            // The Copilot launcher badge lives inside the capsule on phone.
             expect(cluster).toContainElement(
                 screen.getByTestId("copilot-launcher-badge")
-            );
-            expect(cluster).toContainElement(
-                screen.getByRole("button", {
-                    name: /Board Copilot settings/i
-                })
             );
             // MemberPopover trigger is clustered too.
             expect(cluster).toContainElement(
@@ -741,28 +735,22 @@ describe("BoardPage", () => {
             expect(cluster).toContainElement(
                 screen.getByTestId("board-refresh")
             );
-            // The Trash + Archive entry points are core (non-AI) controls
-            // clustered alongside the rest.
-            expect(cluster).toContainElement(screen.getByTestId("board-trash"));
             expect(cluster).toContainElement(
-                screen.getByTestId("board-archive")
+                screen.getByTestId("board-more-actions")
             );
-            // Each leaf control gets its OWN slot so the hairline
-            // separators paint between adjacent controls. board.tsx passes
-            // the controls inside a (nested) fragment, which the cluster
-            // must flatten — a single collapsed slot would paint no
-            // dividers. Refresh + Members + Trash + Archive + Copilot +
-            // Settings = 6 slots.
+            // Trash + Archive move into the overflow menu on phone to keep
+            // the capsule within the viewport.
+            expect(screen.queryByTestId("board-trash")).not.toBeInTheDocument();
+            expect(screen.queryByTestId("board-archive")).not.toBeInTheDocument();
+            // Refresh + Members + Copilot + More = 4 slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")
-            ).toHaveLength(6);
+            ).toHaveLength(4);
             // The controls remain individually focusable inside the
             // capsule — the shared glass background is purely visual.
-            const settings = screen.getByRole("button", {
-                name: /Board Copilot settings/i
-            });
-            settings.focus();
-            expect(settings).toHaveFocus();
+            const moreActions = screen.getByTestId("board-more-actions");
+            moreActions.focus();
+            expect(moreActions).toHaveFocus();
         });
 
         it("renders the toolbar controls in the plain BoardActions row on desktop (no capsule)", async () => {

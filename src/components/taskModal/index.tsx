@@ -4,6 +4,7 @@ import {
     Col,
     Collapse,
     DatePicker,
+    Dropdown,
     Form,
     Grid,
     Input,
@@ -13,6 +14,7 @@ import {
     Tag,
     Typography
 } from "antd";
+import { MoreOutlined } from "@ant-design/icons";
 import { useForm } from "antd/lib/form/Form";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -818,219 +820,260 @@ const TaskModal: React.FC<{
                     placeholder={microcopy.placeholders.selectType}
                 />
             </Form.Item>
-            <Form.Item
-                label={
-                    <FieldLabelWithProvenance
-                        label={microcopy.fields.epic}
-                        suggested={appliedFieldOrigin.epic === "copilot"}
-                    />
-                }
-                name="epic"
-            >
-                <Input
-                    autoComplete="off"
-                    enterKeyHint="next"
-                    inputMode="text"
-                />
-            </Form.Item>
-            <Form.Item
-                label={
-                    <FieldLabelWithProvenance
-                        label={microcopy.fields.storyPoints}
-                        suggested={appliedFieldOrigin.storyPoints === "copilot"}
-                    />
-                }
-                name="storyPoints"
-            >
-                <Select
-                    onChange={() => {
-                        setAppliedFieldOrigin((prev) => {
-                            if (!prev.storyPoints) return prev;
-                            const next = { ...prev };
-                            delete next.storyPoints;
-                            return next;
-                        });
-                    }}
-                    options={STORY_POINT_OPTIONS}
-                    placeholder={microcopy.placeholders.selectStoryPoints}
-                />
-            </Form.Item>
-            {/*
-             * Priority (PRD §3). A single-select enum that rides the same
-             * `merged` → `tasks` PUT payload as every other richness field;
-             * no separate write path. Sits beside story points as the other
-             * single-value triage signal.
-             */}
-            <Form.Item label={microcopy.fields.priority} name="priority">
-                <Select
-                    options={PRIORITY_OPTIONS}
-                    placeholder={microcopy.placeholders.selectPriority}
-                />
-            </Form.Item>
-            {/*
-             * M2 task-richness fields. All optional. Dates bind
-             * as `Dayjs` (see `taskToFormValues` /
-             * `normalizeDateFields`); labels / assignees are
-             * multi-`Select`s whose values are id arrays; parent
-             * is a clearable single `Select`. Every one flows
-             * through the existing `onOk` submit payload (`merged`
-             * → the `tasks` PUT) with no separate write path.
-             */}
-            <Form.Item label={microcopy.fields.startDate} name="startDate">
-                <DatePicker
-                    allowClear
-                    format={ISO_DATE_FORMAT}
-                    placeholder={microcopy.placeholders.selectStartDate}
-                    style={{ width: "100%" }}
-                />
-            </Form.Item>
-            <Form.Item label={microcopy.fields.dueDate} name="dueDate">
-                <DatePicker
-                    allowClear
-                    format={ISO_DATE_FORMAT}
-                    placeholder={microcopy.placeholders.selectDueDate}
-                    style={{ width: "100%" }}
-                />
-            </Form.Item>
-            <Form.Item label={microcopy.fields.labels} name="labelIds">
-                <Select
-                    allowClear
-                    mode="multiple"
-                    optionFilterProp="label"
-                    options={labelOptions}
-                    optionRender={(option) => (
-                        <span
-                            style={{
-                                alignItems: "center",
-                                display: "inline-flex",
-                                gap: space.xs
-                            }}
-                        >
-                            <span
-                                aria-hidden
-                                style={{
-                                    background:
-                                        (
-                                            option.data as {
-                                                color?: string;
+            <Collapse
+                ghost
+                items={[
+                    {
+                        key: "more-details",
+                        label: microcopy.taskModal.moreDetails,
+                        children: (
+                            <>
+                                <Form.Item
+                                    label={
+                                        <FieldLabelWithProvenance
+                                            label={microcopy.fields.epic}
+                                            suggested={
+                                                appliedFieldOrigin.epic ===
+                                                "copilot"
                                             }
-                                        ).color ||
-                                        "var(--ant-color-border, #d9d9d9)",
-                                    borderRadius: "50%",
-                                    display: "inline-block",
-                                    flex: "0 0 auto",
-                                    height: 10,
-                                    width: 10
-                                }}
-                            />
-                            {option.label}
-                        </span>
-                    )}
-                    placeholder={microcopy.placeholders.selectLabels}
-                    tagRender={(tagProps) => {
-                        const color = labels.find(
-                            (item) => item._id === tagProps.value
-                        )?.color;
-                        return (
-                            <Tag
-                                closable={tagProps.closable}
-                                color={color}
-                                onClose={tagProps.onClose}
-                                style={{
-                                    marginInlineEnd: space.xxs
-                                }}
-                            >
-                                {tagProps.label}
-                            </Tag>
-                        );
-                    }}
-                />
-            </Form.Item>
-            <Form.Item label={microcopy.fields.assignees} name="assigneeIds">
-                <Select
-                    allowClear
-                    mode="multiple"
-                    optionFilterProp="label"
-                    options={assigneeOptions}
-                    placeholder={microcopy.placeholders.selectAssignees}
-                />
-            </Form.Item>
-            <Form.Item label={microcopy.fields.parentTask} name="parentTaskId">
-                <Select
-                    allowClear
-                    optionFilterProp="label"
-                    options={parentTaskOptions}
-                    placeholder={microcopy.placeholders.selectParentTask}
-                    showSearch
-                />
-            </Form.Item>
-            {/*
-             * Milestone (PRD milestones). A clearable single `Select` that
-             * MIRRORS the `parentTaskId` field above — `task.milestoneId` is
-             * the same `string | null` FK shape and rides the same `merged`
-             * → `tasks` PUT (no separate write path). Clear-semantics are
-             * intentionally inherited from `parentTaskId` (a cleared `null`
-             * is stripped by `filterRequest`, so the PUT leaves the field
-             * unchanged); a milestone delete clears assignments via the
-             * backend cascade so users are never stuck.
-             */}
-            <Form.Item
-                data-testid="task-modal-milestone"
-                label={microcopy.fields.milestone}
-                name="milestoneId"
-            >
-                <Select
-                    allowClear
-                    optionFilterProp="label"
-                    options={milestoneOptions}
-                    placeholder={microcopy.placeholders.selectMilestone}
-                    showSearch
-                />
-            </Form.Item>
-            {/*
-             * Dependency editor (PRD §4.5). Distinct from `parentTaskId`
-             * (containment): `dependsOn` is the set of prerequisite tasks
-             * that must finish before this one — an ordering edge. Rides the
-             * same `merged` → `tasks` PUT as every other field (no separate
-             * write path); a self / cross-project / cycle-forming edit is
-             * rejected by the backend with a 400 that `ErrorBox` surfaces.
-             */}
-            <Form.Item label={microcopy.fields.dependsOn} name="dependsOn">
-                <Select
-                    allowClear
-                    mode="multiple"
-                    onClear={() => form.setFieldsValue({ dependsOn: [] })}
-                    optionFilterProp="label"
-                    options={dependencyOptions}
-                    placeholder={microcopy.placeholders.selectDependencies}
-                />
-            </Form.Item>
-            {/*
-             * Read-only inverse: the tasks that depend on THIS one (computed
-             * client-side from the project list, not persisted). Shown only
-             * when something actually blocks on this task, rendered as the
-             * same `Tag` idiom the label/title chips use.
-             */}
-            {blocksOptions.length > 0 ? (
-                <Form.Item label={microcopy.taskModal.blocksLabel}>
-                    <div
-                        style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: space.xxs
-                        }}
-                    >
-                        {blocksOptions.map((option) => (
-                            <Tag
-                                key={option.value}
-                                style={{ marginInlineEnd: 0 }}
-                            >
-                                {option.label}
-                            </Tag>
-                        ))}
-                    </div>
-                </Form.Item>
-            ) : null}
+                                        />
+                                    }
+                                    name="epic"
+                                >
+                                    <Input
+                                        autoComplete="off"
+                                        enterKeyHint="next"
+                                        inputMode="text"
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={
+                                        <FieldLabelWithProvenance
+                                            label={
+                                                microcopy.fields.storyPoints
+                                            }
+                                            suggested={
+                                                appliedFieldOrigin
+                                                    .storyPoints === "copilot"
+                                            }
+                                        />
+                                    }
+                                    name="storyPoints"
+                                >
+                                    <Select
+                                        onChange={() => {
+                                            setAppliedFieldOrigin((prev) => {
+                                                if (!prev.storyPoints)
+                                                    return prev;
+                                                const next = { ...prev };
+                                                delete next.storyPoints;
+                                                return next;
+                                            });
+                                        }}
+                                        options={STORY_POINT_OPTIONS}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectStoryPoints
+                                        }
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.priority}
+                                    name="priority"
+                                >
+                                    <Select
+                                        options={PRIORITY_OPTIONS}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectPriority
+                                        }
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.startDate}
+                                    name="startDate"
+                                >
+                                    <DatePicker
+                                        allowClear
+                                        format={ISO_DATE_FORMAT}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectStartDate
+                                        }
+                                        style={{ width: "100%" }}
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.dueDate}
+                                    name="dueDate"
+                                >
+                                    <DatePicker
+                                        allowClear
+                                        format={ISO_DATE_FORMAT}
+                                        placeholder={
+                                            microcopy.placeholders.selectDueDate
+                                        }
+                                        style={{ width: "100%" }}
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.labels}
+                                    name="labelIds"
+                                >
+                                    <Select
+                                        allowClear
+                                        mode="multiple"
+                                        optionFilterProp="label"
+                                        options={labelOptions}
+                                        optionRender={(option) => (
+                                            <span
+                                                style={{
+                                                    alignItems: "center",
+                                                    display: "inline-flex",
+                                                    gap: space.xs
+                                                }}
+                                            >
+                                                <span
+                                                    aria-hidden
+                                                    style={{
+                                                        background:
+                                                            (
+                                                                option.data as {
+                                                                    color?: string;
+                                                                }
+                                                            ).color ||
+                                                            "var(--ant-color-border, #d9d9d9)",
+                                                        borderRadius: "50%",
+                                                        display: "inline-block",
+                                                        flex: "0 0 auto",
+                                                        height: 10,
+                                                        width: 10
+                                                    }}
+                                                />
+                                                {option.label}
+                                            </span>
+                                        )}
+                                        placeholder={
+                                            microcopy.placeholders.selectLabels
+                                        }
+                                        tagRender={(tagProps) => {
+                                            const color = labels.find(
+                                                (item) =>
+                                                    item._id === tagProps.value
+                                            )?.color;
+                                            return (
+                                                <Tag
+                                                    closable={
+                                                        tagProps.closable
+                                                    }
+                                                    color={color}
+                                                    onClose={tagProps.onClose}
+                                                    style={{
+                                                        marginInlineEnd:
+                                                            space.xxs
+                                                    }}
+                                                >
+                                                    {tagProps.label}
+                                                </Tag>
+                                            );
+                                        }}
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.assignees}
+                                    name="assigneeIds"
+                                >
+                                    <Select
+                                        allowClear
+                                        mode="multiple"
+                                        optionFilterProp="label"
+                                        options={assigneeOptions}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectAssignees
+                                        }
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.parentTask}
+                                    name="parentTaskId"
+                                >
+                                    <Select
+                                        allowClear
+                                        optionFilterProp="label"
+                                        options={parentTaskOptions}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectParentTask
+                                        }
+                                        showSearch
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    data-testid="task-modal-milestone"
+                                    label={microcopy.fields.milestone}
+                                    name="milestoneId"
+                                >
+                                    <Select
+                                        allowClear
+                                        optionFilterProp="label"
+                                        options={milestoneOptions}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectMilestone
+                                        }
+                                        showSearch
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label={microcopy.fields.dependsOn}
+                                    name="dependsOn"
+                                >
+                                    <Select
+                                        allowClear
+                                        mode="multiple"
+                                        onClear={() =>
+                                            form.setFieldsValue({
+                                                dependsOn: []
+                                            })
+                                        }
+                                        optionFilterProp="label"
+                                        options={dependencyOptions}
+                                        placeholder={
+                                            microcopy.placeholders
+                                                .selectDependencies
+                                        }
+                                    />
+                                </Form.Item>
+                                {blocksOptions.length > 0 ? (
+                                    <Form.Item
+                                        label={microcopy.taskModal.blocksLabel}
+                                    >
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: space.xxs
+                                            }}
+                                        >
+                                            {blocksOptions.map((option) => (
+                                                <Tag
+                                                    key={option.value}
+                                                    style={{
+                                                        marginInlineEnd: 0
+                                                    }}
+                                                >
+                                                    {option.label}
+                                                </Tag>
+                                            ))}
+                                        </div>
+                                    </Form.Item>
+                                ) : null}
+                            </>
+                        )
+                    }
+                ]}
+            />
             {environment.aiGhostTextEnabled && aiEnabled && boardAiOn ? (
                 <CopilotPrivacyDisclosure
                     onAcknowledge={() => {
@@ -1110,31 +1153,68 @@ const TaskModal: React.FC<{
                 display: "flex",
                 flexWrap: "wrap",
                 gap: space.xs,
-                minWidth: 0
+                justifyContent: "space-between",
+                minWidth: 0,
+                width: "100%"
             }}
         >
-            {editingTask ? (
-                <Tag
-                    variant="filled"
-                    color={editingTask.type === "Bug" ? "magenta" : "geekblue"}
-                    style={{ fontWeight: 500, marginInlineEnd: 0 }}
-                >
-                    {editingTask.type === "Bug"
-                        ? microcopy.options.taskTypes.bug
-                        : microcopy.options.taskTypes.task}
-                </Tag>
-            ) : null}
-            <Typography.Text
-                id={titleId}
+            <div
                 style={{
-                    fontSize: fontSize.lg,
-                    fontWeight: fontWeight.semibold,
-                    lineHeight: 1.3,
-                    overflowWrap: "anywhere"
+                    alignItems: "center",
+                    display: "flex",
+                    flex: "1 1 auto",
+                    flexWrap: "wrap",
+                    gap: space.xs,
+                    minWidth: 0
                 }}
             >
-                {titleText}
-            </Typography.Text>
+                {editingTask ? (
+                    <Tag
+                        variant="filled"
+                        color={
+                            editingTask.type === "Bug" ? "magenta" : "geekblue"
+                        }
+                        style={{ fontWeight: 500, marginInlineEnd: 0 }}
+                    >
+                        {editingTask.type === "Bug"
+                            ? microcopy.options.taskTypes.bug
+                            : microcopy.options.taskTypes.task}
+                    </Tag>
+                ) : null}
+                <Typography.Text
+                    id={titleId}
+                    style={{
+                        fontSize: fontSize.lg,
+                        fontWeight: fontWeight.semibold,
+                        lineHeight: 1.3,
+                        overflowWrap: "anywhere"
+                    }}
+                >
+                    {titleText}
+                </Typography.Text>
+            </div>
+            {isPhone ? (
+                <Dropdown
+                    menu={{
+                        items: [
+                            {
+                                key: "delete",
+                                danger: true,
+                                disabled: deleteDisabled,
+                                label: microcopy.actions.delete,
+                                onClick: onDelete
+                            }
+                        ]
+                    }}
+                    trigger={["click"]}
+                >
+                    <Button
+                        aria-label={microcopy.taskModal.moreActionsAria}
+                        icon={<MoreOutlined aria-hidden />}
+                        type="text"
+                    />
+                </Dropdown>
+            ) : null}
         </div>
     );
 
@@ -1186,7 +1266,18 @@ const TaskModal: React.FC<{
      * Cancel/Save-right. See QW-19 in
      * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
      */
-    const footerNode = !screens.sm ? (
+    const footerNode = isPhone ? (
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: space.xs
+            }}
+        >
+            {cancelButton}
+            {okButton}
+        </div>
+    ) : !screens.sm ? (
         <div
             style={{
                 display: "flex",
@@ -1263,9 +1354,11 @@ const TaskModal: React.FC<{
                          * modal body. The 80 px floor leaves at least a sliver
                          * of scrollable content in pathological cases (Bug 6).
                          */
-                        maxHeight: screens.sm
-                            ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
-                            : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
+                        maxHeight: isPhone
+                            ? "max(80px, calc(100dvh - 240px - env(keyboard-inset-height, 0px)))"
+                            : screens.sm
+                              ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
+                              : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
                         overflowY: "auto"
                     }
                 }}
@@ -1351,25 +1444,21 @@ const TaskModal: React.FC<{
                             <>
                                 {formNode}
                                 {aiAssistNode ? (
-                                    isPhone ? (
-                                        aiAssistNode
-                                    ) : (
-                                        <Collapse
-                                            defaultActiveKey={["ai-assist"]}
-                                            ghost
-                                            items={[
-                                                {
-                                                    key: "ai-assist",
-                                                    label: microcopy.taskModal
-                                                        .aiAssistLabel,
-                                                    children: aiAssistNode
-                                                }
-                                            ]}
-                                            style={{
-                                                marginBlockStart: space.sm
-                                            }}
-                                        />
-                                    )
+                                    <Collapse
+                                        defaultActiveKey={[]}
+                                        ghost
+                                        items={[
+                                            {
+                                                key: "ai-assist",
+                                                label: microcopy.taskModal
+                                                    .aiAssistLabel,
+                                                children: aiAssistNode
+                                            }
+                                        ]}
+                                        style={{
+                                            marginBlockStart: space.sm
+                                        }}
+                                    />
                                 ) : null}
                             </>
                         )}

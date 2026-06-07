@@ -167,6 +167,13 @@ const openSelect = (index: number) => {
     fireEvent.mouseDown(screen.getAllByRole("combobox")[index]);
 };
 
+const expandFilters = async () => {
+    const toggle = screen.getByTestId("task-search-panel-filters-toggle");
+    if (toggle.getAttribute("aria-expanded") !== "true") {
+        await userEvent.setup().click(toggle);
+    }
+};
+
 const getRenderedOptionLabels = () =>
     Array.from(
         document.body.querySelectorAll(".ant-select-item-option-content")
@@ -194,6 +201,7 @@ describe("TaskSearchPanel", () => {
         const param = { coordinatorId: "", taskName: "checkout", type: "" };
 
         renderPanel({ param, setParam });
+        await expandFilters();
 
         fireEvent.change(screen.getByPlaceholderText("Search this board"), {
             target: { value: "invoice" }
@@ -204,6 +212,8 @@ describe("TaskSearchPanel", () => {
             taskName: "invoice",
             type: ""
         });
+
+        await expandFilters();
 
         openSelect(0);
         fireEvent.click(await screen.findByText("Alice"));
@@ -242,6 +252,8 @@ describe("TaskSearchPanel", () => {
             ]
         });
 
+        await expandFilters();
+
         openSelect(0);
 
         await waitFor(() => {
@@ -265,6 +277,8 @@ describe("TaskSearchPanel", () => {
                 task({ _id: "t3", type: "Bug" })
             ]
         });
+
+        await expandFilters();
 
         openSelect(1);
 
@@ -297,6 +311,8 @@ describe("TaskSearchPanel", () => {
             panelTasks: []
         });
 
+        await expandFilters();
+
         openSelect(0);
 
         await waitFor(() => {
@@ -323,6 +339,8 @@ describe("TaskSearchPanel", () => {
             panelMembers: undefined,
             panelTasks: []
         });
+
+        await expandFilters();
 
         openSelect(0);
 
@@ -358,7 +376,7 @@ describe("TaskSearchPanel", () => {
         });
     });
 
-    it("shows loading state for both selects", () => {
+    it("shows loading state for both selects", async () => {
         const { container } = render(
             <Provider store={makePanelStore()}>
                 <MemoryRouter initialEntries={["/projects/p1/board"]}>
@@ -381,6 +399,8 @@ describe("TaskSearchPanel", () => {
                 </MemoryRouter>
             </Provider>
         );
+
+        await expandFilters();
 
         // Two filter selects (coordinator + type) plus the preset Select
         // both render the loading sentinel; we still assert there are at
@@ -687,6 +707,7 @@ describe("TaskSearchPanel", () => {
     describe("density toggle (Phase 4.2)", () => {
         it("flips the slice's boardDensity when the user picks Compact", async () => {
             const { store } = renderPanel();
+            await expandFilters();
             // AntD's Segmented hides the radios behind a label that
             // owns the click; click the visible label rather than the
             // hidden input (which carries `pointer-events: none`).
@@ -701,8 +722,9 @@ describe("TaskSearchPanel", () => {
             });
         });
 
-        it("reflects the slice's current value on mount", () => {
+        it("reflects the slice's current value on mount", async () => {
             renderPanel();
+            await expandFilters();
             const comfortableRadio = screen.getByRole("radio", {
                 name: microcopy.board.densityComfortable
             });
