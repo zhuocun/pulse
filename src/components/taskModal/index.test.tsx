@@ -130,7 +130,9 @@ const expandMoreDetails = async () => {
 };
 
 const expandAiAssist = async () => {
-    const toggle = screen.getByText(microcopy.taskModal.aiAssistLabel as string);
+    const toggle = screen.getByText(
+        microcopy.taskModal.aiAssistLabel as string
+    );
     const header =
         toggle.closest(".ant-collapse-header") ??
         toggle.closest("button") ??

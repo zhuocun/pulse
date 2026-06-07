@@ -741,7 +741,9 @@ describe("BoardPage", () => {
             // Trash + Archive move into the overflow menu on phone to keep
             // the capsule within the viewport.
             expect(screen.queryByTestId("board-trash")).not.toBeInTheDocument();
-            expect(screen.queryByTestId("board-archive")).not.toBeInTheDocument();
+            expect(
+                screen.queryByTestId("board-archive")
+            ).not.toBeInTheDocument();
             // Refresh + Members + Copilot + More = 4 slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")

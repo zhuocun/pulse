@@ -849,12 +849,10 @@ const TaskModal: React.FC<{
                                 <Form.Item
                                     label={
                                         <FieldLabelWithProvenance
-                                            label={
-                                                microcopy.fields.storyPoints
-                                            }
+                                            label={microcopy.fields.storyPoints}
                                             suggested={
-                                                appliedFieldOrigin
-                                                    .storyPoints === "copilot"
+                                                appliedFieldOrigin.storyPoints ===
+                                                "copilot"
                                             }
                                         />
                                     }
@@ -963,9 +961,7 @@ const TaskModal: React.FC<{
                                             )?.color;
                                             return (
                                                 <Tag
-                                                    closable={
-                                                        tagProps.closable
-                                                    }
+                                                    closable={tagProps.closable}
                                                     color={color}
                                                     onClose={tagProps.onClose}
                                                     style={{
