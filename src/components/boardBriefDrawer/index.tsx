@@ -1,4 +1,4 @@
-import { Drawer, Grid, Space, Tag } from "antd";
+import { Drawer, Grid, Space } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import { space } from "../../theme/tokens";
@@ -42,9 +42,6 @@ const BoardBriefDrawer: React.FC<BoardBriefDrawerProps> = ({
                     <span style={{ fontWeight: 600 }}>
                         {microcopy.brief.title}
                     </span>
-                    <Tag color="purple" style={{ marginInlineStart: space.xs }}>
-                        {microcopy.a11y.aiBadge}
-                    </Tag>
                 </Space>
             }
             size={drawerWidth}

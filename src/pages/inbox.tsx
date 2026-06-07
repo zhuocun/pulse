@@ -252,14 +252,6 @@ const InboxPage = () => {
             <PageHeading level={1}>{microcopy.inbox.heading}</PageHeading>
             <SectionStack>
                 <SettingsSection
-                    data-testid="inbox-section-triage"
-                    header={microcopy.inbox.sections.triage.title}
-                >
-                    <SectionEmpty data-testid="inbox-triage-empty">
-                        {microcopy.inbox.sections.triage.empty}
-                    </SectionEmpty>
-                </SettingsSection>
-                <SettingsSection
                     data-testid="inbox-section-mentions"
                     header={microcopy.inbox.sections.mentions.title}
                 >

@@ -1,4 +1,4 @@
-import { Drawer, Grid, Space, Tag, Typography } from "antd";
+import { Drawer, Grid, Space, Typography } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontWeight, space } from "../../theme/tokens";
@@ -79,9 +79,6 @@ const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
                     >
                         {microcopy.ai.askCopilot}
                     </Typography.Text>
-                    {screens.md && (
-                        <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
-                    )}
                 </Space>
             }
         >

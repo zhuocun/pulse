@@ -21,6 +21,7 @@ import {
     space
 } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
 const Container = styled.div`
     display: flex;
@@ -321,6 +322,7 @@ const ProjectDetailPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { pathname } = useLocation();
     const navigate = useNavigate();
+    const isPhoneChrome = useIsPhoneChrome();
 
     const {
         data: project,
@@ -439,7 +441,7 @@ const ProjectDetailPage = () => {
                  * flicker; we surface it as soon as the project
                  * resolves so the nav row can't outlive a 404 body.
                  */}
-                {project && projectId ? (
+                {project && projectId && !isPhoneChrome ? (
                     <ChildNav
                         aria-label={microcopy.labels.projectSections}
                         data-testid="project-detail-child-nav"

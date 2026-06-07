@@ -360,21 +360,9 @@ describe("CopilotDock", () => {
         });
     });
 
-    it("renders a single consolidated header (exactly one AI badge in the dock header)", () => {
+    it("renders a minimal dock header (sparkle + title, no AI badge tag)", () => {
         renderDock();
 
-        // The dock title row owns exactly one ai-badge tag. Both legacy
-        // drawers used to render their own; the dock's role is to
-        // collapse them onto a single header.
-        //
-        // ChatTabBody's per-message disclaimer ALSO renders the
-        // `microcopy.a11y.aiBadge` string, so a global text count can
-        // exceed one without telling us anything about the header.
-        // Scope the assertion to the dock header by querying the title
-        // element by its id (`copilot-dock-title`) and walking up to the
-        // enclosing AntD drawer header — the desktop branch still uses
-        // the AntD `<Drawer>` fallback under the Sheet primitive so the
-        // `.ant-drawer-header` selector is still valid on this branch.
         const header = document.querySelector(
             "[data-testid='copilot-dock'] .ant-drawer-header"
         );
@@ -385,7 +373,10 @@ describe("CopilotDock", () => {
         const headerAiBadges = Array.from(headerBadgeMatches).filter((node) =>
             (node.textContent ?? "").includes(microcopy.a11y.aiBadge as string)
         );
-        expect(headerAiBadges).toHaveLength(1);
+        expect(headerAiBadges).toHaveLength(0);
+        expect(
+            document.getElementById("copilot-dock-title")
+        ).toHaveTextContent(microcopy.copilotDock.title as string);
     });
 
     it("invokes onClose when the mask is clicked on desktop (dirty-state-safe close)", () => {

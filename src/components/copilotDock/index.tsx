@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import { Space, Tabs, Tag, Typography } from "antd";
+import { Space, Segmented, Tabs, Typography } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import { fontWeight, space } from "../../theme/tokens";
@@ -11,8 +11,16 @@ import Sheet from "../sheet";
 import BriefTabBody from "./BriefTabBody";
 import ChatTabBody from "./ChatTabBody";
 import InboxTabBody, { type InboxTabBodyProps } from "./InboxTabBody";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
 export type CopilotDockTab = "chat" | "brief" | "inbox";
+
+const DockTabPane = styled.div<{ $active: boolean }>`
+    display: ${({ $active }) => ($active ? "flex" : "none")};
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+`;
 
 const DockTabs = styled(Tabs)`
     && {
@@ -122,6 +130,7 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
     onActionInboxNudge,
     onDismissInboxNudge
 }) => {
+    const isPhone = useIsPhoneChrome();
     // Both bodies stay mounted across tab switches (`destroyOnHidden={false}`
     // below). `dockOpen` drives close-side teardown ONLY; `tabActive`
     // drives focus/dispatch/initial requests/etc. This split is the
@@ -182,24 +191,52 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
         }
     ];
 
+    const segmentedOptions = tabItems.map((item) => ({
+        label: item.label,
+        value: item.key
+    }));
+
     return (
         <>
-            <DockTabs
-                activeKey={activeTab}
-                aria-label={microcopy.copilotDock.tabListLabel}
-                data-testid="copilot-dock-tabs"
-                /*
-                 * `destroyOnHidden={false}` keeps inactive tabs mounted
-                 * so chat history + the brief cache survive a tab switch
-                 * — both bodies own their own state and teardown via
-                 * their `dockOpen` prop. Replaces the deprecated
-                 * `destroyInactiveTabPane` (AntD 5.18+).
-                 */
-                destroyOnHidden={false}
-                items={tabItems}
-                onChange={(key) => onTabChange(key as CopilotDockTab)}
-                size="small"
-            />
+            {isPhone ? (
+                <>
+                    <Segmented
+                        aria-label={microcopy.copilotDock.tabListLabel}
+                        block
+                        data-testid="copilot-dock-segmented"
+                        onChange={(key) => onTabChange(key as CopilotDockTab)}
+                        options={segmentedOptions}
+                        style={{ marginBottom: space.xs }}
+                        value={activeTab}
+                    />
+                    {tabItems.map((item) => (
+                        <DockTabPane
+                            $active={activeTab === item.key}
+                            data-testid={`copilot-dock-pane-${item.key}`}
+                            key={item.key}
+                        >
+                            {item.children}
+                        </DockTabPane>
+                    ))}
+                </>
+            ) : (
+                <DockTabs
+                    activeKey={activeTab}
+                    aria-label={microcopy.copilotDock.tabListLabel}
+                    data-testid="copilot-dock-tabs"
+                    /*
+                     * `destroyOnHidden={false}` keeps inactive tabs mounted
+                     * so chat history + the brief cache survive a tab switch
+                     * — both bodies own their own state and teardown via
+                     * their `dockOpen` prop. Replaces the deprecated
+                     * `destroyInactiveTabPane` (AntD 5.18+).
+                     */
+                    destroyOnHidden={false}
+                    items={tabItems}
+                    onChange={(key) => onTabChange(key as CopilotDockTab)}
+                    size="small"
+                />
+            )}
             {footerSlot ? (
                 <div
                     data-testid="copilot-dock-footer-slot"
@@ -320,7 +357,6 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                     >
                         {microcopy.copilotDock.title}
                     </Typography.Title>
-                    <Tag color="purple">{microcopy.a11y.aiBadge}</Tag>
                 </Space>
             }
         >

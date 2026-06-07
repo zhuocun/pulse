@@ -173,38 +173,39 @@ interface LensChipsProps {
 
 const LensChips: React.FC<LensChipsProps> = ({ active, onChange }) => {
     const chips = useMemo(
-        () => [
-            {
-                id: "today" as const,
-                label: microcopy.lenses.today,
-                tooltip: microcopy.lenses.todayTooltip
-            },
-            {
-                id: "this-week" as const,
-                label: microcopy.lenses.thisWeek,
-                tooltip: microcopy.lenses.thisWeekTooltip
-            },
-            {
-                id: "mine" as const,
-                label: microcopy.lenses.mine,
-                tooltip: microcopy.lenses.mineTooltip
-            },
-            {
-                id: "priority-high" as const,
-                label: microcopy.lenses.highPriority,
-                tooltip: microcopy.lenses.highPriorityTooltip
-            },
-            {
-                id: "priority-urgent" as const,
-                label: microcopy.lenses.urgent,
-                tooltip: microcopy.lenses.urgentTooltip
-            },
-            {
-                id: "at-risk" as const,
-                label: microcopy.lenses.atRisk,
-                tooltip: microcopy.lenses.atRiskTooltip
-            }
-        ],
+        () =>
+            [
+                {
+                    id: "today" as const,
+                    label: microcopy.lenses.today,
+                    tooltip: microcopy.lenses.todayTooltip
+                },
+                {
+                    id: "this-week" as const,
+                    label: microcopy.lenses.thisWeek,
+                    tooltip: microcopy.lenses.thisWeekTooltip
+                },
+                {
+                    id: "mine" as const,
+                    label: microcopy.lenses.mine,
+                    tooltip: microcopy.lenses.mineTooltip
+                },
+                {
+                    id: "priority-high" as const,
+                    label: microcopy.lenses.highPriority,
+                    tooltip: microcopy.lenses.highPriorityTooltip
+                },
+                {
+                    id: "priority-urgent" as const,
+                    label: microcopy.lenses.urgent,
+                    tooltip: microcopy.lenses.urgentTooltip
+                },
+                {
+                    id: "at-risk" as const,
+                    label: microcopy.lenses.atRisk,
+                    tooltip: microcopy.lenses.atRiskTooltip
+                }
+            ].filter((chip) => !COMING_SOON_LENSES.has(chip.id)),
         []
     );
 

@@ -7,7 +7,7 @@ import {
     SunOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Card, Segmented, Space, Switch, Typography } from "antd";
+import { Button, Card, Collapse, Segmented, Space, Switch, Typography } from "antd";
 
 import ColorThemeSelect from "../components/colorThemeSelect";
 import PageContainer from "../components/pageContainer";
@@ -259,11 +259,17 @@ const SettingsPage = () => {
                         icon={languageIcon}
                         label={microcopy.settings.language}
                     />
-                    <SettingsRow
-                        control={colorThemeControl}
-                        data-testid="settings-row-color-theme"
-                        icon={colorThemeIcon}
-                        label={microcopy.settings.colorTheme}
+                    <Collapse
+                        bordered={false}
+                        data-testid="settings-color-theme-collapse"
+                        ghost
+                        items={[
+                            {
+                                key: "color-theme",
+                                label: microcopy.settings.colorTheme,
+                                children: colorThemeControl
+                            }
+                        ]}
                     />
                 </SettingsSection>
                 {aiAvailable ? (

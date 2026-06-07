@@ -721,11 +721,7 @@ describe("BoardPage", () => {
             await screen.findByText("Roadmap board");
 
             const cluster = await screen.findByTestId("board-actions-cluster");
-            // The Copilot launcher badge lives inside the capsule on phone.
-            expect(cluster).toContainElement(
-                screen.getByTestId("copilot-launcher-badge")
-            );
-            // MemberPopover trigger is clustered too.
+            // MemberPopover trigger is clustered.
             expect(cluster).toContainElement(
                 screen.getByRole("button", { name: /view team members/i })
             );
@@ -738,16 +734,21 @@ describe("BoardPage", () => {
             expect(cluster).toContainElement(
                 screen.getByTestId("board-more-actions")
             );
+            // Copilot is reachable from the bottom tab bar on phone — not
+            // duplicated in the board header capsule.
+            expect(
+                screen.queryByTestId("copilot-launcher-badge")
+            ).not.toBeInTheDocument();
             // Trash + Archive move into the overflow menu on phone to keep
             // the capsule within the viewport.
             expect(screen.queryByTestId("board-trash")).not.toBeInTheDocument();
             expect(
                 screen.queryByTestId("board-archive")
             ).not.toBeInTheDocument();
-            // Refresh + Members + Copilot + More = 4 slots.
+            // Refresh + Members + More = 3 slots.
             expect(
                 cluster.querySelectorAll(".pulse-cluster-slot")
-            ).toHaveLength(4);
+            ).toHaveLength(3);
             // The controls remain individually focusable inside the
             // capsule — the shared glass background is purely visual.
             const moreActions = screen.getByTestId("board-more-actions");
