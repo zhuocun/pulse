@@ -2,6 +2,7 @@ import {
     CheckOutlined,
     CopyOutlined,
     EditOutlined,
+    MoreOutlined,
     PlusOutlined,
     ReloadOutlined
 } from "@ant-design/icons";
@@ -10,6 +11,7 @@ import {
     Button,
     Grid,
     Modal,
+    Popover,
     Select,
     Skeleton,
     Space,
@@ -53,6 +55,7 @@ import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import type {
     AutonomyLevel,
     MutationProposal,
@@ -308,6 +311,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const inputRef = useRef<TextAreaRef | null>(null);
     const historyRestoredForRef = useRef<string | null>(null);
     const screens = Grid.useBreakpoint();
+    const isPhone = useIsPhoneChrome();
     const initialPromptHandled = useRef<string | null>(null);
     const message = useAppMessage();
 
@@ -863,69 +867,63 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
 
     return (
         <ChatTabLayout>
-            <Space
-                size={space.xs}
-                style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    justifyContent: "flex-end",
-                    marginBottom: space.xs
-                }}
-            >
-                <Select
-                    aria-label={microcopyString(
-                        microcopy.ai.autonomySelectorAriaLabel
-                    )}
-                    onChange={(value: AutonomyLevel) => setAutonomyLevel(value)}
-                    options={autonomySelectorOptions.map((opt) => {
-                        const labelText = microcopyString(
-                            microcopy.ai[
-                                opt.labelKey as keyof typeof microcopy.ai
-                            ]
-                        );
-                        const tooltip = opt.disabledTooltipKey
-                            ? microcopyString(
-                                  microcopy.ai[
-                                      opt.disabledTooltipKey as keyof typeof microcopy.ai
-                                  ]
-                              )
-                            : undefined;
-                        return {
-                            value: opt.value,
-                            disabled: opt.disabled,
-                            title: opt.disabled ? tooltip : undefined,
-                            label: opt.disabled ? (
-                                <Tooltip placement="left" title={tooltip}>
-                                    <span
-                                        data-testid={`autonomy-option-${opt.value}`}
-                                    >
-                                        {labelText}
-                                    </span>
-                                </Tooltip>
-                            ) : (
-                                labelText
-                            )
-                        };
-                    })}
-                    size="small"
-                    style={{ minWidth: 90 }}
-                    value={autonomyLevel}
-                />
-                <CopilotAboutPopover />
-                {screens.md && <CopilotPrivacyPopover route="chat" />}
-                <Tooltip
-                    title={
-                        !screens.md ? microcopy.ai.newConversation : undefined
-                    }
+            {isPhone ? (
+                <Space
+                    size={space.xs}
+                    style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginBottom: space.xs,
+                        width: "100%"
+                    }}
                 >
+                    <Popover
+                        content={
+                            <Space
+                                direction="vertical"
+                                size={space.sm}
+                                style={{ maxWidth: 280, width: "100%" }}
+                            >
+                                <Select
+                                    aria-label={microcopyString(
+                                        microcopy.ai.autonomySelectorAriaLabel
+                                    )}
+                                    onChange={(value: AutonomyLevel) =>
+                                        setAutonomyLevel(value)
+                                    }
+                                    options={autonomySelectorOptions.map(
+                                        (opt) => ({
+                                            value: opt.value,
+                                            disabled: opt.disabled,
+                                            label: microcopyString(
+                                                microcopy.ai[
+                                                    opt.labelKey as keyof typeof microcopy.ai
+                                                ]
+                                            )
+                                        })
+                                    )}
+                                    size="small"
+                                    style={{ width: "100%" }}
+                                    value={autonomyLevel}
+                                />
+                                <CopilotAboutPopover />
+                                <CopilotPrivacyPopover route="chat" />
+                            </Space>
+                        }
+                        placement="bottomRight"
+                        trigger={["click"]}
+                    >
+                        <Button
+                            aria-label={microcopy.a11y.boardCopilotSettings}
+                            icon={<MoreOutlined aria-hidden />}
+                            size="small"
+                            type="text"
+                        />
+                    </Popover>
                     <Button
                         aria-label={microcopy.ai.newConversation}
                         disabled={messages.length === 0 || isLoading}
-                        icon={
-                            !screens.md ? (
-                                <PlusOutlined aria-hidden />
-                            ) : undefined
-                        }
+                        icon={<PlusOutlined aria-hidden />}
                         onClick={() => {
                             if (messages.length > 0) {
                                 Modal.confirm({
@@ -938,12 +936,96 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                             }
                         }}
                         size="small"
-                        type="link"
+                        type="text"
+                    />
+                </Space>
+            ) : (
+                <Space
+                    size={space.xs}
+                    style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        marginBottom: space.xs
+                    }}
+                >
+                    <Select
+                        aria-label={microcopyString(
+                            microcopy.ai.autonomySelectorAriaLabel
+                        )}
+                        onChange={(value: AutonomyLevel) =>
+                            setAutonomyLevel(value)
+                        }
+                        options={autonomySelectorOptions.map((opt) => {
+                            const labelText = microcopyString(
+                                microcopy.ai[
+                                    opt.labelKey as keyof typeof microcopy.ai
+                                ]
+                            );
+                            const tooltip = opt.disabledTooltipKey
+                                ? microcopyString(
+                                      microcopy.ai[
+                                          opt.disabledTooltipKey as keyof typeof microcopy.ai
+                                      ]
+                                  )
+                                : undefined;
+                            return {
+                                value: opt.value,
+                                disabled: opt.disabled,
+                                title: opt.disabled ? tooltip : undefined,
+                                label: opt.disabled ? (
+                                    <Tooltip placement="left" title={tooltip}>
+                                        <span
+                                            data-testid={`autonomy-option-${opt.value}`}
+                                        >
+                                            {labelText}
+                                        </span>
+                                    </Tooltip>
+                                ) : (
+                                    labelText
+                                )
+                            };
+                        })}
+                        size="small"
+                        style={{ minWidth: 90 }}
+                        value={autonomyLevel}
+                    />
+                    <CopilotAboutPopover />
+                    {screens.md && <CopilotPrivacyPopover route="chat" />}
+                    <Tooltip
+                        title={
+                            !screens.md
+                                ? microcopy.ai.newConversation
+                                : undefined
+                        }
                     >
-                        {screens.md ? microcopy.ai.newConversation : null}
-                    </Button>
-                </Tooltip>
-            </Space>
+                        <Button
+                            aria-label={microcopy.ai.newConversation}
+                            disabled={messages.length === 0 || isLoading}
+                            icon={
+                                !screens.md ? (
+                                    <PlusOutlined aria-hidden />
+                                ) : undefined
+                            }
+                            onClick={() => {
+                                if (messages.length > 0) {
+                                    Modal.confirm({
+                                        content:
+                                            microcopy.ai.newConversationConfirm,
+                                        onOk: resetAll
+                                    });
+                                } else {
+                                    resetAll();
+                                }
+                            }}
+                            size="small"
+                            type="link"
+                        >
+                            {screens.md ? microcopy.ai.newConversation : null}
+                        </Button>
+                    </Tooltip>
+                </Space>
+            )}
             <CopilotRemoteConsentNotice route="chat" />
             {/* Inline health status alert */}
             {remoteHealthActive &&

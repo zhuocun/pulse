@@ -206,15 +206,14 @@ describe("InboxPage", () => {
             ).not.toBeInTheDocument();
         });
 
-        it("shows the Triage and Mentions structural empty copy", () => {
+        it("shows the Mentions structural empty copy when activity has data", () => {
             seedEvent({ id: "evt-1", summary: "Updated task “Triage me”" });
             renderPage();
 
-            const triage = screen.getByTestId("inbox-section-triage");
-            const mentions = screen.getByTestId("inbox-section-mentions");
             expect(
-                within(triage).getByText(microcopy.inbox.sections.triage.empty)
-            ).toBeInTheDocument();
+                screen.queryByTestId("inbox-section-triage")
+            ).not.toBeInTheDocument();
+            const mentions = screen.getByTestId("inbox-section-mentions");
             expect(
                 within(mentions).getByText(
                     microcopy.inbox.sections.mentions.empty

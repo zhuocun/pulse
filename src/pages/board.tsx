@@ -846,7 +846,7 @@ const BoardPage = () => {
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <BoardShell>
-                {boardAiOn && <CopilotWelcomeBanner />}
+                {boardAiOn && !isPhone && <CopilotWelcomeBanner />}
                 {(() => {
                     /*
                      * Two-tier board header (ui-todo §1.2 item 7). The old
@@ -942,6 +942,27 @@ const BoardPage = () => {
                         <Dropdown
                             menu={{
                                 items: [
+                                    ...(aiEnabled
+                                        ? [
+                                              {
+                                                  key: "project-ai",
+                                                  label: aiDisabledForProject
+                                                      ? microcopy.board
+                                                            .enableCopilotOnBoard
+                                                      : microcopy.board
+                                                            .copilotMenuProjectOff,
+                                                  icon: (
+                                                      <SettingOutlined
+                                                          aria-hidden
+                                                      />
+                                                  ),
+                                                  onClick: () =>
+                                                      setProjectAiDisabled(
+                                                          !aiDisabledForProject
+                                                      )
+                                              }
+                                          ]
+                                        : []),
                                     {
                                         key: "trash",
                                         label: microcopy.trashDrawer
@@ -1006,7 +1027,6 @@ const BoardPage = () => {
                                     />
                                 </>
                             )}
-                            {isPhone && copilotMenuEl}
                             {isPhone && phoneOverflowMenu}
                             {!isPhone && projectAiSwitch}
                         </>

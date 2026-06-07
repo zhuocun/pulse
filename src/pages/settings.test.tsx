@@ -303,18 +303,15 @@ describe("SettingsPage (phone chassis)", () => {
         ).toBeInTheDocument();
     });
 
-    it("nests the color-theme row inside the Appearance section", () => {
+    it("nests the color-theme picker inside a collapsed Appearance disclosure", () => {
         renderPage();
         const appearance = screen.getByTestId("settings-section-appearance");
         expect(
-            within(appearance).getByTestId("settings-row-color-theme")
+            within(appearance).getByTestId("settings-color-theme-collapse")
         ).toBeInTheDocument();
-        // The swatch Segmented exposes one radio per palette.
         expect(
-            within(appearance).getByRole("radio", {
-                name: microcopy.settings.colorThemeEmerald
-            })
-        ).toBeInTheDocument();
+            screen.queryByTestId("settings-row-color-theme")
+        ).not.toBeInTheDocument();
     });
 
     it("keeps the settings rows with their controls", () => {
@@ -322,7 +319,7 @@ describe("SettingsPage (phone chassis)", () => {
         expect(screen.getByTestId("settings-row-theme")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-language")).toBeInTheDocument();
         expect(
-            screen.getByTestId("settings-row-color-theme")
+            screen.getByTestId("settings-color-theme-collapse")
         ).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-ai")).toBeInTheDocument();
         expect(screen.getByTestId("settings-row-logout")).toBeInTheDocument();

@@ -916,12 +916,15 @@ const Header: React.FC = () => {
                  * placement on phones works without colliding with the
                  * bottom-tab bar.
                  */}
-                {environment.activityFeedEnabled && (
-                    <ActivityFeedBell
-                        unreadCount={unreadCount}
-                        onClick={() => setActivityDrawerOpen((prev) => !prev)}
-                    />
-                )}
+                {environment.activityFeedEnabled &&
+                    !(environment.bottomNavEnabled && isPhoneChrome) && (
+                        <ActivityFeedBell
+                            unreadCount={unreadCount}
+                            onClick={() =>
+                                setActivityDrawerOpen((prev) => !prev)
+                            }
+                        />
+                    )}
                 {/*
                  * Notifications bell (backend Notifications feature).
                  * Sits beside the activity-feed bell and is likewise
@@ -998,12 +1001,13 @@ const Header: React.FC = () => {
                     </Dropdown>
                 </HiddenWhenDemoted>
             </RightCluster>
-            {environment.activityFeedEnabled && (
-                <ActivityFeedDrawer
-                    open={activityDrawerOpen}
-                    onClose={() => setActivityDrawerOpen(false)}
-                />
-            )}
+            {environment.activityFeedEnabled &&
+                !(environment.bottomNavEnabled && isPhoneChrome) && (
+                    <ActivityFeedDrawer
+                        open={activityDrawerOpen}
+                        onClose={() => setActivityDrawerOpen(false)}
+                    />
+                )}
             <NotificationDrawer
                 open={notificationDrawerOpen}
                 onClose={() => setNotificationDrawerOpen(false)}

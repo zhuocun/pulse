@@ -35,6 +35,7 @@ import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDebounce from "../utils/hooks/useDebounce";
+import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../utils/hooks/useMembersList";
 import useProjectListDefaults from "../utils/hooks/useProjectListDefaults";
 import useProjectModal from "../utils/hooks/useProjectModal";
@@ -130,7 +131,7 @@ const StatRail = styled.div`
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-bottom: ${space.md}px;
 
-    @media (min-width: ${breakpoints.sm}px) {
+    @media (min-width: ${breakpoints.md}px) {
         display: grid;
         gap: ${space.sm}px;
         margin-bottom: ${space.lg}px;
@@ -143,7 +144,7 @@ const CompactStatsLine = styled(Typography.Text)`
         margin-bottom: ${space.sm}px;
     }
 
-    @media (min-width: ${breakpoints.sm}px) {
+    @media (min-width: ${breakpoints.md}px) {
         && {
             display: none;
         }
@@ -274,6 +275,7 @@ const ProjectPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.projects), false);
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
+    const isPhone = useIsPhoneChrome();
     const {
         open: chatOpen,
         openDrawer: openChatDrawer,
@@ -574,7 +576,7 @@ const ProjectPage = () => {
                         </PageSubheading>
                     </PageHeadingGroup>
                     <Toolbar>
-                        {aiEnabled && (
+                        {aiEnabled && !isPhone && (
                             <Badge
                                 aria-label={copilotUnreadAriaLabel}
                                 count={copilotInboxUnread}
