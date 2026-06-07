@@ -9,7 +9,9 @@ import { AgentTransportError } from "../ai/agentErrors";
 import type { FeToolContext } from "../ai/feTools";
 import useAgentToolResolver, {
     TOOL_ROUND_LIMIT_USER_MESSAGE,
+    applyStreamPart,
     hookErrorFromAgentStreamErrorData,
+    isAssistantStreamChunk,
     isToolRoundLimitErrorCode
 } from "./useAgentToolResolver";
 
@@ -177,6 +179,79 @@ describe("useAgentToolResolver", () => {
             turnErrored: false,
             loopExhausted: true
         });
+    });
+});
+
+describe("isAssistantStreamChunk", () => {
+    it("accepts legacy and assistant stream types", () => {
+        expect(isAssistantStreamChunk(undefined)).toBe(true);
+        expect(isAssistantStreamChunk("ai")).toBe(true);
+        expect(isAssistantStreamChunk("assistant")).toBe(true);
+        expect(isAssistantStreamChunk("AIMessageChunk")).toBe(true);
+    });
+
+    it("rejects tool, human, system, and other explicit non-assistant types", () => {
+        expect(isAssistantStreamChunk("tool")).toBe(false);
+        expect(isAssistantStreamChunk("human")).toBe(false);
+        expect(isAssistantStreamChunk("system")).toBe(false);
+        expect(isAssistantStreamChunk("HumanMessageChunk")).toBe(false);
+    });
+});
+
+describe("applyStreamPart messages filtering", () => {
+    it("concatenates only assistant chunks and skips tool JSON", async () => {
+        const setState = jest.fn();
+        const handlers = {
+            setState,
+            setPendingInterrupt: jest.fn(),
+            setPendingProposal: jest.fn(),
+            setCitations: jest.fn(),
+            setNudges: jest.fn(),
+            setLastSuggestion: jest.fn(),
+            setLastUsageRef: jest.fn(),
+            onMidStreamErrorEnvelope: jest.fn(),
+            resolveInterrupt: jest.fn()
+        };
+
+        await applyStreamPart(
+            {
+                type: "messages",
+                ns: [],
+                data: [{ content: "Summary: ", type: "ai" }, {}]
+            },
+            handlers
+        );
+        await applyStreamPart(
+            {
+                type: "messages",
+                ns: [],
+                data: [
+                    {
+                        content: '{"projects":[{"id":"p1"}]}',
+                        type: "tool"
+                    },
+                    {}
+                ]
+            },
+            handlers
+        );
+        await applyStreamPart(
+            {
+                type: "messages",
+                ns: [],
+                data: [{ content: "done.", type: "AIMessageChunk" }, {}]
+            },
+            handlers
+        );
+
+        expect(setState).toHaveBeenCalledTimes(2);
+        const afterSecond = setState.mock.calls[1][0]({
+            messages: [{ role: "assistant", content: "Summary: " }]
+        });
+        expect(afterSecond.messages).toEqual([
+            { role: "assistant", content: "Summary: done." }
+        ]);
+        expect(afterSecond.messages[0].content).not.toContain('{"projects"');
     });
 });
 

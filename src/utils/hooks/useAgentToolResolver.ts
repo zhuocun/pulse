@@ -96,6 +96,15 @@ export const TOOL_ROUND_LIMIT_USER_MESSAGE =
 export const isToolRoundLimitErrorCode = (code: string | undefined): boolean =>
     code === "tool_round_limit_exceeded" || code === "tool_round_limit";
 
+const ASSISTANT_STREAM_TYPES = new Set([
+    "ai",
+    "assistant",
+    "AIMessageChunk"
+]);
+
+export const isAssistantStreamChunk = (type?: string): boolean =>
+    type === undefined || ASSISTANT_STREAM_TYPES.has(type);
+
 export const hookErrorFromAgentStreamErrorData = (
     data: Extract<StreamPart, { type: "error" }>["data"]
 ): Error => {
@@ -141,6 +150,7 @@ export const applyStreamPart = async (
             return undefined;
         case "messages": {
             const [chunk] = part.data;
+            if (!isAssistantStreamChunk(chunk?.type)) return undefined;
             const content = chunk?.content ?? "";
             if (!content) return undefined;
             handlers.setState((prev) => {
