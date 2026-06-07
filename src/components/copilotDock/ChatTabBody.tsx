@@ -98,6 +98,16 @@ interface ChatTurnFeedback {
 
 const DUE_KEYWORDS = ["due", "deadline", "overdue", "by friday", "by monday"];
 
+/** Route-level project id while the projects query is still loading. */
+export const resolveChatProjectId = (
+    project: IProject | null,
+    knownProjectIds: readonly string[]
+): string => {
+    const fromDoc = project?._id?.trim();
+    if (fromDoc) return fromDoc;
+    return knownProjectIds.find((id) => id.trim().length > 0) ?? "";
+};
+
 const computeFollowUpChips = (
     lastUserText: string,
     memberUsernames: readonly string[],
@@ -313,7 +323,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
 
     const chatCtx = useMemo(() => {
         const knownProjectSet = new Set(knownProjectIds);
-        const pid = project?._id ?? "";
+        const pid = resolveChatProjectId(project, knownProjectIds);
         if (pid) knownProjectSet.add(pid);
 
         return {
@@ -563,6 +573,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         // the dock on the Brief tab via a palette prompt must NOT auto-
         // send into the chat surface.
         if (!surfaceVisible || !initialPrompt) return;
+        if (!resolveChatProjectId(project, knownProjectIds)) return;
         if (initialPromptHandled.current === initialPrompt) return;
         if (!dispatch(initialPrompt)) return;
         initialPromptHandled.current = initialPrompt;
@@ -575,7 +586,14 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         // handler unset because the body's `initialPromptHandled` ref
         // already dedupes for the single-mount drawer model.
         onInitialPromptConsumed?.();
-    }, [dispatch, initialPrompt, onInitialPromptConsumed, surfaceVisible]);
+    }, [
+        dispatch,
+        initialPrompt,
+        knownProjectIds,
+        onInitialPromptConsumed,
+        project,
+        surfaceVisible
+    ]);
 
     useEffect(() => {
         if (!dockOpen) initialPromptHandled.current = null;
