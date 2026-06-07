@@ -142,6 +142,10 @@ def _flatten_messages_chunk(chunk: Any) -> list[Any]:
 
     content = getattr(message, "content", message)
     msg_type = getattr(message, "type", None) or getattr(message, "role", None)
+    if msg_type == "tool":
+        token: dict[str, Any] = {"content": "", "type": "tool"}
+        metadata_dict = metadata if isinstance(metadata, dict) else {}
+        return [token, _to_jsonable(metadata_dict)]
     if isinstance(content, list):
         # Tool-call streaming: content is list[dict] (LangChain content blocks).
         # Stringifying it produces a useless repr, so emit the blocks as-is

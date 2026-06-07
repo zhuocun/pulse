@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, ToolMessage
 
 from app.agents.sse import (
     DONE_FRAME,
@@ -214,3 +214,24 @@ def test_translate_messages_list_content_emits_blocks() -> None:
     assert token["blocks"] == tool_blocks
     assert token["type"] == "AIMessageChunk"
     assert metadata == {"langgraph_node": "agent"}
+
+
+def test_translate_messages_tool_type_emits_empty_content() -> None:
+    """ToolMessage JSON must not leak on the wire — type is preserved for clients."""
+    events = list(
+        translate_event(
+            "messages",
+            (
+                ToolMessage(
+                    content='{"projects":[{"id":"p1","name":"Alpha"}]}',
+                    tool_call_id="call_1",
+                ),
+                {"langgraph_node": "tools"},
+            ),
+        )
+    )
+    assert len(events) == 1
+    token, metadata = events[0]["data"]
+    assert token["type"] == "tool"
+    assert token["content"] == ""
+    assert metadata == {"langgraph_node": "tools"}

@@ -114,6 +114,60 @@ describe("useAgent", () => {
         expect(mockedStream).toHaveBeenCalledTimes(1);
     });
 
+    it("does not append tool message chunks to assistant bubble text", async () => {
+        mockedStream.mockReturnValueOnce(
+            fromParts([
+                {
+                    type: "messages",
+                    ns: ["root"],
+                    data: [
+                        { content: "Here are your projects: ", type: "ai" },
+                        {}
+                    ]
+                },
+                {
+                    type: "messages",
+                    ns: ["root"],
+                    data: [
+                        {
+                            content:
+                                '{"projects":[{"id":"p1","name":"Alpha"}]}',
+                            type: "tool"
+                        },
+                        {}
+                    ]
+                },
+                {
+                    type: "messages",
+                    ns: ["root"],
+                    data: [{ content: "Alpha is active.", type: "ai" }, {}]
+                }
+            ])
+        );
+        const queryClient = new QueryClient();
+        const { result } = renderHook(
+            () => useAgent("board-coach", { projectId: "p1", userId: "u1" }),
+            { wrapper: wrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.start("list projects");
+        });
+
+        await waitFor(() => {
+            expect(result.current.isStreaming).toBe(false);
+        });
+
+        const assistantMsgs = result.current.state.messages.filter(
+            (m) => m.role === "assistant"
+        );
+        const finalContent =
+            assistantMsgs[assistantMsgs.length - 1]?.content ?? "";
+        expect(finalContent).toBe("Here are your projects: Alpha is active.");
+        expect(finalContent).not.toContain('{"projects"');
+        expect(finalContent).not.toContain('"id":"p1"');
+    });
+
     it("does not start a remote run before consent is acknowledged", async () => {
         resetRemoteAiConsentForTests();
         const queryClient = new QueryClient();
