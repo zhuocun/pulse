@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
-import { Button, Card, Typography } from "antd";
+import { Button, Input, Typography } from "antd";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import AiSparkleIcon from "../components/aiSparkleIcon";
@@ -8,7 +9,6 @@ import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
 import {
     accent,
-    breakpoints,
     fontSize,
     fontWeight,
     lineHeight,
@@ -20,25 +20,20 @@ import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 /**
- * Copilot landing page (Phase 3 A3). Two large CTAs surface the
- * primary Copilot entry points from outside a board context. When AI
- * is off (env or per-user toggle), the page renders an EmptyState
+ * Copilot landing page (Phase 3 A3). A single composer-first surface
+ * surfaces the primary Copilot entry point from outside a board context.
+ * When AI is off (env or per-user toggle), the page renders an EmptyState
  * instead.
  *
  * The Ask CTA opens the chat drawer through the canonical Redux hook
  * BEFORE navigating. The drawer state lives in the global overlays
  * slice, so setting it here survives the route change; the project
  * page mounts an `<AiChatDrawer />` keyed off `useAiChatDrawer().open`
- * and opens automatically on first paint. The previous `dispatchEvent`
- * + `navigate` sequence raced the project page's mount and fired the
- * event before any listener had subscribed (cold load) — the chat
- * never opened. Reading from Redux state on mount is race-proof.
+ * and opens automatically on first paint.
  *
- * The Brief CTA only navigates: the brief drawer is mounted on the
- * board page (not `/projects`), so setting the Redux flag here would
- * leak across routes and pop the drawer the next time the user opened
- * any board. The user picks a board from `/projects` and opens the
- * brief from its header.
+ * The Brief secondary action only navigates: the brief drawer is mounted
+ * on the board page (not `/projects`), so setting the Redux flag here
+ * would leak across routes.
  */
 
 const PageHeading = styled(Typography.Title)`
@@ -57,61 +52,41 @@ const PageSubtitle = styled(Typography.Paragraph)`
     && {
         color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
         font-size: ${fontSize.md}px;
-        margin-bottom: ${space.xl}px;
+        margin-bottom: ${space.lg}px;
     }
 `;
 
-const CtaGrid = styled.div`
-    display: grid;
-    gap: ${space.md}px;
-    grid-template-columns: 1fr;
+const ComposerShell = styled.div`
+    background: var(--ant-color-bg-container, #fff);
+    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
+    border-radius: ${radius.lg}px;
+    display: flex;
+    flex-direction: column;
+    gap: ${space.sm}px;
+    padding: ${space.md}px;
+`;
 
-    @media (min-width: ${breakpoints.md}px) {
-        grid-template-columns: 1fr 1fr;
+const ComposerRow = styled.div`
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: ${space.sm}px;
+
+    @media (min-width: 640px) {
+        align-items: center;
+        flex-direction: row;
     }
 `;
 
-const CtaCard = styled(Card)`
+const BriefSecondary = styled(Button)`
     && {
-        border-radius: ${radius.lg}px;
-        transition: border-color 160ms ease-out;
-    }
-
-    && .ant-card-body {
-        padding: ${space.lg}px;
-    }
-
-    /*
-     * Hover highlights the card boundary as a visual cue that there's
-     * an interactive control inside; the inner Button is the actual
-     * click target. The cursor stays default (no pointer lie) since
-     * the bare card surface is no longer clickable.
-     */
-    &&:hover {
-        border-color: ${accent.border};
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        && {
-            transition: none;
-        }
-    }
-`;
-
-const CtaTitle = styled(Typography.Text)`
-    && {
-        display: block;
-        font-size: ${fontSize.lg}px;
-        font-weight: ${fontWeight.semibold};
-        margin-bottom: ${space.xxs}px;
-    }
-`;
-
-const CtaDescription = styled(Typography.Text)`
-    && {
+        align-self: flex-start;
         color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        display: block;
-        font-size: ${fontSize.base}px;
+        padding-inline: 0;
+    }
+
+    &&:hover {
+        color: ${accent.border};
     }
 `;
 
@@ -120,6 +95,7 @@ const CopilotLandingPage = () => {
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
     const { openDrawer: openChatDrawer } = useAiChatDrawer();
+    const [draft, setDraft] = useState("");
 
     if (!aiEnabled) {
         return (
@@ -138,84 +114,60 @@ const CopilotLandingPage = () => {
         );
     }
 
-    const goToAsk = () => {
-        /*
-         * Open the chat drawer via Redux BEFORE navigating so the
-         * project page's `useAiChatDrawer()` reads the open=true
-         * snapshot on mount. The custom-event bridge raced the
-         * navigation on cold loads (event fired, no subscriber yet).
-         */
-        openChatDrawer();
+    const goToAsk = (prompt?: string) => {
+        openChatDrawer(prompt?.trim() || undefined);
         navigate("/projects", { viewTransition: true });
     };
 
     const goToBrief = () => {
-        /*
-         * The brief drawer is mounted only on the board page, never on
-         * `/projects`. Dispatching `openBriefDrawer()` here leaked the
-         * Redux flag across routes and ambushed the user with an
-         * uninvited drawer the next time they opened ANY board. The
-         * brief is a per-board concept, so the landing CTA just routes
-         * to the project list where the user picks a board.
-         */
         navigate("/projects", { viewTransition: true });
     };
 
     return (
         <PageContainer>
             <PageHeading level={1}>
-                {/*
-                 * `<Space>` renders a `<div>`, which is flow content
-                 * and invalid inside the phrasing-only `<h1>`. The
-                 * styled PageHeading sets `display: inline-flex`
-                 * directly so the icon + label sit on the same line
-                 * without dropping a forbidden div inside the heading.
-                 */}
                 <AiSparkleIcon aria-hidden size="lg" />
                 <span>{microcopy.copilotLanding.heading}</span>
             </PageHeading>
             <PageSubtitle>{microcopy.copilotLanding.subtitle}</PageSubtitle>
-            <CtaGrid>
-                {/*
-                 * The CTA cards' inner `<Button>` is the canonical
-                 * click target so the action is keyboard-reachable
-                 * (Enter / Space) and announced by AT. The card no
-                 * longer carries `hoverable` (which paints a
-                 * `cursor: pointer` lie since the surface isn't
-                 * clickable) — the styled `&:hover` border-color
-                 * shift in CtaCard preserves the hover affordance
-                 * without misleading the pointer.
-                 */}
-                <CtaCard data-testid="copilot-landing-ask">
-                    <CtaTitle>{microcopy.copilotLanding.askTitle}</CtaTitle>
-                    <CtaDescription>
-                        {microcopy.copilotLanding.askDescription}
-                    </CtaDescription>
-                    <Button
-                        block
-                        onClick={goToAsk}
+            <ComposerShell data-testid="copilot-landing-ask">
+                <ComposerRow>
+                    <Input
+                        aria-label={microcopy.copilotLanding.askTitle}
+                        autoComplete="off"
+                        enterKeyHint="send"
+                        onChange={(event) => setDraft(event.target.value)}
+                        onPressEnter={() => goToAsk(draft)}
+                        placeholder={
+                            microcopy.copilotLanding.composerPlaceholder
+                        }
+                        prefix={
+                            <AiSparkleIcon
+                                aria-hidden
+                                style={{
+                                    color: "var(--ant-color-primary, #EA580C)"
+                                }}
+                            />
+                        }
                         size="large"
-                        style={{ marginTop: space.md }}
+                        value={draft}
+                    />
+                    <Button
+                        onClick={() => goToAsk(draft)}
+                        size="large"
                         type="primary"
                     >
                         {microcopy.copilotLanding.askTitle}
                     </Button>
-                </CtaCard>
-                <CtaCard data-testid="copilot-landing-brief">
-                    <CtaTitle>{microcopy.copilotLanding.briefTitle}</CtaTitle>
-                    <CtaDescription>
-                        {microcopy.copilotLanding.briefDescription}
-                    </CtaDescription>
-                    <Button
-                        block
-                        onClick={goToBrief}
-                        size="large"
-                        style={{ marginTop: space.md }}
-                    >
-                        {microcopy.copilotLanding.briefTitle}
-                    </Button>
-                </CtaCard>
-            </CtaGrid>
+                </ComposerRow>
+                <BriefSecondary
+                    data-testid="copilot-landing-brief"
+                    onClick={goToBrief}
+                    type="link"
+                >
+                    {microcopy.copilotLanding.briefSecondaryAction}
+                </BriefSecondary>
+            </ComposerShell>
         </PageContainer>
     );
 };

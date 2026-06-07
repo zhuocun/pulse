@@ -302,10 +302,12 @@ const zhCN: Dictionary = {
     copilotLanding: {
         heading: "Copilot",
         subtitle: "提出问题或为当前看板打开简报。",
+        composerPlaceholder: "询问看板、任务或成员…",
         askTitle: "询问 Copilot",
         askDescription: "针对您的看板、任务或成员提出问题。",
         briefTitle: "打开看板简报",
         briefDescription: "查看当前看板的一目了然摘要。",
+        briefSecondaryAction: "或打开看板简报",
         aiDisabledTitle: "AI 已关闭",
         aiDisabledDescription:
             "请在设置中启用看板 Copilot 以使用 Copilot 选项卡。"
@@ -542,6 +544,8 @@ const zhCN: Dictionary = {
         densityCompact: "紧凑",
         filtersToggle: "筛选",
         filtersToggleAria: "搜索和筛选任务",
+        lensesToggle: "视角",
+        lensesToggleAria: "看板视角筛选",
         smartSearchToggle: "智能搜索",
         smartSearchToggleAria: "切换 AI 智能搜索",
         moreActionsAria: "更多看板操作",
@@ -839,7 +843,8 @@ const zhCN: Dictionary = {
         teamMembers: "团队成员",
         loadingStats: "正在加载项目统计",
         statsAnnouncement:
-            "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。"
+            "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。",
+        filtersToggleAria: "筛选和排序项目"
     },
     pageTitle: {
         login: "登录",

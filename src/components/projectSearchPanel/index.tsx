@@ -1,12 +1,13 @@
 import {
+    FilterOutlined,
     LoadingOutlined,
     SearchOutlined,
     StarFilled,
     StarOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Select, Spin, Tooltip } from "antd";
-import React, { useMemo } from "react";
+import { Badge, Button, Input, Select, Spin, Tooltip } from "antd";
+import React, { useMemo, useState } from "react";
 
 import { microcopy } from "../../constants/microcopy";
 import {
@@ -18,6 +19,7 @@ import {
 } from "../../theme/tokens";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useDebounce from "../../utils/hooks/useDebounce";
+import AiSparkleIcon from "../aiSparkleIcon";
 import FilterChips, { FilterChip } from "../filterChips";
 
 /*
@@ -179,6 +181,26 @@ const TouchTargetSlot = styled.span`
     }
 `;
 
+const FilterToggleSlot = styled.div`
+    flex: 0 0 auto;
+    width: 100%;
+
+    @media (min-width: ${breakpoints.md}px) {
+        width: auto;
+    }
+`;
+
+const AdvancedFiltersPanel = styled.div<{ $open: boolean }>`
+    display: ${({ $open }) => ($open ? "block" : "none")};
+    margin-top: ${space.xs}px;
+`;
+
+const AiSearchSlot = styled.div<{ $visible: boolean }>`
+    display: ${({ $visible }) => ($visible ? "block" : "none")};
+    margin-bottom: ${space.sm}px;
+    width: 100%;
+`;
+
 const FavoritedToggleButton = styled(Button, {
     /*
      * Drop the transient `$active` prop before forwarding to the
@@ -323,9 +345,21 @@ const ProjectSearchPanel: React.FC<Props> = ({
     const showDefaultsToolbar =
         Boolean(onSaveDefault) || Boolean(onResetToDefault);
 
+    const hasAdvancedFilters = Boolean(param.managerId || favoritedOnly);
+    const [filtersOpen, setFiltersOpen] = useState(hasAdvancedFilters);
+    const [aiSearchOpen, setAiSearchOpen] = useState(() =>
+        Boolean(param.semanticIds)
+    );
+    const advancedFilterCount =
+        (param.managerId ? 1 : 0) + (favoritedOnly ? 1 : 0);
+
     return (
         <FilterShell>
-            {aiSearchSlot}
+            {aiSearchSlot ? (
+                <AiSearchSlot $visible={aiSearchOpen}>
+                    {aiSearchSlot}
+                </AiSearchSlot>
+            ) : null}
             <FilterRow role="search" aria-label={microcopy.a11y.filterProjects}>
                 <FlexInput>
                     <Input
@@ -350,7 +384,21 @@ const ProjectSearchPanel: React.FC<Props> = ({
                             />
                         }
                         suffix={
-                            searchPending ? (
+                            aiSearchSlot ? (
+                                <Button
+                                    aria-expanded={aiSearchOpen}
+                                    aria-label={
+                                        microcopy.board.smartSearchToggleAria
+                                    }
+                                    icon={<AiSparkleIcon aria-hidden />}
+                                    onClick={() =>
+                                        setAiSearchOpen((open) => !open)
+                                    }
+                                    size="small"
+                                    title={microcopy.board.smartSearchToggle}
+                                    type={aiSearchOpen ? "primary" : "text"}
+                                />
+                            ) : searchPending ? (
                                 <Spin
                                     aria-label={
                                         microcopy.a11y.searchProjectsPending
@@ -361,10 +409,6 @@ const ProjectSearchPanel: React.FC<Props> = ({
                                     size="small"
                                 />
                             ) : (
-                                // Reserve the suffix slot even at rest so
-                                // toggling the spinner doesn't shift the
-                                // input's text width (a tiny CLS guard on
-                                // the control itself).
                                 <span
                                     aria-hidden
                                     style={{
@@ -378,110 +422,137 @@ const ProjectSearchPanel: React.FC<Props> = ({
                         value={liveQuery}
                     />
                 </FlexInput>
-                <FlexSelect>
-                    <Select
-                        allowClear
-                        aria-label={microcopy.a11y.filterByManager}
-                        loading={loading}
-                        onChange={(value) =>
-                            setParam({
-                                ...param,
-                                managerId: value ?? ""
-                            })
-                        }
-                        options={[
-                            {
-                                label: microcopy.placeholders.managers,
-                                value: ""
-                            },
-                            ...members.map((user) => ({
-                                label: user.username,
-                                value: user._id
-                            }))
-                        ]}
-                        placeholder={microcopy.placeholders.manager}
-                        style={{ width: "100%" }}
-                        value={loading ? undefined : (managerName ?? undefined)}
-                    />
-                </FlexSelect>
-                {onFavoritedOnlyChange ? (
-                    <FavoritedToggleButton
-                        $active={favoritedOnly}
-                        aria-label={microcopy.a11y.favoritedOnlyToggle}
-                        aria-pressed={favoritedOnly}
-                        icon={
-                            favoritedOnly ? (
-                                <StarFilled aria-hidden />
-                            ) : (
-                                <StarOutlined aria-hidden />
-                            )
-                        }
-                        onClick={() => onFavoritedOnlyChange(!favoritedOnly)}
-                        size="middle"
-                        type="default"
-                    >
-                        {microcopy.chips.favoritedOnly}
-                    </FavoritedToggleButton>
-                ) : null}
+                <FilterToggleSlot>
+                    <Badge count={advancedFilterCount} size="small">
+                        <Button
+                            aria-expanded={filtersOpen}
+                            data-testid="project-search-panel-filters-toggle"
+                            icon={<FilterOutlined aria-hidden />}
+                            onClick={() => setFiltersOpen((open) => !open)}
+                            type={filtersOpen ? "primary" : "default"}
+                        >
+                            {microcopy.board.filtersToggle}
+                        </Button>
+                    </Badge>
+                </FilterToggleSlot>
             </FilterRow>
             <FilterChips
                 chips={chips}
                 onClearAll={clearAll}
                 onDismiss={dismiss}
             />
-            {showDefaultsToolbar ? (
-                <DefaultsToolbar
-                    role="group"
-                    aria-label={microcopy.a11y.saveCurrentAsDefault}
-                >
-                    {onSaveDefault ? (
-                        <TouchTargetSlot data-touch-hit-area="44">
-                            <Tooltip
-                                title={microcopy.a11y.saveCurrentAsDefault}
-                            >
+            <AdvancedFiltersPanel
+                $open={filtersOpen}
+                aria-label={microcopy.projectsPage.filtersToggleAria}
+                role="region"
+            >
+                <FilterRow>
+                    <FlexSelect>
+                        <Select
+                            allowClear
+                            aria-label={microcopy.a11y.filterByManager}
+                            loading={loading}
+                            onChange={(value) =>
+                                setParam({
+                                    ...param,
+                                    managerId: value ?? ""
+                                })
+                            }
+                            options={[
+                                {
+                                    label: microcopy.placeholders.managers,
+                                    value: ""
+                                },
+                                ...members.map((user) => ({
+                                    label: user.username,
+                                    value: user._id
+                                }))
+                            ]}
+                            placeholder={microcopy.placeholders.manager}
+                            style={{ width: "100%" }}
+                            value={
+                                loading ? undefined : (managerName ?? undefined)
+                            }
+                        />
+                    </FlexSelect>
+                    {onFavoritedOnlyChange ? (
+                        <FavoritedToggleButton
+                            $active={favoritedOnly}
+                            aria-label={microcopy.a11y.favoritedOnlyToggle}
+                            aria-pressed={favoritedOnly}
+                            icon={
+                                favoritedOnly ? (
+                                    <StarFilled aria-hidden />
+                                ) : (
+                                    <StarOutlined aria-hidden />
+                                )
+                            }
+                            onClick={() =>
+                                onFavoritedOnlyChange(!favoritedOnly)
+                            }
+                            size="middle"
+                            type="default"
+                        >
+                            {microcopy.chips.favoritedOnly}
+                        </FavoritedToggleButton>
+                    ) : null}
+                </FilterRow>
+                {showDefaultsToolbar ? (
+                    <DefaultsToolbar
+                        role="group"
+                        aria-label={microcopy.a11y.saveCurrentAsDefault}
+                    >
+                        {onSaveDefault ? (
+                            <TouchTargetSlot data-touch-hit-area="44">
+                                <Tooltip
+                                    title={microcopy.a11y.saveCurrentAsDefault}
+                                >
+                                    <Button
+                                        aria-label={
+                                            microcopy.a11y.saveCurrentAsDefault
+                                        }
+                                        onClick={handleSaveDefault}
+                                        size="small"
+                                        type="link"
+                                    >
+                                        {microcopy.actions.saveAsDefault}
+                                    </Button>
+                                </Tooltip>
+                            </TouchTargetSlot>
+                        ) : null}
+                        {onResetToDefault && hasSavedDefaults ? (
+                            <TouchTargetSlot data-touch-hit-area="44">
+                                <Tooltip
+                                    title={microcopy.a11y.resetToSavedDefault}
+                                >
+                                    <Button
+                                        aria-label={
+                                            microcopy.a11y.resetToSavedDefault
+                                        }
+                                        onClick={handleResetToDefault}
+                                        size="small"
+                                        type="link"
+                                    >
+                                        {microcopy.actions.resetToDefault}
+                                    </Button>
+                                </Tooltip>
+                            </TouchTargetSlot>
+                        ) : null}
+                        {onClearSavedDefault && hasSavedDefaults ? (
+                            <TouchTargetSlot data-touch-hit-area="44">
                                 <Button
-                                    aria-label={
-                                        microcopy.a11y.saveCurrentAsDefault
-                                    }
-                                    onClick={handleSaveDefault}
+                                    aria-label={microcopy.actions.clear}
+                                    onClick={onClearSavedDefault}
                                     size="small"
                                     type="link"
                                 >
-                                    {microcopy.actions.saveAsDefault}
+                                    {microcopy.actions.clear}
                                 </Button>
-                            </Tooltip>
-                        </TouchTargetSlot>
-                    ) : null}
-                    {onResetToDefault && hasSavedDefaults ? (
-                        <TouchTargetSlot data-touch-hit-area="44">
-                            <Tooltip title={microcopy.a11y.resetToSavedDefault}>
-                                <Button
-                                    aria-label={
-                                        microcopy.a11y.resetToSavedDefault
-                                    }
-                                    onClick={handleResetToDefault}
-                                    size="small"
-                                    type="link"
-                                >
-                                    {microcopy.actions.resetToDefault}
-                                </Button>
-                            </Tooltip>
-                        </TouchTargetSlot>
-                    ) : null}
-                    {onClearSavedDefault && hasSavedDefaults ? (
-                        <TouchTargetSlot data-touch-hit-area="44">
-                            <Button
-                                aria-label={microcopy.actions.clear}
-                                onClick={onClearSavedDefault}
-                                size="small"
-                                type="link"
-                            >
-                                {microcopy.actions.clear}
-                            </Button>
-                        </TouchTargetSlot>
-                    ) : null}
-                </DefaultsToolbar>
-            ) : null}
+                            </TouchTargetSlot>
+                        ) : null}
+                    </DefaultsToolbar>
+                ) : null}
+            </AdvancedFiltersPanel>
         </FilterShell>
     );
 };

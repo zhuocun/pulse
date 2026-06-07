@@ -329,10 +329,12 @@ export const enSource = {
     copilotLanding: {
         heading: "Copilot",
         subtitle: "Ask a question or open a brief for the current board.",
+        composerPlaceholder: "Ask about your boards, tasks, or members…",
         askTitle: "Ask Copilot",
         askDescription: "Pose a question about your boards, tasks, or members.",
         briefTitle: "Open Board brief",
         briefDescription: "See a one-glance summary of the active board.",
+        briefSecondaryAction: "Or open a board brief",
         aiDisabledTitle: "AI is off",
         aiDisabledDescription:
             "Turn on Board Copilot in Settings to use the Copilot tab."
@@ -629,6 +631,8 @@ export const enSource = {
          */
         filtersToggle: "Filters",
         filtersToggleAria: "Search and filter tasks",
+        lensesToggle: "Lenses",
+        lensesToggleAria: "Board view lenses",
         smartSearchToggle: "Smart search",
         smartSearchToggleAria: "Toggle AI smart search",
         moreActionsAria: "More board actions",
@@ -1022,7 +1026,8 @@ export const enSource = {
         teamMembers: "Team members",
         loadingStats: "Loading project stats",
         statsAnnouncement:
-            "{total} projects across {organizations} organizations, {members} team members."
+            "{total} projects across {organizations} organizations, {members} team members.",
+        filtersToggleAria: "Filter and sort projects"
     },
     /**
      * Page-name microcopy fed to `useTitle`. The hook composes

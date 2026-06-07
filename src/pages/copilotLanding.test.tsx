@@ -94,10 +94,12 @@ describe("CopilotLandingPage", () => {
         expect(screen.getByTestId("copilot-landing-ask")).toBeInTheDocument();
         expect(screen.getByTestId("copilot-landing-brief")).toBeInTheDocument();
         expect(
-            screen.getByText(microcopy.copilotLanding.askDescription)
+            screen.getByPlaceholderText(
+                microcopy.copilotLanding.composerPlaceholder
+            )
         ).toBeInTheDocument();
         expect(
-            screen.getByText(microcopy.copilotLanding.briefDescription)
+            screen.getByText(microcopy.copilotLanding.briefSecondaryAction)
         ).toBeInTheDocument();
     });
 
@@ -159,9 +161,9 @@ describe("CopilotLandingPage", () => {
             </BrowserRouter>
         );
 
-        const briefButton = screen.getAllByRole("button", {
-            name: microcopy.copilotLanding.briefTitle
-        })[0];
+        const briefButton = screen.getByRole("button", {
+            name: microcopy.copilotLanding.briefSecondaryAction
+        });
         expect(briefButton).toBeTruthy();
         fireEvent.click(briefButton!);
         expect(openDrawer).not.toHaveBeenCalled();

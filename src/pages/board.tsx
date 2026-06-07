@@ -4,7 +4,8 @@ import {
     InboxOutlined,
     MoreOutlined,
     ReloadOutlined,
-    SettingOutlined
+    SettingOutlined,
+    UnorderedListOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
@@ -362,6 +363,14 @@ const BoardSearchSlot = styled.div`
     min-width: 0;
 `;
 
+const LensToggleRow = styled.div`
+    margin-bottom: ${themeSpace.xs}px;
+`;
+
+const LensPanel = styled.div<{ $open: boolean }>`
+    display: ${({ $open }) => ($open ? "block" : "none")};
+`;
+
 /**
  * Trailing slot in the bottom tier that carries the desktop Copilot
  * launcher. Hidden on phone chrome, where the launcher lives inside the
@@ -407,6 +416,10 @@ const BoardPage = () => {
     ]);
     const { user } = useAuth();
     const activeLens = parseLensId(param.lens);
+    const [lensesOpen, setLensesOpen] = useState(() => Boolean(activeLens));
+    useEffect(() => {
+        if (activeLens) setLensesOpen(true);
+    }, [activeLens]);
     const { data: currentProject, isLoading: pLoading } =
         useReactQuery<IProject>("projects", {
             projectId
@@ -1088,15 +1101,75 @@ const BoardPage = () => {
                             </BoardHeader>
                             <BoardBottomTier>
                                 <BoardSearchSlot>
-                                    <LensChips
-                                        active={activeLens}
-                                        onChange={(next) =>
-                                            setParam(
-                                                { lens: next ?? undefined },
-                                                { viewTransition: true }
-                                            )
-                                        }
-                                    />
+                                    {isPhone ? (
+                                        <>
+                                            <LensToggleRow>
+                                                <Button
+                                                    aria-expanded={
+                                                        lensesOpen ||
+                                                        Boolean(activeLens)
+                                                    }
+                                                    aria-label={
+                                                        microcopy.board
+                                                            .lensesToggleAria
+                                                    }
+                                                    data-testid="board-lenses-toggle"
+                                                    icon={
+                                                        <UnorderedListOutlined
+                                                            aria-hidden
+                                                        />
+                                                    }
+                                                    onClick={() =>
+                                                        setLensesOpen(
+                                                            (open) => !open
+                                                        )
+                                                    }
+                                                    type={
+                                                        lensesOpen || activeLens
+                                                            ? "primary"
+                                                            : "default"
+                                                    }
+                                                >
+                                                    {
+                                                        microcopy.board
+                                                            .lensesToggle
+                                                    }
+                                                </Button>
+                                            </LensToggleRow>
+                                            <LensPanel
+                                                $open={
+                                                    lensesOpen ||
+                                                    Boolean(activeLens)
+                                                }
+                                            >
+                                                <LensChips
+                                                    active={activeLens}
+                                                    onChange={(next) =>
+                                                        setParam(
+                                                            {
+                                                                lens:
+                                                                    next ??
+                                                                    undefined
+                                                            },
+                                                            {
+                                                                viewTransition: true
+                                                            }
+                                                        )
+                                                    }
+                                                />
+                                            </LensPanel>
+                                        </>
+                                    ) : (
+                                        <LensChips
+                                            active={activeLens}
+                                            onChange={(next) =>
+                                                setParam(
+                                                    { lens: next ?? undefined },
+                                                    { viewTransition: true }
+                                                )
+                                            }
+                                        />
+                                    )}
                                     <TaskSearchPanel
                                         tasks={visibleTasks}
                                         param={param}

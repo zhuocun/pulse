@@ -47,6 +47,10 @@ const installAntdBrowserMocks = () => {
     });
 };
 
+const openAdvancedFilters = () => {
+    fireEvent.click(screen.getByTestId("project-search-panel-filters-toggle"));
+};
+
 describe("ProjectSearchPanel", () => {
     beforeAll(() => {
         installAntdBrowserMocks();
@@ -162,6 +166,7 @@ describe("ProjectSearchPanel", () => {
             />
         );
 
+        openAdvancedFilters();
         fireEvent.mouseDown(screen.getByRole("combobox"));
 
         expect(screen.getAllByText("Managers").length).toBeGreaterThanOrEqual(
@@ -213,6 +218,7 @@ describe("ProjectSearchPanel", () => {
             />
         );
 
+        openAdvancedFilters();
         const toggle = screen.getByRole("button", {
             name: /show only favorited projects/i
         });
@@ -301,6 +307,7 @@ describe("ProjectSearchPanel", () => {
             />
         );
 
+        openAdvancedFilters();
         fireEvent.click(
             screen.getByRole("button", {
                 name: /reset filters to saved default/i
