@@ -8,6 +8,7 @@ import type {
 import { AgentTransportError } from "../ai/agentErrors";
 import type { FeToolContext } from "../ai/feTools";
 import useAgentToolResolver, {
+    CHAT_AGENT_DEGRADED_REPLY_PREFIX,
     TOOL_ROUND_LIMIT_USER_MESSAGE,
     applyStreamPart,
     hookErrorFromAgentStreamErrorData,
@@ -199,6 +200,11 @@ describe("isAssistantStreamChunk", () => {
 });
 
 describe("applyStreamPart messages filtering", () => {
+    it("pins the degraded-reply prefix to the chat-agent backend marker", () => {
+        expect(CHAT_AGENT_DEGRADED_REPLY_PREFIX).toBe(
+            "[Live AI unavailable - showing fallback]"
+        );
+    });
     it("concatenates only assistant chunks and skips tool JSON", async () => {
         const setState = jest.fn();
         const handlers = {
@@ -252,6 +258,68 @@ describe("applyStreamPart messages filtering", () => {
             { role: "assistant", content: "Summary: done." }
         ]);
         expect(afterSecond.messages[0].content).not.toContain('{"projects"');
+    });
+
+    it("replaces a partial assistant stream when the degraded fallback arrives", async () => {
+        const setState = jest.fn();
+        const handlers = {
+            setState,
+            setPendingInterrupt: jest.fn(),
+            setPendingProposal: jest.fn(),
+            setCitations: jest.fn(),
+            setNudges: jest.fn(),
+            setLastSuggestion: jest.fn(),
+            setLastUsageRef: jest.fn(),
+            onMidStreamErrorEnvelope: jest.fn(),
+            resolveInterrupt: jest.fn()
+        };
+
+        await applyStreamPart(
+            {
+                type: "messages",
+                ns: [],
+                data: [
+                    {
+                        content:
+                            "Let me start by finding your project and board.",
+                        type: "ai"
+                    },
+                    {}
+                ]
+            },
+            handlers
+        );
+        await applyStreamPart(
+            {
+                type: "messages",
+                ns: [],
+                data: [
+                    {
+                        content:
+                            "[Live AI unavailable - showing fallback] [chat-agent project=p1] Summarize this board",
+                        type: "ai"
+                    },
+                    {}
+                ]
+            },
+            handlers
+        );
+
+        const afterFallback = setState.mock.calls[1][0]({
+            messages: [
+                {
+                    role: "assistant",
+                    content: "Let me start by finding your project and board."
+                }
+            ]
+        });
+        expect(afterFallback.messages).toEqual([
+            {
+                role: "assistant",
+                content:
+                    "[Live AI unavailable - showing fallback] [chat-agent project=p1] Summarize this board"
+            }
+        ]);
     });
 });
 

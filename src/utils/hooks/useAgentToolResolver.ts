@@ -136,6 +136,10 @@ export const hookErrorFromAgentStreamErrorData = (
     return new AgentTransportError(message, undefined, code);
 };
 
+/** Mirrors ``chat-agent`` ``_DEGRADED_REPLY_PREFIX`` in ``backend/app/agents/catalog/chat.py``. */
+export const CHAT_AGENT_DEGRADED_REPLY_PREFIX =
+    "[Live AI unavailable - showing fallback]";
+
 export const applyStreamPart = async (
     part: StreamPart,
     handlers: ApplyStreamPartHandlers
@@ -153,9 +157,14 @@ export const applyStreamPart = async (
                 const last = prev.messages[prev.messages.length - 1];
                 if (last && last.role === "assistant") {
                     const next = [...prev.messages];
+                    const replacesPartial = content
+                        .trimStart()
+                        .startsWith(CHAT_AGENT_DEGRADED_REPLY_PREFIX);
                     next[next.length - 1] = {
                         ...last,
-                        content: last.content + content
+                        content: replacesPartial
+                            ? content
+                            : last.content + content
                     };
                     return { ...prev, messages: next };
                 }
