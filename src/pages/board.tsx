@@ -2,6 +2,7 @@ import {
     CloseOutlined,
     DeleteOutlined,
     InboxOutlined,
+    MoreOutlined,
     ReloadOutlined,
     SettingOutlined
 } from "@ant-design/icons";
@@ -9,6 +10,7 @@ import styled from "@emotion/styled";
 import {
     Alert,
     Button,
+    Dropdown,
     Popover,
     Skeleton,
     Space,
@@ -936,6 +938,37 @@ const BoardPage = () => {
                      * the Copilot launcher out of the top tier so it can anchor
                      * the bottom tier beside the search rail.
                      */
+                    const phoneOverflowMenu = isPhone ? (
+                        <Dropdown
+                            menu={{
+                                items: [
+                                    {
+                                        key: "trash",
+                                        label: microcopy.trashDrawer
+                                            .triggerAriaLabel,
+                                        icon: <DeleteOutlined aria-hidden />,
+                                        onClick: () => openTrashDrawer()
+                                    },
+                                    {
+                                        key: "archive",
+                                        label: microcopy.archiveDrawer
+                                            .triggerAriaLabel,
+                                        icon: <InboxOutlined aria-hidden />,
+                                        onClick: () => openArchiveDrawer()
+                                    }
+                                ]
+                            }}
+                            trigger={["click"]}
+                        >
+                            <Button
+                                aria-label={microcopy.board.moreActionsAria}
+                                data-testid="board-more-actions"
+                                icon={<MoreOutlined aria-hidden />}
+                                type="text"
+                            />
+                        </Dropdown>
+                    ) : null;
+
                     const topTierControls = (
                         <>
                             {isPhone && (
@@ -949,26 +982,33 @@ const BoardPage = () => {
                                 />
                             )}
                             <MemberPopover />
-                            <Button
-                                aria-label={
-                                    microcopy.trashDrawer.triggerAriaLabel
-                                }
-                                data-testid="board-trash"
-                                icon={<DeleteOutlined aria-hidden />}
-                                onClick={() => openTrashDrawer()}
-                                type="text"
-                            />
-                            <Button
-                                aria-label={
-                                    microcopy.archiveDrawer.triggerAriaLabel
-                                }
-                                data-testid="board-archive"
-                                icon={<InboxOutlined aria-hidden />}
-                                onClick={() => openArchiveDrawer()}
-                                type="text"
-                            />
+                            {!isPhone && (
+                                <>
+                                    <Button
+                                        aria-label={
+                                            microcopy.trashDrawer
+                                                .triggerAriaLabel
+                                        }
+                                        data-testid="board-trash"
+                                        icon={<DeleteOutlined aria-hidden />}
+                                        onClick={() => openTrashDrawer()}
+                                        type="text"
+                                    />
+                                    <Button
+                                        aria-label={
+                                            microcopy.archiveDrawer
+                                                .triggerAriaLabel
+                                        }
+                                        data-testid="board-archive"
+                                        icon={<InboxOutlined aria-hidden />}
+                                        onClick={() => openArchiveDrawer()}
+                                        type="text"
+                                    />
+                                </>
+                            )}
                             {isPhone && copilotMenuEl}
-                            {projectAiSwitch}
+                            {isPhone && phoneOverflowMenu}
+                            {!isPhone && projectAiSwitch}
                         </>
                     );
 

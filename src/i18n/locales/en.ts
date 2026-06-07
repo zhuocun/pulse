@@ -627,6 +627,11 @@ export const enSource = {
          * Phase 4.2 — saved filter presets on the board. Sit in the
          * task-search panel as a small dropdown + save action.
          */
+        filtersToggle: "Filters",
+        filtersToggleAria: "Search and filter tasks",
+        smartSearchToggle: "Smart search",
+        smartSearchToggleAria: "Toggle AI smart search",
+        moreActionsAria: "More board actions",
         presets: {
             saveAction: "Save filter as preset…",
             saveAriaLabel: "Save current filter as preset",
@@ -684,6 +689,8 @@ export const enSource = {
             "Your edits are still here. Discard them or save them as a new task to keep them.",
         discardEdits: "Discard edits",
         aiAssistLabel: "AI assist",
+        moreDetails: "More details",
+        moreActionsAria: "More task actions",
         blocksLabel: "Blocks"
     },
     taskCard: {

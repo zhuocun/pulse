@@ -11,8 +11,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import userEvent from "@testing-library/user-event";
+
 import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
 import zhCN from "../../i18n/locales/zh-CN";
+import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
@@ -113,6 +116,30 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+};
+
+const expandMoreDetails = async () => {
+    const toggle = screen.getByText(microcopy.taskModal.moreDetails as string);
+    const header =
+        toggle.closest(".ant-collapse-header") ??
+        toggle.closest("button") ??
+        toggle;
+    if (header.getAttribute("aria-expanded") !== "true") {
+        fireEvent.click(header);
+    }
+};
+
+const expandAiAssist = async () => {
+    const toggle = screen.getByText(
+        microcopy.taskModal.aiAssistLabel as string
+    );
+    const header =
+        toggle.closest(".ant-collapse-header") ??
+        toggle.closest("button") ??
+        toggle;
+    if (header.getAttribute("aria-expanded") !== "true") {
+        fireEvent.click(header);
+    }
 };
 
 const LocationProbe = () => {
@@ -280,6 +307,7 @@ describe("TaskModal", () => {
                 new RegExp(`${zhCN.actions.editTask} · build task`, "i")
             )
         ).toBeInTheDocument();
+        await expandMoreDetails();
         expect(
             screen.getByText(zhCN.placeholders.selectStoryPoints)
         ).toBeInTheDocument();
@@ -756,13 +784,11 @@ describe("TaskModal", () => {
         expect(saveIdx).toBeGreaterThan(cancelIdx);
     });
 
-    it("renders the bottom Sheet (medium detent) with the full footer on phone chrome, and the primary button reflects the mutation's loading/disabled state", async () => {
+    it("renders the bottom Sheet (medium detent) with Cancel + Save in the footer and Delete in the overflow menu on phone chrome", async () => {
         // Phone migration (ResponsiveFormSheet). With coarse-pointer chrome
         // the editor renders the animated bottom Sheet instead of the
-        // Modal. Assert the Sheet surface opens at the MEDIUM detent, the
-        // footer still carries Delete + Cancel + Save (Delete -> Cancel ->
-        // Save stacking preserved), and the primary button picks up the
-        // PUT mutation's loading/disabled state while it is in flight.
+        // Modal. Delete moves to the title-row overflow menu so the
+        // footer stays Cancel → Save in the thumb zone.
         mockedUseIsPhoneChrome.mockReturnValue(true);
         let resolvePut: (value: Response) => void = () => undefined;
         fetchMock.mockImplementation(
@@ -776,32 +802,31 @@ describe("TaskModal", () => {
         const surface = await screen.findByTestId("task-modal-surface");
         expect(surface).toHaveAttribute("role", "dialog");
         expect(surface).toHaveAttribute("data-detent", "medium");
-        // The Sheet body wraps the form — no `.ant-modal*` chrome here.
         expect(screen.getByTestId("task-modal-body")).toBeInTheDocument();
         expect(
             within(surface).getByDisplayValue("Build task")
         ).toBeInTheDocument();
 
-        const deleteButton = within(surface).getByRole("button", {
-            name: /^delete build task$/i
-        });
         const cancelButton = within(surface).getByRole("button", {
             name: /^cancel$/i
         });
         const saveButton = within(surface).getByRole("button", {
             name: /^save$/i
         });
-        expect(deleteButton).toBeInTheDocument();
         expect(cancelButton).toBeInTheDocument();
-        // Footer stacking order is preserved on the Sheet too.
-        expect(
-            deleteButton.compareDocumentPosition(cancelButton) &
-                Node.DOCUMENT_POSITION_FOLLOWING
-        ).toBeTruthy();
         expect(
             cancelButton.compareDocumentPosition(saveButton) &
                 Node.DOCUMENT_POSITION_FOLLOWING
         ).toBeTruthy();
+
+        await userEvent.setup().click(
+            within(surface).getByRole("button", {
+                name: microcopy.taskModal.moreActionsAria as string
+            })
+        );
+        expect(
+            await screen.findByRole("menuitem", { name: /^delete$/i })
+        ).toBeInTheDocument();
 
         // Primary starts enabled (task resolved, no mutation in flight).
         expect(saveButton).toBeEnabled();
@@ -873,6 +898,7 @@ describe("TaskModal", () => {
             act(() => {
                 jest.advanceTimersByTime(1000);
             });
+            await expandAiAssist();
             const applyPoints = await screen.findByLabelText(
                 "Apply suggested story points"
             );
@@ -896,6 +922,7 @@ describe("TaskModal", () => {
                     ) as HTMLTextAreaElement
                 ).value
             ).toMatch(/## Acceptance criteria/);
+            await expandMoreDetails();
             fireEvent.change(screen.getByLabelText("Epic"), {
                 target: { value: "" }
             });
@@ -923,10 +950,12 @@ describe("TaskModal", () => {
         expect(
             await screen.findByDisplayValue("Build task")
         ).toBeInTheDocument();
+        await expandAiAssist();
         fireEvent.click(
             await screen.findByLabelText("Apply suggested story points")
         );
 
+        await expandMoreDetails();
         const storyPointsLabel = screen
             .getByText("Story points")
             .closest("label");
@@ -966,6 +995,7 @@ describe("TaskModal", () => {
             act(() => {
                 jest.advanceTimersByTime(1000);
             });
+            await expandAiAssist();
             const taskNameSuggestion = await screen.findByLabelText(
                 /Apply readiness suggestion for taskName/
             );
@@ -1014,6 +1044,7 @@ describe("TaskModal", () => {
             act(() => {
                 jest.advanceTimersByTime(1000);
             });
+            await expandAiAssist();
             const noteSuggestion = await screen.findByLabelText(
                 /Apply readiness suggestion for note/
             );
@@ -1129,15 +1160,20 @@ describe("TaskModal", () => {
             ) as Record<string, unknown>;
         };
 
-        it("renders the new field controls (start/due date, labels, assignees, parent task)", async () => {
+        const openRichnessModal = async (
+            options: Parameters<typeof renderModal>[0] = {}
+        ) => {
             renderModal({
                 labels: labelFixtures,
-                projectMembers: projectMemberFixtures
+                projectMembers: projectMemberFixtures,
+                ...options
             });
+            await screen.findByDisplayValue("Build task");
+            await expandMoreDetails();
+        };
 
-            expect(
-                await screen.findByDisplayValue("Build task")
-            ).toBeInTheDocument();
+        it("renders the new field controls (start/due date, labels, assignees, parent task)", async () => {
+            await openRichnessModal();
             // Labelled Form.Items surface their field labels.
             expect(screen.getByText("Start date")).toBeInTheDocument();
             expect(screen.getByText("Due date")).toBeInTheDocument();
@@ -1147,11 +1183,7 @@ describe("TaskModal", () => {
         });
 
         it("renders the priority Select with the localized enum options", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             // The Form.Item surfaces its "Priority" label…
             expect(screen.getByText("Priority")).toBeInTheDocument();
@@ -1170,11 +1202,7 @@ describe("TaskModal", () => {
         });
 
         it("includes the chosen priority in the PUT payload on save", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             fireEvent.mouseDown(
                 screen.getByRole("combobox", { name: /priority/i })
@@ -1200,11 +1228,7 @@ describe("TaskModal", () => {
         });
 
         it("offers project labels in the label picker (name + colour source)", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             // Open the Labels multi-select and assert both project labels
             // appear as options.
@@ -1221,8 +1245,7 @@ describe("TaskModal", () => {
         });
 
         it("offers PROJECT members (not the global directory) in the assignee picker", async () => {
-            renderModal({
-                labels: labelFixtures,
+            await openRichnessModal({
                 projectMembers: [
                     {
                         _id: "member-9",
@@ -1232,7 +1255,6 @@ describe("TaskModal", () => {
                     }
                 ]
             });
-            await screen.findByDisplayValue("Build task");
 
             const assigneesSelect = screen.getByRole("combobox", {
                 name: /assignees/i
@@ -1246,11 +1268,7 @@ describe("TaskModal", () => {
         });
 
         it("excludes the editing task itself from the parent-task options", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             const parentSelect = screen.getByRole("combobox", {
                 name: /parent task/i
@@ -1269,11 +1287,7 @@ describe("TaskModal", () => {
         });
 
         it("includes labels, assignees, and parent in the PUT payload on save", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             // Pick a label.
             fireEvent.mouseDown(
@@ -1315,11 +1329,7 @@ describe("TaskModal", () => {
         });
 
         it("serializes a chosen due date as a YYYY-MM-DD string in the PUT payload", async () => {
-            renderModal({
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
-            });
-            await screen.findByDisplayValue("Build task");
+            await openRichnessModal();
 
             // AntD DatePicker accepts typed input; type a date then confirm
             // with Enter so the picker commits the value.
@@ -1345,14 +1355,11 @@ describe("TaskModal", () => {
         });
 
         it("seeds the date pickers from the task's stored ISO date strings", async () => {
-            renderModal({
+            await openRichnessModal({
                 initialTasks: [
                     task({ startDate: "2026-03-01", dueDate: "2026-03-15" })
-                ],
-                labels: labelFixtures,
-                projectMembers: projectMemberFixtures
+                ]
             });
-            await screen.findByDisplayValue("Build task");
 
             // The stored ISO strings round-trip into the picker inputs.
             expect(screen.getByDisplayValue("2026-03-01")).toBeInTheDocument();
@@ -1360,12 +1367,9 @@ describe("TaskModal", () => {
         });
 
         it("offers the project's milestones in the milestone picker", async () => {
-            renderModal({
-                labels: labelFixtures,
-                milestones: milestoneFixtures,
-                projectMembers: projectMemberFixtures
+            await openRichnessModal({
+                milestones: milestoneFixtures
             });
-            await screen.findByDisplayValue("Build task");
 
             // The Form.Item surfaces its "Milestone" label…
             expect(screen.getByText("Milestone")).toBeInTheDocument();
@@ -1384,12 +1388,9 @@ describe("TaskModal", () => {
         });
 
         it("includes the chosen milestone in the PUT payload on save", async () => {
-            renderModal({
-                labels: labelFixtures,
-                milestones: milestoneFixtures,
-                projectMembers: projectMemberFixtures
+            await openRichnessModal({
+                milestones: milestoneFixtures
             });
-            await screen.findByDisplayValue("Build task");
 
             // Pick a milestone — `milestoneId` rides the same `tasks` PUT as
             // `parentTaskId`, no separate write path.
@@ -1423,13 +1424,10 @@ describe("TaskModal", () => {
             // The modal opts `milestoneId` into `preserveNullKeys` and maps the
             // cleared value to an explicit `null`, so the cleared assignment
             // reaches the wire and the backend CLEARS it.
-            renderModal({
+            await openRichnessModal({
                 initialTasks: [task({ milestoneId: "milestone-1" })],
-                labels: labelFixtures,
-                milestones: milestoneFixtures,
-                projectMembers: projectMemberFixtures
+                milestones: milestoneFixtures
             });
-            await screen.findByDisplayValue("Build task");
 
             // The picker is seeded with the task's current milestone ("Beta
             // launch"); click the allow-clear button to unset it.
@@ -1472,17 +1470,24 @@ describe("TaskModal", () => {
             ) as Record<string, unknown>;
         };
 
+        const openDependencyModal = async (
+            options: Parameters<typeof renderModal>[0] = {}
+        ) => {
+            renderModal(options);
+            await screen.findByDisplayValue("Build task");
+            await expandMoreDetails();
+        };
+
         it("seeds the dependsOn multi-select with the task's current prerequisites and sends an edited value in the PUT body", async () => {
             // task-1 already depends on task-2 ("Fix bug"); a third task is
             // added so there is something else to pick.
-            renderModal({
+            await openDependencyModal({
                 initialTasks: [
                     task({ dependsOn: ["task-2"] }),
                     task({ _id: "task-2", taskName: "Fix bug", type: "Bug" }),
                     task({ _id: "task-3", taskName: "Write docs" })
                 ]
             });
-            await screen.findByDisplayValue("Build task");
 
             // The seeded prerequisite renders as a selected tag inside the
             // "Depends on" control (not merely as an option in the dropdown).
@@ -1522,13 +1527,12 @@ describe("TaskModal", () => {
             fetchMock.mockResolvedValue(
                 response({ error: "Dependency cycle detected" }, false)
             );
-            renderModal({
+            await openDependencyModal({
                 initialTasks: [
                     task(),
                     task({ _id: "task-2", taskName: "Fix bug", type: "Bug" })
                 ]
             });
-            await screen.findByDisplayValue("Build task");
 
             fireEvent.mouseDown(
                 screen.getByRole("combobox", { name: /depends on/i })
@@ -1549,7 +1553,7 @@ describe("TaskModal", () => {
             // task-2 lists task-1 among its prerequisites, so the inverse
             // (computed client-side) shows task-2 under "Blocks" when editing
             // task-1.
-            renderModal({
+            await openDependencyModal({
                 initialTasks: [
                     task(),
                     task({
@@ -1560,7 +1564,6 @@ describe("TaskModal", () => {
                     })
                 ]
             });
-            await screen.findByDisplayValue("Build task");
 
             // The "Blocks" section header renders…
             const blocksLabel = screen.getByText("Blocks");
@@ -1577,13 +1580,12 @@ describe("TaskModal", () => {
             // Regression guard: a cleared multi-select must reach the wire as
             // an empty array (not be dropped), or the backend keeps the stale
             // edges and the "clear" silently no-ops.
-            renderModal({
+            await openDependencyModal({
                 initialTasks: [
                     task({ dependsOn: ["task-2"] }),
                     task({ _id: "task-2", taskName: "Fix bug", type: "Bug" })
                 ]
             });
-            await screen.findByDisplayValue("Build task");
 
             // Remove the only selected prerequisite tag ("Fix bug") so the
             // dependsOn value becomes [].
