@@ -103,6 +103,24 @@ const PageSubheading = styled.p`
     line-height: ${lineHeight.normal};
     margin: ${space.xxs}px 0 0;
     max-width: 56ch;
+
+    @media (max-width: ${breakpoints.md - 1}px) {
+        display: none;
+    }
+`;
+
+const MobileFirstSection = styled.div`
+    display: contents;
+
+    @media (max-width: ${breakpoints.md - 1}px) {
+        display: flex;
+        flex-direction: column;
+        gap: ${space.md}px;
+    }
+`;
+
+const DesktopFirstSection = styled.div`
+    display: contents;
 `;
 
 const PageHeadingGroup = styled.div`
@@ -608,118 +626,136 @@ const ProjectPage = () => {
                     {statsAnnouncement}
                 </CompactStatsLine>
                 {/*
-                 * Stat rail. `aria-busy` (was previously `aria-hidden`) lets
-                 * the region stay in the AT tree during load — the visible
-                 * cards still announce, but the polite live region below
-                 * narrates the "loading" → "resolved counts" transition so
-                 * SR users get a single sentence about the page instead of
-                 * three separate stats. (QW-14.)
+                 * Stat rail — hidden for small workspaces where the counts
+                 * duplicate what the list already shows. Keeps the sr-only
+                 * announcement for AT; the visual cards only appear once the
+                 * workspace is large enough to benefit from the summary.
                  */}
-                <StatRail aria-busy={statsBusy}>
-                    <StatCard>
-                        <StatHeader>
-                            <StatIcon aria-hidden>
-                                <AppstoreOutlined />
-                            </StatIcon>
-                            <StatLabel>
-                                {microcopy.projectsPage.totalProjects}
-                            </StatLabel>
-                        </StatHeader>
-                        <StatValue>{pLoading ? "—" : stats.total}</StatValue>
-                    </StatCard>
-                    <StatCard>
-                        <StatHeader>
-                            <StatIcon aria-hidden>
-                                <BankOutlined />
-                            </StatIcon>
-                            <StatLabel>
-                                {microcopy.projectsPage.organizations}
-                            </StatLabel>
-                        </StatHeader>
-                        <StatValue>
-                            {pLoading ? "—" : stats.organizations}
-                        </StatValue>
-                    </StatCard>
-                    <StatCard>
-                        <StatHeader>
-                            <StatIcon aria-hidden>
-                                <TeamOutlined />
-                            </StatIcon>
-                            <StatLabel>
-                                {microcopy.projectsPage.teamMembers}
-                            </StatLabel>
-                        </StatHeader>
-                        <StatValue>
-                            {mLoading ? "—" : (members?.length ?? 0)}
-                        </StatValue>
-                    </StatCard>
-                </StatRail>
-                <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
-                <ProjectSearchPanel
-                    param={param}
-                    setParam={setParam}
-                    members={members ?? []}
-                    loading={mLoading}
-                    favoritedOnly={favoritedOnly}
-                    onFavoritedOnlyChange={(next) =>
-                        setParam({ favoritedOnly: next ? "1" : "" })
-                    }
-                    hasSavedDefaults={savedProjectListDefaults !== null}
-                    onSaveDefault={handleSaveDefault}
-                    onResetToDefault={handleResetToDefault}
-                    onClearSavedDefault={clearProjectListDefaults}
-                    aiSearchSlot={
-                        aiEnabled ? (
-                            <div
-                                style={{
-                                    flexBasis: "100%",
-                                    marginBottom: space.sm
-                                }}
-                            >
-                                <AiSearchInput
-                                    kind="projects"
-                                    projectsContext={{
-                                        projects: projects ?? [],
-                                        members: members ?? []
-                                    }}
-                                    semanticIds={param.semanticIds}
-                                    setSemanticIds={(value) =>
-                                        setParam({ semanticIds: value })
-                                    }
-                                />
-                            </div>
-                        ) : undefined
-                    }
-                />
-                {pError || mError ? (
-                    <Alert
-                        action={
-                            <Button
-                                onClick={() => {
-                                    if (pError) refetchProjects();
-                                    if (mError) refetchMembers();
-                                }}
-                                size="small"
-                                type="primary"
-                            >
-                                {microcopy.actions.retry}
-                            </Button>
-                        }
-                        description={microcopy.feedback.retryHint}
-                        showIcon
-                        style={{ marginBottom: space.sm }}
-                        title={microcopy.feedback.loadFailed}
-                        type="error"
-                    />
+                {statsBusy || stats.total >= 8 ? (
+                    <StatRail aria-busy={statsBusy}>
+                        <StatCard>
+                            <StatHeader>
+                                <StatIcon aria-hidden>
+                                    <AppstoreOutlined />
+                                </StatIcon>
+                                <StatLabel>
+                                    {microcopy.projectsPage.totalProjects}
+                                </StatLabel>
+                            </StatHeader>
+                            <StatValue>
+                                {pLoading ? "—" : stats.total}
+                            </StatValue>
+                        </StatCard>
+                        <StatCard>
+                            <StatHeader>
+                                <StatIcon aria-hidden>
+                                    <BankOutlined />
+                                </StatIcon>
+                                <StatLabel>
+                                    {microcopy.projectsPage.organizations}
+                                </StatLabel>
+                            </StatHeader>
+                            <StatValue>
+                                {pLoading ? "—" : stats.organizations}
+                            </StatValue>
+                        </StatCard>
+                        <StatCard>
+                            <StatHeader>
+                                <StatIcon aria-hidden>
+                                    <TeamOutlined />
+                                </StatIcon>
+                                <StatLabel>
+                                    {microcopy.projectsPage.teamMembers}
+                                </StatLabel>
+                            </StatHeader>
+                            <StatValue>
+                                {mLoading ? "—" : (members?.length ?? 0)}
+                            </StatValue>
+                        </StatCard>
+                    </StatRail>
                 ) : null}
-                <ProjectList
-                    dataSource={filteredProjects}
-                    error={Boolean(pError || mError)}
-                    members={members ?? []}
-                    loading={pLoading || mLoading}
-                    sortOrder={sortOrder}
-                    onSortOrderChange={setSortOrder}
-                />
+                <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
+                <MobileFirstSection>
+                    {isPhone ? (
+                        <ProjectList
+                            dataSource={filteredProjects}
+                            error={Boolean(pError || mError)}
+                            members={members ?? []}
+                            loading={pLoading || mLoading}
+                            sortOrder={sortOrder}
+                            onSortOrderChange={setSortOrder}
+                        />
+                    ) : null}
+                </MobileFirstSection>
+                <DesktopFirstSection>
+                    <ProjectSearchPanel
+                        param={param}
+                        setParam={setParam}
+                        members={members ?? []}
+                        loading={mLoading}
+                        favoritedOnly={favoritedOnly}
+                        onFavoritedOnlyChange={(next) =>
+                            setParam({ favoritedOnly: next ? "1" : "" })
+                        }
+                        hasSavedDefaults={savedProjectListDefaults !== null}
+                        onSaveDefault={handleSaveDefault}
+                        onResetToDefault={handleResetToDefault}
+                        onClearSavedDefault={clearProjectListDefaults}
+                        aiSearchSlot={
+                            aiEnabled ? (
+                                <div
+                                    style={{
+                                        flexBasis: "100%",
+                                        marginBottom: space.sm
+                                    }}
+                                >
+                                    <AiSearchInput
+                                        kind="projects"
+                                        projectsContext={{
+                                            projects: projects ?? [],
+                                            members: members ?? []
+                                        }}
+                                        semanticIds={param.semanticIds}
+                                        setSemanticIds={(value) =>
+                                            setParam({ semanticIds: value })
+                                        }
+                                    />
+                                </div>
+                            ) : undefined
+                        }
+                    />
+                    {pError || mError ? (
+                        <Alert
+                            action={
+                                <Button
+                                    onClick={() => {
+                                        if (pError) refetchProjects();
+                                        if (mError) refetchMembers();
+                                    }}
+                                    size="small"
+                                    type="primary"
+                                >
+                                    {microcopy.actions.retry}
+                                </Button>
+                            }
+                            description={microcopy.feedback.retryHint}
+                            showIcon
+                            style={{ marginBottom: space.sm }}
+                            title={microcopy.feedback.loadFailed}
+                            type="error"
+                        />
+                    ) : null}
+                    {!isPhone ? (
+                        <ProjectList
+                            dataSource={filteredProjects}
+                            error={Boolean(pError || mError)}
+                            members={members ?? []}
+                            loading={pLoading || mLoading}
+                            sortOrder={sortOrder}
+                            onSortOrderChange={setSortOrder}
+                        />
+                    ) : null}
+                </DesktopFirstSection>
                 {aiEnabled && !environment.copilotDockEnabled && (
                     /*
                      * R-A M1 Issue #4: when the dock flag is on, the host

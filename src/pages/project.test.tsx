@@ -249,6 +249,13 @@ describe("ProjectPage", () => {
     // flight and the resolved counts once both queries land. Keyboard /
     // SR users now hear the entire stat block as a single sentence.
     it("uses aria-busy on the stat rail and announces the resolved counts", async () => {
+        const largeProjectList = Array.from({ length: 8 }, (_, index) =>
+            project({
+                _id: `project-${index + 1}`,
+                projectName: `Project ${index + 1}`,
+                organization: `Org ${(index % 3) + 1}`
+            })
+        );
         let resolveProjects: (value: Response) => void = () => undefined;
         let resolveMembers: (value: Response) => void = () => undefined;
         fetchMock.mockImplementation((input) => {
@@ -268,10 +275,9 @@ describe("ProjectPage", () => {
 
         renderPage();
 
-        // Pre-resolve: the "Total projects" label always renders. Walk up
-        // its DOM to the StatRail container and assert `aria-busy="true"`
-        // (the page was previously stamped with `aria-hidden`, which
-        // would have wholly removed the rail from the AT tree).
+        // Pre-resolve: the stat rail renders only once the workspace is
+        // large enough (≥ 8 projects). Walk up to the StatRail container
+        // and assert `aria-busy="true"`.
         const totalProjectsLabel = await screen.findByText(/total projects/i);
         const statRail = totalProjectsLabel.closest('[aria-busy="true"]');
         expect(statRail).toBeInTheDocument();
@@ -287,12 +293,9 @@ describe("ProjectPage", () => {
             expect(liveRegion).toHaveAttribute("aria-live", "polite");
         });
 
-        resolveProjects(response(projects));
+        resolveProjects(response(largeProjectList));
         resolveMembers(response(members));
 
-        // Once both queries land, the rail is no longer busy and the
-        // live region replays the resolved counts as one polite sentence
-        // ("2 projects across 2 organizations, 2 team members.").
         await waitFor(() => {
             expect(totalProjectsLabel.closest("[aria-busy]")).toHaveAttribute(
                 "aria-busy",
@@ -304,11 +307,33 @@ describe("ProjectPage", () => {
                 .getAllByRole("status")
                 .find((node) =>
                     node.textContent?.includes(
-                        "2 projects across 2 organizations"
+                        "8 projects across 3 organizations"
                     )
                 );
             expect(liveRegion).toBeDefined();
         });
+    });
+
+    it("hides the visual stat rail for small workspaces but keeps the compact summary", async () => {
+        fetchMock.mockImplementation((input) => {
+            const url = String(input);
+            if (url.includes("users/members")) {
+                return Promise.resolve(response(members));
+            }
+            if (url.includes("projects")) {
+                return Promise.resolve(response(projects));
+            }
+            return Promise.resolve(response({}));
+        });
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(
+                screen.getAllByText(/2 projects across 2 organizations/i).length
+            ).toBeGreaterThan(0);
+        });
+        expect(screen.queryByText(/total projects/i)).not.toBeInTheDocument();
     });
 
     it("shows a shared error message when either query fails", async () => {
