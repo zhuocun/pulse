@@ -1,13 +1,36 @@
 # PRD gap TODO — consolidated, actionable
 
 Consolidated, de-duplicated backlog distilled from the implementation-status
-review of the six Pulse PRDs. Each row is an **actionable** task, not a
-roadmap line. Coarse roadmap bullets live in
+review of the six Pulse PRDs, then **adversarially reviewed** against the
+codebase (2026-06-08). Each row is an **actionable** task, not a roadmap line.
+Coarse roadmap bullets live in
 [`feature-build-progress.md`](feature-build-progress.md); the live AI release
 status lives in [`release-todo.md`](release-todo.md); shipped inventory lives
 in [`product-done.md`](product-done.md); UI/UX polish lives in
 [`ui-todo.md`](ui-todo.md). This file is the **gap** layer: the work the PRDs
 specify that none of those trackers has fully closed.
+
+## Adversarial review (2026-06-08)
+
+Independent review grounded each task against `src/`, `backend/`, and the
+existing trackers. Outcomes:
+
+| Verdict | Item | Resolution |
+| --- | --- | --- |
+| **Invalid as written** | "Build M5 unified Copilot rail" | **Dropped** — the rail is the shipped `copilotDock`; M5 narrows to command-palette actions + saved views + cross-project search (see PRD-GAP-036). |
+| **Invalid as written** | "Notifications not started" (monolith) | **Split** — base `mention` inbox + bell ship under M4; depth is PRD-GAP-026–030. |
+| **Invalid as written** | "Add `guest` role" (PRD-GAP-024) | **Removed from scope** — `ROLE_GUEST` already ships (`project_service.py:34-36`, `70e081fb`). Task now covers share tokens + public viewer only. |
+| **Rescoped** | Shadow mode (PRD-GAP-031) | Split into BE telemetry substrate + FE admin review UI; per-**tool** shadow (AC-V17) is distinct from the existing per-**agent** `status="shadow"` registry marker. |
+| **Rescoped** | Bulk edit (PRD-GAP-008) | Board multi-select is the **minimal** first caller; table view (PRD-GAP-014) is the PRD's richer long-term home — pick one if scope conflicts. |
+| **Rescoped** | Milestone align (PRD-GAP-018) | Requires an explicit **wire-contract decision** (rename fields vs ratify as-built shape in the PRD) before implementation. |
+| **Confirmed open** | CopilotDock cutover, WIP UI, TaskDetailPanel parity, label mgmt, Rewrite panel, queryable `GET /tasks`, org backfill/FE, API doc gaps | Evidence paths cited per task below. |
+| **Confirmed not dev tasks** | pgvector backfill, Redis multi-worker | Operator readiness only (PRD-GAP-034/035). |
+
+**Doc-truth correction:** `api/backend.md` and `api/frontend.md` were reconciled
+for the **core** collaboration layer (RBAC, members, richness, `wipLimit`,
+labels, comments, bulk). They still omit shipped **WMD-depth + org** fields —
+that is the real remaining API-doc gap (PRD-GAP-001/002), not a flat pre-M4 task
+model.
 
 ## How to read this
 
@@ -108,13 +131,14 @@ Tiers, highest priority first:
 
 ## P1 — High-value product gaps
 
-### PRD-GAP-006 — Roll out CopilotDock (flip flag default ON; remove legacy drawers)
+### PRD-GAP-006 — Roll out CopilotDock (validate, flip flag ON, remove legacy drawers)
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.1; `docs/design/_review-2026-05/04-ai-copilot.md` A1
 - **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `environment.copilotDockEnabled` defaults ON (kill-switch; `REACT_APP_COPILOT_DOCK_ENABLED=false` rolls back) and the board mounts the single tabbed dock as the live surface.
-  - The legacy `AiChatDrawer` / `BoardBriefDrawer` standalone surfaces are removed (their bodies already live in `copilotDock/ChatTabBody` + `BriefTabBody`); no duplicate `EngineModeTag` / `Space.Compact` launchers remain.
+  - The legacy `AiChatDrawer` / `BoardBriefDrawer` standalone surfaces are removed (their bodies already live in `copilotDock/ChatTabBody` + `BriefTabBody`); no duplicate launchers remain.
+  - When the kill-switch is off, `CopilotMenu` and `CopilotWelcomeBanner` do not render (no dead launchers).
   - Existing dock + agent tests pass (`board.dock.test.tsx`, `copilotDock/*.test.tsx`); no regression in the full Jest suite.
 - **depends_on:** none
 - **notes:** Shipped — `src/constants/env.ts` flips `copilotDockEnabled` to a default-ON kill-switch, and the `<AiChatDrawer>` / `<BoardBriefDrawer>` wrapper components + their standalone mounts in `pages/board.tsx` / `pages/project.tsx` are deleted (the dock owns the triage agent, inbox nudges, and the `boardCopilot:openChat` palette hand-off via `CopilotDockHost`). The shared composer/brief bodies live in `copilotDock/ChatTabBody` + `BriefTabBody`. Pairs with PRD-GAP-004 (doc) but split per AGENTS.md.
@@ -130,7 +154,7 @@ Tiers, highest priority first:
 - **depends_on:** none
 - **notes:** Shipped — `ColumnCreator` gains a `wipLimit` `InputNumber` (default `0`) and the column more-actions menu opens an edit modal sending `{columnName, category, wipLimit}` on `PUT /boards` (optimistic via `optimisticUpdate/updateColumn`). The header renders a `{count} / {limit}` badge plus a glyph + "Over limit" chip (non-colour-only) when the unfiltered count exceeds a positive limit; both ride a 44px coarse-pointer target.
 
-### PRD-GAP-008 — Bulk-edit UI (board multi-select → fan-out `PUT /tasks/bulk`)
+### PRD-GAP-008 — Bulk-edit UI (first FE caller for `PUT /tasks/bulk`)
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.2.1, §12 (⬜ Bulk edit UI); `docs/prd/work-management-depth.md` §10.5
 - **status:** done
 - **owner_hint:** FE
@@ -207,9 +231,9 @@ Tiers, highest priority first:
 - **acceptance:**
   - A view switcher renders list, table (selectable columns + inline edit), calendar (`startDate`/`dueDate`), and timeline (bars + `dependsOn` edges) over the same task data.
   - Board swimlane grouping by assignee/epic/priority/milestone.
-  - View config lives in URL/query state (persistence deferred to M5); axe-clean across viewports.
-- **depends_on:** PRD-GAP-013
-- **notes:** Only the kanban board exists (§10.1). Table view is the natural home for the bulk-edit UI (PRD-GAP-008). Saved-view persistence is M5 — out of scope here per §10.3.
+  - View config hydrates from saved views when present (PRD-GAP-036) and falls back to URL/query state; axe-clean across viewports.
+- **depends_on:** PRD-GAP-013, PRD-GAP-036
+- **notes:** Only the kanban board exists (§10.1). Table view is the natural home for the bulk-edit UI (PRD-GAP-008). Saved-view persistence is PRD-GAP-036 (M5 prerequisite).
 
 ### PRD-GAP-015 — Custom fields (`customFieldDefs` + `tasks.customFields`)
 - **prd_ref:** `docs/prd/work-management-depth.md` §8, AC-W15, AC-W16, AC-W17
@@ -244,16 +268,17 @@ Tiers, highest priority first:
 - **depends_on:** none
 - **notes:** "No scheduler exists at all" (§6.1) — this is the system's first background-worker dependency (Rollout §14). Sequenced last in `feature-build-progress.md` (new runtime dep). The `due_soon` sweep (PRD-GAP-026) reuses this substrate.
 
-### PRD-GAP-018 — Align the milestone model with WMD §9
+### PRD-GAP-018 — Reconcile milestone wire contract with WMD §9 (decision required)
 - **prd_ref:** `docs/prd/work-management-depth.md` §9.2, AC-W18, AC-W19
 - **status:** open
 - **owner_hint:** BE
 - **acceptance:**
-  - The shipped milestone fields are reconciled to the PRD shape: `goal` (not `description`), `endDate` (not `dueDate`), `status` ∈ `planned|active|completed` (not `state`), with `endDate ≥ startDate` validation.
-  - Milestone read returns the `{total, done}` completion count (done = member tasks in a `category=="done"` column).
-  - FE milestone surface + any consumers updated for the renamed fields; tests cover the count.
+  - **Decision recorded** in the PR: either (a) rename the shipped fields to the PRD shape, or (b) ratify the as-built shape in the PRD and close AC-W18/W19 as intentionally simplified.
+  - If (a): milestones use `goal` (not `description`), `endDate` (not `dueDate`), `status` ∈ `planned|active|completed` (not `state`); `endDate ≥ startDate`; read returns `{total, done}` (done = member tasks in a `category=="done"` column).
+  - FE (`IMilestone`, `useMilestones`, `milestonesManager`) updates in lockstep with whichever shape wins.
+  - Tests cover the chosen contract including progress count if (a).
 - **depends_on:** none
-- **notes:** Milestones shipped (backend + FE, `143866e4`/`83cc9d6b`) but the as-built service uses `{name, description, startDate, dueDate, state}` (`backend/app/services/milestone_service.py:13`) — diverging from §9.2's `{goal, endDate, status}` + `{total, done}`. This is a model-alignment gap, not a re-build (so not a duplicate of the shipped FE milestone work).
+- **notes:** Milestones shipped (backend + FE, `143866e4`/`83cc9d6b`) but the as-built service uses `{name, description, startDate, dueDate, state}` (`backend/app/services/milestone_service.py:12-18`) — diverging from §9.2. **Do not silently rename** — this is a breaking wire change. Not a duplicate of the shipped milestone FE work.
 
 ### PRD-GAP-019 — WMD AI assists: auto-priority / dependency / duplicate-merge
 - **prd_ref:** `docs/prd/work-management-depth.md` §11.2, AC-W3, AC-W23, AC-W24
@@ -310,16 +335,16 @@ Tiers, highest priority first:
 - **depends_on:** PRD-GAP-021
 - **notes:** Member-add still requires an existing user (`project_service.py:236`); `forgotPassword` is FE-only with no backend (§5.1). Closes onboarding-outsiders gap. The email *transport* itself is shared with PRD-GAP-033 (deferred infra).
 
-### PRD-GAP-024 — Guest role + public read-only share links
-- **prd_ref:** `docs/prd/accounts-organizations.md` §6, AC-O16, AC-O17, AC-O18, AC-O19
+### PRD-GAP-024 — Public read-only share links (share tokens + viewer)
+- **prd_ref:** `docs/prd/accounts-organizations.md` §6.3, AC-O17, AC-O18, AC-O19
 - **status:** open
 - **owner_hint:** BE
 - **acceptance:**
-  - `guest` added at rank 0 below `viewer` (write gates auto-exclude guests).
   - `share_tokens` (hashed) + a separate **unauthenticated** token-gated `GET` read path for board/task snapshots (columns/tasks/labels only); no token-authenticated write exists; revoked/expired tokens rejected.
   - A Share affordance (project `owner`) to create/copy/revoke a link, and a minimal read-only public viewer route.
+  - `guest` role assignment UX for link recipients (role already ships at rank 0 — `project_service.py:34-36`, `70e081fb`).
 - **depends_on:** none
-- **notes:** `guest` at rank 0 already landed (`70e081fb`) per `feature-build-progress.md`; the share-token path + public viewer + guest UX are still ⬜ (§6.7). Read-only / non-real-time is a hard boundary (§6.4).
+- **notes:** Do **not** re-open the `guest` role task — it is shipped. `src/pages/share.tsx` is the PWA share-target (quick task create), not public board sharing. Read-only / non-real-time is a hard boundary (§6.4).
 
 ### PRD-GAP-025 — Account / profile management + profile fields
 - **prd_ref:** `docs/prd/accounts-organizations.md` §7, AC-O20, AC-O21, AC-O22
@@ -391,16 +416,16 @@ Tiers, highest priority first:
 
 ## P3 — Deferred / platform / ops readiness
 
-### PRD-GAP-031 — Shadow mode for per-tool quality validation
+### PRD-GAP-031 — Shadow mode for per-tool quality validation (BE telemetry + FE admin UI)
 - **prd_ref:** `docs/prd/v2.1-agent.md` §6.6, AC-V17, Phase F
 - **status:** open
-- **owner_hint:** FE
+- **owner_hint:** BE + FE
 - **acceptance:**
-  - Shadowed tools generate `mutation_proposal` events that the FE silently logs to telemetry instead of rendering.
-  - Shadow mode is opt-in per tool, per project, admin-only in a Settings panel; shadow-vs-actual correlation is recorded.
-  - No shadowed proposal ever surfaces a card to a non-admin user.
+  - **BE:** Shadowed tools emit `mutation_proposal` events tagged for shadow logging; telemetry records shadow-vs-actual correlation. Distinct from the existing per-**agent** `metadata.status == "shadow"` registry hide (`backend/app/agents/registry.py:48-80`) — AC-V17 is per-**tool**.
+  - **FE:** An admin-only Settings surface (`aiSettingsPanel` per `v2.1-agent.md` impl map) lets workspace admins opt tools into shadow mode per project; shadowed proposals never render cards to non-admins.
+  - No shadowed proposal surfaces a card to a non-admin user.
 - **depends_on:** none
-- **notes:** Prerequisite for Auto promotion (§6.6, the chicken-and-egg solution). No `shadow` wiring exists in `src/` today. Horizon AI — below the core product gaps in priority.
+- **notes:** Prerequisite for Auto promotion (PRD-GAP-032). **Not P0** — only gates Auto-tool promotion, which remains hard-disabled (`release-todo.md` §8). No per-tool shadow UI exists in `src/` today.
 
 ### PRD-GAP-032 — Enable "Auto" autonomy (metadata-driven, post-shadow)
 - **prd_ref:** `docs/prd/v2.1-agent.md` Phase F, AC-V5; `release-todo.md` §8
@@ -443,3 +468,14 @@ Tiers, highest priority first:
   - Single-worker-per-container horizontal scaling remains valid without Redis.
 - **depends_on:** none
 - **notes:** Boot-time guard already enforces this (`test_production_backend_guards.py`); the work is **operator configuration/provisioning**, not code. Included per the review's ops list; not a dev task.
+
+### PRD-GAP-036 — Saved-view server model (M5 prerequisite for alternate views)
+- **prd_ref:** `docs/prd/work-management-depth.md` §10.3; `feature-build-progress.md` (M5 saved-views note)
+- **status:** open
+- **owner_hint:** BE
+- **acceptance:**
+  - A persisted saved-view entity (project-scoped, owner/editor CRUD) stores view type + filter/sort/column config per WMD §10.3.
+  - `GET`/`POST`/`PUT`/`DELETE` endpoints ship with RBAC matching project write gates.
+  - PRD-GAP-014 can consume saved views for URL/query hydration without inventing a second persistence model.
+- **depends_on:** none
+- **notes:** WMD defers saved-view *persistence* to M5 (`feature-build-progress.md:117-119`). Alternate views (PRD-GAP-014) should not ship URL-only persistence and then migrate. **Not** the Copilot rail — that slice is PRD-GAP-006 (already built).
