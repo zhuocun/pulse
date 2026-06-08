@@ -1,6 +1,6 @@
 import { PlusOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Input, Select } from "antd";
+import { Input, InputNumber, Select } from "antd";
 import type { InputRef } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -97,9 +97,15 @@ const AddColumnButton = styled.button`
  * without firing the mutation. Blur only collapses empty drafts; Enter is
  * the explicit commit gesture so tabbing away does not create a column.
  */
+// A freshly created column has no WIP limit. ``0`` is the persisted
+// "no limit" sentinel per the drift-detector contract (PRD §5.2), so the
+// input starts there and only a deliberate positive value enforces a cap.
+const DEFAULT_WIP_LIMIT = 0;
+
 const ColumnCreator: React.FC = () => {
     const [columnName, setColumnName] = useState("");
     const [category, setCategory] = useState<ColumnCategory>(DEFAULT_CATEGORY);
+    const [wipLimit, setWipLimit] = useState<number>(DEFAULT_WIP_LIMIT);
     const [editing, setEditing] = useState(false);
     const inputRef = useRef<InputRef>(null);
     const { projectId } = useParams<{ projectId: string }>();
@@ -126,6 +132,7 @@ const ColumnCreator: React.FC = () => {
         setEditing(false);
         setColumnName("");
         setCategory(DEFAULT_CATEGORY);
+        setWipLimit(DEFAULT_WIP_LIMIT);
     }, []);
 
     const submit = async () => {
@@ -135,12 +142,17 @@ const ColumnCreator: React.FC = () => {
             return;
         }
         setColumnName("");
+        // ``wipLimit`` is always sent (default 0 = no limit), mirroring how
+        // ``category`` is always sent with its own default; the backend
+        // validates it as a non-negative int (AC-C11).
         const created = await mutateAsync({
             category,
             columnName: trimmed,
-            projectId
+            projectId,
+            wipLimit
         });
         setCategory(DEFAULT_CATEGORY);
+        setWipLimit(DEFAULT_WIP_LIMIT);
         setEditing(false);
         // Phase 4.3 — record column create into the activity feed.
         // The 10s-window Undo closure DELETEs the just-created column
@@ -217,6 +229,19 @@ const ColumnCreator: React.FC = () => {
                     }))}
                     size="large"
                     value={category}
+                />
+                <InputNumber
+                    aria-label={microcopy.fields.wipLimit}
+                    disabled={isLoading}
+                    min={0}
+                    onChange={(value) =>
+                        setWipLimit(typeof value === "number" ? value : 0)
+                    }
+                    placeholder={microcopy.column.wipLimitPlaceholder}
+                    size="large"
+                    step={1}
+                    style={{ width: "100%" }}
+                    value={wipLimit}
                 />
             </EditingFields>
         </Slot>

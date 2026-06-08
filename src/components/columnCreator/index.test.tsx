@@ -114,7 +114,8 @@ describe("ColumnCreator", () => {
                 body: JSON.stringify({
                     category: "todo",
                     columnName: "QA",
-                    projectId: "project-1"
+                    projectId: "project-1",
+                    wipLimit: 0
                 }),
                 method: "POST"
             })
@@ -162,7 +163,41 @@ describe("ColumnCreator", () => {
                 body: JSON.stringify({
                     category: "done",
                     columnName: "Shipped",
-                    projectId: "project-1"
+                    projectId: "project-1",
+                    wipLimit: 0
+                }),
+                method: "POST"
+            })
+        );
+    });
+
+    it("sends the chosen WIP limit in the create payload (PRD-GAP-007)", async () => {
+        renderCreator();
+        const input = await expandIntoInput();
+
+        fireEvent.change(input, { target: { value: "Doing" } });
+
+        // The WIP-limit InputNumber is labelled by the shared `wipLimit`
+        // field microcopy; set a positive cap and commit.
+        const wipInput = screen.getByRole("spinbutton", {
+            name: "WIP limit"
+        });
+        fireEvent.change(wipInput, { target: { value: "3" } });
+
+        fireEvent.keyDown(input, {
+            charCode: 13,
+            code: "Enter",
+            key: "Enter"
+        });
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        expect(fetchMock.mock.calls[0][1]).toEqual(
+            expect.objectContaining({
+                body: JSON.stringify({
+                    category: "todo",
+                    columnName: "Doing",
+                    projectId: "project-1",
+                    wipLimit: 3
                 }),
                 method: "POST"
             })

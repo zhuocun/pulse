@@ -4,16 +4,19 @@ import {
     FlagFilled,
     HolderOutlined,
     MoreOutlined,
-    StopOutlined
+    StopOutlined,
+    WarningFilled
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
     Badge,
     Dropdown,
     Input,
+    InputNumber,
     type InputRef,
     MenuProps,
     Modal,
+    Select,
     Tag,
     Tooltip,
     Typography
@@ -50,6 +53,7 @@ import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
+import updateColumnCallback from "../../utils/optimisticUpdate/updateColumn";
 import AiMatchStrengthBadge from "../aiMatchStrengthBadge";
 import ColumnReadinessPill from "../columnReadinessPill";
 import {
@@ -455,6 +459,46 @@ const OverdueChip = styled.span`
 `;
 
 /**
+ * WIP-limit display on the column header (PRD §5.5). Renders the live
+ * count against the column's `wipLimit` as a compact `{count} / {limit}`
+ * chip. The chip itself is a neutral count read-out; the over-limit ALARM
+ * is carried by the separate `OverLimitChip` below (a glyph + visible word),
+ * so the indicator is never colour-only (WCAG 1.4.1, matching the overdue
+ * chip). Only rendered when `wipLimit > 0` — a `0` limit means "no limit".
+ */
+const WipLimitBadge = styled.span<{ $over: boolean }>`
+    align-items: center;
+    color: ${(p) =>
+        p.$over
+            ? "var(--ant-color-error, #dc2626)"
+            : "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))"};
+    display: inline-flex;
+    font-size: ${fontSize.xs}px;
+    font-variant-numeric: tabular-nums;
+    font-weight: ${(p) => (p.$over ? fontWeight.semibold : fontWeight.medium)};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
+ * Over-limit indicator on the column header (PRD §5.5). Deliberately NOT
+ * colour-only: a warning glyph pairs with the visible word "Over limit" and
+ * an `aria-label` carrying the count / limit / overflow so the signal reads
+ * for colour-blind and screen-reader users alike (WCAG 1.4.1) — the exact
+ * recipe the card's `OverdueChip` uses. Rendered only when the column's task
+ * count strictly exceeds a positive `wipLimit`.
+ */
+const OverLimitChip = styled.span`
+    align-items: center;
+    color: var(--ant-color-error, #dc2626);
+    display: inline-flex;
+    font-size: ${fontSize.xs}px;
+    font-weight: ${fontWeight.semibold};
+    gap: ${space.xxs}px;
+    white-space: nowrap;
+`;
+
+/**
  * Priority indicator on the card footer (PRD §3.4). Like `OverdueChip`, it is
  * deliberately NOT colour-only: a flag glyph pairs with the visible priority
  * label and an `aria-label` so the signal reads for colour-blind and
@@ -810,6 +854,136 @@ const dotForColumn = (id: string): string => {
     return STATUS_PALETTE[Math.abs(hash) % STATUS_PALETTE.length];
 };
 
+// Column "done" categories shown in the edit picker — same source of truth
+// the creator uses. Listed explicitly so the order is stable across renders.
+const COLUMN_CATEGORY_OPTIONS: NonNullable<IColumn["category"]>[] = [
+    "todo",
+    "in_progress",
+    "done"
+];
+
+/**
+ * Column-edit modal (PRD §5.5 — the first real settings surface for
+ * `columnName`, `category`, and `wipLimit`). The board PUT accepts exactly
+ * `{columnName, wipLimit, category}` keyed by `_id`; we send all three so a
+ * single save can rename, re-categorise, and re-cap the column. The optimistic
+ * `updateColumnCallback` patches the cached column instantly and
+ * `useReactMutation` rolls back on error. `wipLimit` is a non-negative int
+ * (`0` = no limit, AC-C11), matched by the `InputNumber` `min={0}`.
+ */
+const ColumnEditModal: React.FC<{
+    column: IColumn;
+    open: boolean;
+    onClose: () => void;
+}> = ({ column, open, onClose }) => {
+    const { projectId } = useParams<{ projectId: string }>();
+    const { mutate: update, isLoading } = useReactMutation(
+        "boards",
+        "PUT",
+        ["boards", { projectId }],
+        updateColumnCallback
+    );
+    const [name, setName] = React.useState(column.columnName);
+    const [category, setCategory] = React.useState<
+        NonNullable<IColumn["category"]>
+    >(column.category ?? "todo");
+    const [wipLimit, setWipLimit] = React.useState<number>(
+        column.wipLimit ?? 0
+    );
+    // Re-seed the form from the column whenever the modal (re)opens so a
+    // cancelled edit never leaks a stale draft into the next open.
+    React.useEffect(() => {
+        if (open) {
+            setName(column.columnName);
+            setCategory(column.category ?? "todo");
+            setWipLimit(column.wipLimit ?? 0);
+        }
+    }, [open, column.columnName, column.category, column.wipLimit]);
+    const trimmed = name.trim();
+    const onSave = () => {
+        if (!trimmed) return;
+        update({
+            _id: column._id,
+            columnName: trimmed,
+            category,
+            wipLimit
+        });
+        onClose();
+    };
+    return (
+        <Modal
+            centered
+            confirmLoading={isLoading}
+            okButtonProps={{ disabled: !trimmed }}
+            okText={microcopy.actions.save}
+            cancelText={microcopy.actions.cancel}
+            onCancel={onClose}
+            onOk={onSave}
+            open={open}
+            title={microcopy.column.editTitle}
+        >
+            <label
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: space.xxs,
+                    marginBottom: space.sm
+                }}
+            >
+                <span>{microcopy.a11y.newColumnName}</span>
+                <Input
+                    aria-label={microcopy.a11y.newColumnName}
+                    autoFocus
+                    onChange={(e) => setName(e.target.value)}
+                    onPressEnter={onSave}
+                    value={name}
+                />
+            </label>
+            <label
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: space.xxs,
+                    marginBottom: space.sm
+                }}
+            >
+                <span>{microcopy.a11y.newColumnCategory}</span>
+                <Select<NonNullable<IColumn["category"]>>
+                    aria-label={microcopy.a11y.newColumnCategory}
+                    onChange={setCategory}
+                    options={COLUMN_CATEGORY_OPTIONS.map((value) => ({
+                        label: microcopy.options.columnCategories[value],
+                        value
+                    }))}
+                    value={category}
+                />
+            </label>
+            <label
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: space.xxs
+                }}
+            >
+                <span>{microcopy.fields.wipLimit}</span>
+                <InputNumber
+                    aria-label={microcopy.fields.wipLimit}
+                    min={0}
+                    onChange={(value) =>
+                        setWipLimit(typeof value === "number" ? value : 0)
+                    }
+                    step={1}
+                    style={{ width: "100%" }}
+                    value={wipLimit}
+                />
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {microcopy.column.wipLimitHelp}
+                </Typography.Text>
+            </label>
+        </Modal>
+    );
+};
+
 const DeleteDropDown: React.FC<{
     columnId: string;
     columnName: string;
@@ -850,6 +1024,7 @@ const DeleteDropDown: React.FC<{
         () => {}
     );
     const { show: showUndoToast } = useUndoToast();
+    const [editOpen, setEditOpen] = React.useState(false);
     const onDelete = (id: string) => {
         if (hasTasks) {
             // Non-empty column: the server cascade-deletes every task in
@@ -894,6 +1069,25 @@ const DeleteDropDown: React.FC<{
     };
     const items: MenuProps["items"] = [
         {
+            key: "edit",
+            label: (
+                <NoPaddingButton
+                    aria-label={formatTemplate(
+                        microcopy.a11y.editColumnNamed as string,
+                        {
+                            name: columnName
+                        }
+                    )}
+                    disabled={isOptimisticPlaceholderId(columnId)}
+                    onClick={() => setEditOpen(true)}
+                    size="small"
+                    type="text"
+                >
+                    {microcopy.actions.edit}
+                </NoPaddingButton>
+            )
+        },
+        {
             key: "delete",
             label: (
                 <NoPaddingButton
@@ -915,19 +1109,26 @@ const DeleteDropDown: React.FC<{
         }
     ];
     return (
-        <Dropdown menu={{ items }}>
-            <NoPaddingButton
-                aria-label={formatTemplate(
-                    microcopy.a11y.moreActionsForColumn as string,
-                    {
-                        name: columnName
-                    }
-                )}
-                icon={<MoreOutlined />}
-                size="small"
-                type="text"
+        <>
+            <Dropdown menu={{ items }}>
+                <NoPaddingButton
+                    aria-label={formatTemplate(
+                        microcopy.a11y.moreActionsForColumn as string,
+                        {
+                            name: columnName
+                        }
+                    )}
+                    icon={<MoreOutlined />}
+                    size="small"
+                    type="text"
+                />
+            </Dropdown>
+            <ColumnEditModal
+                column={column}
+                onClose={() => setEditOpen(false)}
+                open={editOpen}
             />
-        </Dropdown>
+        </>
     );
 };
 
@@ -1512,6 +1713,17 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
         const hasTasksHiddenByFilter =
             tasks.length > 0 && filteredTasks.length === 0;
         /*
+         * WIP limit (PRD §5.5). The over-limit verdict is a property of the
+         * column's REAL load, not of whatever search filter is active, so it
+         * reads the unfiltered `tasks.length` (same reasoning as the
+         * readiness pill above). `wipLimit === 0` (or absent) means "no
+         * limit" per the drift-detector contract, so the indicator only
+         * surfaces for a positive cap.
+         */
+        const wipLimit = column.wipLimit ?? 0;
+        const wipCount = tasks.length;
+        const overLimit = wipLimit > 0 && wipCount > wipLimit;
+        /*
          * Column-readiness batch (Phase 4 W3). Runs the deterministic
          * readiness engine over the (unfiltered) task list — the score
          * is a property of the column's actual work, not of whatever
@@ -1578,6 +1790,34 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                     fontWeight: 600
                                 }}
                             />
+                            {wipLimit > 0 ? (
+                                <WipLimitBadge
+                                    $over={overLimit}
+                                    aria-label={formatTemplate(
+                                        (overLimit
+                                            ? microcopy.a11y.columnOverLimit
+                                            : microcopy.a11y
+                                                  .columnWipCount) as string,
+                                        {
+                                            count: wipCount,
+                                            limit: wipLimit,
+                                            over: wipCount - wipLimit
+                                        }
+                                    )}
+                                    data-testid="column-wip-badge"
+                                >
+                                    {wipCount} / {wipLimit}
+                                </WipLimitBadge>
+                            ) : null}
+                            {overLimit ? (
+                                <OverLimitChip
+                                    aria-hidden
+                                    data-testid="column-wip-over"
+                                >
+                                    <WarningFilled aria-hidden />
+                                    <span>{microcopy.column.overLimit}</span>
+                                </OverLimitChip>
+                            ) : null}
                             <ColumnReadinessPill report={readinessReport} />
                         </span>
                         <DeleteDropDown

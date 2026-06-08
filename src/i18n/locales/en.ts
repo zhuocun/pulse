@@ -30,6 +30,7 @@ export const enSource = {
         draftTask: "Draft task",
         draftWithAi: "Draft with AI",
         edit: "Edit",
+        editColumn: "Edit column",
         editProject: "Edit project",
         editTask: "Edit task",
         logIn: "Log in",
@@ -153,6 +154,10 @@ export const enSource = {
         openTask: "Open task {name}",
         assignedTo: "Assigned to {name}",
         deleteColumnNamed: "Delete column {name}",
+        editColumnNamed: "Edit column {name}",
+        columnWipCount: "{count} of {limit} tasks (WIP limit)",
+        columnOverLimit:
+            "{count} of {limit} tasks — over the WIP limit by {over}",
         moreActionsForColumn: "More actions for column {name}",
         moreActionsForProject: "More actions for {name}",
         likeProject: "Like {name}",
@@ -373,7 +378,8 @@ export const enSource = {
         storyPoints: "Story points",
         taskName: "Task name",
         type: "Type",
-        username: "Username"
+        username: "Username",
+        wipLimit: "WIP limit"
     },
     placeholders: {
         emailExample: "name@example.com",
@@ -704,6 +710,18 @@ export const enSource = {
         blocked: "Blocked",
         /** Visible chip text on a completed card (paired with an icon, not colour-only). */
         completed: "Completed"
+    },
+    /*
+     * Column header / edit affordance copy (PRD §5.5 WIP-limit control).
+     * `overLimit` pairs with a warning glyph on the header chip so the
+     * over-limit signal is never colour-only (matches the overdue chip).
+     * `wipLimitHelp` explains the `0 = no limit` convention on the editor.
+     */
+    column: {
+        editTitle: "Edit column",
+        overLimit: "Over limit",
+        wipLimitHelp: "0 means no limit.",
+        wipLimitPlaceholder: "WIP limit (0 = none)"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",

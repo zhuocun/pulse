@@ -33,6 +33,7 @@ const zhCN: Dictionary = {
         draftTask: "起草任务",
         draftWithAi: "使用 AI 起草",
         edit: "编辑",
+        editColumn: "编辑列",
         editProject: "编辑项目",
         editTask: "编辑任务",
         logIn: "登录",
@@ -149,6 +150,9 @@ const zhCN: Dictionary = {
         openTask: "打开任务 {name}",
         assignedTo: "已分配给 {name}",
         deleteColumnNamed: "删除列 {name}",
+        editColumnNamed: "编辑列 {name}",
+        columnWipCount: "{count} / {limit} 个任务（在制品上限）",
+        columnOverLimit: "{count} / {limit} 个任务 — 超出在制品上限 {over}",
         moreActionsForColumn: "{name} 列的更多操作",
         moreActionsForProject: "{name} 的更多操作",
         likeProject: "收藏 {name}",
@@ -333,7 +337,8 @@ const zhCN: Dictionary = {
         storyPoints: "故事点",
         taskName: "任务名称",
         type: "类型",
-        username: "用户名"
+        username: "用户名",
+        wipLimit: "在制品上限"
     },
     placeholders: {
         emailExample: "name@example.com",
@@ -589,6 +594,12 @@ const zhCN: Dictionary = {
         overdue: "已逾期",
         blocked: "已阻塞",
         completed: "已完成"
+    },
+    column: {
+        editTitle: "编辑列",
+        overLimit: "超出上限",
+        wipLimitHelp: "0 表示不限制。",
+        wipLimitPlaceholder: "在制品上限（0 = 不限制）"
     },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",

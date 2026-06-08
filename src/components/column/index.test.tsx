@@ -172,6 +172,7 @@ const defaultParam: TaskSearchParam = {
 
 const removeColumn = jest.fn();
 const recreateColumn = jest.fn().mockResolvedValue(undefined);
+const editColumn = jest.fn();
 const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
@@ -238,11 +239,12 @@ const renderColumn = ({
     labels?: ILabel[];
     milestones?: IMilestone[];
 } = {}) => {
-    // The component calls `useReactMutation` three times: the column
+    // The component calls `useReactMutation` four times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
-    // used by the Undo toast (endpoint="boards", method="POST"), and the
-    // inline task rename (endpoint="tasks"). Route by the first two args
-    // so the mutations don't collide in test assertions.
+    // used by the Undo toast (endpoint="boards", method="POST"), the
+    // column edit (endpoint="boards", method="PUT"), and the inline task
+    // rename (endpoint="tasks"). Route by the first two args so the
+    // mutations don't collide in test assertions.
     mockedUseReactMutation.mockImplementation(
         (endPoint: string, method: string) => {
             if (endPoint === "tasks") {
@@ -250,6 +252,9 @@ const renderColumn = ({
             }
             if (method === "POST") {
                 return { mutateAsync: recreateColumn, isLoading: false };
+            }
+            if (method === "PUT") {
+                return { mutate: editColumn, isLoading: false };
             }
             return { mutate: removeColumn, isLoading: false };
         }
@@ -671,6 +676,93 @@ describe("Column", () => {
         });
         fireEvent.click(resetBtn);
         expect(onResetFilters).toHaveBeenCalledTimes(1);
+    });
+
+    /*
+     * PRD-GAP-007 — WIP-limit header indicator. The over-limit verdict is a
+     * property of the column's real (unfiltered) task count, surfaced as a
+     * `{count} / {limit}` chip plus a non-colour-only "Over limit" chip when
+     * the count strictly exceeds a positive limit.
+     */
+    it("shows the WIP count and an over-limit indicator when the column exceeds its limit", () => {
+        // renderColumn seeds three tasks by default (> 2).
+        renderColumn({ boardColumn: column({ wipLimit: 2 }) });
+
+        const wipBadge = screen.getByTestId("column-wip-badge");
+        expect(wipBadge).toHaveTextContent("3 / 2");
+        // Accessible over-limit label rides on the count chip (the visible
+        // chip is the colour-blind-safe glyph + word reinforcement).
+        expect(wipBadge).toHaveAttribute(
+            "aria-label",
+            "3 of 2 tasks — over the WIP limit by 1"
+        );
+        const overChip = screen.getByTestId("column-wip-over");
+        expect(overChip).toHaveTextContent("Over limit");
+    });
+
+    it("shows the WIP count without an over-limit indicator when within the limit", () => {
+        renderColumn({ boardColumn: column({ wipLimit: 5 }) });
+
+        const wipBadge = screen.getByTestId("column-wip-badge");
+        expect(wipBadge).toHaveTextContent("3 / 5");
+        expect(wipBadge).toHaveAttribute(
+            "aria-label",
+            "3 of 5 tasks (WIP limit)"
+        );
+        expect(
+            screen.queryByTestId("column-wip-over")
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders no WIP badge when the column has no limit (0 = no limit)", () => {
+        renderColumn({ boardColumn: column({ wipLimit: 0 }) });
+        expect(
+            screen.queryByTestId("column-wip-badge")
+        ).not.toBeInTheDocument();
+
+        // Absent wipLimit reads the same as 0.
+        renderColumn();
+        expect(
+            screen.queryByTestId("column-wip-badge")
+        ).not.toBeInTheDocument();
+    });
+
+    /*
+     * PRD-GAP-007 — column edit path. The more-actions menu now exposes an
+     * Edit affordance that opens a modal sending `{columnName, category,
+     * wipLimit}` on PUT /boards.
+     */
+    it("edits a column's name and WIP limit through the edit modal (PUT /boards)", async () => {
+        renderColumn({ boardColumn: column({ wipLimit: 0 }) });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^edit column todo$/i })
+        );
+
+        // The modal seeds from the column; rename it and set a positive cap.
+        const nameInput = await screen.findByLabelText("New column name");
+        fireEvent.change(nameInput, { target: { value: "Doing" } });
+        const wipInput = screen.getByRole("spinbutton", { name: "WIP limit" });
+        fireEvent.change(wipInput, { target: { value: "4" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(editColumn).toHaveBeenCalledWith({
+            _id: "column-1",
+            columnName: "Doing",
+            category: "todo",
+            wipLimit: 4
+        });
+    });
+
+    it("disables the edit affordance for an optimistic mock column", () => {
+        renderColumn({
+            boardColumn: column({ _id: "mock", columnName: "Mock" })
+        });
+
+        expect(
+            screen.getByRole("button", { name: /^edit column mock$/i })
+        ).toBeDisabled();
     });
 
     it("disables delete for the optimistic mock column", () => {
