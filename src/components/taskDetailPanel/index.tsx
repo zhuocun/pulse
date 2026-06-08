@@ -50,6 +50,7 @@ import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
+import AiRewritePanel from "../aiRewritePanel";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import CommentsThread from "../commentsThread";
 import ErrorBox from "../errorBox";
@@ -1281,7 +1282,43 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             showSearch
                         />
                     </Form.Item>
-                    <Form.Item label={microcopy.fields.notes} name="note">
+                    {aiEnabled && boardAiOn && editingTask ? (
+                        <Form.Item label={null}>
+                            <AiRewritePanel
+                                note={liveValues.note ?? ""}
+                                onAccept={(text) => {
+                                    markFieldAsCopilotApplied("note");
+                                    form.setFieldsValue({ note: text });
+                                    setFormTick((tick) => tick + 1);
+                                    setIsFormDirty(true);
+                                    isFormDirtyRef.current = true;
+                                }}
+                                projectId={projectId}
+                            />
+                        </Form.Item>
+                    ) : null}
+                    <Form.Item
+                        label={
+                            <span
+                                style={{
+                                    alignItems: "center",
+                                    display: "inline-flex",
+                                    gap: space.xs
+                                }}
+                            >
+                                {microcopy.fields.notes}
+                                {appliedFieldOrigin.note === "copilot" ? (
+                                    <Tag
+                                        color="purple"
+                                        style={{ marginInlineEnd: 0 }}
+                                    >
+                                        {microcopy.ai.suggestedByCopilot}
+                                    </Tag>
+                                ) : null}
+                            </span>
+                        }
+                        name="note"
+                    >
                         <Input.TextArea
                             autoComplete="off"
                             enterKeyHint="done"

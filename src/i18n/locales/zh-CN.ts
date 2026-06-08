@@ -1257,6 +1257,39 @@ const zhCN: Dictionary = {
             srOnlySuggestionDismissed: "已关闭建议。"
         }
     },
+    aiRewrite: {
+        openButton: "用 AI 改写",
+        openButtonAria: "用 AI 改写备注",
+        panelTitle: "用 AI 改写",
+        panelAriaLabel: "用 AI 改写备注",
+        closeAria: "关闭改写面板",
+        modeLabel: "改写为",
+        modeSelectAria: "选择改写风格",
+        modes: {
+            userStory: "用户故事",
+            acceptanceCriteria: "验收标准",
+            translate: "翻译为{language}",
+            summarize: "摘要",
+            polish: "润色",
+            free: "自定义指令"
+        },
+        freePromptLabel: "指令",
+        freePromptPlaceholder: "例如:让内容更简洁、更正式",
+        rewriteButton: "改写",
+        rewriting: "改写中…",
+        regenerate: "重试",
+        emptyNoteHint: "请先填写备注,再用 AI 改写。",
+        resultLabel: "改写建议",
+        diffLabel: "变更",
+        diffAddedAria: "新增行",
+        diffRemovedAria: "删除行",
+        accept: "采用",
+        cancel: "取消",
+        acceptedAnnouncement: "改写已应用到备注。",
+        streamingAnnouncement: "正在生成改写…",
+        errorTitle: "无法改写备注。",
+        localUnsupported: "该风格需要远程 AI 服务,请在设置中开启。"
+    },
     auth: {
         loginTitle: "登录账号",
         loginSubtitle: "输入邮箱和密码以继续。",

@@ -1544,6 +1544,48 @@ export const enSource = {
             srOnlySuggestionDismissed: "Suggestion dismissed."
         }
     },
+    /**
+     * "Rewrite with AI" side panel on the task note editor (PRD-GAP-012,
+     * v3 §7.5, v2.1 AC-V12). The trigger sits above the note textarea; the
+     * panel keeps the note visible while the user picks a rewrite style,
+     * previews the streamed result (a line diff for longer notes), then
+     * Accepts (replacing the note + stamping the Copilot badge) or Cancels.
+     * `{language}` in `modes.translate` is the active locale's display name.
+     */
+    aiRewrite: {
+        openButton: "Rewrite with AI",
+        openButtonAria: "Rewrite the note with AI",
+        panelTitle: "Rewrite with AI",
+        panelAriaLabel: "Rewrite the note with AI",
+        closeAria: "Close rewrite panel",
+        modeLabel: "Rewrite as",
+        modeSelectAria: "Choose a rewrite style",
+        modes: {
+            userStory: "User story",
+            acceptanceCriteria: "Acceptance criteria",
+            translate: "Translate to {language}",
+            summarize: "Summarize",
+            polish: "Polish",
+            free: "Custom instruction"
+        },
+        freePromptLabel: "Instruction",
+        freePromptPlaceholder: "e.g. Make this shorter and more formal",
+        rewriteButton: "Rewrite",
+        rewriting: "Rewriting…",
+        regenerate: "Try again",
+        emptyNoteHint: "Add a note first, then rewrite it with AI.",
+        resultLabel: "Suggested rewrite",
+        diffLabel: "Changes",
+        diffAddedAria: "Added line",
+        diffRemovedAria: "Removed line",
+        accept: "Accept",
+        cancel: "Cancel",
+        acceptedAnnouncement: "Rewrite applied to the note.",
+        streamingAnnouncement: "Generating a rewrite…",
+        errorTitle: "Couldn't rewrite the note.",
+        localUnsupported:
+            "This style needs the remote AI service. Turn it on in Settings."
+    },
     auth: {
         loginTitle: "Log in to your account",
         loginSubtitle: "Enter your email and password to continue.",

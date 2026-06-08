@@ -45,6 +45,7 @@ import AiGhostText, {
     AI_PRIVACY_CONSENT_EVENT,
     type AiPrivacyConsentEventDetail
 } from "../aiGhostText";
+import AiRewritePanel from "../aiRewritePanel";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import CommentsThread from "../commentsThread";
 import { CopilotPrivacyDisclosure } from "../copilotPrivacyPopover";
@@ -1107,6 +1108,17 @@ const TaskModal: React.FC<{
                      */
                     route="task-note"
                     storageKey="boardCopilot:privacyShown:task-note"
+                />
+            ) : null}
+            {aiEnabled && boardAiOn ? (
+                <AiRewritePanel
+                    note={liveValues.note ?? ""}
+                    onAccept={(text) => {
+                        markFieldAsCopilotApplied("note");
+                        form.setFieldsValue({ note: text });
+                        setFormTick((tick) => tick + 1);
+                    }}
+                    projectId={projectId}
                 />
             ) : null}
             <Form.Item
