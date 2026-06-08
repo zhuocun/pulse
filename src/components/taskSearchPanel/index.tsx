@@ -344,8 +344,8 @@ const TaskSearchPanel: React.FC<Props> = ({
     const [draftName, setDraftName] = useState("");
     const hasAdvancedFilters = Boolean(param.coordinatorId || param.type);
     const [filtersOpen, setFiltersOpen] = useState(hasAdvancedFilters);
-    const [aiSearchOpen, setAiSearchOpen] = useState(
-        () => !isPhone || Boolean(param.semanticIds)
+    const [aiSearchOpen, setAiSearchOpen] = useState(() =>
+        Boolean(param.semanticIds)
     );
 
     const advancedFilterCount =
@@ -496,7 +496,7 @@ const TaskSearchPanel: React.FC<Props> = ({
     return (
         <FilterShell>
             {aiSearchSlot ? (
-                <AiSearchSlot $visible={!isPhone || aiSearchOpen}>
+                <AiSearchSlot $visible={aiSearchOpen}>
                     {aiSearchSlot}
                 </AiSearchSlot>
             ) : null}
@@ -524,7 +524,7 @@ const TaskSearchPanel: React.FC<Props> = ({
                             />
                         }
                         suffix={
-                            aiSearchSlot && isPhone ? (
+                            aiSearchSlot ? (
                                 <Button
                                     aria-expanded={aiSearchOpen}
                                     aria-label={

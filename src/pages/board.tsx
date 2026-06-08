@@ -55,6 +55,7 @@ import {
 } from "../theme/tokens";
 import type { TriageNudge } from "../interfaces/agent";
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
+import { srOnlyLiveRegionStyle } from "../utils/a11y/srOnlyLiveRegionStyle";
 import { useRemoteAiConsent } from "../utils/ai/remoteAiConsent";
 import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
@@ -279,6 +280,11 @@ const BoardHeader = styled.div`
     flex-direction: column;
     gap: ${themeSpace.xs}px;
     margin-bottom: ${themeSpace.lg}px;
+
+    @media (pointer: coarse) {
+        gap: 0;
+        margin-bottom: ${themeSpace.sm}px;
+    }
 `;
 
 const BoardTitle = styled(Typography.Title)`
@@ -1058,28 +1064,44 @@ const BoardPage = () => {
                                     }}
                                 >
                                     {pLoading ? (
-                                        <span
-                                            aria-label={
-                                                microcopy.a11y
-                                                    .loadingProjectName
-                                            }
-                                            role="status"
-                                            style={{
-                                                flex: "1 1 auto",
-                                                minWidth: 0
-                                            }}
-                                        >
-                                            <Skeleton.Input
-                                                active
-                                                size="large"
+                                        isPhone ? (
+                                            <BoardTitle
+                                                level={1}
+                                                style={srOnlyLiveRegionStyle}
+                                            >
+                                                {microcopy.board.title}
+                                            </BoardTitle>
+                                        ) : (
+                                            <span
+                                                aria-label={
+                                                    microcopy.a11y
+                                                        .loadingProjectName
+                                                }
+                                                role="status"
                                                 style={{
-                                                    maxWidth: "100%",
-                                                    width: 240
+                                                    flex: "1 1 auto",
+                                                    minWidth: 0
                                                 }}
-                                            />
-                                        </span>
+                                            >
+                                                <Skeleton.Input
+                                                    active
+                                                    size="large"
+                                                    style={{
+                                                        maxWidth: "100%",
+                                                        width: 240
+                                                    }}
+                                                />
+                                            </span>
+                                        )
                                     ) : (
-                                        <BoardTitle level={1}>
+                                        <BoardTitle
+                                            level={1}
+                                            style={
+                                                isPhone
+                                                    ? srOnlyLiveRegionStyle
+                                                    : undefined
+                                            }
+                                        >
                                             {boardTitle(
                                                 currentProject?.projectName
                                             )}
@@ -1101,75 +1123,56 @@ const BoardPage = () => {
                             </BoardHeader>
                             <BoardBottomTier>
                                 <BoardSearchSlot>
-                                    {isPhone ? (
-                                        <>
-                                            <LensToggleRow>
-                                                <Button
-                                                    aria-expanded={
-                                                        lensesOpen ||
-                                                        Boolean(activeLens)
-                                                    }
-                                                    aria-label={
-                                                        microcopy.board
-                                                            .lensesToggleAria
-                                                    }
-                                                    data-testid="board-lenses-toggle"
-                                                    icon={
-                                                        <UnorderedListOutlined
-                                                            aria-hidden
-                                                        />
-                                                    }
-                                                    onClick={() =>
-                                                        setLensesOpen(
-                                                            (open) => !open
-                                                        )
-                                                    }
-                                                    type={
-                                                        lensesOpen || activeLens
-                                                            ? "primary"
-                                                            : "default"
-                                                    }
-                                                >
-                                                    {
-                                                        microcopy.board
-                                                            .lensesToggle
-                                                    }
-                                                </Button>
-                                            </LensToggleRow>
-                                            <LensPanel
-                                                $open={
-                                                    lensesOpen ||
-                                                    Boolean(activeLens)
-                                                }
-                                            >
-                                                <LensChips
-                                                    active={activeLens}
-                                                    onChange={(next) =>
-                                                        setParam(
-                                                            {
-                                                                lens:
-                                                                    next ??
-                                                                    undefined
-                                                            },
-                                                            {
-                                                                viewTransition: true
-                                                            }
-                                                        )
-                                                    }
+                                    <LensToggleRow>
+                                        <Button
+                                            aria-expanded={
+                                                lensesOpen ||
+                                                Boolean(activeLens)
+                                            }
+                                            aria-label={
+                                                microcopy.board
+                                                    .lensesToggleAria
+                                            }
+                                            data-testid="board-lenses-toggle"
+                                            icon={
+                                                <UnorderedListOutlined
+                                                    aria-hidden
                                                 />
-                                            </LensPanel>
-                                        </>
-                                    ) : (
+                                            }
+                                            onClick={() =>
+                                                setLensesOpen((open) => !open)
+                                            }
+                                            type={
+                                                lensesOpen || activeLens
+                                                    ? "primary"
+                                                    : "default"
+                                            }
+                                        >
+                                            {microcopy.board.lensesToggle}
+                                        </Button>
+                                    </LensToggleRow>
+                                    <LensPanel
+                                        $open={
+                                            lensesOpen ||
+                                            Boolean(activeLens)
+                                        }
+                                    >
                                         <LensChips
                                             active={activeLens}
                                             onChange={(next) =>
                                                 setParam(
-                                                    { lens: next ?? undefined },
-                                                    { viewTransition: true }
+                                                    {
+                                                        lens:
+                                                            next ??
+                                                            undefined
+                                                    },
+                                                    {
+                                                        viewTransition: true
+                                                    }
                                                 )
                                             }
                                         />
-                                    )}
+                                    </LensPanel>
                                     <TaskSearchPanel
                                         tasks={visibleTasks}
                                         param={param}

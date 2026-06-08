@@ -238,9 +238,8 @@ const SettingsPage = () => {
             onClick={() => {
                 logout();
             }}
-        >
-            {microcopy.actions.logOut}
-        </Button>
+            type="text"
+        />
     );
 
     if (isPhone) {

@@ -1,3 +1,4 @@
+import { RightOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
 import { Button, Input, Typography } from "antd";
 import { useState } from "react";
@@ -162,6 +163,8 @@ const CopilotLandingPage = () => {
                 </ComposerRow>
                 <BriefSecondary
                     data-testid="copilot-landing-brief"
+                    icon={<RightOutlined aria-hidden />}
+                    iconPlacement="end"
                     onClick={goToBrief}
                     type="link"
                 >

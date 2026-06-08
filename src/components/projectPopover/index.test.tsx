@@ -108,7 +108,7 @@ describe("ProjectPopover", () => {
     it("shows projects and navigates to a selected project", async () => {
         renderProjectPopover();
 
-        fireEvent.mouseEnter(screen.getByText("Projects"));
+        fireEvent.mouseEnter(screen.getByText("Boards"));
 
         fireEvent.click(await screen.findByText("Roadmap"));
 
@@ -120,7 +120,7 @@ describe("ProjectPopover", () => {
     it("opens the project modal from the create action", async () => {
         const { openModal } = renderProjectPopover();
 
-        fireEvent.mouseEnter(screen.getByText("Projects"));
+        fireEvent.mouseEnter(screen.getByText("Boards"));
 
         fireEvent.click(
             await screen.findByRole("button", { name: /create project/i })

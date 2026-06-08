@@ -293,7 +293,7 @@ describe("App integration (full providers + routes)", () => {
         expect(
             await screen.findByRole(
                 "heading",
-                { name: /^projects$/i, level: 1 },
+                { name: /^boards$/i, level: 1 },
                 { timeout: 5000 }
             )
         ).toBeInTheDocument();
@@ -345,7 +345,7 @@ describe("App integration (full providers + routes)", () => {
         expect(
             await screen.findByRole(
                 "heading",
-                { name: /alpha board/i },
+                { name: /^alpha$/i },
                 { timeout: 5000 }
             )
         ).toBeInTheDocument();
@@ -467,7 +467,7 @@ describe("App integration (full providers + routes)", () => {
         expect(
             await screen.findByRole(
                 "heading",
-                { name: /alpha board/i },
+                { name: /^alpha$/i },
                 { timeout: 5000 }
             )
         ).toBeInTheDocument();
@@ -491,7 +491,7 @@ describe("App integration (full providers + routes)", () => {
             })
         ).toBeInTheDocument();
         expect(
-            screen.queryByRole("heading", { name: /alpha board/i })
+            screen.queryByRole("heading", { name: /^alpha$/i })
         ).not.toBeInTheDocument();
     }, 30000);
 });

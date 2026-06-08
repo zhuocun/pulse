@@ -191,7 +191,7 @@ describe("ProjectPage", () => {
             "/projects?projectName=Road&managerId=member-1"
         );
 
-        expect(document.title).toBe("Projects · Pulse");
+        expect(document.title).toBe("Boards · Pulse");
         expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(screen.getByText("Billing")).toBeInTheDocument();
         expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);

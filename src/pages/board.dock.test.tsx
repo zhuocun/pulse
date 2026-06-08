@@ -274,7 +274,7 @@ describe("BoardPage · CopilotDock flag", () => {
     it("mounts the legacy AiChatDrawer + BoardBriefDrawer when copilotDockEnabled is off (default)", async () => {
         mockEnv.copilotDockEnabled = false;
         renderBoard();
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         // Open the chat drawer via the Redux action — the legacy
         // surface should render its own Drawer.
@@ -298,7 +298,7 @@ describe("BoardPage · CopilotDock flag", () => {
     it("mounts the CopilotDock instead of the legacy drawers when copilotDockEnabled is on", async () => {
         mockEnv.copilotDockEnabled = true;
         renderBoard();
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         // Same Redux trigger — but with the flag on the dock owns the
         // surface and the legacy drawers do not mount their own
@@ -316,7 +316,7 @@ describe("BoardPage · CopilotDock flag", () => {
     it("switches to the Brief tab when the brief overlay flag is the active surface", async () => {
         mockEnv.copilotDockEnabled = true;
         renderBoard();
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         act(() => {
             store.dispatch(overlaysActions.openBoardBrief());

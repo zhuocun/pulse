@@ -51,11 +51,22 @@ import UserAvatar from "../userAvatar";
  * title here too would duplicate it.
  */
 export const resolveMobileHeaderTitle = (path: string): string | null => {
-    if (path === "/projects") return microcopy.nav.tabs.boards;
+    /*
+     * Top-level tab destinations (/projects, /inbox, /copilot, /settings)
+     * each render their own page H1. Surfacing a second title in the
+     * sticky header duplicates ~80 px of chrome on every phone route.
+     * Project-detail routes keep null here — their breadcrumb sub-header
+     * carries the project name.
+     */
     if (path.startsWith("/projects/")) return null;
-    if (path.startsWith("/inbox")) return microcopy.nav.tabs.inbox;
-    if (path.startsWith("/copilot")) return microcopy.nav.tabs.copilot;
-    if (path.startsWith("/settings")) return microcopy.settings.pageTitle;
+    if (
+        path === "/projects" ||
+        path.startsWith("/inbox") ||
+        path.startsWith("/copilot") ||
+        path.startsWith("/settings")
+    ) {
+        return null;
+    }
     return null;
 };
 

@@ -260,7 +260,7 @@ const zhCN: Dictionary = {
             boards: "看板",
             inbox: "收件箱",
             copilot: "Copilot",
-            profile: "我的",
+            profile: "设置",
             search: "搜索"
         }
     },
@@ -531,7 +531,7 @@ const zhCN: Dictionary = {
     },
     board: {
         title: "看板",
-        titleWithName: "{name} 看板",
+        titleWithName: "{name}",
         enableCopilotOnBoard: "在此看板启用",
         swipeHint: "滑动查看更多列",
         copilotMenuAsk: "询问 Copilot",
@@ -835,7 +835,7 @@ const zhCN: Dictionary = {
         }
     },
     projectsPage: {
-        title: "项目",
+        title: "看板",
         subtitle:
             "浏览您的团队正在推进的看板。筛选、搜索,或创建一个新项目来开始跟踪工作。",
         totalProjects: "项目总数",
@@ -851,7 +851,7 @@ const zhCN: Dictionary = {
         register: "注册",
         forgotPassword: "重置密码",
         terms: "服务条款",
-        projects: "项目",
+        projects: "看板",
         inbox: "收件箱",
         copilot: "Copilot",
         settings: "设置",
