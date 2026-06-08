@@ -627,9 +627,7 @@ describe("BoardPage", () => {
                 screen.queryByRole("group", { name: /board lenses/i })
             ).not.toBeInTheDocument();
 
-            await userEvent.click(
-                screen.getByTestId("board-lenses-toggle")
-            );
+            await userEvent.click(screen.getByTestId("board-lenses-toggle"));
 
             expect(
                 screen.getByRole("group", { name: /board lenses/i })
@@ -648,9 +646,7 @@ describe("BoardPage", () => {
             // Wait for the board to render; the seeded user is member-1
             // (Alice), so only "Build task" (coordinatorId: member-1)
             // should remain on the board. "Fix bug" belongs to member-2.
-            expect(
-                await screen.findByText("Roadmap")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             await waitFor(() => {
                 expect(screen.getByText("Build task")).toBeInTheDocument();
             });
@@ -668,9 +664,7 @@ describe("BoardPage", () => {
             // Both must apply.
             renderBoard("/projects/project-1/board?lens=mine&type=Task");
 
-            expect(
-                await screen.findByText("Roadmap")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             // Build task is type=Task AND coordinated by member-1 → visible.
             expect(screen.getByText("Build task")).toBeInTheDocument();
             // Fix bug is type=Bug AND coordinated by member-2 → hidden by
@@ -681,9 +675,7 @@ describe("BoardPage", () => {
         it("graceful-skips the Today lens (no dueDate on ITask yet) — board renders unchanged", async () => {
             renderBoard("/projects/project-1/board?lens=today");
 
-            expect(
-                await screen.findByText("Roadmap")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             // No dueDate → predicate is a no-op → both tasks visible.
             await waitFor(() => {
                 expect(screen.getByText("Build task")).toBeInTheDocument();
@@ -694,13 +686,9 @@ describe("BoardPage", () => {
         it("toggles the lens via URL when chips are clicked, and clears on re-click", async () => {
             renderBoard();
 
-            expect(
-                await screen.findByText("Roadmap")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
 
-            await userEvent.click(
-                screen.getByTestId("board-lenses-toggle")
-            );
+            await userEvent.click(screen.getByTestId("board-lenses-toggle"));
 
             const mineChip = screen.getByRole("button", { name: /mine/i });
             fireEvent.click(mineChip);

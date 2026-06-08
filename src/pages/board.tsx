@@ -1130,8 +1130,7 @@ const BoardPage = () => {
                                                 Boolean(activeLens)
                                             }
                                             aria-label={
-                                                microcopy.board
-                                                    .lensesToggleAria
+                                                microcopy.board.lensesToggleAria
                                             }
                                             data-testid="board-lenses-toggle"
                                             icon={
@@ -1153,8 +1152,7 @@ const BoardPage = () => {
                                     </LensToggleRow>
                                     <LensPanel
                                         $open={
-                                            lensesOpen ||
-                                            Boolean(activeLens)
+                                            lensesOpen || Boolean(activeLens)
                                         }
                                     >
                                         <LensChips
@@ -1162,9 +1160,7 @@ const BoardPage = () => {
                                             onChange={(next) =>
                                                 setParam(
                                                     {
-                                                        lens:
-                                                            next ??
-                                                            undefined
+                                                        lens: next ?? undefined
                                                     },
                                                     {
                                                         viewTransition: true
