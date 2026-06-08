@@ -121,7 +121,11 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 | `PUT`    | `/api/v1/tasks/restore` | `trashDrawer` (clears `deletedAt` + `archivedAt`)                                 | `{ _id }`                                                        | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/tasks/archive` | `archiveDrawer` (unarchive: `{ archived: false }`)                                | `{ _id, archived }`                                              | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/tasks/orders`  | `useDragEnd`                                                                      | `{ fromId, referenceId, fromColumnId, referenceColumnId, type }` | `string` (acknowledgement)     |
-| `GET`    | `/api/v1/labels`        | `useLabels` → `board.tsx` (card chips), `taskModal` (label picker)                | `?projectId=…`                                                   | `ILabel[]` (3)                 |
+| `PUT`    | `/api/v1/tasks/bulk`    | `bulkEditToolbar` / `useBulkSelection` → `bulkUpdateTasksCallback` (in `board.tsx`) | `{ taskIds, changes }`                                          | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/labels`        | `useLabels` → `board.tsx` (card chips), `taskModal` (label picker), `labelsManager` | `?projectId=…`                                                | `ILabel[]` (3)                 |
+| `POST`   | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `{ projectId, name, color? }`                                   | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `{ _id, name?, color? }`                                        | `string` (acknowledgement)     |
+| `DELETE` | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `?labelId=…`                                                     | `string` (acknowledgement)     |
 | `GET`    | `/api/v1/milestones`    | `useMilestones` → `taskModal` (milestone picker), `milestonesManager`, `column` (card badge) | `?projectId=…`                                       | `IMilestone[]`                 |
 | `POST`   | `/api/v1/milestones`    | `useMilestones` → `milestonesManager`                                             | `{ projectId, name, … }`                                        | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/milestones`    | `useMilestones` → `milestonesManager`                                             | `{ _id, … }`                                                    | `string` (acknowledgement)     |
@@ -137,7 +141,7 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 
 (2) `/api/v1/projects/members` is the project **roster**, distinct from the global `/api/v1/users/members` directory (row above). It now has a full member-management surface: `useProjectMembers` issues the `GET`, and `useProjectMemberMutations` drives the `POST` / `PUT` / `DELETE` verbs from `projectMembersManager` (routed at `/projects/:projectId/members`). `IProjectMember` adds `role` to the `IMember` shape, and `role` **is** rendered — `projectMembersManager` shows each member's role as a tag and (for owners) an editable role select, mirroring the server's owner-gated RBAC. The roster also populates the `taskModal` assignee picker.
 
-(3) `useLabels` exposes `createLabel` (a `POST /api/v1/labels`), but it has **no UI caller** — labels are read-only on the FE (chips on cards + the `taskModal` apply picker). The label `PUT` / `DELETE` verbs likewise exist server-side but are not consumed. The task comments CRUD (`/api/v1/comments`) **is** wired: `useComments` drives all four verbs from `commentsThread` (rendered inside `taskModal`). Task lifecycle recovery is also wired — `trashDrawer` calls `PUT /tasks/restore` and `archiveDrawer` calls `PUT /tasks/archive` (both with a `?purge=true` hard-delete via `DELETE /tasks`). Two surfaces still have **no FE caller** and so are intentionally absent from this table: the bulk task edit (`PUT /api/v1/tasks/bulk` — no multi-select / bulk-edit UI) and the **project** lifecycle endpoints (`PUT /api/v1/projects/restore`, `PUT /api/v1/projects/archive`, and `DELETE /api/v1/projects?purge=true` — there is no project trash/archive UI; the board-level drawers are task-scoped). See [`backend.md`](backend.md) for those server contracts.
+(3) `useLabels` now drives all three write verbs — `createLabel` (`POST`), `updateLabel` (`PUT`), and `removeLabel` (`DELETE /api/v1/labels?labelId=`) — from `labelsManager`, the editor-gated label-management page routed at `/projects/:projectId/labels` (PRD-GAP-011). Labels are still applied via the `taskModal` / `taskDetailPanel` picker and rendered as card chips. The bulk task edit (`PUT /api/v1/tasks/bulk`) is also wired now (PRD-GAP-008): `useBulkSelection` owns board multi-select and `bulkEditToolbar` fans the change out via `bulkUpdateTasksCallback`. The task comments CRUD (`/api/v1/comments`) **is** wired: `useComments` drives all four verbs from `commentsThread` (rendered inside `taskModal` and the routed `taskDetailPanel`). Task lifecycle recovery is also wired — `trashDrawer` calls `PUT /tasks/restore` and `archiveDrawer` calls `PUT /tasks/archive` (both with a `?purge=true` hard-delete via `DELETE /tasks`). One surface still has **no FE caller** and so is intentionally absent from this table: the **project** lifecycle endpoints (`PUT /api/v1/projects/restore`, `PUT /api/v1/projects/archive`, and `DELETE /api/v1/projects?purge=true` — there is no project trash/archive UI; the board-level drawers are task-scoped). See [`backend.md`](backend.md) for those server contracts.
 
 ### AI v1 (`/api/ai/`)
 
@@ -347,15 +351,22 @@ const useLabels: (projectId: string | undefined) => {
     isLoading: boolean;
     createLabel: (input: { name: string; color?: string }) => Promise<unknown>;
     isCreating: boolean;
+    updateLabel: (input: {
+        _id: string;
+        name?: string;
+        color?: string;
+    }) => Promise<unknown>;
+    isUpdating: boolean;
+    removeLabel: (labelId: string) => Promise<unknown>;
+    isRemoving: boolean;
 };
 ```
 
-The project-labels hook. Used by `board.tsx` (to resolve card label chips) and the `taskModal` label picker.
+The project-labels hook. Used by `board.tsx` (to resolve card label chips), the `taskModal` / `taskDetailPanel` label picker, and the `labelsManager` management page.
 
 - Reads `GET /api/v1/labels?projectId=…` via `useReactQuery`, keyed per-project (`["labels", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`.
-- `createLabel` POSTs `/api/v1/labels` with `{ projectId, name, color? }` via `useReactMutation`, invalidating that project's list on success. **`createLabel` has no UI caller today** — labels are read/apply-only on the FE (no create/edit/delete management surface); the function exists for a future labels UI.
+- `createLabel` POSTs `/api/v1/labels` with `{ projectId, name, color? }`, `updateLabel` PUTs `{ _id, name?, color? }`, and `removeLabel` DELETEs (`?labelId=`) — each via `useReactMutation`, invalidating that project's list on success. All three are consumed by `labelsManager` (routed `/projects/:projectId/labels`, PRD-GAP-011); the write controls are editor-gated.
 - `labels` is normalized via `Array.isArray` (a non-array payload resolves to `undefined`).
-- The label `PUT` (update) and `DELETE` verbs exist server-side but this hook does not expose or call them.
 
 ---
 

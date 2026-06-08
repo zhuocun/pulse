@@ -69,7 +69,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Task card type icons — decorative img a11y (`TaskTypeBadge`) | UX ([`ui-todo.md`](ui-todo.md) §21) | ✅ `<img alt="" aria-hidden>` beside visible type labels; regression test in `column/index.test.tsx` |
 | `useAgent` nudge-inbox extracted into `useNudgeInbox` hook | [`release-todo.md`](release-todo.md) §16b | ✅ AC-V14 reducer + state moved to `src/utils/hooks/useNudgeInbox.ts`; `useAgent` re-exports `reduceNudgeInbox` / `NUDGE_INBOX_MAX` / `NUDGE_EXPIRY_MS` for compatibility |
 | Members popover avatars + count badge + shared cached query | UX ([`ui-todo.md`](ui-todo.md) §14, §19 remaining) | ✅ `useMembersList()` centralizes the `users/members` React Query (5-minute `staleTime`); 4 consumers migrated; popover trigger renders avatar group + count badge; no refetch on open |
-| Throttled spinners across AI surfaces | UX ([`ui-todo.md`](ui-todo.md) Phase 3.5 / 2.A.7) | ✅ `useDelayedFlag(active, 250)` hook gates visible spinners in `AiTaskAssistPanel`, `AiChatDrawer`, and `BoardBriefDrawer`; underlying loading state and analytics unchanged |
+| Throttled spinners across AI surfaces | UX ([`ui-todo.md`](ui-todo.md) Phase 3.5 / 2.A.7) | ✅ `useDelayedFlag(active, 250)` hook gates visible spinners in `AiTaskAssistPanel` and the dock bodies `copilotDock/ChatTabBody` + `BriefTabBody`; underlying loading state and analytics unchanged |
 | Microcopy / casing sentence-case sweep | UX ([`ui-todo.md`](ui-todo.md) §17 / Phase 3.1) | ✅ Value-only update across `src/i18n/locales/en.ts` (`Login` → `Log in`, `Register` → `Sign up`, `Open Chat` → `Open chat`, `Board Brief` → `Board brief`, etc.); zh-CN parity preserved; affected tests updated |
 | `CopilotAboutPopover` + wire `AgentMetadata` (budget cap, limits, tags, schema keys) | [`release-todo.md`](release-todo.md) §13–§14 | ✅ BE `as_dict()` + `monthly_token_budget_cap`; FE shows cap line, `recursion_limit`, `tags`, `context_schema` shape; i18n `en`/`zh-CN` |
 | MCP streamable HTTP `/mcp` + read-only `fe.*` tools | [`release-todo.md`](release-todo.md) §15 | **Reverted 2026-05-21** — MCP module deleted (opt-in, no consumers); see release-todo.md §15. |
@@ -79,7 +79,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Multi-worker Uvicorn guard + Docker `UVICORN_WORKERS` | [`release-todo.md`](release-todo.md) §16d | ✅ Boot raises if workers>1 without Redis rate/budget/idempotency + `REDIS_URI`; Dockerfile passes `${UVICORN_WORKERS:-1}`; tests `test_production_backend_guards.py` |
 | Task card keyboard-drag affordance hint | UX ([`ui-todo.md`](ui-todo.md) Phase 3.4 / 2.A.9 — WCAG 2.5.7) | ✅ Task-card button exposes `title={microcopy.dragHints.taskCardKeyboard}` + `aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"`; en + zh-CN parity; column test asserts the hint |
 | `useAgent` FE-tool resolver extracted into `useAgentToolResolver` hook | [`release-todo.md`](release-todo.md) §16b | ✅ FE-tool registry lookup + 8-round auto-resume loop + stream-part reducer + mid-stream typed-error mapping moved to `src/utils/hooks/useAgentToolResolver.ts`; focused tests in `useAgentToolResolver.test.ts` |
-| Header logo a11y label + AI assist / brief drawer live regions | UX ([`ui-todo.md`](ui-todo.md) §21 / Phase 3.4 4.1.3) | ✅ `microcopy.header.logoLabel` (`Pulse home` / `Pulse 首页`) wired to logo button `aria-label` + `title`; `AiTaskAssistPanel` and `BoardBriefDrawer` expose discrete polite live regions for loading/ready/error status without leaking raw payloads |
+| Header logo a11y label + AI assist / brief drawer live regions | UX ([`ui-todo.md`](ui-todo.md) §21 / Phase 3.4 4.1.3) | ✅ `microcopy.header.logoLabel` (`Pulse home` / `Pulse 首页`) wired to logo button `aria-label` + `title`; `AiTaskAssistPanel` and `copilotDock/BriefTabBody` expose discrete polite live regions for loading/ready/error status without leaking raw payloads |
 | Board page error + empty parity with project list | UX ([`ui-todo.md`](ui-todo.md) §16) | ✅ Top-of-board `<Alert>` + Retry on `boards`/`tasks` query failure; zero-column board renders `EmptyState` with `Create your first column` CTA that focuses the inline column creator; new error-state test covers Retry behavior |
 | Task modal Type select uses canonical Task / Bug constant | UX ([`ui-todo.md`](ui-todo.md) §10 / Phase 2.6) | ✅ `TASK_TYPE_OPTIONS` mirrors the schema regardless of dataset shape (still localized via `microcopy.options.taskTypes.*`); regression tests added for empty + single-type datasets |
 | `Suggested by Copilot` badge on AI story-points Apply | UX ([`ui-todo.md`](ui-todo.md) 2.A.8 partial) | ✅ `appliedFieldOrigin` provenance tracked in `TaskModal`; `microcopy.ai.suggestedByCopilot` (en + zh-CN) renders next to Story points after Apply and clears on user edit; unit test covers both branches |
@@ -137,8 +137,8 @@ For the live GA / blocker / soft-blocker / polish status see
 
 - `src/components/copilotDock/BriefTabBody.tsx` — board brief surface
   (headline, per-column counts, largest unstarted, unowned, workload,
-  recommendation CTAs). Rendered inside `CopilotDock` (default) or via
-  the legacy brief drawer wrapper when the dock flag is off.
+  recommendation CTAs). Rendered inside `CopilotDock` (the live AI
+  surface); with the dock flag off there is no AI surface at all.
 - `src/pages/board.tsx` — `Brief` button gated by the runtime toggle.
 
 ### Phase 2A — Smart task drafting (Capability A)
@@ -301,8 +301,8 @@ All six structured routes are on the v2.1 SSE agent surface in
 remote builds; `useAi` v1 JSON path is retained as the
 local-engine fallback in each component.
 
-- `BoardBriefDrawer` → `useAgent("board-brief-agent")` — consumes
-  `surface: "brief"` payloads; renders `CitationChip` footer.
+- `copilotDock/BriefTabBody` → `useAgent("board-brief-agent")` —
+  consumes `surface: "brief"` payloads; renders `CitationChip` footer.
 - `AiTaskDraftModal` → `useAgent("task-drafting-agent")` — consumes
   `surface: "draft"` for both single-draft and `{axis, items}`
   breakdown payloads. Two sequential interrupts (`fe.boardSnapshot`,
@@ -317,13 +317,15 @@ local-engine fallback in each component.
   `surface: "search"` payload; new `fe.searchCandidates` FE tool
   resolves the search-agent interrupt from the React Query cache
   (cap 50 `{id, text}` per kind).
-- `AiChatDrawer` → `useAgentChat` (which wraps
+- `copilotDock/ChatTabBody` → `useAgentChat` (which wraps
   `useAgent("chat-agent")`) — SSE streaming; tool-trace bubbles
   synthesised from `pendingInterrupt` events.
 
-`board.tsx` mounts `useAgent("triage-agent", …)` in remote mode
-and fires once per `(projectId, app session)` when the chat drawer
-first opens; nudges are fed to `AiChatDrawer` via `pendingNudges`.
+`copilotDockHost.tsx` now owns the background `useAgent("triage-agent", …)`
+run in remote mode (it moved off `board.tsx`, which no longer mounts an
+AI surface) and fires once per `(projectId, app session)`; nudges feed
+the dock's chat tab (`ChatTabBody` via `pendingNudges`) and inbox tab
+(`InboxTabBody` via `inboxNudges`).
 
 ---
 
