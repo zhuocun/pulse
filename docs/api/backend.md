@@ -585,16 +585,20 @@ Create a new project. The authenticated user becomes the manager and is seeded a
 ```json
 {
   "projectName": "Acme Backlog",
-  "organization": "Acme Corp"
+  "organization": "Acme Corp",
+  "organizationId": "64c0d1e2f3a4b5c6d7e8f9a0"
 }
 ```
 
 | Field | Type | Rules |
 |---|---|---|
 | `projectName` | string | Required, non-empty |
-| `organization` | string | Required, non-empty |
+| `organization` | string | Required, non-empty (free-text label, distinct from `organizationId`) |
+| `organizationId` | string | Optional. Scopes the project to an organization tenant. When supplied it must reference an existing org (else `400`), and the caller must be `org_admin` or `org_owner` on that org (else `403`). When omitted, the project is a legacy / personal project with no tenant scope. See [Organization tenancy on projects](#organization-tenancy-on-projects). |
 
 > **`managerId` is never read from the body.** It is derived from the JWT `sub` claim (anti-confused-deputy). Any `managerId` supplied in the body is ignored. On success the project is seeded with `memberIds: [{"userId": "<caller>", "role": "owner"}]`.
+
+> **`organizationId` is org-gated.** A dangling `organizationId` (no such org) returns `400`, and a caller who is not at least `org_admin` on the referenced org returns `403`. When `organizationId` is absent, the persisted document is byte-for-byte the legacy shape (no `organizationId` key).
 
 **Response — 201 Created:**
 
@@ -607,8 +611,9 @@ Create a new project. The authenticated user becomes the manager and is seeded a
 | Code | Condition |
 |---|---|
 | 201 | Project created |
-| 400 | Validation errors (missing `projectName` or `organization`) |
+| 400 | Validation errors (missing `projectName` or `organization`), or `organizationId` references a non-existent org |
 | 401 | Missing or invalid JWT |
+| 403 | `organizationId` supplied but caller is not `org_admin`/`org_owner` on that org |
 
 ---
 
@@ -625,8 +630,12 @@ Retrieve one or more projects the authenticated caller can access (`viewer`-leve
 | `projectId` | string | Optional. Fetch a single project by ID. Returns `403` if the caller lacks `viewer` access (this is also how a cross-tenant probe is rejected). |
 | `projectName` | string | Optional. Filter the list by name (exact match). |
 | `managerId` | string | Optional. Must equal the authenticated user's ID; any other value short-circuits to `403` before any lookup. |
+| `includeArchived` | boolean | Optional (default `false`). When `true`, archived projects (those with `archivedAt` set) are also enumerated in the listing. |
+| `includeTrashed` | boolean | Optional (default `false`). When `true`, trashed projects (those with `deletedAt` set) are also enumerated in the listing. |
 
-When no `projectId` is given, the list of every project the caller can access (as manager or member) is returned. Visibility is computed in the application layer: the candidate set is fetched with a flat filter and each row is checked with the `viewer` access rule, so the list never leaks a project the caller is not a member of.
+When no `projectId` is given, the list of every project the caller can access (as manager or member) is returned. Visibility is computed in the application layer: the candidate set is fetched with a flat filter and each row is checked with the `viewer` access rule, so the list never leaks a project the caller is not a member of. The listing is additionally **tenant-scoped** — an org-scoped project is only enumerated for callers who belong to its org; a null-org (legacy / personal) project keeps its members-only visibility (see [Organization tenancy on projects](#organization-tenancy-on-projects)).
+
+By default the listing **excludes** archived (`archivedAt` set) and trashed (`deletedAt` set) projects (PRD §5.4/§5.5). The `includeArchived` / `includeTrashed` flags **widen** the enumeration to also include those rows — they do not scope it to only-archived / only-trashed, so an archive or trash view that wants only those rows must filter the widened response on `archivedAt`/`deletedAt`. A **direct-by-id read** (`projectId` supplied) is never filtered: a trashed or archived project is still returned so the restore / archive flows can load it, which makes the flags inert when `projectId` is present.
 
 **Response — 200 OK** (list query):
 
@@ -716,15 +725,16 @@ Only `{projectName, organization, managerId}` are writable. **`memberIds` is not
 
 ### DELETE /api/v1/projects/
 
-Delete a project and all its columns and tasks (cascading deletion, leaves-first: tasks → columns → project). **Manager-only** — strict `managerId == caller`.
+Delete a project. By default this is a **soft delete** — the project is moved to the trash by stamping `deletedAt`, and its columns and tasks are left **intact** so a later [`PUT /projects/restore`](#put-apiv1projectsrestore) brings the whole project back losslessly (PRD §5.5). Passing `?purge=true` performs the legacy **hard cascade**: the project and all its columns and tasks are permanently removed, leaves-first (tasks → columns → project). **Manager-only** — strict `managerId == caller`; owner-level membership is not sufficient.
 
 **Auth:** Required (must be the project manager — strict `managerId == caller`).
 
-**Query parameter:**
+**Query parameters:**
 
 | Parameter | Type | Notes |
 |---|---|---|
 | `projectId` | string | Required |
+| `purge` | boolean | Optional (default `false`). `false` = soft-delete (trash; columns + tasks preserved). `true` = permanent hard cascade (delete project + columns + tasks). Both return `"Project deleted"`. |
 
 **Response — 200 OK:**
 
@@ -736,11 +746,81 @@ Delete a project and all its columns and tasks (cascading deletion, leaves-first
 
 | Code | Condition |
 |---|---|
-| 200 | Project deleted |
+| 200 | Project deleted (soft by default; permanent with `?purge=true`) |
 | 400 | `projectId` not provided or other bad request |
 | 401 | Missing or invalid JWT |
 | 403 | Caller is not the project manager (`managerId != caller`) |
 | 404 | Project not found |
+
+---
+
+### PUT /api/v1/projects/restore
+
+Un-trash **and** un-archive a project — clears both `deletedAt` and `archivedAt` — bringing it back to the active listing in one step (PRD §5.4/§5.5). **Manager-only** — strict `managerId == caller`.
+
+**Auth:** Required (must be the project manager).
+
+**Request body:**
+
+```json
+{"projectId": "64a1f2e3b4c5d6e7f8a9b0c2"}
+```
+
+> **Body key.** The project id is sent as `projectId` in the body (matching the `DELETE` query param and the member endpoints), not as a bare `_id`.
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required — identifies the project to restore |
+
+**Response — 200 OK:**
+
+```json
+"Project restored"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Project restored |
+| 401 | Missing or invalid JWT |
+| 403 | Caller is not the project manager (`managerId != caller`) |
+| 404 | Project not found (missing/unknown `projectId`) |
+
+---
+
+### PUT /api/v1/projects/archive
+
+Archive or un-archive a project (stamps or clears `archivedAt`). Existence + access are checked **before** `archived` is validated, so a non-manager cannot probe a project's existence with a malformed body. **Manager-only** — strict `managerId == caller`.
+
+**Auth:** Required (must be the project manager).
+
+**Request body:**
+
+```json
+{"projectId": "64a1f2e3b4c5d6e7f8a9b0c2", "archived": true}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required — identifies the project |
+| `archived` | boolean | Required — `true` archives (stamps `archivedAt`), `false` un-archives (clears it). Must be a boolean (else `400 "Bad request"`). |
+
+**Response — 200 OK:**
+
+```json
+"Project archived"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Project archived / un-archived |
+| 400 | `archived` is not a boolean |
+| 401 | Missing or invalid JWT |
+| 403 | Caller is not the project manager (`managerId != caller`) |
+| 404 | Project not found (missing/unknown `projectId`) |
 
 ---
 
@@ -899,6 +979,17 @@ Remove a member from the project.
 
 ---
 
+### Organization tenancy on projects
+
+A project may optionally be scoped to an **organization** tenant via `organizationId` (see [§19 Organizations](#19-organizations-tenancy) for the org entity and its RBAC). Tenancy is layered on top of the per-project RBAC above — it **narrows enumeration**, it does not replace membership.
+
+- **Create.** `organizationId` is optional on [`POST /projects`](#post-apiv1projects). When supplied it must reference an existing org (else `400`) and the caller must be at least `org_admin` (`org_admin` or `org_owner`) on that org (else `403`); plain org members cannot stand up an org-scoped project. When omitted, the project is persisted in the legacy shape with no `organizationId` key (a null-org / personal project).
+- **Listing visibility.** [`GET /projects`](#get-apiv1projects) is tenant-scoped: an org-scoped project is enumerated **only** for callers who belong to its org (any org role), while a null-org project keeps its members-only visibility via a back-compat fallback (so tenant-scoping lands ahead of the legacy `organization`-string → org-entity backfill without hiding existing projects).
+- **Direct reads are not tenant-scoped.** A direct-by-id read (`?projectId=…`) is gated by project membership only, not org membership — enumeration is narrowed, direct reads are not.
+- **`organization` vs `organizationId`.** `organization` is a free-text label retained during the dual-write window; `organizationId` is the structured tenant reference. They are independent fields.
+
+---
+
 ## 11. Boards (Columns)
 
 Base path: `/api/v1/boards`
@@ -907,7 +998,7 @@ Board endpoints manage columns on a project board. All require a valid JWT. **Re
 
 **Default-column seeding (self-healing).** When a project has no columns, the three default columns ("To Do", "In Progress", "Done") are seeded lazily before returning. This happens both at project-create time and on the first `GET`/`POST` to `/api/v1/boards/`, so legacy projects that predate create-time seeding self-heal on first board access. Seeded columns have no explicit `wipLimit`, which reads as "no limit" (equivalent to `0`).
 
-Each column carries a `wipLimit` — a per-column work-in-progress cap. See [WIP-limit semantics](#wip-limit-semantics) below.
+Each column carries a `wipLimit` — a per-column work-in-progress cap. See [WIP-limit semantics](#wip-limit-semantics) below. Each column also carries a `category` (`"todo" | "in_progress" | "done"`) that drives done-ness for completion and drift; see [Column category & `isDone`](#column-category--isdone).
 
 ---
 
@@ -927,13 +1018,15 @@ Retrieve all columns for a project, sorted by `index`.
 
 ```json
 [
-  {"_id": "col_a", "columnName": "To Do",       "projectId": "proj_abc", "index": 0, "wipLimit": 0},
-  {"_id": "col_b", "columnName": "In Progress", "projectId": "proj_abc", "index": 1, "wipLimit": 3},
-  {"_id": "col_c", "columnName": "Done",        "projectId": "proj_abc", "index": 2, "wipLimit": 0}
+  {"_id": "col_a", "columnName": "To Do",       "projectId": "proj_abc", "index": 0, "wipLimit": 0, "category": "todo",        "isDone": false},
+  {"_id": "col_b", "columnName": "In Progress", "projectId": "proj_abc", "index": 1, "wipLimit": 3, "category": "in_progress", "isDone": false},
+  {"_id": "col_c", "columnName": "Done",        "projectId": "proj_abc", "index": 2, "wipLimit": 0, "category": "done",        "isDone": true}
 ]
 ```
 
 (Columns seeded as defaults may omit `wipLimit` entirely; treat a missing `wipLimit` as `0` / no limit.)
+
+Each column carries a `category` — the persisted source of truth for its "done" semantics, one of `"todo" | "in_progress" | "done"` (default `"todo"`). The read path additionally exposes a **derived** `isDone` boolean computed as `category == "done"`. `isDone` is **read-only and never stored** — it is omitted from the write allowlist and recomputed on every `GET`. See [Column category & `isDone`](#column-category--isdone) below.
 
 **Status codes:**
 
@@ -961,6 +1054,22 @@ A failed check returns `400` with the validation envelope (`param: "wipLimit"`).
 
 ---
 
+### Column category & `isDone`
+
+`category` is the **stored** source of truth for a column's "done" semantics. It is one of:
+
+| Value | Meaning |
+|---|---|
+| `"todo"` | Not started (default for a newly created column when `category` is omitted). |
+| `"in_progress"` | Work underway. |
+| `"done"` | A done bucket — a task moved here is treated as complete (its `completedAt` is stamped; see [Task lifecycle](#task-lifecycle-completion--archive--trash)) and the [dependency move-to-done gate](#dependency-move-to-done-gate) keys off it. |
+
+Validation (applied on `POST` and `PUT`): when `category` is present it must be exactly one of `"todo" | "in_progress" | "done"`; any other value returns `400` with the validation envelope (`param: "category"`). The check runs at the router and again defensively in the service. `category` is only validated **when supplied** — an absent `category` on create defaults to `"todo"`.
+
+On **read** (`GET /api/v1/boards/`) each column additionally exposes a derived `isDone` boolean computed as `category == "done"`. `isDone` is **computed only** — it is never stored, is not part of a column's persisted shape, and is dropped from any write body. Clients should write `category` and read `isDone`.
+
+---
+
 ### POST /api/v1/boards/
 
 Add a new column to a project board. The new column is appended (its `index` is the current column count).
@@ -973,7 +1082,8 @@ Add a new column to a project board. The new column is appended (its `index` is 
 {
   "columnName": "Review",
   "projectId": "proj_abc",
-  "wipLimit": 3
+  "wipLimit": 3,
+  "category": "in_progress"
 }
 ```
 
@@ -982,6 +1092,7 @@ Add a new column to a project board. The new column is appended (its `index` is 
 | `columnName` | string | Required, non-empty |
 | `projectId` | string | Required, non-empty |
 | `wipLimit` | integer | Optional. Non-negative integer; `0` = no limit (default when omitted). See [WIP-limit semantics](#wip-limit-semantics). |
+| `category` | string | Optional. One of `"todo" \| "in_progress" \| "done"`; defaults to `"todo"` when omitted. See [Column category & `isDone`](#column-category--isdone). |
 
 **Response — 201 Created:**
 
@@ -994,7 +1105,7 @@ Add a new column to a project board. The new column is appended (its `index` is 
 | Code | Condition |
 |---|---|
 | 201 | Column created |
-| 400 | Validation errors (missing `columnName`/`projectId`, or invalid `wipLimit`) |
+| 400 | Validation errors (missing `columnName`/`projectId`, or invalid `wipLimit`/`category`) |
 | 401 | Missing or invalid JWT |
 | 403 | Caller lacks `editor` access to the project |
 | 404 | Project not found |
@@ -1013,7 +1124,8 @@ Rename a column and/or change its WIP limit.
 {
   "_id": "col_b",
   "columnName": "In Review",
-  "wipLimit": 5
+  "wipLimit": 5,
+  "category": "done"
 }
 ```
 
@@ -1022,8 +1134,9 @@ Rename a column and/or change its WIP limit.
 | `_id` | string | Required — identifies the column |
 | `columnName` | string | Optional; non-empty when present |
 | `wipLimit` | integer | Optional. Non-negative integer; `0` = no limit. See [WIP-limit semantics](#wip-limit-semantics). |
+| `category` | string | Optional. One of `"todo" \| "in_progress" \| "done"` when present. See [Column category & `isDone`](#column-category--isdone). |
 
-Only `{columnName, wipLimit}` are writable. **`projectId` and `index` are not writable** — a column cannot be re-parented or repositioned via this call (use `PUT /api/v1/boards/orders` to reposition). Any other key in the body is ignored.
+Only `{columnName, wipLimit, category}` are writable. **`projectId` and `index` are not writable** — a column cannot be re-parented or repositioned via this call (use `PUT /api/v1/boards/orders` to reposition). The derived `isDone` is read-only and cannot be set here. Any other key in the body is ignored.
 
 **Response — 200 OK:**
 
@@ -1036,7 +1149,7 @@ Only `{columnName, wipLimit}` are writable. **`projectId` and `index` are not wr
 | Code | Condition |
 |---|---|
 | 200 | Updated successfully |
-| 400 | `_id` missing, empty `columnName`, or invalid `wipLimit` |
+| 400 | `_id` missing, empty `columnName`, or invalid `wipLimit`/`category` |
 | 401 | Missing or invalid JWT |
 | 403 | Caller lacks `editor` access to the column's project |
 | 404 | Column not found |
@@ -2992,7 +3105,7 @@ Mid-stream errors arrive as `{"type": "error", ...}` SSE frames followed by `[DO
 
 Base path: `/api/v1/organizations`
 
-The organization is the **tenant** entity that a project may be scoped to (see [Organization tenancy](#organization-tenancy) in §10). All endpoints require a valid JWT.
+The organization is the **tenant** entity that a project may be scoped to (see [Organization tenancy on projects](#organization-tenancy-on-projects) in §10). All endpoints require a valid JWT.
 
 ### Org access model (RBAC)
 
