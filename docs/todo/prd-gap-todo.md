@@ -143,25 +143,25 @@ Tiers, highest priority first:
 
 ### PRD-GAP-009 — Port the five richness fields into `TaskDetailPanel`
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.5, AC-C26, §12 (⬜ Task richness on routed panel)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `TaskDetailPanel` edits `startDate`, `dueDate`, `labelIds`, `assigneeIds`, and `parentTaskId` (parity with `TaskModal`), reusing `useProjectMembers`/`useLabels`.
   - Clearing a scalar FK/date uses the PRD-GAP-005 `preserveNullKeys` opt-in.
   - With `REACT_APP_TASK_PANEL_ROUTED=true`, no richness field is lost vs the legacy modal (regression test).
 - **depends_on:** PRD-GAP-005
-- **notes:** `TaskDetailPanel` renders only `taskName/coordinator/type/epic/storyPoints/note` (AC-C26); flipping `taskPanelRouted` today silently drops dates/labels/extra-assignees/parentage. Prerequisite for retiring `TaskModal`.
+- **notes:** Shipped — `TaskDetailPanel` now edits `startDate`, `dueDate`, `labelIds`, `assigneeIds`, and `parentTaskId` (parity with `TaskModal`), reusing `useLabels` / `useProjectMembers` and the same date `DatePicker` / label `tagRender` / assignee / parent pickers. The PUT mutation opts `parentTaskId`/`startDate`/`dueDate` into `preserveNullKeys` (the GAP-005 pattern) and the dirty-check compares `filterRequest`'d payloads so an untouched optional field fires no needless PUT. Regression tests in `taskDetailPanel/index.test.tsx` prove the fields ride the PUT and a cleared parent reaches the wire as `null`.
 
 ### PRD-GAP-010 — Mount the comments thread on `TaskDetailPanel`
 - **prd_ref:** `docs/prd/core-collaboration.md` §8.5, §12 (✅ on `TaskModal`, remaining: routed panel)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `TaskDetailPanel` mounts `CommentsThread` (`useComments`) with the same author-only edit / author-or-owner delete rules and mention multi-select as `TaskModal`.
   - A mention-bearing create invalidates the notifications query (bell badge refreshes).
   - Covered by a panel-level test.
 - **depends_on:** PRD-GAP-009
-- **notes:** The comments UI shipped on the legacy `TaskModal` (M4c) but "not yet on the routed `TaskDetailPanel`" (§8.5, §12). Reuses the existing hook/component — no new backend.
+- **notes:** Shipped — `TaskDetailPanel` mounts `CommentsThread` (`useComments`) below the form for a real (non-placeholder) task, reusing the same author-only edit / author-or-owner delete rules and mention multi-select as `TaskModal`; a mention-bearing create invalidates the notifications query via `useComments`. Panel-level tests in `taskDetailPanel/index.test.tsx` cover the thread mount and the mention → notifications-invalidation path. Reuses the existing hook/component — no new backend.
 
 ### PRD-GAP-011 — Label management UI (create / edit / delete)
 - **prd_ref:** `docs/prd/core-collaboration.md` §7.4, §12 (⬜ Label management UI), AC-C20

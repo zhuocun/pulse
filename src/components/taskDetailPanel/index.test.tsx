@@ -1725,3 +1725,372 @@ describe("TaskDetailPanel — swipe-between-tasks (Phase 3 A2 / R-B L)", () => {
         });
     });
 });
+
+/*
+ * PRD-GAP-009 / PRD-GAP-010 — richness fields + comments thread parity
+ * with `TaskModal`. The routed `TaskDetailPanel` is the surface
+ * `REACT_APP_TASK_PANEL_ROUTED=true` activates; these tests render it
+ * directly (the route adapter does the same when the flag is on) and
+ * prove no richness field is lost vs the legacy modal, that a cleared
+ * scalar FK reaches the wire as `null` (the GAP-005 `preserveNullKeys`
+ * pattern), and that the comments thread mounts.
+ */
+describe("TaskDetailPanel — richness fields + comments (GAP-009/010)", () => {
+    const fetchMock = jest.spyOn(global, "fetch");
+
+    const labelFixtures: ILabel[] = [
+        {
+            _id: "label-1",
+            projectId: "project-1",
+            name: "Backend",
+            color: "blue"
+        },
+        {
+            _id: "label-2",
+            projectId: "project-1",
+            name: "Frontend",
+            color: "geekblue"
+        }
+    ];
+    const projectMemberFixtures: IProjectMember[] = [
+        {
+            _id: "member-1",
+            email: "alice@example.com",
+            username: "Alice",
+            role: "owner"
+        },
+        {
+            _id: "member-2",
+            email: "bob@example.com",
+            username: "Bob",
+            role: "coordinator"
+        }
+    ];
+    const siblingTasks: ITask[] = [
+        task({ _id: "task-1", taskName: "Build task" }),
+        task({ _id: "task-2", taskName: "Fix bug" })
+    ];
+
+    interface RichnessRenderOptions {
+        initialTasks?: ITask[];
+        comments?: IComment[];
+    }
+
+    // Mutable backing list for the `GET /tasks` mock so a per-test task
+    // shape (e.g. a seeded `parentTaskId` / dates) survives react-query's
+    // background refetch instead of being clobbered by the default fixture.
+    let currentTasks: ITask[] = siblingTasks;
+
+    const renderRichnessPanel = (options: RichnessRenderOptions = {}) => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                mutations: { retry: false },
+                queries: { retry: false }
+            }
+        });
+        const initialTasks = options.initialTasks ?? siblingTasks;
+        currentTasks = initialTasks;
+        queryClient.setQueryData(["users/members"], members);
+        queryClient.setQueryData(
+            ["tasks", { projectId: "project-1" }],
+            initialTasks
+        );
+        queryClient.setQueryData(
+            ["labels", { projectId: "project-1" }],
+            labelFixtures
+        );
+        queryClient.setQueryData(
+            ["projects/members", { projectId: "project-1" }],
+            projectMemberFixtures
+        );
+        queryClient.setQueryData(
+            ["comments", { taskId: "task-1" }],
+            options.comments ?? []
+        );
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "/projects/:projectId/board",
+                    element: <Outlet />,
+                    children: [
+                        {
+                            path: "task/:taskId",
+                            element: (
+                                <TaskDetailPanel
+                                    boardAiOn={false}
+                                    projectId="project-1"
+                                    taskId="task-1"
+                                />
+                            )
+                        }
+                    ]
+                }
+            ],
+            { initialEntries: ["/projects/project-1/board/task/task-1"] }
+        );
+        return {
+            queryClient,
+            router,
+            ...render(
+                <Provider store={store}>
+                    <QueryClientProvider client={queryClient}>
+                        <RouterProvider router={router} />
+                    </QueryClientProvider>
+                </Provider>
+            )
+        };
+    };
+
+    const lastPutBody = () => {
+        const putCall = fetchMock.mock.calls.find(
+            ([, init]) => (init as RequestInit | undefined)?.method === "PUT"
+        );
+        return JSON.parse(
+            (putCall?.[1] as RequestInit)?.body as string
+        ) as Record<string, unknown>;
+    };
+
+    beforeAll(() => {
+        installAntdBrowserMocks();
+    });
+
+    afterEach(() => {
+        act(() => {
+            message.destroy();
+        });
+    });
+
+    beforeEach(() => {
+        currentTasks = siblingTasks;
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(async (input) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const body = url.includes("/labels")
+                ? labelFixtures
+                : url.includes("/projects/members")
+                  ? projectMemberFixtures
+                  : url.includes("/comments")
+                    ? []
+                    : url.includes("/notifications")
+                      ? []
+                      : url.includes("/tasks")
+                        ? currentTasks
+                        : url.includes("/users/members")
+                          ? members
+                          : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+    });
+
+    afterAll(() => {
+        fetchMock.mockRestore();
+    });
+
+    it("renders the new richness field controls (start/due date, labels, assignees, parent task)", async () => {
+        renderRichnessPanel();
+        await screen.findByDisplayValue("Build task");
+
+        expect(screen.getByText("Start date")).toBeInTheDocument();
+        expect(screen.getByText("Due date")).toBeInTheDocument();
+        expect(screen.getByText("Labels")).toBeInTheDocument();
+        expect(screen.getByText("Assignees")).toBeInTheDocument();
+        expect(screen.getByText("Parent task")).toBeInTheDocument();
+    });
+
+    it("excludes the editing task itself from the parent-task options", async () => {
+        renderRichnessPanel();
+        await screen.findByDisplayValue("Build task");
+
+        const parentSelect = screen.getByRole("combobox", {
+            name: /parent task/i
+        });
+        fireEvent.mouseDown(parentSelect);
+        await screen.findByRole("option", { name: "Fix bug" });
+        const optionContents = Array.from(
+            document.querySelectorAll(".ant-select-item-option-content")
+        ).map((el) => el.textContent);
+        expect(optionContents).toContain("Fix bug");
+        expect(optionContents).not.toContain("Build task");
+    });
+
+    it("includes labels, assignees, and parent in the PUT payload on save (parity with TaskModal)", async () => {
+        renderRichnessPanel();
+        await screen.findByDisplayValue("Build task");
+
+        fireEvent.mouseDown(screen.getByRole("combobox", { name: /labels/i }));
+        fireEvent.click(await screen.findByText("Backend"));
+
+        fireEvent.mouseDown(
+            screen.getByRole("combobox", { name: /assignees/i })
+        );
+        fireEvent.click(await screen.findByText("Bob"));
+
+        fireEvent.mouseDown(
+            screen.getByRole("combobox", { name: /parent task/i })
+        );
+        fireEvent.click(await screen.findByText("Fix bug"));
+
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() =>
+            expect(
+                fetchMock.mock.calls.some(
+                    ([, init]) =>
+                        (init as RequestInit | undefined)?.method === "PUT"
+                )
+            ).toBe(true)
+        );
+        expect(lastPutBody()).toEqual(
+            expect.objectContaining({
+                _id: "task-1",
+                labelIds: ["label-1"],
+                assigneeIds: ["member-2"],
+                parentTaskId: "task-2"
+            })
+        );
+    });
+
+    it("serializes a chosen due date as a YYYY-MM-DD string in the PUT payload", async () => {
+        renderRichnessPanel();
+        await screen.findByDisplayValue("Build task");
+
+        const dueInput = screen.getByPlaceholderText(
+            "Select a due date"
+        ) as HTMLInputElement;
+        fireEvent.mouseDown(dueInput);
+        fireEvent.change(dueInput, { target: { value: "2026-12-25" } });
+        fireEvent.keyDown(dueInput, { key: "Enter", code: "Enter" });
+
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() =>
+            expect(
+                fetchMock.mock.calls.some(
+                    ([, init]) =>
+                        (init as RequestInit | undefined)?.method === "PUT"
+                )
+            ).toBe(true)
+        );
+        expect(lastPutBody().dueDate).toBe("2026-12-25");
+    });
+
+    it("seeds the date pickers from the task's stored ISO date strings", async () => {
+        renderRichnessPanel({
+            initialTasks: [
+                task({
+                    _id: "task-1",
+                    taskName: "Build task",
+                    startDate: "2026-03-01",
+                    dueDate: "2026-03-15"
+                })
+            ]
+        });
+        await screen.findByDisplayValue("Build task");
+
+        expect(screen.getByDisplayValue("2026-03-01")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("2026-03-15")).toBeInTheDocument();
+    });
+
+    it("clearing a set parent task sends parentTaskId: null so the backend unassigns it (GAP-005)", async () => {
+        renderRichnessPanel({
+            initialTasks: [
+                task({
+                    _id: "task-1",
+                    taskName: "Build task",
+                    parentTaskId: "task-2"
+                }),
+                task({ _id: "task-2", taskName: "Fix bug" })
+            ]
+        });
+        await screen.findByDisplayValue("Build task");
+
+        const parentControl = screen
+            .getByRole("combobox", { name: /parent task/i })
+            .closest(".ant-select") as HTMLElement;
+        const clearButton = parentControl.querySelector(".ant-select-clear");
+        expect(clearButton).not.toBeNull();
+        fireEvent.mouseDown(clearButton as Element);
+        fireEvent.click(clearButton as Element);
+
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() =>
+            expect(
+                fetchMock.mock.calls.some(
+                    ([, init]) =>
+                        (init as RequestInit | undefined)?.method === "PUT"
+                )
+            ).toBe(true)
+        );
+        const body = lastPutBody();
+        expect(body._id).toBe("task-1");
+        // The cleared parent reaches the wire as an explicit `null` (not
+        // dropped), so the backend unassigns it.
+        expect(body.parentTaskId).toBeNull();
+    });
+
+    it("mounts the comments thread for a real task (GAP-010)", async () => {
+        renderRichnessPanel({
+            comments: [
+                {
+                    _id: "comment-1",
+                    taskId: "task-1",
+                    projectId: "project-1",
+                    authorId: "member-1",
+                    body: "First comment",
+                    createdAt: "2026-05-01T10:00:00.000Z"
+                } as IComment
+            ]
+        });
+        await screen.findByDisplayValue("Build task");
+
+        // The thread renders its composer and the seeded comment.
+        expect(
+            await screen.findByTestId("comment-composer-input")
+        ).toBeInTheDocument();
+        expect(screen.getByText("First comment")).toBeInTheDocument();
+    });
+
+    it("invalidates the notifications query when a mention-bearing comment is posted (GAP-010)", async () => {
+        const { queryClient } = renderRichnessPanel();
+        await screen.findByDisplayValue("Build task");
+
+        const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+        // Compose a comment and add a mention via the member multi-select.
+        // Mention Bob (Alice is the seeded coordinator and shows as a
+        // selected-value duplicate, so its text isn't uniquely queryable).
+        const composer = await screen.findByTestId("comment-composer-input");
+        fireEvent.change(composer, { target: { value: "Ping @Bob" } });
+
+        const mentionSelect = screen.getByRole("combobox", {
+            name: /mention/i
+        });
+        fireEvent.mouseDown(mentionSelect);
+        fireEvent.click(await screen.findByText("Bob"));
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId("comment-post"));
+        });
+
+        await waitFor(() => {
+            const postedComment = fetchMock.mock.calls.some(
+                ([url, init]) =>
+                    (init as RequestInit | undefined)?.method === "POST" &&
+                    String(url).includes("/comments")
+            );
+            expect(postedComment).toBe(true);
+        });
+        // The mention triggers a cross-resource refresh of the bell badge.
+        await waitFor(() => {
+            expect(invalidateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ queryKey: ["notifications"] })
+            );
+        });
+        invalidateSpy.mockRestore();
+    });
+});
