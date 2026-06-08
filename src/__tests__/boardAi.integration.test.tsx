@@ -332,14 +332,8 @@ describe("Board AI integration (App + local engine)", () => {
             screen.getByRole("textbox", { name: /Find related tasks/i })
         ).toBeInTheDocument();
 
-        await user.click(
-            screen.getByRole("button", { name: /board copilot settings/i })
-        );
-        await user.click(
-            await screen.findByRole("switch", {
-                name: /board copilot for this project/i
-            })
-        );
+        await user.click(screen.getByTestId("board-more-actions"));
+        await user.click(await screen.findByText(/project ai off/i));
 
         await waitFor(() => {
             expect(

@@ -47,15 +47,15 @@ interface Props {
     aiSearchSlot?: React.ReactNode;
 }
 
-const FilterShell = styled.div`
+const FilterShell = styled.div<{ $compact?: boolean }>`
     background: var(--ant-color-bg-container, #fff);
     border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
     border-radius: ${radius.lg}px;
     margin-bottom: ${space.md}px;
-    padding: ${space.sm}px;
+    padding: ${({ $compact }) => ($compact ? space.xs : space.sm)}px;
 
     @media (min-width: ${breakpoints.md}px) {
-        padding: ${space.md}px;
+        padding: ${({ $compact }) => ($compact ? space.xs : space.md)}px;
     }
 `;
 
@@ -180,6 +180,11 @@ const FilterToggleSlot = styled.div`
 `;
 
 const AdvancedFiltersPanel = styled.div<{ $open: boolean }>`
+    display: ${({ $open }) => ($open ? "block" : "none")};
+    margin-top: ${space.xs}px;
+`;
+
+const ViewOptionsPanel = styled.div<{ $open: boolean }>`
     display: ${({ $open }) => ($open ? "block" : "none")};
     margin-top: ${space.xs}px;
 `;
@@ -340,8 +345,8 @@ const TaskSearchPanel: React.FC<Props> = ({
      */
     const [saveOpen, setSaveOpen] = useState(false);
     const [draftName, setDraftName] = useState("");
-    const hasAdvancedFilters = Boolean(param.coordinatorId || param.type);
-    const [filtersOpen, setFiltersOpen] = useState(hasAdvancedFilters);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
     const [aiSearchOpen, setAiSearchOpen] = useState(() =>
         Boolean(param.semanticIds)
     );
@@ -491,8 +496,10 @@ const TaskSearchPanel: React.FC<Props> = ({
         [visiblePresets]
     );
 
+    const isCompact = !filtersOpen && chips.length === 0 && !aiSearchOpen;
+
     return (
-        <FilterShell>
+        <FilterShell $compact={isCompact}>
             {aiSearchSlot ? (
                 <AiSearchSlot $visible={aiSearchOpen}>
                     {aiSearchSlot}
@@ -630,6 +637,19 @@ const TaskSearchPanel: React.FC<Props> = ({
                         </Button>
                     </ResetButtonSlot>
                 </FilterRow>
+            </AdvancedFiltersPanel>
+            <Button
+                aria-expanded={viewOptionsOpen}
+                aria-label={microcopy.board.viewOptionsToggleAria}
+                data-testid="task-search-panel-view-options-toggle"
+                onClick={() => setViewOptionsOpen((open) => !open)}
+                size="small"
+                style={{ marginTop: space.xs }}
+                type="text"
+            >
+                {microcopy.board.viewOptionsToggle}
+            </Button>
+            <ViewOptionsPanel $open={viewOptionsOpen}>
                 <PrefRow>
                     <Space size="small" align="center" wrap>
                         <span
@@ -752,7 +772,7 @@ const TaskSearchPanel: React.FC<Props> = ({
                         </Popover>
                     </PrefRowTrailing>
                 </PrefRow>
-            </AdvancedFiltersPanel>
+            </ViewOptionsPanel>
         </FilterShell>
     );
 };

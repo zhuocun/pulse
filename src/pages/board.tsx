@@ -8,16 +8,7 @@ import {
     UnorderedListOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Dropdown,
-    Popover,
-    Skeleton,
-    Space,
-    Switch,
-    Typography
-} from "antd";
+import { Alert, Button, Dropdown, Skeleton, Typography } from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -886,118 +877,52 @@ const BoardPage = () => {
                             inboxUnread={copilotInboxUnread}
                             onAsk={() => openChatDrawer()}
                             onBrief={() => openBriefDrawer()}
-                            onProjectOff={() => setProjectAiDisabled(true)}
                             unreadAriaLabel={copilotUnreadAriaLabel}
                         />
                     ) : null;
 
-                    const projectAiSwitch = aiEnabled ? (
-                        <Popover
-                            content={
-                                <Space
-                                    direction="vertical"
-                                    size={themeSpace.xs}
-                                    style={{ maxWidth: 280, width: "100%" }}
-                                >
-                                    <Typography.Text type="secondary">
-                                        {microcopy.ai.copilotLabel}
-                                    </Typography.Text>
-                                    <div
-                                        style={{
-                                            alignItems: "center",
-                                            display: "flex",
-                                            gap: themeSpace.sm,
-                                            justifyContent: "space-between"
-                                        }}
-                                    >
-                                        <span>
-                                            {
-                                                microcopy.board
-                                                    .enableCopilotOnBoard
-                                            }
-                                        </span>
-                                        <Switch
-                                            aria-label={
-                                                microcopy.a11y
-                                                    .boardCopilotProjectToggle
-                                            }
-                                            checked={!aiDisabledForProject}
-                                            onChange={(checked) =>
-                                                setProjectAiDisabled(!checked)
-                                            }
-                                            size="small"
-                                        />
-                                    </div>
-                                    <Typography.Text
-                                        style={{ fontSize: fontSize.xs }}
-                                        type="secondary"
-                                    >
-                                        {
-                                            microcopy.board
-                                                .copilotProjectDisabledDescription
-                                        }
-                                    </Typography.Text>
-                                </Space>
-                            }
-                            placement="bottomRight"
-                            trigger={["click"]}
-                        >
-                            <Button
-                                aria-label={microcopy.a11y.boardCopilotSettings}
-                                icon={<SettingOutlined aria-hidden />}
-                                type="text"
-                            />
-                        </Popover>
-                    ) : null;
-
                     /*
-                     * Phone clusters every chrome control — including the
-                     * Copilot launcher — into one capsule (6 slots: refresh,
-                     * members, trash, archive, Copilot, settings). Desktop keeps
-                     * the Copilot launcher out of the top tier so it can anchor
-                     * the bottom tier beside the search rail.
+                     * Both phone and desktop cluster trash, archive, and
+                     * project AI settings behind a shared overflow menu
+                     * (MoreOutlined button). Phone wraps it inside the
+                     * Liquid Glass capsule; desktop renders it in the plain
+                     * BoardActions flex row. MemberPopover stays visible on
+                     * both surfaces.
                      */
-                    const phoneOverflowMenu = isPhone ? (
+                    const overflowMenuItems = [
+                        ...(aiEnabled
+                            ? [
+                                  {
+                                      key: "project-ai",
+                                      label: aiDisabledForProject
+                                          ? microcopy.board.enableCopilotOnBoard
+                                          : microcopy.board
+                                                .copilotMenuProjectOff,
+                                      icon: <SettingOutlined aria-hidden />,
+                                      onClick: () =>
+                                          setProjectAiDisabled(
+                                              !aiDisabledForProject
+                                          )
+                                  }
+                              ]
+                            : []),
+                        {
+                            key: "trash",
+                            label: microcopy.trashDrawer.triggerAriaLabel,
+                            icon: <DeleteOutlined aria-hidden />,
+                            onClick: () => openTrashDrawer()
+                        },
+                        {
+                            key: "archive",
+                            label: microcopy.archiveDrawer.triggerAriaLabel,
+                            icon: <InboxOutlined aria-hidden />,
+                            onClick: () => openArchiveDrawer()
+                        }
+                    ];
+
+                    const overflowMenu = (
                         <Dropdown
-                            menu={{
-                                items: [
-                                    ...(aiEnabled
-                                        ? [
-                                              {
-                                                  key: "project-ai",
-                                                  label: aiDisabledForProject
-                                                      ? microcopy.board
-                                                            .enableCopilotOnBoard
-                                                      : microcopy.board
-                                                            .copilotMenuProjectOff,
-                                                  icon: (
-                                                      <SettingOutlined
-                                                          aria-hidden
-                                                      />
-                                                  ),
-                                                  onClick: () =>
-                                                      setProjectAiDisabled(
-                                                          !aiDisabledForProject
-                                                      )
-                                              }
-                                          ]
-                                        : []),
-                                    {
-                                        key: "trash",
-                                        label: microcopy.trashDrawer
-                                            .triggerAriaLabel,
-                                        icon: <DeleteOutlined aria-hidden />,
-                                        onClick: () => openTrashDrawer()
-                                    },
-                                    {
-                                        key: "archive",
-                                        label: microcopy.archiveDrawer
-                                            .triggerAriaLabel,
-                                        icon: <InboxOutlined aria-hidden />,
-                                        onClick: () => openArchiveDrawer()
-                                    }
-                                ]
-                            }}
+                            menu={{ items: overflowMenuItems }}
                             trigger={["click"]}
                         >
                             <Button
@@ -1007,7 +932,7 @@ const BoardPage = () => {
                                 type="text"
                             />
                         </Dropdown>
-                    ) : null;
+                    );
 
                     const topTierControls = (
                         <>
@@ -1022,32 +947,7 @@ const BoardPage = () => {
                                 />
                             )}
                             <MemberPopover />
-                            {!isPhone && (
-                                <>
-                                    <Button
-                                        aria-label={
-                                            microcopy.trashDrawer
-                                                .triggerAriaLabel
-                                        }
-                                        data-testid="board-trash"
-                                        icon={<DeleteOutlined aria-hidden />}
-                                        onClick={() => openTrashDrawer()}
-                                        type="text"
-                                    />
-                                    <Button
-                                        aria-label={
-                                            microcopy.archiveDrawer
-                                                .triggerAriaLabel
-                                        }
-                                        data-testid="board-archive"
-                                        icon={<InboxOutlined aria-hidden />}
-                                        onClick={() => openArchiveDrawer()}
-                                        type="text"
-                                    />
-                                </>
-                            )}
-                            {isPhone && phoneOverflowMenu}
-                            {!isPhone && projectAiSwitch}
+                            {overflowMenu}
                         </>
                     );
 
@@ -1144,10 +1044,15 @@ const BoardPage = () => {
                                             type={
                                                 lensesOpen || activeLens
                                                     ? "primary"
-                                                    : "default"
+                                                    : isPhone
+                                                      ? "default"
+                                                      : "text"
                                             }
                                         >
-                                            {microcopy.board.lensesToggle}
+                                            {(isPhone ||
+                                                lensesOpen ||
+                                                activeLens) &&
+                                                microcopy.board.lensesToggle}
                                         </Button>
                                     </LensToggleRow>
                                     <LensPanel

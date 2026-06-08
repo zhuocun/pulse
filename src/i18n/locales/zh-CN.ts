@@ -549,6 +549,8 @@ const zhCN: Dictionary = {
         smartSearchToggle: "智能搜索",
         smartSearchToggleAria: "切换 AI 智能搜索",
         moreActionsAria: "更多看板操作",
+        viewOptionsToggle: "显示选项",
+        viewOptionsToggleAria: "显示看板视图选项",
         presets: {
             saveAction: "保存当前筛选为预设…",
             saveAriaLabel: "保存当前筛选为预设",
@@ -700,6 +702,14 @@ const zhCN: Dictionary = {
             description: "此操作无法撤销。",
             confirmLabel: "永久删除"
         }
+    },
+    unifiedNotifications: {
+        bellAriaLabelZero: "通知,暂无未读",
+        bellAriaLabelOne: "通知,{count} 条未读",
+        bellAriaLabelOther: "通知,{count} 条未读",
+        drawerTitle: "通知",
+        tabActivity: "动态",
+        tabAlerts: "提醒"
     },
     notifications: {
         bellAriaLabelZero: "通知,暂无未读",

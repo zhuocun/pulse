@@ -35,9 +35,10 @@ import useAuth from "../../utils/hooks/useAuth";
 import useColorScheme from "../../utils/hooks/useColorScheme";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useNotifications from "../../utils/hooks/useNotifications";
-import ActivityFeedDrawer, { ActivityFeedBell } from "../activityFeedDrawer";
-import NotificationDrawer, { NotificationBell } from "../notificationBell";
 import BrandMark from "../brandMark";
+import UnifiedNotificationsDrawer, {
+    UnifiedNotificationsBell
+} from "../unifiedNotifications";
 import EngineModeTag from "../engineModeTag";
 import GlassIntensitySelect from "../glassIntensitySelect";
 import LanguageSwitcher from "../languageSwitcher";
@@ -739,24 +740,14 @@ const Header: React.FC = () => {
     const path = useLocation().pathname;
     const navigate = useNavigate();
     /*
-     * Phase 4.3 — activity feed. The bell icon is always visible
-     * (including phone chrome) so notifications stay reachable without
-     * touching the demoted dropdown. The flag is a hard kill-switch so
-     * deployed builds can roll back the entire surface with one env
-     * var; see `environment.activityFeedEnabled` for the rationale.
+     * Unified notifications — one bell aggregates session activity and
+     * server alerts; the tabbed drawer keeps both surfaces reachable
+     * without duplicating header chrome.
      */
     const { unreadCount } = useActivityFeed();
-    const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
-    /*
-     * Notifications (backend Notifications feature). A second bell beside
-     * the activity-feed bell, backed by the server's persisted
-     * notifications. Like the activity bell it stays visible on every
-     * viewport (including phone chrome) so notifications are reachable
-     * without the demoted dropdown; the drawer body mounts once below the
-     * header chrome.
-     */
     const { unreadCount: notificationUnreadCount } = useNotifications();
-    const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+    const unifiedUnreadCount = unreadCount + notificationUnreadCount;
+    const [unifiedDrawerOpen, setUnifiedDrawerOpen] = useState(false);
     /*
      * Phase 3 A3 — phone demotion. The flag-gated `bottomNavEnabled`
      * env switch composes with the shared `useIsPhoneChrome` predicate
@@ -919,33 +910,9 @@ const Header: React.FC = () => {
                 {environment.aiEnabled && !environment.aiUseLocalEngine && (
                     <AgentHealthBadge />
                 )}
-                {/*
-                 * Phase 4.3 — activity feed bell. The bell renders on
-                 * every viewport (including phone chrome) so the user
-                 * can reach the drawer from anywhere. The drawer itself
-                 * lives below the header chrome so its bottom-sheet
-                 * placement on phones works without colliding with the
-                 * bottom-tab bar.
-                 */}
-                {environment.activityFeedEnabled &&
-                    !(environment.bottomNavEnabled && isPhoneChrome) && (
-                        <ActivityFeedBell
-                            unreadCount={unreadCount}
-                            onClick={() =>
-                                setActivityDrawerOpen((prev) => !prev)
-                            }
-                        />
-                    )}
-                {/*
-                 * Notifications bell (backend Notifications feature).
-                 * Sits beside the activity-feed bell and is likewise
-                 * visible on every viewport so server notifications stay
-                 * reachable from anywhere; its drawer mounts below the
-                 * header chrome.
-                 */}
-                <NotificationBell
-                    unreadCount={notificationUnreadCount}
-                    onClick={() => setNotificationDrawerOpen((prev) => !prev)}
+                <UnifiedNotificationsBell
+                    unreadCount={unifiedUnreadCount}
+                    onClick={() => setUnifiedDrawerOpen((prev) => !prev)}
                 />
                 {/*
                  * Phone-demotion wrapper. With the bottom-tab chassis
@@ -1012,16 +979,9 @@ const Header: React.FC = () => {
                     </Dropdown>
                 </HiddenWhenDemoted>
             </RightCluster>
-            {environment.activityFeedEnabled &&
-                !(environment.bottomNavEnabled && isPhoneChrome) && (
-                    <ActivityFeedDrawer
-                        open={activityDrawerOpen}
-                        onClose={() => setActivityDrawerOpen(false)}
-                    />
-                )}
-            <NotificationDrawer
-                open={notificationDrawerOpen}
-                onClose={() => setNotificationDrawerOpen(false)}
+            <UnifiedNotificationsDrawer
+                open={unifiedDrawerOpen}
+                onClose={() => setUnifiedDrawerOpen(false)}
             />
         </PageHeader>
     );

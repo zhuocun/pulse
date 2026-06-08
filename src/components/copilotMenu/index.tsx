@@ -32,8 +32,6 @@ interface CopilotMenuProps {
     onAsk: () => void;
     /** Opens the board brief drawer. */
     onBrief: () => void;
-    /** Disables Board Copilot for the current project. */
-    onProjectOff: () => void;
     /** Unread Inbox-nudge count surfaced as a launcher badge. */
     inboxUnread: number;
     /** Pre-formatted accessible label for the unread badge (omit when 0). */
@@ -44,7 +42,8 @@ interface CopilotMenuProps {
  * Consolidated Board Copilot launcher (ui-todo §1.2 item 7). Replaces the
  * separate Brief / Ask buttons with a single split control: the primary
  * button runs the most common action (open chat / Ask), and the trailing
- * caret opens a menu with Brief, Ask, and a "Project AI off" quick toggle.
+ * caret opens a menu with Brief and Ask. Per-project AI toggles live in
+ * the board overflow menu so the launcher stays focused on chat actions.
  *
  * `Space.Compact` + `Dropdown` + `Button` is AntD 6's recommended pattern
  * (the legacy `Dropdown.Button` is deprecated and would log a console
@@ -57,7 +56,6 @@ interface CopilotMenuProps {
 const CopilotMenu: React.FC<CopilotMenuProps> = ({
     onAsk,
     onBrief,
-    onProjectOff,
     inboxUnread,
     unreadAriaLabel
 }) => {
@@ -73,13 +71,6 @@ const CopilotMenu: React.FC<CopilotMenuProps> = ({
             label: microcopy.board.copilotMenuAsk,
             icon: <MessageOutlined aria-hidden />,
             onClick: onAsk
-        },
-        { type: "divider" },
-        {
-            key: "project-off",
-            label: microcopy.board.copilotMenuProjectOff,
-            danger: true,
-            onClick: onProjectOff
         }
     ];
 
