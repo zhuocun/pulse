@@ -623,35 +623,14 @@ describe("Header", () => {
         });
     });
 
-    /*
-     * Phase 4.3 — activity feed bell. The header mounts an
-     * `<ActivityFeedBell>` whose aria-label tracks the live unread
-     * count from the activity feed slice; clicking it opens the
-     * drawer (rendered by the same `<Header>`).
-     */
-    describe("activity feed bell (Phase 4.3)", () => {
-        const envMod = jest.requireMock("../../constants/env") as {
-            default: {
-                apiBaseUrl: string;
-                aiBaseUrl: string;
-                aiEnabled: boolean;
-                aiUseLocalEngine: boolean;
-                bottomNavEnabled: boolean;
-                activityFeedEnabled: boolean;
-            };
-        };
-
-        afterEach(() => {
-            envMod.default.activityFeedEnabled = true;
-        });
-
-        it("renders the bell with the zero-unread copy when the feed is empty", () => {
+    describe("unified notifications bell", () => {
+        it("renders the unified bell with the zero-unread copy when feeds are empty", () => {
             renderHeader();
-            const bell = screen.getByTestId("activity-feed-bell");
-            expect(bell).toHaveAccessibleName(/no new notifications/i);
+            const bell = screen.getByTestId("unified-notifications-bell");
+            expect(bell).toHaveAccessibleName(/none unread/i);
         });
 
-        it("includes the unread count in the bell aria-label", () => {
+        it("includes the combined unread count in the bell aria-label", () => {
             renderHeader();
             act(() => {
                 store.dispatch(
@@ -677,33 +656,29 @@ describe("Header", () => {
                     })
                 );
             });
-            const bell = screen.getByTestId("activity-feed-bell");
-            expect(bell).toHaveAccessibleName(/2 unread notifications/i);
+            const bell = screen.getByTestId("unified-notifications-bell");
+            expect(bell).toHaveAccessibleName(/2 unread/i);
         });
 
-        it("opens the drawer on click and exposes the drawer body", () => {
+        it("opens the unified drawer on click", () => {
             renderHeader();
-            const bell = screen.getByTestId("activity-feed-bell");
-            // Before click the drawer body is not mounted into the DOM.
+            const bell = screen.getByTestId("unified-notifications-bell");
             expect(
-                screen.queryByTestId("activity-feed-drawer-body")
+                screen.queryByTestId("unified-notifications-drawer-body")
             ).not.toBeInTheDocument();
             fireEvent.click(bell);
-            // AntD renders the drawer body inside a portal; it appears
-            // after the click. Use `findBy*` to await the portal mount.
             return waitFor(() => {
                 expect(
-                    screen.getByTestId("activity-feed-drawer-body")
+                    screen.getByTestId("unified-notifications-drawer-body")
                 ).toBeInTheDocument();
             });
         });
 
-        it("does not mount the bell when the activity-feed env flag is off", () => {
-            envMod.default.activityFeedEnabled = false;
+        it("is always mounted (no separate env-flag gate)", () => {
             renderHeader();
             expect(
-                screen.queryByTestId("activity-feed-bell")
-            ).not.toBeInTheDocument();
+                screen.getByTestId("unified-notifications-bell")
+            ).toBeInTheDocument();
         });
     });
 

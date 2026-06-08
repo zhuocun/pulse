@@ -883,7 +883,6 @@ const BoardPage = () => {
                             inboxUnread={copilotInboxUnread}
                             onAsk={() => openChatDrawer()}
                             onBrief={() => openBriefDrawer()}
-                            onProjectOff={() => setProjectAiDisabled(true)}
                             unreadAriaLabel={copilotUnreadAriaLabel}
                         />
                     ) : null;

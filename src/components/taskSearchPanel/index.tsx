@@ -637,20 +637,20 @@ const TaskSearchPanel: React.FC<Props> = ({
                         </Button>
                     </ResetButtonSlot>
                 </FilterRow>
-                <Button
-                    aria-expanded={viewOptionsOpen}
-                    aria-label={microcopy.board.viewOptionsToggleAria}
-                    data-testid="task-search-panel-view-options-toggle"
-                    onClick={() =>
-                        setViewOptionsOpen((open) => !open)
-                    }
-                    size="small"
-                    type="text"
-                >
-                    {microcopy.board.viewOptionsToggle}
-                </Button>
-                <ViewOptionsPanel $open={viewOptionsOpen}>
-                    <PrefRow>
+            </AdvancedFiltersPanel>
+            <Button
+                aria-expanded={viewOptionsOpen}
+                aria-label={microcopy.board.viewOptionsToggleAria}
+                data-testid="task-search-panel-view-options-toggle"
+                onClick={() => setViewOptionsOpen((open) => !open)}
+                size="small"
+                style={{ marginTop: space.xs }}
+                type="text"
+            >
+                {microcopy.board.viewOptionsToggle}
+            </Button>
+            <ViewOptionsPanel $open={viewOptionsOpen}>
+                <PrefRow>
                         <Space size="small" align="center" wrap>
                             <span
                                 id="board-density-label"
@@ -783,7 +783,6 @@ const TaskSearchPanel: React.FC<Props> = ({
                         </PrefRowTrailing>
                     </PrefRow>
                 </ViewOptionsPanel>
-            </AdvancedFiltersPanel>
         </FilterShell>
     );
 };
