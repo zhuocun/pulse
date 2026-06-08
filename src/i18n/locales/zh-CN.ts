@@ -601,6 +601,25 @@ const zhCN: Dictionary = {
         wipLimitHelp: "0 表示不限制。",
         wipLimitPlaceholder: "在制品上限（0 = 不限制）"
     },
+    bulkEdit: {
+        toolbarAriaLabel: "批量编辑所选任务",
+        selectTask: "选择任务 {name}",
+        deselectTask: "取消选择任务 {name}",
+        clearSelection: "清除选择",
+        applyAriaLabel: "将更改应用到所选任务",
+        setPriority: "设置优先级",
+        setCoordinator: "设置负责人",
+        setLabels: "设置标签",
+        selectedCount: {
+            one: "已选择 {count} 个任务",
+            other: "已选择 {count} 个任务"
+        },
+        applied: {
+            one: "已更新 {count} 个任务",
+            other: "已更新 {count} 个任务"
+        },
+        applyFailed: "无法更新所选任务，请重试。"
+    },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",
         confirmDiscardBody: "对此任务的编辑将会丢失。",

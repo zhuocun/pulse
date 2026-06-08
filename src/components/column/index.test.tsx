@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
+import { BulkSelectionProvider } from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -214,6 +215,7 @@ const renderColumn = ({
     boardDensity = "comfortable",
     labels = [],
     milestones = [],
+    selection = false,
     tasks = [
         task(),
         task({
@@ -238,6 +240,7 @@ const renderColumn = ({
     boardDensity?: "comfortable" | "compact";
     labels?: ILabel[];
     milestones?: IMilestone[];
+    selection?: boolean;
 } = {}) => {
     // The component calls `useReactMutation` four times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
@@ -262,6 +265,20 @@ const renderColumn = ({
     mockedUseTaskModal.mockReturnValue({ startEditing });
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
 
+    const columnEl = (
+        <Column
+            boardAiOn={boardAiOn}
+            column={boardColumn}
+            dragDisabledByFilters={dragDisabledByFilters}
+            isDragDisabled={isDragDisabled}
+            labels={labels}
+            milestones={milestones}
+            param={param}
+            taskDragDisabled={taskDragDisabled}
+            tasks={tasks}
+        />
+    );
+
     return render(
         <Provider store={makeTestStore(boardDensity)}>
             <MemoryRouter initialEntries={["/projects/project-1/board"]}>
@@ -269,17 +286,13 @@ const renderColumn = ({
                     <Route
                         path="/projects/:projectId/board"
                         element={
-                            <Column
-                                boardAiOn={boardAiOn}
-                                column={boardColumn}
-                                dragDisabledByFilters={dragDisabledByFilters}
-                                isDragDisabled={isDragDisabled}
-                                labels={labels}
-                                milestones={milestones}
-                                param={param}
-                                taskDragDisabled={taskDragDisabled}
-                                tasks={tasks}
-                            />
+                            selection ? (
+                                <BulkSelectionProvider>
+                                    {columnEl}
+                                </BulkSelectionProvider>
+                            ) : (
+                                columnEl
+                            )
                         }
                     />
                 </Routes>
@@ -709,9 +722,7 @@ describe("Column", () => {
             "aria-label",
             "3 of 5 tasks (WIP limit)"
         );
-        expect(
-            screen.queryByTestId("column-wip-over")
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("column-wip-over")).not.toBeInTheDocument();
     });
 
     it("renders no WIP badge when the column has no limit (0 = no limit)", () => {
@@ -763,6 +774,43 @@ describe("Column", () => {
         expect(
             screen.getByRole("button", { name: /^edit column mock$/i })
         ).toBeDisabled();
+    });
+
+    /*
+     * PRD-GAP-008 — board multi-select. The checkbox only appears under a
+     * BulkSelectionProvider, never on optimistic placeholder cards, and
+     * toggles the card's selected state (flipping its accessible label).
+     */
+    it("renders no select checkbox without a BulkSelectionProvider", () => {
+        renderColumn();
+        expect(
+            screen.queryByTestId("task-card-select")
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders select checkboxes for persisted cards under a provider", () => {
+        renderColumn({ selection: true });
+
+        // Two persisted tasks get a checkbox; the optimistic "mock" card
+        // (no server id) does not.
+        expect(screen.getAllByTestId("task-card-select")).toHaveLength(2);
+        expect(
+            screen.getByRole("checkbox", { name: "Select task Build task" })
+        ).toBeInTheDocument();
+    });
+
+    it("toggles a card's selected state when its checkbox is clicked", () => {
+        renderColumn({ selection: true });
+
+        const checkbox = screen.getByRole("checkbox", {
+            name: "Select task Build task"
+        });
+        fireEvent.click(checkbox);
+
+        // The accessible label flips to the deselect verb once selected.
+        expect(
+            screen.getByRole("checkbox", { name: "Deselect task Build task" })
+        ).toBeChecked();
     });
 
     it("disables delete for the optimistic mock column", () => {

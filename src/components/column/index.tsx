@@ -10,6 +10,7 @@ import {
 import styled from "@emotion/styled";
 import {
     Badge,
+    Checkbox,
     Dropdown,
     Input,
     InputNumber,
@@ -45,6 +46,7 @@ import {
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
+import useBulkSelection from "../../utils/hooks/useBulkSelection";
 import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -335,6 +337,55 @@ const TaskCardOuter = styled.button<{ $dragDisabledByFilters?: boolean }>`
             box-shadow: ${shadow.xs};
             transform: none;
         }
+    }
+`;
+
+/**
+ * Wrapper that hosts the multi-select checkbox alongside the card button
+ * (PRD-GAP-008). A native checkbox cannot live INSIDE the `<button>` card
+ * (invalid HTML + the dnd library blocks drags off interactive elements),
+ * so the checkbox is a sibling overlay and this relative shell positions
+ * it over the card's top-left corner. Rendered only under a
+ * `BulkSelectionProvider`; without one the card returns the bare button.
+ */
+const SelectableShell = styled.div`
+    position: relative;
+    width: 100%;
+`;
+
+/**
+ * Selection checkbox overlay. Hidden by default and revealed on
+ * hover / keyboard focus of the card, or whenever the card is selected, so
+ * the calm board isn't littered with checkboxes at rest. On coarse pointers
+ * (no hover) it is always visible and lifts to a 44 px hit target (WCAG
+ * 2.5.8). The wrapping click/mousedown guards stop the toggle from also
+ * opening the task or starting a drag.
+ */
+const SelectionCheckboxSlot = styled.span<{ $selected: boolean }>`
+    align-items: center;
+    background: var(--ant-color-bg-container, #fff);
+    border-radius: ${radius.sm}px;
+    display: inline-flex;
+    justify-content: center;
+    left: ${space.xs}px;
+    opacity: ${(p) => (p.$selected ? 1 : 0)};
+    padding: 2px;
+    position: absolute;
+    top: ${space.xs}px;
+    transition: opacity 120ms ease-out;
+    z-index: 2;
+
+    ${SelectableShell}:hover &,
+    ${SelectableShell}:focus-within & {
+        opacity: 1;
+    }
+
+    @media (pointer: coarse) {
+        align-items: center;
+        justify-content: center;
+        min-height: ${touchTargetCoarse}px;
+        min-width: ${touchTargetCoarse}px;
+        opacity: 1;
     }
 `;
 
@@ -1169,6 +1220,12 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         ref
     ) => {
         const { projectId } = useParams<{ projectId: string }>();
+        // Board multi-select (PRD-GAP-008). `selectable` gates the checkbox
+        // on a live provider AND a persisted task — an optimistic placeholder
+        // has no server id to bulk-edit, so it's never selectable.
+        const selection = useBulkSelection();
+        const selectable = selection.enabled && !isMock;
+        const selected = selectable && selection.isSelected(task._id);
         const coordinator = members.find((m) => m._id === task.coordinatorId);
         const isBug = task.type === "Bug";
         // Resolve the task's label ids to the project's label objects (name
@@ -1392,7 +1449,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 onOpen();
             }, 250);
         }, [onOpen]);
-        return (
+        const cardButton = (
             <TaskCardOuter
                 $dragDisabledByFilters={dragDisabledByFilters}
                 aria-label={
@@ -1610,6 +1667,34 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                     </CardMeta>
                 </CardFooter>
             </TaskCardOuter>
+        );
+        if (!selectable) {
+            return cardButton;
+        }
+        const selectLabel = formatTemplate(
+            (selected
+                ? microcopy.bulkEdit.deselectTask
+                : microcopy.bulkEdit.selectTask) as string,
+            { name: task.taskName }
+        );
+        return (
+            <SelectableShell data-selected={selected ? "true" : "false"}>
+                <SelectionCheckboxSlot
+                    $selected={Boolean(selected)}
+                    // Quarantine pointer events so toggling selection never
+                    // bubbles to the card's open handler or kicks off a drag.
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <Checkbox
+                        aria-label={selectLabel}
+                        checked={Boolean(selected)}
+                        data-testid="task-card-select"
+                        onChange={() => selection.toggle(task._id)}
+                    />
+                </SelectionCheckboxSlot>
+                {cardButton}
+            </SelectableShell>
         );
     }
 );

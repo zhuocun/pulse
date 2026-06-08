@@ -723,6 +723,31 @@ export const enSource = {
         wipLimitHelp: "0 means no limit.",
         wipLimitPlaceholder: "WIP limit (0 = none)"
     },
+    /*
+     * Bulk-edit toolbar (PRD-GAP-008 — board multi-select → PUT /tasks/bulk).
+     * Routing fields (column / project) are deliberately NOT offered; the
+     * server drops them. `selectedCount` / `applied` are one/other plural
+     * forms interpolated with `{count}`.
+     */
+    bulkEdit: {
+        toolbarAriaLabel: "Bulk edit selected tasks",
+        selectTask: "Select task {name}",
+        deselectTask: "Deselect task {name}",
+        clearSelection: "Clear selection",
+        applyAriaLabel: "Apply changes to the selected tasks",
+        setPriority: "Set priority",
+        setCoordinator: "Set coordinator",
+        setLabels: "Set labels",
+        selectedCount: {
+            one: "{count} task selected",
+            other: "{count} tasks selected"
+        },
+        applied: {
+            one: "Updated {count} task",
+            other: "Updated {count} tasks"
+        },
+        applyFailed: "Couldn't update the selected tasks. Please try again."
+    },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",
         confirmDiscardBody: "Your edits to this task will be lost.",
