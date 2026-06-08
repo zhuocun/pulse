@@ -351,6 +351,11 @@ const TaskCardOuter = styled.button<{ $dragDisabledByFilters?: boolean }>`
 const SelectableShell = styled.div`
     position: relative;
     width: 100%;
+
+    &:hover [data-select-slot],
+    &:focus-within [data-select-slot] {
+        opacity: 1;
+    }
 `;
 
 /**
@@ -374,11 +379,6 @@ const SelectionCheckboxSlot = styled.span<{ $selected: boolean }>`
     top: ${space.xs}px;
     transition: opacity 120ms ease-out;
     z-index: 2;
-
-    ${SelectableShell}:hover &,
-    ${SelectableShell}:focus-within & {
-        opacity: 1;
-    }
 
     @media (pointer: coarse) {
         align-items: center;
@@ -1681,6 +1681,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             <SelectableShell data-selected={selected ? "true" : "false"}>
                 <SelectionCheckboxSlot
                     $selected={Boolean(selected)}
+                    data-select-slot
                     // Quarantine pointer events so toggling selection never
                     // bubbles to the card's open handler or kicks off a drag.
                     onClick={(e) => e.stopPropagation()}
