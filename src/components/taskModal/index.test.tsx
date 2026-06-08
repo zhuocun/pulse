@@ -1456,6 +1456,70 @@ describe("TaskModal", () => {
             // (not dropped), so the backend unassigns it.
             expect(body.milestoneId).toBeNull();
         });
+
+        it("clearing parentTaskId/startDate/dueDate sends explicit null so the cleared values survive a refetch", async () => {
+            // Regression guard (PRD-GAP-005): the parent single-select and the
+            // date pickers clear to `undefined`, which `filterRequest` would
+            // normally strip — leaving the key absent so the backend treats the
+            // value as unchanged and a refetch resurrects the stale value. The
+            // modal opts these keys into `preserveNullKeys` and maps each
+            // cleared value to an explicit `null`, so the clear reaches the wire
+            // and the backend persists the unassignment (mirrors the
+            // `milestoneId` fix).
+            await openRichnessModal({
+                initialTasks: [
+                    task({
+                        parentTaskId: "task-2",
+                        startDate: "2026-03-01",
+                        dueDate: "2026-03-15"
+                    }),
+                    task({ _id: "task-2", taskName: "Fix bug", type: "Bug" })
+                ]
+            });
+
+            // Clear the parent-task single-select via its allow-clear button.
+            const parentControl = screen
+                .getByRole("combobox", { name: /parent task/i })
+                .closest(".ant-select") as HTMLElement;
+            const parentClear =
+                parentControl.querySelector(".ant-select-clear");
+            expect(parentClear).not.toBeNull();
+            fireEvent.mouseDown(parentClear as Element);
+            fireEvent.click(parentClear as Element);
+
+            // Clear both date pickers via their allow-clear buttons (each
+            // picker is seeded with the task's stored ISO date string).
+            const clearDatePicker = (displayValue: string) => {
+                const picker = (
+                    screen.getByDisplayValue(displayValue) as HTMLElement
+                ).closest(".ant-picker") as HTMLElement;
+                const clearBtn = picker.querySelector(".ant-picker-clear");
+                expect(clearBtn).not.toBeNull();
+                fireEvent.mouseDown(clearBtn as Element);
+                fireEvent.click(clearBtn as Element);
+            };
+            clearDatePicker("2026-03-01");
+            clearDatePicker("2026-03-15");
+
+            fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+            await waitFor(() =>
+                expect(
+                    fetchMock.mock.calls.some(
+                        ([, init]) =>
+                            (init as RequestInit | undefined)?.method === "PUT"
+                    )
+                ).toBe(true)
+            );
+            const body = lastPutBody();
+            expect(body._id).toBe("task-1");
+            // Each cleared field reaches the wire as an explicit `null` (not
+            // dropped), so the backend clears it and the next refetch returns
+            // the unassigned value rather than the stale one.
+            expect(body.parentTaskId).toBeNull();
+            expect(body.startDate).toBeNull();
+            expect(body.dueDate).toBeNull();
+        });
     });
 
     // ── FE-3 dependency editor (PRD §4.5) ────────────────────────────────

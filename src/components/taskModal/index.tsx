@@ -288,12 +288,12 @@ const TaskModal: React.FC<{
         ["tasks", { projectId }],
         undefined,
         (err) => setSaveError(err),
-        // `setCache` stays default; the trailing `["milestoneId"]` opts that
-        // one key into `filterRequest`'s preserve path so a cleared
-        // (`null`) milestone reaches the PUT and the backend CLEARS the
-        // assignment instead of treating the stripped/absent key as unchanged.
+        // `setCache` stays default; the trailing list opts these clearable
+        // scalar/date keys into `filterRequest`'s preserve path so a cleared
+        // (`null`/`""`) value reaches the PUT and the backend CLEARS the
+        // field instead of treating the stripped/absent key as unchanged.
         undefined,
-        ["milestoneId"]
+        ["milestoneId", "parentTaskId", "startDate", "dueDate"]
     );
     const { mutate: remove, isLoading: dLoading } = useReactMutation(
         "tasks",
@@ -513,12 +513,17 @@ const TaskModal: React.FC<{
             ...fieldValues,
             taskName: trimmedName
         } as ITask;
-        // The milestone single-select clears to `undefined`; convert to an
-        // explicit `null` so the (opt-in `preserveNullKeys`) PUT carries
-        // `milestoneId: null` and the backend CLEARS the assignment (a
-        // stripped/absent key would leave it unchanged). Harmless when already
-        // unassigned (null → backend no-op).
+        // Clearable FK / date fields share the milestone pattern: the
+        // single-select / date picker clears to `undefined`, so convert each
+        // to an explicit `null` so the (opt-in `preserveNullKeys`) PUT carries
+        // the cleared key and the backend CLEARS the field (a stripped/absent
+        // key would leave it unchanged). Harmless when already unset
+        // (null → backend no-op); the default-stripped dirty-check below treats
+        // an untouched unset field as equal so no needless PUT fires.
         merged.milestoneId = merged.milestoneId ?? null;
+        merged.parentTaskId = merged.parentTaskId ?? null;
+        merged.startDate = merged.startDate ?? null;
+        merged.dueDate = merged.dueDate ?? null;
         // Compare the FILTERED payloads. The form now registers optional
         // fields (dates, labelIds, assigneeIds, parentTaskId) that read back
         // as `undefined` / `null` / `""` when unset; `filterRequest` strips

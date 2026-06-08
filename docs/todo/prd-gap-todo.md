@@ -95,7 +95,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-005 — Extend `preserveNullKeys` to `parentTaskId` and the date fields
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.3; `feature-build-progress.md` (Open decisions — FE clear-semantics)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - Clearing `parentTaskId`, `startDate`, or `dueDate` in `TaskModal` sends the key as an explicit `null`/`""` (not stripped) so the PUT unassigns instead of silently keeping the old value.

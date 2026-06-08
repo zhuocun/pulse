@@ -560,7 +560,7 @@ const MilestoneBadge = styled.span`
  * simpler date-only rule.
  */
 const isTaskOverdue = (
-    dueDate: string | undefined,
+    dueDate: string | null | undefined,
     now: Date = new Date()
 ): boolean => {
     if (!dueDate) return false;

@@ -18,8 +18,8 @@ interface ITask {
     projectId: string;
     storyPoints: number;
     index: number;
-    startDate?: string;
-    dueDate?: string;
+    startDate?: string | null;
+    dueDate?: string | null;
     labelIds?: string[];
     assigneeIds?: string[];
     parentTaskId?: string | null;
