@@ -51,8 +51,10 @@ gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
     route + `ProjectMembersManager` (roster with roles; owner-gated add /
     change-role / remove; manager row immutable; read-only for
     non-owners) + `useProjectMemberMutations`.
-- [ ] **M5 — Unified Copilot rail rebuild; action-capable command palette;
-  shared saved views; cross-project search**.
+- [ ] **M5 — Action-capable command palette; shared saved views
+  (PRD-GAP-036); cross-project search**. *(Unified Copilot rail =
+  shipped `copilotDock`; rollout = PRD-GAP-006 in
+  [`prd-gap-todo.md`](prd-gap-todo.md).)*
 - [ ] **M6 — Reporting (velocity/WIP/throughput); admin AI-gating
   dashboard; keyboard-first surface**.
 - [ ] **M7 — Attachments (GridFS); real-time board sync (SSE);
@@ -101,7 +103,9 @@ escalation), both fixed before landing.
 - [ ] Public read-only share links; account/profile management
 - [ ] Platform horizon (SSO/OIDC, SCIM, PAT, billing) — high-level
 
-**[`collaboration-notifications.md`](../prd/collaboration-notifications.md)** — not started
+**[`collaboration-notifications.md`](../prd/collaboration-notifications.md)**
+— **depth** not started; base `mention` inbox + bell ship under M4. Tracked
+in [`prd-gap-todo.md`](prd-gap-todo.md) PRD-GAP-026–030.
 - [ ] Watchers/subscriptions; notification breadth + `actorId` + per-kind prefs
 - [ ] Comment reactions / threads / edit-history; per-task activity timeline
 - [ ] Transactional email + web-push delivery (infra-heavy — later)
@@ -116,7 +120,11 @@ escalation), both fixed before landing.
 
 **Also pending — M5 saved-views server model:** work-management-depth
 defers saved-view *persistence* to M5, built just before the alternate-views
-slice that consumes it.
+slice that consumes it. Actionable task: **PRD-GAP-036** in
+[`prd-gap-todo.md`](prd-gap-todo.md).
+
+**PRD gap index:** consolidated, adversarially reviewed actionable tasks live in
+[`prd-gap-todo.md`](prd-gap-todo.md) (36 tasks, tiers P0–P3).
 
 ### Open decisions (carry forward)
 - AI/agent routes (`ai.py`, `agents.py`) remain owner-gated. Decide in the
