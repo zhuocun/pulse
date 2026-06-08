@@ -174,13 +174,6 @@ const expandFilters = async () => {
     }
 };
 
-const expandViewOptions = async () => {
-    const toggle = screen.getByTestId("task-search-panel-view-options-toggle");
-    if (toggle.getAttribute("aria-expanded") !== "true") {
-        await userEvent.setup().click(toggle);
-    }
-};
-
 const getRenderedOptionLabels = () =>
     Array.from(
         document.body.querySelectorAll(".ant-select-item-option-content")
@@ -408,7 +401,6 @@ describe("TaskSearchPanel", () => {
         );
 
         await expandFilters();
-        await expandViewOptions();
 
         // Two filter selects (coordinator + type) plus the preset Select
         // both render the loading sentinel; we still assert there are at
@@ -433,8 +425,6 @@ describe("TaskSearchPanel", () => {
                 type: ""
             };
             const { store } = renderPanel({ param, setParam });
-            await expandFilters();
-            await expandViewOptions();
             await rtlUser.click(
                 screen.getByTestId("task-search-panel-save-preset")
             );
@@ -462,10 +452,8 @@ describe("TaskSearchPanel", () => {
             });
         });
 
-        it("disables the save button when no filter is active", async () => {
+        it("disables the save button when no filter is active", () => {
             renderPanel({ param: defaultParam });
-            await expandFilters();
-            await expandViewOptions();
             expect(
                 screen.getByTestId("task-search-panel-save-preset")
             ).toBeDisabled();
@@ -487,8 +475,6 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            await expandFilters();
-            await expandViewOptions();
             // Open the preset Select and pick the only option.
             // AntD's Select traps the selector behind nested divs; the
             // outer `.ant-select-selector` is the element that listens
@@ -528,8 +514,6 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            await expandFilters();
-            await expandViewOptions();
             const presetSelect = screen.getByLabelText(
                 microcopy.board.presets.loadAriaLabel as string
             ) as HTMLElement;
@@ -560,8 +544,6 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            await expandFilters();
-            await expandViewOptions();
             const presetSelect = screen.getByLabelText(
                 microcopy.board.presets.loadAriaLabel as string
             ) as HTMLElement;
@@ -592,8 +574,6 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            await expandFilters();
-            await expandViewOptions();
             // AntD's Select traps the selector behind nested divs; the
             // outer `.ant-select-selector` is the element that listens
             // for the open mousedown event in the codebase's existing
@@ -634,8 +614,6 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             const { store } = renderPanel({ initialPresets: [preset] });
-            await expandFilters();
-            await expandViewOptions();
             // AntD's Select traps the selector behind nested divs; the
             // outer `.ant-select-selector` is the element that listens
             // for the open mousedown event in the codebase's existing
@@ -700,8 +678,6 @@ describe("TaskSearchPanel", () => {
                 }
             ];
             renderPanel({ initialPresets: presets });
-            await expandFilters();
-            await expandViewOptions();
             // AntD's Select traps the selector behind nested divs; the
             // outer `.ant-select-selector` is the element that listens
             // for the open mousedown event in the codebase's existing
@@ -732,7 +708,6 @@ describe("TaskSearchPanel", () => {
         it("flips the slice's boardDensity when the user picks Compact", async () => {
             const { store } = renderPanel();
             await expandFilters();
-            await expandViewOptions();
             // AntD's Segmented hides the radios behind a label that
             // owns the click; click the visible label rather than the
             // hidden input (which carries `pointer-events: none`).
@@ -750,7 +725,6 @@ describe("TaskSearchPanel", () => {
         it("reflects the slice's current value on mount", async () => {
             renderPanel();
             await expandFilters();
-            await expandViewOptions();
             const comfortableRadio = screen.getByRole("radio", {
                 name: microcopy.board.densityComfortable
             });
