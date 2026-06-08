@@ -175,9 +175,7 @@ const expandFilters = async () => {
 };
 
 const expandViewOptions = async () => {
-    const toggle = screen.getByTestId(
-        "task-search-panel-view-options-toggle"
-    );
+    const toggle = screen.getByTestId("task-search-panel-view-options-toggle");
     if (toggle.getAttribute("aria-expanded") !== "true") {
         await userEvent.setup().click(toggle);
     }

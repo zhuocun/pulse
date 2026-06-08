@@ -120,9 +120,7 @@ describe("UnifiedNotificationsBell", () => {
 
     it("fires onClick when pressed", () => {
         const onClick = jest.fn();
-        render(
-            <UnifiedNotificationsBell onClick={onClick} unreadCount={0} />
-        );
+        render(<UnifiedNotificationsBell onClick={onClick} unreadCount={0} />);
         fireEvent.click(screen.getByTestId("unified-notifications-bell"));
         expect(onClick).toHaveBeenCalledTimes(1);
     });
@@ -169,14 +167,10 @@ describe("UnifiedNotificationsDrawer", () => {
         const tabs = screen.getByTestId("unified-notifications-tabs");
         expect(tabs).toBeInTheDocument();
         expect(
-            within(tabs).getByText(
-                microcopy.unifiedNotifications.tabActivity
-            )
+            within(tabs).getByText(microcopy.unifiedNotifications.tabActivity)
         ).toBeInTheDocument();
         expect(
-            within(tabs).getByText(
-                microcopy.unifiedNotifications.tabAlerts
-            )
+            within(tabs).getByText(microcopy.unifiedNotifications.tabAlerts)
         ).toBeInTheDocument();
     });
 
@@ -185,9 +179,7 @@ describe("UnifiedNotificationsDrawer", () => {
         expect(
             screen.getByTestId("unified-activity-panel")
         ).toBeInTheDocument();
-        expect(
-            screen.getByTestId("activity-feed-empty")
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("activity-feed-empty")).toBeInTheDocument();
     });
 
     it("shows activity feed events in the Activity tab", () => {
@@ -218,9 +210,7 @@ describe("UnifiedNotificationsDrawer", () => {
             microcopy.unifiedNotifications.tabAlerts
         );
         fireEvent.click(alertsLabel);
-        expect(
-            screen.getByTestId("unified-alerts-panel")
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("unified-alerts-panel")).toBeInTheDocument();
         expect(screen.getByText("Mention A")).toBeInTheDocument();
     });
 

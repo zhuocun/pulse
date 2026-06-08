@@ -282,9 +282,7 @@ export const UnifiedNotificationsBell: React.FC<
 > = ({ unreadCount, onClick }) => {
     const ariaLabel =
         unreadCount === 0
-            ? microcopyString(
-                  microcopy.unifiedNotifications.bellAriaLabelZero
-              )
+            ? microcopyString(microcopy.unifiedNotifications.bellAriaLabelZero)
             : microcopyString(
                   unreadCount === 1
                       ? microcopy.unifiedNotifications.bellAriaLabelOne

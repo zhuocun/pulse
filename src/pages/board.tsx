@@ -8,13 +8,7 @@ import {
     UnorderedListOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Dropdown,
-    Skeleton,
-    Typography
-} from "antd";
+import { Alert, Button, Dropdown, Skeleton, Typography } from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -901,13 +895,10 @@ const BoardPage = () => {
                                   {
                                       key: "project-ai",
                                       label: aiDisabledForProject
-                                          ? microcopy.board
-                                                .enableCopilotOnBoard
+                                          ? microcopy.board.enableCopilotOnBoard
                                           : microcopy.board
                                                 .copilotMenuProjectOff,
-                                      icon: (
-                                          <SettingOutlined aria-hidden />
-                                      ),
+                                      icon: <SettingOutlined aria-hidden />,
                                       onClick: () =>
                                           setProjectAiDisabled(
                                               !aiDisabledForProject
