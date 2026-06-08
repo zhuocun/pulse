@@ -280,7 +280,7 @@ export const enSource = {
             boards: "Boards",
             inbox: "Inbox",
             copilot: "Copilot",
-            profile: "Profile",
+            profile: "Settings",
             search: "Search"
         }
     },
@@ -606,8 +606,8 @@ export const enSource = {
     },
     board: {
         title: "Board",
-        titleWithName: "{name} board",
-        swipeHint: "Swipe to see more columns",
+        titleWithName: "{name}",
+        swipeHint: "Swipe for more columns",
         enableCopilotOnBoard: "Enable on this board",
         copilotMenuAsk: "Ask Copilot",
         copilotMenuBrief: "Board brief",
@@ -1018,7 +1018,7 @@ export const enSource = {
         }
     },
     projectsPage: {
-        title: "Projects",
+        title: "Boards",
         subtitle:
             "Browse the boards your team is shipping. Filter, search, or create a new project to start tracking work.",
         totalProjects: "Total projects",
@@ -1041,7 +1041,7 @@ export const enSource = {
         register: "Sign up",
         forgotPassword: "Reset your password",
         terms: "Terms of Service",
-        projects: "Projects",
+        projects: "Boards",
         inbox: "Inbox",
         copilot: "Copilot",
         settings: "Settings",

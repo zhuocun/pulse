@@ -48,3 +48,6 @@ __pycache__/
 
 # Claude Code subagent worktrees (transient; never committed)
 .claude/worktrees/
+
+# UX sweep screenshots & harness
+/.ux-sweep/

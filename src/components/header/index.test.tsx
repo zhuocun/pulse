@@ -735,34 +735,26 @@ describe("Header", () => {
             installAntdBrowserMocks();
         });
 
-        it("resolves the top-level route to its contextual title", () => {
-            expect(resolveMobileHeaderTitle("/projects")).toBe(
-                microcopy.nav.tabs.boards
-            );
+        it("returns null for top-level tab routes that render their own page heading", () => {
+            expect(resolveMobileHeaderTitle("/projects")).toBeNull();
             expect(
                 resolveMobileHeaderTitle("/projects/abc123/board")
             ).toBeNull();
             expect(
                 resolveMobileHeaderTitle("/projects/abc/reports")
             ).toBeNull();
-            expect(resolveMobileHeaderTitle("/inbox")).toBe(
-                microcopy.nav.tabs.inbox
-            );
-            expect(resolveMobileHeaderTitle("/copilot")).toBe(
-                microcopy.nav.tabs.copilot
-            );
-            expect(resolveMobileHeaderTitle("/settings")).toBe(
-                microcopy.settings.pageTitle
-            );
+            expect(resolveMobileHeaderTitle("/inbox")).toBeNull();
+            expect(resolveMobileHeaderTitle("/copilot")).toBeNull();
+            expect(resolveMobileHeaderTitle("/settings")).toBeNull();
             expect(resolveMobileHeaderTitle("/anything-else")).toBeNull();
         });
 
-        it("renders the contextual title in phone chrome on a top-level route", () => {
+        it("does not render a centered duplicate title on top-level phone routes", () => {
             installCoarsePointer();
             renderHeader("/projects");
             expect(
-                screen.getByText(microcopy.nav.tabs.boards)
-            ).toBeInTheDocument();
+                screen.queryByRole("heading", { level: 1, name: /boards/i })
+            ).not.toBeInTheDocument();
         });
 
         it("suppresses the contextual title on board / project-detail routes", () => {

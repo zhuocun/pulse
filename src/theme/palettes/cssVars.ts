@@ -199,7 +199,7 @@ html[data-color-scheme="light"] {
     --color-copilot-pulse: rgba(${p.accent.rgb}, 0.45);
 
     --glass-surface: rgba(255, 255, 255, 0.68);
-    --glass-surface-strong: rgba(255, 255, 255, 0.82);
+    --glass-surface-strong: rgba(255, 255, 255, 0.96);
     --glass-surface-subtle: rgba(255, 255, 255, 0.50);
     --glass-border: rgba(15, 23, 42, 0.06);
     --glass-border-strong: rgba(${p.accent.rgb}, 0.22);
@@ -295,7 +295,7 @@ html[data-color-scheme="dark"] {
     --color-copilot-pulse: rgba(${p.accent.rgbDark}, 0.5);
 
     --glass-surface: rgba(10, 12, 8, 0.55);
-    --glass-surface-strong: rgba(10, 12, 8, 0.74);
+    --glass-surface-strong: rgba(10, 12, 8, 0.88);
     --glass-surface-subtle: rgba(10, 12, 8, 0.35);
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-border-strong: rgba(${p.accent.rgbDark}, 0.30);

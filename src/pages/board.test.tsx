@@ -5,6 +5,7 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
@@ -324,7 +325,7 @@ describe("BoardPage", () => {
         );
         renderBoard();
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", {
                 name: /Board Copilot menu/i
@@ -343,7 +344,7 @@ describe("BoardPage", () => {
     it("mounts MemberPopover in the BoardActions row, surfacing team avatars when members are present (QW-12)", async () => {
         renderBoard();
         // Wait for the board to settle so members query resolves.
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         // The MemberPopover trigger advertises itself with the
         // "View team members" aria-label and shows the count + initials of
@@ -367,7 +368,7 @@ describe("BoardPage", () => {
         );
         renderBoard("/projects/project-1/board?semanticIds=task-1");
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         await waitFor(() => {
             expect(screen.getByTestId("current-search")).not.toHaveTextContent(
                 "semanticIds"
@@ -383,7 +384,7 @@ describe("BoardPage", () => {
         );
         renderBoard();
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         fireEvent.click(
             screen.getByRole("button", { name: /Board Copilot settings/i })
         );
@@ -414,7 +415,7 @@ describe("BoardPage", () => {
     it("renders the launcher badge aria-label as a human-readable string (no ICU template syntax)", async () => {
         store.dispatch(overlaysActions.setCopilotDockInboxUnread(3));
         renderBoard();
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         const badge = screen.getByTestId("copilot-launcher-badge");
         const ariaLabel = badge.getAttribute("aria-label") ?? "";
@@ -428,7 +429,7 @@ describe("BoardPage", () => {
     it("uses the singular badge aria-label when the unread count is exactly 1", async () => {
         store.dispatch(overlaysActions.setCopilotDockInboxUnread(1));
         renderBoard();
-        await screen.findByText("Roadmap board");
+        await screen.findByText("Roadmap");
 
         const badge = screen.getByTestId("copilot-launcher-badge");
         expect(badge.getAttribute("aria-label")).toBe("1 unread Copilot nudge");
@@ -497,7 +498,7 @@ describe("BoardPage", () => {
             await Promise.resolve();
         });
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(await screen.findByText("Build task")).toBeInTheDocument();
         expect(screen.getByText("Fix bug")).toBeInTheDocument();
         expect(screen.getByText("Optimistic task")).toBeInTheDocument();
@@ -524,7 +525,7 @@ describe("BoardPage", () => {
             "/projects/project-1/board?taskName=Fix&type=Bug&coordinatorId=member-2"
         );
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(screen.getByText("Fix bug")).toBeInTheDocument();
         expect(screen.queryByText("Build task")).not.toBeInTheDocument();
         expect(
@@ -536,7 +537,7 @@ describe("BoardPage", () => {
         renderBoard();
         store.dispatch(overlaysActions.startEditingTask("task-1"));
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(
             await screen.findByDisplayValue("Build task")
         ).toBeInTheDocument();
@@ -597,7 +598,7 @@ describe("BoardPage", () => {
         });
         renderBoard();
 
-        expect(await screen.findByText("Roadmap board")).toBeInTheDocument();
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
         expect(screen.getByText("Add your first column")).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "Create your first column" })
@@ -617,12 +618,16 @@ describe("BoardPage", () => {
     });
 
     describe("A7 lenses", () => {
-        it("mounts the lens chip row above the filter rail", async () => {
+        it("mounts the lens chip row behind the lenses toggle", async () => {
             renderBoard();
 
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+
             expect(
-                await screen.findByText("Roadmap board")
-            ).toBeInTheDocument();
+                screen.queryByRole("group", { name: /board lenses/i })
+            ).not.toBeInTheDocument();
+
+            await userEvent.click(screen.getByTestId("board-lenses-toggle"));
 
             expect(
                 screen.getByRole("group", { name: /board lenses/i })
@@ -641,9 +646,7 @@ describe("BoardPage", () => {
             // Wait for the board to render; the seeded user is member-1
             // (Alice), so only "Build task" (coordinatorId: member-1)
             // should remain on the board. "Fix bug" belongs to member-2.
-            expect(
-                await screen.findByText("Roadmap board")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             await waitFor(() => {
                 expect(screen.getByText("Build task")).toBeInTheDocument();
             });
@@ -661,9 +664,7 @@ describe("BoardPage", () => {
             // Both must apply.
             renderBoard("/projects/project-1/board?lens=mine&type=Task");
 
-            expect(
-                await screen.findByText("Roadmap board")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             // Build task is type=Task AND coordinated by member-1 → visible.
             expect(screen.getByText("Build task")).toBeInTheDocument();
             // Fix bug is type=Bug AND coordinated by member-2 → hidden by
@@ -674,9 +675,7 @@ describe("BoardPage", () => {
         it("graceful-skips the Today lens (no dueDate on ITask yet) — board renders unchanged", async () => {
             renderBoard("/projects/project-1/board?lens=today");
 
-            expect(
-                await screen.findByText("Roadmap board")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
             // No dueDate → predicate is a no-op → both tasks visible.
             await waitFor(() => {
                 expect(screen.getByText("Build task")).toBeInTheDocument();
@@ -687,9 +686,9 @@ describe("BoardPage", () => {
         it("toggles the lens via URL when chips are clicked, and clears on re-click", async () => {
             renderBoard();
 
-            expect(
-                await screen.findByText("Roadmap board")
-            ).toBeInTheDocument();
+            expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+
+            await userEvent.click(screen.getByTestId("board-lenses-toggle"));
 
             const mineChip = screen.getByRole("button", { name: /mine/i });
             fireEvent.click(mineChip);
@@ -718,7 +717,7 @@ describe("BoardPage", () => {
             mockedUseIsPhoneChrome.mockReturnValue(true);
             renderBoard();
 
-            await screen.findByText("Roadmap board");
+            await screen.findByText("Roadmap");
 
             const cluster = await screen.findByTestId("board-actions-cluster");
             // MemberPopover trigger is clustered.
@@ -760,7 +759,7 @@ describe("BoardPage", () => {
             mockedUseIsPhoneChrome.mockReturnValue(false);
             renderBoard();
 
-            await screen.findByText("Roadmap board");
+            await screen.findByText("Roadmap");
 
             // No glass capsule on desktop.
             expect(
@@ -815,7 +814,7 @@ describe("BoardPage", () => {
                 return Promise.resolve(response({}));
             });
             renderBoard();
-            await screen.findByText("Roadmap board");
+            await screen.findByText("Roadmap");
 
             // Closed by default — the drawer body is not mounted.
             expect(

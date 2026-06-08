@@ -139,6 +139,12 @@ describe("ProjectPage with Board Copilot enabled", () => {
             await screen.findByLabelText("Message Board Copilot")
         ).toBeInTheDocument();
 
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /toggle ai smart search/i
+            })
+        );
+
         fireEvent.change(
             screen.getByRole("textbox", { name: /Find related projects/i }),
             {

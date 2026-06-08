@@ -428,55 +428,57 @@ const ProjectDetailPage = () => {
 
     return (
         <Container>
-            <TopBar
-                data-glass-context="true"
-                data-testid="project-detail-chrome"
-            >
-                <BreadcrumbWrapper>
-                    <Breadcrumb items={breadcrumbItems} />
-                </BreadcrumbWrapper>
-                {/*
-                 * In-project navigation (Phase 4.7). Hidden while the
-                 * project query is in-flight to avoid a layout
-                 * flicker; we surface it as soon as the project
-                 * resolves so the nav row can't outlive a 404 body.
-                 */}
-                {project && projectId && !isPhoneChrome ? (
-                    <ChildNav
-                        aria-label={microcopy.labels.projectSections}
-                        data-testid="project-detail-child-nav"
-                    >
-                        <ChildNavLink
-                            end
-                            to={`/projects/${projectId}/board`}
-                            viewTransition
+            {!(isPhoneChrome && activeChild === "board") ? (
+                <TopBar
+                    data-glass-context="true"
+                    data-testid="project-detail-chrome"
+                >
+                    <BreadcrumbWrapper>
+                        <Breadcrumb items={breadcrumbItems} />
+                    </BreadcrumbWrapper>
+                    {/*
+                     * In-project navigation (Phase 4.7). Hidden while the
+                     * project query is in-flight to avoid a layout
+                     * flicker; we surface it as soon as the project
+                     * resolves so the nav row can't outlive a 404 body.
+                     */}
+                    {project && projectId && !isPhoneChrome ? (
+                        <ChildNav
+                            aria-label={microcopy.labels.projectSections}
+                            data-testid="project-detail-child-nav"
                         >
-                            {microcopy.labels.board}
-                        </ChildNavLink>
-                        <ChildNavLink
-                            end
-                            to={`/projects/${projectId}/members`}
-                            viewTransition
-                        >
-                            {microcopy.labels.members}
-                        </ChildNavLink>
-                        <ChildNavLink
-                            end
-                            to={`/projects/${projectId}/milestones`}
-                            viewTransition
-                        >
-                            {microcopy.labels.milestones}
-                        </ChildNavLink>
-                        <ChildNavLink
-                            end
-                            to={`/projects/${projectId}/reports`}
-                            viewTransition
-                        >
-                            {microcopy.labels.reports}
-                        </ChildNavLink>
-                    </ChildNav>
-                ) : null}
-            </TopBar>
+                            <ChildNavLink
+                                end
+                                to={`/projects/${projectId}/board`}
+                                viewTransition
+                            >
+                                {microcopy.labels.board}
+                            </ChildNavLink>
+                            <ChildNavLink
+                                end
+                                to={`/projects/${projectId}/members`}
+                                viewTransition
+                            >
+                                {microcopy.labels.members}
+                            </ChildNavLink>
+                            <ChildNavLink
+                                end
+                                to={`/projects/${projectId}/milestones`}
+                                viewTransition
+                            >
+                                {microcopy.labels.milestones}
+                            </ChildNavLink>
+                            <ChildNavLink
+                                end
+                                to={`/projects/${projectId}/reports`}
+                                viewTransition
+                            >
+                                {microcopy.labels.reports}
+                            </ChildNavLink>
+                        </ChildNav>
+                    ) : null}
+                </TopBar>
+            ) : null}
             <Body>
                 {pError ? (
                     <Alert

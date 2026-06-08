@@ -266,7 +266,7 @@ describe("Board AI integration (App + local engine)", () => {
         expect(
             await screen.findByRole(
                 "heading",
-                { name: /alpha board/i },
+                { name: /^alpha$/i },
                 { timeout: 5000 }
             )
         ).toBeInTheDocument();
@@ -300,6 +300,12 @@ describe("Board AI integration (App + local engine)", () => {
     it("runs natural language task search and filters the task list", async () => {
         const user = await loginAndOpenBoard();
 
+        await user.click(
+            screen.getByRole("button", {
+                name: /toggle ai smart search/i
+            })
+        );
+
         const nlInput = screen.getByRole("textbox", {
             name: /Find related tasks/i
         });
@@ -315,6 +321,12 @@ describe("Board AI integration (App + local engine)", () => {
 
     it("toggles Project AI off and hides the natural language search slot", async () => {
         const user = await loginAndOpenBoard();
+
+        await user.click(
+            screen.getByRole("button", {
+                name: /toggle ai smart search/i
+            })
+        );
 
         expect(
             screen.getByRole("textbox", { name: /Find related tasks/i })
