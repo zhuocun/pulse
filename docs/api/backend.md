@@ -1134,6 +1134,19 @@ Beyond the base fields (`taskName`, `type`, `epic`, `storyPoints`, `note`, `colu
 
 `coordinatorId` remains the **primary** assignee (a single user id); `assigneeIds` is the additional list.
 
+It also carries the following **work-management depth** fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `priority` | string | Urgency, one of `"none"` / `"low"` / `"medium"` / `"high"` / `"urgent"`. Default `"none"`. A derived rank (`urgent`=4 … `none`=0) drives sorting server-side and is **never** stored. Validated against the enum on every write (`param: "priority"`). |
+| `dependsOn` | string[] | Prerequisite edge-list — the same-project task ids this task is blocked by. Default `[]`. Must be a `list[str]`; each id must exist in the **same project**, must not be the task itself, and the resulting graph must stay **acyclic** (a DAG of arbitrary depth, distinct from the one-level `parentTaskId` tree). See [Dependencies](#dependencies-dependson). |
+| `milestoneId` | string \| null | Optional FK onto a [milestone](#20-milestones). Default `null`. A non-empty value must reference a milestone in the **same project**; clearing (`null` / `""`) is always allowed. NULLed automatically when the milestone is deleted. |
+| `completedAt` | string \| null | **Server-managed** completion stamp (ISO string, or `null`). Set when the task enters a `category == "done"` column and cleared when it leaves. **Never client-written** — a `completedAt` in a write body is dropped (see [Task lifecycle](#task-lifecycle-completion--archive--trash)). |
+| `archivedAt` | string \| null | **Server-managed** archive marker (ISO string, or `null`). Set/cleared only via `PUT /tasks/archive`. |
+| `deletedAt` | string \| null | **Server-managed** trash marker (ISO string, or `null`). Set via the default soft `DELETE /tasks`; cleared via `PUT /tasks/restore`. |
+
+On read, `GET /api/v1/tasks/` additionally annotates each task with a **derived** `blockedBy` array (the subset of `dependsOn` whose prerequisites are still unfinished). It is computed on read, **not stored**, and never accepted on a write — see [Dependencies](#dependencies-dependson).
+
 ---
 
 ### GET /api/v1/tasks/
@@ -1142,11 +1155,15 @@ Retrieve all tasks for a project, sorted by `index` within each column.
 
 **Auth:** Required (`viewer` on the project).
 
-**Query parameter:**
+**Query parameters:**
 
 | Parameter | Type | Notes |
 |---|---|---|
 | `projectId` | string | Required |
+| `includeArchived` | boolean | Optional (default `false`). When `true`, archived tasks (those with `archivedAt` set) are also returned. |
+| `includeTrashed` | boolean | Optional (default `false`). When `true`, trashed tasks (those with `deletedAt` set) are also returned. |
+
+By default archived and trashed tasks are **excluded**. The flags **widen** the result to also include those rows — they do not scope it to only-archived / only-trashed — so a recovery view that wants only the trash must filter the widened response on `deletedAt`/`archivedAt`. The zero-tasks default-seed decision is made against the **raw** task set, so a project whose only tasks are trashed/archived is not re-seeded.
 
 **Response — 200 OK:**
 
@@ -1167,10 +1184,19 @@ Retrieve all tasks for a project, sorted by `index` within each column.
     "dueDate": "2026-06-15",
     "labelIds": ["label_bug", "label_p1"],
     "assigneeIds": ["64b2a3d4c5e6f7a8b9c0d1e2"],
-    "parentTaskId": null
+    "parentTaskId": null,
+    "priority": "high",
+    "dependsOn": ["task_000"],
+    "blockedBy": ["task_000"],
+    "milestoneId": "ms_v1",
+    "completedAt": null,
+    "archivedAt": null,
+    "deletedAt": null
   }
 ]
 ```
+
+`blockedBy` is the **derived** read-only subset of `dependsOn` whose prerequisites are unfinished (a non-empty array means the task is blocked). It is computed on read and never sent on a write.
 
 **Status codes:**
 
@@ -1225,6 +1251,11 @@ Create a new task. Only the routing/identity fields (`projectId`, `columnId`, `t
 | `labelIds` | string[] | Optional; list of strings. Default `[]`. |
 | `assigneeIds` | string[] | Optional; list of strings. Default `[]`. |
 | `parentTaskId` | string \| null | Optional; parent task `_id` or `null`. Default `null`. Validated per [Sub-tasks](#sub-tasks-parenttaskid). |
+| `priority` | string | Optional; one of the five-member enum. Default `"none"`. |
+| `dependsOn` | string[] | Optional; same-project task ids. Default `[]`. Validated per [Dependencies](#dependencies-dependson) (existence + same-project + no self; the cycle check is inert on create because a new task has no inbound edges yet). |
+| `milestoneId` | string \| null | Optional; same-project milestone `_id` or `null`. Default `null`. |
+
+> `completedAt` is set automatically when `columnId` resolves to a `category == "done"` column at create time; it is never read from the body.
 
 **Response — 201 Created:**
 
@@ -1280,6 +1311,12 @@ Update a task. Every field except `_id` and the ordering-managed `index` is writ
 | `labelIds` | string[] | Optional; list of strings |
 | `assigneeIds` | string[] | Optional; list of strings |
 | `parentTaskId` | string \| null | Optional; validated per [Sub-tasks](#sub-tasks-parenttaskid). `null`/`""` clears the parent. |
+| `priority` | string | Optional; one of the five-member enum. |
+| `dependsOn` | string[] | Optional; same-project task ids. Validated per [Dependencies](#dependencies-dependson) (existence + same-project + no self + **acyclic**). |
+| `milestoneId` | string \| null | Optional; same-project milestone `_id`. `null`/`""` clears the assignment. |
+| `force` | boolean | Optional; when `true`, bypasses the [dependency move-to-done gate](#dependency-move-to-done-gate) for this update. Not stored. |
+
+> `completedAt`, `archivedAt`, and `deletedAt` are **server-managed** and dropped from the write body. `completedAt` is reconciled against the destination column on every update (stamped on entering done, cleared on leaving). Use `PUT /tasks/archive`, `PUT /tasks/restore`, and `DELETE /tasks` for the archive/trash markers.
 
 **Response — 200 OK:**
 
@@ -1292,7 +1329,7 @@ Update a task. Every field except `_id` and the ordering-managed `index` is writ
 | Code | Condition |
 |---|---|
 | 200 | Updated successfully |
-| 400 | A field fails validation (e.g. empty `taskName`, bad `storyPoints`/dates/id-lists, or an invalid `parentTaskId`) |
+| 400 | A field fails validation (e.g. empty `taskName`, bad `storyPoints`/dates/id-lists, invalid `parentTaskId`/`priority`/`milestoneId`/`dependsOn`), or the move is blocked by the dependency gate (`"Blocked by dependencies"`) |
 | 401 | Missing or invalid JWT |
 | 403 | Caller lacks `editor` access to the task's current or target project |
 | 404 | Task not found, or referenced column/project/coordinator does not exist |
@@ -1312,6 +1349,11 @@ These rules apply to `POST /api/v1/tasks/`, `PUT /api/v1/tasks/`, and `PUT /api/
 | `labelIds` / `assigneeIds` | When present, must be a **list of strings**. |
 | `taskName` (update) | When present, must be a non-empty string. |
 | `parentTaskId` | See [Sub-tasks](#sub-tasks-parenttaskid). |
+| `priority` | When present, must be one of `"none"` / `"low"` / `"medium"` / `"high"` / `"urgent"`. |
+| `dependsOn` | When present, must be a list of same-project task ids (no self, acyclic). See [Dependencies](#dependencies-dependson). |
+| `milestoneId` | When present and non-empty, must reference a milestone in the same project. |
+
+`priority` is validated on create, update, **and** bulk. `dependsOn` and `milestoneId` are validated on create + single update (they need the resolved project/task context) but are **excluded** from `PUT /tasks/bulk` (see [PUT /api/v1/tasks/bulk](#put-apiv1tasksbulk)).
 
 ### Sub-tasks (`parentTaskId`)
 
@@ -1321,21 +1363,58 @@ A task may reference a parent via `parentTaskId`. When set to a non-empty value 
 - The parent must live in the **same project** as the child.
 - The parent must **not be the task itself** (no self-parent).
 
-Clearing the parent (`null` or `""`) is always allowed. Only **one level** of nesting is supported — the server does not walk an ancestor chain, so it does not prevent deeper graphs beyond the immediate self-reference guard; the board treats parentage as a single level. On parent **deletion**, children are **orphaned to top-level** (their `parentTaskId` is set to `null`); they are never cascade-deleted (see `DELETE` below).
+Clearing the parent (`null` or `""`) is always allowed. Only **one level** of nesting is supported — the server does not walk an ancestor chain, so it does not prevent deeper graphs beyond the immediate self-reference guard; the board treats parentage as a single level. On parent **purge** (hard delete), children are **orphaned to top-level** (their `parentTaskId` is set to `null`); they are never cascade-deleted (see [`DELETE`](#delete-apiv1tasks) below).
+
+---
+
+### Dependencies (`dependsOn`)
+
+`dependsOn` is a task's prerequisite edge-list — the same-project tasks that must be finished first. Unlike the one-level `parentTaskId` tree, `dependsOn` is a **DAG of arbitrary depth**.
+
+Validation (on create + single `PUT /tasks/`):
+
+- The value must be a `list[str]`.
+- Each id must reference a task that **exists in the same project**.
+- A task may **not depend on itself**.
+- Adding the edges must keep the project's dependency graph **acyclic** — adding `task → d` is rejected (`"Dependency cycle detected"`) if `d` already (transitively) depends on the task. The cycle guard is inert on create (a new task has no inbound edges yet).
+
+`dependsOn` is **excluded** from `PUT /tasks/bulk` (fanning one prerequisite set across many tasks is almost always wrong and makes the per-task cycle check ambiguous) — dependency edges are set one task at a time via single `PUT /tasks/`.
+
+**Derived `blockedBy` (read-only).** `GET /tasks` annotates each task with `blockedBy`: the subset of its `dependsOn` ids that resolve to an in-project task sitting in a non-`done` column (a dangling id is skipped, never counted as blocking). It is computed on read using the same done-resolution as the move-to-done gate (so the badge and the gate agree), is **not stored**, and is never accepted on a write.
+
+### Dependency move-to-done gate
+
+When a task is moved **into a `done`-category column** (via `PUT /tasks/` changing `columnId`, or `PUT /tasks/orders` dragging across columns) while one or more of its `dependsOn` prerequisites is still **unfinished** (its own column is not `done`), the move is **rejected** with `400 "Blocked by dependencies"`. The gate is bypassed when:
+
+- the request body carries `force: true`, **or**
+- the project has `enforceDependencyGate: false` (see [`PUT /api/v1/projects/`](#put-apiv1projects)).
+
+A within-`done` reorder is not gated (the source is already done), and a dangling prerequisite is ignored.
+
+### Task lifecycle (completion / archive / trash)
+
+A task carries three independent server-managed lifecycle markers:
+
+- **`completedAt`** — stamped when the task enters a `category == "done"` column and cleared when it leaves. Reconciled on create, single update, and reorder. Never client-written (a body value is dropped after the write-allowlist filter).
+- **`archivedAt`** — set/cleared only via [`PUT /tasks/archive`](#put-apiv1tasksarchive).
+- **`deletedAt`** — set by the default soft [`DELETE /tasks`](#delete-apiv1tasks); cleared (along with `archivedAt`) by [`PUT /tasks/restore`](#put-apiv1tasksrestore).
+
+`GET /tasks` excludes archived and trashed tasks by default; the `includeArchived` / `includeTrashed` flags widen the read.
 
 ---
 
 ### DELETE /api/v1/tasks/
 
-Delete a task. Its sub-tasks (children referencing it as `parentTaskId`) are **orphaned to top-level** rather than deleted, and the remaining tasks in the column have their `index` values re-packed contiguously.
+Delete a task. By default this is a **soft delete** (the task is moved to the trash by stamping `deletedAt`; children are **not** orphaned and sibling indices are **not** re-packed, so a later `/restore` brings the task and its position/links back losslessly). Passing `?purge=true` performs the legacy **hard delete**: sub-tasks (children referencing it as `parentTaskId`) are **orphaned to top-level**, and the remaining tasks in the column have their `index` values re-packed contiguously.
 
 **Auth:** Required (`editor` on the task's project).
 
-**Query parameter:**
+**Query parameters:**
 
 | Parameter | Type | Notes |
 |---|---|---|
 | `taskId` | string | Required |
+| `purge` | boolean | Optional (default `false`). `false` = soft-delete (trash). `true` = hard delete (orphan children + re-pack). Both return `"Task deleted"`. |
 
 **Response — 200 OK:**
 
@@ -1347,11 +1426,79 @@ Delete a task. Its sub-tasks (children referencing it as `parentTaskId`) are **o
 
 | Code | Condition |
 |---|---|
-| 200 | Task deleted (children orphaned; sibling indices re-packed) |
+| 200 | Task deleted (soft by default; hard delete with `?purge=true`) |
 | 400 | `taskId` not provided |
 | 401 | Missing or invalid JWT |
 | 403 | Caller lacks `editor` access to the task's project |
 | 404 | Task not found |
+
+---
+
+### PUT /api/v1/tasks/restore
+
+Un-trash **and** un-archive a task (clears both `deletedAt` and `archivedAt`), bringing it back to the active board in one step.
+
+**Auth:** Required (`editor` on the task's project).
+
+**Request body:**
+
+```json
+{"_id": "task_001"}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the task to restore |
+
+**Response — 200 OK:**
+
+```json
+"Task restored"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Task restored |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the task's project |
+| 404 | `_id` missing or task not found |
+
+---
+
+### PUT /api/v1/tasks/archive
+
+Archive or un-archive a task (stamps or clears `archivedAt`). Existence + access are checked **before** `archived` is validated, so a non-member cannot probe a task's existence with a malformed body.
+
+**Auth:** Required (`editor` on the task's project).
+
+**Request body:**
+
+```json
+{"_id": "task_001", "archived": true}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required |
+| `archived` | boolean | Required — `true` archives (stamps `archivedAt`), `false` un-archives (clears it). Must be a boolean (else `400 "Bad request"`). |
+
+**Response — 200 OK:**
+
+```json
+"Task archived"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Task archived / un-archived |
+| 400 | `archived` is not a boolean |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `editor` access to the task's project |
+| 404 | `_id` missing or task not found |
 
 ---
 
@@ -1382,7 +1529,7 @@ Apply one set of metadata `changes` to many tasks at once (fan-out edit).
 | `taskIds` | string[] | Required, non-empty list of task ids |
 | `changes` | object | Required, non-empty object of fields to apply to every listed task |
 
-**Editable subset.** `changes` may set any task field **except `columnId` and `projectId`** (and the ordering-managed `index`) — positional/routing moves must go through `PUT /api/v1/tasks/orders` or a single `PUT /api/v1/tasks/`, where index re-packing and project re-validation happen. **Unknown or disallowed keys in `changes` are silently dropped**, so a client may send a wider patch object and trust the server to keep only the safe fields. If, after dropping disallowed keys, nothing editable remains, the request is a `400`.
+**Editable subset.** `changes` may set any task field **except the positional/routing `columnId` and `projectId`** (and the ordering-managed `index`), **and except `dependsOn` and `milestoneId`** — positional/routing moves must go through `PUT /api/v1/tasks/orders` or a single `PUT /api/v1/tasks/`, and dependency edges / milestone assignment are set one task at a time (a fan-out cycle check is ambiguous). `priority` **is** bulk-editable (and validated against the enum across the set). **Unknown or disallowed keys in `changes` are silently dropped**, so a client may send a wider patch object and trust the server to keep only the safe fields. If, after dropping disallowed keys, nothing editable remains, the request is a `400`.
 
 **All-or-nothing on validation.** Every target id is resolved up front: **a single unknown id fails the whole batch with `404`** before anything is written. The same invariants the single-task path enforces are re-run on the change set (`storyPoints`, dates, id-lists, `coordinatorId` existence, and `parentTaskId` same-project/not-self per target task). The access check runs on every task's project before any mutation, so a member who lacks `editor` on even one target cannot slip edits onto the tasks they do control.
 
@@ -2838,6 +2985,331 @@ After the `interrupt` frame, the client resumes by calling `/stream` again with 
 | 429 | Rate limit exceeded |
 
 Mid-stream errors arrive as `{"type": "error", ...}` SSE frames followed by `[DONE]`.
+
+---
+
+## 19. Organizations (Tenancy)
+
+Base path: `/api/v1/organizations`
+
+The organization is the **tenant** entity that a project may be scoped to (see [Organization tenancy](#organization-tenancy) in §10). All endpoints require a valid JWT.
+
+### Org access model (RBAC)
+
+Org membership is stored **inline** on the organization document as `members`: a list of `{"userId": "<id>", "role": "<role>"}` rows. Org roles are **totally ordered**: `org_owner > org_admin > member` (ranks `3 > 2 > 1`); a gate expressed as a minimum role passes for any role whose rank is ≥ the gate's rank.
+
+- **`member`** — read the org + its roster; an org-member can see org-scoped projects in the project listing.
+- **`org_admin`** — everything `member` can do, plus manage org members (add / change-role / remove) and create org-scoped projects.
+- **`org_owner`** — everything `org_admin` can do; **only an `org_owner` may grant the `org_owner` role**.
+
+Unlike projects there is **no separate "manager" root of trust**: org ownership is an ordinary `org_owner` membership. The invariant "an org always retains at least one `org_owner`" is enforced by the member operations — every demote/remove path that would drop the **last** `org_owner` is refused with `400 "Bad request"`.
+
+`can_access_org(org, user, min_role)` fails closed (deny) when the org is missing or the recorded role is unknown.
+
+---
+
+### POST /api/v1/organizations/
+
+Create an organization. The caller is seeded as the sole `org_owner` member.
+
+**Auth:** Required.
+
+**Request body:**
+
+```json
+{"name": "Acme Corp", "slug": "acme"}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `name` | string | Required, non-empty |
+| `slug` | string | Required, non-empty; the **globally-unique** public tenant handle (a duplicate returns `400 "Bad request"`) |
+
+**Response — 201 Created:**
+
+```json
+"Organization created"
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 201 | Organization created |
+| 400 | Missing `name`/`slug`, or `slug` already taken |
+| 401 | Missing or invalid JWT |
+
+---
+
+### GET /api/v1/organizations/
+
+List the organizations the caller belongs to, or fetch one by id.
+
+**Auth:** Required.
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `organizationId` | string | Optional. When supplied, returns that single org (caller must be a member, any role); otherwise returns every org the caller is a member of. |
+
+**Response — 200 OK** (list):
+
+```json
+[
+  {
+    "_id": "64c0d1e2f3a4b5c6d7e8f9a0",
+    "name": "Acme Corp",
+    "slug": "acme",
+    "members": [{"userId": "64a1f2e3b4c5d6e7f8a9b0c1", "role": "org_owner"}],
+    "settings": {}
+  }
+]
+```
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Organization(s) returned |
+| 401 | Missing or invalid JWT |
+| 403 | `organizationId` set but caller is not a member |
+| 404 | `organizationId` references a non-existent org |
+
+---
+
+### PUT /api/v1/organizations/
+
+Update an organization's `name`, `slug`, and/or `settings`. **`org_admin`-gated.**
+
+**Auth:** Required (`org_admin` on the org).
+
+**Request body:**
+
+```json
+{"_id": "64c0d1e2f3a4b5c6d7e8f9a0", "name": "Acme Corporation", "slug": "acme", "settings": {}}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the org |
+| `name` | string | Optional |
+| `slug` | string | Optional; a **change** must keep the handle globally unique (a no-op same-slug PUT is allowed) |
+| `settings` | object | Optional free-form tenant settings blob |
+
+Only `{name, slug, settings}` are writable. **`members` is not writable here** — it is managed exclusively through the member endpoints.
+
+**Response — 200 OK:** `"Organization updated"`
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Updated successfully |
+| 400 | `_id` missing, or `slug` change collides with an existing handle |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `org_admin` |
+| 404 | Organization not found |
+
+---
+
+### DELETE /api/v1/organizations/
+
+Delete an organization. **`org_owner`-gated.** Refused if the org still owns any project (`projects.organizationId`), so a tenant's projects can never be orphaned.
+
+**Auth:** Required (`org_owner` on the org).
+
+**Query parameter:**
+
+| Parameter | Type | Notes |
+|---|---|---|
+| `organizationId` | string | Required |
+
+**Response — 200 OK:** `"Organization deleted"`
+
+**Status codes:**
+
+| Code | Condition |
+|---|---|
+| 200 | Organization deleted |
+| 400 | `organizationId` missing, or the org still owns ≥1 project |
+| 401 | Missing or invalid JWT |
+| 403 | Caller lacks `org_owner` |
+| 404 | Organization not found |
+
+---
+
+### Organization Members
+
+Base path: `/api/v1/organizations/members`. The roster **read** requires `member`; all **mutations** require `org_admin`. Only an `org_owner` may grant the `org_owner` role, and the last `org_owner` cannot be demoted or removed.
+
+#### GET /api/v1/organizations/members
+
+Retrieve the org's member roster (resolved against the user directory; dangling references are skipped).
+
+**Auth:** Required (`member` on the org).
+
+**Query parameter:** `organizationId` (required).
+
+**Response — 200 OK:**
+
+```json
+[
+  {"_id": "64a1f2e3b4c5d6e7f8a9b0c1", "username": "alice", "email": "alice@example.com", "role": "org_owner"}
+]
+```
+
+**Status codes:** `200` roster returned · `401` no JWT · `403` not a member · `404` org not found.
+
+#### POST /api/v1/organizations/members
+
+Add a member, or update an existing member's role (idempotent upsert).
+
+**Auth:** Required (`org_admin`; granting `org_owner` requires `org_owner`).
+
+**Request body:**
+
+```json
+{"organizationId": "64c0d1e2f3a4b5c6d7e8f9a0", "userId": "64b2a3d4c5e6f7a8b9c0d1e2", "role": "org_admin"}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `organizationId` | string | Required, non-empty |
+| `userId` | string | Required, non-empty; must reference an existing user |
+| `role` | string | Required; one of `"org_owner"`, `"org_admin"`, `"member"` |
+
+**Response — 201 Created:** `"Member added"`
+
+**Status codes:** `201` added/updated · `400` missing fields, invalid `role`, demoting the last owner via re-add, or granting `org_owner` as a non-owner · `401` no JWT · `403` caller lacks `org_admin` (or lacks `org_owner` when granting `org_owner`) · `404` org or user not found.
+
+#### PUT /api/v1/organizations/members
+
+Change an existing member's role. Same body and gates as `POST`.
+
+**Response — 200 OK:** `"Member updated"`
+
+**Status codes:** `200` updated · `400` missing fields, invalid `role`, demoting the last owner, or granting `org_owner` as a non-owner · `401` no JWT · `403` caller lacks the required role · `404` org not found or `userId` is not a member.
+
+#### DELETE /api/v1/organizations/members
+
+Remove a member.
+
+**Auth:** Required (`org_admin`).
+
+**Query parameters:** `organizationId` (required), `userId` (required).
+
+**Response — 200 OK:** `"Member removed"`
+
+**Status codes:** `200` removed · `400` `userId` missing, or removing the last `org_owner` · `401` no JWT · `403` caller lacks `org_admin` · `404` org not found or `userId` is not a member.
+
+---
+
+## 20. Milestones
+
+Base path: `/api/v1/milestones`
+
+Milestones are per-project planning markers a task may be assigned to via its `milestoneId` (see [§12 Task fields](#task-fields)). They follow the project RBAC: **reads require `viewer`**, **writes (create / update / delete) require `editor`** on the milestone's project.
+
+### Milestone fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | string | Server-assigned |
+| `projectId` | string | Owning project. Immutable — not writable on `PUT`. |
+| `name` | string | Required, non-empty |
+| `description` | string | Optional free text; defaults to `""` on create |
+| `startDate` | string \| null | Optional ISO date string (or `null`) |
+| `dueDate` | string \| null | Optional ISO date string (or `null`) |
+| `state` | string | Lifecycle, one of `"open"` / `"closed"`; defaults to `"open"` on create |
+
+> The as-built milestone shape is `{name, description, startDate, dueDate, state}`. (The PRD work-management-depth §9.2 target shape — `{goal, endDate, status}` plus a `{total, done}` completion count — is a separate model-alignment gap, not yet shipped.)
+
+---
+
+### GET /api/v1/milestones/
+
+List a project's milestones.
+
+**Auth:** Required (`viewer` on the project).
+
+**Query parameter:** `projectId` (required).
+
+**Response — 200 OK:**
+
+```json
+[
+  {"_id": "ms_v1", "projectId": "proj_abc", "name": "v1.0", "description": "", "startDate": null, "dueDate": "2026-07-01", "state": "open"}
+]
+```
+
+**Status codes:** `200` milestones returned · `401` no JWT · `403` caller lacks `viewer` · `404` project not found.
+
+---
+
+### POST /api/v1/milestones/
+
+Create a milestone on a project.
+
+**Auth:** Required (`editor` on the project).
+
+**Request body:**
+
+```json
+{"projectId": "proj_abc", "name": "v1.0", "description": "First release", "dueDate": "2026-07-01", "state": "open"}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `projectId` | string | Required, non-empty |
+| `name` | string | Required, non-empty |
+| `description` | string | Optional; defaults to `""` |
+| `startDate` / `dueDate` | string \| null | Optional ISO date strings |
+| `state` | string | Optional; `"open"` (default) or `"closed"` |
+
+**Response — 201 Created:** `"Milestone created"`
+
+**Status codes:** `201` created · `400` missing `projectId`/`name`, or invalid `state` (`"Bad request"`) · `401` no JWT · `403` caller lacks `editor` · `404` project not found.
+
+---
+
+### PUT /api/v1/milestones/
+
+Update a milestone's `name`, `description`, `startDate`, `dueDate`, and/or `state`. **`projectId` is immutable** — any `projectId` (or other unknown) key is ignored.
+
+**Auth:** Required (`editor` on the milestone's project).
+
+**Request body:**
+
+```json
+{"_id": "ms_v1", "name": "v1.0 GA", "state": "closed"}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | string | Required — identifies the milestone |
+| `name` | string | Optional; non-empty when present |
+| `description` | string | Optional |
+| `startDate` / `dueDate` | string \| null | Optional |
+| `state` | string | Optional; `"open"` or `"closed"` |
+
+**Response — 200 OK:** `"Milestone updated"`
+
+**Status codes:** `200` updated · `400` empty `name` or invalid `state` (`"Bad request"`) · `401` no JWT · `403` caller lacks `editor` · `404` milestone (or its project) not found.
+
+---
+
+### DELETE /api/v1/milestones/
+
+Delete a milestone. The deleted id is **cascade-nulled** from every same-project task's `milestoneId`, so no task is left pointing at a removed milestone.
+
+**Auth:** Required (`editor` on the milestone's project).
+
+**Query parameter:** `milestoneId` (required).
+
+**Response — 200 OK:** `"Milestone deleted"`
+
+**Status codes:** `200` deleted (assignments NULLed) · `400` `milestoneId` not provided · `401` no JWT · `403` caller lacks `editor` · `404` milestone (or its project) not found.
 
 ---
 

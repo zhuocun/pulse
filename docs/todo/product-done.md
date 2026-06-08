@@ -8,7 +8,7 @@ open. Per-PR history lives in git log.
 | Field        | Value                                                                                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status       | Phases 0–4 shipped; AI UX Phase 1 trust/privacy corrections merged; v2.1 SSE migration complete for all six structured routes; architecture-theme backlog closed on ``orch/architecture-todo-impl-9ea4/integrate-architecture-backlog-closeout``; **GA §1 closed** — organic chat proposals, v2.1 FE interrupts, mutation journal HTTP, and FE apply/undo path are covered by targeted tests ([`release-todo.md`](release-todo.md) §1). |
-| Last updated | 2026-05-22                                                                                                                                                                       |
+| Last updated | 2026-06-08                                                                                                                                                                       |
 | Owner        | TBD (frontend)                                                                                                                                                                   |
 
 For the live GA / blocker / soft-blocker / polish status see
@@ -31,7 +31,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Observability call sites (`AGENT_TURN_*`, `AGENT_HEALTH_DEGRADED`, `COPILOT_REWRITE_ACCEPT`) | — | ✅ |
 | v2.1 streaming infra (`useAgent`, `agentClient`, cards, palette AI mode) | — | ✅ |
 | v2.1 UI surface — agent health badge, chat-drawer cards | — | ✅ |
-| Unified Copilot shell scaffold (`CopilotShell`) | — | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
+| Unified Copilot dock (`CopilotDock`) | v3 §7.1 / PRD-GAP-006 | ✅ Shipped — the earlier `CopilotShell` placeholder (reverted 2026-05-21) was rebuilt as a single tabbed `<CopilotDock>` (Chat + Brief + Inbox tabs) that is now the live AI surface. Default ON via `environment.copilotDockEnabled` (`REACT_APP_COPILOT_DOCK_ENABLED=false` kill-switch). The legacy standalone `<AiChatDrawer>` / `<BoardBriefDrawer>` mounts are removed; their bodies live in `copilotDock/ChatTabBody` + `BriefTabBody`. See the Phase-4 surface inventory below. |
 | v2.1 chat path migrated to SSE streaming | — | ✅ |
 | v2.1 triage nudges mounted in board page | — | ✅ |
 | Protocol / i18n / a11y (snake_case args, `Idempotency-Key`, typed errors, jest-axe) | — | ✅ |
@@ -65,7 +65,7 @@ For the live GA / blocker / soft-blocker / polish status see
 | Design-token contributor reference | UX (ui-todo §20e / §2.C) | ✅ [`docs/design-tokens.md`](../design-tokens.md) documents scales and AntD mapping; implementation remains `src/theme/tokens.ts` + `src/theme/antdTheme.ts` |
 | `CopilotAboutPopover` i18n + configurable knowledge cutoff | UX (ui-todo §20c) | ✅ Mode tags from `microcopy.about.*`; cutoff from `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF`, optional wire `knowledge_cutoff`) |
 | Copilot About — `chat-agent` `rate_limit` / `allowed_autonomy` in UI | [`release-todo.md`](release-todo.md) §14 | ✅ Remote-only `useChatAgentMetadata` + session `getSessionCachedAgentMetadata`; loading/empty/error handling in `CopilotAboutPopover` |
-| `CopilotShell` tab/title/placeholder i18n (`microcopy.copilotShell`) | UX ([`ui-todo.md`](ui-todo.md) §20f partial) | **Reverted 2026-05-21** — placeholder shell deleted; Phase-2 right-rail will be built from scratch when design lands. |
+| `CopilotDock` tab/title i18n (`microcopy.copilotDock`) | UX ([`ui-todo.md`](ui-todo.md) §20f) | ✅ Shipped with the as-built dock (the reverted `CopilotShell` placeholder + its `microcopy.copilotShell` strings are gone); tab labels and titles now flow through `microcopy.copilotDock`. |
 | Task card type icons — decorative img a11y (`TaskTypeBadge`) | UX ([`ui-todo.md`](ui-todo.md) §21) | ✅ `<img alt="" aria-hidden>` beside visible type labels; regression test in `column/index.test.tsx` |
 | `useAgent` nudge-inbox extracted into `useNudgeInbox` hook | [`release-todo.md`](release-todo.md) §16b | ✅ AC-V14 reducer + state moved to `src/utils/hooks/useNudgeInbox.ts`; `useAgent` re-exports `reduceNudgeInbox` / `NUDGE_INBOX_MAX` / `NUDGE_EXPIRY_MS` for compatibility |
 | Members popover avatars + count badge + shared cached query | UX ([`ui-todo.md`](ui-todo.md) §14, §19 remaining) | ✅ `useMembersList()` centralizes the `users/members` React Query (5-minute `staleTime`); 4 consumers migrated; popover trigger renders avatar group + count badge; no refetch on open |
@@ -200,9 +200,41 @@ JSON shim remains for local/fallback compatibility.
   `useAgentHealth` status dot in remote mode.
 - `src/components/aiSparkleIcon/index.tsx` — single shared "AI"
   affordance.
-- `src/components/copilotShell/index.tsx` — **Reverted 2026-05-21** —
-  placeholder shell deleted; Phase-2 right-rail will be built from
-  scratch when design lands.
+- `src/components/copilotDock/index.tsx` — the as-built unified dock
+  (Chat + Brief + Inbox tabs) that replaced the reverted `copilotShell`
+  placeholder. Live AI surface; default ON (`copilotDockEnabled`
+  kill-switch). Bodies in `copilotDock/{ChatTabBody,BriefTabBody}`.
+
+### Phase 4 — AI UX surfaces and feature flags
+
+The Phase-4 board chrome is gated by per-surface flags in
+`src/constants/env.ts`. Most are **kill-switches** (default ON, set the
+env var to `"false"` to roll back); the two completion surfaces are
+**opt-in** (default OFF, set to `"true"` to enable).
+
+| Surface | `environment` flag | Env var | Default | Component(s) |
+| --- | --- | --- | --- | --- |
+| Unified Copilot dock (Chat / Brief / Inbox) | `copilotDockEnabled` | `REACT_APP_COPILOT_DOCK_ENABLED` | ON (kill-switch) | `copilotDock/` + `ChatTabBody` / `BriefTabBody` |
+| Column readiness pill ("Ready to ship" / "Needs grooming") | `aiColumnReadinessEnabled` | `REACT_APP_AI_COLUMN_READINESS_ENABLED` | OFF (opt-in) | `column/` header pill (deterministic readiness engine, batch) |
+| Inline ghost-text completions in the task note field | `aiGhostTextEnabled` | `REACT_APP_AI_GHOST_TEXT_ENABLED` | OFF (opt-in) | `aiGhostText/` (Tab accepts, Esc dismisses; gated on privacy disclosure) |
+| Board minimap overview strip | `boardMinimapEnabled` | `REACT_APP_BOARD_MINIMAP_ENABLED` | ON (kill-switch) | board minimap strip (also gated `columns.length >= 5`) |
+| Activity / notifications feed drawer | `activityFeedEnabled` | `REACT_APP_ACTIVITY_FEED_ENABLED` | ON (kill-switch) | `activityFeedDrawer/` (header bell → drawer of session optimistic-update events) |
+| Bottom tab bar + demoted header (mobile chassis) | `bottomNavEnabled` | `REACT_APP_BOTTOM_NAV_ENABLED` | ON (kill-switch) | bottom nav + header right-cluster demotion |
+| Routed inline task panel | `taskPanelRouted` | `REACT_APP_TASK_PANEL_ROUTED` | OFF (opt-in) | `taskDetailPanel/` route (migration target for `taskModal`) |
+| Mutation-proposal card | `aiMutationProposalsEnabled` | `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED` | ON (kill-switch) | `mutationProposalCard/` |
+
+Other Phase-4 AI-UX surfaces (always mounted, no dedicated flag — gated
+only by the global `REACT_APP_AI_ENABLED` switch where relevant):
+
+- `src/components/copilotMenu/index.tsx` — the board's Copilot launcher
+  dropdown (Ask / Brief / disable-for-project), collapsing to icon-only
+  under a coarse pointer.
+- `src/components/aiActivityLog/index.tsx` — the AI mutation-ledger pill +
+  expandable popover/drawer (`useAiLedger`); each row offers a Revert
+  while its undo closure is alive this session.
+- `src/components/onboardingTour/index.tsx` — Phase 4.4 one-shot
+  first-login AntD `<Tour>` (driven by `useOnboardingTour`, dismissed
+  flag in `localStorage`; mounted from `mainLayout`).
 
 ### AI UX Phase 1 — trust and privacy corrections
 

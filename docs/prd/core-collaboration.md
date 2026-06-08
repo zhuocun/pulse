@@ -527,15 +527,18 @@ A perf extension point (not a gap): the membership and label/comment cascades sc
 
 ## 13. Documentation Debt
 
-The existing API docs predate this layer and **contradict** the shipped behaviour. They are called out here so a follow-up can reconcile them to this PRD. **Do not treat them as authoritative for the collaboration layer.**
+**Status: reconciled.** The earlier contradictions between this PRD and the API docs have been closed — [`../api/backend.md`](../api/backend.md) and [`../api/frontend.md`](../api/frontend.md) now describe the shipped collaboration layer (RBAC membership, richness fields, `wipLimit`, and the member / label / comment / notification / bulk surfaces) and may be treated as authoritative. The table below records what was reconciled and where to read it.
 
-| Doc                                          | Stale claim / omission                                                                                                                  | Reality (this PRD)                                            |
+| Doc                                          | Previously stale claim / omission                                                                                                                  | Reconciled location                                          |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [`../api/backend.md`](../api/backend.md) §10 | "Project access is restricted to the project manager (the user who created it…)."                                                       | RBAC with `owner/editor/viewer` membership; the manager is one (immutable) root of trust, not the only accessor (§3). |
-| [`../api/backend.md`](../api/backend.md) §10–§12 | Documents a **flat** task (no `startDate`/`dueDate`/`labelIds`/`assigneeIds`/`parentTaskId`), columns **without** `wipLimit`, and **no** member / label / comment / notification / bulk endpoints. | Full richness model (§6), `wipLimit` (§5), and the member/label/comment/notification/bulk surfaces (§4, §6–§9). |
-| [`../api/frontend.md`](../api/frontend.md)   | The domain-interface table (`ITask`/`IProject`/`IColumn`) is stale (`ITask` pre-richness, `IColumn` pre-`wipLimit`) and omits the separate `IProjectMember` roster interface.             | `ITask` carries the richness fields and `IColumn` carries `wipLimit`; the project roster is modeled by a separate `IProjectMember` (with `role`), not inline on `IProject` (Appendix B + §10). |
+| [`../api/backend.md`](../api/backend.md) §10 | "Project access is restricted to the project manager."                                                                                  | Documents the `owner > editor > viewer` RBAC model with the manager as the immutable root of trust ([backend.md](../api/backend.md) "Access Model (RBAC)" + Project Members). |
+| [`../api/backend.md`](../api/backend.md) §10–§12 | Documented a **flat** task, columns without `wipLimit`, and no member / label / comment / notification / bulk endpoints. | Full richness model, `wipLimit` semantics, and the member/label/comment/notification/bulk surfaces are all documented in their respective sections. |
+| [`../api/frontend.md`](../api/frontend.md)   | The domain-interface table was pre-richness and omitted `IProjectMember`.                                                               | `ITask`/`IColumn` carry the richness fields and the roster is modeled by a separate `IProjectMember` (with rendered `role`) — see the Domain interfaces table. |
 
-Recommendation: reconcile both `../api/*.md` documents against this PRD in a follow-up. (This document does not edit them.)
+**Beyond this PRD's scope (also now documented).** Two feature layers that post-date core-collaboration ship today and are documented in the reconciled API docs, not here:
+
+- **Work-management depth (WMD)** — task `priority`, `dependsOn` / derived `blockedBy`, `milestoneId`, the `milestones` collection + `/api/v1/milestones` CRUD, column `category` (`todo`/`in_progress`/`done`) with derived `isDone`, and the completion / archive / trash lifecycle (`completedAt`/`archivedAt`/`deletedAt`, plus `restore` / `archive` / `?purge`). See [backend.md](../api/backend.md) Tasks / Boards / Milestones sections and the WMD depth fields in [frontend.md](../api/frontend.md). The milestone *shape* as-built (`{name, description, startDate, dueDate, state}`) differs from the work-management-depth PRD's target shape — that model-alignment gap is tracked in [`work-management-depth.md`](work-management-depth.md), not here.
+- **Organization tenancy** — `organizationId` on projects, the organizations router, `can_access_org`, and org-gated project creation. See [backend.md](../api/backend.md) Organizations (Tenancy) section.
 
 ---
 

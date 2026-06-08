@@ -52,7 +52,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-001 — Document shipped WMD-depth + org endpoints in `api/backend.md`
 - **prd_ref:** `docs/prd/work-management-depth.md` §3–§5, §9, Appendix A; `docs/prd/accounts-organizations.md` §3, Appendix A
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - `api/backend.md` documents the shipped `tasks.priority`, `tasks.dependsOn` (+ derived `blockedBy`), `columns.category`, and the lifecycle fields (`completedAt`/`archivedAt`/`deletedAt`) with their soft-delete `?purge`, `/tasks/restore`, `/tasks/archive`, `/projects/restore`, `/projects/archive` endpoints.
@@ -63,7 +63,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-002 — Reconcile `api/frontend.md` interface table + hook notes with shipped depth & surfaces
 - **prd_ref:** `docs/prd/core-collaboration.md` §10, §13; `docs/prd/work-management-depth.md` Appendix B
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - The `ITask`/`IColumn` rows add the shipped depth fields (`priority`, `dependsOn`, `milestoneId`, `completedAt`/`archivedAt`/`deletedAt`); `IMilestone` is listed.
@@ -74,7 +74,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-003 — Correct the now-stale "Documentation Debt" table in `core-collaboration.md` §13
 - **prd_ref:** `docs/prd/core-collaboration.md` §13
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - §13's claims that `api/backend.md` documents a flat task / says "access restricted to the project manager", and that `api/frontend.md`'s interface table is pre-richness, are removed or rewritten to match reality (both docs reconciled for the core layer).
@@ -84,7 +84,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-004 — Refresh `product-done.md` for CopilotDock + Phase-4 AI surfaces
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.1–§7.3; `docs/design/_review-2026-05/04-ai-copilot.md` A1
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - The "Unified Copilot shell scaffold — Reverted… built from scratch when design lands" rows are replaced with the as-built CopilotDock (`src/components/copilotDock/`, Chat/Brief/Inbox tabs, `useCopilotDock`, `REACT_APP_COPILOT_DOCK_ENABLED`).
