@@ -405,33 +405,21 @@ describe("ProjectPage", () => {
         }
     });
 
-    it("opens AI chat drawer on non-board route when boardCopilot:openChat fires (Defect 2 fix)", async () => {
+    /*
+     * The command-palette `boardCopilot:openChat` hand-off is no longer
+     * owned by the project page — `CopilotDockHost`'s bridge listens for
+     * the event on every route and forwards it to the persistent dock
+     * (covered by `copilotDock/copilotDockHost.test.tsx`). The project
+     * page only renders the "Ask Board Copilot" launcher, which flips the
+     * same Redux flag the bridge consumes.
+     */
+    it("renders the Ask Board Copilot launcher when AI is enabled", async () => {
         renderPage();
 
-        // Wait for the page to be ready (projects loaded)
         expect(await screen.findByText("Roadmap")).toBeInTheDocument();
-
-        // The "Ask Board Copilot" button should be visible because aiEnabled
-        // defaults to true — confirming the drawer mount point is active.
         expect(
             screen.getByRole("button", { name: "Ask Board Copilot" })
         ).toBeInTheDocument();
-
-        // Simulate the command palette dispatching the event from a non-board route
-        await act(async () => {
-            window.dispatchEvent(
-                new CustomEvent("boardCopilot:openChat", {
-                    detail: { prompt: "What is at risk?" }
-                })
-            );
-        });
-
-        // After the event fires, the project page's handler opens the AI
-        // drawer via `useAiChatDrawer`. The drawer is now Redux-driven; verify
-        // the slice flipped instead of inspecting the URL.
-        await waitFor(() => {
-            expect(store.getState().overlays.chatDrawer.open).toBe(true);
-        });
     });
 
     /*

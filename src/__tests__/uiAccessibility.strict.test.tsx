@@ -16,11 +16,10 @@ import React from "react";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 
-import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import AiTaskAssistPanel from "../components/aiTaskAssistPanel";
 import AiTaskDraftModal from "../components/aiTaskDraftModal";
-import BoardBriefDrawer from "../components/boardBriefDrawer";
+import CopilotDock from "../components/copilotDock";
 import EmptyState from "../components/emptyState";
 import ErrorBox from "../components/errorBox";
 import Header from "../components/header";
@@ -353,12 +352,15 @@ describe("UI quality :: axe accessibility audit", () => {
 });
 
 describe("AI a11y :: axe accessibility audit", () => {
-    it("BoardBriefDrawer (open) has no axe violations", async () => {
+    it("CopilotDock (brief tab, open) has no axe violations", async () => {
         renderInWrapper(
-            <BoardBriefDrawer
+            <CopilotDock
+                activeTab="brief"
                 columns={SAMPLE_COLUMNS}
+                knownProjectIds={[SAMPLE_PROJECT._id]}
                 members={SAMPLE_MEMBERS}
                 onClose={jest.fn()}
+                onTabChange={jest.fn()}
                 open
                 project={SAMPLE_PROJECT}
                 tasks={SAMPLE_TASKS}
@@ -419,19 +421,21 @@ describe("AI a11y :: axe accessibility audit", () => {
         expect(results).toHaveNoViolations();
     });
 
-    it("AiChatDrawer (open) has no axe violations", async () => {
+    it("CopilotDock (chat tab, open) has no axe violations", async () => {
         // Render without `AntdApp` to stay consistent with the other AI
         // surfaces here — wrapping with `<AntdApp component={false}>` would
         // re-trigger AntD's cssVar warning and the jsdom NaN-height path.
-        // `App.useApp()` inside the drawer falls back to a no-op message
+        // `App.useApp()` inside the dock falls back to a no-op message
         // bag when no provider is present, which is fine because nothing
         // in this test triggers a feedback toast.
         renderInWrapper(
-            <AiChatDrawer
+            <CopilotDock
+                activeTab="chat"
                 columns={SAMPLE_COLUMNS}
                 knownProjectIds={[SAMPLE_PROJECT._id]}
                 members={SAMPLE_MEMBERS}
                 onClose={jest.fn()}
+                onTabChange={jest.fn()}
                 open
                 project={SAMPLE_PROJECT}
                 tasks={SAMPLE_TASKS}

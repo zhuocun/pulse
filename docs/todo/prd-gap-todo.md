@@ -110,14 +110,14 @@ Tiers, highest priority first:
 
 ### PRD-GAP-006 — Roll out CopilotDock (flip flag default ON; remove legacy drawers)
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.1; `docs/design/_review-2026-05/04-ai-copilot.md` A1
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
-  - `environment.copilotDockEnabled` defaults ON (or the flag is retired) and the board mounts the single tabbed dock as the live surface.
+  - `environment.copilotDockEnabled` defaults ON (kill-switch; `REACT_APP_COPILOT_DOCK_ENABLED=false` rolls back) and the board mounts the single tabbed dock as the live surface.
   - The legacy `AiChatDrawer` / `BoardBriefDrawer` standalone surfaces are removed (their bodies already live in `copilotDock/ChatTabBody` + `BriefTabBody`); no duplicate `EngineModeTag` / `Space.Compact` launchers remain.
   - Existing dock + agent tests pass (`board.dock.test.tsx`, `copilotDock/*.test.tsx`); no regression in the full Jest suite.
 - **depends_on:** none
-- **notes:** Dock is built but `REACT_APP_COPILOT_DOCK_ENABLED` defaults **false / opt-in** (`src/constants/env.ts:195,281`). The review (`04-ai-copilot.md` A1: "flag-gate the rollout for one release") and the "five doors into AI" finding make flipping it the highest-leverage AI ship. Pairs with PRD-GAP-004 (doc) but split per AGENTS.md.
+- **notes:** Shipped — `src/constants/env.ts` flips `copilotDockEnabled` to a default-ON kill-switch, and the `<AiChatDrawer>` / `<BoardBriefDrawer>` wrapper components + their standalone mounts in `pages/board.tsx` / `pages/project.tsx` are deleted (the dock owns the triage agent, inbox nudges, and the `boardCopilot:openChat` palette hand-off via `CopilotDockHost`). The shared composer/brief bodies live in `copilotDock/ChatTabBody` + `BriefTabBody`. Pairs with PRD-GAP-004 (doc) but split per AGENTS.md.
 
 ### PRD-GAP-007 — WIP-limit control UI on column create/edit + overflow indicator
 - **prd_ref:** `docs/prd/core-collaboration.md` §5.5, §12 (⬜ WIP-limit control); AC-C11

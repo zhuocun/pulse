@@ -20,7 +20,13 @@ jest.mock("../constants/env", () => ({
         apiBaseUrl: "http://localhost:8080/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        // PRD-GAP-006: the CopilotDock is the live AI surface (default ON),
+        // mounted once by `CopilotDockHost` in `MainLayout`. The board /
+        // project pages no longer mount the legacy `<AiChatDrawer>` /
+        // `<BoardBriefDrawer>` overlays, so the dock must be enabled for
+        // these end-to-end Copilot flows to have a surface to drive.
+        copilotDockEnabled: true
     }
 }));
 
@@ -358,10 +364,12 @@ describe("Board AI integration (App + local engine)", () => {
             await screen.findByRole("menuitem", { name: /board brief/i })
         );
 
+        // The Brief launcher opens the CopilotDock on its Brief tab.
         await waitFor(() => {
-            expect(
-                screen.getByText(/board copilot brief/i)
-            ).toBeInTheDocument();
+            expect(screen.getByRole("tab", { name: /brief/i })).toHaveAttribute(
+                "aria-selected",
+                "true"
+            );
         });
 
         const briefClose = document.querySelector(

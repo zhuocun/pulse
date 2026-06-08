@@ -22,10 +22,8 @@ import { DragDropContext } from "@hello-pangea/dnd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import ArchiveDrawer from "../components/archiveDrawer";
-import BoardBriefDrawer from "../components/boardBriefDrawer";
 import BoardMinimap from "../components/boardMinimap";
 import Column from "../components/column";
 import CopilotMenu from "../components/copilotMenu";
@@ -53,11 +51,8 @@ import {
     radius,
     space as themeSpace
 } from "../theme/tokens";
-import type { TriageNudge } from "../interfaces/agent";
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import { srOnlyLiveRegionStyle } from "../utils/a11y/srOnlyLiveRegionStyle";
-import { useRemoteAiConsent } from "../utils/ai/remoteAiConsent";
-import useAgent from "../utils/hooks/useAgent";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
@@ -72,8 +67,6 @@ import useMembersList from "../utils/hooks/useMembersList";
 import useMilestones from "../utils/hooks/useMilestones";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
-import useTaskModal from "../utils/hooks/useTaskModal";
-import useTaskPanelNavigation from "../utils/hooks/useTaskPanelNavigation";
 import useTitle from "../utils/hooks/useTitle";
 import useTrashDrawer from "../utils/hooks/useTrashDrawer";
 import useUrl from "../utils/hooks/useUrl";
@@ -592,20 +585,15 @@ const BoardPage = () => {
                   members: members ?? []
               }
             : null;
-    // Brief drawer state lives in the URL so the system back button (iOS
-    // swipe-back, Android hardware back) dismisses it before exiting the
-    // route.
-    const {
-        open: briefOpen,
-        openDrawer: openBriefDrawer,
-        closeDrawer: closeBriefDrawer
-    } = useBoardBriefDrawer();
-    const {
-        open: chatOpen,
-        openDrawer: openChatDrawer,
-        closeDrawer: closeChatDrawer,
-        pendingPrompt: chatInitialPrompt
-    } = useAiChatDrawer();
+    /*
+     * Copilot launchers (CopilotMenu Ask / Brief, welcome-banner CTA).
+     * These open the legacy `chatDrawer` / `boardBriefOpen` Redux flags
+     * which `CopilotDockHost`'s bridge forwards onto the persistent dock
+     * state — the dock itself is mounted once in `MainLayout`, so the
+     * board page only triggers it.
+     */
+    const { openDrawer: openBriefDrawer } = useBoardBriefDrawer();
+    const { openDrawer: openChatDrawer } = useAiChatDrawer();
     /*
      * Trash drawer (work-management-depth §5.4/§5.6). Open/close lives on
      * the overlays slice like the rest of the family; the drawer itself
@@ -647,143 +635,14 @@ const BoardPage = () => {
           ).replace("{count}", String(copilotInboxUnread))
         : undefined;
     /*
-     * R-A M1: the CopilotDock is now mounted in `MainLayout` by
-     * `CopilotDockHost`, which bridges these legacy `chatDrawer` /
-     * `boardBriefOpen` flags onto the persistent dock state so the
-     * existing trigger callsites below (CopilotMenu, welcome banner
-     * CTA, palette hand-off) keep working unchanged. The board page no
-     * longer owns the dock's open/active-tab state — those moved to
-     * Redux to survive project-route navigations.
-     *
-     * The flags ARE still read here (`chatOpen` / `briefOpen` below)
-     * because the rollback path (`!copilotDockEnabled`) keeps
-     * mounting the legacy drawers from this file.
+     * The CopilotDock is mounted once in `MainLayout` by
+     * `CopilotDockHost`, which owns the persistent dock state, the
+     * background triage-agent run, the inbox nudges, and the
+     * command-palette `boardCopilot:openChat` hand-off across every
+     * route. The board page only triggers the dock via the legacy
+     * `chatDrawer` / `boardBriefOpen` Redux flags (see the launcher
+     * callsites above); it no longer mounts an AI surface itself.
      */
-    /**
-     * Background triage-agent mount (v2.1). Always call the hook
-     * unconditionally to respect React's hook ordering rules. The agent
-     * will only be started (via effect below) when all of the following
-     * are true:
-     *   - boardAiOn is true
-     *   - aiUseLocalEngine is false (remote backend is available)
-     *   - the chat drawer has just been opened for the first time for this
-     *     project in the current app session
-     */
-    const triageAgent = useAgent("triage-agent", {
-        projectId: currentProject?._id,
-        feToolContext: { projectId: currentProject?._id }
-    });
-    const startTriageAgent = triageAgent.start;
-    const dismissTriageNudge = triageAgent.dismissNudge;
-    const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
-    /**
-     * Track which project IDs have already triggered a triage run in
-     * this app session so we fire at most once per (project, session).
-     */
-    const triagedProjectsRef = useRef<Set<string>>(new Set());
-
-    useEffect(() => {
-        // R-A M1 Issue #2: when the CopilotDock flag is ON, the host
-        // owns the triage-agent mount and start-effect (see
-        // `copilotDockHost.tsx`). Without this guard, BOTH the host
-        // and the board page would call `startTriageAgent` for the
-        // same project, leading to two SSE stream POSTs and two
-        // independent `useAgent` instances writing to the same
-        // sessionStorage thread-id key. The legacy drawer mounts in
-        // this file are already flag-gated; we extend the same gate
-        // to the triage start-effect.
-        if (environment.copilotDockEnabled) return;
-        if (!chatOpen) return;
-        const pid = currentProject?._id;
-        if (!pid) return;
-        if (!boardAiOn) return;
-        if (environment.aiUseLocalEngine) return;
-        if (!remoteAiConsentGranted) return;
-        if (triagedProjectsRef.current.has(pid)) return;
-
-        triagedProjectsRef.current.add(pid);
-        try {
-            void startTriageAgent(
-                {
-                    messages: [
-                        {
-                            role: "user",
-                            content: microcopy.ai.runBoardTriagePrompt
-                        }
-                    ]
-                },
-                { autonomy: "suggest" }
-            );
-        } catch {
-            // AgentForbiddenError (per-project AI opt-out) — fail silently;
-            // the error will also surface via triageAgent.error if needed.
-        }
-    }, [
-        boardAiOn,
-        chatOpen,
-        currentProject?._id,
-        remoteAiConsentGranted,
-        startTriageAgent
-    ]);
-
-    const { startEditing: openTaskModal } = useTaskModal();
-    const { openTask: openTaskPanel } = useTaskPanelNavigation();
-    /**
-     * Triage-nudge primary CTA. The nudge wire shape (`agent.d.ts`)
-     * exposes `target_ids` but does not type-distinguish between task,
-     * column, or member ids. Resolve the first id against the in-cache
-     * task list and only navigate when it matches — that avoids
-     * opening a phantom modal when the id is a column/member ref (e.g.
-     * `wip_overflow`, `load_imbalance`). When no target resolves the
-     * click is a graceful no-op; the user still has Dismiss.
-     */
-    const handleTriageNudgeAction = useCallback(
-        (nudge: TriageNudge) => {
-            const taskId = nudge.target_ids.find((id) =>
-                visibleTasks.some((t) => t._id === id)
-            );
-            if (!taskId) return;
-            // Route through the panel when the routed-task-panel flag
-            // is on; otherwise fall back to the legacy modal (B-H5).
-            // Pass projectId explicitly so the open survives a URL transit
-            // mid-handler instead of relying on useParams inside the hook.
-            if (environment.taskPanelRouted)
-                openTaskPanel(taskId, currentProject?._id);
-            else openTaskModal(taskId);
-        },
-        [currentProject?._id, openTaskModal, openTaskPanel, visibleTasks]
-    );
-    const handleTriageNudgeDismiss = useCallback(
-        (nudge: TriageNudge) => {
-            dismissTriageNudge(nudge.nudge_id);
-        },
-        [dismissTriageNudge]
-    );
-
-    /**
-     * Wire the command palette → AI chat hand-off (PRD CP-R6). When the
-     * user submits a prompt in palette AI mode, the palette dispatches
-     * a `boardCopilot:openChat` event with the prompt; we open the
-     * drawer here so the chat hook can pick up the pre-populated value.
-     *
-     * R-A M1 Issue #2 follow-on: under the dock flag, `ProjectPage`'s
-     * mirror listener (or `CopilotDockHost`'s bridge if the user is
-     * already on board) handles the same event by dispatching the
-     * chat-drawer Redux action that the bridge forwards to the dock.
-     * Keeping this listener live with the flag on would dispatch the
-     * Redux action twice for the same palette submission.
-     */
-    useEffect(() => {
-        if (environment.copilotDockEnabled) return;
-        if (!boardAiOn) return;
-        const onOpenChat = (event: Event) => {
-            const detail = (event as CustomEvent<{ prompt?: string }>).detail;
-            openChatDrawer(detail?.prompt);
-        };
-        window.addEventListener("boardCopilot:openChat", onOpenChat);
-        return () =>
-            window.removeEventListener("boardCopilot:openChat", onOpenChat);
-    }, [boardAiOn, openChatDrawer]);
     const [swipeHintDismissed, setSwipeHintDismissed] = useState(() => {
         if (typeof window === "undefined") return false;
         try {
@@ -1355,10 +1214,9 @@ const BoardPage = () => {
                     <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
                 )}
                 {/*
-                 * Trash drawer is a core (non-AI) recovery surface, so —
-                 * unlike the AI drawers below — it mounts unconditionally
-                 * (like the TaskModal above). Its list query is disabled
-                 * while closed, so the mount is cheap.
+                 * Trash drawer is a core (non-AI) recovery surface, so it
+                 * mounts unconditionally (like the TaskModal above). Its
+                 * list query is disabled while closed, so the mount is cheap.
                  */}
                 <TrashDrawer
                     onClose={closeTrashDrawer}
@@ -1377,50 +1235,12 @@ const BoardPage = () => {
                     projectId={projectId}
                 />
                 {/*
-                 * When the CopilotDock flag is on, the dock is mounted
-                 * by `CopilotDockHost` inside `MainLayout` so it
-                 * survives project-route navigations (R-A M1). The
-                 * legacy drawers below only render under the rollback
-                 * branch; the two surfaces never co-exist for a given
-                 * user.
+                 * The Copilot AI surface (Chat / Brief / Inbox) is the
+                 * tabbed `<CopilotDock>` mounted once by `CopilotDockHost`
+                 * inside `MainLayout`, so it survives project-route
+                 * navigations (R-A M1). The board page only triggers it via
+                 * the launcher callsites above — it mounts no AI drawer.
                  */}
-                {boardAiOn && !environment.copilotDockEnabled && (
-                    <>
-                        <BoardBriefDrawer
-                            columns={board ?? []}
-                            members={members ?? []}
-                            onClose={closeBriefDrawer}
-                            open={briefOpen}
-                            project={currentProject}
-                            tasks={visibleTasks}
-                        />
-                        <AiChatDrawer
-                            columns={board ?? []}
-                            initialPrompt={chatInitialPrompt}
-                            knownProjectIds={projectId ? [projectId] : []}
-                            members={members ?? []}
-                            onActionNudge={
-                                !environment.aiUseLocalEngine
-                                    ? handleTriageNudgeAction
-                                    : undefined
-                            }
-                            onClose={closeChatDrawer}
-                            onDismissNudge={
-                                !environment.aiUseLocalEngine
-                                    ? handleTriageNudgeDismiss
-                                    : undefined
-                            }
-                            open={chatOpen}
-                            pendingNudges={
-                                !environment.aiUseLocalEngine
-                                    ? triageAgent.nudges
-                                    : undefined
-                            }
-                            project={currentProject ?? null}
-                            tasks={visibleTasks}
-                        />
-                    </>
-                )}
             </BoardShell>
         </DragDropContext>
     );
