@@ -331,14 +331,12 @@ describe("BoardPage", () => {
                 name: /Board Copilot menu/i
             })
         ).not.toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole("button", { name: /Board Copilot settings/i })
-        );
+        // Open the overflow menu and verify the project-AI item shows
+        // "Enable on this board" (because AI is disabled for this project).
+        fireEvent.click(screen.getByTestId("board-more-actions"));
         expect(
-            await screen.findByRole("switch", {
-                name: /Board Copilot for this project/i
-            })
-        ).not.toBeChecked();
+            await screen.findByText(/Enable on this board/i)
+        ).toBeInTheDocument();
     });
 
     it("mounts MemberPopover in the BoardActions row, surfacing team avatars when members are present (QW-12)", async () => {
@@ -385,14 +383,10 @@ describe("BoardPage", () => {
         renderBoard();
 
         expect(await screen.findByText("Roadmap")).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole("button", { name: /Board Copilot settings/i })
-        );
-        fireEvent.click(
-            await screen.findByRole("switch", {
-                name: /Board Copilot for this project/i
-            })
-        );
+        // Open the overflow menu and click the "Enable on this board" item
+        // to re-enable AI for this project.
+        fireEvent.click(screen.getByTestId("board-more-actions"));
+        fireEvent.click(await screen.findByText(/Enable on this board/i));
 
         expect(
             await screen.findByRole("button", {
@@ -738,8 +732,8 @@ describe("BoardPage", () => {
             expect(
                 screen.queryByTestId("copilot-launcher-badge")
             ).not.toBeInTheDocument();
-            // Trash + Archive move into the overflow menu on phone to keep
-            // the capsule within the viewport.
+            // Trash + Archive live inside the overflow menu (no standalone
+            // buttons on either surface).
             expect(screen.queryByTestId("board-trash")).not.toBeInTheDocument();
             expect(
                 screen.queryByTestId("board-archive")
@@ -765,14 +759,13 @@ describe("BoardPage", () => {
             expect(
                 screen.queryByTestId("board-actions-cluster")
             ).not.toBeInTheDocument();
-            // The same controls still render — just in the flat flex row.
+            // Copilot launcher renders in the bottom tier on desktop.
             expect(
                 screen.getByTestId("copilot-launcher-badge")
             ).toBeInTheDocument();
+            // Desktop now uses the overflow menu instead of separate buttons.
             expect(
-                screen.getByRole("button", {
-                    name: /Board Copilot settings/i
-                })
+                screen.getByTestId("board-more-actions")
             ).toBeInTheDocument();
             // The Wave 6 refresh button is phone-only — never on desktop,
             // where the board has its own in-page refresh affordances.
@@ -783,12 +776,7 @@ describe("BoardPage", () => {
     });
 
     describe("Trash drawer entry point (work-management-depth §5.4/§5.6)", () => {
-        it("renders a Trash button in the BoardActions row that opens the drawer", async () => {
-            // The trash drawer filters its widened `?includeTrashed=true`
-            // response to only `deletedAt`-set rows, so the default board
-            // fixtures (all active) would surface zero rows. Return a
-            // genuinely-trashed task for the trash GET while keeping the
-            // active fixtures for the board's own `?projectId=…` GET.
+        it("opens the Trash drawer via the overflow menu", async () => {
             const trashedTask = task({
                 _id: "trashed-1",
                 taskName: "Trashed task",
@@ -816,18 +804,13 @@ describe("BoardPage", () => {
             renderBoard();
             await screen.findByText("Roadmap");
 
-            // Closed by default — the drawer body is not mounted.
             expect(
                 screen.queryByTestId("trash-drawer-body")
             ).not.toBeInTheDocument();
 
-            const trashButton = screen.getByTestId("board-trash");
-            expect(trashButton).toHaveAccessibleName(/open trash/i);
-            fireEvent.click(trashButton);
+            fireEvent.click(screen.getByTestId("board-more-actions"));
+            fireEvent.click(await screen.findByText(/open trash/i));
 
-            // The drawer opens and lists the project's trashed tasks. The
-            // `?includeTrashed=true` GET returns one trashed fixture, so the
-            // body surfaces a row.
             expect(
                 await screen.findByTestId("trash-drawer-body")
             ).toBeInTheDocument();
@@ -836,7 +819,6 @@ describe("BoardPage", () => {
                     screen.getAllByTestId("trash-drawer-row").length
                 ).toBeGreaterThan(0)
             );
-            // The drawer's open state is owned by the overlays slice.
             expect(store.getState().overlays.trashDrawerOpen).toBe(true);
         });
     });
