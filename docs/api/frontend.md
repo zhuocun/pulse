@@ -371,7 +371,7 @@ const useProjectMembers: (
 
 Reads the **project roster** — `GET /api/v1/projects/members?projectId=…` — via `useReactQuery<IProjectMember[]>`, keyed per-project (`["projects/members", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`. Returns the raw `useReactQuery` result (no wrapper object); callers read `.data`.
 
-Its sole consumer is the `taskModal` assignee picker (`assigneeIds`). `IProjectMember` adds `role` to `IMember`, but `role` is not rendered anywhere.
+Primary consumers are the `taskModal` / `taskDetailPanel` assignee pickers (`assigneeIds`) and `projectMembersManager` (roster management at `/projects/:projectId/members`, which renders each member's `role`). `IProjectMember` adds `role` to `IMember`.
 
 **Not to be confused with `useMembersList`** (`src/utils/hooks/useMembersList.ts`), which reads the **global** user directory `GET /api/v1/users/members` (returns `IMember[]`, no `role`) and backs the coordinator picker and `memberPopover`. `useProjectMembers` is "who is on this project"; `useMembersList` is "every user in the system".
 

@@ -135,10 +135,10 @@ For the live GA / blocker / soft-blocker / polish status see
 
 ### Phase 1 — Board summary brief (Capability C)
 
-- `src/components/boardBriefDrawer/index.tsx` — Ant Design `Drawer`
-  with headline, per-column counts, largest unstarted, unowned,
-  workload, and a one-line recommendation. Brief items deep-link
-  into the existing task modal.
+- `src/components/copilotDock/BriefTabBody.tsx` — board brief surface
+  (headline, per-column counts, largest unstarted, unowned, workload,
+  recommendation CTAs). Rendered inside `CopilotDock` (default) or via
+  the legacy brief drawer wrapper when the dock flag is off.
 - `src/pages/board.tsx` — `Brief` button gated by the runtime toggle.
 
 ### Phase 2A — Smart task drafting (Capability A)
@@ -161,13 +161,11 @@ For the live GA / blocker / soft-blocker / polish status see
 
 ### Phase 3 — Conversational assistant (Capability D)
 
-- `src/components/aiChatDrawer/index.tsx` — right-edge
-  "Ask Board Copilot" drawer with message thread and read-only
-  tool traces. Remote builds use `useAgentChat` over
-  `useAgent("chat-agent")` SSE; local builds use `useAiChat` and
-  the deterministic engine. Accepts optional `pendingProposal` /
-  `pendingNudges` props that render `MutationProposalCard` and
-  `NudgeCard` inline. Proposal cards default on; operators can set
+- `src/components/copilotDock/ChatTabBody.tsx` — conversational
+  assistant tab inside `CopilotDock` (default). Remote builds use
+  `useAgentChat` over `useAgent("chat-agent")` SSE; local builds use
+  `useAiChat` and the deterministic engine. Renders `MutationProposalCard`
+  and `NudgeCard` inline. Proposal cards default on; operators can set
   `REACT_APP_AI_MUTATION_PROPOSALS_ENABLED=false` as a rollback.
 - `src/utils/hooks/useAiChat.ts` and
   `src/utils/hooks/useAgentChat.ts` — local and remote orchestrators.
