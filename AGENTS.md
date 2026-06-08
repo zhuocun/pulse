@@ -169,3 +169,12 @@ GA blockers and ship sequence live in
   `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
   inspection" subsection.
 
+## PR & merge process
+
+The same review-and-merge flow applies across the `agent`, `pulse`, and `agent-skills` repos.
+
+- **One concern per PR.** Keep PRs small and single-purpose, and squash-merge to keep `main` history clean. A larger change ships as a single PR only when its commits share one integration story — one logical commit per concern.
+- **Open a PR before wrapping up.** A task isn't finished until its changes are up for review; don't leave finished work stranded on a pushed branch with no PR. Check for an existing PR on the branch first. If that branch's earlier PR has already merged, branch off fresh `main` and open a new PR rather than pushing onto the dead branch.
+- **Watch CI, then merge on green.** After opening a PR, watch its checks (subscribe to PR activity, or poll the check runs). Once all required checks pass, squash-merge. If CI goes red, push a fix rather than leaving it stranded. A PR-activity subscription only wakes on *failures* and review comments — a green pass emits no event, so confirm success by polling the checks, not by waiting to be notified. Merging `main` triggers the production deploy, so green CI is the merge gate.
+- **Never bypass hooks.** Don't use `--no-verify` / `--no-gpg-sign`, especially on workflow-file changes. If a commit-msg or pre-commit hook fails, fix the cause and make a new commit — don't amend past it.
+
