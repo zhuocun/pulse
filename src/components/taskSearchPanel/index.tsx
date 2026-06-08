@@ -21,7 +21,6 @@ import { breakpoints, radius, space } from "../../theme/tokens";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
-import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import FilterChips, { FilterChip } from "../filterChips";
 import AiSparkleIcon from "../aiSparkleIcon";
 import { parseLensId } from "../lensChips";
@@ -230,7 +229,6 @@ const TaskSearchPanel: React.FC<Props> = ({
     aiSearchSlot
 }) => {
     const { user } = useAuth();
-    const isPhone = useIsPhoneChrome();
     const { projectId } = useParams<{ projectId: string }>();
     const dispatch = useDispatch<ReduxDispatch>();
     const message = useAppMessage();
