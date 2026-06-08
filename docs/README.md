@@ -60,6 +60,9 @@ the whole backlog without folder-hopping.
   build-out: M1–M4 shipped (documented as-built in
   [`prd/core-collaboration.md`](prd/core-collaboration.md)); M5–M8 are the
   forward roadmap.
+- [`todo/prd-gap-todo.md`](todo/prd-gap-todo.md) — consolidated,
+  adversarially reviewed PRD-gap backlog (actionable tasks with acceptance
+  criteria, tiers P0–P3); complements the milestone trackers above.
 
 ## Operations
 
