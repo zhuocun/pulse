@@ -37,15 +37,17 @@ const setup = (
 ) => {
     const onAsk = jest.fn();
     const onBrief = jest.fn();
+    const onProjectOff = jest.fn();
     render(
         <CopilotMenu
             inboxUnread={0}
             onAsk={onAsk}
             onBrief={onBrief}
+            onProjectOff={onProjectOff}
             {...overrides}
         />
     );
-    return { onAsk, onBrief };
+    return { onAsk, onBrief, onProjectOff };
 };
 
 const openMenu = async () => {
@@ -60,10 +62,11 @@ describe("CopilotMenu", () => {
     });
 
     it("runs the Ask action when the primary Copilot button is clicked", () => {
-        const { onAsk, onBrief } = setup();
+        const { onAsk, onBrief, onProjectOff } = setup();
         fireEvent.click(screen.getByRole("button", { name: /^copilot$/i }));
         expect(onAsk).toHaveBeenCalledTimes(1);
         expect(onBrief).not.toHaveBeenCalled();
+        expect(onProjectOff).not.toHaveBeenCalled();
     });
 
     it("opens the Brief drawer from the menu", async () => {
@@ -82,6 +85,15 @@ describe("CopilotMenu", () => {
             await screen.findByRole("menuitem", { name: /ask copilot/i })
         );
         expect(onAsk).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables Project AI from the menu", async () => {
+        const { onProjectOff } = setup();
+        await openMenu();
+        fireEvent.click(
+            await screen.findByRole("menuitem", { name: /project ai off/i })
+        );
+        expect(onProjectOff).toHaveBeenCalledTimes(1);
     });
 
     it("surfaces the unread badge with the supplied accessible label", () => {
