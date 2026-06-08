@@ -121,25 +121,25 @@ Tiers, highest priority first:
 
 ### PRD-GAP-007 — WIP-limit control UI on column create/edit + overflow indicator
 - **prd_ref:** `docs/prd/core-collaboration.md` §5.5, §12 (⬜ WIP-limit control); AC-C11
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `ColumnCreator` and the column-edit path send `wipLimit` (non-negative int; `0` = no limit) on `POST`/`PUT /boards`.
   - The column header surfaces the limit and a non-colour-only overflow indicator when `count > wipLimit > 0` (matches the overdue-chip a11y rule).
   - Touch target ≥44px under `pointer: coarse`; axe-clean.
 - **depends_on:** none
-- **notes:** Backend complete and validated; `IColumn.wipLimit` is "referenced by no component" (`core-collaboration.md` §5.5). Today the header renders a plain count `Badge` only.
+- **notes:** Shipped — `ColumnCreator` gains a `wipLimit` `InputNumber` (default `0`) and the column more-actions menu opens an edit modal sending `{columnName, category, wipLimit}` on `PUT /boards` (optimistic via `optimisticUpdate/updateColumn`). The header renders a `{count} / {limit}` badge plus a glyph + "Over limit" chip (non-colour-only) when the unfiltered count exceeds a positive limit; both ride a 44px coarse-pointer target.
 
 ### PRD-GAP-008 — Bulk-edit UI (board multi-select → fan-out `PUT /tasks/bulk`)
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.2.1, §12 (⬜ Bulk edit UI); `docs/prd/work-management-depth.md` §10.5
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A multi-select affordance lets a user pick N tasks and apply a metadata change (labels, assignees, priority, etc.) via `PUT /tasks/bulk`.
   - Routing fields (`columnId`/`projectId`) are not offered (server drops them); a single bad id surfaces the all-or-nothing 404 cleanly.
   - Optimistic update + error rollback covered by a test.
 - **depends_on:** none
-- **notes:** `PUT /tasks/bulk` "has no FE caller at all" (`core-collaboration.md` §6.5). The table view (PRD-GAP-014) is its richer long-term home; a board multi-select is the minimal first caller.
+- **notes:** Shipped — task cards gain a hover/focus-revealed select checkbox (gated on `BulkSelectionProvider`; never on optimistic placeholders) feeding a `useBulkSelection` context. A floating `BulkEditToolbar` fans priority / coordinator / labels across the selection via `PUT /tasks/bulk` (routing fields never offered), optimistic through `optimisticUpdate/bulkUpdateTasks` with error rollback + selection-preserved retry. The table view (PRD-GAP-014) is its richer long-term home.
 
 ### PRD-GAP-009 — Port the five richness fields into `TaskDetailPanel`
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.5, AC-C26, §12 (⬜ Task richness on routed panel)

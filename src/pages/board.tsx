@@ -25,6 +25,7 @@ import { useParams } from "react-router-dom";
 import AiSearchInput from "../components/aiSearchInput";
 import ArchiveDrawer from "../components/archiveDrawer";
 import BoardMinimap from "../components/boardMinimap";
+import BulkEditToolbar from "../components/bulkEditToolbar";
 import Column from "../components/column";
 import CopilotMenu from "../components/copilotMenu";
 import CopilotWelcomeBanner from "../components/copilotWelcomeBanner";
@@ -59,6 +60,7 @@ import useAuth from "../utils/hooks/useAuth";
 import useAiProjectDisabled from "../utils/hooks/useAiProjectDisabled";
 import useArchiveDrawer from "../utils/hooks/useArchiveDrawer";
 import useBoardBriefDrawer from "../utils/hooks/useBoardBriefDrawer";
+import { BulkSelectionProvider } from "../utils/hooks/useBulkSelection";
 import useCopilotDock from "../utils/hooks/useCopilotDock";
 import useDragEnd from "../utils/hooks/useDragEnd";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
@@ -723,525 +725,568 @@ const BoardPage = () => {
 
     return (
         <DragDropContext onDragEnd={onDragEnd}>
-            <BoardShell>
-                {boardAiOn && !isPhone && <CopilotWelcomeBanner />}
-                {(() => {
-                    /*
-                     * Two-tier board header (ui-todo §1.2 item 7). The old
-                     * single overloaded row wrapped unpredictably around
-                     * 1024px. We split it into:
-                     *   - Top tier: project name + chrome toolbar (members,
-                     *     per-project "Project AI" switch, phone-only
-                     *     refresh).
-                     *   - Bottom tier: the search/filter rail + the Copilot
-                     *     action launcher.
-                     * On phone chrome the whole toolbar (including the
-                     * Copilot launcher) collapses into the shared Liquid
-                     * Glass capsule, so we render the launcher there and
-                     * skip the desktop bottom-tier slot.
-                     */
-                    const copilotMenuEl = boardAiOn ? (
-                        <CopilotMenu
-                            inboxUnread={copilotInboxUnread}
-                            onAsk={() => openChatDrawer()}
-                            onBrief={() => openBriefDrawer()}
-                            onProjectOff={() => setProjectAiDisabled(true)}
-                            unreadAriaLabel={copilotUnreadAriaLabel}
-                        />
-                    ) : null;
-
-                    const projectAiSwitch = aiEnabled ? (
-                        <Popover
-                            content={
-                                <Space
-                                    direction="vertical"
-                                    size={themeSpace.xs}
-                                    style={{ maxWidth: 280, width: "100%" }}
-                                >
-                                    <Typography.Text type="secondary">
-                                        {microcopy.ai.copilotLabel}
-                                    </Typography.Text>
-                                    <div
-                                        style={{
-                                            alignItems: "center",
-                                            display: "flex",
-                                            gap: themeSpace.sm,
-                                            justifyContent: "space-between"
-                                        }}
-                                    >
-                                        <span>
-                                            {
-                                                microcopy.board
-                                                    .enableCopilotOnBoard
-                                            }
-                                        </span>
-                                        <Switch
-                                            aria-label={
-                                                microcopy.a11y
-                                                    .boardCopilotProjectToggle
-                                            }
-                                            checked={!aiDisabledForProject}
-                                            onChange={(checked) =>
-                                                setProjectAiDisabled(!checked)
-                                            }
-                                            size="small"
-                                        />
-                                    </div>
-                                    <Typography.Text
-                                        style={{ fontSize: fontSize.xs }}
-                                        type="secondary"
-                                    >
-                                        {
-                                            microcopy.board
-                                                .copilotProjectDisabledDescription
-                                        }
-                                    </Typography.Text>
-                                </Space>
-                            }
-                            placement="bottomRight"
-                            trigger={["click"]}
-                        >
-                            <Button
-                                aria-label={microcopy.a11y.boardCopilotSettings}
-                                icon={<SettingOutlined aria-hidden />}
-                                type="text"
+            <BulkSelectionProvider>
+                <BoardShell>
+                    {boardAiOn && !isPhone && <CopilotWelcomeBanner />}
+                    {(() => {
+                        /*
+                         * Two-tier board header (ui-todo §1.2 item 7). The old
+                         * single overloaded row wrapped unpredictably around
+                         * 1024px. We split it into:
+                         *   - Top tier: project name + chrome toolbar (members,
+                         *     per-project "Project AI" switch, phone-only
+                         *     refresh).
+                         *   - Bottom tier: the search/filter rail + the Copilot
+                         *     action launcher.
+                         * On phone chrome the whole toolbar (including the
+                         * Copilot launcher) collapses into the shared Liquid
+                         * Glass capsule, so we render the launcher there and
+                         * skip the desktop bottom-tier slot.
+                         */
+                        const copilotMenuEl = boardAiOn ? (
+                            <CopilotMenu
+                                inboxUnread={copilotInboxUnread}
+                                onAsk={() => openChatDrawer()}
+                                onBrief={() => openBriefDrawer()}
+                                onProjectOff={() => setProjectAiDisabled(true)}
+                                unreadAriaLabel={copilotUnreadAriaLabel}
                             />
-                        </Popover>
-                    ) : null;
+                        ) : null;
 
-                    /*
-                     * Phone clusters every chrome control — including the
-                     * Copilot launcher — into one capsule (6 slots: refresh,
-                     * members, trash, archive, Copilot, settings). Desktop keeps
-                     * the Copilot launcher out of the top tier so it can anchor
-                     * the bottom tier beside the search rail.
-                     */
-                    const phoneOverflowMenu = isPhone ? (
-                        <Dropdown
-                            menu={{
-                                items: [
-                                    ...(aiEnabled
-                                        ? [
-                                              {
-                                                  key: "project-ai",
-                                                  label: aiDisabledForProject
-                                                      ? microcopy.board
-                                                            .enableCopilotOnBoard
-                                                      : microcopy.board
-                                                            .copilotMenuProjectOff,
-                                                  icon: (
-                                                      <SettingOutlined
-                                                          aria-hidden
-                                                      />
-                                                  ),
-                                                  onClick: () =>
-                                                      setProjectAiDisabled(
-                                                          !aiDisabledForProject
-                                                      )
-                                              }
-                                          ]
-                                        : []),
-                                    {
-                                        key: "trash",
-                                        label: microcopy.trashDrawer
-                                            .triggerAriaLabel,
-                                        icon: <DeleteOutlined aria-hidden />,
-                                        onClick: () => openTrashDrawer()
-                                    },
-                                    {
-                                        key: "archive",
-                                        label: microcopy.archiveDrawer
-                                            .triggerAriaLabel,
-                                        icon: <InboxOutlined aria-hidden />,
-                                        onClick: () => openArchiveDrawer()
-                                    }
-                                ]
-                            }}
-                            trigger={["click"]}
-                        >
-                            <Button
-                                aria-label={microcopy.board.moreActionsAria}
-                                data-testid="board-more-actions"
-                                icon={<MoreOutlined aria-hidden />}
-                                type="text"
-                            />
-                        </Dropdown>
-                    ) : null;
-
-                    const topTierControls = (
-                        <>
-                            {isPhone && (
-                                <Button
-                                    aria-label={microcopy.actions.refresh}
-                                    data-testid="board-refresh"
-                                    icon={<ReloadOutlined aria-hidden />}
-                                    loading={boardRefreshing}
-                                    onClick={handleRefresh}
-                                    type="text"
-                                />
-                            )}
-                            <MemberPopover />
-                            {!isPhone && (
-                                <>
-                                    <Button
-                                        aria-label={
-                                            microcopy.trashDrawer
-                                                .triggerAriaLabel
-                                        }
-                                        data-testid="board-trash"
-                                        icon={<DeleteOutlined aria-hidden />}
-                                        onClick={() => openTrashDrawer()}
-                                        type="text"
-                                    />
-                                    <Button
-                                        aria-label={
-                                            microcopy.archiveDrawer
-                                                .triggerAriaLabel
-                                        }
-                                        data-testid="board-archive"
-                                        icon={<InboxOutlined aria-hidden />}
-                                        onClick={() => openArchiveDrawer()}
-                                        type="text"
-                                    />
-                                </>
-                            )}
-                            {isPhone && phoneOverflowMenu}
-                            {!isPhone && projectAiSwitch}
-                        </>
-                    );
-
-                    return (
-                        <>
-                            <BoardHeader>
-                                <Row
-                                    between
-                                    style={{
-                                        alignItems: "flex-start",
-                                        flexWrap: "wrap",
-                                        gap: themeSpace.sm,
-                                        rowGap: themeSpace.xs
-                                    }}
-                                >
-                                    {pLoading ? (
-                                        isPhone ? (
-                                            <BoardTitle
-                                                level={1}
-                                                style={srOnlyLiveRegionStyle}
-                                            >
-                                                {microcopy.board.title}
-                                            </BoardTitle>
-                                        ) : (
-                                            <span
+                        const projectAiSwitch = aiEnabled ? (
+                            <Popover
+                                content={
+                                    <Space
+                                        direction="vertical"
+                                        size={themeSpace.xs}
+                                        style={{ maxWidth: 280, width: "100%" }}
+                                    >
+                                        <Typography.Text type="secondary">
+                                            {microcopy.ai.copilotLabel}
+                                        </Typography.Text>
+                                        <div
+                                            style={{
+                                                alignItems: "center",
+                                                display: "flex",
+                                                gap: themeSpace.sm,
+                                                justifyContent: "space-between"
+                                            }}
+                                        >
+                                            <span>
+                                                {
+                                                    microcopy.board
+                                                        .enableCopilotOnBoard
+                                                }
+                                            </span>
+                                            <Switch
                                                 aria-label={
                                                     microcopy.a11y
-                                                        .loadingProjectName
+                                                        .boardCopilotProjectToggle
                                                 }
-                                                role="status"
-                                                style={{
-                                                    flex: "1 1 auto",
-                                                    minWidth: 0
-                                                }}
-                                            >
-                                                <Skeleton.Input
-                                                    active
-                                                    size="large"
-                                                    style={{
-                                                        maxWidth: "100%",
-                                                        width: 240
-                                                    }}
-                                                />
-                                            </span>
-                                        )
-                                    ) : (
-                                        <BoardTitle
-                                            level={1}
-                                            style={
-                                                isPhone
-                                                    ? srOnlyLiveRegionStyle
-                                                    : undefined
-                                            }
+                                                checked={!aiDisabledForProject}
+                                                onChange={(checked) =>
+                                                    setProjectAiDisabled(
+                                                        !checked
+                                                    )
+                                                }
+                                                size="small"
+                                            />
+                                        </div>
+                                        <Typography.Text
+                                            style={{ fontSize: fontSize.xs }}
+                                            type="secondary"
                                         >
-                                            {boardTitle(
-                                                currentProject?.projectName
-                                            )}
-                                        </BoardTitle>
-                                    )}
-                                    <BoardActions>
-                                        {isPhone ? (
-                                            <GlassActionCluster
-                                                data-testid="board-actions-cluster"
-                                                reducedMotion={reducedMotion}
-                                            >
-                                                {topTierControls}
-                                            </GlassActionCluster>
-                                        ) : (
-                                            topTierControls
-                                        )}
-                                    </BoardActions>
-                                </Row>
-                            </BoardHeader>
-                            <BoardBottomTier>
-                                <BoardSearchSlot>
-                                    <LensToggleRow>
+                                            {
+                                                microcopy.board
+                                                    .copilotProjectDisabledDescription
+                                            }
+                                        </Typography.Text>
+                                    </Space>
+                                }
+                                placement="bottomRight"
+                                trigger={["click"]}
+                            >
+                                <Button
+                                    aria-label={
+                                        microcopy.a11y.boardCopilotSettings
+                                    }
+                                    icon={<SettingOutlined aria-hidden />}
+                                    type="text"
+                                />
+                            </Popover>
+                        ) : null;
+
+                        /*
+                         * Phone clusters every chrome control — including the
+                         * Copilot launcher — into one capsule (6 slots: refresh,
+                         * members, trash, archive, Copilot, settings). Desktop keeps
+                         * the Copilot launcher out of the top tier so it can anchor
+                         * the bottom tier beside the search rail.
+                         */
+                        const phoneOverflowMenu = isPhone ? (
+                            <Dropdown
+                                menu={{
+                                    items: [
+                                        ...(aiEnabled
+                                            ? [
+                                                  {
+                                                      key: "project-ai",
+                                                      label: aiDisabledForProject
+                                                          ? microcopy.board
+                                                                .enableCopilotOnBoard
+                                                          : microcopy.board
+                                                                .copilotMenuProjectOff,
+                                                      icon: (
+                                                          <SettingOutlined
+                                                              aria-hidden
+                                                          />
+                                                      ),
+                                                      onClick: () =>
+                                                          setProjectAiDisabled(
+                                                              !aiDisabledForProject
+                                                          )
+                                                  }
+                                              ]
+                                            : []),
+                                        {
+                                            key: "trash",
+                                            label: microcopy.trashDrawer
+                                                .triggerAriaLabel,
+                                            icon: (
+                                                <DeleteOutlined aria-hidden />
+                                            ),
+                                            onClick: () => openTrashDrawer()
+                                        },
+                                        {
+                                            key: "archive",
+                                            label: microcopy.archiveDrawer
+                                                .triggerAriaLabel,
+                                            icon: <InboxOutlined aria-hidden />,
+                                            onClick: () => openArchiveDrawer()
+                                        }
+                                    ]
+                                }}
+                                trigger={["click"]}
+                            >
+                                <Button
+                                    aria-label={microcopy.board.moreActionsAria}
+                                    data-testid="board-more-actions"
+                                    icon={<MoreOutlined aria-hidden />}
+                                    type="text"
+                                />
+                            </Dropdown>
+                        ) : null;
+
+                        const topTierControls = (
+                            <>
+                                {isPhone && (
+                                    <Button
+                                        aria-label={microcopy.actions.refresh}
+                                        data-testid="board-refresh"
+                                        icon={<ReloadOutlined aria-hidden />}
+                                        loading={boardRefreshing}
+                                        onClick={handleRefresh}
+                                        type="text"
+                                    />
+                                )}
+                                <MemberPopover />
+                                {!isPhone && (
+                                    <>
                                         <Button
-                                            aria-expanded={
+                                            aria-label={
+                                                microcopy.trashDrawer
+                                                    .triggerAriaLabel
+                                            }
+                                            data-testid="board-trash"
+                                            icon={
+                                                <DeleteOutlined aria-hidden />
+                                            }
+                                            onClick={() => openTrashDrawer()}
+                                            type="text"
+                                        />
+                                        <Button
+                                            aria-label={
+                                                microcopy.archiveDrawer
+                                                    .triggerAriaLabel
+                                            }
+                                            data-testid="board-archive"
+                                            icon={<InboxOutlined aria-hidden />}
+                                            onClick={() => openArchiveDrawer()}
+                                            type="text"
+                                        />
+                                    </>
+                                )}
+                                {isPhone && phoneOverflowMenu}
+                                {!isPhone && projectAiSwitch}
+                            </>
+                        );
+
+                        return (
+                            <>
+                                <BoardHeader>
+                                    <Row
+                                        between
+                                        style={{
+                                            alignItems: "flex-start",
+                                            flexWrap: "wrap",
+                                            gap: themeSpace.sm,
+                                            rowGap: themeSpace.xs
+                                        }}
+                                    >
+                                        {pLoading ? (
+                                            isPhone ? (
+                                                <BoardTitle
+                                                    level={1}
+                                                    style={
+                                                        srOnlyLiveRegionStyle
+                                                    }
+                                                >
+                                                    {microcopy.board.title}
+                                                </BoardTitle>
+                                            ) : (
+                                                <span
+                                                    aria-label={
+                                                        microcopy.a11y
+                                                            .loadingProjectName
+                                                    }
+                                                    role="status"
+                                                    style={{
+                                                        flex: "1 1 auto",
+                                                        minWidth: 0
+                                                    }}
+                                                >
+                                                    <Skeleton.Input
+                                                        active
+                                                        size="large"
+                                                        style={{
+                                                            maxWidth: "100%",
+                                                            width: 240
+                                                        }}
+                                                    />
+                                                </span>
+                                            )
+                                        ) : (
+                                            <BoardTitle
+                                                level={1}
+                                                style={
+                                                    isPhone
+                                                        ? srOnlyLiveRegionStyle
+                                                        : undefined
+                                                }
+                                            >
+                                                {boardTitle(
+                                                    currentProject?.projectName
+                                                )}
+                                            </BoardTitle>
+                                        )}
+                                        <BoardActions>
+                                            {isPhone ? (
+                                                <GlassActionCluster
+                                                    data-testid="board-actions-cluster"
+                                                    reducedMotion={
+                                                        reducedMotion
+                                                    }
+                                                >
+                                                    {topTierControls}
+                                                </GlassActionCluster>
+                                            ) : (
+                                                topTierControls
+                                            )}
+                                        </BoardActions>
+                                    </Row>
+                                </BoardHeader>
+                                <BoardBottomTier>
+                                    <BoardSearchSlot>
+                                        <LensToggleRow>
+                                            <Button
+                                                aria-expanded={
+                                                    lensesOpen ||
+                                                    Boolean(activeLens)
+                                                }
+                                                aria-label={
+                                                    microcopy.board
+                                                        .lensesToggleAria
+                                                }
+                                                data-testid="board-lenses-toggle"
+                                                icon={
+                                                    <UnorderedListOutlined
+                                                        aria-hidden
+                                                    />
+                                                }
+                                                onClick={() =>
+                                                    setLensesOpen(
+                                                        (open) => !open
+                                                    )
+                                                }
+                                                type={
+                                                    lensesOpen || activeLens
+                                                        ? "primary"
+                                                        : "default"
+                                                }
+                                            >
+                                                {microcopy.board.lensesToggle}
+                                            </Button>
+                                        </LensToggleRow>
+                                        <LensPanel
+                                            $open={
                                                 lensesOpen ||
                                                 Boolean(activeLens)
                                             }
-                                            aria-label={
-                                                microcopy.board.lensesToggleAria
-                                            }
-                                            data-testid="board-lenses-toggle"
-                                            icon={
-                                                <UnorderedListOutlined
-                                                    aria-hidden
-                                                />
-                                            }
-                                            onClick={() =>
-                                                setLensesOpen((open) => !open)
-                                            }
-                                            type={
-                                                lensesOpen || activeLens
-                                                    ? "primary"
-                                                    : "default"
-                                            }
                                         >
-                                            {microcopy.board.lensesToggle}
-                                        </Button>
-                                    </LensToggleRow>
-                                    <LensPanel
-                                        $open={
-                                            lensesOpen || Boolean(activeLens)
-                                        }
-                                    >
-                                        <LensChips
-                                            active={activeLens}
-                                            onChange={(next) =>
-                                                setParam(
-                                                    {
-                                                        lens: next ?? undefined
-                                                    },
-                                                    {
-                                                        viewTransition: true
-                                                    }
-                                                )
+                                            <LensChips
+                                                active={activeLens}
+                                                onChange={(next) =>
+                                                    setParam(
+                                                        {
+                                                            lens:
+                                                                next ??
+                                                                undefined
+                                                        },
+                                                        {
+                                                            viewTransition: true
+                                                        }
+                                                    )
+                                                }
+                                            />
+                                        </LensPanel>
+                                        <TaskSearchPanel
+                                            tasks={visibleTasks}
+                                            param={param}
+                                            setParam={setParam}
+                                            members={members}
+                                            loading={tLoading || mLoading}
+                                            aiSearchSlot={
+                                                boardAiOn &&
+                                                aiProjectContext ? (
+                                                    <div
+                                                        style={{
+                                                            flexBasis: "100%",
+                                                            marginBottom:
+                                                                themeSpace.sm
+                                                        }}
+                                                    >
+                                                        <AiSearchInput
+                                                            kind="tasks"
+                                                            projectContext={
+                                                                aiProjectContext
+                                                            }
+                                                            semanticIds={
+                                                                param.semanticIds
+                                                            }
+                                                            setSemanticIds={(
+                                                                value
+                                                            ) =>
+                                                                setParam({
+                                                                    semanticIds:
+                                                                        value
+                                                                })
+                                                            }
+                                                        />
+                                                    </div>
+                                                ) : undefined
                                             }
                                         />
-                                    </LensPanel>
-                                    <TaskSearchPanel
-                                        tasks={visibleTasks}
-                                        param={param}
-                                        setParam={setParam}
-                                        members={members}
-                                        loading={tLoading || mLoading}
-                                        aiSearchSlot={
-                                            boardAiOn && aiProjectContext ? (
-                                                <div
-                                                    style={{
-                                                        flexBasis: "100%",
-                                                        marginBottom:
-                                                            themeSpace.sm
-                                                    }}
-                                                >
-                                                    <AiSearchInput
-                                                        kind="tasks"
-                                                        projectContext={
-                                                            aiProjectContext
-                                                        }
-                                                        semanticIds={
-                                                            param.semanticIds
-                                                        }
-                                                        setSemanticIds={(
-                                                            value
-                                                        ) =>
-                                                            setParam({
-                                                                semanticIds:
-                                                                    value
-                                                            })
-                                                        }
-                                                    />
-                                                </div>
-                                            ) : undefined
-                                        }
-                                    />
-                                </BoardSearchSlot>
-                                {!isPhone && copilotMenuEl && (
-                                    <BoardCopilotSlot>
-                                        {copilotMenuEl}
-                                    </BoardCopilotSlot>
-                                )}
-                            </BoardBottomTier>
-                        </>
-                    );
-                })()}
-                {bError || tError ? (
-                    <Alert
-                        action={
-                            <Button
-                                onClick={() => {
-                                    if (bError) refetchBoard();
-                                    if (tError) refetchTasks();
-                                }}
-                                size="small"
-                                type="primary"
-                            >
-                                {microcopy.actions.retry}
-                            </Button>
-                        }
-                        description={microcopy.feedback.retryHint}
-                        title={microcopy.feedback.loadFailed}
-                        showIcon
-                        style={{ marginBottom: themeSpace.md }}
-                        type="error"
-                    />
-                ) : null}
-                <SrOnlyLive>{filterStatusMessage}</SrOnlyLive>
-                {!(bLoading || tLoading) ? (
-                    (board?.length ?? 0) === 0 && !(bError || tError) ? (
-                        <>
-                            <EmptyState
-                                title={microcopy.empty.board.title}
-                                description={microcopy.empty.board.description}
-                                cta={
-                                    <Button
-                                        onClick={handleCreateFirstColumn}
-                                        type="primary"
-                                    >
-                                        {microcopy.empty.board.cta}
-                                    </Button>
-                                }
-                            />
-                            <div ref={emptyColumnCreatorRef}>
-                                <ColumnCreator />
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            {(board?.length ?? 0) > 1 &&
-                                !swipeHintDismissed && (
-                                    <SwipeHint role="status">
-                                        <span aria-hidden>←</span>
-                                        <span>{microcopy.board.swipeHint}</span>
-                                        <span aria-hidden>→</span>
-                                        <SwipeHintClose
-                                            aria-label={
-                                                microcopy.a11y.dismissSwipeHint
-                                            }
-                                            onClick={dismissSwipeHint}
-                                            type="button"
+                                    </BoardSearchSlot>
+                                    {!isPhone && copilotMenuEl && (
+                                        <BoardCopilotSlot>
+                                            {copilotMenuEl}
+                                        </BoardCopilotSlot>
+                                    )}
+                                </BoardBottomTier>
+                            </>
+                        );
+                    })()}
+                    {bError || tError ? (
+                        <Alert
+                            action={
+                                <Button
+                                    onClick={() => {
+                                        if (bError) refetchBoard();
+                                        if (tError) refetchTasks();
+                                    }}
+                                    size="small"
+                                    type="primary"
+                                >
+                                    {microcopy.actions.retry}
+                                </Button>
+                            }
+                            description={microcopy.feedback.retryHint}
+                            title={microcopy.feedback.loadFailed}
+                            showIcon
+                            style={{ marginBottom: themeSpace.md }}
+                            type="error"
+                        />
+                    ) : null}
+                    <SrOnlyLive>{filterStatusMessage}</SrOnlyLive>
+                    {!(bLoading || tLoading) ? (
+                        (board?.length ?? 0) === 0 && !(bError || tError) ? (
+                            <>
+                                <EmptyState
+                                    title={microcopy.empty.board.title}
+                                    description={
+                                        microcopy.empty.board.description
+                                    }
+                                    cta={
+                                        <Button
+                                            onClick={handleCreateFirstColumn}
+                                            type="primary"
                                         >
-                                            <CloseOutlined
-                                                aria-hidden
-                                                style={{ fontSize: 10 }}
-                                            />
-                                        </SwipeHintClose>
-                                    </SwipeHint>
-                                )}
-                            {environment.boardMinimapEnabled && (
-                                <BoardMinimap
-                                    columns={minimapColumns}
-                                    scrollContainerRef={boardScrollRef}
+                                            {microcopy.empty.board.cta}
+                                        </Button>
+                                    }
                                 />
-                            )}
-                            <ColumnsViewport>
-                                <ColumnContainer ref={boardScrollRef}>
-                                    <Drop
-                                        droppableId="column"
-                                        type="COLUMN"
-                                        direction="horizontal"
-                                    >
-                                        <DropChild style={{ display: "flex" }}>
-                                            {board?.map((column, index) => (
-                                                <Drag
-                                                    detachDragHandle
-                                                    disableInteractiveElementBlocking
-                                                    key={column._id}
-                                                    draggableId={`column${column._id}`}
-                                                    index={index}
-                                                    isDragDisabled={
-                                                        isColumnDragDisabled ||
-                                                        isTaskDragDisabled ||
-                                                        isOptimisticPlaceholderId(
-                                                            column._id
-                                                        )
-                                                    }
-                                                >
-                                                    <Column
-                                                        boardAiOn={boardAiOn}
-                                                        tasks={
-                                                            tasksByColumn.get(
-                                                                column._id
-                                                            ) ?? EMPTY_TASKS
-                                                        }
-                                                        column={column}
-                                                        data-minimap-column-id={
-                                                            column._id
-                                                        }
-                                                        members={safeMembers}
-                                                        labels={safeLabels}
-                                                        milestones={
-                                                            safeMilestones
-                                                        }
-                                                        param={param}
-                                                        onResetFilters={
-                                                            resetBoardFilters
-                                                        }
-                                                        isDragDisabled={
-                                                            isTaskDragDisabled
-                                                        }
-                                                        taskDragDisabled={
-                                                            isTaskDragDisabled ||
-                                                            hasActiveFilters
-                                                        }
-                                                        dragDisabledByFilters={
-                                                            hasActiveFilters &&
-                                                            !isTaskDragDisabled
-                                                        }
-                                                    />
-                                                </Drag>
-                                            ))}
-                                        </DropChild>
-                                    </Drop>
+                                <div ref={emptyColumnCreatorRef}>
                                     <ColumnCreator />
-                                </ColumnContainer>
-                            </ColumnsViewport>
-                        </>
-                    )
-                ) : (
-                    <BoardLoadingSkeleton />
-                )}
-                {!environment.taskPanelRouted && (
-                    <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
-                )}
-                {/*
-                 * Trash drawer is a core (non-AI) recovery surface, so it
-                 * mounts unconditionally (like the TaskModal above). Its
-                 * list query is disabled while closed, so the mount is cheap.
-                 */}
-                <TrashDrawer
-                    onClose={closeTrashDrawer}
-                    open={trashOpen}
-                    projectId={projectId}
-                />
-                {/*
-                 * Archive drawer is a core (non-AI) recovery surface, so —
-                 * like the TrashDrawer above — it mounts unconditionally
-                 * (its list query is disabled while closed, so the mount is
-                 * cheap).
-                 */}
-                <ArchiveDrawer
-                    onClose={closeArchiveDrawer}
-                    open={archiveOpen}
-                    projectId={projectId}
-                />
-                {/*
-                 * The Copilot AI surface (Chat / Brief / Inbox) is the
-                 * tabbed `<CopilotDock>` mounted once by `CopilotDockHost`
-                 * inside `MainLayout`, so it survives project-route
-                 * navigations (R-A M1). The board page only triggers it via
-                 * the launcher callsites above — it mounts no AI drawer.
-                 */}
-            </BoardShell>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {(board?.length ?? 0) > 1 &&
+                                    !swipeHintDismissed && (
+                                        <SwipeHint role="status">
+                                            <span aria-hidden>←</span>
+                                            <span>
+                                                {microcopy.board.swipeHint}
+                                            </span>
+                                            <span aria-hidden>→</span>
+                                            <SwipeHintClose
+                                                aria-label={
+                                                    microcopy.a11y
+                                                        .dismissSwipeHint
+                                                }
+                                                onClick={dismissSwipeHint}
+                                                type="button"
+                                            >
+                                                <CloseOutlined
+                                                    aria-hidden
+                                                    style={{ fontSize: 10 }}
+                                                />
+                                            </SwipeHintClose>
+                                        </SwipeHint>
+                                    )}
+                                {environment.boardMinimapEnabled && (
+                                    <BoardMinimap
+                                        columns={minimapColumns}
+                                        scrollContainerRef={boardScrollRef}
+                                    />
+                                )}
+                                <ColumnsViewport>
+                                    <ColumnContainer ref={boardScrollRef}>
+                                        <Drop
+                                            droppableId="column"
+                                            type="COLUMN"
+                                            direction="horizontal"
+                                        >
+                                            <DropChild
+                                                style={{ display: "flex" }}
+                                            >
+                                                {board?.map((column, index) => (
+                                                    <Drag
+                                                        detachDragHandle
+                                                        disableInteractiveElementBlocking
+                                                        key={column._id}
+                                                        draggableId={`column${column._id}`}
+                                                        index={index}
+                                                        isDragDisabled={
+                                                            isColumnDragDisabled ||
+                                                            isTaskDragDisabled ||
+                                                            isOptimisticPlaceholderId(
+                                                                column._id
+                                                            )
+                                                        }
+                                                    >
+                                                        <Column
+                                                            boardAiOn={
+                                                                boardAiOn
+                                                            }
+                                                            tasks={
+                                                                tasksByColumn.get(
+                                                                    column._id
+                                                                ) ?? EMPTY_TASKS
+                                                            }
+                                                            column={column}
+                                                            data-minimap-column-id={
+                                                                column._id
+                                                            }
+                                                            members={
+                                                                safeMembers
+                                                            }
+                                                            labels={safeLabels}
+                                                            milestones={
+                                                                safeMilestones
+                                                            }
+                                                            param={param}
+                                                            onResetFilters={
+                                                                resetBoardFilters
+                                                            }
+                                                            isDragDisabled={
+                                                                isTaskDragDisabled
+                                                            }
+                                                            taskDragDisabled={
+                                                                isTaskDragDisabled ||
+                                                                hasActiveFilters
+                                                            }
+                                                            dragDisabledByFilters={
+                                                                hasActiveFilters &&
+                                                                !isTaskDragDisabled
+                                                            }
+                                                        />
+                                                    </Drag>
+                                                ))}
+                                            </DropChild>
+                                        </Drop>
+                                        <ColumnCreator />
+                                    </ColumnContainer>
+                                </ColumnsViewport>
+                            </>
+                        )
+                    ) : (
+                        <BoardLoadingSkeleton />
+                    )}
+                    {!environment.taskPanelRouted && (
+                        <TaskModal boardAiOn={boardAiOn} tasks={tasks} />
+                    )}
+                    {/*
+                     * Trash drawer is a core (non-AI) recovery surface, so it
+                     * mounts unconditionally (like the TaskModal above). Its
+                     * list query is disabled while closed, so the mount is cheap.
+                     */}
+                    <TrashDrawer
+                        onClose={closeTrashDrawer}
+                        open={trashOpen}
+                        projectId={projectId}
+                    />
+                    {/*
+                     * Archive drawer is a core (non-AI) recovery surface, so —
+                     * like the TrashDrawer above — it mounts unconditionally
+                     * (its list query is disabled while closed, so the mount is
+                     * cheap).
+                     */}
+                    <ArchiveDrawer
+                        onClose={closeArchiveDrawer}
+                        open={archiveOpen}
+                        projectId={projectId}
+                    />
+                    {/*
+                     * Bulk-edit toolbar (PRD-GAP-008). Renders nothing until ≥1
+                     * card is selected; mounting it unconditionally keeps the
+                     * selection→toolbar wiring inside the same provider as the
+                     * cards. Fed the shared member/label refs so its selects
+                     * resolve coordinator + label options without a new fetch.
+                     */}
+                    <BulkEditToolbar
+                        labels={safeLabels}
+                        members={safeMembers}
+                    />
+                    {/*
+                     * The Copilot AI surface (Chat / Brief / Inbox) is the
+                     * tabbed `<CopilotDock>` mounted once by `CopilotDockHost`
+                     * inside `MainLayout`, so it survives project-route
+                     * navigations (R-A M1). The board page only triggers it via
+                     * the launcher callsites above — it mounts no AI drawer.
+                     */}
+                </BoardShell>
+            </BulkSelectionProvider>
         </DragDropContext>
     );
 };
