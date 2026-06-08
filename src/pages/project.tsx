@@ -15,6 +15,7 @@ import PageContainer from "../components/pageContainer";
 import ProjectList from "../components/projectList";
 import ProjectSearchPanel from "../components/projectSearchPanel";
 import PullToRefresh from "../components/pullToRefresh";
+import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import type { ProjectListSort } from "../store/reducers/userPreferencesSlice";
 import {
@@ -564,24 +565,26 @@ const ProjectPage = () => {
                         </PageSubheading>
                     </PageHeadingGroup>
                     <Toolbar>
-                        {aiEnabled && !isPhone && (
-                            <Badge
-                                aria-label={copilotUnreadAriaLabel}
-                                count={copilotInboxUnread}
-                                data-testid="copilot-launcher-badge"
-                                offset={[-4, 4]}
-                                size="small"
-                            >
-                                <Button
-                                    aria-label={microcopy.ai.askCopilot}
-                                    icon={<AiSparkleIcon aria-hidden />}
-                                    onClick={() => openChatDrawer()}
-                                    type="default"
+                        {aiEnabled &&
+                            environment.copilotDockEnabled &&
+                            !isPhone && (
+                                <Badge
+                                    aria-label={copilotUnreadAriaLabel}
+                                    count={copilotInboxUnread}
+                                    data-testid="copilot-launcher-badge"
+                                    offset={[-4, 4]}
+                                    size="small"
                                 >
-                                    {microcopy.labels.askShort}
-                                </Button>
-                            </Badge>
-                        )}
+                                    <Button
+                                        aria-label={microcopy.ai.askCopilot}
+                                        icon={<AiSparkleIcon aria-hidden />}
+                                        onClick={() => openChatDrawer()}
+                                        type="default"
+                                    >
+                                        {microcopy.labels.askShort}
+                                    </Button>
+                                </Badge>
+                            )}
                         <Button
                             aria-label={microcopy.actions.createProject}
                             icon={<PlusOutlined aria-hidden />}

@@ -570,6 +570,14 @@ const BoardPage = () => {
         setDisabled: setProjectAiDisabled
     } = useAiProjectDisabled(projectId);
     const boardAiOn = aiEnabled && !aiDisabledForProject;
+    /*
+     * Copilot launchers (CopilotMenu, welcome-banner CTA) only trigger
+     * the unified dock, which `CopilotDockHost` mounts solely when the
+     * `copilotDockEnabled` kill-switch is on. With the switch off the
+     * dock host is a no-op, so a rendered launcher would be a dead
+     * control whose click goes nowhere — gate it on both flags.
+     */
+    const copilotLaunchersOn = boardAiOn && environment.copilotDockEnabled;
     // Phone chassis clusters the header toolbar controls into a single
     // Liquid Glass capsule (iOS 26 toolbar idiom). Desktop keeps the
     // plain right-aligned flex row.
@@ -589,10 +597,12 @@ const BoardPage = () => {
             : null;
     /*
      * Copilot launchers (CopilotMenu Ask / Brief, welcome-banner CTA).
-     * These open the legacy `chatDrawer` / `boardBriefOpen` Redux flags
-     * which `CopilotDockHost`'s bridge forwards onto the persistent dock
+     * These flip the `chatDrawer` / `boardBriefOpen` Redux flags which
+     * `CopilotDockHost`'s bridge forwards onto the persistent dock
      * state — the dock itself is mounted once in `MainLayout`, so the
-     * board page only triggers it.
+     * board page only triggers it. The launchers render only when
+     * `copilotLaunchersOn` is true (AI on for the project AND the dock
+     * kill-switch enabled), so a click always reaches a mounted dock.
      */
     const { openDrawer: openBriefDrawer } = useBoardBriefDrawer();
     const { openDrawer: openChatDrawer } = useAiChatDrawer();
@@ -727,7 +737,7 @@ const BoardPage = () => {
         <DragDropContext onDragEnd={onDragEnd}>
             <BulkSelectionProvider>
                 <BoardShell>
-                    {boardAiOn && !isPhone && <CopilotWelcomeBanner />}
+                    {copilotLaunchersOn && !isPhone && <CopilotWelcomeBanner />}
                     {(() => {
                         /*
                          * Two-tier board header (ui-todo §1.2 item 7). The old
@@ -743,7 +753,7 @@ const BoardPage = () => {
                          * Glass capsule, so we render the launcher there and
                          * skip the desktop bottom-tier slot.
                          */
-                        const copilotMenuEl = boardAiOn ? (
+                        const copilotMenuEl = copilotLaunchersOn ? (
                             <CopilotMenu
                                 inboxUnread={copilotInboxUnread}
                                 onAsk={() => openChatDrawer()}

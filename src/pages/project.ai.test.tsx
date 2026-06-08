@@ -14,7 +14,8 @@ jest.mock("../constants/env", () => ({
         apiBaseUrl: "http://localhost:8080/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        copilotDockEnabled: true
     }
 }));
 

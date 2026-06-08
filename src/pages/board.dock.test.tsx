@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
 
@@ -294,6 +295,28 @@ describe("BoardPage · CopilotDock flag", () => {
                 name: /message board copilot/i
             })
         ).not.toBeInTheDocument();
+
+        // GAP-006: the board-page launchers (CopilotMenu split button +
+        // first-run welcome banner) are dead controls when the dock
+        // host is killed, so they must not render either. Assert by the
+        // launcher's accessible names / banner region + title, plus the
+        // shared launcher-badge test id the CopilotMenu wraps.
+        expect(
+            screen.queryByTestId("copilot-launcher-badge")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", {
+                name: microcopy.a11y.boardCopilotMenu
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("region", {
+                name: microcopy.a11y.boardCopilotWelcome
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(microcopy.ai.welcomeBannerTitle)
+        ).not.toBeInTheDocument();
     });
 
     it("mounts the CopilotDock instead of the legacy drawers when copilotDockEnabled is on", async () => {
@@ -312,6 +335,13 @@ describe("BoardPage · CopilotDock flag", () => {
         // Tab list confirms it's the dock chrome, not the legacy
         // drawer header.
         expect(screen.getByRole("tablist")).toBeInTheDocument();
+        // GAP-006: with the kill-switch on, the board launchers are
+        // live controls and must render so a click reaches the dock.
+        expect(
+            screen.getByRole("button", {
+                name: microcopy.a11y.boardCopilotMenu
+            })
+        ).toBeInTheDocument();
     });
 
     it("switches to the Brief tab when the brief overlay flag is the active surface", async () => {
