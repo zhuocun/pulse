@@ -47,15 +47,15 @@ interface Props {
     aiSearchSlot?: React.ReactNode;
 }
 
-const FilterShell = styled.div`
+const FilterShell = styled.div<{ $compact?: boolean }>`
     background: var(--ant-color-bg-container, #fff);
     border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
     border-radius: ${radius.lg}px;
     margin-bottom: ${space.md}px;
-    padding: ${space.sm}px;
+    padding: ${({ $compact }) => ($compact ? space.xs : space.sm)}px;
 
     @media (min-width: ${breakpoints.md}px) {
-        padding: ${space.md}px;
+        padding: ${({ $compact }) => ($compact ? space.xs : space.md)}px;
     }
 `;
 
@@ -180,6 +180,11 @@ const FilterToggleSlot = styled.div`
 `;
 
 const AdvancedFiltersPanel = styled.div<{ $open: boolean }>`
+    display: ${({ $open }) => ($open ? "block" : "none")};
+    margin-top: ${space.xs}px;
+`;
+
+const ViewOptionsPanel = styled.div<{ $open: boolean }>`
     display: ${({ $open }) => ($open ? "block" : "none")};
     margin-top: ${space.xs}px;
 `;
@@ -340,8 +345,8 @@ const TaskSearchPanel: React.FC<Props> = ({
      */
     const [saveOpen, setSaveOpen] = useState(false);
     const [draftName, setDraftName] = useState("");
-    const hasAdvancedFilters = Boolean(param.coordinatorId || param.type);
-    const [filtersOpen, setFiltersOpen] = useState(hasAdvancedFilters);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
     const [aiSearchOpen, setAiSearchOpen] = useState(() =>
         Boolean(param.semanticIds)
     );
@@ -491,8 +496,10 @@ const TaskSearchPanel: React.FC<Props> = ({
         [visiblePresets]
     );
 
+    const isCompact = !filtersOpen && chips.length === 0 && !aiSearchOpen;
+
     return (
-        <FilterShell>
+        <FilterShell $compact={isCompact}>
             {aiSearchSlot ? (
                 <AiSearchSlot $visible={aiSearchOpen}>
                     {aiSearchSlot}
@@ -630,128 +637,152 @@ const TaskSearchPanel: React.FC<Props> = ({
                         </Button>
                     </ResetButtonSlot>
                 </FilterRow>
-                <PrefRow>
-                    <Space size="small" align="center" wrap>
-                        <span
-                            id="board-density-label"
-                            style={{
-                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                                fontSize: "12px"
-                            }}
-                        >
-                            {microcopy.board.densityLabel}
-                        </span>
-                        <Segmented
-                            aria-labelledby="board-density-label"
-                            aria-label={microcopy.board.densityLabel}
-                            onChange={(value) =>
-                                setDensity(value as "comfortable" | "compact")
-                            }
-                            options={[
-                                {
-                                    label: microcopy.board.densityComfortable,
-                                    value: "comfortable"
-                                },
-                                {
-                                    label: microcopy.board.densityCompact,
-                                    value: "compact"
-                                }
-                            ]}
-                            size="small"
-                            value={density}
-                        />
-                    </Space>
-                    <PrefRowTrailing>
-                        <Select
-                            allowClear
-                            aria-label={microcopy.board.presets.loadAriaLabel}
-                            data-testid="task-search-panel-presets-select"
-                            notFoundContent={microcopy.empty.savedPresets.empty}
-                            onChange={(value) => {
-                                if (typeof value === "string")
-                                    handleApplyPreset(value);
-                            }}
-                            options={presetOptions}
-                            placeholder={
-                                microcopy.board.presets.loadPlaceholder
-                            }
-                            size="small"
-                            style={{ minWidth: 160 }}
-                            value={null}
-                        />
-                        <Popover
-                            content={
-                                <Space
-                                    direction="vertical"
-                                    size="small"
-                                    style={{ width: "100%" }}
-                                >
-                                    <Input
-                                        aria-label={
-                                            microcopy.board.presets
-                                                .namePlaceholder
-                                        }
-                                        autoFocus
-                                        data-testid="task-search-panel-preset-name-input"
-                                        maxLength={60}
-                                        onChange={(e) =>
-                                            setDraftName(e.target.value)
-                                        }
-                                        onPressEnter={handleSavePreset}
-                                        placeholder={
-                                            microcopy.board.presets
-                                                .namePlaceholder
-                                        }
-                                        value={draftName}
-                                    />
-                                    <Space size="small" wrap>
-                                        <Button
-                                            onClick={handleSavePreset}
-                                            disabled={!draftName.trim()}
-                                            size="small"
-                                            type="primary"
-                                        >
-                                            {
-                                                microcopy.board.presets
-                                                    .saveConfirm
-                                            }
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setSaveOpen(false);
-                                                setDraftName("");
-                                            }}
-                                            size="small"
-                                        >
-                                            {microcopy.board.presets.saveCancel}
-                                        </Button>
-                                    </Space>
-                                </Space>
-                            }
-                            onOpenChange={(open) => {
-                                setSaveOpen(open);
-                                if (!open) setDraftName("");
-                            }}
-                            open={saveOpen}
-                            placement="bottomRight"
-                            title={microcopy.board.presets.saveAction}
-                            trigger="click"
-                        >
-                            <Button
-                                aria-label={
-                                    microcopy.board.presets.saveAriaLabel
-                                }
-                                data-testid="task-search-panel-save-preset"
-                                disabled={chips.length === 0}
-                                icon={<SaveOutlined aria-hidden />}
-                                size="small"
-                                type="text"
+                <Button
+                    aria-expanded={viewOptionsOpen}
+                    aria-label={microcopy.board.viewOptionsToggleAria}
+                    data-testid="task-search-panel-view-options-toggle"
+                    onClick={() =>
+                        setViewOptionsOpen((open) => !open)
+                    }
+                    size="small"
+                    type="text"
+                >
+                    {microcopy.board.viewOptionsToggle}
+                </Button>
+                <ViewOptionsPanel $open={viewOptionsOpen}>
+                    <PrefRow>
+                        <Space size="small" align="center" wrap>
+                            <span
+                                id="board-density-label"
+                                style={{
+                                    color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
+                                    fontSize: "12px"
+                                }}
                             >
-                                {microcopy.board.presets.saveAction}
-                            </Button>
-                        </Popover>
-                    </PrefRowTrailing>
-                </PrefRow>
+                                {microcopy.board.densityLabel}
+                            </span>
+                            <Segmented
+                                aria-labelledby="board-density-label"
+                                aria-label={microcopy.board.densityLabel}
+                                onChange={(value) =>
+                                    setDensity(
+                                        value as "comfortable" | "compact"
+                                    )
+                                }
+                                options={[
+                                    {
+                                        label: microcopy.board
+                                            .densityComfortable,
+                                        value: "comfortable"
+                                    },
+                                    {
+                                        label: microcopy.board.densityCompact,
+                                        value: "compact"
+                                    }
+                                ]}
+                                size="small"
+                                value={density}
+                            />
+                        </Space>
+                        <PrefRowTrailing>
+                            <Select
+                                allowClear
+                                aria-label={
+                                    microcopy.board.presets.loadAriaLabel
+                                }
+                                data-testid="task-search-panel-presets-select"
+                                notFoundContent={
+                                    microcopy.empty.savedPresets.empty
+                                }
+                                onChange={(value) => {
+                                    if (typeof value === "string")
+                                        handleApplyPreset(value);
+                                }}
+                                options={presetOptions}
+                                placeholder={
+                                    microcopy.board.presets.loadPlaceholder
+                                }
+                                size="small"
+                                style={{ minWidth: 160 }}
+                                value={null}
+                            />
+                            <Popover
+                                content={
+                                    <Space
+                                        direction="vertical"
+                                        size="small"
+                                        style={{ width: "100%" }}
+                                    >
+                                        <Input
+                                            aria-label={
+                                                microcopy.board.presets
+                                                    .namePlaceholder
+                                            }
+                                            autoFocus
+                                            data-testid="task-search-panel-preset-name-input"
+                                            maxLength={60}
+                                            onChange={(e) =>
+                                                setDraftName(e.target.value)
+                                            }
+                                            onPressEnter={handleSavePreset}
+                                            placeholder={
+                                                microcopy.board.presets
+                                                    .namePlaceholder
+                                            }
+                                            value={draftName}
+                                        />
+                                        <Space size="small" wrap>
+                                            <Button
+                                                onClick={handleSavePreset}
+                                                disabled={!draftName.trim()}
+                                                size="small"
+                                                type="primary"
+                                            >
+                                                {
+                                                    microcopy.board.presets
+                                                        .saveConfirm
+                                                }
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    setSaveOpen(false);
+                                                    setDraftName("");
+                                                }}
+                                                size="small"
+                                            >
+                                                {
+                                                    microcopy.board.presets
+                                                        .saveCancel
+                                                }
+                                            </Button>
+                                        </Space>
+                                    </Space>
+                                }
+                                onOpenChange={(open) => {
+                                    setSaveOpen(open);
+                                    if (!open) setDraftName("");
+                                }}
+                                open={saveOpen}
+                                placement="bottomRight"
+                                title={microcopy.board.presets.saveAction}
+                                trigger="click"
+                            >
+                                <Button
+                                    aria-label={
+                                        microcopy.board.presets.saveAriaLabel
+                                    }
+                                    data-testid="task-search-panel-save-preset"
+                                    disabled={chips.length === 0}
+                                    icon={<SaveOutlined aria-hidden />}
+                                    size="small"
+                                    type="text"
+                                >
+                                    {microcopy.board.presets.saveAction}
+                                </Button>
+                            </Popover>
+                        </PrefRowTrailing>
+                    </PrefRow>
+                </ViewOptionsPanel>
             </AdvancedFiltersPanel>
         </FilterShell>
     );

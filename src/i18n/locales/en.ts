@@ -636,6 +636,8 @@ export const enSource = {
         smartSearchToggle: "Smart search",
         smartSearchToggleAria: "Toggle AI smart search",
         moreActionsAria: "More board actions",
+        viewOptionsToggle: "View options",
+        viewOptionsToggleAria: "Show board view options",
         presets: {
             saveAction: "Save filter as preset…",
             saveAriaLabel: "Save current filter as preset",
@@ -850,6 +852,14 @@ export const enSource = {
      * key off the unread count and interpolates `{count}` (no ICU plural
      * syntax because the codebase has no formatter).
      */
+    unifiedNotifications: {
+        bellAriaLabelZero: "Notifications, none unread",
+        bellAriaLabelOne: "Notifications, {count} unread",
+        bellAriaLabelOther: "Notifications, {count} unread",
+        drawerTitle: "Notifications",
+        tabActivity: "Activity",
+        tabAlerts: "Alerts"
+    },
     notifications: {
         bellAriaLabelZero: "Notifications, none unread",
         bellAriaLabelOne: "Notifications, {count} unread",
