@@ -127,4 +127,54 @@ describe("useLabels", () => {
             queryKey: getLabelsQueryKey("project-1")
         });
     });
+
+    it("updateLabel PUTs { _id, name, color } and invalidates the list", async () => {
+        const queryClient = createQueryClient();
+        const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries");
+        apiMock.mockResolvedValue([label()]);
+
+        const { result } = renderHook(() => useLabels("project-1"), {
+            wrapper: createWrapper(queryClient)
+        });
+        await waitFor(() => expect(result.current.labels).toBeDefined());
+
+        apiMock.mockClear();
+        apiMock.mockResolvedValue("Label updated");
+        await result.current.updateLabel({
+            _id: "label-1",
+            name: "API",
+            color: "#22c55e"
+        });
+
+        expect(apiMock).toHaveBeenCalledWith(LABELS_ENDPOINT, {
+            data: { _id: "label-1", name: "API", color: "#22c55e" },
+            method: "PUT"
+        });
+        expect(invalidateSpy).toHaveBeenCalledWith({
+            queryKey: getLabelsQueryKey("project-1")
+        });
+    });
+
+    it("removeLabel DELETEs { labelId } and invalidates the list", async () => {
+        const queryClient = createQueryClient();
+        const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries");
+        apiMock.mockResolvedValue([label()]);
+
+        const { result } = renderHook(() => useLabels("project-1"), {
+            wrapper: createWrapper(queryClient)
+        });
+        await waitFor(() => expect(result.current.labels).toBeDefined());
+
+        apiMock.mockClear();
+        apiMock.mockResolvedValue("Label deleted");
+        await result.current.removeLabel("label-1");
+
+        expect(apiMock).toHaveBeenCalledWith(LABELS_ENDPOINT, {
+            data: { labelId: "label-1" },
+            method: "DELETE"
+        });
+        expect(invalidateSpy).toHaveBeenCalledWith({
+            queryKey: getLabelsQueryKey("project-1")
+        });
+    });
 });

@@ -39,6 +39,7 @@ const BoardPage = lazy(() => import("../pages/board"));
 const ReportsPage = lazy(() => import("../pages/reports"));
 const MembersPage = lazy(() => import("../pages/members"));
 const MilestonesPage = lazy(() => import("../pages/milestones"));
+const LabelsPage = lazy(() => import("../pages/labels"));
 const SharePage = lazy(() => import("../pages/share"));
 const InboxPage = lazy(() => import("../pages/inbox"));
 const CopilotLandingPage = lazy(() => import("../pages/copilotLanding"));
@@ -355,6 +356,21 @@ const routes = [
                             {
                                 path: "milestones",
                                 element: <MilestonesPage />
+                            },
+                            /*
+                             * PRD-GAP-011 project labels surface. Sibling
+                             * of board / members / milestones / reports
+                             * under the project detail shell so the
+                             * in-project nav can point at a "Labels"
+                             * entry. The page is a thin shell around
+                             * `LabelsManager`, which owns the list +
+                             * editor-gated create / edit / delete
+                             * controls (delete relies on the server
+                             * cascade-strip of the label id from tasks).
+                             */
+                            {
+                                path: "labels",
+                                element: <LabelsPage />
                             },
                             /*
                              * Phase 4.7 reports landing. Placeholder

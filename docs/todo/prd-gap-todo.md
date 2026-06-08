@@ -165,25 +165,25 @@ Tiers, highest priority first:
 
 ### PRD-GAP-011 — Label management UI (create / edit / delete)
 - **prd_ref:** `docs/prd/core-collaboration.md` §7.4, §12 (⬜ Label management UI), AC-C20
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A labels surface (page or settings modal) lists project labels and supports create/edit (name + colour)/delete via `useLabels`.
   - Delete confirms and relies on the server cascade-strip; chips disappear from cards after delete.
   - Editor-gated controls; axe-clean; ≥44px targets.
 - **depends_on:** none
-- **notes:** `useLabels.createLabel` "has ZERO UI callers" and there is "no labels page, modal, or settings surface" (§7.4). Backend (incl. cascade-on-delete) complete.
+- **notes:** Shipped — `useLabels` gains `updateLabel` / `removeLabel` (PUT/DELETE) alongside the existing `createLabel`. A new `LabelsManager` (`src/components/labelsManager/`) lists the project's labels as colour chips and offers editor-gated create / rename+recolour / delete (a `Popconfirm` whose body names the project-wide server cascade-strip). It mirrors the milestones / members managers' role-gate (`useProjectMembers` roster + project `managerId`); a viewer/guest sees the list read-only. The surface mounts at `/projects/:projectId/labels` via a thin `pages/labels.tsx` shell wired into the project-detail child nav + breadcrumb. Colour is a curated swatch palette (`radiogroup`, 44px coarse targets); microcopy lives under `projectLabels.*` in `en`/`zh-CN`; axe-clean.
 
 ### PRD-GAP-012 — "Rewrite with AI" side panel on the task note editor
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.5; `docs/prd/v2.1-agent.md` AC-V12
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A "Rewrite with AI" button above the note textarea opens a **side panel** (textarea stays visible) with the spec options (user story, acceptance criteria, translate, summarize, polish, free prompt).
   - Accept replaces the note + shows the "Suggested by Copilot" badge; Cancel reverts; keyboard-operable (Tab/Enter/Esc); diff view for notes >3 lines.
   - Streams via the existing agent plumbing; aborts on close; axe-clean.
 - **depends_on:** none
-- **notes:** No `src/components/aiRewritePanel/` exists (glob empty) though `v2.1-agent.md:1219` names it and AC-V12 requires it. `COPILOT_REWRITE_ACCEPT` analytics already wired, so the event sink exists.
+- **notes:** Shipped — `src/components/aiRewritePanel/` renders a "Rewrite with AI" trigger above the note textarea (in both `TaskModal` and `TaskDetailPanel`) that expands an inline side panel while the textarea stays visible. The dual-engine `useRewrite` hook (`src/utils/hooks/useRewrite.ts`) streams through the `chat-agent` plumbing on a fresh per-run thread id (so a rewrite never bleeds into the chat dock) and falls back to deterministic local rules in `src/utils/ai/rewrite.ts` (`rewriteNoteLocally`, `diffLines`); translate/free require the remote engine and show an explanatory notice offline. Accept replaces the note via `form.setFieldsValue` and stamps the "Suggested by Copilot" badge through `appliedFieldOrigin`; Cancel/close aborts any in-flight stream (the body unmounts → `useAgent` cleanup aborts). Notes longer than three lines render a line diff. Microcopy lives under `aiRewrite.*` in `en`/`zh-CN`; `COPILOT_REWRITE_ACCEPT` fires on accept; component + hook + engine tests cover the flow and axe-clean.
 
 ---
 

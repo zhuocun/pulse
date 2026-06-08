@@ -347,6 +347,7 @@ export const enSource = {
     labels: {
         members: "Members",
         milestones: "Milestones",
+        labels: "Labels",
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
@@ -1021,6 +1022,43 @@ export const enSource = {
         updateError: "Couldn't update the milestone. Please try again.",
         deleteError: "Couldn't delete the milestone. Please try again."
     },
+    /**
+     * PRD-GAP-011 project label management surface. Mirrors the
+     * `milestones.*` shape: a manager title, the add-form labels /
+     * placeholders, the colour picker, the delete confirm, the empty /
+     * load-error copy, and the create / update / delete / failure
+     * feedback toasts. The colour swatch's aria-label interpolates the
+     * hex value so every preset is distinguishable to a screen reader
+     * without a per-colour translation.
+     */
+    projectLabels: {
+        heading: "Labels",
+        addHeading: "Add a label",
+        addNamePlaceholder: "Label name",
+        colorLabel: "Colour",
+        colorSwatchAriaLabel: "Use colour {color}",
+        addButton: "Add label",
+        adding: "Adding…",
+        save: "Save",
+        cancel: "Cancel",
+        edit: "Edit",
+        editAriaLabel: "Edit {name}",
+        delete: "Delete",
+        deleteConfirmTitle: "Delete {name}?",
+        deleteConfirmBody:
+            "This removes the label from every task that uses it.",
+        deleteAriaLabel: "Delete {name}",
+        empty: "No labels yet.",
+        loadError: "Couldn't load labels. Please try again.",
+        listAriaLabel: "Project labels",
+        readOnlyHint: "Only an editor can manage labels.",
+        created: "Label created.",
+        updated: "Label updated.",
+        deleted: "Label deleted.",
+        createError: "Couldn't create the label. Please try again.",
+        updateError: "Couldn't update the label. Please try again.",
+        deleteError: "Couldn't delete the label. Please try again."
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",
@@ -1112,7 +1150,15 @@ export const enSource = {
          * fallback before the project query resolves.
          */
         milestones: "Milestones",
-        milestonesWithProject: "Milestones · {project}"
+        milestonesWithProject: "Milestones · {project}",
+        /*
+         * PRD-GAP-011 project labels surface. Same pattern as members /
+         * milestones: the project name is interpolated at the page level
+         * (see `pages/labels.tsx`); the bare "Labels" form is the
+         * fallback before the project query resolves.
+         */
+        labels: "Labels",
+        labelsWithProject: "Labels · {project}"
     },
     empty: {
         projects: {

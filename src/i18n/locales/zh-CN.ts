@@ -202,6 +202,7 @@ const zhCN: Dictionary = {
     labels: {
         members: "成员",
         milestones: "里程碑",
+        labels: "标签",
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
@@ -829,6 +830,33 @@ const zhCN: Dictionary = {
         updateError: "无法更新里程碑,请重试。",
         deleteError: "无法删除里程碑,请重试。"
     },
+    projectLabels: {
+        heading: "标签",
+        addHeading: "添加标签",
+        addNamePlaceholder: "标签名称",
+        colorLabel: "颜色",
+        colorSwatchAriaLabel: "使用颜色 {color}",
+        addButton: "添加标签",
+        adding: "添加中…",
+        save: "保存",
+        cancel: "取消",
+        edit: "编辑",
+        editAriaLabel: "编辑 {name}",
+        delete: "删除",
+        deleteConfirmTitle: "确认删除 {name}?",
+        deleteConfirmBody: "这会将该标签从所有使用它的任务中移除。",
+        deleteAriaLabel: "删除 {name}",
+        empty: "暂无标签。",
+        loadError: "无法加载标签,请重试。",
+        listAriaLabel: "项目标签",
+        readOnlyHint: "只有编辑者才能管理标签。",
+        created: "标签已创建。",
+        updated: "标签已更新。",
+        deleted: "标签已删除。",
+        createError: "无法创建标签,请重试。",
+        updateError: "无法更新标签,请重试。",
+        deleteError: "无法删除标签,请重试。"
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
@@ -899,7 +927,9 @@ const zhCN: Dictionary = {
          * (详见 `pages/milestones.tsx`),在项目查询完成前回退到无名版本。
          */
         milestones: "里程碑",
-        milestonesWithProject: "里程碑 · {project}"
+        milestonesWithProject: "里程碑 · {project}",
+        labels: "标签",
+        labelsWithProject: "标签 · {project}"
     },
     empty: {
         projects: {
