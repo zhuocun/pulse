@@ -475,7 +475,7 @@ describe("App integration (full providers + routes)", () => {
         // Click the Inbox tab in the bottom tab bar.
         const inboxLink = await screen.findByRole(
             "link",
-            { name: new RegExp(`^${microcopy.nav.tabs.inbox}$`, "i") },
+            { name: new RegExp(`^${microcopy.nav.inboxTabAriaLabel}$`, "i") },
             { timeout: 5000 }
         );
         await user.click(inboxLink);
