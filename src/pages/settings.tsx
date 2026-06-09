@@ -4,6 +4,7 @@ import {
     GlobalOutlined,
     LogoutOutlined,
     MoonOutlined,
+    RobotOutlined,
     SunOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
@@ -167,6 +168,7 @@ const SettingsPage = () => {
     const languageIcon = <GlobalOutlined aria-hidden />;
     const colorThemeIcon = <BgColorsOutlined aria-hidden />;
     const logoutIcon = <LogoutOutlined aria-hidden />;
+    const copilotIcon = <RobotOutlined aria-hidden />;
 
     /*
      * 3-state Segmented preserves the underlying `useColorScheme()`
@@ -290,6 +292,7 @@ const SettingsPage = () => {
                         <SettingsRow
                             control={aiControl}
                             data-testid="settings-row-ai"
+                            icon={copilotIcon}
                             label={microcopy.settings.aiEnabled}
                         />
                     </SettingsSection>
@@ -348,7 +351,12 @@ const SettingsPage = () => {
                 {aiAvailable ? (
                     <Row data-testid="settings-row-ai">
                         <RowLabel>
-                            <RowText>{microcopy.settings.aiEnabled}</RowText>
+                            <Space size={space.xs}>
+                                {copilotIcon}
+                                <RowText>
+                                    {microcopy.settings.aiEnabled}
+                                </RowText>
+                            </Space>
                         </RowLabel>
                         {aiControl}
                     </Row>

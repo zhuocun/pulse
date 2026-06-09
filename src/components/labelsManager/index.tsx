@@ -12,6 +12,7 @@ import {
 import React, { useCallback, useMemo, useState } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
+import { labelTagProps } from "../../utils/labelTagColor";
 import {
     fontSize,
     fontWeight,
@@ -412,8 +413,8 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                             >
                                 <Identity>
                                     <Tag
-                                        color={label.color || undefined}
                                         data-testid="label-chip"
+                                        {...labelTagProps(label.color)}
                                     >
                                         {label.name}
                                     </Tag>

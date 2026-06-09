@@ -45,6 +45,7 @@ import {
     zIndex
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
+import { labelTagProps } from "../../utils/labelTagColor";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import useBulkSelection from "../../utils/hooks/useBulkSelection";
 import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
@@ -272,7 +273,10 @@ const FilteredEmptyButton = styled.button`
     }
 `;
 
-const TaskCardOuter = styled.button<{ $dragDisabledByFilters?: boolean }>`
+const TaskCardOuter = styled.button<{
+    $dragDisabledByFilters?: boolean;
+    $selectable?: boolean;
+}>`
     background: var(--ant-color-bg-container, #fff);
     border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
     border-radius: ${radius.md}px;
@@ -337,6 +341,16 @@ const TaskCardOuter = styled.button<{ $dragDisabledByFilters?: boolean }>`
             box-shadow: ${shadow.xs};
             transform: none;
         }
+    }
+
+    @media (pointer: coarse) {
+        ${({ $selectable }) =>
+            $selectable
+                ? `
+            padding-left: calc(${space.xs}px + ${touchTargetCoarse}px);
+            padding-top: calc(${space.xs}px + ${touchTargetCoarse}px);
+        `
+                : ""}
     }
 `;
 
@@ -1452,6 +1466,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const cardButton = (
             <TaskCardOuter
                 $dragDisabledByFilters={dragDisabledByFilters}
+                $selectable={selectable}
                 aria-label={
                     ariaLabel ??
                     formatTemplate(microcopy.a11y.openTask as string, {
@@ -1482,9 +1497,9 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                     <LabelRow aria-label={microcopy.fields.labels}>
                         {taskLabels.map((label) => (
                             <LabelChip
-                                color={label.color}
                                 key={label._id}
                                 variant="filled"
+                                {...labelTagProps(label.color)}
                             >
                                 {label.name}
                             </LabelChip>

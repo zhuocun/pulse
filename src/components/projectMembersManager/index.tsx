@@ -376,15 +376,15 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
                                 <Identity>
                                     <UserAvatar
                                         id={member._id}
-                                        name={member.username}
+                                        name={memberName}
                                     />
                                     <NameBlock>
-                                        <MemberName>
-                                            {member.username}
-                                        </MemberName>
-                                        <MemberEmail>
-                                            {member.email}
-                                        </MemberEmail>
+                                        <MemberName>{memberName}</MemberName>
+                                        {member.email ? (
+                                            <MemberEmail>
+                                                {member.email}
+                                            </MemberEmail>
+                                        ) : null}
                                     </NameBlock>
                                 </Identity>
                                 <Controls>

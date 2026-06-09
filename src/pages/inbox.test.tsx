@@ -221,6 +221,16 @@ describe("InboxPage", () => {
             ).toBeInTheDocument();
         });
 
+        it("shows the Activity structural empty copy when mentions have data", () => {
+            setNotifications([buildMention()]);
+            renderPage();
+
+            const activity = screen.getByTestId("inbox-section-activity");
+            expect(
+                within(activity).getByText(microcopy.activityFeed.empty)
+            ).toBeInTheDocument();
+        });
+
         it("orders activity rows newest-first", () => {
             const now = Date.now();
             seedEvent({
