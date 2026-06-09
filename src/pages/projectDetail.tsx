@@ -225,7 +225,10 @@ const BreadcrumbWrapper = styled.div`
         white-space: nowrap;
     }
     && .ant-breadcrumb li:not(:first-child):not(:last-child),
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) .ant-breadcrumb-link,
+    &&
+        .ant-breadcrumb
+        li:not(:first-child):not(:last-child)
+        .ant-breadcrumb-link,
     && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
         max-width: 100%;
         min-width: 0;

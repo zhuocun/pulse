@@ -233,9 +233,9 @@ describe("ProjectDetailPage", () => {
             expect(
                 middleCrumbRule?.style.getPropertyValue("text-overflow")
             ).toBe("ellipsis");
-            expect(
-                middleCrumbRule?.style.getPropertyValue("white-space")
-            ).toBe("nowrap");
+            expect(middleCrumbRule?.style.getPropertyValue("white-space")).toBe(
+                "nowrap"
+            );
         });
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {

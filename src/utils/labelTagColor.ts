@@ -5,9 +5,10 @@ import type { CSSProperties } from "react";
  * render as opaque fills that stay light in dark mode. For hex labels, derive
  * a translucent fill + coloured text so chips read consistently in both themes.
  */
-export function labelTagProps(
-    color?: string | null
-): { color?: string; style?: CSSProperties } {
+export function labelTagProps(color?: string | null): {
+    color?: string;
+    style?: CSSProperties;
+} {
     if (!color) return {};
     if (!color.startsWith("#")) return { color };
     return {

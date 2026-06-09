@@ -353,7 +353,9 @@ const SettingsPage = () => {
                         <RowLabel>
                             <Space size={space.xs}>
                                 {copilotIcon}
-                                <RowText>{microcopy.settings.aiEnabled}</RowText>
+                                <RowText>
+                                    {microcopy.settings.aiEnabled}
+                                </RowText>
                             </Space>
                         </RowLabel>
                         {aiControl}

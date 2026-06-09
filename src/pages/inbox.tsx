@@ -318,24 +318,24 @@ const InboxPage = () => {
                         </SectionEmpty>
                     ) : (
                         sortedEvents.map((event) => (
-                        <EventRow
-                            key={event.id}
-                            data-event-id={event.id}
-                            data-kind={event.kind}
-                            data-testid="inbox-activity-row"
-                        >
-                            <EventIcon
-                                data-testid={`inbox-activity-icon-${event.kind}`}
+                            <EventRow
+                                key={event.id}
+                                data-event-id={event.id}
+                                data-kind={event.kind}
+                                data-testid="inbox-activity-row"
                             >
-                                {KIND_ICON[event.kind]}
-                            </EventIcon>
-                            <EventBody>
-                                <EventSummary>{event.summary}</EventSummary>
-                                <EventMeta>
-                                    {formatRelative(event.timestamp, now)}
-                                </EventMeta>
-                            </EventBody>
-                        </EventRow>
+                                <EventIcon
+                                    data-testid={`inbox-activity-icon-${event.kind}`}
+                                >
+                                    {KIND_ICON[event.kind]}
+                                </EventIcon>
+                                <EventBody>
+                                    <EventSummary>{event.summary}</EventSummary>
+                                    <EventMeta>
+                                        {formatRelative(event.timestamp, now)}
+                                    </EventMeta>
+                                </EventBody>
+                            </EventRow>
                         ))
                     )}
                 </SettingsSection>
