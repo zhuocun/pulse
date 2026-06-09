@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { lazy } from "react";
+import { lazy, useCallback, useEffect, useState } from "react";
 import {
     Navigate,
     Outlet,
@@ -8,6 +8,7 @@ import {
     useParams
 } from "react-router-dom";
 
+import CommandPalette from "../components/commandPalette";
 import EmptyState from "../components/emptyState";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
@@ -145,10 +146,38 @@ const NotFoundRoute = () => {
     );
 };
 
-// Thin root shell — the Suspense boundary has been moved into the
-// layout shells (mainLayout + authLayout) so the chrome stays mounted
-// while a lazy page chunk fetches (B-M6).
-const RootShell = () => <Outlet />;
+const RootShell = () => {
+    const [paletteOpen, setPaletteOpen] = useState(false);
+
+    const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const onKey = (event: KeyboardEvent) => {
+            const isHotkey =
+                (event.metaKey || event.ctrlKey) &&
+                (event.key === "k" || event.key === "K");
+            if (isHotkey) {
+                event.preventDefault();
+                setPaletteOpen(true);
+            }
+        };
+        const onCustomOpen = () => setPaletteOpen(true);
+        window.addEventListener("keydown", onKey);
+        window.addEventListener("commandPalette:open", onCustomOpen);
+        return () => {
+            window.removeEventListener("keydown", onKey);
+            window.removeEventListener("commandPalette:open", onCustomOpen);
+        };
+    }, []);
+
+    return (
+        <>
+            <Outlet />
+            <CommandPalette onClose={closePalette} open={paletteOpen} />
+        </>
+    );
+};
 
 /**
  * Layout wrapper for `/projects/:projectId/board` and its sibling

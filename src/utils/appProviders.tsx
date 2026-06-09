@@ -2,7 +2,6 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
 
 import { LanguageProvider, useLocale } from "../i18n";
 import { store } from "../store";
@@ -137,13 +136,11 @@ const AppProviders = ({ children }: { children: ReactNode }) => {
     return (
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
-                <BrowserRouter>
-                    <LanguageProvider>
-                        <ThemedShell>
-                            <AuthProvider>{children}</AuthProvider>
-                        </ThemedShell>
-                    </LanguageProvider>
-                </BrowserRouter>
+                <LanguageProvider>
+                    <ThemedShell>
+                        <AuthProvider>{children}</AuthProvider>
+                    </ThemedShell>
+                </LanguageProvider>
             </QueryClientProvider>
         </Provider>
     );

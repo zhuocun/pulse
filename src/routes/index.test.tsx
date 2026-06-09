@@ -2,7 +2,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactElement } from "react";
 import { Provider } from "react-redux";
-import { BrowserRouter } from "react-router-dom";
 
 import App from "../App";
 import { store } from "../store";
@@ -94,11 +93,11 @@ const element = <Props,>(route: { element?: unknown }) =>
     route.element as ReactElement<Props>;
 
 describe("routes", () => {
-    it("wraps the app in a Suspense shell with an auth-aware index redirect", () => {
+    it("wraps the app in a root shell with an auth-aware index redirect", () => {
         const root = routes[0];
         expect(root.path).toBe("/");
-        // The root element wraps an Outlet in a Suspense boundary so the
-        // lazily-loaded page chunks can suspend without blanking the page.
+        // The root element keeps shared UI such as the command palette
+        // mounted inside the data router while rendering the matched Outlet.
         expect(element(root).type).toBeInstanceOf(Function);
 
         const indexRedirect = root.children?.[0];
@@ -113,7 +112,7 @@ describe("routes", () => {
     });
 
     it("guards auth-only pages with <RequireGuest />, mounts terms on a public <PublicAuthShell />, and protects app pages with <RequireAuth /> (QW-4 + Bug 1)", () => {
-        // Layer 0: SuspenseShell. Layer 1 children are:
+        // Layer 0: RootShell. Layer 1 children are:
         //   [0] index → RootRedirect
         //   [1] RequireGuest wrapper for login / register / forgot
         //   [2] PublicAuthShell wrapper for auth/terms (Bug 1 — reachable
@@ -211,9 +210,7 @@ describe("auth/terms reachability (Bug 1)", () => {
         render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
-                    <BrowserRouter>
-                        <App />
-                    </BrowserRouter>
+                    <App />
                 </QueryClientProvider>
             </Provider>
         );
@@ -271,9 +268,7 @@ describe("bottom-tab routes (Phase 3 A3)", () => {
         render(
             <Provider store={store}>
                 <QueryClientProvider client={queryClient}>
-                    <BrowserRouter>
-                        <App />
-                    </BrowserRouter>
+                    <App />
                 </QueryClientProvider>
             </Provider>
         );
