@@ -181,16 +181,13 @@ const bottomNavEnabledFlag = readEnv("REACT_APP_BOTTOM_NAV_ENABLED");
 const taskPanelRoutedFlag = readEnv("REACT_APP_TASK_PANEL_ROUTED");
 
 /**
- * Phase 3 A1 — CopilotDock. Opt-in until validated: when "true" the
- * board mounts a single tabbed `<CopilotDock>` hosting Chat + Brief
- * (plus future Inbox / Settings tabs) instead of the two legacy
- * `<AiChatDrawer>` / `<BoardBriefDrawer>` surfaces. When the flag is
- * unset or "false" (default) the legacy drawers continue to render
- * exactly as today and the dock does not mount. The migration plan
- * mirrors A2: one release with both surfaces alive behind the flag,
- * then a follow-up PR removes the legacy drawers. Set
- * `REACT_APP_COPILOT_DOCK_ENABLED=true` in a local `.env.development`
- * or at deploy time to enable.
+ * Phase 3 A1 — CopilotDock. Default ON (kill-switch): the board mounts a
+ * single tabbed `<CopilotDock>` hosting Chat + Brief + Inbox as the live
+ * AI surface (PRD-GAP-006). The legacy standalone `<AiChatDrawer>` /
+ * `<BoardBriefDrawer>` mounts have been removed — their bodies now live in
+ * `copilotDock/ChatTabBody` + `BriefTabBody`, rendered by the dock. Set
+ * `REACT_APP_COPILOT_DOCK_ENABLED=false` for a one-flag rollback that
+ * unmounts the entire Copilot surface.
  */
 const copilotDockEnabledFlag = readEnv("REACT_APP_COPILOT_DOCK_ENABLED");
 
@@ -275,10 +272,11 @@ const environment = {
      */
     taskPanelRouted: taskPanelRoutedFlag === "true",
     /**
-     * Phase 3 A1 CopilotDock flag. Default false (opt-in) — see the
-     * `copilotDockEnabledFlag` block above for the rollout plan.
+     * Phase 3 A1 CopilotDock flag. Default true (kill-switch) — the dock
+     * is the live AI surface; set `REACT_APP_COPILOT_DOCK_ENABLED=false`
+     * for a one-flag rollback. See the `copilotDockEnabledFlag` block above.
      */
-    copilotDockEnabled: copilotDockEnabledFlag === "true",
+    copilotDockEnabled: copilotDockEnabledFlag === "false" ? false : true,
     /**
      * Phase 4 W3 column-readiness flag. Default false (opt-in) — see the
      * `aiColumnReadinessEnabledFlag` block above. The hook runs entirely

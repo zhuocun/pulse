@@ -30,9 +30,8 @@ import { CopilotDockBody, CopilotDockShell } from "./index";
  * flag — all the things the single-Copilot dock model relies on.
  *
  * Hidden / no-op when:
- *   - The `REACT_APP_COPILOT_DOCK_ENABLED` flag is off (rollback path —
- *     the BoardPage continues to render the legacy `<AiChatDrawer>` +
- *     `<BoardBriefDrawer>` overlays).
+ *   - The `REACT_APP_COPILOT_DOCK_ENABLED` flag is off (kill-switch —
+ *     no unified dock mounts; set the flag to restore the Copilot surface).
  *   - AI is globally disabled (env or per-user opt-out).
  *   - The current URL does not match a board route (no `projectId` to
  *     scope chat / brief context to).
@@ -479,8 +478,7 @@ const CopilotDockHostFlagged: React.FC = () => {
 };
 
 const CopilotDockHost: React.FC = () => {
-    // Flag gate is the hard rollback: when off, the BoardPage still
-    // owns the legacy drawer mounts and we do nothing here at all.
+    // Flag gate is the kill-switch: when off, no unified dock mounts.
     // Hooks below depend on Redux + react-router context — running them
     // when the flag is off would break tests that render `MainLayout`
     // without those providers (the host is supposed to be a no-op).

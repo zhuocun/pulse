@@ -155,10 +155,11 @@ describe("environment", () => {
         }
     });
 
-    it("defaults the CopilotDock flag to false (opt-in) and only flips on for `true`", () => {
-        // Phase 3 A1: the new tabbed CopilotDock ships behind a feature
-        // flag. Default false until validated; strict literal "true" opt-in
-        // so values like "TRUE" or "1" do not accidentally flip the rollout.
+    it("defaults the CopilotDock flag to true (kill-switch) and only flips off for `false`", () => {
+        // PRD-GAP-006: the tabbed CopilotDock is now the live AI surface,
+        // so the flag defaults ON. Only the literal "false" rolls it back
+        // (kill-switch); any other value — unset, "true", "TRUE", "1" —
+        // leaves the dock enabled.
         const originalFlag = process.env.REACT_APP_COPILOT_DOCK_ENABLED;
         try {
             delete process.env.REACT_APP_COPILOT_DOCK_ENABLED;
@@ -166,7 +167,7 @@ describe("environment", () => {
 
             jest.resetModules();
             const defaultEnv = require("./env").default;
-            expect(defaultEnv.copilotDockEnabled).toBe(false);
+            expect(defaultEnv.copilotDockEnabled).toBe(true);
 
             process.env.REACT_APP_COPILOT_DOCK_ENABLED = "false";
             jest.resetModules();
@@ -178,15 +179,16 @@ describe("environment", () => {
             const onEnv = require("./env").default;
             expect(onEnv.copilotDockEnabled).toBe(true);
 
+            // Any non-"false" value keeps the kill-switch open.
             process.env.REACT_APP_COPILOT_DOCK_ENABLED = "TRUE";
             jest.resetModules();
-            const strictEnv = require("./env").default;
-            expect(strictEnv.copilotDockEnabled).toBe(false);
+            const upperEnv = require("./env").default;
+            expect(upperEnv.copilotDockEnabled).toBe(true);
 
             process.env.REACT_APP_COPILOT_DOCK_ENABLED = "1";
             jest.resetModules();
             const numericEnv = require("./env").default;
-            expect(numericEnv.copilotDockEnabled).toBe(false);
+            expect(numericEnv.copilotDockEnabled).toBe(true);
         } finally {
             if (originalFlag === undefined) {
                 delete process.env.REACT_APP_COPILOT_DOCK_ENABLED;

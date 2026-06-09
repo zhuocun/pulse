@@ -33,6 +33,7 @@ const zhCN: Dictionary = {
         draftTask: "起草任务",
         draftWithAi: "使用 AI 起草",
         edit: "编辑",
+        editColumn: "编辑列",
         editProject: "编辑项目",
         editTask: "编辑任务",
         logIn: "登录",
@@ -149,6 +150,9 @@ const zhCN: Dictionary = {
         openTask: "打开任务 {name}",
         assignedTo: "已分配给 {name}",
         deleteColumnNamed: "删除列 {name}",
+        editColumnNamed: "编辑列 {name}",
+        columnWipCount: "{count} / {limit} 个任务（在制品上限）",
+        columnOverLimit: "{count} / {limit} 个任务 — 超出在制品上限 {over}",
         moreActionsForColumn: "{name} 列的更多操作",
         moreActionsForProject: "{name} 的更多操作",
         likeProject: "收藏 {name}",
@@ -198,6 +202,7 @@ const zhCN: Dictionary = {
     labels: {
         members: "成员",
         milestones: "里程碑",
+        labels: "标签",
         teamMembers: "团队成员",
         board: "看板",
         project: "项目",
@@ -333,7 +338,8 @@ const zhCN: Dictionary = {
         storyPoints: "故事点",
         taskName: "任务名称",
         type: "类型",
-        username: "用户名"
+        username: "用户名",
+        wipLimit: "在制品上限"
     },
     placeholders: {
         emailExample: "name@example.com",
@@ -590,6 +596,31 @@ const zhCN: Dictionary = {
         blocked: "已阻塞",
         completed: "已完成"
     },
+    column: {
+        editTitle: "编辑列",
+        overLimit: "超出上限",
+        wipLimitHelp: "0 表示不限制。",
+        wipLimitPlaceholder: "在制品上限（0 = 不限制）"
+    },
+    bulkEdit: {
+        toolbarAriaLabel: "批量编辑所选任务",
+        selectTask: "选择任务 {name}",
+        deselectTask: "取消选择任务 {name}",
+        clearSelection: "清除选择",
+        applyAriaLabel: "将更改应用到所选任务",
+        setPriority: "设置优先级",
+        setCoordinator: "设置负责人",
+        setLabels: "设置标签",
+        selectedCount: {
+            one: "已选择 {count} 个任务",
+            other: "已选择 {count} 个任务"
+        },
+        applied: {
+            one: "已更新 {count} 个任务",
+            other: "已更新 {count} 个任务"
+        },
+        applyFailed: "无法更新所选任务，请重试。"
+    },
     taskDetailPanel: {
         confirmDiscardTitle: "放弃未保存的更改?",
         confirmDiscardBody: "对此任务的编辑将会丢失。",
@@ -799,6 +830,33 @@ const zhCN: Dictionary = {
         updateError: "无法更新里程碑,请重试。",
         deleteError: "无法删除里程碑,请重试。"
     },
+    projectLabels: {
+        heading: "标签",
+        addHeading: "添加标签",
+        addNamePlaceholder: "标签名称",
+        colorLabel: "颜色",
+        colorSwatchAriaLabel: "使用颜色 {color}",
+        addButton: "添加标签",
+        adding: "添加中…",
+        save: "保存",
+        cancel: "取消",
+        edit: "编辑",
+        editAriaLabel: "编辑 {name}",
+        delete: "删除",
+        deleteConfirmTitle: "确认删除 {name}?",
+        deleteConfirmBody: "这会将该标签从所有使用它的任务中移除。",
+        deleteAriaLabel: "删除 {name}",
+        empty: "暂无标签。",
+        loadError: "无法加载标签,请重试。",
+        listAriaLabel: "项目标签",
+        readOnlyHint: "只有编辑者才能管理标签。",
+        created: "标签已创建。",
+        updated: "标签已更新。",
+        deleted: "标签已删除。",
+        createError: "无法创建标签,请重试。",
+        updateError: "无法更新标签,请重试。",
+        deleteError: "无法删除标签,请重试。"
+    },
     aiActivityLog: {
         pillLabel: "本次会话中有 {count} 项 AI 变更",
         pillLabelPlural: "本次会话中有 {count} 项 AI 变更",
@@ -869,7 +927,9 @@ const zhCN: Dictionary = {
          * (详见 `pages/milestones.tsx`),在项目查询完成前回退到无名版本。
          */
         milestones: "里程碑",
-        milestonesWithProject: "里程碑 · {project}"
+        milestonesWithProject: "里程碑 · {project}",
+        labels: "标签",
+        labelsWithProject: "标签 · {project}"
     },
     empty: {
         projects: {
@@ -1196,6 +1256,39 @@ const zhCN: Dictionary = {
             srOnlySuggestionAccepted: "已接受建议。",
             srOnlySuggestionDismissed: "已关闭建议。"
         }
+    },
+    aiRewrite: {
+        openButton: "用 AI 改写",
+        openButtonAria: "用 AI 改写备注",
+        panelTitle: "用 AI 改写",
+        panelAriaLabel: "用 AI 改写备注",
+        closeAria: "关闭改写面板",
+        modeLabel: "改写为",
+        modeSelectAria: "选择改写风格",
+        modes: {
+            userStory: "用户故事",
+            acceptanceCriteria: "验收标准",
+            translate: "翻译为{language}",
+            summarize: "摘要",
+            polish: "润色",
+            free: "自定义指令"
+        },
+        freePromptLabel: "指令",
+        freePromptPlaceholder: "例如:让内容更简洁、更正式",
+        rewriteButton: "改写",
+        rewriting: "改写中…",
+        regenerate: "重试",
+        emptyNoteHint: "请先填写备注,再用 AI 改写。",
+        resultLabel: "改写建议",
+        diffLabel: "变更",
+        diffAddedAria: "新增行",
+        diffRemovedAria: "删除行",
+        accept: "采用",
+        cancel: "取消",
+        acceptedAnnouncement: "改写已应用到备注。",
+        streamingAnnouncement: "正在生成改写…",
+        errorTitle: "无法改写备注。",
+        localUnsupported: "该风格需要远程 AI 服务,请在设置中开启。"
     },
     auth: {
         loginTitle: "登录账号",

@@ -1,10 +1,4 @@
-import {
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-    within
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -20,7 +14,8 @@ jest.mock("../constants/env", () => ({
         apiBaseUrl: "http://localhost:8080/api/v1",
         aiBaseUrl: "",
         aiEnabled: true,
-        aiUseLocalEngine: true
+        aiUseLocalEngine: true,
+        copilotDockEnabled: true
     }
 }));
 
@@ -109,7 +104,16 @@ describe("ProjectPage with Board Copilot enabled", () => {
         fetchMock.mockRestore();
     });
 
-    it("opens the Ask drawer and runs semantic project search", async () => {
+    /*
+     * PRD-GAP-006: the project-list AI chat surface is no longer a
+     * standalone `<AiChatDrawer>` mounted on the page — the launcher just
+     * flips the chat-drawer Redux flag, which `CopilotDockHost`'s bridge
+     * forwards to the persistent dock once the user lands on a board
+     * (the chat send / tool-payload flow is covered by
+     * `copilotDock/*.test.tsx`). The project page's own AI surface is the
+     * semantic project search in the search panel, asserted below.
+     */
+    it("runs semantic project search from the search panel", async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 mutations: { retry: false },
@@ -131,12 +135,9 @@ describe("ProjectPage with Board Copilot enabled", () => {
 
         expect(await screen.findByText("Roadmap Alpha")).toBeInTheDocument();
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /ask board copilot/i })
-        );
-
+        // The "Ask Board Copilot" launcher remains on the toolbar.
         expect(
-            await screen.findByLabelText("Message Board Copilot")
+            screen.getByRole("button", { name: /ask board copilot/i })
         ).toBeInTheDocument();
 
         fireEvent.click(
@@ -158,71 +159,6 @@ describe("ProjectPage with Board Copilot enabled", () => {
         await waitFor(() => {
             expect(screen.getByText("Billing Portal")).toBeInTheDocument();
             expect(screen.queryByText("Roadmap Alpha")).not.toBeInTheDocument();
-        });
-    });
-
-    it("sends a chat message from the project list drawer", async () => {
-        const queryClient = new QueryClient({
-            defaultOptions: {
-                mutations: { retry: false },
-                queries: { retry: false }
-            }
-        });
-
-        render(
-            <Provider store={store}>
-                <QueryClientProvider client={queryClient}>
-                    <MemoryRouter initialEntries={["/projects"]}>
-                        <Routes>
-                            <Route path="/projects" element={<ProjectPage />} />
-                        </Routes>
-                    </MemoryRouter>
-                </QueryClientProvider>
-            </Provider>
-        );
-
-        expect(await screen.findByText("Roadmap Alpha")).toBeInTheDocument();
-
-        fireEvent.click(
-            screen.getByRole("button", { name: /ask board copilot/i })
-        );
-
-        const messageInput = await screen.findByLabelText(
-            "Message Board Copilot"
-        );
-        fireEvent.change(messageInput, {
-            target: { value: "List all projects" }
-        });
-        fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-        await waitFor(() => {
-            const drawer = document.querySelector(".ant-drawer-open");
-            expect(
-                drawer?.querySelector('[data-testid="chat-tool-payload-block"]')
-            ).toBeTruthy();
-        });
-        const drawerEl = document.querySelector(".ant-drawer-open");
-        expect(drawerEl).toBeTruthy();
-        const toolBlock = drawerEl!.querySelector(
-            '[data-testid="chat-tool-payload-block"]'
-        );
-        expect(toolBlock?.textContent ?? "").toMatch(/Checked projects/i);
-        fireEvent.click(
-            within(drawerEl as HTMLElement).getByRole("button", {
-                name: /show details/i
-            })
-        );
-
-        const drawerClose = document.querySelector(
-            ".ant-drawer-open .ant-drawer-close"
-        ) as HTMLElement | null;
-        expect(drawerClose).toBeTruthy();
-        fireEvent.click(drawerClose!);
-
-        await waitFor(() => {
-            expect(
-                document.querySelector(".ant-drawer-open")
-            ).not.toBeInTheDocument();
         });
     });
 });

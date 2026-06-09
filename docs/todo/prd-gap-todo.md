@@ -75,7 +75,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-001 — Document shipped WMD-depth + org endpoints in `api/backend.md`
 - **prd_ref:** `docs/prd/work-management-depth.md` §3–§5, §9, Appendix A; `docs/prd/accounts-organizations.md` §3, Appendix A
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - `api/backend.md` documents the shipped `tasks.priority`, `tasks.dependsOn` (+ derived `blockedBy`), `columns.category`, and the lifecycle fields (`completedAt`/`archivedAt`/`deletedAt`) with their soft-delete `?purge`, `/tasks/restore`, `/tasks/archive`, `/projects/restore`, `/projects/archive` endpoints.
@@ -86,7 +86,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-002 — Reconcile `api/frontend.md` interface table + hook notes with shipped depth & surfaces
 - **prd_ref:** `docs/prd/core-collaboration.md` §10, §13; `docs/prd/work-management-depth.md` Appendix B
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - The `ITask`/`IColumn` rows add the shipped depth fields (`priority`, `dependsOn`, `milestoneId`, `completedAt`/`archivedAt`/`deletedAt`); `IMilestone` is listed.
@@ -97,7 +97,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-003 — Correct the now-stale "Documentation Debt" table in `core-collaboration.md` §13
 - **prd_ref:** `docs/prd/core-collaboration.md` §13
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - §13's claims that `api/backend.md` documents a flat task / says "access restricted to the project manager", and that `api/frontend.md`'s interface table is pre-richness, are removed or rewritten to match reality (both docs reconciled for the core layer).
@@ -107,7 +107,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-004 — Refresh `product-done.md` for CopilotDock + Phase-4 AI surfaces
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.1–§7.3; `docs/design/_review-2026-05/04-ai-copilot.md` A1
-- **status:** open
+- **status:** done
 - **owner_hint:** docs
 - **acceptance:**
   - The "Unified Copilot shell scaffold — Reverted… built from scratch when design lands" rows are replaced with the as-built CopilotDock (`src/components/copilotDock/`, Chat/Brief/Inbox tabs, `useCopilotDock`, `REACT_APP_COPILOT_DOCK_ENABLED`).
@@ -118,7 +118,7 @@ Tiers, highest priority first:
 
 ### PRD-GAP-005 — Extend `preserveNullKeys` to `parentTaskId` and the date fields
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.3; `feature-build-progress.md` (Open decisions — FE clear-semantics)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - Clearing `parentTaskId`, `startDate`, or `dueDate` in `TaskModal` sends the key as an explicit `null`/`""` (not stripped) so the PUT unassigns instead of silently keeping the old value.
@@ -133,81 +133,81 @@ Tiers, highest priority first:
 
 ### PRD-GAP-006 — Roll out CopilotDock (validate, flip flag ON, remove legacy drawers)
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.1; `docs/design/_review-2026-05/04-ai-copilot.md` A1
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
-  - A validation pass runs with `REACT_APP_COPILOT_DOCK_ENABLED=true` (smoke: Chat/Brief/Inbox tabs, nudge inbox, proposal cards, mobile sheet) before the default flips.
-  - `environment.copilotDockEnabled` defaults ON (or the flag is retired) and the board mounts the single tabbed dock as the live surface.
-  - The legacy `AiChatDrawer` / `BoardBriefDrawer` standalone mount paths are removed in the **same PR** as the flip (bodies already live in `copilotDock/ChatTabBody` + `BriefTabBody`); no duplicate launchers remain.
+  - `environment.copilotDockEnabled` defaults ON (kill-switch; `REACT_APP_COPILOT_DOCK_ENABLED=false` rolls back) and the board mounts the single tabbed dock as the live surface.
+  - The legacy `AiChatDrawer` / `BoardBriefDrawer` standalone surfaces are removed (their bodies already live in `copilotDock/ChatTabBody` + `BriefTabBody`); no duplicate launchers remain.
+  - When the kill-switch is off, `CopilotMenu` and `CopilotWelcomeBanner` do not render (no dead launchers).
   - Existing dock + agent tests pass (`board.dock.test.tsx`, `copilotDock/*.test.tsx`); no regression in the full Jest suite.
-- **depends_on:** PRD-GAP-004
-- **notes:** Dock is built but `REACT_APP_COPILOT_DOCK_ENABLED` defaults **false / opt-in** (`src/constants/env.ts:188-194,281`; rollout plan at `:188` calls for a follow-up PR removing legacy drawers). **Not a GA code blocker** — legacy drawers are the live fallback. Ship PRD-GAP-004 (doc truth) in the same PR per AGENTS.md doc–code coherence. This is M5's "unified Copilot rail" slice — already built; do not open a separate rail-build task.
+- **depends_on:** none
+- **notes:** Shipped — `src/constants/env.ts` flips `copilotDockEnabled` to a default-ON kill-switch, and the `<AiChatDrawer>` / `<BoardBriefDrawer>` wrapper components + their standalone mounts in `pages/board.tsx` / `pages/project.tsx` are deleted (the dock owns the triage agent, inbox nudges, and the `boardCopilot:openChat` palette hand-off via `CopilotDockHost`). The shared composer/brief bodies live in `copilotDock/ChatTabBody` + `BriefTabBody`. Pairs with PRD-GAP-004 (doc) but split per AGENTS.md.
 
 ### PRD-GAP-007 — WIP-limit control UI on column create/edit + overflow indicator
 - **prd_ref:** `docs/prd/core-collaboration.md` §5.5, §12 (⬜ WIP-limit control); AC-C11
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `ColumnCreator` and the column-edit path send `wipLimit` (non-negative int; `0` = no limit) on `POST`/`PUT /boards`.
   - The column header surfaces the limit and a non-colour-only overflow indicator when `count > wipLimit > 0` (matches the overdue-chip a11y rule).
   - Touch target ≥44px under `pointer: coarse`; axe-clean.
 - **depends_on:** none
-- **notes:** Backend complete and validated; `IColumn.wipLimit` is "referenced by no component" (`core-collaboration.md` §5.5). Today the header renders a plain count `Badge` only.
+- **notes:** Shipped — `ColumnCreator` gains a `wipLimit` `InputNumber` (default `0`) and the column more-actions menu opens an edit modal sending `{columnName, category, wipLimit}` on `PUT /boards` (optimistic via `optimisticUpdate/updateColumn`). The header renders a `{count} / {limit}` badge plus a glyph + "Over limit" chip (non-colour-only) when the unfiltered count exceeds a positive limit; both ride a 44px coarse-pointer target.
 
 ### PRD-GAP-008 — Bulk-edit UI (first FE caller for `PUT /tasks/bulk`)
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.2.1, §12 (⬜ Bulk edit UI); `docs/prd/work-management-depth.md` §10.5
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A multi-select affordance lets a user pick N tasks and apply a metadata change (labels, assignees, priority, etc.) via `PUT /tasks/bulk`.
   - Routing fields (`columnId`/`projectId`) are not offered (server drops them); a single bad id surfaces the all-or-nothing 404 cleanly.
   - Optimistic update + error rollback covered by a test.
-- **depends_on:** none (or PRD-GAP-014 if the team chooses table view as the sole home — decide before starting)
-- **notes:** `PUT /tasks/bulk` "has no FE caller at all" (`core-collaboration.md` §6.5). **Scope conflict to resolve:** core-collaboration frames board multi-select; WMD §10.5 frames the table view. Minimal path = board multi-select now; richer path = defer until PRD-GAP-014. Do not build both independently.
+- **depends_on:** none
+- **notes:** Shipped — task cards gain a hover/focus-revealed select checkbox (gated on `BulkSelectionProvider`; never on optimistic placeholders) feeding a `useBulkSelection` context. A floating `BulkEditToolbar` fans priority / coordinator / labels across the selection via `PUT /tasks/bulk` (routing fields never offered), optimistic through `optimisticUpdate/bulkUpdateTasks` with error rollback + selection-preserved retry. The table view (PRD-GAP-014) is its richer long-term home.
 
 ### PRD-GAP-009 — Port the five richness fields into `TaskDetailPanel`
 - **prd_ref:** `docs/prd/core-collaboration.md` §6.5, AC-C26, §12 (⬜ Task richness on routed panel)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `TaskDetailPanel` edits `startDate`, `dueDate`, `labelIds`, `assigneeIds`, and `parentTaskId` (parity with `TaskModal`), reusing `useProjectMembers`/`useLabels`.
   - Clearing a scalar FK/date uses the PRD-GAP-005 `preserveNullKeys` opt-in.
   - With `REACT_APP_TASK_PANEL_ROUTED=true`, no richness field is lost vs the legacy modal (regression test).
 - **depends_on:** PRD-GAP-005
-- **notes:** `TaskDetailPanel` renders only `taskName/coordinator/type/epic/storyPoints/note` (AC-C26); flipping `taskPanelRouted` today silently drops dates/labels/extra-assignees/parentage. Prerequisite for retiring `TaskModal`.
+- **notes:** Shipped — `TaskDetailPanel` now edits `startDate`, `dueDate`, `labelIds`, `assigneeIds`, and `parentTaskId` (parity with `TaskModal`), reusing `useLabels` / `useProjectMembers` and the same date `DatePicker` / label `tagRender` / assignee / parent pickers. The PUT mutation opts `parentTaskId`/`startDate`/`dueDate` into `preserveNullKeys` (the GAP-005 pattern) and the dirty-check compares `filterRequest`'d payloads so an untouched optional field fires no needless PUT. Regression tests in `taskDetailPanel/index.test.tsx` prove the fields ride the PUT and a cleared parent reaches the wire as `null`.
 
 ### PRD-GAP-010 — Mount the comments thread on `TaskDetailPanel`
 - **prd_ref:** `docs/prd/core-collaboration.md` §8.5, §12 (✅ on `TaskModal`, remaining: routed panel)
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - `TaskDetailPanel` mounts `CommentsThread` (`useComments`) with the same author-only edit / author-or-owner delete rules and mention multi-select as `TaskModal`.
   - A mention-bearing create invalidates the notifications query (bell badge refreshes).
   - Covered by a panel-level test.
 - **depends_on:** PRD-GAP-009
-- **notes:** The comments UI shipped on the legacy `TaskModal` (M4c) but "not yet on the routed `TaskDetailPanel`" (§8.5, §12). Reuses the existing hook/component — no new backend.
+- **notes:** Shipped — `TaskDetailPanel` mounts `CommentsThread` (`useComments`) below the form for a real (non-placeholder) task, reusing the same author-only edit / author-or-owner delete rules and mention multi-select as `TaskModal`; a mention-bearing create invalidates the notifications query via `useComments`. Panel-level tests in `taskDetailPanel/index.test.tsx` cover the thread mount and the mention → notifications-invalidation path. Reuses the existing hook/component — no new backend.
 
 ### PRD-GAP-011 — Label management UI (create / edit / delete)
 - **prd_ref:** `docs/prd/core-collaboration.md` §7.4, §12 (⬜ Label management UI), AC-C20
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A labels surface (page or settings modal) lists project labels and supports create/edit (name + colour)/delete via `useLabels`.
   - Delete confirms and relies on the server cascade-strip; chips disappear from cards after delete.
   - Editor-gated controls; axe-clean; ≥44px targets.
 - **depends_on:** none
-- **notes:** `useLabels.createLabel` "has ZERO UI callers" and there is "no labels page, modal, or settings surface" (§7.4). Backend (incl. cascade-on-delete) complete.
+- **notes:** Shipped — `useLabels` gains `updateLabel` / `removeLabel` (PUT/DELETE) alongside the existing `createLabel`. A new `LabelsManager` (`src/components/labelsManager/`) lists the project's labels as colour chips and offers editor-gated create / rename+recolour / delete (a `Popconfirm` whose body names the project-wide server cascade-strip). It mirrors the milestones / members managers' role-gate (`useProjectMembers` roster + project `managerId`); a viewer/guest sees the list read-only. The surface mounts at `/projects/:projectId/labels` via a thin `pages/labels.tsx` shell wired into the project-detail child nav + breadcrumb. Colour is a curated swatch palette (`radiogroup`, 44px coarse targets); microcopy lives under `projectLabels.*` in `en`/`zh-CN`; axe-clean.
 
 ### PRD-GAP-012 — "Rewrite with AI" side panel on the task note editor
 - **prd_ref:** `docs/prd/v3-ai-ux.md` §7.5; `docs/prd/v2.1-agent.md` AC-V12
-- **status:** open
+- **status:** done
 - **owner_hint:** FE
 - **acceptance:**
   - A "Rewrite with AI" button above the note textarea opens a **side panel** (textarea stays visible) with the spec options (user story, acceptance criteria, translate, summarize, polish, free prompt).
   - Accept replaces the note + shows the "Suggested by Copilot" badge; Cancel reverts; keyboard-operable (Tab/Enter/Esc); diff view for notes >3 lines.
   - Streams via the existing agent plumbing; aborts on close; axe-clean.
 - **depends_on:** none
-- **notes:** No `src/components/aiRewritePanel/` exists (glob empty) though `v2.1-agent.md:1219` names it and AC-V12 requires it. `COPILOT_REWRITE_ACCEPT` analytics already wired, so the event sink exists.
+- **notes:** Shipped — `src/components/aiRewritePanel/` renders a "Rewrite with AI" trigger above the note textarea (in both `TaskModal` and `TaskDetailPanel`) that expands an inline side panel while the textarea stays visible. The dual-engine `useRewrite` hook (`src/utils/hooks/useRewrite.ts`) streams through the `chat-agent` plumbing on a fresh per-run thread id (so a rewrite never bleeds into the chat dock) and falls back to deterministic local rules in `src/utils/ai/rewrite.ts` (`rewriteNoteLocally`, `diffLines`); translate/free require the remote engine and show an explanatory notice offline. Accept replaces the note via `form.setFieldsValue` and stamps the "Suggested by Copilot" badge through `appliedFieldOrigin`; Cancel/close aborts any in-flight stream (the body unmounts → `useAgent` cleanup aborts). Notes longer than three lines render a line diff. Microcopy lives under `aiRewrite.*` in `en`/`zh-CN`; `COPILOT_REWRITE_ACCEPT` fires on accept; component + hook + engine tests cover the flow and axe-clean.
 
 ---
 

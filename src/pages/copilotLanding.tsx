@@ -26,11 +26,11 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * When AI is off (env or per-user toggle), the page renders an EmptyState
  * instead.
  *
- * The Ask CTA opens the chat drawer through the canonical Redux hook
- * BEFORE navigating. The drawer state lives in the global overlays
- * slice, so setting it here survives the route change; the project
- * page mounts an `<AiChatDrawer />` keyed off `useAiChatDrawer().open`
- * and opens automatically on first paint.
+ * The Ask CTA opens the chat tab through the canonical Redux hook
+ * BEFORE navigating. The dock state lives in the global overlays
+ * slice, so setting it here survives the route change; `CopilotDockHost`
+ * bridges the legacy overlay flags into the persistent dock on the
+ * board route.
  *
  * The Brief secondary action only navigates: the brief drawer is mounted
  * on the board page (not `/projects`), so setting the Redux flag here

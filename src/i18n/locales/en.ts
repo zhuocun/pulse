@@ -30,6 +30,7 @@ export const enSource = {
         draftTask: "Draft task",
         draftWithAi: "Draft with AI",
         edit: "Edit",
+        editColumn: "Edit column",
         editProject: "Edit project",
         editTask: "Edit task",
         logIn: "Log in",
@@ -153,6 +154,10 @@ export const enSource = {
         openTask: "Open task {name}",
         assignedTo: "Assigned to {name}",
         deleteColumnNamed: "Delete column {name}",
+        editColumnNamed: "Edit column {name}",
+        columnWipCount: "{count} of {limit} tasks (WIP limit)",
+        columnOverLimit:
+            "{count} of {limit} tasks — over the WIP limit by {over}",
         moreActionsForColumn: "More actions for column {name}",
         moreActionsForProject: "More actions for {name}",
         likeProject: "Like {name}",
@@ -342,6 +347,7 @@ export const enSource = {
     labels: {
         members: "Members",
         milestones: "Milestones",
+        labels: "Labels",
         teamMembers: "Team members",
         board: "Board",
         project: "Project",
@@ -373,7 +379,8 @@ export const enSource = {
         storyPoints: "Story points",
         taskName: "Task name",
         type: "Type",
-        username: "Username"
+        username: "Username",
+        wipLimit: "WIP limit"
     },
     placeholders: {
         emailExample: "name@example.com",
@@ -705,6 +712,43 @@ export const enSource = {
         /** Visible chip text on a completed card (paired with an icon, not colour-only). */
         completed: "Completed"
     },
+    /*
+     * Column header / edit affordance copy (PRD §5.5 WIP-limit control).
+     * `overLimit` pairs with a warning glyph on the header chip so the
+     * over-limit signal is never colour-only (matches the overdue chip).
+     * `wipLimitHelp` explains the `0 = no limit` convention on the editor.
+     */
+    column: {
+        editTitle: "Edit column",
+        overLimit: "Over limit",
+        wipLimitHelp: "0 means no limit.",
+        wipLimitPlaceholder: "WIP limit (0 = none)"
+    },
+    /*
+     * Bulk-edit toolbar (PRD-GAP-008 — board multi-select → PUT /tasks/bulk).
+     * Routing fields (column / project) are deliberately NOT offered; the
+     * server drops them. `selectedCount` / `applied` are one/other plural
+     * forms interpolated with `{count}`.
+     */
+    bulkEdit: {
+        toolbarAriaLabel: "Bulk edit selected tasks",
+        selectTask: "Select task {name}",
+        deselectTask: "Deselect task {name}",
+        clearSelection: "Clear selection",
+        applyAriaLabel: "Apply changes to the selected tasks",
+        setPriority: "Set priority",
+        setCoordinator: "Set coordinator",
+        setLabels: "Set labels",
+        selectedCount: {
+            one: "{count} task selected",
+            other: "{count} tasks selected"
+        },
+        applied: {
+            one: "Updated {count} task",
+            other: "Updated {count} tasks"
+        },
+        applyFailed: "Couldn't update the selected tasks. Please try again."
+    },
     taskDetailPanel: {
         confirmDiscardTitle: "Discard unsaved changes?",
         confirmDiscardBody: "Your edits to this task will be lost.",
@@ -978,6 +1022,43 @@ export const enSource = {
         updateError: "Couldn't update the milestone. Please try again.",
         deleteError: "Couldn't delete the milestone. Please try again."
     },
+    /**
+     * PRD-GAP-011 project label management surface. Mirrors the
+     * `milestones.*` shape: a manager title, the add-form labels /
+     * placeholders, the colour picker, the delete confirm, the empty /
+     * load-error copy, and the create / update / delete / failure
+     * feedback toasts. The colour swatch's aria-label interpolates the
+     * hex value so every preset is distinguishable to a screen reader
+     * without a per-colour translation.
+     */
+    projectLabels: {
+        heading: "Labels",
+        addHeading: "Add a label",
+        addNamePlaceholder: "Label name",
+        colorLabel: "Colour",
+        colorSwatchAriaLabel: "Use colour {color}",
+        addButton: "Add label",
+        adding: "Adding…",
+        save: "Save",
+        cancel: "Cancel",
+        edit: "Edit",
+        editAriaLabel: "Edit {name}",
+        delete: "Delete",
+        deleteConfirmTitle: "Delete {name}?",
+        deleteConfirmBody:
+            "This removes the label from every task that uses it.",
+        deleteAriaLabel: "Delete {name}",
+        empty: "No labels yet.",
+        loadError: "Couldn't load labels. Please try again.",
+        listAriaLabel: "Project labels",
+        readOnlyHint: "Only an editor can manage labels.",
+        created: "Label created.",
+        updated: "Label updated.",
+        deleted: "Label deleted.",
+        createError: "Couldn't create the label. Please try again.",
+        updateError: "Couldn't update the label. Please try again.",
+        deleteError: "Couldn't delete the label. Please try again."
+    },
     aiActivityLog: {
         pillLabel: "{count} AI change this session",
         pillLabelPlural: "{count} AI changes this session",
@@ -1069,7 +1150,15 @@ export const enSource = {
          * fallback before the project query resolves.
          */
         milestones: "Milestones",
-        milestonesWithProject: "Milestones · {project}"
+        milestonesWithProject: "Milestones · {project}",
+        /*
+         * PRD-GAP-011 project labels surface. Same pattern as members /
+         * milestones: the project name is interpolated at the page level
+         * (see `pages/labels.tsx`); the bare "Labels" form is the
+         * fallback before the project query resolves.
+         */
+        labels: "Labels",
+        labelsWithProject: "Labels · {project}"
     },
     empty: {
         projects: {
@@ -1454,6 +1543,48 @@ export const enSource = {
             srOnlySuggestionAccepted: "Suggestion accepted.",
             srOnlySuggestionDismissed: "Suggestion dismissed."
         }
+    },
+    /**
+     * "Rewrite with AI" side panel on the task note editor (PRD-GAP-012,
+     * v3 §7.5, v2.1 AC-V12). The trigger sits above the note textarea; the
+     * panel keeps the note visible while the user picks a rewrite style,
+     * previews the streamed result (a line diff for longer notes), then
+     * Accepts (replacing the note + stamping the Copilot badge) or Cancels.
+     * `{language}` in `modes.translate` is the active locale's display name.
+     */
+    aiRewrite: {
+        openButton: "Rewrite with AI",
+        openButtonAria: "Rewrite the note with AI",
+        panelTitle: "Rewrite with AI",
+        panelAriaLabel: "Rewrite the note with AI",
+        closeAria: "Close rewrite panel",
+        modeLabel: "Rewrite as",
+        modeSelectAria: "Choose a rewrite style",
+        modes: {
+            userStory: "User story",
+            acceptanceCriteria: "Acceptance criteria",
+            translate: "Translate to {language}",
+            summarize: "Summarize",
+            polish: "Polish",
+            free: "Custom instruction"
+        },
+        freePromptLabel: "Instruction",
+        freePromptPlaceholder: "e.g. Make this shorter and more formal",
+        rewriteButton: "Rewrite",
+        rewriting: "Rewriting…",
+        regenerate: "Try again",
+        emptyNoteHint: "Add a note first, then rewrite it with AI.",
+        resultLabel: "Suggested rewrite",
+        diffLabel: "Changes",
+        diffAddedAria: "Added line",
+        diffRemovedAria: "Removed line",
+        accept: "Accept",
+        cancel: "Cancel",
+        acceptedAnnouncement: "Rewrite applied to the note.",
+        streamingAnnouncement: "Generating a rewrite…",
+        errorTitle: "Couldn't rewrite the note.",
+        localUnsupported:
+            "This style needs the remote AI service. Turn it on in Settings."
     },
     auth: {
         loginTitle: "Log in to your account",

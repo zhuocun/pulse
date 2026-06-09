@@ -4,19 +4,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
 
 /*
- * Phase 3 A1 — flag-on / flag-off mount coverage for the CopilotDock.
+ * Phase 3 A1 / PRD-GAP-006 — flag-on / kill-switch mount coverage for
+ * the CopilotDock.
  *
- * R-A M1 update: the dock no longer mounts inside `BoardPage` — it
- * lives in `MainLayout` via `CopilotDockHost` so it survives project-
- * route navigations. These tests now render the host alongside the
- * page so the mount/no-mount assertions still exercise the dock from
- * the shape it has in production. The legacy `<AiChatDrawer>` +
- * `<BoardBriefDrawer>` mounts remain inside the board page on the
- * rollback branch, so the flag-off assertion stays meaningful.
+ * The dock mounts in `MainLayout` via `CopilotDockHost` so it survives
+ * project-route navigations; these tests render the host alongside the
+ * page so the mount/no-mount assertions exercise the dock from the
+ * shape it has in production. The dock is now the live AI surface
+ * (default ON) and the legacy `<AiChatDrawer>` / `<BoardBriefDrawer>`
+ * standalone mounts have been removed entirely — so when the kill-switch
+ * (`copilotDockEnabled = false`) is engaged the board renders NO AI
+ * surface at all.
  *
  * The flag is checked at module load through
  * `environment.copilotDockEnabled`, so we mock `constants/env` per
@@ -271,13 +274,14 @@ describe("BoardPage · CopilotDock flag", () => {
         fetchMock.mockRestore();
     });
 
-    it("mounts the legacy AiChatDrawer + BoardBriefDrawer when copilotDockEnabled is off (default)", async () => {
+    it("renders no AI surface when copilotDockEnabled is off (rollback kill-switch)", async () => {
         mockEnv.copilotDockEnabled = false;
         renderBoard();
         await screen.findByText("Roadmap");
 
-        // Open the chat drawer via the Redux action — the legacy
-        // surface should render its own Drawer.
+        // Open the chat drawer via the Redux action — with the dock
+        // kill-switch off and the legacy drawers removed, nothing should
+        // mount: neither the dock shell nor a chat composer.
         act(() => {
             store.dispatch(overlaysActions.openChatDrawer());
         });
@@ -286,13 +290,33 @@ describe("BoardPage · CopilotDock flag", () => {
                 screen.queryByTestId("copilot-dock")
             ).not.toBeInTheDocument();
         });
-        // The legacy chat surface advertises its message-board-copilot
-        // composer label even on the legacy drawer.
         expect(
-            await screen.findByRole("textbox", {
+            screen.queryByRole("textbox", {
                 name: /message board copilot/i
             })
-        ).toBeInTheDocument();
+        ).not.toBeInTheDocument();
+
+        // GAP-006: the board-page launchers (CopilotMenu split button +
+        // first-run welcome banner) are dead controls when the dock
+        // host is killed, so they must not render either. Assert by the
+        // launcher's accessible names / banner region + title, plus the
+        // shared launcher-badge test id the CopilotMenu wraps.
+        expect(
+            screen.queryByTestId("copilot-launcher-badge")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", {
+                name: microcopy.a11y.boardCopilotMenu
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("region", {
+                name: microcopy.a11y.boardCopilotWelcome
+            })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(microcopy.ai.welcomeBannerTitle)
+        ).not.toBeInTheDocument();
     });
 
     it("mounts the CopilotDock instead of the legacy drawers when copilotDockEnabled is on", async () => {
@@ -311,6 +335,13 @@ describe("BoardPage · CopilotDock flag", () => {
         // Tab list confirms it's the dock chrome, not the legacy
         // drawer header.
         expect(screen.getByRole("tablist")).toBeInTheDocument();
+        // GAP-006: with the kill-switch on, the board launchers are
+        // live controls and must render so a click reaches the dock.
+        expect(
+            screen.getByRole("button", {
+                name: microcopy.a11y.boardCopilotMenu
+            })
+        ).toBeInTheDocument();
     });
 
     it("switches to the Brief tab when the brief overlay flag is the active surface", async () => {

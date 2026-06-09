@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
+import { BulkSelectionProvider } from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -172,6 +173,7 @@ const defaultParam: TaskSearchParam = {
 
 const removeColumn = jest.fn();
 const recreateColumn = jest.fn().mockResolvedValue(undefined);
+const editColumn = jest.fn();
 const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
@@ -213,6 +215,7 @@ const renderColumn = ({
     boardDensity = "comfortable",
     labels = [],
     milestones = [],
+    selection = false,
     tasks = [
         task(),
         task({
@@ -237,12 +240,14 @@ const renderColumn = ({
     boardDensity?: "comfortable" | "compact";
     labels?: ILabel[];
     milestones?: IMilestone[];
+    selection?: boolean;
 } = {}) => {
-    // The component calls `useReactMutation` three times: the column
+    // The component calls `useReactMutation` four times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
-    // used by the Undo toast (endpoint="boards", method="POST"), and the
-    // inline task rename (endpoint="tasks"). Route by the first two args
-    // so the mutations don't collide in test assertions.
+    // used by the Undo toast (endpoint="boards", method="POST"), the
+    // column edit (endpoint="boards", method="PUT"), and the inline task
+    // rename (endpoint="tasks"). Route by the first two args so the
+    // mutations don't collide in test assertions.
     mockedUseReactMutation.mockImplementation(
         (endPoint: string, method: string) => {
             if (endPoint === "tasks") {
@@ -251,11 +256,28 @@ const renderColumn = ({
             if (method === "POST") {
                 return { mutateAsync: recreateColumn, isLoading: false };
             }
+            if (method === "PUT") {
+                return { mutate: editColumn, isLoading: false };
+            }
             return { mutate: removeColumn, isLoading: false };
         }
     );
     mockedUseTaskModal.mockReturnValue({ startEditing });
     mockedUseTaskPanelNavigation.mockReturnValue({ openTask, closeTask });
+
+    const columnEl = (
+        <Column
+            boardAiOn={boardAiOn}
+            column={boardColumn}
+            dragDisabledByFilters={dragDisabledByFilters}
+            isDragDisabled={isDragDisabled}
+            labels={labels}
+            milestones={milestones}
+            param={param}
+            taskDragDisabled={taskDragDisabled}
+            tasks={tasks}
+        />
+    );
 
     return render(
         <Provider store={makeTestStore(boardDensity)}>
@@ -264,17 +286,13 @@ const renderColumn = ({
                     <Route
                         path="/projects/:projectId/board"
                         element={
-                            <Column
-                                boardAiOn={boardAiOn}
-                                column={boardColumn}
-                                dragDisabledByFilters={dragDisabledByFilters}
-                                isDragDisabled={isDragDisabled}
-                                labels={labels}
-                                milestones={milestones}
-                                param={param}
-                                taskDragDisabled={taskDragDisabled}
-                                tasks={tasks}
-                            />
+                            selection ? (
+                                <BulkSelectionProvider>
+                                    {columnEl}
+                                </BulkSelectionProvider>
+                            ) : (
+                                columnEl
+                            )
                         }
                     />
                 </Routes>
@@ -671,6 +689,128 @@ describe("Column", () => {
         });
         fireEvent.click(resetBtn);
         expect(onResetFilters).toHaveBeenCalledTimes(1);
+    });
+
+    /*
+     * PRD-GAP-007 — WIP-limit header indicator. The over-limit verdict is a
+     * property of the column's real (unfiltered) task count, surfaced as a
+     * `{count} / {limit}` chip plus a non-colour-only "Over limit" chip when
+     * the count strictly exceeds a positive limit.
+     */
+    it("shows the WIP count and an over-limit indicator when the column exceeds its limit", () => {
+        // renderColumn seeds three tasks by default (> 2).
+        renderColumn({ boardColumn: column({ wipLimit: 2 }) });
+
+        const wipBadge = screen.getByTestId("column-wip-badge");
+        expect(wipBadge).toHaveTextContent("3 / 2");
+        // Accessible over-limit label rides on the count chip (the visible
+        // chip is the colour-blind-safe glyph + word reinforcement).
+        expect(wipBadge).toHaveAttribute(
+            "aria-label",
+            "3 of 2 tasks — over the WIP limit by 1"
+        );
+        const overChip = screen.getByTestId("column-wip-over");
+        expect(overChip).toHaveTextContent("Over limit");
+    });
+
+    it("shows the WIP count without an over-limit indicator when within the limit", () => {
+        renderColumn({ boardColumn: column({ wipLimit: 5 }) });
+
+        const wipBadge = screen.getByTestId("column-wip-badge");
+        expect(wipBadge).toHaveTextContent("3 / 5");
+        expect(wipBadge).toHaveAttribute(
+            "aria-label",
+            "3 of 5 tasks (WIP limit)"
+        );
+        expect(screen.queryByTestId("column-wip-over")).not.toBeInTheDocument();
+    });
+
+    it("renders no WIP badge when the column has no limit (0 = no limit)", () => {
+        renderColumn({ boardColumn: column({ wipLimit: 0 }) });
+        expect(
+            screen.queryByTestId("column-wip-badge")
+        ).not.toBeInTheDocument();
+
+        // Absent wipLimit reads the same as 0.
+        renderColumn();
+        expect(
+            screen.queryByTestId("column-wip-badge")
+        ).not.toBeInTheDocument();
+    });
+
+    /*
+     * PRD-GAP-007 — column edit path. The more-actions menu now exposes an
+     * Edit affordance that opens a modal sending `{columnName, category,
+     * wipLimit}` on PUT /boards.
+     */
+    it("edits a column's name and WIP limit through the edit modal (PUT /boards)", async () => {
+        renderColumn({ boardColumn: column({ wipLimit: 0 }) });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^edit column todo$/i })
+        );
+
+        // The modal seeds from the column; rename it and set a positive cap.
+        const nameInput = await screen.findByLabelText("New column name");
+        fireEvent.change(nameInput, { target: { value: "Doing" } });
+        const wipInput = screen.getByRole("spinbutton", { name: "WIP limit" });
+        fireEvent.change(wipInput, { target: { value: "4" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(editColumn).toHaveBeenCalledWith({
+            _id: "column-1",
+            columnName: "Doing",
+            category: "todo",
+            wipLimit: 4
+        });
+    });
+
+    it("disables the edit affordance for an optimistic mock column", () => {
+        renderColumn({
+            boardColumn: column({ _id: "mock", columnName: "Mock" })
+        });
+
+        expect(
+            screen.getByRole("button", { name: /^edit column mock$/i })
+        ).toBeDisabled();
+    });
+
+    /*
+     * PRD-GAP-008 — board multi-select. The checkbox only appears under a
+     * BulkSelectionProvider, never on optimistic placeholder cards, and
+     * toggles the card's selected state (flipping its accessible label).
+     */
+    it("renders no select checkbox without a BulkSelectionProvider", () => {
+        renderColumn();
+        expect(
+            screen.queryByTestId("task-card-select")
+        ).not.toBeInTheDocument();
+    });
+
+    it("renders select checkboxes for persisted cards under a provider", () => {
+        renderColumn({ selection: true });
+
+        // Two persisted tasks get a checkbox; the optimistic "mock" card
+        // (no server id) does not.
+        expect(screen.getAllByTestId("task-card-select")).toHaveLength(2);
+        expect(
+            screen.getByRole("checkbox", { name: "Select task Build task" })
+        ).toBeInTheDocument();
+    });
+
+    it("toggles a card's selected state when its checkbox is clicked", () => {
+        renderColumn({ selection: true });
+
+        const checkbox = screen.getByRole("checkbox", {
+            name: "Select task Build task"
+        });
+        fireEvent.click(checkbox);
+
+        // The accessible label flips to the deselect verb once selected.
+        expect(
+            screen.getByRole("checkbox", { name: "Deselect task Build task" })
+        ).toBeChecked();
     });
 
     it("disables delete for the optimistic mock column", () => {

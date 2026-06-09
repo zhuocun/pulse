@@ -2,6 +2,7 @@ import { CloseOutlined } from "@ant-design/icons";
 import {
     Alert,
     Button,
+    DatePicker,
     Form,
     Grid,
     Input,
@@ -13,6 +14,7 @@ import {
     Typography
 } from "antd";
 import { useForm } from "antd/lib/form/Form";
+import dayjs, { type Dayjs } from "dayjs";
 import {
     cloneElement,
     isValidElement,
@@ -33,10 +35,13 @@ import {
     radius,
     space
 } from "../../theme/tokens";
+import filterRequest from "../../utils/filterRequest";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import useLabels from "../../utils/hooks/useLabels";
 import useMembersList from "../../utils/hooks/useMembersList";
+import useProjectMembers from "../../utils/hooks/useProjectMembers";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -45,7 +50,9 @@ import useUndoToast from "../../utils/hooks/useUndoToast";
 import { isOptimisticPlaceholderId } from "../../utils/optimisticClientId";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
+import AiRewritePanel from "../aiRewritePanel";
 import AiTaskAssistPanel from "../aiTaskAssistPanel";
+import CommentsThread from "../commentsThread";
 import ErrorBox from "../errorBox";
 import Sheet from "../sheet";
 
@@ -128,6 +135,91 @@ function shallowEqual<T>(a: T, b: T): boolean {
     }
     return true;
 }
+
+/*
+ * `startDate` / `dueDate` persist as date-only ISO strings (`YYYY-MM-DD`).
+ * AntD's `DatePicker` works in `Dayjs`, so we convert at the form
+ * boundary — same contract as `TaskModal`: `taskToFormValues` maps the
+ * stored string → a `Dayjs` for the control, and `normalizeDateFields`
+ * maps the `Dayjs` back to a `YYYY-MM-DD` string for the submit payload
+ * (and the `shallowEqual` dirty-check).
+ */
+const ISO_DATE_FORMAT = "YYYY-MM-DD";
+
+const DATE_FIELDS = ["startDate", "dueDate"] as const;
+
+const toDayjsOrUndefined = (value: unknown): Dayjs | undefined => {
+    if (!value) return undefined;
+    const parsed = dayjs(value as string);
+    return parsed.isValid() ? parsed : undefined;
+};
+
+type TaskFormValues = Omit<ITask, "startDate" | "dueDate"> & {
+    startDate?: Dayjs;
+    dueDate?: Dayjs;
+};
+
+/**
+ * Map an `ITask` into the shape AntD `Form` expects for this panel —
+ * every field passes through unchanged except the two date fields, which
+ * become `Dayjs` instances (or `undefined` when unset / unparsable) so the
+ * `DatePicker` controls bind correctly. `labelIds` / `assigneeIds` /
+ * `parentTaskId` are seeded by the spread (an absent value stays
+ * `undefined`, which `filterRequest` strips on both sides of the dirty-
+ * check so an untouched task fires no needless PUT).
+ */
+const taskToFormValues = (task: ITask): TaskFormValues => ({
+    ...task,
+    startDate: toDayjsOrUndefined(task.startDate),
+    dueDate: toDayjsOrUndefined(task.dueDate)
+});
+
+/**
+ * Convert any `Dayjs` date-field values in a raw form payload back to
+ * date-only ISO strings, leaving every other field untouched. A cleared
+ * picker stays falsy (`undefined` / `null`), which the cleared-scalar
+ * normalisation in `onSubmit` then maps to an explicit `null` so the
+ * `preserveNullKeys` PUT clears the field.
+ */
+const normalizeDateFields = (
+    values: Record<string, unknown>
+): Record<string, unknown> => {
+    const next = { ...values };
+    DATE_FIELDS.forEach((field) => {
+        const value = next[field];
+        if (value && dayjs.isDayjs(value)) {
+            next[field] = value.format(ISO_DATE_FORMAT);
+        }
+    });
+    return next;
+};
+
+/**
+ * Merge a raw form payload onto the persisted task into the exact `ITask`
+ * shape the PUT (and the dirty-check) need: date `Dayjs` values become
+ * ISO strings, the name is trimmed, and the clearable FK/date fields
+ * coerce a cleared `undefined` to an explicit `null` so the
+ * `preserveNullKeys` PUT clears them. Shared by `onSubmit` and the
+ * `onValuesChange` dirty signal so both read the same boundary.
+ */
+const buildMergedTask = (
+    base: ITask,
+    rawValues: Record<string, unknown>
+): ITask => {
+    const fieldValues = normalizeDateFields(rawValues);
+    const rawName = fieldValues.taskName;
+    const trimmedName =
+        typeof rawName === "string" ? rawName.trim() : base.taskName;
+    const merged = {
+        ...base,
+        ...fieldValues,
+        taskName: trimmedName
+    } as ITask;
+    merged.parentTaskId = merged.parentTaskId ?? null;
+    merged.startDate = merged.startDate ?? null;
+    merged.dueDate = merged.dueDate ?? null;
+    return merged;
+};
 
 const TASK_TYPE_OPTIONS = [
     { label: microcopy.options.taskTypes.task, value: "Task" },
@@ -236,7 +328,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         "PUT",
         ["tasks", { projectId }],
         undefined,
-        (err) => setSaveError(err)
+        (err) => setSaveError(err),
+        // `setCache` stays default; the trailing list opts these clearable
+        // scalar/date keys into `filterRequest`'s preserve path so a cleared
+        // (`null`/`""`) value reaches the PUT and the backend CLEARS the
+        // field instead of treating the stripped/absent key as unchanged
+        // (the PRD-GAP-005 pattern, mirrored from `TaskModal`).
+        undefined,
+        ["parentTaskId", "startDate", "dueDate"]
     );
     // Name of the task currently being deleted, captured so the DELETE
     // failure toast reads the right label. The error toast MUST fire from
@@ -273,6 +372,52 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const { show: showUndoToast } = useUndoToast();
     const { data: membersData } = useMembersList();
     const members = membersData ?? [];
+    // Project labels + project-member roster power the richness pickers
+    // (parity with `TaskModal`). Both are keyed per-project and disabled
+    // until `projectId` resolves. `useLabels` feeds the tag-mode label
+    // Select; `useProjectMembers` hits `/projects/members` (the project
+    // roster) so the assignee picker offers only the people on this
+    // project — NOT `useMembersList`'s global directory used for the
+    // coordinator picker.
+    const { labels: labelsData } = useLabels(projectId);
+    const labels = useMemo(() => labelsData ?? [], [labelsData]);
+    const { data: projectMembersData } = useProjectMembers(projectId);
+    // Guard against a non-array payload (errored / stubbed response sharing
+    // the query cache) so the `.map` below never throws — mirrors the
+    // `Array.isArray` normalization `useLabels` / `useProjectMembers` do.
+    const projectMembers = useMemo(
+        () => (Array.isArray(projectMembersData) ? projectMembersData : []),
+        [projectMembersData]
+    );
+    const labelOptions = useMemo(
+        () =>
+            labels.map((label) => ({
+                label: label.name,
+                value: label._id,
+                color: label.color
+            })),
+        [labels]
+    );
+    const assigneeOptions = useMemo(
+        () =>
+            projectMembers.map((member) => ({
+                label: member.username,
+                value: member._id
+            })),
+        [projectMembers]
+    );
+    // Parent-task options: every OTHER task in the project (a task can't be
+    // its own parent). Clearable + optional — mirrors `TaskModal`.
+    const parentTaskOptions = useMemo(
+        () =>
+            (tasks ?? [])
+                .filter((candidate) => candidate._id !== taskId)
+                .map((candidate) => ({
+                    label: candidate.taskName,
+                    value: candidate._id
+                })),
+        [tasks, taskId]
+    );
 
     /*
      * Sibling navigation (Phase 3 A2 — swipe-between-tasks). The hook
@@ -406,22 +551,24 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             // bail so we never persist a half-validated payload.
             return;
         }
-        const fieldValues = form.getFieldsValue();
-        const trimmedName =
-            typeof fieldValues.taskName === "string"
-                ? fieldValues.taskName.trim()
-                : fieldValues.taskName;
-        const merged = {
-            ...editingTask,
-            ...fieldValues,
-            taskName: trimmedName
-        };
-        if (shallowEqual(merged, editingTask)) {
+        const merged = buildMergedTask(editingTask, form.getFieldsValue());
+        // Compare the FILTERED payloads. The form now registers optional
+        // richness fields (dates, labelIds, assigneeIds, parentTaskId) that
+        // read back as `undefined` / `null` / `""` when unset; `filterRequest`
+        // strips those void keys from both sides (exactly as the wire payload
+        // would be) so an untouched task with no richness still compares equal
+        // and closes without a needless PUT.
+        if (
+            shallowEqual(
+                filterRequest(merged as unknown as Record<string, unknown>),
+                filterRequest(editingTask as unknown as Record<string, unknown>)
+            )
+        ) {
             closePanel();
             return;
         }
         try {
-            await update(merged);
+            await update(merged as unknown as Record<string, unknown>);
             setSaveError(null);
             message.success(microcopy.feedback.taskSaved);
             closePanel();
@@ -470,7 +617,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     // taskId, fresh fetch). Mirrors the modal's effect.
     useEffect(() => {
         if (!editingTask) return;
-        form.setFieldsValue(editingTask);
+        // Convert the stored ISO date strings into `Dayjs` so the
+        // `DatePicker` controls bind (they reject bare strings).
+        form.setFieldsValue(taskToFormValues(editingTask));
     }, [form, editingTask]);
 
     // Clear stale save errors when the user opens a different task; the
@@ -897,33 +1046,37 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 <ErrorBox error={saveError} />
                 <Form
                     form={form}
-                    initialValues={editingTask}
+                    initialValues={
+                        editingTask ? taskToFormValues(editingTask) : undefined
+                    }
                     layout="vertical"
                     onValuesChange={(changedValues, allValues) => {
                         setFormTick((tick) => tick + 1);
                         if (saveError) setSaveError(null);
                         clearOriginOnManualEdits(changedValues);
                         /*
-                         * Flip the dirty flag iff the current
-                         * form contents diverge from the
-                         * persisted task. Trim the taskName
-                         * before comparing so trailing whitespace
-                         * doesn't read as a real edit. Mirroring
-                         * the same trim that `onSubmit` applies
-                         * keeps the dirty signal in lockstep
-                         * with the persistence boundary.
+                         * Flip the dirty flag iff the current form
+                         * contents diverge from the persisted task.
+                         * `buildMergedTask` applies the same name-trim,
+                         * date normalisation, and cleared-scalar coercion
+                         * that `onSubmit` does, and the comparison runs
+                         * over the FILTERED payloads so a registered-but-
+                         * unset optional richness field doesn't read as a
+                         * spurious edit.
                          */
                         if (!editingTask) return;
-                        const trimmedName =
-                            typeof allValues.taskName === "string"
-                                ? allValues.taskName.trim()
-                                : allValues.taskName;
-                        const merged = {
-                            ...editingTask,
-                            ...allValues,
-                            taskName: trimmedName
-                        };
-                        const nextDirty = !shallowEqual(merged, editingTask);
+                        const merged = buildMergedTask(editingTask, allValues);
+                        const nextDirty = !shallowEqual(
+                            filterRequest(
+                                merged as unknown as Record<string, unknown>
+                            ),
+                            filterRequest(
+                                editingTask as unknown as Record<
+                                    string,
+                                    unknown
+                                >
+                            )
+                        );
                         setIsFormDirty(nextDirty);
                         isFormDirtyRef.current = nextDirty;
                     }}
@@ -1032,7 +1185,140 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             }
                         />
                     </Form.Item>
-                    <Form.Item label={microcopy.fields.notes} name="note">
+                    <Form.Item
+                        label={microcopy.fields.startDate}
+                        name="startDate"
+                    >
+                        <DatePicker
+                            allowClear
+                            format={ISO_DATE_FORMAT}
+                            placeholder={microcopy.placeholders.selectStartDate}
+                            style={{ width: "100%" }}
+                        />
+                    </Form.Item>
+                    <Form.Item label={microcopy.fields.dueDate} name="dueDate">
+                        <DatePicker
+                            allowClear
+                            format={ISO_DATE_FORMAT}
+                            placeholder={microcopy.placeholders.selectDueDate}
+                            style={{ width: "100%" }}
+                        />
+                    </Form.Item>
+                    <Form.Item label={microcopy.fields.labels} name="labelIds">
+                        <Select
+                            allowClear
+                            mode="multiple"
+                            optionFilterProp="label"
+                            options={labelOptions}
+                            optionRender={(option) => (
+                                <span
+                                    style={{
+                                        alignItems: "center",
+                                        display: "inline-flex",
+                                        gap: space.xs
+                                    }}
+                                >
+                                    <span
+                                        aria-hidden
+                                        style={{
+                                            background:
+                                                (
+                                                    option.data as {
+                                                        color?: string;
+                                                    }
+                                                ).color ||
+                                                "var(--ant-color-border, #d9d9d9)",
+                                            borderRadius: "50%",
+                                            display: "inline-block",
+                                            flex: "0 0 auto",
+                                            height: 10,
+                                            width: 10
+                                        }}
+                                    />
+                                    {option.label}
+                                </span>
+                            )}
+                            placeholder={microcopy.placeholders.selectLabels}
+                            tagRender={(tagProps) => {
+                                const color = labels.find(
+                                    (item) => item._id === tagProps.value
+                                )?.color;
+                                return (
+                                    <Tag
+                                        closable={tagProps.closable}
+                                        color={color}
+                                        onClose={tagProps.onClose}
+                                        style={{ marginInlineEnd: space.xxs }}
+                                    >
+                                        {tagProps.label}
+                                    </Tag>
+                                );
+                            }}
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        label={microcopy.fields.assignees}
+                        name="assigneeIds"
+                    >
+                        <Select
+                            allowClear
+                            mode="multiple"
+                            optionFilterProp="label"
+                            options={assigneeOptions}
+                            placeholder={microcopy.placeholders.selectAssignees}
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        label={microcopy.fields.parentTask}
+                        name="parentTaskId"
+                    >
+                        <Select
+                            allowClear
+                            optionFilterProp="label"
+                            options={parentTaskOptions}
+                            placeholder={
+                                microcopy.placeholders.selectParentTask
+                            }
+                            showSearch
+                        />
+                    </Form.Item>
+                    {aiEnabled && boardAiOn && editingTask ? (
+                        <Form.Item label={null}>
+                            <AiRewritePanel
+                                note={liveValues.note ?? ""}
+                                onAccept={(text) => {
+                                    markFieldAsCopilotApplied("note");
+                                    form.setFieldsValue({ note: text });
+                                    setFormTick((tick) => tick + 1);
+                                    setIsFormDirty(true);
+                                    isFormDirtyRef.current = true;
+                                }}
+                                projectId={projectId}
+                            />
+                        </Form.Item>
+                    ) : null}
+                    <Form.Item
+                        label={
+                            <span
+                                style={{
+                                    alignItems: "center",
+                                    display: "inline-flex",
+                                    gap: space.xs
+                                }}
+                            >
+                                {microcopy.fields.notes}
+                                {appliedFieldOrigin.note === "copilot" ? (
+                                    <Tag
+                                        color="purple"
+                                        style={{ marginInlineEnd: 0 }}
+                                    >
+                                        {microcopy.ai.suggestedByCopilot}
+                                    </Tag>
+                                ) : null}
+                            </span>
+                        }
+                        name="note"
+                    >
                         <Input.TextArea
                             autoComplete="off"
                             enterKeyHint="done"
@@ -1091,6 +1377,21 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             values={liveValues}
                         />
                     )}
+                {/*
+                 * Comments + @mentions thread (GAP-010 — parity with
+                 * `TaskModal`). Mounted below the form + AI assist for a
+                 * real (persisted) task only — an optimistic placeholder has
+                 * no server comments, and the thread keys its query off the
+                 * concrete task id. `projectId` is always known on the panel
+                 * (a required prop), but we gate on `editingTask` /
+                 * non-placeholder so the thread never queries a half-resolved
+                 * task. RBAC (author-only edit, author-or-owner delete) and
+                 * mention → notifications invalidation all live in
+                 * `CommentsThread` / `useComments`.
+                 */}
+                {editingTask && taskId && !placeholderId && projectId ? (
+                    <CommentsThread projectId={projectId} taskId={taskId} />
+                ) : null}
                 {siblingHint}
             </div>
         </div>

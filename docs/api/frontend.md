@@ -106,25 +106,42 @@ See the server-side docs for request/response schemas: [`backend.md`](backend.md
 | `POST`   | `/api/v1/projects`      | `projectModal`                                                                    | `{ projectName, organization }` (1)                              | `string` (`"Project created"`) |
 | `PUT`    | `/api/v1/projects`      | `projectModal`                                                                    | `{ _id, projectName, organization, managerId? }`                 | `string` (`"Project updated"`) |
 | `DELETE` | `/api/v1/projects`      | `projectList`                                                                     | `?projectId=…`                                                   | `string` (acknowledgement)     |
-| `GET`    | `/api/v1/projects/members` | `useProjectMembers` → `taskModal` (assignee picker)                            | `?projectId=…`                                                   | `IProjectMember[]` (2)         |
+| `GET`    | `/api/v1/projects/members` | `useProjectMembers` → `taskModal` (assignee picker), `projectMembersManager`   | `?projectId=…`                                                   | `IProjectMember[]` (2)         |
+| `POST`   | `/api/v1/projects/members` | `useProjectMemberMutations` → `projectMembersManager`                          | `{ projectId, userId, role }`                                    | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/projects/members` | `useProjectMemberMutations` → `projectMembersManager`                          | `{ projectId, userId, role }`                                    | `string` (acknowledgement)     |
+| `DELETE` | `/api/v1/projects/members` | `useProjectMemberMutations` → `projectMembersManager`                          | `?projectId=…&userId=…`                                          | `string` (acknowledgement)     |
 | `GET`    | `/api/v1/boards`        | `board.tsx`, `useDragEnd`, `chatTools.listBoard`                                  | `?projectId=…`                                                   | `IColumn[]`                    |
-| `POST`   | `/api/v1/boards`        | `columnCreator`                                                                   | `{ projectId, columnName }`                                      | `string` (`"Column created"`)  |
+| `POST`   | `/api/v1/boards`        | `columnCreator`                                                                   | `{ projectId, columnName, category? }`                          | `string` (`"Column created"`)  |
 | `DELETE` | `/api/v1/boards`        | `column/index.tsx`                                                                | `?columnId=…`                                                    | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/boards/orders` | `useDragEnd`                                                                      | `{ fromId, referenceId, type }`                                  | `string` (acknowledgement)     |
-| `GET`    | `/api/v1/tasks`         | `board.tsx`, `useDragEnd`, `chatTools.listTasks`, `chatTools.getTask`             | `?projectId=…` and optional filters                              | `ITask[]`                      |
-| `POST`   | `/api/v1/tasks`         | `taskCreator`, `aiTaskDraftModal`                                                 | task fields                                                      | `string` (`"Task created"`)    |
-| `PUT`    | `/api/v1/tasks`         | `taskModal`                                                                       | task fields with `_id`                                           | `string` (`"Task updated"`)    |
-| `DELETE` | `/api/v1/tasks`         | `taskModal`                                                                       | `?taskId=…`                                                      | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/tasks`         | `board.tsx`, `useDragEnd`, `chatTools.listTasks`, `chatTools.getTask`, trash/archive drawers | `?projectId=…&[includeArchived,includeTrashed]` and filters | `ITask[]`                      |
+| `POST`   | `/api/v1/tasks`         | `taskCreator`, `aiTaskDraftModal`                                                 | task fields (incl. `priority`, `dependsOn`, `milestoneId`)      | `string` (`"Task created"`)    |
+| `PUT`    | `/api/v1/tasks`         | `taskModal`                                                                       | task fields with `_id` (incl. depth fields)                     | `string` (`"Task updated"`)    |
+| `DELETE` | `/api/v1/tasks`         | `taskModal` (soft delete), `trashDrawer` / `archiveDrawer` (`?purge=true`)        | `?taskId=…&[purge]`                                              | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/tasks/restore` | `trashDrawer` (clears `deletedAt` + `archivedAt`)                                 | `{ _id }`                                                        | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/tasks/archive` | `archiveDrawer` (unarchive: `{ archived: false }`)                                | `{ _id, archived }`                                              | `string` (acknowledgement)     |
 | `PUT`    | `/api/v1/tasks/orders`  | `useDragEnd`                                                                      | `{ fromId, referenceId, fromColumnId, referenceColumnId, type }` | `string` (acknowledgement)     |
-| `GET`    | `/api/v1/labels`        | `useLabels` → `board.tsx` (card chips), `taskModal` (label picker)                | `?projectId=…`                                                   | `ILabel[]` (3)                 |
+| `PUT`    | `/api/v1/tasks/bulk`    | `bulkEditToolbar` / `useBulkSelection` → `bulkUpdateTasksCallback` (in `board.tsx`) | `{ taskIds, changes }`                                          | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/labels`        | `useLabels` → `board.tsx` (card chips), `taskModal` (label picker), `labelsManager` | `?projectId=…`                                                | `ILabel[]` (3)                 |
+| `POST`   | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `{ projectId, name, color? }`                                   | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `{ _id, name?, color? }`                                        | `string` (acknowledgement)     |
+| `DELETE` | `/api/v1/labels`        | `useLabels` → `labelsManager`                                                     | `?labelId=…`                                                     | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/milestones`    | `useMilestones` → `taskModal` (milestone picker), `milestonesManager`, `column` (card badge) | `?projectId=…`                                       | `IMilestone[]`                 |
+| `POST`   | `/api/v1/milestones`    | `useMilestones` → `milestonesManager`                                             | `{ projectId, name, … }`                                        | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/milestones`    | `useMilestones` → `milestonesManager`                                             | `{ _id, … }`                                                    | `string` (acknowledgement)     |
+| `DELETE` | `/api/v1/milestones`    | `useMilestones` → `milestonesManager`                                             | `?milestoneId=…`                                                 | `string` (acknowledgement)     |
+| `GET`    | `/api/v1/comments`      | `useComments` → `commentsThread` (in `taskModal`)                                 | `?taskId=…`                                                      | `IComment[]`                   |
+| `POST`   | `/api/v1/comments`      | `useComments` → `commentsThread`                                                  | `{ taskId, body, mentions? }`                                   | `string` (acknowledgement)     |
+| `PUT`    | `/api/v1/comments`      | `useComments` → `commentsThread`                                                  | `{ _id, body }`                                                 | `string` (acknowledgement)     |
+| `DELETE` | `/api/v1/comments`      | `useComments` → `commentsThread`                                                  | `?commentId=…`                                                   | `string` (acknowledgement)     |
 | `GET`    | `/api/v1/notifications` | `useNotifications` → `notificationBell`, `header`, `inbox.tsx`                    | — (no params; caller's own inbox)                                | `INotification[]`              |
 | `PUT`    | `/api/v1/notifications` | `useNotifications` → `notificationBell`                             | `{ _id }` (mark one) or `{ markAll: true }` (mark all)           | `string` (acknowledgement)     |
 
 (1) `projectModal` form state includes `managerId` and the FE sends it on both `POST` and `PUT`. The server silently ignores it on `POST` (the manager is derived from the JWT subject — see `app/services/project_service.py`) and only honours it on `PUT` for ownership transfer. Mutating endpoints on `projects`, `boards`, and `tasks` return a bare acknowledgement string (e.g. `"Project created"`, `"Task updated"`); they do NOT echo the resource. Callers that need the new document must re-`GET` it or invalidate the React Query cache.
 
-(2) `/api/v1/projects/members` is the project **roster**, distinct from the global `/api/v1/users/members` directory (row above). The FE only ever **reads** it — `useProjectMembers` issues the `GET`; the `POST` / `PUT` / `DELETE` member-management verbs exist server-side (see [`backend.md`](backend.md)) but have **no FE caller** (no member-management UI ships today). `IProjectMember` adds `role` to the `IMember` shape, but `role` is not rendered anywhere — the roster is consumed only to populate the `taskModal` assignee picker.
+(2) `/api/v1/projects/members` is the project **roster**, distinct from the global `/api/v1/users/members` directory (row above). It now has a full member-management surface: `useProjectMembers` issues the `GET`, and `useProjectMemberMutations` drives the `POST` / `PUT` / `DELETE` verbs from `projectMembersManager` (routed at `/projects/:projectId/members`). `IProjectMember` adds `role` to the `IMember` shape, and `role` **is** rendered — `projectMembersManager` shows each member's role as a tag and (for owners) an editable role select, mirroring the server's owner-gated RBAC. The roster also populates the `taskModal` assignee picker.
 
-(3) `useLabels` exposes `createLabel` (a `POST /api/v1/labels`), but it has **no UI caller** — labels are read-only on the FE (chips on cards + the `taskModal` apply picker). The label `PUT` / `DELETE` verbs likewise exist server-side but are not consumed. Two further server-side surfaces have **no FE caller at all** and so are intentionally absent from this table: the comments CRUD (`/api/v1/comments` — there is no `useComments` hook and no comment component) and the bulk task edit (`PUT /api/v1/tasks/bulk` — there is no multi-select / bulk-edit UI). See [`backend.md`](backend.md) for those server contracts.
+(3) `useLabels` now drives all three write verbs — `createLabel` (`POST`), `updateLabel` (`PUT`), and `removeLabel` (`DELETE /api/v1/labels?labelId=`) — from `labelsManager`, the editor-gated label-management page routed at `/projects/:projectId/labels` (PRD-GAP-011). Labels are still applied via the `taskModal` / `taskDetailPanel` picker and rendered as card chips. The bulk task edit (`PUT /api/v1/tasks/bulk`) is also wired now (PRD-GAP-008): `useBulkSelection` owns board multi-select and `bulkEditToolbar` fans the change out via `bulkUpdateTasksCallback`. The task comments CRUD (`/api/v1/comments`) **is** wired: `useComments` drives all four verbs from `commentsThread` (rendered inside `taskModal` and the routed `taskDetailPanel`). Task lifecycle recovery is also wired — `trashDrawer` calls `PUT /tasks/restore` and `archiveDrawer` calls `PUT /tasks/archive` (both with a `?purge=true` hard-delete via `DELETE /tasks`). One surface still has **no FE caller** and so is intentionally absent from this table: the **project** lifecycle endpoints (`PUT /api/v1/projects/restore`, `PUT /api/v1/projects/archive`, and `DELETE /api/v1/projects?purge=true` — there is no project trash/archive UI; the board-level drawers are task-scoped). See [`backend.md`](backend.md) for those server contracts.
 
 ### AI v1 (`/api/ai/`)
 
@@ -334,15 +351,22 @@ const useLabels: (projectId: string | undefined) => {
     isLoading: boolean;
     createLabel: (input: { name: string; color?: string }) => Promise<unknown>;
     isCreating: boolean;
+    updateLabel: (input: {
+        _id: string;
+        name?: string;
+        color?: string;
+    }) => Promise<unknown>;
+    isUpdating: boolean;
+    removeLabel: (labelId: string) => Promise<unknown>;
+    isRemoving: boolean;
 };
 ```
 
-The project-labels hook. Used by `board.tsx` (to resolve card label chips) and the `taskModal` label picker.
+The project-labels hook. Used by `board.tsx` (to resolve card label chips), the `taskModal` / `taskDetailPanel` label picker, and the `labelsManager` management page.
 
 - Reads `GET /api/v1/labels?projectId=…` via `useReactQuery`, keyed per-project (`["labels", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`.
-- `createLabel` POSTs `/api/v1/labels` with `{ projectId, name, color? }` via `useReactMutation`, invalidating that project's list on success. **`createLabel` has no UI caller today** — labels are read/apply-only on the FE (no create/edit/delete management surface); the function exists for a future labels UI.
+- `createLabel` POSTs `/api/v1/labels` with `{ projectId, name, color? }`, `updateLabel` PUTs `{ _id, name?, color? }`, and `removeLabel` DELETEs (`?labelId=`) — each via `useReactMutation`, invalidating that project's list on success. All three are consumed by `labelsManager` (routed `/projects/:projectId/labels`, PRD-GAP-011); the write controls are editor-gated.
 - `labels` is normalized via `Array.isArray` (a non-array payload resolves to `undefined`).
-- The label `PUT` (update) and `DELETE` verbs exist server-side but this hook does not expose or call them.
 
 ---
 
@@ -358,9 +382,56 @@ const useProjectMembers: (
 
 Reads the **project roster** — `GET /api/v1/projects/members?projectId=…` — via `useReactQuery<IProjectMember[]>`, keyed per-project (`["projects/members", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`. Returns the raw `useReactQuery` result (no wrapper object); callers read `.data`.
 
-Its sole consumer is the `taskModal` assignee picker (`assigneeIds`). `IProjectMember` adds `role` to `IMember`, but `role` is not rendered anywhere.
+Primary consumers are the `taskModal` / `taskDetailPanel` assignee pickers (`assigneeIds`) and `projectMembersManager` (roster management at `/projects/:projectId/members`, which renders each member's `role`). `IProjectMember` adds `role` to `IMember`.
 
 **Not to be confused with `useMembersList`** (`src/utils/hooks/useMembersList.ts`), which reads the **global** user directory `GET /api/v1/users/members` (returns `IMember[]`, no `role`) and backs the coordinator picker and `memberPopover`. `useProjectMembers` is "who is on this project"; `useMembersList` is "every user in the system".
+
+Member **management** (add / change-role / remove) is a separate hook, `useProjectMemberMutations` (`POST` / `PUT` / `DELETE /api/v1/projects/members`), consumed by `projectMembersManager` — the routed surface at `/projects/:projectId/members`. The manager renders each member's `role` as a tag and, for project owners, an editable role select; RBAC mirrors the server (roster read is viewer-gated, mutations owner-gated).
+
+---
+
+### `useComments`
+
+_Source: `src/utils/hooks/useComments.ts:83`_
+
+```ts
+const useComments: (taskId: string | undefined) => {
+    comments: IComment[] | undefined;
+    isLoading: boolean;
+    isError: boolean;
+    createComment: (input: { body: string; mentions?: string[] }) => Promise<unknown>;
+    isCreating: boolean;
+    editComment: (input: { _id: string; body: string }) => Promise<unknown>;
+    isEditing: boolean;
+    deleteComment: (commentId: string) => Promise<unknown>;
+    isDeleting: boolean;
+};
+```
+
+The task-comments hook backing `commentsThread` (rendered inside `taskModal`).
+
+- Reads `GET /api/v1/comments?taskId=…` via `useReactQuery`, keyed per-task (`["comments", { taskId }]`), with a 30-second `staleTime` (shorter than the 5-minute label/member rosters — comments are conversational). Disabled until a real `taskId` is known; an optimistic placeholder id never fires the `GET`.
+- `createComment` POSTs `{ taskId, body, mentions? }` (`mentions` is an array of explicit user ids — the server does not parse `@name`). When ≥1 mention is sent, it also invalidates the notifications query so the bell badge picks up the freshly-produced `mention` notifications.
+- `editComment` PUTs `{ _id, body }` (only `body` is writable; author-only server-side). `deleteComment` DELETEs `?commentId=…`.
+- `comments` is normalized via `Array.isArray` (a non-array payload resolves to `undefined`).
+
+---
+
+### `useMilestones`
+
+_Source: `src/utils/hooks/useMilestones.ts:44`_
+
+```ts
+const useMilestones: (
+    projectId: string | undefined
+) => UseQueryResult<IMilestone[]> & { isIdle: boolean; data: IMilestone[] | undefined };
+```
+
+The project-milestones read hook. Used by the `taskModal` milestone picker (`milestoneId`), the `column` card milestone badge, and the routed `milestonesManager` (`/projects/:projectId/milestones`).
+
+- Reads `GET /api/v1/milestones?projectId=…` via `useReactQuery<IMilestone[]>`, keyed per-project (`["milestones", { projectId }]`), disabled until `projectId` is known, with a 5-minute `staleTime`.
+- `data` is normalized via `Array.isArray` (a non-array payload resolves to `undefined`).
+- Milestone **writes** (`POST` / `PUT` / `DELETE /api/v1/milestones`) live in the sibling `useMilestoneMutations` hook consumed by `milestonesManager`; each write invalidates that project's milestone list.
 
 ---
 
@@ -677,6 +748,27 @@ const useBoardBriefDrawer: () => {
 ```
 
 URL-driven drawer state via `?brief=1`.
+
+---
+
+### `useTrashDrawer` / `useArchiveDrawer`
+
+_Sources: `src/utils/hooks/useTrashDrawer.ts:18`, `src/utils/hooks/useArchiveDrawer.ts:18`_
+
+```ts
+const useTrashDrawer: () => {
+    open: boolean;
+    openDrawer: () => void;
+    closeDrawer: () => void;
+};
+// useArchiveDrawer has the identical shape.
+```
+
+Redux-backed open/close flags (via `_createOverlayHook`) for the board's two task-recovery drawers. The hooks own only the visibility flag; the REST work lives in the drawer components:
+
+- `trashDrawer` lists soft-deleted tasks (`GET /tasks?includeTrashed=true`, filtered client-side on `deletedAt`). **Restore** calls `PUT /tasks/restore { _id }` (clears both `deletedAt` and `archivedAt`); **Delete permanently** calls `DELETE /tasks?taskId=…&purge=true`.
+- `archiveDrawer` lists archived tasks (`GET /tasks?includeArchived=true`, filtered on `archivedAt`). **Unarchive** calls `PUT /tasks/archive { _id, archived: false }` (clears `archivedAt` only); **Delete permanently** calls the same purge `DELETE`.
+- Both drawers invalidate the bare `["tasks"]` query prefix so the recovered/purged row leaves the drawer list **and** the board's own `["tasks", { projectId }]` list re-settles in one pass. `includeArchived` / `includeTrashed` **widen** (not scope) the response, which is why each drawer filters on the lifecycle marker.
 
 ---
 
@@ -1766,8 +1858,9 @@ _Sources: `src/interfaces/`_
 
 | Interface        | Key fields                                                                                                  | Source               |
 | ---------------- | ----------------------------------------------------------------------------------------------------------- | -------------------- |
-| `ITask`          | `_id`, `columnId`, `coordinatorId`, `epic`, `taskName`, `type`, `note`, `projectId`, `storyPoints`, `index`, `startDate?`, `dueDate?`, `labelIds?: string[]`, `assigneeIds?: string[]`, `parentTaskId?: string \| null` | `task.d.ts`    |
-| `IColumn`        | `_id`, `columnName`, `projectId`, `index`, `wipLimit?: number`                                              | `column.d.ts`        |
+| `ITask`          | `_id`, `columnId`, `coordinatorId`, `epic`, `taskName`, `type`, `note`, `projectId`, `storyPoints`, `index`, `startDate?`, `dueDate?`, `labelIds?: string[]`, `assigneeIds?: string[]`, `parentTaskId?: string \| null`, `milestoneId?: string \| null`, `priority?: "none" \| "low" \| "medium" \| "high" \| "urgent"`, `dependsOn?: string[]`, `blockedBy?: string[]` (derived), `completedAt?`, `archivedAt?`, `deletedAt?` | `task.d.ts`    |
+| `IColumn`        | `_id`, `columnName`, `projectId`, `index`, `wipLimit?: number`, `category?: "todo" \| "in_progress" \| "done"`, `isDone?: boolean` (derived) | `column.d.ts`        |
+| `IMilestone`     | `_id`, `projectId`, `name`, `description?`, `startDate?`, `dueDate?`, `state?: "open" \| "closed"`, `createdAt?`                            | `milestone.d.ts`     |
 | `IProject`       | `_id`, `projectName`, `managerId`, `organization`, `createdAt?`                                             | `project.d.ts`       |
 | `IProjectMember` | extends `IMember`, adds `role: string`                                                                      | `projectMember.d.ts` |
 | `IComment`       | `_id`, `taskId`, `projectId`, `authorId`, `body`, `mentions: string[]`, `createdAt?`                        | `comment.d.ts`       |
@@ -1780,7 +1873,15 @@ _Sources: `src/interfaces/`_
 
 `IUser.ai_jwt` may be present in `POST /auth/login` responses and is copied into `sessionStorage` for remote AI calls. `GET /users` and `PUT /users/likes` intentionally omit tokens; the REST session stays in the HttpOnly `Token` cookie.
 
-The five `ITask` "richness" fields (`startDate`, `dueDate`, `labelIds`, `assigneeIds`, `parentTaskId`) and `IColumn.wipLimit` are all **optional** in the type. They are fully editable in the legacy `taskModal` (the live surface) but are **not** rendered by the routed `taskDetailPanel`, and `wipLimit` is referenced by no component — see the hook notes and the coverage map in [`../prd/core-collaboration.md`](../prd/core-collaboration.md) §10. Project membership is **not** carried inline on `IProject`: the roster is a separate `IProjectMember[]` fetched from `GET /projects/members` (it adds `role` to the `IMember` shape; `role` is typed as a free `string` and is currently never rendered).
+The `ITask` "richness" fields (`startDate`, `dueDate`, `labelIds`, `assigneeIds`, `parentTaskId`) and `IColumn.wipLimit` are all **optional** in the type and fully editable in the legacy `taskModal` (the live surface). The work-management-depth (WMD) fields layer on top:
+
+- **`priority`** — edited via the `taskModal` priority `Select` and surfaced as a card `PriorityBadge`; the stored default `"none"` renders no badge. Allowed in `PUT /tasks/bulk`.
+- **`dependsOn`** — edited via the `taskModal` dependency `Select` (other tasks in the same project). The client also derives an inverse "blocks" list for display; **`blockedBy`** itself is server-derived (unfinished prerequisites) and read-only. Excluded from bulk edits.
+- **`milestoneId`** — edited via the `taskModal` milestone picker (backed by `useMilestones`); milestone names also render as a card badge in `column`. Excluded from bulk edits.
+- **`completedAt` / `archivedAt` / `deletedAt`** — server-managed lifecycle markers, never sent on a write. `GET /tasks` excludes archived/trashed rows by default; the `includeArchived` / `includeTrashed` flags **widen** (not scope) the result, so the trash/archive recovery drawers filter on these markers client-side.
+- **`IColumn.category`** — `"todo" | "in_progress" | "done"` is the persisted done-semantics source of truth (replacing the locale-fragile name heuristic); `isDone` is the server-derived read alias. `category` is settable on column create/edit.
+
+Project membership is **not** carried inline on `IProject`: the roster is a separate `IProjectMember[]` fetched from `GET /projects/members` (it adds `role` to the `IMember` shape). The roster now ships a full management surface — `projectMembersManager` (routed at `/projects/:projectId/members`) renders each `role` as a tag and, for owners, an editable role select.
 
 ---
 

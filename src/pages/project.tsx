@@ -9,7 +9,6 @@ import { Alert, Badge, Button, Typography } from "antd";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import AiChatDrawer from "../components/aiChatDrawer";
 import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
@@ -294,12 +293,7 @@ const ProjectPage = () => {
     const { openModal } = useProjectModal();
     const { enabled: aiEnabled } = useAiEnabled();
     const isPhone = useIsPhoneChrome();
-    const {
-        open: chatOpen,
-        openDrawer: openChatDrawer,
-        closeDrawer: closeChatDrawer,
-        pendingPrompt: chatInitialPrompt
-    } = useAiChatDrawer();
+    const { openDrawer: openChatDrawer } = useAiChatDrawer();
     /*
      * Phase 4 A8 — launcher badge subscription mirrors the Board
      * Copilot menu's badge on `pages/board.tsx`. We surface the same
@@ -320,29 +314,6 @@ const ProjectPage = () => {
               : microcopy.copilotDock.inboxTab.unreadBadgeAriaLabelOther
           ).replace("{count}", String(copilotInboxUnread))
         : undefined;
-    /**
-     * Listen for `boardCopilot:openChat` from the command palette so the
-     * project list (no board context) still surfaces AI mode submissions
-     * (PRD CP-R6).
-     *
-     * R-A M1 Issue #2: under the dock flag, the host owns the listener
-     * so palette → dock works from any route. Keeping this listener
-     * live under the flag would dispatch `openChatDrawer` twice and
-     * cause Issue #4 (the project-page-mounted `<AiChatDrawer>` also
-     * consumes the prompt, then the dock body consumes it AGAIN after
-     * navigation to the board).
-     */
-    useEffect(() => {
-        if (environment.copilotDockEnabled) return;
-        if (!aiEnabled) return;
-        const onOpenChat = (event: Event) => {
-            const detail = (event as CustomEvent<{ prompt?: string }>).detail;
-            openChatDrawer(detail?.prompt);
-        };
-        window.addEventListener("boardCopilot:openChat", onOpenChat);
-        return () =>
-            window.removeEventListener("boardCopilot:openChat", onOpenChat);
-    }, [aiEnabled, openChatDrawer]);
     /*
      * PWA manifest shortcuts (`/projects?openTaskCreator=1`,
      * `/projects?openCopilot=1`) fire from the OS launcher long-press menu.
@@ -368,8 +339,8 @@ const ProjectPage = () => {
         shortcutsFiredRef.current = true;
         // `openTaskCreator` (legacy param name) opens the project-create
         // modal — the PWA shortcut is labeled "New project" to match
-        // actual behavior. `openCopilot` opens the legacy AI chat drawer
-        // mounted below (the CopilotDock lives only on board.tsx).
+        // actual behavior. `openCopilot` flips the chat-drawer Redux flag,
+        // which `CopilotDockHost`'s bridge forwards to the persistent dock.
         if (wantsTaskCreator) openModal();
         if (wantsCopilot) openChatDrawer();
         const next = new URLSearchParams(shortcutSearchParams);
@@ -594,24 +565,26 @@ const ProjectPage = () => {
                         </PageSubheading>
                     </PageHeadingGroup>
                     <Toolbar>
-                        {aiEnabled && !isPhone && (
-                            <Badge
-                                aria-label={copilotUnreadAriaLabel}
-                                count={copilotInboxUnread}
-                                data-testid="copilot-launcher-badge"
-                                offset={[-4, 4]}
-                                size="small"
-                            >
-                                <Button
-                                    aria-label={microcopy.ai.askCopilot}
-                                    icon={<AiSparkleIcon aria-hidden />}
-                                    onClick={() => openChatDrawer()}
-                                    type="default"
+                        {aiEnabled &&
+                            environment.copilotDockEnabled &&
+                            !isPhone && (
+                                <Badge
+                                    aria-label={copilotUnreadAriaLabel}
+                                    count={copilotInboxUnread}
+                                    data-testid="copilot-launcher-badge"
+                                    offset={[-4, 4]}
+                                    size="small"
                                 >
-                                    {microcopy.labels.askShort}
-                                </Button>
-                            </Badge>
-                        )}
+                                    <Button
+                                        aria-label={microcopy.ai.askCopilot}
+                                        icon={<AiSparkleIcon aria-hidden />}
+                                        onClick={() => openChatDrawer()}
+                                        type="default"
+                                    >
+                                        {microcopy.labels.askShort}
+                                    </Button>
+                                </Badge>
+                            )}
                         <Button
                             aria-label={microcopy.actions.createProject}
                             icon={<PlusOutlined aria-hidden />}
@@ -756,30 +729,14 @@ const ProjectPage = () => {
                         />
                     ) : null}
                 </DesktopFirstSection>
-                {aiEnabled && !environment.copilotDockEnabled && (
-                    /*
-                     * R-A M1 Issue #4: when the dock flag is on, the host
-                     * mounts a single CopilotDock surface that survives
-                     * navigations and consumes any pending prompt through
-                     * the bridge. Keeping this drawer mounted alongside
-                     * caused the prompt to be dispatched TWICE: once by
-                     * this drawer's ChatTabBody on /projects, then again
-                     * by the host's ChatTabBody after the user navigated
-                     * to /projects/p1/board — because the new instance
-                     * still saw `chatDrawer.pendingPrompt` in Redux and
-                     * its own `initialPromptHandled.current` was null.
-                     */
-                    <AiChatDrawer
-                        columns={[]}
-                        initialPrompt={chatInitialPrompt}
-                        knownProjectIds={(projects ?? []).map((p) => p._id)}
-                        members={members ?? []}
-                        onClose={closeChatDrawer}
-                        open={chatOpen}
-                        project={null}
-                        tasks={[]}
-                    />
-                )}
+                {/*
+                 * The Copilot chat surface is the tabbed `<CopilotDock>`
+                 * mounted once by `CopilotDockHost` inside `MainLayout`; it
+                 * survives the /projects → board navigation and consumes any
+                 * pending prompt through the bridge. The project list only
+                 * triggers it via the launcher + PWA-shortcut callsites
+                 * above — it mounts no AI drawer of its own.
+                 */}
             </PullToRefresh>
         </PageContainer>
     );
