@@ -810,9 +810,7 @@ const Sheet: React.FC<SheetProps> = ({
         return (
             <Drawer
                 closable={
-                    closable
-                        ? { "aria-label": resolvedCloseAriaLabel }
-                        : false
+                    closable ? { "aria-label": resolvedCloseAriaLabel } : false
                 }
                 mask={mask}
                 maskClosable={maskClosable}

@@ -10,7 +10,9 @@ let mockProjectName = "Atlas";
 
 jest.mock("../utils/hooks/useReactQuery", () => ({
     __esModule: true,
-    default: () => ({ data: { _id: "project-1", projectName: mockProjectName } })
+    default: () => ({
+        data: { _id: "project-1", projectName: mockProjectName }
+    })
 }));
 
 const LocationProbe = () => {
