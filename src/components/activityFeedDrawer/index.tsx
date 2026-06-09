@@ -400,6 +400,9 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
              */
             desktopPlacement="right"
             desktopSize="default"
+            closeAriaLabel={microcopyString(
+                microcopy.activityFeed.drawerCloseLabel
+            )}
             onClose={onClose}
             open={open}
             title={

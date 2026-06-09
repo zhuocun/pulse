@@ -2,7 +2,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
-import { BrowserRouter } from "react-router-dom";
+import { createMemoryRouter, useBlocker } from "react-router-dom";
 
 import App from "./App";
 import { store } from "./store";
@@ -100,9 +100,7 @@ const renderAppAt = (path: string, authedUser?: IUser) => {
     render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
-                <BrowserRouter>
-                    <App />
-                </BrowserRouter>
+                <App />
             </QueryClientProvider>
         </Provider>
     );
@@ -121,6 +119,23 @@ beforeEach(() => {
 });
 
 describe("App", () => {
+    it("provides a data router context for routes that use useBlocker", async () => {
+        const BlockerProbe = () => {
+            useBlocker(() => false);
+            return <div>Data router blocker available</div>;
+        };
+        const router = createMemoryRouter(
+            [{ path: "/", element: <BlockerProbe /> }],
+            { initialEntries: ["/"] }
+        );
+
+        render(<App router={router} />);
+
+        expect(
+            await screen.findByText("Data router blocker available")
+        ).toBeInTheDocument();
+    });
+
     it("redirects the root route to login when unauthenticated", async () => {
         renderAppAt("/");
 

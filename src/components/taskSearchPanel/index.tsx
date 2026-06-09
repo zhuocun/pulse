@@ -17,7 +17,12 @@ import {
     userPreferencesActions,
     type SavedFilterPresetState
 } from "../../store/reducers/userPreferencesSlice";
-import { breakpoints, radius, space } from "../../theme/tokens";
+import {
+    breakpoints,
+    radius,
+    space,
+    touchTargetCoarse
+} from "../../theme/tokens";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
@@ -208,6 +213,13 @@ const PresetDeleteButton = styled.button`
     &:focus-visible {
         background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
         color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+    }
+
+    @media (pointer: coarse) {
+        height: ${touchTargetCoarse}px;
+        min-height: ${touchTargetCoarse}px;
+        min-width: ${touchTargetCoarse}px;
+        width: ${touchTargetCoarse}px;
     }
 `;
 

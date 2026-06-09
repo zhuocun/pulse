@@ -2,7 +2,6 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
-import { MemoryRouter } from "react-router-dom";
 
 import App from "../App";
 import { store } from "../store";
@@ -16,23 +15,6 @@ jest.mock("../constants/env", () => ({
         aiUseLocalEngine: true
     }
 }));
-
-// Stub the heavy route children — we only care that the AppShell mounts
-// the CommandPalette and the Cmd/Ctrl+K hotkey opens it. Each route
-// renders a tiny placeholder so React Router can resolve them without
-// pulling in pages, providers, or icons that drag in big test setup.
-jest.mock("../routes", () => {
-    const React = jest.requireActual("react");
-    const dummy = (label: string) =>
-        React.createElement("div", { "data-testid": `route-${label}` }, label);
-    return {
-        __esModule: true,
-        default: [
-            { path: "/", element: dummy("home") },
-            { path: "*", element: dummy("anything") }
-        ]
-    };
-});
 
 const installAntdMocks = () => {
     Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
@@ -55,15 +37,14 @@ const installAntdMocks = () => {
 };
 
 const renderApp = () => {
+    window.history.pushState({}, "Command palette", "/");
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } }
     });
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={["/"]}>
-                    <App />
-                </MemoryRouter>
+                <App />
             </QueryClientProvider>
         </Provider>
     );

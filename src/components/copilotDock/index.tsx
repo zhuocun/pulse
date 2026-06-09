@@ -322,6 +322,7 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
             // 420 px right shelf (Phase 3 A1, doc §A1 lines 153-166).
             desktopPlacement="right"
             desktopSize={420}
+            closeAriaLabel={microcopy.copilotDock.closeLabel}
             mask
             maskClosable
             onClose={onClose}

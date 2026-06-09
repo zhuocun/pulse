@@ -313,6 +313,37 @@ const BoardTitle = styled(Typography.Title)`
     }
 `;
 
+const PhoneBoardTitle = styled.div`
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+`;
+
+const PhoneBoardTitleEyebrow = styled(Typography.Text)`
+    && {
+        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+        font-size: ${fontSize.xs}px;
+        font-weight: ${fontWeight.medium};
+        letter-spacing: ${letterSpacing.wide};
+        line-height: ${lineHeight.tight};
+        text-transform: uppercase;
+    }
+`;
+
+const PhoneBoardTitleText = styled(Typography.Text)`
+    && {
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+        display: block;
+        font-size: ${fontSize.lg}px;
+        font-weight: ${fontWeight.semibold};
+        line-height: ${lineHeight.tight};
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+`;
+
 /**
  * Action cluster on the board header. Wraps the CopilotMenu launcher and the
  * Settings cog into a tight row. On phone-sized viewports the cluster takes
@@ -943,47 +974,60 @@ const BoardPage = () => {
                                             rowGap: themeSpace.xs
                                         }}
                                     >
-                                        {pLoading ? (
-                                            isPhone ? (
+                                        {isPhone ? (
+                                            <>
                                                 <BoardTitle
                                                     level={1}
                                                     style={
                                                         srOnlyLiveRegionStyle
                                                     }
                                                 >
-                                                    {microcopy.board.title}
+                                                    {pLoading
+                                                        ? microcopy.board.title
+                                                        : boardTitle(
+                                                              currentProject?.projectName
+                                                          )}
                                                 </BoardTitle>
-                                            ) : (
-                                                <span
-                                                    aria-label={
-                                                        microcopy.a11y
-                                                            .loadingProjectName
-                                                    }
-                                                    role="status"
-                                                    style={{
-                                                        flex: "1 1 auto",
-                                                        minWidth: 0
-                                                    }}
+                                                <PhoneBoardTitle
+                                                    aria-hidden="true"
+                                                    data-testid="phone-board-title"
                                                 >
-                                                    <Skeleton.Input
-                                                        active
-                                                        size="large"
-                                                        style={{
-                                                            maxWidth: "100%",
-                                                            width: 240
-                                                        }}
-                                                    />
-                                                </span>
-                                            )
-                                        ) : (
-                                            <BoardTitle
-                                                level={1}
-                                                style={
-                                                    isPhone
-                                                        ? srOnlyLiveRegionStyle
-                                                        : undefined
+                                                    <PhoneBoardTitleEyebrow>
+                                                        {microcopy.labels.board}
+                                                    </PhoneBoardTitleEyebrow>
+                                                    <PhoneBoardTitleText>
+                                                        {pLoading
+                                                            ? microcopy.a11y
+                                                                  .loadingProjectName
+                                                            : (currentProject?.projectName ??
+                                                              microcopy.labels
+                                                                  .project)}
+                                                    </PhoneBoardTitleText>
+                                                </PhoneBoardTitle>
+                                            </>
+                                        ) : pLoading ? (
+                                            <span
+                                                aria-label={
+                                                    microcopy.a11y
+                                                        .loadingProjectName
                                                 }
+                                                role="status"
+                                                style={{
+                                                    flex: "1 1 auto",
+                                                    minWidth: 0
+                                                }}
                                             >
+                                                <Skeleton.Input
+                                                    active
+                                                    size="large"
+                                                    style={{
+                                                        maxWidth: "100%",
+                                                        width: 240
+                                                    }}
+                                                />
+                                            </span>
+                                        ) : (
+                                            <BoardTitle level={1}>
                                                 {boardTitle(
                                                     currentProject?.projectName
                                                 )}

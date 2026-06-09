@@ -1,6 +1,6 @@
 import { DeleteOutlined, UndoOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Empty, Popconfirm, Typography } from "antd";
+import { Button, Empty, Popconfirm, Skeleton, Typography } from "antd";
 import React, { useCallback } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
@@ -92,6 +92,13 @@ const RowActions = styled.div`
     display: flex;
     flex: 0 0 auto;
     gap: ${space.xxs}px;
+`;
+
+const LoadingState = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${space.sm}px;
+    padding: ${space.sm}px;
 `;
 
 interface TrashDrawerProps {
@@ -198,13 +205,20 @@ const TrashDrawer: React.FC<TrashDrawerProps> = ({
     const actionsBusy = restoring || purging;
 
     const body = (
-        <div data-testid="trash-drawer-body">
+        <div aria-busy={isLoading} data-testid="trash-drawer-body">
             <DrawerHeader>
                 <Typography.Text strong style={{ fontSize: fontSize.sm }}>
                     {drawerTitle}
                 </Typography.Text>
             </DrawerHeader>
-            {!isLoading && trashedTasks.length === 0 ? (
+            {isLoading ? (
+                <LoadingState data-testid="trash-drawer-loading" role="status">
+                    <Typography.Text type="secondary">
+                        {microcopyString(microcopy.trashDrawer.loading)}
+                    </Typography.Text>
+                    <Skeleton active paragraph={{ rows: 3 }} title={false} />
+                </LoadingState>
+            ) : trashedTasks.length === 0 ? (
                 <Empty
                     data-testid="trash-drawer-empty"
                     description={
@@ -317,6 +331,7 @@ const TrashDrawer: React.FC<TrashDrawerProps> = ({
              */
             desktopPlacement="right"
             desktopSize="default"
+            closeAriaLabel={microcopyString(microcopy.actions.close)}
             onClose={onClose}
             open={open}
             title={

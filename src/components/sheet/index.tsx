@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
     chromeInset,
     radius,
@@ -86,6 +87,8 @@ export interface SheetProps {
 
     /** Render a close (X) affordance in the header. Default `true`. */
     closable?: boolean;
+    /** Accessible name for the close affordance. Defaults to localized "Close". */
+    closeAriaLabel?: string;
     /** Render the scrim behind the sheet. Default `true`. */
     mask?: boolean;
     /**
@@ -494,6 +497,7 @@ interface AnimatedSheetProps {
     title?: React.ReactNode;
     footer?: React.ReactNode;
     closable: boolean;
+    closeAriaLabel: string;
     mask: boolean;
     maskClosable: boolean;
     dismissOnScrimClick?: boolean;
@@ -515,6 +519,7 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
     title,
     footer,
     closable,
+    closeAriaLabel,
     mask,
     maskClosable,
     dismissOnScrimClick,
@@ -724,7 +729,7 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
                                 </TitleSlot>
                                 {closable ? (
                                     <CloseButton
-                                        aria-label="Close"
+                                        aria-label={closeAriaLabel}
                                         data-testid={
                                             dataTestid
                                                 ? `${dataTestid}-close`
@@ -779,6 +784,7 @@ const Sheet: React.FC<SheetProps> = ({
     children,
     footer,
     closable = true,
+    closeAriaLabel,
     mask = true,
     maskClosable = true,
     dismissOnScrimClick,
@@ -795,13 +801,17 @@ const Sheet: React.FC<SheetProps> = ({
     const isPhone = useIsPhoneChrome();
     const reducedMotion = useReducedMotion();
     const useAnimatedBranch = isPhone && !reducedMotion && !forceDrawerFallback;
+    const resolvedCloseAriaLabel =
+        closeAriaLabel ?? microcopyString(microcopy.actions.close);
 
     if (!useAnimatedBranch) {
         const placement = isPhone ? "bottom" : desktopPlacement;
         const resolvedAriaLabelledBy = ariaLabelledByProp ?? ariaLabelledBy;
         return (
             <Drawer
-                closable={closable}
+                closable={
+                    closable ? { "aria-label": resolvedCloseAriaLabel } : false
+                }
                 mask={mask}
                 maskClosable={maskClosable}
                 onClose={onClose}
@@ -857,6 +867,7 @@ const Sheet: React.FC<SheetProps> = ({
             title={title}
             footer={footer}
             closable={closable}
+            closeAriaLabel={resolvedCloseAriaLabel}
             mask={mask}
             maskClosable={maskClosable}
             dismissOnScrimClick={dismissOnScrimClick}

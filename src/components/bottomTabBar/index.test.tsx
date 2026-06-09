@@ -149,6 +149,15 @@ describe("BottomTabBar", () => {
         expect(inbox).toHaveAttribute("aria-current", "page");
     });
 
+    it("names the Inbox tab as the activity destination for phone access", () => {
+        renderBar("/projects");
+        expect(
+            screen.getByRole("link", {
+                name: microcopy.nav.inboxTabAriaLabel
+            })
+        ).toBeInTheDocument();
+    });
+
     it("marks the Copilot tab active when on /copilot", () => {
         renderBar("/copilot");
         const copilot = screen.getByRole("link", {

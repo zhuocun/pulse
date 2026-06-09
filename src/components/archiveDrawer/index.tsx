@@ -4,7 +4,7 @@ import {
     RollbackOutlined
 } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Empty, Popconfirm, Typography } from "antd";
+import { Button, Empty, Popconfirm, Skeleton, Typography } from "antd";
 import React, { useCallback } from "react";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
@@ -99,6 +99,13 @@ const RowActions = styled.div`
     display: flex;
     flex: 0 0 auto;
     gap: ${space.xxs}px;
+`;
+
+const LoadingState = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${space.sm}px;
+    padding: ${space.sm}px;
 `;
 
 interface ArchiveDrawerProps {
@@ -207,13 +214,23 @@ const ArchiveDrawer: React.FC<ArchiveDrawerProps> = ({
     const actionsBusy = unarchiving || purging;
 
     const body = (
-        <div data-testid="archive-drawer-body">
+        <div aria-busy={isLoading} data-testid="archive-drawer-body">
             <DrawerHeader>
                 <Typography.Text strong style={{ fontSize: fontSize.sm }}>
                     {drawerTitle}
                 </Typography.Text>
             </DrawerHeader>
-            {!isLoading && archivedTasks.length === 0 ? (
+            {isLoading ? (
+                <LoadingState
+                    data-testid="archive-drawer-loading"
+                    role="status"
+                >
+                    <Typography.Text type="secondary">
+                        {microcopyString(microcopy.archiveDrawer.loading)}
+                    </Typography.Text>
+                    <Skeleton active paragraph={{ rows: 3 }} title={false} />
+                </LoadingState>
+            ) : archivedTasks.length === 0 ? (
                 <Empty
                     data-testid="archive-drawer-empty"
                     description={
@@ -327,6 +344,7 @@ const ArchiveDrawer: React.FC<ArchiveDrawerProps> = ({
              */
             desktopPlacement="right"
             desktopSize="default"
+            closeAriaLabel={microcopyString(microcopy.actions.close)}
             onClose={onClose}
             open={open}
             title={

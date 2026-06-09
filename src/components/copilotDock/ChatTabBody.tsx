@@ -1599,9 +1599,10 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                     !assistantHadToolStep(index) && (
                                         <Typography.Text
                                             style={{
-                                                color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+                                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65))",
                                                 display: "block",
-                                                fontSize: fontSize.xs,
+                                                fontSize: fontSize.sm,
+                                                fontWeight: fontWeight.medium,
                                                 marginTop: 2
                                             }}
                                             type="secondary"

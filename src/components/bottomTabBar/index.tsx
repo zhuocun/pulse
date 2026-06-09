@@ -703,6 +703,10 @@ const BottomTabBar: React.FC = () => {
                         </TabLabel>
                     </>
                 );
+                const tabAriaLabel =
+                    tab.labelKey === "inbox"
+                        ? microcopy.nav.inboxTabAriaLabel
+                        : microcopy.nav.tabs[tab.labelKey];
                 /*
                  * View-transition name is per-tab so the morph
                  * indicator can slide between them. React's inline
@@ -726,7 +730,7 @@ const BottomTabBar: React.FC = () => {
                         <TabButton
                             key={`action-${tab.labelKey}`}
                             type="button"
-                            aria-label={microcopy.nav.tabs[tab.labelKey]}
+                            aria-label={tabAriaLabel}
                             onClick={() => {
                                 vibrate("tap");
                                 tab.onActivate();
@@ -763,6 +767,7 @@ const BottomTabBar: React.FC = () => {
                         ref={(node: HTMLAnchorElement | null) => {
                             tabsRef.current[idx] = node as HTMLElement;
                         }}
+                        aria-label={tabAriaLabel}
                         style={viewTransitionStyle}
                         to={tab.to}
                         viewTransition

@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { ReactNode } from "react";
 import { useSelector } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
 
 import { RootState } from "../store";
 
@@ -17,7 +16,6 @@ jest.mock("./authProvider", () => ({
 
 const ProviderProbe = () => {
     const queryClient = useQueryClient();
-    const location = useLocation();
     const modalOpen = useSelector(
         (s: RootState) => s.projectModal.isModalOpened
     );
@@ -27,7 +25,6 @@ const ProviderProbe = () => {
             <span data-testid="has-query-client">
                 {String(Boolean(queryClient))}
             </span>
-            <span data-testid="path">{location.pathname}</span>
             <span data-testid="redux-modal">{String(modalOpen)}</span>
         </div>
     );
@@ -36,10 +33,9 @@ const ProviderProbe = () => {
 describe("AppProviders", () => {
     beforeEach(() => {
         localStorage.clear();
-        window.history.pushState({}, "Projects", "/projects");
     });
 
-    it("renders children under Redux, query, router, and auth providers", () => {
+    it("renders children under Redux, query, and auth providers", () => {
         render(
             <AppProviders>
                 <ProviderProbe />
@@ -49,7 +45,6 @@ describe("AppProviders", () => {
         expect(screen.getByTestId("has-query-client")).toHaveTextContent(
             "true"
         );
-        expect(screen.getByTestId("path")).toHaveTextContent("/projects");
         expect(screen.getByTestId("redux-modal")).toHaveTextContent("false");
         expect(screen.getByTestId("auth-provider")).toBeInTheDocument();
     });

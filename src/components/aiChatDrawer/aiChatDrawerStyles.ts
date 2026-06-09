@@ -96,12 +96,11 @@ export const AssistantAttribution = styled.div`
 
 /**
  * "AI · review before using" footnote below each assistant bubble (P2-2).
- * Kept intentionally low-contrast so it sits out of the reading flow but
- * remains discoverable when users are calibrating trust on a response.
  */
 export const AssistantDisclaimer = styled.div`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    font-size: ${fontSize.xs}px;
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+    font-size: ${fontSize.sm}px;
+    font-weight: ${fontWeight.medium};
     margin-top: 2px;
 `;
 

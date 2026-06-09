@@ -261,6 +261,7 @@ const zhCN: Dictionary = {
     nav: {
         primaryLandmarkLabel: "主导航",
         desktopNavLabel: "主导航栏",
+        inboxTabAriaLabel: "收件箱、提及和活动",
         tabs: {
             boards: "看板",
             inbox: "收件箱",
@@ -698,6 +699,7 @@ const zhCN: Dictionary = {
         triggerLabel: "回收站",
         triggerAriaLabel: "打开回收站",
         drawerTitle: "回收站",
+        loading: "正在加载回收站任务…",
         empty: {
             title: "回收站为空",
             description:
@@ -717,6 +719,7 @@ const zhCN: Dictionary = {
         triggerLabel: "归档",
         triggerAriaLabel: "打开归档",
         drawerTitle: "归档",
+        loading: "正在加载归档任务…",
         empty: {
             title: "归档为空",
             description:
