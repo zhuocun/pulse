@@ -209,6 +209,20 @@ const BreadcrumbWrapper = styled.div`
     }
     && .ant-breadcrumb ol {
         flex-wrap: nowrap;
+        min-width: 0;
+    }
+    && .ant-breadcrumb li,
+    && .ant-breadcrumb-link {
+        min-width: 0;
+    }
+    && .ant-breadcrumb li:not(:last-child),
+    && .ant-breadcrumb li:not(:last-child) .ant-breadcrumb-link,
+    && .ant-breadcrumb li:not(:last-child) a {
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     && .ant-breadcrumb li:last-child {
         color: var(--ant-color-text, rgba(15, 23, 42, 0.92));

@@ -6,9 +6,11 @@ import { ruleTextsFor, styledClassFor } from "../testUtils/styleRules";
 
 import ProjectDetailPage from "./projectDetail";
 
+let mockProjectName = "Atlas";
+
 jest.mock("../utils/hooks/useReactQuery", () => ({
     __esModule: true,
-    default: () => ({ data: { _id: "project-1", projectName: "Atlas" } })
+    default: () => ({ data: { _id: "project-1", projectName: mockProjectName } })
 }));
 
 const LocationProbe = () => {
@@ -51,6 +53,7 @@ const renderDetail = (route: string) =>
                 >
                     <Route index element={<Navigate to="board" replace />} />
                     <Route path="board" element={<div>Board outlet</div>} />
+                    <Route path="labels" element={<div>Labels outlet</div>} />
                 </Route>
                 <Route path="*" element={<LocationProbe />} />
             </Routes>
@@ -65,6 +68,10 @@ describe("ProjectDetailPage", () => {
         consoleErrorSpy = silenceExpectedConsoleErrors([
             ["An update to", "ForwardRef", "not wrapped in act"]
         ]);
+    });
+
+    beforeEach(() => {
+        mockProjectName = "Atlas";
     });
 
     afterAll(() => {
@@ -174,6 +181,48 @@ describe("ProjectDetailPage", () => {
 
             expect(breadcrumbRuleText).toContain("min-height: 44px");
             expect(childRuleText).toContain("min-height: 44px");
+        });
+
+        it("ellipsizes non-final breadcrumb links so long project names stay in the viewport", () => {
+            mockProjectName =
+                "Design system launch with a long-but-readable project name that should truncate";
+            renderDetail("/projects/project-1/labels");
+            const breadcrumbWrapper = screen
+                .getByTestId("project-detail-chrome")
+                .querySelector(".ant-breadcrumb")?.parentElement;
+            expect(breadcrumbWrapper).not.toBeNull();
+
+            const breadcrumbRuleText = ruleTextsFor(
+                styledClassFor(breadcrumbWrapper as Element) ?? ""
+            ).join("\n");
+            const nonFinalLinkRule = Array.from(document.styleSheets)
+                .flatMap((sheet) => Array.from(sheet.cssRules))
+                .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
+                .find((rule) =>
+                    rule.selectorText.includes(
+                        ".ant-breadcrumb li:not(:last-child) a"
+                    )
+                );
+
+            expect(breadcrumbRuleText).toContain(
+                ".ant-breadcrumb li:not(:last-child)"
+            );
+            expect(nonFinalLinkRule).toBeDefined();
+            expect(nonFinalLinkRule?.style.getPropertyValue("max-width")).toBe(
+                "100%"
+            );
+            expect(nonFinalLinkRule?.style.getPropertyValue("min-width")).toBe(
+                "0"
+            );
+            expect(nonFinalLinkRule?.style.getPropertyValue("overflow")).toBe(
+                "hidden"
+            );
+            expect(
+                nonFinalLinkRule?.style.getPropertyValue("text-overflow")
+            ).toBe("ellipsis");
+            expect(
+                nonFinalLinkRule?.style.getPropertyValue("white-space")
+            ).toBe("nowrap");
         });
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {
