@@ -185,7 +185,7 @@ describe("ProjectDetailPage", () => {
             expect(childRuleText).toContain("min-height: 44px");
         });
 
-        it("ellipsizes non-final breadcrumb links so long project names stay in the viewport", () => {
+        it("pins the Projects root crumb and ellipsizes the project name when space is tight", () => {
             mockProjectName =
                 "Design system launch with a long-but-readable project name that should truncate";
             renderDetail("/projects/project-1/labels");
@@ -197,33 +197,44 @@ describe("ProjectDetailPage", () => {
             const breadcrumbRuleText = ruleTextsFor(
                 styledClassFor(breadcrumbWrapper as Element) ?? ""
             ).join("\n");
-            const nonFinalLinkRule = Array.from(document.styleSheets)
+            const rootCrumbRule = Array.from(document.styleSheets)
                 .flatMap((sheet) => Array.from(sheet.cssRules))
                 .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
                 .find((rule) =>
                     rule.selectorText.includes(
-                        ".ant-breadcrumb li:not(:last-child) a"
+                        ".ant-breadcrumb li:first-child a"
+                    )
+                );
+            const middleCrumbRule = Array.from(document.styleSheets)
+                .flatMap((sheet) => Array.from(sheet.cssRules))
+                .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
+                .find((rule) =>
+                    rule.selectorText.includes(
+                        ".ant-breadcrumb li:not(:first-child):not(:last-child) a"
                     )
                 );
 
             expect(breadcrumbRuleText).toContain(
-                ".ant-breadcrumb li:not(:last-child)"
+                ".ant-breadcrumb li:first-child"
             );
-            expect(nonFinalLinkRule).toBeDefined();
-            expect(nonFinalLinkRule?.style.getPropertyValue("max-width")).toBe(
-                "100%"
-            );
-            expect(nonFinalLinkRule?.style.getPropertyValue("min-width")).toBe(
+            expect(rootCrumbRule?.style.getPropertyValue("flex-shrink")).toBe(
                 "0"
             );
-            expect(nonFinalLinkRule?.style.getPropertyValue("overflow")).toBe(
+            expect(middleCrumbRule).toBeDefined();
+            expect(middleCrumbRule?.style.getPropertyValue("max-width")).toBe(
+                "100%"
+            );
+            expect(middleCrumbRule?.style.getPropertyValue("min-width")).toBe(
+                "0"
+            );
+            expect(middleCrumbRule?.style.getPropertyValue("overflow")).toBe(
                 "hidden"
             );
             expect(
-                nonFinalLinkRule?.style.getPropertyValue("text-overflow")
+                middleCrumbRule?.style.getPropertyValue("text-overflow")
             ).toBe("ellipsis");
             expect(
-                nonFinalLinkRule?.style.getPropertyValue("white-space")
+                middleCrumbRule?.style.getPropertyValue("white-space")
             ).toBe("nowrap");
         });
 

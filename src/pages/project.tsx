@@ -548,6 +548,79 @@ const ProjectPage = () => {
     const handleRefresh = () =>
         Promise.all([refetchProjects(), refetchMembers()]);
 
+    const projectSearchPanel = (
+        <ProjectSearchPanel
+            favoritedOnly={favoritedOnly}
+            hasSavedDefaults={savedProjectListDefaults !== null}
+            loading={mLoading}
+            members={members ?? []}
+            onClearSavedDefault={clearProjectListDefaults}
+            onFavoritedOnlyChange={(next) =>
+                setParam({ favoritedOnly: next ? "1" : "" })
+            }
+            onResetToDefault={handleResetToDefault}
+            onSaveDefault={handleSaveDefault}
+            param={param}
+            setParam={setParam}
+            aiSearchSlot={
+                aiEnabled ? (
+                    <div
+                        style={{
+                            flexBasis: "100%",
+                            marginBottom: space.sm
+                        }}
+                    >
+                        <AiSearchInput
+                            kind="projects"
+                            projectsContext={{
+                                projects: projects ?? [],
+                                members: members ?? []
+                            }}
+                            semanticIds={param.semanticIds}
+                            setSemanticIds={(value) =>
+                                setParam({ semanticIds: value })
+                            }
+                        />
+                    </div>
+                ) : undefined
+            }
+        />
+    );
+
+    const projectsErrorAlert =
+        pError || mError ? (
+            <Alert
+                action={
+                    <Button
+                        onClick={() => {
+                            if (pError) refetchProjects();
+                            if (mError) refetchMembers();
+                        }}
+                        size="small"
+                        type="primary"
+                    >
+                        {microcopy.actions.retry}
+                    </Button>
+                }
+                description={microcopy.feedback.retryHint}
+                showIcon
+                style={{ marginBottom: space.sm }}
+                title={microcopy.feedback.loadFailed}
+                type="error"
+            />
+        ) : null;
+
+    const projectList = (
+        <ProjectList
+            dataSource={filteredProjects}
+            error={Boolean(pError || mError)}
+            loading={pLoading || mLoading}
+            members={members ?? []}
+            onSortOrderChange={setSortOrder}
+            sortOrder={sortOrder}
+        />
+    );
+
     return (
         <PageContainer>
             <PullToRefresh
@@ -650,84 +723,17 @@ const ProjectPage = () => {
                 <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
                 <MobileFirstSection>
                     {isPhone ? (
-                        <ProjectList
-                            dataSource={filteredProjects}
-                            error={Boolean(pError || mError)}
-                            members={members ?? []}
-                            loading={pLoading || mLoading}
-                            sortOrder={sortOrder}
-                            onSortOrderChange={setSortOrder}
-                        />
+                        <>
+                            {projectSearchPanel}
+                            {projectsErrorAlert}
+                            {projectList}
+                        </>
                     ) : null}
                 </MobileFirstSection>
                 <DesktopFirstSection>
-                    <ProjectSearchPanel
-                        param={param}
-                        setParam={setParam}
-                        members={members ?? []}
-                        loading={mLoading}
-                        favoritedOnly={favoritedOnly}
-                        onFavoritedOnlyChange={(next) =>
-                            setParam({ favoritedOnly: next ? "1" : "" })
-                        }
-                        hasSavedDefaults={savedProjectListDefaults !== null}
-                        onSaveDefault={handleSaveDefault}
-                        onResetToDefault={handleResetToDefault}
-                        onClearSavedDefault={clearProjectListDefaults}
-                        aiSearchSlot={
-                            aiEnabled ? (
-                                <div
-                                    style={{
-                                        flexBasis: "100%",
-                                        marginBottom: space.sm
-                                    }}
-                                >
-                                    <AiSearchInput
-                                        kind="projects"
-                                        projectsContext={{
-                                            projects: projects ?? [],
-                                            members: members ?? []
-                                        }}
-                                        semanticIds={param.semanticIds}
-                                        setSemanticIds={(value) =>
-                                            setParam({ semanticIds: value })
-                                        }
-                                    />
-                                </div>
-                            ) : undefined
-                        }
-                    />
-                    {pError || mError ? (
-                        <Alert
-                            action={
-                                <Button
-                                    onClick={() => {
-                                        if (pError) refetchProjects();
-                                        if (mError) refetchMembers();
-                                    }}
-                                    size="small"
-                                    type="primary"
-                                >
-                                    {microcopy.actions.retry}
-                                </Button>
-                            }
-                            description={microcopy.feedback.retryHint}
-                            showIcon
-                            style={{ marginBottom: space.sm }}
-                            title={microcopy.feedback.loadFailed}
-                            type="error"
-                        />
-                    ) : null}
-                    {!isPhone ? (
-                        <ProjectList
-                            dataSource={filteredProjects}
-                            error={Boolean(pError || mError)}
-                            members={members ?? []}
-                            loading={pLoading || mLoading}
-                            sortOrder={sortOrder}
-                            onSortOrderChange={setSortOrder}
-                        />
-                    ) : null}
+                    {!isPhone ? projectSearchPanel : null}
+                    {!isPhone ? projectsErrorAlert : null}
+                    {!isPhone ? projectList : null}
                 </DesktopFirstSection>
                 {/*
                  * The Copilot chat surface is the tabbed `<CopilotDock>`

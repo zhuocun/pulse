@@ -215,9 +215,18 @@ const BreadcrumbWrapper = styled.div`
     && .ant-breadcrumb-link {
         min-width: 0;
     }
-    && .ant-breadcrumb li:not(:last-child),
-    && .ant-breadcrumb li:not(:last-child) .ant-breadcrumb-link,
-    && .ant-breadcrumb li:not(:last-child) a {
+    && .ant-breadcrumb li:first-child,
+    && .ant-breadcrumb li:first-child .ant-breadcrumb-link,
+    && .ant-breadcrumb li:first-child a {
+        flex-shrink: 0;
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+        white-space: nowrap;
+    }
+    && .ant-breadcrumb li:not(:first-child):not(:last-child),
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) .ant-breadcrumb-link,
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
         max-width: 100%;
         min-width: 0;
         overflow: hidden;

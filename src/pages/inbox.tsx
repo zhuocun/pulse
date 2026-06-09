@@ -261,12 +261,15 @@ const InboxPage = () => {
                         </SectionEmpty>
                     ) : (
                         mentions.map((mention) => {
+                            const summary =
+                                mention.summary?.trim() ||
+                                microcopyString(
+                                    microcopy.inbox.sections.mentions.empty
+                                );
                             const body = (
                                 <>
                                     <EventBody>
-                                        <EventSummary>
-                                            {mention.summary}
-                                        </EventSummary>
+                                        <EventSummary>{summary}</EventSummary>
                                     </EventBody>
                                     {mention.projectId && (
                                         <MentionAction aria-hidden>
@@ -284,7 +287,7 @@ const InboxPage = () => {
                                     aria-label={microcopyString(
                                         microcopy.inbox.sections.mentions
                                             .itemAriaLabel
-                                    ).replace("{summary}", mention.summary)}
+                                    ).replace("{summary}", summary)}
                                     data-mention-id={mention._id}
                                     data-ref-id={mention.refId}
                                     data-testid="inbox-mention-row"
@@ -309,7 +312,12 @@ const InboxPage = () => {
                     data-testid="inbox-section-activity"
                     header={microcopy.inbox.sections.activity.title}
                 >
-                    {sortedEvents.map((event) => (
+                    {sortedEvents.length === 0 ? (
+                        <SectionEmpty data-testid="inbox-activity-empty">
+                            {microcopy.activityFeed.empty}
+                        </SectionEmpty>
+                    ) : (
+                        sortedEvents.map((event) => (
                         <EventRow
                             key={event.id}
                             data-event-id={event.id}
@@ -328,7 +336,8 @@ const InboxPage = () => {
                                 </EventMeta>
                             </EventBody>
                         </EventRow>
-                    ))}
+                        ))
+                    )}
                 </SettingsSection>
             </SectionStack>
         </PageContainer>
