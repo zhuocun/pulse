@@ -189,6 +189,27 @@ describe("ArchiveDrawer", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("shows an aria-busy loading body before empty or rows render", () => {
+        fetchMock.mockImplementation(
+            () => new Promise<Response>(() => undefined)
+        );
+        renderDrawer();
+
+        expect(screen.getByTestId("archive-drawer-body")).toHaveAttribute(
+            "aria-busy",
+            "true"
+        );
+        expect(screen.getByTestId("archive-drawer-loading")).toHaveTextContent(
+            "Loading archived tasks…"
+        );
+        expect(
+            screen.queryByTestId("archive-drawer-empty")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId("archive-drawer-list")
+        ).not.toBeInTheDocument();
+    });
+
     it("renders the empty state when there are no archived tasks", async () => {
         renderDrawer({}, []);
         expect(

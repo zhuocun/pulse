@@ -79,6 +79,7 @@ interface HarnessProps {
     detents?: readonly SheetDetent[];
     forceDrawerFallback?: boolean;
     closable?: boolean;
+    closeAriaLabel?: string;
     "data-testid"?: string;
 }
 
@@ -89,6 +90,7 @@ const Harness: React.FC<HarnessProps> = ({
     detents,
     forceDrawerFallback,
     closable,
+    closeAriaLabel,
     "data-testid": dataTestid = "test-sheet"
 }) => (
     <Sheet
@@ -97,6 +99,7 @@ const Harness: React.FC<HarnessProps> = ({
         detents={detents}
         forceDrawerFallback={forceDrawerFallback}
         closable={closable}
+        closeAriaLabel={closeAriaLabel}
         onClose={onClose}
         open={open}
         title="Sheet title"
@@ -172,6 +175,13 @@ describe("Sheet — animated phone branch", () => {
         const user = userEvent.setup();
         await user.click(screen.getByTestId("test-sheet-close"));
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses a caller-supplied close button label", () => {
+        render(<Harness closeAriaLabel="Close localized sheet" />);
+        expect(
+            screen.getByRole("button", { name: "Close localized sheet" })
+        ).toBeInTheDocument();
     });
 
     it("declares a 44 px close target on coarse pointers", () => {
@@ -293,6 +303,13 @@ describe("Sheet — desktop drawer fallback", () => {
         expect(document.querySelector(".ant-drawer")).toBeTruthy();
     });
 
+    it("uses a caller-supplied close button label", () => {
+        render(<Harness closeAriaLabel="Dismiss sheet" />);
+        expect(
+            screen.getByRole("button", { name: "Dismiss sheet" })
+        ).toBeInTheDocument();
+    });
+
     it("passes axe with no a11y violations in the fallback branch", async () => {
         const { baseElement } = render(<Harness />);
         const results = await axe(baseElement);
@@ -321,6 +338,13 @@ describe("Sheet — reduced-motion fallback", () => {
             screen.queryByTestId("test-sheet-surface")
         ).not.toBeInTheDocument();
         expect(document.querySelector(".ant-drawer")).toBeTruthy();
+    });
+
+    it("uses a caller-supplied close button label", () => {
+        render(<Harness closeAriaLabel="Dismiss reduced sheet" />);
+        expect(
+            screen.getByRole("button", { name: "Dismiss reduced sheet" })
+        ).toBeInTheDocument();
     });
 
     it("passes axe with no a11y violations in the reduced-motion branch", async () => {

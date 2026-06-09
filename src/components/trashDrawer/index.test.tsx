@@ -189,6 +189,27 @@ describe("TrashDrawer", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("shows an aria-busy loading body before empty or rows render", () => {
+        fetchMock.mockImplementation(
+            () => new Promise<Response>(() => undefined)
+        );
+        renderDrawer();
+
+        expect(screen.getByTestId("trash-drawer-body")).toHaveAttribute(
+            "aria-busy",
+            "true"
+        );
+        expect(screen.getByTestId("trash-drawer-loading")).toHaveTextContent(
+            "Loading trashed tasks…"
+        );
+        expect(
+            screen.queryByTestId("trash-drawer-empty")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId("trash-drawer-list")
+        ).not.toBeInTheDocument();
+    });
+
     it("renders the empty state when there are no trashed tasks", async () => {
         renderDrawer({}, []);
         expect(

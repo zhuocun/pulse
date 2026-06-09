@@ -11,6 +11,10 @@ import {
     USER_PREFERENCES_STORAGE_KEY,
     userPreferencesSlice
 } from "../../store/reducers/userPreferencesSlice";
+import {
+    coarseTouchTargetsFor,
+    styledClassFor
+} from "../../testUtils/styleRules";
 import useAuth from "../../utils/hooks/useAuth";
 
 import TaskSearchPanel, { TaskSearchParam } from ".";
@@ -635,6 +639,40 @@ describe("TaskSearchPanel", () => {
                     store.getState().userPreferences.savedFilterPresets
                 ).toHaveLength(0);
             });
+        });
+
+        it("expands the inline delete button to a 44px coarse-pointer target", async () => {
+            const preset: SavedFilterPresetState = {
+                id: "preset-touch",
+                name: "Touch preset",
+                boardId: "project-1",
+                filterState: {
+                    taskName: "",
+                    coordinatorId: "",
+                    type: "",
+                    lens: ""
+                },
+                createdAt: 1
+            };
+            renderPanel({ initialPresets: [preset] });
+            const presetSelect = screen.getByLabelText(
+                microcopy.board.presets.loadAriaLabel as string
+            ) as HTMLElement;
+            const selector =
+                presetSelect
+                    .closest(".ant-select")
+                    ?.querySelector(".ant-select-selector") ?? presetSelect;
+            fireEvent.mouseDown(selector as HTMLElement);
+            const deleteButton = await screen.findByLabelText(
+                /Delete preset Touch preset/i
+            );
+            const styledClass = styledClassFor(deleteButton);
+            expect(styledClass).toBeTruthy();
+            const { heights, widths } = coarseTouchTargetsFor(
+                styledClass ?? ""
+            );
+            expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+            expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
         });
 
         it("scopes presets to the current board (project) plus globals", async () => {

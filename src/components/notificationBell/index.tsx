@@ -283,6 +283,9 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             detents={["medium", "large"]}
             desktopPlacement="right"
             desktopSize="default"
+            closeAriaLabel={microcopyString(
+                microcopy.notifications.drawerCloseLabel
+            )}
             onClose={onClose}
             open={open}
             title={

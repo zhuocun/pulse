@@ -60,6 +60,7 @@ export interface ResponsiveFormSheetProps {
 
     /* -- Shared -------------------------------------------------------- */
     closable?: boolean;
+    closeAriaLabel?: string;
     maskClosable?: boolean;
     "data-testid"?: string;
     ariaLabelledBy?: string;
@@ -83,6 +84,7 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
     defaultDetent = "medium",
     showGrabber,
     closable,
+    closeAriaLabel,
     maskClosable,
     "data-testid": dataTestid,
     ariaLabelledBy,
@@ -103,6 +105,7 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
                 title={title}
                 footer={footer}
                 closable={closable}
+                closeAriaLabel={closeAriaLabel}
                 maskClosable={maskClosable}
                 data-testid={dataTestid}
                 ariaLabelledBy={ariaLabelledBy}

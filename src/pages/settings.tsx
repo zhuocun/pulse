@@ -235,11 +235,14 @@ const SettingsPage = () => {
         <Button
             aria-label={microcopy.actions.logOut}
             danger
+            icon={<LogoutOutlined aria-hidden />}
             onClick={() => {
                 logout();
             }}
             type="text"
-        />
+        >
+            {microcopy.actions.logOut}
+        </Button>
     );
 
     if (isPhone) {
@@ -297,10 +300,13 @@ const SettingsPage = () => {
                     header={microcopy.settings.sections.account.header}
                 >
                     <SettingsRow
-                        control={logoutControl}
                         data-testid="settings-row-logout"
+                        destructive
                         icon={logoutIcon}
                         label={microcopy.actions.logOut}
+                        onActivate={() => {
+                            logout();
+                        }}
                     />
                 </SettingsSection>
             </PageContainer>

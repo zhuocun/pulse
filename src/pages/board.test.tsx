@@ -717,8 +717,10 @@ describe("BoardPage", () => {
             mockedUseIsPhoneChrome.mockReturnValue(true);
             renderBoard();
 
-            await screen.findByText("Roadmap");
-
+            const phoneTitle = await screen.findByTestId("phone-board-title");
+            await waitFor(() => {
+                expect(phoneTitle).toHaveTextContent("BoardRoadmap");
+            });
             const cluster = await screen.findByTestId("board-actions-cluster");
             // MemberPopover trigger is clustered.
             expect(cluster).toContainElement(

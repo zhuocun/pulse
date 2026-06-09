@@ -281,6 +281,7 @@ export const enSource = {
     nav: {
         primaryLandmarkLabel: "Primary",
         desktopNavLabel: "Primary navigation",
+        inboxTabAriaLabel: "Inbox, mentions and activity",
         tabs: {
             boards: "Boards",
             inbox: "Inbox",
@@ -851,6 +852,7 @@ export const enSource = {
         triggerLabel: "Trash",
         triggerAriaLabel: "Open trash",
         drawerTitle: "Trash",
+        loading: "Loading trashed tasks…",
         empty: {
             title: "Trash is empty",
             description:
@@ -870,6 +872,7 @@ export const enSource = {
         triggerLabel: "Archive",
         triggerAriaLabel: "Open archive",
         drawerTitle: "Archive",
+        loading: "Loading archived tasks…",
         empty: {
             title: "Archive is empty",
             description:

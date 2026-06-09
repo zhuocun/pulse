@@ -470,9 +470,7 @@ const ProjectSearchPanel: React.FC<Props> = ({
                             ]}
                             placeholder={microcopy.placeholders.manager}
                             style={{ width: "100%" }}
-                            value={
-                                loading ? undefined : (managerName ?? undefined)
-                            }
+                            value={param.managerId || undefined}
                         />
                     </FlexSelect>
                     {onFavoritedOnlyChange ? (
