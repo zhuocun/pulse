@@ -632,10 +632,17 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     const shortcutText = isMacLike() ? "Cmd+K" : "Ctrl+K";
+    const isMobile = !screens.md;
+    /*
+     * The full nav placeholder enumerates every entry kind and clips
+     * inside the phone search capsule, so narrow viewports get a short
+     * variant instead.
+     */
     const placeholder = aiMode
         ? microcopy.placeholders.commandPaletteAi
-        : microcopy.placeholders.commandPaletteNav;
-    const isMobile = !screens.md;
+        : isMobile
+          ? microcopy.placeholders.commandPaletteNavShort
+          : microcopy.placeholders.commandPaletteNav;
     const resultCount = visible.length;
 
     const renderSearchField = () => (

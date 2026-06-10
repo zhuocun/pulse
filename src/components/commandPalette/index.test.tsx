@@ -159,6 +159,17 @@ describe("CommandPalette", () => {
         expect(sublabelRuleText).toContain("overflow-wrap: anywhere");
     });
 
+    it("uses the full nav placeholder on desktop", async () => {
+        renderPalette(true);
+        const input = (await screen.findByRole("combobox")).querySelector(
+            "input"
+        ) as HTMLInputElement;
+        expect(input).toHaveAttribute(
+            "placeholder",
+            microcopy.placeholders.commandPaletteNav
+        );
+    });
+
     it("filters results as the user types", async () => {
         renderPalette(true);
         const input = await screen.findByRole("combobox");
@@ -564,6 +575,17 @@ describe("CommandPalette", () => {
                 ).toBeGreaterThan(0);
                 expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
             });
+        });
+
+        it("uses the short nav placeholder so the capsule field does not clip it", async () => {
+            renderPalette(true);
+            const input = (await screen.findByRole("combobox")).querySelector(
+                "input"
+            ) as HTMLInputElement;
+            expect(input).toHaveAttribute(
+                "placeholder",
+                microcopy.placeholders.commandPaletteNavShort
+            );
         });
 
         it("keeps the sparkle AI-mode toggle working on phone", async () => {

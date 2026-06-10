@@ -369,6 +369,7 @@ const zhCN: Dictionary = {
         notesAcceptanceCriteria: "备注 / 验收标准",
         chatAsk: "提出问题…(Shift+Enter 换行)",
         commandPaletteNav: "搜索项目、任务、列、成员…",
+        commandPaletteNavShort: "搜索 Pulse…",
         commandPaletteAi: "向看板 Copilot 提问…",
         taskPromptExample: "例如:排查 Safari 上偶发的登录失败,影响 v2 发布",
         describeWork: "用您自己的话描述这项工作"
