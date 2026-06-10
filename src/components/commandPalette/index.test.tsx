@@ -503,9 +503,7 @@ describe("CommandPalette", () => {
                 screen.getByText(microcopy.commandPalette.kindLabels.section)
             ).toBeInTheDocument();
             expect(screen.getAllByText("Members").length).toBeGreaterThan(0);
-            expect(screen.getAllByText("Milestones").length).toBeGreaterThan(
-                0
-            );
+            expect(screen.getAllByText("Milestones").length).toBeGreaterThan(0);
         });
 
         it("navigates to the project section route when a section entry is picked", async () => {
@@ -570,9 +568,9 @@ describe("CommandPalette", () => {
             const inputEl = combo.querySelector("input") as HTMLInputElement;
             fireEvent.change(inputEl, { target: { value: "road" } });
             await waitFor(() => {
-                expect(
-                    screen.getAllByText("Roadmap").length
-                ).toBeGreaterThan(0);
+                expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(
+                    0
+                );
                 expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
             });
         });

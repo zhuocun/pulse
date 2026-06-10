@@ -207,9 +207,7 @@ describe("ProjectDetailPage", () => {
                 );
             const styleRules = Array.from(document.styleSheets)
                 .flatMap((sheet) => Array.from(sheet.cssRules))
-                .filter(
-                    (rule): rule is CSSStyleRule => "selectorText" in rule
-                );
+                .filter((rule): rule is CSSStyleRule => "selectorText" in rule);
             // Stylis serializes the child combinator without spaces
             // ("a>span"), so match it with a whitespace-tolerant regex.
             const spanSelector =
@@ -330,9 +328,9 @@ describe("ProjectDetailPage", () => {
             renderDetail("/projects/project-1/labels");
 
             const board = screen.getByRole("link", { name: "Board" });
-            const linkRuleText = ruleTextsFor(
-                styledClassFor(board) ?? ""
-            ).join("\n");
+            const linkRuleText = ruleTextsFor(styledClassFor(board) ?? "").join(
+                "\n"
+            );
             expect(linkRuleText).toContain("flex: 0 0 auto");
             expect(linkRuleText).toContain("white-space: nowrap");
         });
