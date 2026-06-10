@@ -6,6 +6,7 @@ import type { RefObject } from "react";
 import { microcopy } from "../../constants/microcopy";
 import { fontSize } from "../../theme/tokens";
 import type { AgentHealthStatus } from "../../utils/hooks/useAgentHealth";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
 import { ComposerControlRow } from "./aiChatDrawerStyles";
 
@@ -49,6 +50,12 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
         if (isLoading) return;
         onSend();
     };
+    /*
+     * Coarse-pointer chrome has no hardware keyboard, so the
+     * "(Shift+Enter for a new line)" hint reads as noise there — touch
+     * users get the hint-less placeholder variant instead.
+     */
+    const isPhoneChrome = useIsPhoneChrome();
     return (
         <>
             <ComposerControlRow data-testid="ai-chat-composer-row">
@@ -66,7 +73,11 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
                         e.preventDefault();
                         handleSubmit();
                     }}
-                    placeholder={microcopy.placeholders.chatAsk}
+                    placeholder={
+                        isPhoneChrome
+                            ? microcopy.placeholders.chatAskTouch
+                            : microcopy.placeholders.chatAsk
+                    }
                     ref={inputRef}
                     value={input}
                 />

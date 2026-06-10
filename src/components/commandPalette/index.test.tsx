@@ -135,13 +135,17 @@ describe("CommandPalette", () => {
         expect(combo).toBeInTheDocument();
         const list = screen.getByRole("listbox");
         expect(list).toBeInTheDocument();
-        expect(screen.getByText("Roadmap")).toBeInTheDocument();
-        expect(screen.getByText("Marketing")).toBeInTheDocument();
+        // Project names surface both as the project entry's label and as
+        // its section entries' sublabels.
+        expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Marketing").length).toBeGreaterThan(0);
     });
 
     it("lets long entry labels and sublabels wrap instead of widening result rows", async () => {
         renderPalette(true);
-        const label = await screen.findByText("Roadmap");
+        // First match in DOM order is the project entry's label (projects
+        // are indexed before their section entries).
+        const label = (await screen.findAllByText("Roadmap"))[0];
         const sublabel = screen.getAllByText("Acme")[0];
 
         const labelRuleText = ruleTextsFor(styledClassFor(label) ?? "").join(
@@ -155,13 +159,63 @@ describe("CommandPalette", () => {
         expect(sublabelRuleText).toContain("overflow-wrap: anywhere");
     });
 
+    it("uses the full nav placeholder on desktop", async () => {
+        renderPalette(true);
+        const input = (await screen.findByRole("combobox")).querySelector(
+            "input"
+        ) as HTMLInputElement;
+        expect(input).toHaveAttribute(
+            "placeholder",
+            microcopy.placeholders.commandPaletteNav
+        );
+    });
+
+    it("shows the Cmd/Ctrl+K shortcut hint in the title on fine-pointer chrome", async () => {
+        renderPalette(true);
+        await screen.findByRole("combobox");
+        expect(screen.getByText(/^(Cmd|Ctrl)\+K$/)).toBeInTheDocument();
+    });
+
+    it("hides the Cmd/Ctrl+K hint on coarse-pointer (touch) chrome", async () => {
+        // Touch laptop / tablet shape: wide viewport (Modal branch) but
+        // a coarse primary pointer — no hardware-keyboard hint.
+        const original = window.matchMedia;
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) => ({
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches:
+                    query.includes("min-width") ||
+                    query.includes("pointer: coarse"),
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            })
+        });
+        try {
+            renderPalette(true);
+            await screen.findByRole("combobox");
+            expect(
+                screen.queryByText(/^(Cmd|Ctrl)\+K$/)
+            ).not.toBeInTheDocument();
+        } finally {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: original
+            });
+        }
+    });
+
     it("filters results as the user types", async () => {
         renderPalette(true);
         const input = await screen.findByRole("combobox");
         const inputEl = input.querySelector("input") as HTMLInputElement;
         fireEvent.change(inputEl, { target: { value: "road" } });
         await waitFor(() => {
-            expect(screen.getByText("Roadmap")).toBeInTheDocument();
+            expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0);
             expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
         });
     });
@@ -217,7 +271,7 @@ describe("CommandPalette", () => {
         ) as HTMLInputElement;
         fireEvent.change(input, { target: { value: "road" } });
         await waitFor(() => {
-            expect(screen.getByText("Roadmap")).toBeInTheDocument();
+            expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0);
         });
         fireEvent.keyDown(input, { key: "Enter" });
         // onClose called by enter path
@@ -449,6 +503,72 @@ describe("CommandPalette", () => {
         });
     });
 
+    describe("project section entries", () => {
+        const LocationProbe = () => {
+            const location = useLocation();
+            return <div data-testid="location">{location.pathname}</div>;
+        };
+
+        const renderPaletteWithProbe = () => {
+            const qc = seedClient();
+            return render(
+                <Provider store={store}>
+                    <QueryClientProvider client={qc}>
+                        <MemoryRouter initialEntries={["/start"]}>
+                            <Routes>
+                                <Route
+                                    path="*"
+                                    element={
+                                        <>
+                                            <CommandPalette
+                                                onClose={jest.fn()}
+                                                open
+                                            />
+                                            <LocationProbe />
+                                        </>
+                                    }
+                                />
+                            </Routes>
+                        </MemoryRouter>
+                    </QueryClientProvider>
+                </Provider>
+            );
+        };
+
+        it("indexes Members / Milestones / Labels / Reports per project under a section group", async () => {
+            renderPaletteWithProbe();
+            await screen.findByRole("combobox");
+            expect(
+                screen.getByText(microcopy.commandPalette.kindLabels.section)
+            ).toBeInTheDocument();
+            expect(screen.getAllByText("Members").length).toBeGreaterThan(0);
+            expect(screen.getAllByText("Milestones").length).toBeGreaterThan(0);
+        });
+
+        it("navigates to the project section route when a section entry is picked", async () => {
+            renderPaletteWithProbe();
+            const input = (await screen.findByRole("combobox")).querySelector(
+                "input"
+            ) as HTMLInputElement;
+            fireEvent.change(input, { target: { value: "milestones" } });
+            await waitFor(() => {
+                expect(
+                    screen.getAllByText("Milestones").length
+                ).toBeGreaterThan(0);
+            });
+            // The sublabel carries the project name, so it pins which
+            // project's Milestones entry this row belongs to.
+            const row = screen.getByText("Roadmap").closest("li");
+            expect(row).not.toBeNull();
+            fireEvent.click(row as HTMLElement);
+            await waitFor(() => {
+                expect(screen.getByTestId("location").textContent).toBe(
+                    "/projects/p1/milestones"
+                );
+            });
+        });
+    });
+
     describe("phone bottom-anchored search (CP-R5 / iOS 26 Liquid Glass)", () => {
         beforeAll(() => {
             installPhoneMocks();
@@ -464,7 +584,7 @@ describe("CommandPalette", () => {
             const combo = await screen.findByRole("combobox");
             expect(combo).toBeInTheDocument();
             expect(screen.getByRole("listbox")).toBeInTheDocument();
-            expect(screen.getByText("Roadmap")).toBeInTheDocument();
+            expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0);
         });
 
         it("pins the search input BELOW the results in DOM order (results grow above the thumb-anchored field)", async () => {
@@ -487,9 +607,22 @@ describe("CommandPalette", () => {
             const inputEl = combo.querySelector("input") as HTMLInputElement;
             fireEvent.change(inputEl, { target: { value: "road" } });
             await waitFor(() => {
-                expect(screen.getByText("Roadmap")).toBeInTheDocument();
+                expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(
+                    0
+                );
                 expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
             });
+        });
+
+        it("uses the short nav placeholder so the capsule field does not clip it", async () => {
+            renderPalette(true);
+            const input = (await screen.findByRole("combobox")).querySelector(
+                "input"
+            ) as HTMLInputElement;
+            expect(input).toHaveAttribute(
+                "placeholder",
+                microcopy.placeholders.commandPaletteNavShort
+            );
         });
 
         it("keeps the sparkle AI-mode toggle working on phone", async () => {

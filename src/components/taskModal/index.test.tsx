@@ -366,6 +366,40 @@ describe("TaskModal", () => {
         expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
     });
 
+    it("normalizes an out-of-vocabulary task type to 'Task' in the select and the title tag", async () => {
+        renderModal({
+            initialTasks: [task({ epic: "Auth", type: "feature" })]
+        });
+
+        expect(
+            await screen.findByText(/edit task · build task/i)
+        ).toBeInTheDocument();
+        // The raw wire value must not leak into any control — the card
+        // coerces it to "Task", so the modal has to agree.
+        expect(screen.queryByText("feature")).not.toBeInTheDocument();
+        // Both the title tag and the type select read the canonical label.
+        expect(
+            screen.getAllByText(microcopy.options.taskTypes.task as string)
+                .length
+        ).toBeGreaterThanOrEqual(2);
+    });
+
+    it("saves an untouched legacy-type task without firing a needless PUT", async () => {
+        renderModal({
+            initialTasks: [task({ epic: "Auth", type: "feature" })]
+        });
+
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() =>
+            expect(store.getState().overlays.editingTaskId).toBe(null)
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("closes without mutation when submitted values are unchanged", async () => {
         renderModal();
 

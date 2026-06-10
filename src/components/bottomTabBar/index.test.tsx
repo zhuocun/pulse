@@ -793,6 +793,24 @@ describe("BottomTabBar", () => {
             expect(nav.getAttribute("data-minimized")).toBe("false");
         });
 
+        it("restores data-minimized='false' after navigating to another tab (no cross-route latch)", async () => {
+            const user = userEvent.setup();
+            renderBar("/projects");
+            const nav = screen.getByTestId("bottom-tab-bar");
+            act(() => {
+                setScrollY(120);
+                fireScroll();
+            });
+            expect(nav.getAttribute("data-minimized")).toBe("true");
+            await user.click(
+                screen.getByRole("link", {
+                    name: new RegExp(microcopy.nav.tabs.inbox, "i")
+                })
+            );
+            expect(screen.getByTestId("loc")).toHaveTextContent("/inbox");
+            expect(nav.getAttribute("data-minimized")).toBe("false");
+        });
+
         it("does NOT toggle on small scroll deltas below the threshold (hysteresis)", () => {
             renderBar();
             const nav = screen.getByTestId("bottom-tab-bar");

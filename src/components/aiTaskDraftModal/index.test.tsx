@@ -165,6 +165,19 @@ describe("AiTaskDraftModal", () => {
         expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
     });
 
+    it("shows the Cmd/Ctrl+Enter draft hint on fine-pointer chrome", async () => {
+        mountModal();
+        await screen.findByRole("dialog");
+        expect(screen.getByText(/to draft\./)).toBeInTheDocument();
+    });
+
+    it("hides the hardware-keyboard draft hint on coarse-pointer (touch) chrome", async () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        mountModal();
+        await screen.findByRole("dialog");
+        expect(screen.queryByText(/to draft\./)).not.toBeInTheDocument();
+    });
+
     it("disables the Draft button until a prompt is entered", async () => {
         mountModal();
         expect(screen.getByLabelText("Draft task with Copilot")).toBeDisabled();

@@ -264,6 +264,30 @@ describe("Header", () => {
                 screen.getByRole("link", { name: /boards/i })
             ).toHaveAttribute("aria-current", "page");
         });
+
+        it("keeps the active tab visible in forced-colors mode via a system-color border", () => {
+            renderHeader("/projects");
+            // Forced-colors strips the translucent active-pill background,
+            // so the NavTab re-draws the pill with a CanvasText border. The
+            // sheet is walked directly because jsdom does not evaluate
+            // media queries via getComputedStyle.
+            const css = Array.from(document.styleSheets)
+                .map((sheet) => {
+                    let rules: CSSRuleList;
+                    try {
+                        rules = sheet.cssRules;
+                    } catch {
+                        return "";
+                    }
+                    return Array.from(rules)
+                        .map((rule) => rule.cssText)
+                        .join("\n");
+                })
+                .join("\n");
+            expect(css).toMatch(
+                /forced-colors:\s*active[\s\S]*?\[aria-current="page"\][^}]*border:\s*1px solid CanvasText/
+            );
+        });
     });
 
     it("hosts a single EngineModeTag in the app chrome when AI is enabled (Cross-cutting #8 dedup)", () => {

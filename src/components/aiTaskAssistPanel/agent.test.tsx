@@ -49,6 +49,7 @@ jest.mock("../../constants/env", () => ({
 }));
 
 // eslint-disable-next-line simple-import-sort/imports
+import { microcopy } from "../../constants/microcopy";
 import { streamAgent } from "../../utils/ai/agentClient";
 import {
     acknowledgeRemoteAi,
@@ -350,6 +351,41 @@ describe("AiTaskAssistPanel — remote agent path", () => {
             }),
             expect.objectContaining({ autonomy: "plan" })
         );
+    });
+
+    it("collapses both suggestion sections while remote consent is pending, then restores them on acknowledgement", () => {
+        resetRemoteAiConsentForTests();
+        const start = jest.fn().mockResolvedValue(undefined);
+        renderPanel({ start });
+
+        // Consent notice owns the panel — no bare headings over
+        // permanently-empty bodies, and no remote request fires.
+        expect(
+            screen.getByText(microcopy.ai.remoteConsentTitle)
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(microcopy.ai.suggestedStoryPoints)
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(microcopy.ai.readinessCheck)
+        ).not.toBeInTheDocument();
+        expect(start).not.toHaveBeenCalled();
+
+        act(() => {
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.ai.remoteConsentAccept
+                })
+            );
+        });
+
+        expect(
+            screen.getByText(microcopy.ai.suggestedStoryPoints)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(microcopy.ai.readinessCheck)
+        ).toBeInTheDocument();
+        expect(start).toHaveBeenCalled();
     });
 
     it("does not restart the remote agent when unrelated tasks cache updates leave the draft unchanged", async () => {

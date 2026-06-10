@@ -136,6 +136,23 @@ const RemoveButton = styled(Button)`
     }
 `;
 
+/*
+ * AntD's light-mode gold Tag pairs #d48806 ink with the #fffbe6 fill —
+ * 2.8:1, failing WCAG AA for the 12px badge label. Darken the ink to
+ * gold-9 (#874d00, ~6.5:1 on the same fill) in light mode only; the
+ * dark algorithm's gold pairing already clears AA.
+ *
+ * Triple `&` is load-bearing: AntD's own ink rule is
+ * `:where(.css-x).ant-tag.ant-tag-gold:not(.ant-tag-disabled).ant-tag-filled`
+ * — specificity (0,4,0) — so the override needs (0,4,1) to win the
+ * cascade (a double `&` at (0,3,1) silently loses).
+ */
+const ManagerBadge = styled(Tag)`
+    html:not([data-color-scheme="dark"]) &&& {
+        color: #874d00;
+    }
+`;
+
 const AddSection = styled.div`
     border-top: 1px solid
         var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
@@ -389,14 +406,14 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
                                 </Identity>
                                 <Controls>
                                     {isManager ? (
-                                        <Tag
+                                        <ManagerBadge
                                             color="gold"
                                             data-testid="member-manager-badge"
                                         >
                                             {microcopyString(
                                                 microcopy.members.managerBadge
                                             )}
-                                        </Tag>
+                                        </ManagerBadge>
                                     ) : null}
                                     {canManage && !isManager ? (
                                         <RoleSelect

@@ -197,6 +197,64 @@ describe("ProjectMembersManager", () => {
         expect(within(managerRow).getByTestId("member-remove")).toBeDisabled();
     });
 
+    it("darkens the gold manager badge ink to an AA-safe gold-9 in light mode", () => {
+        renderManager();
+        const badge = within(rowFor(MANAGER_ID)).getByTestId(
+            "member-manager-badge"
+        );
+        // styled-components hashes the rule into a class like `css-mcde2a`
+        // (skipping AntD's `css-var-root` / `css-dev-only-...` markers).
+        const styledCls = badge.className
+            .split(/\s+/)
+            .find(
+                (tok) =>
+                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
+                    !tok.startsWith("css-var-") &&
+                    !tok.startsWith("css-dev-only-")
+            );
+        expect(styledCls).toBeTruthy();
+
+        // The AA ink must be declared inside a light-mode-scoped rule
+        // (`html:not([data-color-scheme="dark"]) …`) so the dark
+        // algorithm's gold pairing stays untouched.
+        const lightModeRules: string[] = [];
+        const visit = (rule: CSSRule) => {
+            if (rule instanceof CSSStyleRule) {
+                if (!styledCls || !rule.selectorText.includes(styledCls))
+                    return;
+                if (
+                    rule.selectorText.includes(
+                        'html:not([data-color-scheme="dark"])'
+                    )
+                ) {
+                    lightModeRules.push(rule.cssText);
+                }
+                return;
+            }
+            const grouping = rule as CSSGroupingRule;
+            if (grouping.cssRules) {
+                Array.from(grouping.cssRules).forEach(visit);
+            }
+        };
+        Array.from(document.styleSheets).forEach((sheet) => {
+            Array.from(sheet.cssRules).forEach(visit);
+        });
+
+        const aaInkRule = lightModeRules.find((cssText) =>
+            /color:\s*(?:#874d00|rgb\(135,\s*77,\s*0\))/i.test(cssText)
+        );
+        expect(aaInkRule).toBeTruthy();
+
+        // Specificity guard: AntD's gold-filled ink rule computes (0,4,0)
+        // (`.ant-tag.ant-tag-gold:not(.ant-tag-disabled).ant-tag-filled`),
+        // so the override must repeat the styled class three times to
+        // reach (0,4,1) — a double `&` loses the cascade and the badge
+        // silently stays at the 2.8:1 stock ink.
+        const classRepeats =
+            aaInkRule!.split("{")[0].split(`.${styledCls}`).length - 1;
+        expect(classRepeats).toBeGreaterThanOrEqual(3);
+    });
+
     it("renders the roster read-only for a non-owner", () => {
         setUser("user-bob"); // editor → cannot manage
         renderManager();

@@ -205,14 +205,22 @@ describe("ProjectDetailPage", () => {
                         ".ant-breadcrumb li:first-child a"
                     )
                 );
-            const middleCrumbRule = Array.from(document.styleSheets)
+            const styleRules = Array.from(document.styleSheets)
                 .flatMap((sheet) => Array.from(sheet.cssRules))
-                .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
-                .find((rule) =>
+                .filter((rule): rule is CSSStyleRule => "selectorText" in rule);
+            // Stylis serializes the child combinator without spaces
+            // ("a>span"), so match it with a whitespace-tolerant regex.
+            const spanSelector =
+                /\.ant-breadcrumb li:not\(:first-child\):not\(:last-child\) a\s*>\s*span/;
+            const middleCrumbAnchorRule = styleRules.find(
+                (rule) =>
                     rule.selectorText.includes(
                         ".ant-breadcrumb li:not(:first-child):not(:last-child) a"
-                    )
-                );
+                    ) && !spanSelector.test(rule.selectorText)
+            );
+            const middleCrumbSpanRule = styleRules.find((rule) =>
+                spanSelector.test(rule.selectorText)
+            );
 
             expect(breadcrumbRuleText).toContain(
                 ".ant-breadcrumb li:first-child"
@@ -220,22 +228,42 @@ describe("ProjectDetailPage", () => {
             expect(rootCrumbRule?.style.getPropertyValue("flex-shrink")).toBe(
                 "0"
             );
-            expect(middleCrumbRule).toBeDefined();
-            expect(middleCrumbRule?.style.getPropertyValue("max-width")).toBe(
-                "100%"
-            );
-            expect(middleCrumbRule?.style.getPropertyValue("min-width")).toBe(
-                "0"
-            );
-            expect(middleCrumbRule?.style.getPropertyValue("overflow")).toBe(
-                "hidden"
-            );
+            // The anchor stays the sized flex box (touch target +
+            // clipping)…
+            expect(middleCrumbAnchorRule).toBeDefined();
             expect(
-                middleCrumbRule?.style.getPropertyValue("text-overflow")
+                middleCrumbAnchorRule?.style.getPropertyValue("display")
+            ).toBe("inline-flex");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("max-width")
+            ).toBe("100%");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("min-width")
+            ).toBe("0");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("overflow")
+            ).toBe("hidden");
+            // …while the ellipsis lives on the inner span, because
+            // text-overflow cannot ellipsize a flex container's contents.
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("text-overflow")
+            ).toBe("");
+            expect(middleCrumbSpanRule).toBeDefined();
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("text-overflow")
             ).toBe("ellipsis");
-            expect(middleCrumbRule?.style.getPropertyValue("white-space")).toBe(
-                "nowrap"
-            );
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("overflow")
+            ).toBe("hidden");
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("white-space")
+            ).toBe("nowrap");
+            // The project-name link wraps its text in the inner span the
+            // ellipsis rule targets.
+            const projectLink = screen.getByRole("link", {
+                name: mockProjectName
+            });
+            expect(projectLink.querySelector("span")).not.toBeNull();
         });
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {
@@ -243,6 +271,76 @@ describe("ProjectDetailPage", () => {
             const css = sheetText();
             expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
             expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+    });
+
+    describe("phone chrome section navigation", () => {
+        const desktopMatchMedia = window.matchMedia;
+
+        beforeAll(() => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: (query: string) => ({
+                    addEventListener: jest.fn(),
+                    addListener: jest.fn(),
+                    dispatchEvent: jest.fn(),
+                    matches: query === "(pointer: coarse)",
+                    media: query,
+                    onchange: null,
+                    removeEventListener: jest.fn(),
+                    removeListener: jest.fn()
+                })
+            });
+        });
+
+        afterAll(() => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: desktopMatchMedia
+            });
+        });
+
+        it("renders the child nav as a horizontally scrollable row on phone chrome", () => {
+            renderDetail("/projects/project-1/labels");
+
+            const nav = screen.getByTestId("project-detail-child-nav");
+            for (const name of [
+                "Board",
+                "Members",
+                "Milestones",
+                "Labels",
+                "Reports"
+            ]) {
+                expect(within(nav).getByRole("link", { name })).toHaveAttribute(
+                    "href",
+                    expect.stringContaining("/projects/project-1/")
+                );
+            }
+
+            const navRuleText = ruleTextsFor(styledClassFor(nav) ?? "").join(
+                "\n"
+            );
+            expect(navRuleText).toContain("overflow-x: auto");
+            expect(navRuleText).toContain("flex: 1 1 100%");
+        });
+
+        it("keeps nav links pan-friendly: fixed-size segments that never wrap", () => {
+            renderDetail("/projects/project-1/labels");
+
+            const board = screen.getByRole("link", { name: "Board" });
+            const linkRuleText = ruleTextsFor(styledClassFor(board) ?? "").join(
+                "\n"
+            );
+            expect(linkRuleText).toContain("flex: 0 0 auto");
+            expect(linkRuleText).toContain("white-space: nowrap");
+        });
+
+        it("still hides the whole chrome on the phone board route", () => {
+            renderDetail("/projects/project-1/board");
+
+            expect(
+                screen.queryByTestId("project-detail-chrome")
+            ).not.toBeInTheDocument();
         });
     });
 });

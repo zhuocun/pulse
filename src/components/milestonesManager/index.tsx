@@ -484,6 +484,11 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                     ) : null}
                                 </Identity>
                                 <Controls>
+                                    {/* One state control per row: managers
+                                     * get the Select (which already shows
+                                     * the current state), read-only viewers
+                                     * get the Tag. Rendering both would
+                                     * duplicate the state callout. */}
                                     {canManage ? (
                                         <StateSelect
                                             aria-label={microcopyString(
@@ -504,17 +509,18 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     : "open"
                                             }
                                         />
-                                    ) : null}
-                                    <Tag
-                                        color={
-                                            milestone.state === "closed"
-                                                ? "default"
-                                                : "green"
-                                        }
-                                        data-testid="milestone-state-tag"
-                                    >
-                                        {stateLabel(milestone.state)}
-                                    </Tag>
+                                    ) : (
+                                        <Tag
+                                            color={
+                                                milestone.state === "closed"
+                                                    ? "default"
+                                                    : "green"
+                                            }
+                                            data-testid="milestone-state-tag"
+                                        >
+                                            {stateLabel(milestone.state)}
+                                        </Tag>
+                                    )}
                                     {canManage ? (
                                         <>
                                             <IconButton

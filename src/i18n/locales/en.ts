@@ -409,7 +409,9 @@ export const enSource = {
         whatNeedsToBeDone: "What needs to be done?",
         notesAcceptanceCriteria: "Notes / acceptance criteria",
         chatAsk: "Ask a question… (Shift+Enter for a new line)",
+        chatAskTouch: "Ask a question…",
         commandPaletteNav: "Search projects, tasks, columns, members…",
+        commandPaletteNavShort: "Search Pulse…",
         commandPaletteAi: "Ask Board Copilot…",
         taskPromptExample:
             "e.g. Investigate flaky login on Safari, blocks v2 release",
@@ -1633,12 +1635,14 @@ export const enSource = {
         title: "Command palette",
         kindLabels: {
             project: "Projects",
+            section: "Project sections",
             task: "Tasks",
             column: "Columns",
             member: "Members"
         },
         kindTags: {
             project: "Project",
+            section: "Section",
             task: "Task",
             column: "Column",
             member: "Member"

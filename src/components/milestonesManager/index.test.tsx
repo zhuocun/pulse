@@ -186,7 +186,7 @@ describe("MilestonesManager", () => {
         expect(screen.queryByTestId("milestone-row")).not.toBeInTheDocument();
     });
 
-    it("renders a row per milestone with name, state tag, and dates", () => {
+    it("renders a row per milestone with name, state control, and dates", () => {
         renderManager();
         expect(screen.getByTestId("milestones-manager")).toBeInTheDocument();
         const rows = screen.getAllByTestId("milestone-row");
@@ -195,15 +195,20 @@ describe("MilestonesManager", () => {
         const first = rowFor("ms-1");
         expect(within(first).getByText("v1 launch")).toBeInTheDocument();
         expect(within(first).getByText("Ship the MVP")).toBeInTheDocument();
+        // Managers see ONE state control — the Select (which already
+        // displays the current state). No duplicate Tag beside it.
         expect(
-            within(first).getByTestId("milestone-state-tag")
+            within(first).getByTestId("milestone-state-select")
         ).toHaveTextContent(microcopy.milestones.states.open);
+        expect(
+            within(first).queryByTestId("milestone-state-tag")
+        ).not.toBeInTheDocument();
         expect(
             within(first).getByTestId("milestone-date-range")
         ).toHaveTextContent("2026-01-01 → 2026-03-01");
 
         expect(
-            within(rowFor("ms-2")).getByTestId("milestone-state-tag")
+            within(rowFor("ms-2")).getByTestId("milestone-state-select")
         ).toHaveTextContent(microcopy.milestones.states.closed);
     });
 
@@ -341,7 +346,7 @@ describe("MilestonesManager", () => {
             "添加里程碑"
         );
         expect(
-            within(rowFor("ms-2")).getByTestId("milestone-state-tag")
+            within(rowFor("ms-2")).getByTestId("milestone-state-select")
         ).toHaveTextContent("已关闭");
     });
 

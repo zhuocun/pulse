@@ -228,9 +228,30 @@ const BreadcrumbWrapper = styled.div`
     &&
         .ant-breadcrumb
         li:not(:first-child):not(:last-child)
-        .ant-breadcrumb-link,
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
+        .ant-breadcrumb-link {
         max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    /*
+     * The project-name anchor is inline-flex (it carries the 44 px
+     * coarse-pointer touch target below), and text-overflow does not
+     * ellipsize the contents of a flex container — the glyphs hard-clip
+     * at the box edge instead. Keep the anchor as the sized/clipped
+     * flex box and move the ellipsis onto the inner span, which as a
+     * min-width: 0 flex item truncates correctly.
+     */
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
+        align-items: center;
+        display: inline-flex;
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) a > span {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -273,22 +294,48 @@ const Body = styled.div`
  * Keep the row inside the same TopBar so the chrome stays a single
  * sticky band; `flex-wrap: wrap` lets the breadcrumb and the nav
  * row sit side by side on wide viewports and stack on phones.
+ *
+ * On phone chrome ($scrollable) the row takes the full chrome width
+ * under the breadcrumb and pans horizontally instead of wrapping, so
+ * all five sections stay reachable on narrow viewports without the
+ * chrome growing several rows tall. The scrollbar is suppressed so
+ * the row reads as a segmented control; the links themselves are the
+ * scroll affordance.
  */
-const ChildNav = styled.nav`
+const ChildNav = styled.nav<{ $scrollable: boolean }>`
     align-items: center;
     display: flex;
     flex: 0 0 auto;
     gap: ${space.xs}px;
+
+    ${(props) =>
+        props.$scrollable
+            ? `
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    `
+            : ""}
 `;
 
 const ChildNavLink = styled(NavLink)`
     border-radius: ${radius.sm}px;
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+    /* Fixed-size segments inside the (possibly scrollable) nav row —
+     * a link must never shrink or wrap mid-label, otherwise the
+     * horizontal pan on phone chrome clips labels instead of panning. */
+    flex: 0 0 auto;
     font-size: ${fontSize.sm}px;
     font-weight: ${fontWeight.medium};
     line-height: 1.2;
     padding: ${space.xs}px ${space.sm}px;
     text-decoration: none;
+    white-space: nowrap;
     /*
      * Phase 5 "Liquid Glass" Wave 2 — gel-flex on breadcrumb tabs.
      * Mirrors the header / bottom-tab gel-flex so every interactive
@@ -438,7 +485,9 @@ const ProjectDetailPage = () => {
                      * `aria-current="page"`.
                      */
                     <Link to={`/projects/${projectId}`} viewTransition>
-                        {project?.projectName ?? microcopy.labels.project}
+                        <span>
+                            {project?.projectName ?? microcopy.labels.project}
+                        </span>
                     </Link>
                 ) : (
                     <span aria-current="page">
@@ -470,9 +519,14 @@ const ProjectDetailPage = () => {
                      * project query is in-flight to avoid a layout
                      * flicker; we surface it as soon as the project
                      * resolves so the nav row can't outlive a 404 body.
+                     * On phone chrome the row renders as a horizontally
+                     * scrollable segment strip — previously it was hidden
+                     * there entirely, leaving Members / Milestones /
+                     * Labels / Reports unreachable by touch.
                      */}
-                    {project && projectId && !isPhoneChrome ? (
+                    {project && projectId ? (
                         <ChildNav
+                            $scrollable={isPhoneChrome}
                             aria-label={microcopy.labels.projectSections}
                             data-testid="project-detail-child-nav"
                         >

@@ -368,7 +368,9 @@ const zhCN: Dictionary = {
         whatNeedsToBeDone: "需要完成什么?",
         notesAcceptanceCriteria: "备注 / 验收标准",
         chatAsk: "提出问题…(Shift+Enter 换行)",
+        chatAskTouch: "提出问题…",
         commandPaletteNav: "搜索项目、任务、列、成员…",
+        commandPaletteNavShort: "搜索 Pulse…",
         commandPaletteAi: "向看板 Copilot 提问…",
         taskPromptExample: "例如:排查 Safari 上偶发的登录失败,影响 v2 发布",
         describeWork: "用您自己的话描述这项工作"
@@ -1336,12 +1338,14 @@ const zhCN: Dictionary = {
         title: "命令面板",
         kindLabels: {
             project: "项目",
+            section: "项目分区",
             task: "任务",
             column: "列",
             member: "成员"
         },
         kindTags: {
             project: "项目",
+            section: "分区",
             task: "任务",
             column: "列",
             member: "成员"

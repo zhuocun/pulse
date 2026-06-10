@@ -593,10 +593,14 @@ const BottomTabBar: React.FC = () => {
      * Minimize-on-scroll — `down` collapses the bar; anything else
      * (idle / up) restores. The hook owns the hysteresis, the
      * min-duration lockout, and the in-flight view-transition pause.
+     * `resetKey` ties the direction to the route: a minimized bar must
+     * not latch across navigations, so every pathname change restores
+     * the full chrome.
      */
     const scrollDirection = useScrollDirection({
         threshold: 50,
-        minStateDurationMs: 300
+        minStateDurationMs: 300,
+        resetKey: location.pathname
     });
     const minimized = scrollDirection === "down";
 

@@ -39,6 +39,7 @@ import useApi from "../../utils/hooks/useApi";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useCachedQueryData from "../../utils/hooks/useCachedQueryData";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useUndoToast from "../../utils/hooks/useUndoToast";
 import useUnsavedChangesGuard from "../../utils/hooks/useUnsavedChangesGuard";
@@ -182,6 +183,11 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
     );
     const [form] = useForm();
     const undoToast = useUndoToast();
+    /*
+     * Coarse-pointer chrome has no hardware keyboard, so the
+     * "⌘⏎ / Ctrl+Enter to draft" hint reads as noise there.
+     */
+    const isPhoneChrome = useIsPhoneChrome();
     /*
      * A8 activity ledger: each drafted task that lands creates an entry
      * so the dock's session log can show + revert AI-created work even
@@ -713,12 +719,14 @@ const AiTaskDraftModal: React.FC<AiTaskDraftModalProps> = ({
                         showCount
                         value={prompt}
                     />
-                    <Typography.Text
-                        style={{ display: "block", marginTop: 4 }}
-                        type="secondary"
-                    >
-                        {isMacLike() ? "⌘⏎" : "Ctrl+Enter"} to draft.
-                    </Typography.Text>
+                    {!isPhoneChrome && (
+                        <Typography.Text
+                            style={{ display: "block", marginTop: 4 }}
+                            type="secondary"
+                        >
+                            {isMacLike() ? "⌘⏎" : "Ctrl+Enter"} to draft.
+                        </Typography.Text>
+                    )}
                 </Form.Item>
                 {!prompt.trim() && (
                     <SamplePromptList size={space.xs} wrap>

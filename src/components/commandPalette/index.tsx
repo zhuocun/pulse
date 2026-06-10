@@ -26,6 +26,7 @@ import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -43,7 +44,7 @@ interface PaletteEntry {
     id: string;
     label: string;
     sublabel?: string;
-    kind: "project" | "task" | "column" | "member";
+    kind: "project" | "section" | "task" | "column" | "member";
     href?: string;
     /**
      * Task entries carry the raw taskId + projectId so the selection
@@ -241,6 +242,18 @@ const GlassSearchCapsule = styled(GlassPanel)`
     }
 `;
 
+/*
+ * Per-project section routes indexed alongside the project itself. On
+ * phone chrome the board route hides the project breadcrumb bar, so the
+ * palette is the guaranteed way to reach these surfaces by touch.
+ */
+const PROJECT_SECTION_SEGMENTS = [
+    "members",
+    "milestones",
+    "labels",
+    "reports"
+] as const;
+
 const indexEntries = (
     projects: IProject[],
     tasks: ITask[],
@@ -257,6 +270,18 @@ const indexEntries = (
             href: `/projects/${p._id}`,
             rankBoost: 0
         });
+    }
+    for (const p of projects) {
+        for (const segment of PROJECT_SECTION_SEGMENTS) {
+            out.push({
+                id: `section:${p._id}:${segment}`,
+                label: microcopy.labels[segment],
+                sublabel: p.projectName,
+                kind: "section",
+                href: `/projects/${p._id}/${segment}`,
+                rankBoost: 1
+            });
+        }
     }
     for (const c of columns) {
         out.push({
@@ -357,6 +382,7 @@ type RenderedItem = RenderedRow | RenderedHeader;
 
 const KIND_ORDER: PaletteEntry["kind"][] = [
     "project",
+    "section",
     "task",
     "column",
     "member"
@@ -404,6 +430,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const screens = Grid.useBreakpoint();
     const keyboardOpen = useKeyboardOpen();
     const reducedMotion = useReducedMotion();
+    const isPhoneChrome = useIsPhoneChrome();
 
     const projects = useGatheredCachedList<IProject>(["projects"]);
     const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
@@ -607,10 +634,17 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     const shortcutText = isMacLike() ? "Cmd+K" : "Ctrl+K";
+    const isMobile = !screens.md;
+    /*
+     * The full nav placeholder enumerates every entry kind and clips
+     * inside the phone search capsule, so narrow viewports get a short
+     * variant instead.
+     */
     const placeholder = aiMode
         ? microcopy.placeholders.commandPaletteAi
-        : microcopy.placeholders.commandPaletteNav;
-    const isMobile = !screens.md;
+        : isMobile
+          ? microcopy.placeholders.commandPaletteNavShort
+          : microcopy.placeholders.commandPaletteNav;
     const resultCount = visible.length;
 
     const renderSearchField = () => (
@@ -806,7 +840,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
             <span style={{ fontWeight: fontWeight.semibold }}>
                 {microcopy.commandPalette.title}
             </span>
-            <Typography.Text type="secondary">{shortcutText}</Typography.Text>
+            {/* Coarse-pointer chrome has no hardware keyboard — the
+             * Cmd/Ctrl+K hint only makes sense where one exists. */}
+            {!isPhoneChrome && (
+                <Typography.Text type="secondary">
+                    {shortcutText}
+                </Typography.Text>
+            )}
         </span>
     );
 
