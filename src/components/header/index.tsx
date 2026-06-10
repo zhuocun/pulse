@@ -683,6 +683,18 @@ const NavTab = styled(NavLink)`
         font-weight: ${fontWeight.semibold};
     }
 
+    /*
+     * Forced-colors mode strips the translucent active-pill fill, leaving
+     * the current tab indistinguishable from its neighbours. Re-draw the
+     * pill geometry with a system-color border — the same "selection slot"
+     * cue BottomTabBar's indicator keeps in high-contrast.
+     */
+    @media (forced-colors: active) {
+        &[aria-current="page"] {
+            border: 1px solid CanvasText;
+        }
+    }
+
     @media (pointer: coarse) {
         height: 44px;
     }
