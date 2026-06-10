@@ -347,6 +347,76 @@ describe("TaskDetailPanel", () => {
         );
     });
 
+    it("normalizes an out-of-vocabulary task type to 'Task' in the select and the title tag", async () => {
+        const legacyTask = task({ epic: "Auth", type: "feature" });
+        fetchMock.mockImplementation(async (input) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const body = url.includes("/tasks")
+                ? [legacyTask]
+                : url.includes("/users/members")
+                  ? members
+                  : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+        renderPanelAt("/projects/project-1/board/task/task-1", {
+            initialTasks: [legacyTask]
+        });
+
+        expect(
+            await screen.findByText(/edit task · build task/i)
+        ).toBeInTheDocument();
+        // The raw wire value must not leak into any control — the card
+        // coerces it to "Task", so the panel has to agree.
+        expect(screen.queryByText("feature")).not.toBeInTheDocument();
+        // Both the title tag and the type select read the canonical label.
+        expect(
+            screen.getAllByText(microcopy.options.taskTypes.task as string)
+                .length
+        ).toBeGreaterThanOrEqual(2);
+    });
+
+    it("saves an untouched legacy-type task without firing a needless PUT", async () => {
+        const legacyTask = task({ epic: "Auth", type: "feature" });
+        fetchMock.mockImplementation(async (input) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const body = url.includes("/tasks")
+                ? [legacyTask]
+                : url.includes("/users/members")
+                  ? members
+                  : { _id: "task-1" };
+            return {
+                json: jest.fn().mockResolvedValue(body),
+                ok: true,
+                status: 200
+            } as unknown as Response;
+        });
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1",
+            { initialTasks: [legacyTask] }
+        );
+
+        expect(
+            await screen.findByDisplayValue("Build task")
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        // The dirty-check compares against the same normalized baseline
+        // the form binds, so the untouched panel closes with no PUT.
+        await waitFor(() =>
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board"
+            )
+        );
+        const putCalls = fetchMock.mock.calls.filter(
+            (call) => (call[1] as RequestInit | undefined)?.method === "PUT"
+        );
+        expect(putCalls).toHaveLength(0);
+    });
+
     it("deletes the task immediately (no confirm) and surfaces an Undo toast", async () => {
         // §2.A.4 — task delete is reversible, so it skips Modal.confirm
         // and goes straight to an optimistic DELETE + Undo toast.

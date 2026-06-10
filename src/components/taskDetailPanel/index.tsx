@@ -36,6 +36,7 @@ import {
     space
 } from "../../theme/tokens";
 import filterRequest from "../../utils/filterRequest";
+import normalizeTaskType from "../../utils/normalizeTaskType";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
@@ -170,6 +171,12 @@ type TaskFormValues = Omit<ITask, "startDate" | "dueDate"> & {
  */
 const taskToFormValues = (task: ITask): TaskFormValues => ({
     ...task,
+    // The wire `type` is an open string; the select only knows the
+    // canonical Task/Bug vocabulary. Normalize at the form boundary so
+    // an out-of-vocabulary value (e.g. "feature") binds as "Task" —
+    // matching how the board card and the title tag render it —
+    // instead of leaking the raw string into the control.
+    type: normalizeTaskType(task.type),
     startDate: toDayjsOrUndefined(task.startDate),
     dueDate: toDayjsOrUndefined(task.dueDate)
 });
@@ -220,6 +227,18 @@ const buildMergedTask = (
     merged.dueDate = merged.dueDate ?? null;
     return merged;
 };
+
+/**
+ * The form binds a NORMALIZED `type` (out-of-vocabulary values read as
+ * "Task"), so the dirty-checks must compare against the same
+ * normalization — otherwise an untouched task with a legacy type would
+ * diff as dirty and fire a needless PUT on Save. Mirrors `TaskModal`'s
+ * baseline.
+ */
+const toDirtyCheckBaseline = (task: ITask): ITask => ({
+    ...task,
+    type: normalizeTaskType(task.type)
+});
 
 const TASK_TYPE_OPTIONS = [
     { label: microcopy.options.taskTypes.task, value: "Task" },
@@ -558,10 +577,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // strips those void keys from both sides (exactly as the wire payload
         // would be) so an untouched task with no richness still compares equal
         // and closes without a needless PUT.
+        const baseline = toDirtyCheckBaseline(editingTask);
         if (
             shallowEqual(
                 filterRequest(merged as unknown as Record<string, unknown>),
-                filterRequest(editingTask as unknown as Record<string, unknown>)
+                filterRequest(baseline as unknown as Record<string, unknown>)
             )
         ) {
             closePanel();
@@ -829,10 +849,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             {editingTask ? (
                 <Tag
                     variant="filled"
-                    color={editingTask.type === "Bug" ? "magenta" : "geekblue"}
+                    color={
+                        normalizeTaskType(editingTask.type) === "Bug"
+                            ? "magenta"
+                            : "geekblue"
+                    }
                     style={{ fontWeight: 500, marginInlineEnd: 0 }}
                 >
-                    {editingTask.type === "Bug"
+                    {normalizeTaskType(editingTask.type) === "Bug"
                         ? microcopy.options.taskTypes.bug
                         : microcopy.options.taskTypes.task}
                 </Tag>
@@ -1066,15 +1090,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                          */
                         if (!editingTask) return;
                         const merged = buildMergedTask(editingTask, allValues);
+                        const baseline = toDirtyCheckBaseline(editingTask);
                         const nextDirty = !shallowEqual(
                             filterRequest(
                                 merged as unknown as Record<string, unknown>
                             ),
                             filterRequest(
-                                editingTask as unknown as Record<
-                                    string,
-                                    unknown
-                                >
+                                baseline as unknown as Record<string, unknown>
                             )
                         );
                         setIsFormDirty(nextDirty);
