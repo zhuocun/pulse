@@ -46,6 +46,7 @@ import {
 } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import { labelTagProps } from "../../utils/labelTagColor";
+import normalizeTaskType from "../../utils/normalizeTaskType";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
 import useBulkSelection from "../../utils/hooks/useBulkSelection";
 import useColumnReadiness from "../../utils/hooks/useColumnReadiness";
@@ -1241,7 +1242,9 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const selectable = selection.enabled && !isMock;
         const selected = selectable && selection.isSelected(task._id);
         const coordinator = members.find((m) => m._id === task.coordinatorId);
-        const isBug = task.type === "Bug";
+        // Shared normalizer keeps the card's Task/Bug coercion in
+        // lockstep with the task modal's select + title tag.
+        const isBug = normalizeTaskType(task.type) === "Bug";
         // Resolve the task's label ids to the project's label objects (name
         // + colour). Unknown ids (a label deleted since the task was tagged)
         // are dropped rather than rendered as a blank chip. Order follows

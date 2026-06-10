@@ -24,6 +24,7 @@ import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { fontSize, fontWeight, modalWidthCss, space } from "../../theme/tokens";
 import filterRequest from "../../utils/filterRequest";
+import normalizeTaskType from "../../utils/normalizeTaskType";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAppMessage from "../../utils/hooks/useAppMessage";
@@ -140,6 +141,12 @@ type TaskFormValues = Omit<ITask, "startDate" | "dueDate"> & {
  */
 const taskToFormValues = (task: ITask): TaskFormValues => ({
     ...task,
+    // The wire `type` is an open string; the select only knows the
+    // canonical Task/Bug vocabulary. Normalize at the form boundary so
+    // an out-of-vocabulary value (e.g. "feature") binds as "Task" —
+    // matching how the board card and the modal title tag render it —
+    // instead of leaking the raw string into the control.
+    type: normalizeTaskType(task.type),
     startDate: toDayjsOrUndefined(task.startDate),
     dueDate: toDayjsOrUndefined(task.dueDate)
     // `dependsOn` is seeded by the `...task` spread above (same as
@@ -532,10 +539,18 @@ const TaskModal: React.FC<{
         // be), so an untouched task with no richness still compares equal and
         // closes without a needless PUT instead of tripping the key-count
         // check.
+        // The form binds a NORMALIZED `type` (out-of-vocabulary values
+        // read as "Task"), so compare against the same normalization —
+        // otherwise an untouched task with a legacy type would diff as
+        // dirty and fire a needless PUT on every Save.
+        const baseline: ITask = {
+            ...editingTask,
+            type: normalizeTaskType(editingTask.type)
+        };
         if (
             shallowEqual(
                 filterRequest(merged as unknown as Record<string, unknown>),
-                filterRequest(editingTask as unknown as Record<string, unknown>)
+                filterRequest(baseline as unknown as Record<string, unknown>)
             )
         ) {
             closeModal();
@@ -1135,7 +1150,7 @@ const TaskModal: React.FC<{
                         columnId={editingTask?.columnId}
                         projectId={projectId}
                         taskName={liveValues.taskName}
-                        type={liveValues.type === "Bug" ? "Bug" : "Task"}
+                        type={normalizeTaskType(liveValues.type)}
                     />
                 ) : (
                     <Input.TextArea
@@ -1185,11 +1200,13 @@ const TaskModal: React.FC<{
                     <Tag
                         variant="filled"
                         color={
-                            editingTask.type === "Bug" ? "magenta" : "geekblue"
+                            normalizeTaskType(editingTask.type) === "Bug"
+                                ? "magenta"
+                                : "geekblue"
                         }
                         style={{ fontWeight: 500, marginInlineEnd: 0 }}
                     >
-                        {editingTask.type === "Bug"
+                        {normalizeTaskType(editingTask.type) === "Bug"
                             ? microcopy.options.taskTypes.bug
                             : microcopy.options.taskTypes.task}
                     </Tag>
