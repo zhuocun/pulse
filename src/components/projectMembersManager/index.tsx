@@ -141,9 +141,14 @@ const RemoveButton = styled(Button)`
  * 2.8:1, failing WCAG AA for the 12px badge label. Darken the ink to
  * gold-9 (#874d00, ~6.5:1 on the same fill) in light mode only; the
  * dark algorithm's gold pairing already clears AA.
+ *
+ * Triple `&` is load-bearing: AntD's own ink rule is
+ * `:where(.css-x).ant-tag.ant-tag-gold:not(.ant-tag-disabled).ant-tag-filled`
+ * — specificity (0,4,0) — so the override needs (0,4,1) to win the
+ * cascade (a double `&` at (0,3,1) silently loses).
  */
 const ManagerBadge = styled(Tag)`
-    html:not([data-color-scheme="dark"]) && {
+    html:not([data-color-scheme="dark"]) &&& {
         color: #874d00;
     }
 `;
