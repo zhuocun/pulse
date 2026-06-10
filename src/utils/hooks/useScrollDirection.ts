@@ -28,6 +28,17 @@ import { useEffect, useRef, useState } from "react";
  *     minimize-on-scroll transforms during a view transition snapshot
  *     cause the snapshot to capture mid-animation and flicker on
  *     restore. Wave 2 T5 mitigation.
+ *   - `resetKey`: when this value changes, direction resets to
+ *     `"idle"`. The BottomTabBar passes `location.pathname` so a
+ *     minimized bar never latches across navigations — landing on a
+ *     new page always restores the full chrome.
+ *
+ * Top-of-page restore: any scroll event that lands at `scrollY <= 0`
+ * forces the direction back to `"idle"` (bypassing the threshold and
+ * the lockout). A bar minimized by a downward fling must not stay
+ * minimized once the user is back at the very top — there is nothing
+ * above to scroll up to, so the "scroll up to restore" affordance is
+ * unreachable.
  *
  * Listener:
  *   - Subscribes to `window.scroll` with `{ passive: true }`. The
@@ -57,6 +68,8 @@ export interface UseScrollDirectionOptions {
     minStateDurationMs?: number;
     /** Pause direction updates during in-flight view transitions. */
     pauseDuringViewTransition?: boolean;
+    /** Direction resets to "idle" whenever this value changes. */
+    resetKey?: unknown;
 }
 
 const isBrowser = (): boolean => typeof window !== "undefined";
@@ -99,7 +112,8 @@ const useScrollDirection = (
     const {
         threshold = 50,
         minStateDurationMs = 300,
-        pauseDuringViewTransition = true
+        pauseDuringViewTransition = true,
+        resetKey
     } = options;
     const [direction, setDirection] = useState<ScrollDirection>("idle");
     /*
@@ -118,6 +132,10 @@ const useScrollDirection = (
         lastYRef.current = readScrollY();
         accumRef.current = 0;
         lastFlipAtRef.current = 0;
+        // A change to any dep (notably `resetKey` on navigation) starts
+        // a fresh measurement window, so the direction must not carry
+        // over from the previous page / configuration.
+        setDirection("idle");
 
         const handler = () => {
             // Pause direction updates during route view transitions.
@@ -136,6 +154,17 @@ const useScrollDirection = (
                 return;
             }
             const y = readScrollY();
+            // Top-of-page force-restore: at scrollY <= 0 there is no
+            // content above to "scroll up" past the threshold, so a
+            // latched "down" would strand the minimized state. Bypass
+            // both the threshold and the lockout.
+            if (y <= 0) {
+                lastYRef.current = y;
+                accumRef.current = 0;
+                lastFlipAtRef.current = 0;
+                setDirection((prev) => (prev === "idle" ? prev : "idle"));
+                return;
+            }
             const delta = y - lastYRef.current;
             lastYRef.current = y;
             if (delta === 0) return;
@@ -222,7 +251,7 @@ const useScrollDirection = (
                 doc.startViewTransition = originalStart;
             }
         };
-    }, [threshold, minStateDurationMs, pauseDuringViewTransition]);
+    }, [threshold, minStateDurationMs, pauseDuringViewTransition, resetKey]);
 
     return direction;
 };

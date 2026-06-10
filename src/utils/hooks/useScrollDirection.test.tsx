@@ -94,21 +94,23 @@ describe("useScrollDirection", () => {
             useScrollDirection({ threshold: 50, minStateDurationMs: 300 })
         );
         act(() => {
-            setScrollY(60);
+            setScrollY(200);
             fireScroll();
         });
         expect(result.current).toBe("down");
         // Reverse direction within the lockout window — must not flip.
+        // (Stays above scrollY 0 so the top-of-page force-restore does
+        // not apply.)
         act(() => {
             nowMs += 100; // still inside 300ms
-            setScrollY(0);
+            setScrollY(140);
             fireScroll();
         });
         expect(result.current).toBe("down");
         // After the lockout expires, the reversal should land.
         act(() => {
             nowMs += 400;
-            setScrollY(-80);
+            setScrollY(60);
             fireScroll();
         });
         expect(result.current).toBe("up");
@@ -133,6 +135,40 @@ describe("useScrollDirection", () => {
         });
         // 30px is still below the threshold; direction stays "down".
         expect(result.current).toBe("down");
+    });
+
+    it("force-restores to 'idle' when scrollY reaches 0, bypassing threshold and lockout", () => {
+        const { result } = renderHook(() =>
+            useScrollDirection({ threshold: 50, minStateDurationMs: 300 })
+        );
+        act(() => {
+            setScrollY(80);
+            fireScroll();
+        });
+        expect(result.current).toBe("down");
+        // Jump straight back to the top INSIDE the lockout window — the
+        // forced restore must still land.
+        act(() => {
+            nowMs += 100;
+            setScrollY(0);
+            fireScroll();
+        });
+        expect(result.current).toBe("idle");
+    });
+
+    it("resets to 'idle' when resetKey changes (navigation)", () => {
+        const { result, rerender } = renderHook(
+            ({ resetKey }: { resetKey: string }) =>
+                useScrollDirection({ threshold: 50, resetKey }),
+            { initialProps: { resetKey: "/projects" } }
+        );
+        act(() => {
+            setScrollY(80);
+            fireScroll();
+        });
+        expect(result.current).toBe("down");
+        rerender({ resetKey: "/inbox" });
+        expect(result.current).toBe("idle");
     });
 
     it("pauses direction updates while a view transition is in flight", async () => {
