@@ -205,14 +205,24 @@ describe("ProjectDetailPage", () => {
                         ".ant-breadcrumb li:first-child a"
                     )
                 );
-            const middleCrumbRule = Array.from(document.styleSheets)
+            const styleRules = Array.from(document.styleSheets)
                 .flatMap((sheet) => Array.from(sheet.cssRules))
-                .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
-                .find((rule) =>
+                .filter(
+                    (rule): rule is CSSStyleRule => "selectorText" in rule
+                );
+            // Stylis serializes the child combinator without spaces
+            // ("a>span"), so match it with a whitespace-tolerant regex.
+            const spanSelector =
+                /\.ant-breadcrumb li:not\(:first-child\):not\(:last-child\) a\s*>\s*span/;
+            const middleCrumbAnchorRule = styleRules.find(
+                (rule) =>
                     rule.selectorText.includes(
                         ".ant-breadcrumb li:not(:first-child):not(:last-child) a"
-                    )
-                );
+                    ) && !spanSelector.test(rule.selectorText)
+            );
+            const middleCrumbSpanRule = styleRules.find((rule) =>
+                spanSelector.test(rule.selectorText)
+            );
 
             expect(breadcrumbRuleText).toContain(
                 ".ant-breadcrumb li:first-child"
@@ -220,22 +230,42 @@ describe("ProjectDetailPage", () => {
             expect(rootCrumbRule?.style.getPropertyValue("flex-shrink")).toBe(
                 "0"
             );
-            expect(middleCrumbRule).toBeDefined();
-            expect(middleCrumbRule?.style.getPropertyValue("max-width")).toBe(
-                "100%"
-            );
-            expect(middleCrumbRule?.style.getPropertyValue("min-width")).toBe(
-                "0"
-            );
-            expect(middleCrumbRule?.style.getPropertyValue("overflow")).toBe(
-                "hidden"
-            );
+            // The anchor stays the sized flex box (touch target +
+            // clipping)…
+            expect(middleCrumbAnchorRule).toBeDefined();
             expect(
-                middleCrumbRule?.style.getPropertyValue("text-overflow")
+                middleCrumbAnchorRule?.style.getPropertyValue("display")
+            ).toBe("inline-flex");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("max-width")
+            ).toBe("100%");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("min-width")
+            ).toBe("0");
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("overflow")
+            ).toBe("hidden");
+            // …while the ellipsis lives on the inner span, because
+            // text-overflow cannot ellipsize a flex container's contents.
+            expect(
+                middleCrumbAnchorRule?.style.getPropertyValue("text-overflow")
+            ).toBe("");
+            expect(middleCrumbSpanRule).toBeDefined();
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("text-overflow")
             ).toBe("ellipsis");
-            expect(middleCrumbRule?.style.getPropertyValue("white-space")).toBe(
-                "nowrap"
-            );
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("overflow")
+            ).toBe("hidden");
+            expect(
+                middleCrumbSpanRule?.style.getPropertyValue("white-space")
+            ).toBe("nowrap");
+            // The project-name link wraps its text in the inner span the
+            // ellipsis rule targets.
+            const projectLink = screen.getByRole("link", {
+                name: mockProjectName
+            });
+            expect(projectLink.querySelector("span")).not.toBeNull();
         });
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {

@@ -228,9 +228,30 @@ const BreadcrumbWrapper = styled.div`
     &&
         .ant-breadcrumb
         li:not(:first-child):not(:last-child)
-        .ant-breadcrumb-link,
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
+        .ant-breadcrumb-link {
         max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    /*
+     * The project-name anchor is inline-flex (it carries the 44 px
+     * coarse-pointer touch target below), and text-overflow does not
+     * ellipsize the contents of a flex container — the glyphs hard-clip
+     * at the box edge instead. Keep the anchor as the sized/clipped
+     * flex box and move the ellipsis onto the inner span, which as a
+     * min-width: 0 flex item truncates correctly.
+     */
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
+        align-items: center;
+        display: inline-flex;
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+    && .ant-breadcrumb li:not(:first-child):not(:last-child) a > span {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -464,7 +485,9 @@ const ProjectDetailPage = () => {
                      * `aria-current="page"`.
                      */
                     <Link to={`/projects/${projectId}`} viewTransition>
-                        {project?.projectName ?? microcopy.labels.project}
+                        <span>
+                            {project?.projectName ?? microcopy.labels.project}
+                        </span>
                     </Link>
                 ) : (
                     <span aria-current="page">
