@@ -1633,12 +1633,14 @@ export const enSource = {
         title: "Command palette",
         kindLabels: {
             project: "Projects",
+            section: "Project sections",
             task: "Tasks",
             column: "Columns",
             member: "Members"
         },
         kindTags: {
             project: "Project",
+            section: "Section",
             task: "Task",
             column: "Column",
             member: "Member"

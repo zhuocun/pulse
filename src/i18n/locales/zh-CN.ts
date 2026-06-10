@@ -1336,12 +1336,14 @@ const zhCN: Dictionary = {
         title: "命令面板",
         kindLabels: {
             project: "项目",
+            section: "项目分区",
             task: "任务",
             column: "列",
             member: "成员"
         },
         kindTags: {
             project: "项目",
+            section: "分区",
             task: "任务",
             column: "列",
             member: "成员"

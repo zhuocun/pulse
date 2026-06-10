@@ -43,7 +43,7 @@ interface PaletteEntry {
     id: string;
     label: string;
     sublabel?: string;
-    kind: "project" | "task" | "column" | "member";
+    kind: "project" | "section" | "task" | "column" | "member";
     href?: string;
     /**
      * Task entries carry the raw taskId + projectId so the selection
@@ -241,6 +241,18 @@ const GlassSearchCapsule = styled(GlassPanel)`
     }
 `;
 
+/*
+ * Per-project section routes indexed alongside the project itself. On
+ * phone chrome the board route hides the project breadcrumb bar, so the
+ * palette is the guaranteed way to reach these surfaces by touch.
+ */
+const PROJECT_SECTION_SEGMENTS = [
+    "members",
+    "milestones",
+    "labels",
+    "reports"
+] as const;
+
 const indexEntries = (
     projects: IProject[],
     tasks: ITask[],
@@ -257,6 +269,18 @@ const indexEntries = (
             href: `/projects/${p._id}`,
             rankBoost: 0
         });
+    }
+    for (const p of projects) {
+        for (const segment of PROJECT_SECTION_SEGMENTS) {
+            out.push({
+                id: `section:${p._id}:${segment}`,
+                label: microcopy.labels[segment],
+                sublabel: p.projectName,
+                kind: "section",
+                href: `/projects/${p._id}/${segment}`,
+                rankBoost: 1
+            });
+        }
     }
     for (const c of columns) {
         out.push({
@@ -357,6 +381,7 @@ type RenderedItem = RenderedRow | RenderedHeader;
 
 const KIND_ORDER: PaletteEntry["kind"][] = [
     "project",
+    "section",
     "task",
     "column",
     "member"

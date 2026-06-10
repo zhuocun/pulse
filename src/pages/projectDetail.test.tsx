@@ -245,4 +245,74 @@ describe("ProjectDetailPage", () => {
             expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
         });
     });
+
+    describe("phone chrome section navigation", () => {
+        const desktopMatchMedia = window.matchMedia;
+
+        beforeAll(() => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: (query: string) => ({
+                    addEventListener: jest.fn(),
+                    addListener: jest.fn(),
+                    dispatchEvent: jest.fn(),
+                    matches: query === "(pointer: coarse)",
+                    media: query,
+                    onchange: null,
+                    removeEventListener: jest.fn(),
+                    removeListener: jest.fn()
+                })
+            });
+        });
+
+        afterAll(() => {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: desktopMatchMedia
+            });
+        });
+
+        it("renders the child nav as a horizontally scrollable row on phone chrome", () => {
+            renderDetail("/projects/project-1/labels");
+
+            const nav = screen.getByTestId("project-detail-child-nav");
+            for (const name of [
+                "Board",
+                "Members",
+                "Milestones",
+                "Labels",
+                "Reports"
+            ]) {
+                expect(within(nav).getByRole("link", { name })).toHaveAttribute(
+                    "href",
+                    expect.stringContaining("/projects/project-1/")
+                );
+            }
+
+            const navRuleText = ruleTextsFor(styledClassFor(nav) ?? "").join(
+                "\n"
+            );
+            expect(navRuleText).toContain("overflow-x: auto");
+            expect(navRuleText).toContain("flex: 1 1 100%");
+        });
+
+        it("keeps nav links pan-friendly: fixed-size segments that never wrap", () => {
+            renderDetail("/projects/project-1/labels");
+
+            const board = screen.getByRole("link", { name: "Board" });
+            const linkRuleText = ruleTextsFor(
+                styledClassFor(board) ?? ""
+            ).join("\n");
+            expect(linkRuleText).toContain("flex: 0 0 auto");
+            expect(linkRuleText).toContain("white-space: nowrap");
+        });
+
+        it("still hides the whole chrome on the phone board route", () => {
+            renderDetail("/projects/project-1/board");
+
+            expect(
+                screen.queryByTestId("project-detail-chrome")
+            ).not.toBeInTheDocument();
+        });
+    });
 });
