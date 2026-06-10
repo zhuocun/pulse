@@ -368,6 +368,7 @@ const zhCN: Dictionary = {
         whatNeedsToBeDone: "需要完成什么?",
         notesAcceptanceCriteria: "备注 / 验收标准",
         chatAsk: "提出问题…(Shift+Enter 换行)",
+        chatAskTouch: "提出问题…",
         commandPaletteNav: "搜索项目、任务、列、成员…",
         commandPaletteNavShort: "搜索 Pulse…",
         commandPaletteAi: "向看板 Copilot 提问…",

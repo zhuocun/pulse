@@ -9,8 +9,15 @@ import {
     ruleTextsFor,
     styledClassFor
 } from "../../testUtils/styleRules";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
 import { AiChatComposer } from "./AiChatComposer";
+
+jest.mock("../../utils/hooks/useIsPhoneChrome");
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
 
 const renderComposer = (
     overrides: Partial<React.ComponentProps<typeof AiChatComposer>> = {}
@@ -37,6 +44,28 @@ const renderComposer = (
 };
 
 describe("AiChatComposer", () => {
+    beforeEach(() => {
+        mockedUseIsPhoneChrome.mockReturnValue(false);
+    });
+
+    it("shows the Shift+Enter placeholder hint on fine-pointer chrome", () => {
+        renderComposer({ input: "" });
+        expect(
+            screen.getByPlaceholderText(microcopy.placeholders.chatAsk)
+        ).toBeInTheDocument();
+    });
+
+    it("hides the hardware-keyboard hint from the placeholder on phone chrome", () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        renderComposer({ input: "" });
+        expect(
+            screen.getByPlaceholderText(microcopy.placeholders.chatAskTouch)
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByPlaceholderText(microcopy.placeholders.chatAsk)
+        ).not.toBeInTheDocument();
+    });
+
     it("keeps the textarea editable while streaming so the user can type the next prompt", () => {
         // AI UX best practices §2.1: input stays editable, only dispatch
         // is gated. The textarea has no `disabled` attribute during

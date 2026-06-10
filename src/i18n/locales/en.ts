@@ -409,6 +409,7 @@ export const enSource = {
         whatNeedsToBeDone: "What needs to be done?",
         notesAcceptanceCriteria: "Notes / acceptance criteria",
         chatAsk: "Ask a question… (Shift+Enter for a new line)",
+        chatAskTouch: "Ask a question…",
         commandPaletteNav: "Search projects, tasks, columns, members…",
         commandPaletteNavShort: "Search Pulse…",
         commandPaletteAi: "Ask Board Copilot…",

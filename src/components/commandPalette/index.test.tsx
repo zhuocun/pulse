@@ -170,6 +170,45 @@ describe("CommandPalette", () => {
         );
     });
 
+    it("shows the Cmd/Ctrl+K shortcut hint in the title on fine-pointer chrome", async () => {
+        renderPalette(true);
+        await screen.findByRole("combobox");
+        expect(screen.getByText(/^(Cmd|Ctrl)\+K$/)).toBeInTheDocument();
+    });
+
+    it("hides the Cmd/Ctrl+K hint on coarse-pointer (touch) chrome", async () => {
+        // Touch laptop / tablet shape: wide viewport (Modal branch) but
+        // a coarse primary pointer — no hardware-keyboard hint.
+        const original = window.matchMedia;
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) => ({
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches:
+                    query.includes("min-width") ||
+                    query.includes("pointer: coarse"),
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            })
+        });
+        try {
+            renderPalette(true);
+            await screen.findByRole("combobox");
+            expect(
+                screen.queryByText(/^(Cmd|Ctrl)\+K$/)
+            ).not.toBeInTheDocument();
+        } finally {
+            Object.defineProperty(window, "matchMedia", {
+                writable: true,
+                value: original
+            });
+        }
+    });
+
     it("filters results as the user types", async () => {
         renderPalette(true);
         const input = await screen.findByRole("combobox");

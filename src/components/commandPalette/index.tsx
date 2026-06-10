@@ -26,6 +26,7 @@ import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -429,6 +430,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const screens = Grid.useBreakpoint();
     const keyboardOpen = useKeyboardOpen();
     const reducedMotion = useReducedMotion();
+    const isPhoneChrome = useIsPhoneChrome();
 
     const projects = useGatheredCachedList<IProject>(["projects"]);
     const members = useCachedQueryData<IMember[]>(["users/members"]) ?? [];
@@ -838,7 +840,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
             <span style={{ fontWeight: fontWeight.semibold }}>
                 {microcopy.commandPalette.title}
             </span>
-            <Typography.Text type="secondary">{shortcutText}</Typography.Text>
+            {/* Coarse-pointer chrome has no hardware keyboard — the
+             * Cmd/Ctrl+K hint only makes sense where one exists. */}
+            {!isPhoneChrome && (
+                <Typography.Text type="secondary">
+                    {shortcutText}
+                </Typography.Text>
+            )}
         </span>
     );
 
