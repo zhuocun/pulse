@@ -169,6 +169,18 @@ GA blockers and ship sequence live in
   `logs <url>`, `inspect <url>`, `env ls`). See README's "Ad-hoc Vercel
   inspection" subsection.
 
+## Claude Code auto-compact (`.claude/settings.json`)
+
+`.claude/settings.json` pins `autoCompactWindow: 400000` and
+`env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"`, so auto-compaction fires at 80% of a
+400K window (~320K tokens) instead of the model's full 1M default. The percentage
+override has no settings key — it only takes effect from the `env` block — and is
+clamped by `Math.min` to the default, so it can pull compaction *earlier* but
+never later. Verified on Claude Code 2.1.173; older builds ignored the override on
+1M-context Opus and compacted at a hardcoded ~195K. To re-verify, read an
+auto-compact event's `preTokens` in the session `.jsonl`: ~320K means it works,
+~195K means it regressed.
+
 ## PR & merge process
 
 The same review-and-merge flow applies across the `agent`, `pulse`, and `agent-skills` repos.
