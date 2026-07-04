@@ -5,7 +5,7 @@ Consolidated GA status and open backlog across the FastAPI agent server
 see [`product-done.md`](product-done.md); for deployment
 configuration see [`../operations/deployment.md`](../operations/deployment.md).
 
-Last updated: 2026-05-22 (GA §1 closed in code: real-provider chat tool calls now dispatch through v2.1 FE interrupts, organic `requestMutationApproval` tool calls emit typed `mutation_proposal` events, and the accept/apply/undo lane is covered by targeted BE + FE tests. Rerun recipes below when pinning numeric totals.)
+Last updated: 2026-07-04 (housekeeping reconciliation against main: repointed the deleted `BoardBriefDrawer` to `copilotDock/BriefTabBody` in the GA-ready FE table, re-pinned the §10/§11 test counts. Content last substantively refreshed 2026-05-22, when GA §1 closed in code: real-provider chat tool calls now dispatch through v2.1 FE interrupts, organic `requestMutationApproval` tool calls emit typed `mutation_proposal` events, and the accept/apply/undo lane is covered by targeted BE + FE tests. Rerun recipes below when pinning numeric totals.)
 
 ## TL;DR
 
@@ -206,17 +206,18 @@ flow remains gated on GA Blocker §1.
 `enforce_request_limits` added to every v1 (`POST /api/ai/*`) and v2.1
 (`POST /api/v1/agents/*/{invoke,stream}`) endpoint. Defaults: 64 KiB
 total body, 8 KiB prompt, 50 messages, 8 KiB per-message content.
-Returns HTTP 413 on violation. **18 tests in `tests/test_ai_limits.py`**
+Returns HTTP 413 on violation. **23 tests in `tests/test_ai_limits.py`**
 (grew past the 13 cited in the original PR as edge cases were added;
-re-counted 2026-05-10).
+re-counted 2026-07-04 — rerun `pytest tests/test_ai_limits.py` to refresh).
 
 ### 🟡 11. PII leak from `/estimate` and `/readiness` task fields  *(BE — Resolved 2026-05-05, `0e990e4`)*
 
 `taskName`, `note`, `epic`, and `coordinatorId` on `/estimate` and
 `/readiness` requests now run through `redact_task_fields` before the
-LLM polish call. Closes the leak documented in PRD §5A.10. **20 tests
+LLM polish call. Closes the leak documented in PRD §5A.10. **24 tests
 in `tests/test_ai_redaction.py`** (grew past the 9 cited in the
-original PR as the redaction surface widened; re-counted 2026-05-10).
+original PR as the redaction surface widened; re-counted 2026-07-04 —
+rerun `pytest tests/test_ai_redaction.py` to refresh).
 
 ### 🟡 12. Embedding dimensions hard-pinned to 16  *(BE — Resolved 2026-05-05, `0e990e4`)*
 
@@ -343,7 +344,7 @@ post-v2.1 role as the deterministic local-engine fallback only.
 | Surface | Status | Notes |
 |---|---|---|
 | Local engine (deterministic) | ✅ | Full coverage; demo-able with no backend |
-| `useAgent("board-brief-agent")` (remote) | ✅ | Suggestion + citations rendered in `BoardBriefDrawer` |
+| `useAgent("board-brief-agent")` (remote) | ✅ | Suggestion + citations rendered in `copilotDock/BriefTabBody` (the standalone `BoardBriefDrawer` was removed with the dock cutover — PRD-GAP-006) |
 | `useAgent("task-drafting-agent")` (remote) | ✅ | Two sequential interrupts auto-resumed |
 | `useAgent("task-estimation-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE context caps) |
 | `useAgent("search-agent")` (remote) | ⚠️ | Same caveat as BE §4 path (optional vector augment + backfill vs FE candidate cap) |
