@@ -5,12 +5,12 @@ import { Link, useLocation } from "react-router";
 import RegisterForm from "../components/registerForm";
 import { microcopy } from "../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../layouts/authLayout";
-import { fontSize, space } from "../theme/tokens";
+import { bodyCopyCoarseFontCss, space } from "../theme/tokens";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
 const SwitchRow = styled.p`
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.sm}px;
+    ${bodyCopyCoarseFontCss}
     margin: ${space.lg}px 0 0;
     text-align: center;
 `;

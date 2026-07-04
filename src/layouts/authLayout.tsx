@@ -13,6 +13,7 @@ import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
 import {
     aurora,
+    bodyCopyCoarseFontCss,
     breakpoints,
     fontSize,
     fontWeight,
@@ -238,7 +239,7 @@ const HeroFeatureIcon = styled.span`
 
 const HeroFinePrint = styled.p`
     color: rgba(255, 255, 255, 0.6);
-    font-size: ${fontSize.sm}px;
+    ${bodyCopyCoarseFontCss}
     line-height: ${lineHeight.normal};
     margin: ${space.xl}px 0 0;
 `;
