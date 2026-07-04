@@ -22,7 +22,13 @@ import { palette } from "../theme/palettes";
 import { paletteToCss } from "../theme/palettes/cssVars";
 import { emeraldPalette } from "../theme/palettes/emerald";
 import { orangePalette } from "../theme/palettes/orange";
-import { brand, accent, aurora, avatarGradients } from "../theme/tokens";
+import {
+    brand,
+    accent,
+    aurora,
+    avatarGradients,
+    fontSize
+} from "../theme/tokens";
 import { buildAntdTheme } from "../theme/antdTheme";
 
 describe("theme/palette integration", () => {
@@ -158,6 +164,50 @@ describe("theme/palette integration", () => {
             )?.controlHeight;
             expect(lightHeight).toBe(darkHeight);
             expect(lightHeight).toBeGreaterThanOrEqual(44);
+        });
+
+        it("desktop (fine pointer) keeps the dense 14 / 13 / 16 body ladder", () => {
+            const desktop = buildAntdTheme("light");
+            expect(desktop.token?.fontSize).toBe(fontSize.base);
+            expect(desktop.token?.fontSizeSM).toBe(fontSize.sm);
+            expect(desktop.token?.fontSizeLG).toBe(fontSize.md);
+        });
+
+        it("coarse pointer lifts the body type scale one step (16 / 14 / 18)", () => {
+            // Native iOS/Android body copy reads ~16 px; 14 px feels cramped
+            // on a phone. The coarse branch bumps base -> md, SM -> base,
+            // LG -> lg so touch body/label copy lands at least 14 px. A
+            // regression that drops this back to the dense desktop ladder
+            // must fail loudly here.
+            const coarse = buildAntdTheme("light", true);
+            expect(coarse.token?.fontSize).toBe(fontSize.md);
+            expect(coarse.token?.fontSizeSM).toBe(fontSize.base);
+            expect(coarse.token?.fontSizeLG).toBe(fontSize.lg);
+            expect(coarse.token?.fontSize).toBe(16);
+            expect(coarse.token?.fontSizeSM).toBe(14);
+            expect(coarse.token?.fontSizeLG).toBe(18);
+        });
+
+        it("coarse type-scale lift is identical in light and dark", () => {
+            const light = buildAntdTheme("light", true);
+            const dark = buildAntdTheme("dark", true);
+            expect(dark.token?.fontSize).toBe(light.token?.fontSize);
+            expect(dark.token?.fontSizeSM).toBe(light.token?.fontSizeSM);
+            expect(dark.token?.fontSizeLG).toBe(light.token?.fontSizeLG);
+        });
+
+        it("headings stay unchanged between fine and coarse pointers", () => {
+            const desktop = buildAntdTheme("light");
+            const coarse = buildAntdTheme("light", true);
+            expect(coarse.token?.fontSizeHeading1).toBe(
+                desktop.token?.fontSizeHeading1
+            );
+            expect(coarse.token?.fontSizeHeading2).toBe(
+                desktop.token?.fontSizeHeading2
+            );
+            expect(coarse.token?.fontSizeHeading3).toBe(
+                desktop.token?.fontSizeHeading3
+            );
         });
     });
 });

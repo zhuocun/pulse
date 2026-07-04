@@ -72,12 +72,16 @@ export const buildAntdTheme = (
         borderRadiusXS: radius.xs,
         borderRadiusOuter: radius.md,
 
-        // Typography
+        // Typography. On coarse pointers (touch) we lift the body ladder one
+        // step so base copy reads ~16 px like native iOS/Android body text
+        // (14 px reads cramped on a phone). Headings already read large, so
+        // only the base / SM / LG body sizes shift; desktop keeps the denser
+        // 14 / 13 / 16 ladder.
         fontFamily: fontFamily.sans,
         fontFamilyCode: fontFamily.mono,
-        fontSize: fontSize.base,
-        fontSizeSM: fontSize.sm,
-        fontSizeLG: fontSize.md,
+        fontSize: coarsePointer ? fontSize.md : fontSize.base,
+        fontSizeSM: coarsePointer ? fontSize.base : fontSize.sm,
+        fontSizeLG: coarsePointer ? fontSize.lg : fontSize.md,
         fontSizeHeading1: fontSize.display,
         fontSizeHeading2: fontSize.xxl,
         fontSizeHeading3: fontSize.xl,
