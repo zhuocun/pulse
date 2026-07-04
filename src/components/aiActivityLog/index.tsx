@@ -72,9 +72,13 @@ const ListWrapper = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${space.xs}px;
+    /* Dynamic viewport unit keeps the log from jumping when the iOS Safari
+     * URL bar collapses. The vh declaration stays as a fallback. */
     max-height: 60vh;
+    max-height: 60dvh;
     min-width: 280px;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0;
 `;
 

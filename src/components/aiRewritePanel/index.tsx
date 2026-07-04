@@ -313,6 +313,8 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                         aria-labelledby={`${panelId}-free-label`}
                         autoComplete="off"
                         data-testid="ai-rewrite-free-prompt"
+                        enterKeyHint="enter"
+                        inputMode="text"
                         onChange={(event) => setFreePrompt(event.target.value)}
                         placeholder={microcopy.aiRewrite.freePromptPlaceholder}
                         rows={2}

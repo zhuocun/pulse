@@ -233,6 +233,7 @@ const ColumnCreator: React.FC = () => {
                 <InputNumber
                     aria-label={microcopy.fields.wipLimit}
                     disabled={isLoading}
+                    inputMode="numeric"
                     min={0}
                     onChange={(value) =>
                         setWipLimit(typeof value === "number" ? value : 0)

@@ -24,6 +24,7 @@ const ContentContainer = styled.div`
     max-width: min(22rem, calc(100dvw - ${modalGutterPx}px));
     min-width: min(18rem, calc(100dvw - ${modalGutterPx}px));
     overflow-y: auto;
+    overscroll-behavior: contain;
 `;
 
 const SectionLabel = styled(Typography.Text)`

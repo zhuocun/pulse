@@ -591,7 +591,10 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     microcopy.milestones
                                                         .addNamePlaceholder
                                                 )}
+                                                autoComplete="off"
                                                 data-testid="milestone-edit-name"
+                                                enterKeyHint="done"
+                                                inputMode="text"
                                                 onChange={(event) =>
                                                     setEditDraft((draft) =>
                                                         draft
@@ -615,7 +618,10 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     microcopy.milestones
                                                         .addDescriptionPlaceholder
                                                 )}
+                                                autoComplete="off"
                                                 data-testid="milestone-edit-description"
+                                                enterKeyHint="done"
+                                                inputMode="text"
                                                 onChange={(event) =>
                                                     setEditDraft((draft) =>
                                                         draft
@@ -732,7 +738,10 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                             aria-label={microcopyString(
                                 microcopy.milestones.addNamePlaceholder
                             )}
+                            autoComplete="off"
                             data-testid="milestone-add-name"
+                            enterKeyHint="done"
+                            inputMode="text"
                             onChange={(event) => setNewName(event.target.value)}
                             onPressEnter={handleAdd}
                             placeholder={microcopyString(
@@ -744,7 +753,10 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                             aria-label={microcopyString(
                                 microcopy.milestones.addDescriptionPlaceholder
                             )}
+                            autoComplete="off"
                             data-testid="milestone-add-description"
+                            enterKeyHint="done"
+                            inputMode="text"
                             onChange={(event) =>
                                 setNewDescription(event.target.value)
                             }

@@ -413,11 +413,14 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
                                             aria-label={microcopyString(
                                                 microcopy.comments.editAriaLabel
                                             )}
+                                            autoComplete="off"
                                             autoSize={{
                                                 minRows: 2,
                                                 maxRows: 6
                                             }}
                                             data-testid="comment-edit-input"
+                                            enterKeyHint="enter"
+                                            inputMode="text"
                                             onChange={(event) =>
                                                 setEditBody(event.target.value)
                                             }
@@ -484,8 +487,11 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
             <Composer>
                 <Input.TextArea
                     aria-label={microcopyString(microcopy.comments.placeholder)}
+                    autoComplete="off"
                     autoSize={{ minRows: 2, maxRows: 6 }}
                     data-testid="comment-composer-input"
+                    enterKeyHint="enter"
+                    inputMode="text"
                     onChange={(event) => setBody(event.target.value)}
                     placeholder={microcopyString(
                         microcopy.comments.placeholder

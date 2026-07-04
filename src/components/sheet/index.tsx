@@ -342,6 +342,7 @@ const CloseButton = styled.button`
 const Body = styled.div`
     flex: 1 1 auto;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: ${chromeInset.mobile}px;
     /*
      * iOS Safari: the dvh-based height collapses to the visual
