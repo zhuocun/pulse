@@ -334,6 +334,11 @@ const TrashDrawer: React.FC<TrashDrawerProps> = ({
             closeAriaLabel={microcopyString(microcopy.actions.close)}
             onClose={onClose}
             open={open}
+            styles={{
+                body: {
+                    paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`
+                }
+            }}
             title={
                 <span>
                     <DeleteOutlined
