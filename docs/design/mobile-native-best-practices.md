@@ -74,7 +74,7 @@ button,
 In this repo:
 
 - `index.html` carries every meta tag above.
-- `public/manifest.webmanifest` describes the installable PWA shell. **Gap:** real PNG icons are not yet shipped — the manifest references paths that 404. Plan to generate via `pwa-asset-generator`.
+- `public/manifest.webmanifest` describes the installable PWA shell. Real PNG icons (`purpose: "any"` + `purpose: "maskable"`, 192 px + 512 px) ship in `public/icons/`, with the SVG variants kept as fallbacks — see §5 for how they're generated.
 - `src/App.css:79–127` owns the document-level reset, the `body` font stack, and `-webkit-text-size-adjust`.
 - The 16 px input rule is scoped to `@media (pointer: coarse)` (`src/App.css:202–222`) so desktop keeps AntD's denser 14 px look while iOS does not auto-zoom on focus. This was the single highest-impact change in the audit.
 
@@ -278,7 +278,7 @@ Tier 1 — every user, every session:
 
 Tier 2 — visible only at specific moments, but very visible when they happen:
 
-2. ~~**Real PNG icons for the manifest.**~~ **Done.** SVG icons generated to `public/icons/` via `scripts/generate-icons.js`. Manifest updated to reference SVGs. For production, run `pwa-asset-generator` to produce PNG variants and iOS splash images.
+2. ~~**Real PNG icons for the manifest.**~~ **Done.** PNG icons (`icon-192`, `icon-512`, plus `icon-maskable-*` variants) now ship in `public/icons/` alongside the SVG originals, and `public/manifest.webmanifest` lists the PNGs first (`purpose: "any"` + `purpose: "maskable"`, 192 px + 512 px) with the SVGs as progressive-enhancement fallbacks. Both are produced by `scripts/generate-icons.js`. iOS splash images remain a future `pwa-asset-generator` follow-up.
 
 Tier 3 — barely perceptible:
 
