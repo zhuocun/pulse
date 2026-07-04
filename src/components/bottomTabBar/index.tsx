@@ -479,15 +479,17 @@ const TabLink = styled(NavLink)`
 /*
  * The Search action tab. A real `<button>` (correct semantic for an
  * in-place action with no URL) styled identically to the route
- * NavLinks via the shared `tabStyles` fragment. `font: inherit`
- * neutralises the UA button font so the label matches the links;
- * `appearance: none` strips native chrome. Keyboard activation
+ * NavLinks via the shared `tabStyles` fragment. `font-family: inherit`
+ * neutralises the UA button font so the label matches the links —
+ * the `font` shorthand would reset the `font-size: fontSize.xs` from
+ * `tabStyles` back to the UA default, oversizing and truncating the
+ * label. `appearance: none` strips native chrome. Keyboard activation
  * (Enter / Space) comes free from the button element.
  */
 const TabButton = styled.button`
     ${tabStyles}
     appearance: none;
-    font: inherit;
+    font-family: inherit;
     text-align: center;
 `;
 
