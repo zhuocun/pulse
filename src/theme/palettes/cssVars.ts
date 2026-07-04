@@ -162,6 +162,16 @@ html[data-color-scheme="light"] {
     --pulse-bg-page: ${p.page.bgLight};
     --pulse-text-base: ${p.page.textLight};
 
+    /*
+     * AA-safe amber for the high-priority badge glyph + label. The
+     * brand warning seed (#F59E0B) reads at ~2.2:1 on the white card
+     * surface — below WCAG 1.4.3 for the ~12px footer label — so light
+     * mode steps down to amber-700 (#B45309, ~5:1 on white) while dark
+     * keeps the brighter seed (AA against the near-black card). Mode-
+     * agnostic across palettes, like the mobile foundation tokens.
+     */
+    --pulse-priority-high: #b45309;
+
     --pulse-brand-primary: ${p.brand.primary};
     --pulse-brand-primary-hover: ${p.brand.primaryHover};
     --pulse-brand-primary-active: ${p.brand.primaryActive};
@@ -249,6 +259,14 @@ html[data-color-scheme="light"] {
 html[data-color-scheme="dark"] {
     --pulse-bg-page: ${p.page.bgDark};
     --pulse-text-base: ${p.page.textDark};
+
+    /*
+     * High-priority amber, dark counterpart. The near-black card
+     * surface lets the brighter brand seed (#F59E0B, ~7:1 on dark)
+     * carry the same escalation cue without dimming to the light-mode
+     * amber-700 step (which would muddy against the dark card).
+     */
+    --pulse-priority-high: #f59e0b;
 
     /*
      * Brand / accent / aurora / avatar-gradient vars are mode-agnostic

@@ -1389,7 +1389,8 @@ const TaskModal: React.FC<{
                             : screens.sm
                               ? "calc(100dvh - 220px - env(keyboard-inset-height, 0px))"
                               : "max(80px, calc(100dvh - 320px - env(keyboard-inset-height, 0px)))",
-                        overflowY: "auto"
+                        overflowY: "auto",
+                        overscrollBehavior: "contain"
                     }
                 }}
                 width={modalWidthCss(640)}

@@ -116,6 +116,27 @@ export const fontWeight = {
     bold: 700
 } as const;
 
+/**
+ * Body/label copy set at `fontSize.sm` (13 px) reads below the 14 px mobile
+ * floor once `buildAntdTheme` lifts the coarse AntD base to 16 px — a 13 px
+ * paragraph next to 16 px system copy looks like a shrunk afterthought on a
+ * phone. Drop this snippet into a styled block in place of a bare
+ * `font-size: ${fontSize.sm}px` so the copy keeps the dense 13 px on fine
+ * pointers but lifts to `fontSize.base` (14 px) on coarse pointers, matching
+ * the AntD `fontSizeSM` step in `antdTheme.ts`.
+ *
+ * This is ONLY for genuine body/label copy. Intentional micro-captions
+ * (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs`
+ * / `fontSize.sm` literal and must NOT use this.
+ */
+export const bodyCopyCoarseFontCss = `
+    font-size: ${fontSize.sm}px;
+
+    @media (pointer: coarse) {
+        font-size: ${fontSize.base}px;
+    }
+`;
+
 export const lineHeight = {
     tight: 1.25,
     snug: 1.4,

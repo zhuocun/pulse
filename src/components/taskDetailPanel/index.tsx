@@ -1567,6 +1567,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             flex: "1 1 auto",
                             minHeight: 0,
                             overflowY: "auto",
+                            overscrollBehavior: "contain",
                             padding: `${space.lg}px ${space.lg}px ${space.md}px`
                         }}
                     >
@@ -1634,7 +1635,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                          * the fold. The keyboard-inset subtraction
                          * parallels the modal's QW-18 fix.
                          */
-                        overflowY: "auto"
+                        overflowY: "auto",
+                        overscrollBehavior: "contain"
                     }
                 }}
                 title={titleNode}

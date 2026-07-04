@@ -191,6 +191,22 @@ html[data-color-scheme="dark"] .ant-drawer-content {
 }
 
 /*
+ * Toast surfaces (`message` top-center, `notification` top-end) float at
+ * fixed offsets from the viewport edge, so in installed-PWA standalone
+ * mode on a notched / rounded-corner device they collide with the status
+ * bar or the right-edge curvature. Nudge each container inward by the
+ * matching safe-area inset so a toast never lands in the unsafe zone.
+ */
+.ant-message {
+    margin-top: env(safe-area-inset-top);
+}
+
+.ant-notification {
+    margin-top: env(safe-area-inset-top);
+    margin-inline-end: env(safe-area-inset-right);
+}
+
+/*
  * Modal mask is a flat dim overlay, no blur. The backdrop-filter that used
  * to soften the page behind the modal has been removed — combined with
  * the opaque `.ant-modal-content` above, modals now read as a real card

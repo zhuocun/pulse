@@ -22,6 +22,11 @@ import { orangePalette } from "./orange";
 const REQUIRED_LIGHT_VARS = [
     "--pulse-bg-page",
     "--pulse-text-base",
+    // AA-safe, mode-aware amber for the high-priority card badge. Steps
+    // to amber-700 in light (readable on the white card) and back to the
+    // brand seed in dark; a regression that drops it in either block
+    // would revert the badge to the ~2.2:1 warning seed on white.
+    "--pulse-priority-high",
     // Runtime palette-switch vars — the brand / accent / aurora /
     // avatar-gradient surface consumed by the `var(--pulse-…)` tokens in
     // tokens.ts. These are mode-agnostic brand hexes (emitted identically

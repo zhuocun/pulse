@@ -66,6 +66,7 @@ const ListContainer = styled.ul`
     max-height: 50vh;
     max-height: 50dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0;
 `;
 
@@ -190,6 +191,7 @@ const PhoneResults = styled.div`
     justify-content: flex-end;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
 `;
 
 /**

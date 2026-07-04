@@ -481,7 +481,10 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                     microcopy.projectLabels
                                                         .addNamePlaceholder
                                                 )}
+                                                autoComplete="off"
                                                 data-testid="label-edit-name"
+                                                enterKeyHint="done"
+                                                inputMode="text"
                                                 onChange={(event) =>
                                                     setEditDraft((draft) =>
                                                         draft
@@ -562,7 +565,10 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                             aria-label={microcopyString(
                                 microcopy.projectLabels.addNamePlaceholder
                             )}
+                            autoComplete="off"
                             data-testid="label-add-name"
+                            enterKeyHint="done"
+                            inputMode="text"
                             onChange={(event) => setNewName(event.target.value)}
                             onPressEnter={handleAdd}
                             placeholder={microcopyString(

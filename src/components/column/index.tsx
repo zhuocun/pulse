@@ -401,6 +401,19 @@ const SelectionCheckboxSlot = styled.span<{ $selected: boolean }>`
         min-height: ${touchTargetCoarse}px;
         min-width: ${touchTargetCoarse}px;
         opacity: 1;
+        padding: 0;
+
+        /* Stretch the AntD checkbox's clickable label to fill the whole
+         * 44 x 44 slot so the tap target matches the visible hit area —
+         * the bare checkbox glyph is only ~22 x 24 px, well under the
+         * WCAG 2.5.8 floor. The glyph stays centred; only the label's
+         * hit region grows. */
+        .ant-checkbox-wrapper {
+            align-items: center;
+            height: 100%;
+            justify-content: center;
+            width: 100%;
+        }
     }
 `;
 
@@ -590,7 +603,9 @@ const PriorityBadge = styled.span<{ $tint: string }>`
 const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
     low: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
     medium: "var(--ant-color-info, #2563eb)",
-    high: "var(--ant-color-warning, #d97706)",
+    // `--ant-color-warning` (#F59E0B) reads at ~2.2:1 on the white card;
+    // `--pulse-priority-high` is the AA-safe, mode-aware amber (see cssVars).
+    high: "var(--pulse-priority-high, #b45309)",
     urgent: "var(--ant-color-error, #dc2626)"
 };
 
@@ -999,7 +1014,10 @@ const ColumnEditModal: React.FC<{
                 <span>{microcopy.a11y.newColumnName}</span>
                 <Input
                     aria-label={microcopy.a11y.newColumnName}
+                    autoComplete="off"
                     autoFocus
+                    enterKeyHint="done"
+                    inputMode="text"
                     onChange={(e) => setName(e.target.value)}
                     onPressEnter={onSave}
                     value={name}
@@ -1034,6 +1052,7 @@ const ColumnEditModal: React.FC<{
                 <span>{microcopy.fields.wipLimit}</span>
                 <InputNumber
                     aria-label={microcopy.fields.wipLimit}
+                    inputMode="numeric"
                     min={0}
                     onChange={(value) =>
                         setWipLimit(typeof value === "number" ? value : 0)
@@ -1523,9 +1542,12 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                     >
                         <Input
                             aria-label={microcopy.a11y.renameTask as string}
+                            autoComplete="off"
                             autoFocus
                             data-testid="task-card-title-input"
                             disabled={isUpdating}
+                            enterKeyHint="done"
+                            inputMode="text"
                             onBlur={commitDraft}
                             onChange={(e) => setDraft(e.target.value)}
                             onClick={(e) => e.stopPropagation()}

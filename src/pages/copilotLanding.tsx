@@ -137,6 +137,7 @@ const CopilotLandingPage = () => {
                         aria-label={microcopy.copilotLanding.askTitle}
                         autoComplete="off"
                         enterKeyHint="send"
+                        inputMode="text"
                         onChange={(event) => setDraft(event.target.value)}
                         onPressEnter={() => goToAsk(draft)}
                         placeholder={

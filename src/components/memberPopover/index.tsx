@@ -23,6 +23,7 @@ const ContentContainer = styled.div`
     max-width: min(30rem, calc(100dvw - ${modalGutterPx}px));
     min-width: min(20rem, calc(100dvw - ${modalGutterPx}px));
     overflow-y: auto;
+    overscroll-behavior: contain;
 `;
 
 const TriggerLabel = styled.span`

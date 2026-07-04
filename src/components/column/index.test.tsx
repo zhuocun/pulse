@@ -813,6 +813,71 @@ describe("Column", () => {
         ).toBeChecked();
     });
 
+    // WCAG 2.5.8 (Target Size, Minimum). The bulk-select checkbox glyph is
+    // only ~22 x 24 px on its own — below the 44 x 44 AAA target. The
+    // `SelectionCheckboxSlot` overlay lifts to `min-height`/`min-width: 44px`
+    // under `@media (pointer: coarse)` and stretches the AntD checkbox label
+    // to fill it, so the tap region matches the visible slot. Walk the
+    // rendered stylesheet (same approach as `projectCard.test.tsx`) and
+    // assert the 44 px declaration is still emitted — a refactor that drops
+    // it below 44 must fail CI.
+    it("declares a touch-target height of at least 44 px on the select slot (WCAG 2.5.8)", () => {
+        renderColumn({ selection: true });
+
+        // Anchor on the checkbox, then walk up to the nearest element that
+        // carries a bare `css-xxx` emotion class (the styled slot),
+        // skipping AntD's `css-var-*` / `css-dev-only-*` markers.
+        const checkbox = screen.getByRole("checkbox", {
+            name: "Select task Build task"
+        });
+        const isEmotionToken = (tok: string) =>
+            /^css-[a-z0-9]{4,}$/i.test(tok) &&
+            !tok.startsWith("css-var-") &&
+            !tok.startsWith("css-dev-only-");
+        let node: HTMLElement | null = checkbox as HTMLElement;
+        let styledCls: string | undefined;
+        while (node) {
+            styledCls = node.className
+                ?.toString()
+                .split(/\s+/)
+                .find(isEmotionToken);
+            if (styledCls) break;
+            node = node.parentElement;
+        }
+        expect(styledCls).toBeTruthy();
+
+        const heights: number[] = [];
+        const visit = (rule: CSSRule) => {
+            if (rule instanceof CSSStyleRule) {
+                if (!styledCls || !rule.selectorText.includes(styledCls))
+                    return;
+                const re = /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
+                let m: RegExpExecArray | null = re.exec(rule.cssText);
+                while (m !== null) {
+                    heights.push(parseFloat(m[1] ?? "0"));
+                    m = re.exec(rule.cssText);
+                }
+            } else if ("cssRules" in rule) {
+                for (const child of Array.from(
+                    (rule as CSSGroupingRule).cssRules
+                )) {
+                    visit(child);
+                }
+            }
+        };
+        Array.from(document.styleSheets).forEach((sheet) => {
+            let rules: CSSRuleList;
+            try {
+                rules = sheet.cssRules;
+            } catch {
+                return;
+            }
+            for (const rule of Array.from(rules)) visit(rule);
+        });
+
+        expect(heights).toContain(44);
+    });
+
     it("disables delete for the optimistic mock column", () => {
         renderColumn({
             boardColumn: column({ _id: "mock", columnName: "Mock" })

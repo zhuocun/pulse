@@ -113,6 +113,14 @@ const ClearAllButton = styled.button`
         color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
         text-decoration-color: currentColor;
     }
+
+    /* Lift to the 44 px touch floor on coarse pointers (WCAG 2.5.8),
+     * mirroring the sibling ChipDismiss control so both filter affordances
+     * stay comfortably tappable on a phone without disturbing the dense
+     * desktop rhythm. */
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
 `;
 
 /**

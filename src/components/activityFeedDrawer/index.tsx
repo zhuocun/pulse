@@ -405,6 +405,11 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
             )}
             onClose={onClose}
             open={open}
+            styles={{
+                body: {
+                    paddingBottom: `max(${space.lg}px, env(safe-area-inset-bottom))`
+                }
+            }}
             title={
                 <span>
                     <HistoryOutlined

@@ -6,7 +6,7 @@ import {
     passwordStrengthMeterValue
 } from "../../constants/passwordStrength";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize } from "../../theme/tokens";
+import { bodyCopyCoarseFontCss } from "../../theme/tokens";
 
 const StrengthBlock = styled.div`
     margin-bottom: 4px;
@@ -37,7 +37,7 @@ const StrengthText = styled.span`
     display: block;
     margin-top: 6px;
     color: var(--ant-color-text-secondary);
-    font-size: ${fontSize.sm}px;
+    ${bodyCopyCoarseFontCss}
     line-height: 1.4;
 `;
 
