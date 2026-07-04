@@ -234,7 +234,7 @@ hardening, M = a few files / small infra change, L = cross-cutting).
    `useAgentHealth.test.tsx` (S).**
 4. **Tighten `waitFor` usage in
    `aiTaskDraftModal/agent.test.tsx` and
-   `boardBriefDrawer/agent.test.tsx` (S).** Use immediate assertions
+   `copilotDock/index.agent.test.tsx` (S).** Use immediate assertions
    or `findBy*` where the transition is genuinely async.
 5. **Relax strict full-sequence SSE assertions in
    `test_agent_sse_transcripts.py` (S).**
