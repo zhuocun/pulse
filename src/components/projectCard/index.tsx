@@ -152,10 +152,18 @@ const TitleLink = styled.a`
     &:focus-visible {
         color: var(--ant-color-primary, #ea580c);
     }
+
+    /* The title is the card's primary keyboard/screen-reader link target;
+     * its own text box is only ~25 px tall. Lift it to the 44 px touch
+     * floor on coarse pointers (WCAG 2.5.8) so the focusable anchor itself
+     * clears the minimum, independent of the card-wide ::after overlay. */
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
 `;
 
 const Organization = styled.span`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
     font-size: ${fontSize.xs}px;
     font-weight: ${fontWeight.medium};
     letter-spacing: ${letterSpacing.normal};
@@ -207,7 +215,7 @@ const MetaSeparator = styled.span`
 `;
 
 const DateChip = styled.span`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
+    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
     flex: 0 0 auto;
     font-size: ${fontSize.xs}px;
     font-variant-numeric: tabular-nums;
@@ -218,7 +226,10 @@ const ActionsCluster = styled.div`
     align-items: center;
     display: inline-flex;
     flex: 0 0 auto;
-    gap: 2px;
+    /* Space the Like and More targets apart so adjacent 44 px touch
+     * regions don't abut — a 2 px gap let a thumb straddle both (WCAG
+     * 2.5.8 spacing). space.xs keeps them visually grouped but distinct. */
+    gap: ${space.xs}px;
     isolation: isolate;
     position: relative;
     z-index: 3;

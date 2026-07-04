@@ -132,6 +132,58 @@ describe("buildAntdTheme", () => {
                     ?.optionHeight
             ).toBe(touchTargetCoarse);
         });
+
+        // WCAG 2.5.8 — each Segmented option is an independent tap target.
+        // On coarse pointers the control heights pin to the 44 px floor and
+        // the track inset drops to 0 so the option fills the full 44 px
+        // (a non-zero inset would shave it to 40 px). Desktop keeps the
+        // dense 36/44/28 ladder with the default 2 px inset.
+        it("pins the Segmented option height to the 44 px floor on coarse pointers", () => {
+            const fine = buildAntdTheme("light", false).components
+                ?.Segmented as
+                | {
+                      controlHeight?: number;
+                      controlHeightSM?: number;
+                      trackPadding?: number;
+                  }
+                | undefined;
+            const coarse = buildAntdTheme("light", true).components
+                ?.Segmented as
+                | {
+                      controlHeight?: number;
+                      controlHeightLG?: number;
+                      controlHeightSM?: number;
+                      trackPadding?: number;
+                  }
+                | undefined;
+
+            expect(fine?.controlHeight).toBe(36);
+            expect(fine?.controlHeightSM).toBe(28);
+            expect(fine?.trackPadding).toBe(2);
+
+            expect(coarse?.controlHeight).toBe(touchTargetCoarse);
+            expect(coarse?.controlHeightLG).toBe(touchTargetCoarse);
+            expect(coarse?.controlHeightSM).toBe(touchTargetCoarse);
+            // Zero inset means labelHeight === controlHeight === 44, so the
+            // small-size board-density picker clears the floor too.
+            expect(coarse?.trackPadding).toBe(0);
+        });
+
+        // WCAG 2.5.8 — the dense desktop Dropdown padding (space.xxs) caps a
+        // menu row at ~32 px on touch. On coarse pointers the vertical
+        // padding grows so each row clears 44 px (content 24 px + 2 × 10 px).
+        it("pads Dropdown menu rows to the 44 px floor on coarse pointers", () => {
+            const fine = buildAntdTheme("light", false).components?.Dropdown as
+                | { paddingBlock?: number }
+                | undefined;
+            const coarse = buildAntdTheme("light", true).components
+                ?.Dropdown as { paddingBlock?: number } | undefined;
+
+            expect(fine?.paddingBlock).toBe(4);
+            // fontSize.md (16) × lineHeight.normal (1.5) = 24 px content;
+            // (44 − 24) / 2 = 10 px on each edge → 44 px row.
+            expect(coarse?.paddingBlock).toBe(10);
+        });
     });
 
     describe("Modal component overrides", () => {

@@ -153,6 +153,13 @@ const MentionLink = styled(Link)`
     &:focus-visible {
         background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
     }
+
+    /* The whole row is the link target; its single-line body leaves it just
+     * under 44 px. Lift to the touch floor on coarse pointers (WCAG 2.5.8)
+     * so a thumb lands the mention without zoom. */
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
 `;
 
 const MentionAction = styled.span`

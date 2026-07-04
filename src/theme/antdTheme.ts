@@ -173,6 +173,17 @@ export const buildAntdTheme = (
             optionPadding: `${space.xs}px ${space.sm}px`,
             optionHeight: coarsePointer ? touchTargetCoarse : 32
         },
+        Segmented: {
+            // Each option is an independent tap target. Drop the 2 px track
+            // inset on coarse pointers and pin the control height to the
+            // 44 px floor so each option fills the full 44 px (WCAG 2.5.8) —
+            // the default inset would otherwise leave a 40 px option. Covers
+            // the board-density, theme, and language pickers in one place.
+            controlHeight: coarsePointer ? touchTargetCoarse : 36,
+            controlHeightLG: coarsePointer ? touchTargetCoarse : 44,
+            controlHeightSM: coarsePointer ? touchTargetCoarse : 28,
+            trackPadding: coarsePointer ? 0 : 2
+        },
         Table: {
             cellPaddingBlock: space.sm,
             cellPaddingInline: space.md,
@@ -254,7 +265,15 @@ export const buildAntdTheme = (
         },
         Dropdown: {
             borderRadiusLG: radius.md,
-            paddingBlock: space.xxs
+            // Menu-item vertical padding. The dense desktop value (space.xxs)
+            // caps each row at ~32 px — below the WCAG 2.5.8 floor on touch —
+            // because it overrides AntD's height-derived default. On coarse
+            // pointers pad so a row clears 44 px: content is fontSize.md ×
+            // lineHeight.normal (24 px), so (44 − 24) / 2 = 10 px of padding
+            // on each edge lands the row at exactly the 44 px touch minimum.
+            paddingBlock: coarsePointer
+                ? (touchTargetCoarse - fontSize.md * lineHeight.normal) / 2
+                : space.xxs
         }
     }
 });
