@@ -107,10 +107,10 @@ tests / 142 suites) so the suite has grown.
   `src/components/aiTaskAssistPanel/agent.test.tsx:287`.
 - Real wall-clock `setTimeout` use remains in 3 test files; example
   `src/components/aiTaskAssistPanel/index.test.tsx:305`.
-- Strict suites with auto-mocked `useAiEnabled` but no explicit
-  `useAutonomyLevel` override appear in 7 files; example
-  `src/__tests__/uiQuality.strict.test.tsx:48` (currently safe;
-  fragile if Board/Ai drawer surfaces are added later).
+- Suites with auto-mocked `useAiEnabled` but no explicit
+  `useAutonomyLevel` override appear in 6 files; example
+  `src/pages/settings.test.tsx:16` (currently safe; fragile if
+  Board/Ai drawer surfaces are added later).
 
 ## Backend pytest
 
@@ -234,7 +234,7 @@ hardening, M = a few files / small infra change, L = cross-cutting).
    `useAgentHealth.test.tsx` (S).**
 4. **Tighten `waitFor` usage in
    `aiTaskDraftModal/agent.test.tsx` and
-   `boardBriefDrawer/agent.test.tsx` (S).** Use immediate assertions
+   `copilotDock/index.agent.test.tsx` (S).** Use immediate assertions
    or `findBy*` where the transition is genuinely async.
 5. **Relax strict full-sequence SSE assertions in
    `test_agent_sse_transcripts.py` (S).**

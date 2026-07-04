@@ -40,7 +40,7 @@ Node version requirement: use the version pinned in `.nvmrc`.
 
 ### Environment variables
 
-_Source: `src/constants/env.ts:1`_
+_Source: `src/constants/env.ts`_
 
 | Variable                     | Default                                   | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -64,7 +64,7 @@ interface Environment {
 
 ### Auth session storage
 
-_Source: `src/utils/authProvider.tsx:1`, `src/utils/hooks/useApi.ts:1`_
+_Source: `src/utils/authProvider.tsx`, `src/utils/hooks/useApi.ts`_
 
 `POST /api/v1/auth/login` sets the REST JWT in an HttpOnly `Token` cookie.
 Frontend code cannot read that cookie; all REST calls use same-origin
@@ -222,7 +222,7 @@ Idempotency-Key: <uuid>
 
 ### `useApi`
 
-_Source: `src/utils/hooks/useApi.ts:86`_
+_Source: `src/utils/hooks/useApi.ts`_
 
 ```ts
 const useApi: () => (
@@ -254,7 +254,7 @@ The bare `api` function is also exported for use outside of React components.
 
 ### `useReactQuery`
 
-_Source: `src/utils/hooks/useReactQuery.ts:18`_
+_Source: `src/utils/hooks/useReactQuery.ts`_
 
 ```ts
 const useReactQuery: <D>(
@@ -278,7 +278,7 @@ Thin wrapper around `@tanstack/react-query` `useQuery`.
 
 ### `useReactMutation`
 
-_Source: `src/utils/hooks/useReactMutation.ts:27`_
+_Source: `src/utils/hooks/useReactMutation.ts`_
 
 ```ts
 const useReactMutation: <D>(
@@ -300,7 +300,7 @@ const useReactMutation: <D>(
 
 ### `useAuth`
 
-_Source: `src/utils/hooks/useAuth.ts:7`_
+_Source: `src/utils/hooks/useAuth.ts`_
 
 ```ts
 const useAuth: () => {
@@ -319,7 +319,7 @@ const useAuth: () => {
 
 ### `useNotifications`
 
-_Source: `src/utils/hooks/useNotifications.ts:46`_
+_Source: `src/utils/hooks/useNotifications.ts`_
 
 ```ts
 const useNotifications: () => {
@@ -343,7 +343,7 @@ The notifications inbox hook (consumer side; the producer — comment @mentions 
 
 ### `useLabels`
 
-_Source: `src/utils/hooks/useLabels.ts:60`_
+_Source: `src/utils/hooks/useLabels.ts`_
 
 ```ts
 const useLabels: (projectId: string | undefined) => {
@@ -372,7 +372,7 @@ The project-labels hook. Used by `board.tsx` (to resolve card label chips), the 
 
 ### `useProjectMembers`
 
-_Source: `src/utils/hooks/useProjectMembers.ts:38`_
+_Source: `src/utils/hooks/useProjectMembers.ts`_
 
 ```ts
 const useProjectMembers: (
@@ -392,7 +392,7 @@ Member **management** (add / change-role / remove) is a separate hook, `useProje
 
 ### `useComments`
 
-_Source: `src/utils/hooks/useComments.ts:83`_
+_Source: `src/utils/hooks/useComments.ts`_
 
 ```ts
 const useComments: (taskId: string | undefined) => {
@@ -419,7 +419,7 @@ The task-comments hook backing `commentsThread` (rendered inside `taskModal`).
 
 ### `useMilestones`
 
-_Source: `src/utils/hooks/useMilestones.ts:44`_
+_Source: `src/utils/hooks/useMilestones.ts`_
 
 ```ts
 const useMilestones: (
@@ -437,7 +437,7 @@ The project-milestones read hook. Used by the `taskModal` milestone picker (`mil
 
 ### `useAi`
 
-_Source: `src/utils/hooks/useAi.ts:247`_
+_Source: `src/utils/hooks/useAi.ts`_
 
 ```ts
 const useAi: <T>(options: { route: AiRoute }) => {
@@ -501,7 +501,7 @@ interface RunPayload {
 
 ### `useAiChat`
 
-_Source: `src/utils/hooks/useAiChat.ts:90`_
+_Source: `src/utils/hooks/useAiChat.ts`_
 
 ```ts
 const useAiChat: (ctx: UseAiChatContext | null) => {
@@ -547,7 +547,7 @@ interface UseAiChatContext {
 
 ### `useAgent`
 
-_Source: `src/utils/hooks/useAgent.ts:215`_
+_Source: `src/utils/hooks/useAgent.ts`_
 
 ```ts
 const useAgent: (name: string, options?: UseAgentOptions) => UseAgentResult;
@@ -624,7 +624,7 @@ interface StartOptions {
 
 ### `useAgentHealth`
 
-_Source: `src/utils/hooks/useAgentHealth.ts:28`_
+_Source: `src/utils/hooks/useAgentHealth.ts`_
 
 ```ts
 const useAgentHealth: (
@@ -656,7 +656,7 @@ interface UseAgentHealthState {
 
 ### `useAiEnabled`
 
-_Source: `src/utils/hooks/useAiEnabled.ts:36`_
+_Source: `src/utils/hooks/useAiEnabled.ts`_
 
 ```ts
 const useAiEnabled: () => {
@@ -686,7 +686,7 @@ export const useAutonomyLevel: () => {
 
 ### `useAiProjectDisabled`
 
-_Source: `src/utils/hooks/useAiProjectDisabled.ts:13`_
+_Source: `src/utils/hooks/useAiProjectDisabled.ts`_
 
 ```ts
 const useAiProjectDisabled: (projectId: string | undefined | null) => {
@@ -704,7 +704,7 @@ const useAiProjectDisabled: (projectId: string | undefined | null) => {
 
 ### `useAiChatDrawer`
 
-_Source: `src/utils/hooks/useAiChatDrawer.ts:11`_
+_Source: `src/utils/hooks/useAiChatDrawer.ts`_
 
 ```ts
 const useAiChatDrawer: () => {
@@ -721,7 +721,7 @@ URL-driven drawer state via `?chat=1` or `?chat=1:<encodedPrompt>`. The system b
 
 ### `useAiDraftModal`
 
-_Source: `src/utils/hooks/useAiDraftModal.ts:13`_
+_Source: `src/utils/hooks/useAiDraftModal.ts`_
 
 ```ts
 const useAiDraftModal: () => {
@@ -737,7 +737,7 @@ URL-driven modal state via `?aiDraft=<columnId>`. Each `TaskCreator` only render
 
 ### `useBoardBriefDrawer`
 
-_Source: `src/utils/hooks/useBoardBriefDrawer.ts:12`_
+_Source: `src/utils/hooks/useBoardBriefDrawer.ts`_
 
 ```ts
 const useBoardBriefDrawer: () => {
@@ -753,7 +753,7 @@ URL-driven drawer state via `?brief=1`.
 
 ### `useTrashDrawer` / `useArchiveDrawer`
 
-_Sources: `src/utils/hooks/useTrashDrawer.ts:18`, `src/utils/hooks/useArchiveDrawer.ts:18`_
+_Sources: `src/utils/hooks/useTrashDrawer.ts`, `src/utils/hooks/useArchiveDrawer.ts`_
 
 ```ts
 const useTrashDrawer: () => {
@@ -774,7 +774,7 @@ Redux-backed open/close flags (via `_createOverlayHook`) for the board's two tas
 
 ### `useDragEnd`
 
-_Source: `src/utils/hooks/useDragEnd.ts:11`_
+_Source: `src/utils/hooks/useDragEnd.ts`_
 
 ```ts
 const useDragEnd: (options?: { tasksEnabled?: boolean }) => {
@@ -790,7 +790,7 @@ Handles `@hello-pangea/dnd` drop events. Column reorders call `PUT /api/v1/board
 
 ### `useUrl`
 
-_Source: `src/utils/hooks/useUrl.ts:6`_
+_Source: `src/utils/hooks/useUrl.ts`_
 
 ```ts
 const useUrl: <K extends string>(
@@ -806,7 +806,7 @@ Typed wrapper around React Router `useSearchParams`. Setting a key to `undefined
 
 ### `engine.ts` — local deterministic engine
 
-_Source: `src/utils/ai/engine.ts:1`_
+_Source: `src/utils/ai/engine.ts`_
 
 All functions are pure and synchronous. They are called by `localResolve` in `useAi.ts` when `REACT_APP_AI_BASE_URL` is unset.
 
@@ -931,7 +931,7 @@ Exported helpers used by the engine internally and by AI surface tests.
 
 ### `agentClient.ts` — streaming agent transport
 
-_Source: `src/utils/ai/agentClient.ts:1`_
+_Source: `src/utils/ai/agentClient.ts`_
 
 Typed HTTP transport over the LangGraph v2 agent surface. All functions refresh
 the short-lived `ai_jwt` when needed and attach it via
@@ -1029,7 +1029,7 @@ Measures round-trip latency client-side when the body omits `latencyMs`. The ser
 
 ### `chatTools.ts` — chat tool execution
 
-_Source: `src/utils/ai/chatTools.ts:1`_
+_Source: `src/utils/ai/chatTools.ts`_
 
 #### `executeChatToolCall`
 
@@ -1107,7 +1107,7 @@ Exported constant of allowed chat tool names.
 
 ### `aiDataScope.ts` — per-route privacy declarations
 
-_Source: `src/utils/ai/aiDataScope.ts:1`_
+_Source: `src/utils/ai/aiDataScope.ts`_
 
 #### `AI_DATA_SCOPES`
 
@@ -1150,7 +1150,7 @@ Called by `useAi.ts` (before remote AI v1 requests) and `useAiChat.ts` (before r
 
 ### `projectAiStorage.ts` — per-project AI opt-out
 
-_Source: `src/utils/ai/projectAiStorage.ts:1`_
+_Source: `src/utils/ai/projectAiStorage.ts`_
 
 #### `isProjectAiDisabled`
 
@@ -1194,7 +1194,7 @@ Stable error message string thrown by `assertRunPayloadProjectsAiAllowed` and us
 
 ### `remoteAiConsent.ts` — one-shot remote-AI consent banner
 
-_Source: `src/utils/ai/remoteAiConsent.ts:1`_
+_Source: `src/utils/ai/remoteAiConsent.ts`_
 
 Stores acknowledgement of the "Board Copilot is connected to a remote AI service"
 banner per-device and per-configured-base-URL. Falls back to in-memory state when
@@ -1229,7 +1229,7 @@ Test-only helper. Clears the in-memory map and removes the matching `localStorag
 
 ### `aiAuthHeader.ts` — auth header factory
 
-_Source: `src/utils/aiAuthHeader.ts:1`_
+_Source: `src/utils/aiAuthHeader.ts`_
 
 #### `getStoredBearerAuthHeader`
 
@@ -1245,7 +1245,7 @@ or `""` when no token is stored. Used by `useAi.ts`, `useAiChat.ts`, and
 
 ### `agentHealth.ts` — health probe
 
-_Source: `src/utils/ai/agentHealth.ts:1`_
+_Source: `src/utils/ai/agentHealth.ts`_
 
 #### `pingAgent`
 
@@ -1264,7 +1264,7 @@ tick.
 
 ### `idempotencyKey.ts` — idempotency key generator
 
-_Source: `src/utils/ai/idempotencyKey.ts:1`_
+_Source: `src/utils/ai/idempotencyKey.ts`_
 
 ```ts
 function newIdempotencyKey(): string;
@@ -1279,7 +1279,7 @@ cache the key across retries.
 
 ### `mapErrorResponse.ts` — HTTP status → typed error mapper
 
-_Source: `src/utils/ai/mapErrorResponse.ts:1`_
+_Source: `src/utils/ai/mapErrorResponse.ts`_
 
 ```ts
 async function mapErrorResponse(response: Response): Promise<Error>;
@@ -1294,7 +1294,7 @@ error taxonomy and `aiErrorView` can render consistent UI copy.
 
 ### `sinks.ts` — observability sinks
 
-_Source: `src/utils/observability/sinks.ts:1`_
+_Source: `src/utils/observability/sinks.ts`_
 
 Three sinks wired from `src/index.tsx`:
 
@@ -1322,7 +1322,7 @@ Both HTTP sinks swallow failures after one retry and never throw.
 
 ### `chatEngine.ts` — local chat assistant
 
-_Source: `src/utils/ai/chatEngine.ts:1`_
+_Source: `src/utils/ai/chatEngine.ts`_
 
 #### `chatAssistantTurn`
 
@@ -1397,7 +1397,7 @@ type ChatTurnResult =
 
 ### FE Tool Registry (`feTools/`)
 
-_Source: `src/utils/ai/feTools/index.ts:34`_
+_Source: `src/utils/ai/feTools/index.ts`_
 
 ```ts
 const FE_TOOL_REGISTRY: Record<string, FeTool<unknown, unknown>>;
@@ -1467,7 +1467,7 @@ full note is forwarded.
 
 ### `IDraftTaskSuggestion`
 
-_Source: `src/interfaces/ai.d.ts:3`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface IDraftTaskSuggestion {
@@ -1492,7 +1492,7 @@ sequence: `1 | 2 | 3 | 5 | 8 | 13`.
 
 ### `ITaskBreakdownSuggestion`
 
-_Source: `src/interfaces/ai.d.ts:95`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface ITaskBreakdownSuggestion {
@@ -1507,7 +1507,7 @@ from the parent draft. Each item has its own `confidence` and `rationale`.
 
 ### `IEstimateSuggestion`
 
-_Source: `src/interfaces/ai.d.ts:21`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface IEstimateSuggestion {
@@ -1532,7 +1532,7 @@ heuristics and sets a lower `confidence`.
 
 ### `IReadinessReport`
 
-_Source: `src/interfaces/ai.d.ts:33`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface IReadinessReport {
@@ -1555,7 +1555,7 @@ start. `severity` escalates from informational nudges (`"info"`) through soft wa
 
 ### `IBoardBrief`
 
-_Source: `src/interfaces/ai.d.ts:80`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface IBoardBrief {
@@ -1604,7 +1604,7 @@ pre-date this field omit it; surfaces degrade gracefully.
 
 ### `ISearchResult`
 
-_Source: `src/interfaces/ai.d.ts:114`_
+_Source: `src/interfaces/ai.d.ts`_
 
 ```ts
 interface ISearchResult {
@@ -1631,7 +1631,7 @@ Remote engines that pre-date these optional fields omit them; the UI degrades gr
 
 ### `MutationProposal`
 
-_Source: `src/interfaces/agent.d.ts:79`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface MutationProposal {
@@ -1686,7 +1686,7 @@ reversed via the undo toast.
 
 ### `StreamPart`
 
-_Source: `src/interfaces/agent.d.ts:122`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 type StreamPart =
@@ -1727,7 +1727,7 @@ type CustomEvent =
 
 ### `AgentMetadata`
 
-_Source: `src/interfaces/agent.d.ts:14`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface AgentMetadata {
@@ -1752,7 +1752,7 @@ The server response also carries `tags: string[]`, `recursion_limit: number`, an
 
 ### `AgentStreamRequest`
 
-_Source: `src/interfaces/agent.d.ts:133`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface AgentStreamRequest {
@@ -1782,7 +1782,7 @@ to prevent identity spoofing.
 
 ### `InterruptPayload`
 
-_Source: `src/interfaces/agent.d.ts:107`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface InterruptPayload {
@@ -1800,7 +1800,7 @@ surfacing the interrupt to the UI.
 
 ### `TriageNudge`
 
-_Source: `src/interfaces/agent.d.ts:87`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface TriageNudge {
@@ -1821,7 +1821,7 @@ the tasks or members the nudge applies to.
 
 ### `CitationRef`
 
-_Source: `src/interfaces/agent.d.ts:28`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 interface CitationRef {
@@ -1840,7 +1840,7 @@ round; in `useAgent`, they accumulate from `custom` events per turn.
 
 ### `AutonomyLevel`
 
-_Source: `src/interfaces/agent.d.ts:12`_
+_Source: `src/interfaces/agent.d.ts`_
 
 ```ts
 type AutonomyLevel = "suggest" | "plan" | "auto";

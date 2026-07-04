@@ -44,11 +44,11 @@ concrete rule plus the canonical anchor that demonstrates it.
   `FE_TOOL_REGISTRY.size` (currently 11) matches `ALL_FE_TOOL_NAMES`
   matches `FE_TOOL_SCHEMAS`. Every BE-advertised tool has an FE
   resolver; every `interrupt(NAME, …)` reaches a registry entry or an
-  explicit HITL special case (`useAgentToolResolver.ts:241-243`).
+  explicit HITL special case (`useAgentToolResolver.ts:254-258`).
 - **Decompositional** — Split by responsibility, not by cosmetic file
   count. >800 LOC of business code in one file is a smell; <50 LOC files
   that always travel together should fold back. Outliers
-  (`aiChatDrawer/index.tsx`, `useAgent.ts`) are tracked debt, not models.
+  (`copilotDock/ChatTabBody.tsx`, `useAgent.ts`) are tracked debt, not models.
 - **Smart** — Don't defend against scenarios that can't happen. No
   compat shims for refactors that completed (the `fe.applyMutation`
   cleanup is the template). Fix root causes, not symptoms.
@@ -100,7 +100,7 @@ concrete rule plus the canonical anchor that demonstrates it.
 - Both `useAi` (v1 JSON) and `useAgent` (v2.1 SSE) commonly mount unconditionally
   in components that switch on `environment.aiUseLocalEngine`. This is required —
   conditionally calling either hook breaks React's hook-ordering rule. See
-  `AiChatDrawer` and `BoardBriefDrawer` for the canonical pattern.
+  `copilotDock/ChatTabBody.tsx` and `copilotDock/BriefTabBody.tsx` for the canonical pattern.
 - Migration progress for the six structured routes lives in
   `docs/todo/product-done.md`. As of 2026-05-05, all six are on the
   v2.1 SSE surface in remote builds (each component dual-mounts `useAgent`
@@ -116,11 +116,11 @@ concrete rule plus the canonical anchor that demonstrates it.
   `src/utils/ai/mapErrorResponse.ts` compatible with both shapes, because older
   tests/docs still refer to the flat envelope while the live FE-BE contract is
   nested.
-- Tests that render `BoardPage` or `AiChatDrawer` and partial-mock
+- Tests that render `BoardPage` or `CopilotDock` and partial-mock
   `../utils/hooks/useAiEnabled` MUST also mock `useAutonomyLevel: () => ({level:
 "plan", setLevel: jest.fn()})`. Otherwise `useAgent` crashes destructuring
-  `{level}` from `undefined`. See the four `src/__tests__/*.strict.test.tsx`
-  suites for examples.
+  `{level}` from `undefined`. See the `uiAccessibility.strict.test.tsx` and
+  `uiLoadingErrorStates.strict.test.tsx` suites for examples.
 - Components that trigger `remoteAgent.start()` from an effect must not depend on
   the whole `useAgent()` return object. `useAgent` returns a memoized object
   whose identity still changes on streaming state updates (`isStreaming`,

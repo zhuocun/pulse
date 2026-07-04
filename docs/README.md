@@ -81,6 +81,9 @@ the whole backlog without folder-hopping.
   and recommended follow-ups.
 - [`operations/cursor-cloud.md`](operations/cursor-cloud.md) — VM
   setup notes for Cursor Cloud (mongod, NVM, Jest heap bump).
+- [`operations/agent-stream-resume.md`](operations/agent-stream-resume.md)
+  — support/operator runbook for agent SSE resume, idempotency, and
+  retries (`thread_id` vs `Idempotency-Key`, `409` / `422` triage).
 
 ## Design
 
@@ -89,3 +92,10 @@ the whole backlog without folder-hopping.
   RMF, etc.).
 - [`design/mobile-native-best-practices.md`](design/mobile-native-best-practices.md)
   — mobile responsive patterns and red flags.
+- [`design/modal-routing-policy.md`](design/modal-routing-policy.md) —
+  adopted policy: new detail surfaces are routed (URL-addressable) by
+  default; AntD `Modal` is reserved for ephemeral yes/no/cancel prompts.
+- [`design/ui-ux-comprehensive-review-2026-05.md`](design/ui-ux-comprehensive-review-2026-05.md)
+  — consolidated 2026-05 UI/UX audit (124 findings across six surface
+  reports, 30 screenshots); the per-surface source reports live under
+  [`design/_review-2026-05/`](design/_review-2026-05/).

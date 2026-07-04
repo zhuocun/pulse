@@ -2,7 +2,7 @@
 
 Implementation of the feature set from the completeness review/brainstorm,
 built in dependency-ordered milestones. Each milestone is reviewed +
-gated + committed before the next. Branch: `claude/clever-gauss-YckJC`.
+gated + committed before the next.
 
 > **As-built docs:** M1–M4 (RBAC/membership, task & board richness, comments
 > + @mentions, notifications, and the shipped frontend surfaces) are now
@@ -156,17 +156,20 @@ slice that consumes it. Actionable task: **PRD-GAP-036** in
   tsc/eslint/prettier/smoke but NOT jest, so a broken consumer test slips
   through. The trash filter (`a43afd70`) broke `board.test.tsx`'s trash-button
   test (its fixtures set no `deletedAt`); caught + fixed in `e31adf95`.
-- FE clear-semantics for nullable scalar FKs — RESOLVED for `milestoneId`
-  (`96030127`). `filterRequest` (`utils/filterRequest.ts`) strips
-  `null`/`undefined`/`""` from every request body, so a cleared scalar select
-  used to reach the wire as an ABSENT KEY → the task PUT treated absent =
-  unchanged → the FK silently reverted on refetch (multi-selects dodge it:
-  `[]` is non-void, like `dependsOn`). FIX: an additive opt-in
-  `preserveNullKeys` on `filterRequest`/`useReactMutation` keeps listed keys
-  for any non-`undefined` value; the task modal opts in for `milestoneId` and
-  maps the cleared `undefined→null` in `onOk`. `parentTaskId` and the date
-  fields have the SAME latent gap and can adopt `preserveNullKeys` the same
-  way (a 1-line opt-in each) — a cheap follow-up. Recon: `a0a1f195`.
+- FE clear-semantics for nullable scalar FKs — RESOLVED for `milestoneId`,
+  `parentTaskId`, `startDate`, and `dueDate`. `filterRequest`
+  (`utils/filterRequest.ts`) strips `null`/`undefined`/`""` from every request
+  body, so a cleared scalar select used to reach the wire as an ABSENT KEY →
+  the task PUT treated absent = unchanged → the FK silently reverted on refetch
+  (multi-selects dodge it: `[]` is non-void, like `dependsOn`). FIX: an
+  additive opt-in `preserveNullKeys` on `filterRequest`/`useReactMutation`
+  keeps listed keys for any non-`undefined` value; `taskModal` now opts in for
+  all four fields (`src/components/taskModal/index.tsx` — the
+  `["milestoneId", "parentTaskId", "startDate", "dueDate"]` list plus the
+  `?? null` coercions in `onOk`) and `taskDetailPanel` applies the same pattern
+  to its clearable set (`["parentTaskId", "startDate", "dueDate"]`; it renders
+  no milestone picker). Tracked as the (now closed) PRD-GAP-005 in
+  [`prd-gap-todo.md`](prd-gap-todo.md).
 
 ### Excluded (per review "don't build")
 MCP, voice, CRDT co-editing, four-level autonomy dial, configurable

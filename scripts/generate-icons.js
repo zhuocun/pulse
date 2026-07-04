@@ -1,14 +1,16 @@
 /**
- * Generate PWA icon PNGs from the brand SVG.
+ * Generate placeholder PWA icon SVGs from the brand mark.
  *
- * This produces minimal valid PNGs with the brand gradient mark on a white
- * background (standard icons) and on an orange background with padding
- * (maskable icons, safe zone = inner 80%).
+ * This writes SVGs for the standard icons (brand gradient mark on white) and
+ * the maskable icons (white mark on orange, safe zone = inner 80%) at 192 and
+ * 512 into public/icons/. These resolve the SVG-alternate entries in the
+ * manifest and the `rel="icon"` reference in index.html.
  *
  * Run: node scripts/generate-icons.js
  *
- * For production-quality icons, use pwa-asset-generator or a design tool.
- * These are placeholder icons that resolve the 404 gaps in the manifest.
+ * The production PNG variants shipped in public/ (apple-touch-icon-*.png and
+ * public/icons/*.png) are NOT produced here — generate those with
+ * pwa-asset-generator or a design tool.
  */
 const fs = require("fs");
 const path = require("path");
@@ -62,12 +64,6 @@ for (const size of SIZES) {
         makeSvgIcon(size, true)
     );
 }
-
-// Also generate an apple-touch-icon (180x180 is Apple's standard)
-fs.writeFileSync(
-    path.join(OUTPUT_DIR, "..", "apple-touch-icon.svg"),
-    makeSvgIcon(180, false)
-);
 
 console.log("Generated SVG icons in public/icons/");
 console.log(
