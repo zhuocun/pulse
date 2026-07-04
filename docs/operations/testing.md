@@ -109,7 +109,7 @@ tests / 142 suites) so the suite has grown.
   `src/components/aiTaskAssistPanel/index.test.tsx:305`.
 - Strict suites with auto-mocked `useAiEnabled` but no explicit
   `useAutonomyLevel` override appear in 7 files; example
-  `src/__tests__/uiQuality.strict.test.tsx:48` (currently safe;
+  `src/__tests__/uiAccessibility.strict.test.tsx` (currently safe;
   fragile if Board/Ai drawer surfaces are added later).
 
 ## Backend pytest

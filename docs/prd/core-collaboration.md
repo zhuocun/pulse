@@ -346,7 +346,7 @@ Deleting a label removes it **and** strips its id from every task in the same pr
 ### 7.4 Frontend status — ✅ Chips + label management shipped
 
 - **Label chips render on cards** (board → column → card; §6.5).
-- **A label-management UI ships (PRD-GAP-011).** `LabelsManager` (`src/components/labelsManager/index.tsx`) consumes `useLabels` create / update / delete at the routed `/projects/:projectId/labels` page (`src/pages/labels`, wired in `src/routes/index.tsx`). Editor-gated create / edit / delete controls drive the list; delete relies on the server cascade-strip of the label id from tasks (§7.2). Labels remain applicable via the `TaskModal` / `TaskDetailPanel` picker.
+- **A label-management UI ships (PRD-GAP-011).** `LabelsManager` (`src/components/labelsManager/index.tsx`) consumes `useLabels` create / update / delete at the routed `/projects/:projectId/labels` page (`src/pages/labels.tsx`, wired in `src/routes/index.tsx`). Editor-gated create / edit / delete controls drive the list; delete relies on the server cascade-strip of the label id from tasks (§7.2). Labels remain applicable via the `TaskModal` / `TaskDetailPanel` picker.
 
 ---
 

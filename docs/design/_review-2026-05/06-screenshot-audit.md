@@ -6,7 +6,7 @@ The look is calm, premium, and brand-consistent across light/dark and every view
 
 ## Capture matrix (routes × viewports × states actually captured)
 
-30 screenshots, `/home/user/pulse/docs/design/_review-2026-05/screenshots/`. Naming: `<route-slug>__<viewport>__<scheme>.png`.
+30 screenshots, `docs/design/_review-2026-05/screenshots/`. Naming: `<route-slug>__<viewport>__<scheme>.png`.
 
 | Surface                        | iPhone SE | iPhone 13 (light) | iPhone 13 (dark) | Pixel 7 | iPad portrait | iPad landscape | Desktop (light) | Desktop (dark) | Wide |
 | ------------------------------ | --------- | ----------------- | ---------------- | ------- | ------------- | -------------- | --------------- | -------------- | ---- |

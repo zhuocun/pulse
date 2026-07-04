@@ -397,16 +397,16 @@ Things the subagents flagged that we'd consciously *not* do this year.
 
 ### Subagent reports
 
-- `/home/user/pulse/docs/design/_review-2026-05/01-auth-and-projects.md` — 34 findings + 4 ambitions
-- `/home/user/pulse/docs/design/_review-2026-05/02-board-and-project-detail.md` — 20 findings + 5 ambitions
-- `/home/user/pulse/docs/design/_review-2026-05/03-modals-and-forms.md` — 17 findings + 4 ambitions
-- `/home/user/pulse/docs/design/_review-2026-05/04-ai-copilot.md` — 27 findings + 6 ambitions
-- `/home/user/pulse/docs/design/_review-2026-05/05-pwa-mobile-a11y-designsystem.md` — 20 findings + 5 ambitions + token-coverage audit
-- `/home/user/pulse/docs/design/_review-2026-05/06-screenshot-audit.md` — 10 findings across 30 screenshots
+- `docs/design/_review-2026-05/01-auth-and-projects.md` — 34 findings + 4 ambitions
+- `docs/design/_review-2026-05/02-board-and-project-detail.md` — 20 findings + 5 ambitions
+- `docs/design/_review-2026-05/03-modals-and-forms.md` — 17 findings + 4 ambitions
+- `docs/design/_review-2026-05/04-ai-copilot.md` — 27 findings + 6 ambitions
+- `docs/design/_review-2026-05/05-pwa-mobile-a11y-designsystem.md` — 20 findings + 5 ambitions + token-coverage audit
+- `docs/design/_review-2026-05/06-screenshot-audit.md` — 10 findings across 30 screenshots
 
 ### Screenshots, by surface
 
-Path prefix: `/home/user/pulse/docs/design/_review-2026-05/screenshots/`
+Path prefix: `docs/design/_review-2026-05/screenshots/`
 
 - **Auth.** `login__desktop__light.png`, `login__iphone13__{light,dark}.png`, `login__iphoneSE__light.png`, `register__desktop__light.png`, `register__iphone13__light.png`, `forgot-password__iphone13__light.png`.
 - **Projects list.** `projects__desktop__{light,dark}.png`, `projects__iphone13__{light,dark}.png`, `projects__iphoneSE__light.png`, `projects__pixel7__light.png`, `projects__ipad{Portrait,Landscape}__light.png`, `projects__wide__light.png`, `projects-modal-create__{desktop,iphone13}__light.png`.
@@ -416,6 +416,6 @@ Path prefix: `/home/user/pulse/docs/design/_review-2026-05/screenshots/`
 
 ### Reference standards
 
-- `/home/user/pulse/docs/design/mobile-native-best-practices.md` — boilerplate, PWA, bottom-tab guidance, safe-area + viewport units, keyboard handling, drag/touch + 44 px targets, dynamic type, dark mode + reduced motion + reduced transparency, the Baymard 2024 broken-back-button citation.
-- `/home/user/pulse/docs/design/ai-ux-best-practices.md` — five core axioms (calibrated transparency, user agency, reversibility, honest framing, privacy by default), prompt input design, streaming, follow-up chips, conversational vs structured output, source attribution, autonomy + consent, AI Inbox pattern, mutation proposal contract.
-- `/home/user/pulse/src/theme/tokens.ts` — design tokens. Palette swap is one line in `src/theme/palettes/index.ts`.
+- `docs/design/mobile-native-best-practices.md` — boilerplate, PWA, bottom-tab guidance, safe-area + viewport units, keyboard handling, drag/touch + 44 px targets, dynamic type, dark mode + reduced motion + reduced transparency, the Baymard 2024 broken-back-button citation.
+- `docs/design/ai-ux-best-practices.md` — five core axioms (calibrated transparency, user agency, reversibility, honest framing, privacy by default), prompt input design, streaming, follow-up chips, conversational vs structured output, source attribution, autonomy + consent, AI Inbox pattern, mutation proposal contract.
+- `src/theme/tokens.ts` — design tokens. Palette swap is one line in `src/theme/palettes/index.ts`.
