@@ -136,10 +136,15 @@ In this repo: login/registration already had `inputMode` + `enterKeyHint`. The f
 
 - **Dark mode**: drive with CSS variables flipped via `prefers-color-scheme`. Inject a blocking script that reads the `Sec-CH-Prefers-Color-Scheme` client hint to prevent the flash on SSR.
 - **System fonts**: `-apple-system, BlinkMacSystemFont, system-ui, …` mimics the platform shell.
+- **Dynamic type / body size**: native iOS body copy reads ~16–17 px; a 14 px web base feels cramped on a phone. Lift the base type scale one step on `pointer: coarse` while keeping desktop dense, and never let body/label copy fall below the 14 px mobile floor.
 - **Reduced motion**: default to no motion, gate animation inside `@media (prefers-reduced-motion: no-preference)`. The EU Accessibility Act (2026) effectively requires this.
 - **Theme-color** with `media` queries swaps the URL bar / status bar color in dark mode.
 
-In this repo: dark mode is fully wired via `useColorScheme`, AntD `ConfigProvider`, and matching `theme-color` meta tags. Reduced motion has both a global guard (`src/App.css:230–242`) and a `useReducedMotion` hook for component opt-in.
+In this repo:
+
+- Dark mode is fully wired via `useColorScheme`, AntD `ConfigProvider`, and matching `theme-color` meta tags. Reduced motion has both a global guard (`src/App.css:230–242`) and a `useReducedMotion` hook for component opt-in.
+- `buildAntdTheme` (`src/theme/antdTheme.ts`) lifts the AntD body type scale one step on `pointer: coarse` inside the same coarse branch that raises `controlHeight`: `fontSize` 14→16, `fontSizeSM` 13→14, `fontSizeLG` 16→18. Desktop keeps the dense 14 / 13 / 16 ladder; heading tokens (display/xxl/xl/lg) are unchanged because they already read large. The step reuses the existing `fontSize.*` tokens — no new literals.
+- Body/label copy that hard-codes `fontSize.sm` (13 px) — the auth switch rows, terms agreement, password-strength hint, and auth hero fine print — reads through `bodyCopyCoarseFontCss` (`src/theme/tokens.ts`) so it lifts to `fontSize.base` (14 px) on coarse pointers and never renders sub-14 px next to the bumped 16 px base. Intentional micro-captions (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs` / `fontSize.sm` literal on purpose.
 
 ### F. Offline & resilience
 
@@ -241,6 +246,7 @@ Applied in the audit (PR #46), the View Transitions follow-up (PR #47), and the 
 - Full PWA boilerplate in `index.html`; minimal `public/manifest.webmanifest`.
 - All popover / drawer height caps use `dvh` with `vh` fallback.
 - AntD `controlHeightSM` is 44 px on coarse pointers (Apple HIG).
+- AntD body type scale lifts one step on coarse pointers — `fontSize` 14→16, `fontSizeSM` 13→14, `fontSizeLG` 16→18 (`src/theme/antdTheme.ts`) — so mobile body copy reads ~16 px like native, while desktop keeps the dense ladder and headings stay put. Body/label copy that hard-coded `fontSize.sm` (auth switch rows, terms agreement, password-strength hint, hero fine print) now routes through `bodyCopyCoarseFontCss` so it clears the 14 px floor on touch.
 - `inputMode` + `enterKeyHint` on every text input — auth, creators, search panels, modals (`projectModal`, `taskModal`), `commandPalette`, `aiSearchInput`, and the AI chat composer (`enterKeyHint="send"`).
 - `autoFocus` removed from modal text inputs so opening the dialog never triggers a viewport jump on iOS.
 - `FilteredEmptyButton` (the "Reset filters" CTA in an empty filtered column) lifts to `min-height: 44 px` on coarse pointers.
