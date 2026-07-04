@@ -138,7 +138,12 @@ async function staleWhileRevalidate(request, cacheName) {
 }
 
 function isHashedAsset(url) {
-    return /\.[a-f0-9]{8,}\.(js|css|woff2?)$/i.test(url.pathname);
+    // Vite emits content-hashed bundles as `name-[hash].ext`, where the
+    // hash is 8+ base64url chars (`[A-Za-z0-9_-]`) — NOT the lowercase-hex
+    // `name.[hash].ext` the previous pattern assumed. Match the dash-
+    // separated base64url shape so JS/CSS/font bundles route cache-first
+    // by hash even outside the `/assets/` prefix contract.
+    return /-[A-Za-z0-9_-]{8,}\.(js|css|woff2?)$/.test(url.pathname);
 }
 
 function isGoogleFontStylesheet(url) {
