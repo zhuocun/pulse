@@ -964,6 +964,17 @@ const ColumnEditModal: React.FC<{
         ["boards", { projectId }],
         updateColumnCallback
     );
+    // Companion PUT used only as the Undo closure: it restores the
+    // column's captured prior settings. Fire-and-forget — errors are
+    // swallowed because the user already initiated the Undo deliberately.
+    const { mutateAsync: undoUpdate } = useReactMutation(
+        "boards",
+        "PUT",
+        ["boards", { projectId }],
+        updateColumnCallback,
+        () => {}
+    );
+    const { show: showUndoToast } = useUndoToast();
     const [name, setName] = React.useState(column.columnName);
     const [category, setCategory] = React.useState<
         NonNullable<IColumn["category"]>
@@ -983,6 +994,14 @@ const ColumnEditModal: React.FC<{
     const trimmed = name.trim();
     const onSave = () => {
         if (!trimmed) return;
+        // Capture the column's prior settings BEFORE the optimistic PUT so
+        // the Undo closure can restore them.
+        const beforeState = {
+            _id: column._id,
+            columnName: column.columnName,
+            category: column.category ?? "todo",
+            wipLimit: column.wipLimit ?? 0
+        };
         update({
             _id: column._id,
             columnName: trimmed,
@@ -990,6 +1009,15 @@ const ColumnEditModal: React.FC<{
             wipLimit
         });
         onClose();
+        // §2.A.4 — a column edit is reversible, so surface a transient Undo
+        // toast whose inverse PUTs the captured prior settings back.
+        showUndoToast({
+            description: microcopy.feedback.columnUpdated,
+            analyticsTag: "column.update",
+            undo: async () => {
+                await undoUpdate(beforeState);
+            }
+        });
     };
     return (
         <Modal

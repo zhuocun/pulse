@@ -8,6 +8,7 @@ import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import useUnsavedChangesGuard from "../../utils/hooks/useUnsavedChangesGuard";
 import deleteProjectCallback from "../../utils/optimisticUpdate/deleteProject";
 import ErrorBox from "../errorBox";
@@ -68,6 +69,7 @@ const ProjectModal: React.FC = () => {
         () => {}
     );
     const { record: recordActivity } = useActivityFeed();
+    const { show: showUndoToast } = useUndoToast();
 
     const [form] = useForm();
     const onClose = () => {
@@ -144,6 +146,24 @@ const ProjectModal: React.FC = () => {
                 ).replace("{name}", input.projectName),
                 undo: undoCallback
             });
+            // Transient Undo toast — the immediate recovery path alongside
+            // the activity-feed entry, reusing the same inverse closure
+            // (create → DELETE the project; update → PUT the before-state).
+            // Skipped when the closure is undefined (a malformed create
+            // response with no id) so we never render an Undo we can't honor.
+            if (undoCallback) {
+                showUndoToast({
+                    description: isEditing
+                        ? microcopy.feedback.projectUpdated
+                        : microcopy.feedback.projectCreated,
+                    analyticsTag: isEditing
+                        ? "project.update"
+                        : "project.create",
+                    undo: async () => {
+                        undoCallback();
+                    }
+                });
+            }
             onClose();
         } catch {
             // ErrorBox surfaces the message via the onError callback above;

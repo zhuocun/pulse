@@ -347,6 +347,41 @@ describe("TaskDetailPanel", () => {
         );
     });
 
+    it("surfaces an Undo toast after a save and re-PUTs the before-state on click", async () => {
+        // §2.A.4 — a task update is reversible, so a successful save shows
+        // a transient Undo toast. The panel navigates to the board on save,
+        // so the toast must outlive the unmounting panel (dismissOnUnmount:
+        // false); clicking Undo replays the inverse PUT with the pre-edit
+        // name.
+        renderPanelAt("/projects/project-1/board/task/task-1");
+        const input = await screen.findByDisplayValue("Build task");
+
+        fireEvent.change(input, { target: { value: "Build task details" } });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        expect(
+            await screen.findByText(microcopy.feedback.taskSaved)
+        ).toBeInTheDocument();
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        await waitFor(() => {
+            const putCalls = fetchMock.mock.calls.filter(
+                (call) => (call[1] as RequestInit | undefined)?.method === "PUT"
+            );
+            expect(putCalls.length).toBeGreaterThanOrEqual(2);
+            const lastPut = putCalls.at(-1)!;
+            expect(JSON.parse(lastPut[1]?.body as string)).toEqual(
+                expect.objectContaining({
+                    _id: "task-1",
+                    taskName: "Build task"
+                })
+            );
+        });
+    });
+
     it("normalizes an out-of-vocabulary task type to 'Task' in the select and the title tag", async () => {
         const legacyTask = task({ epic: "Auth", type: "feature" });
         fetchMock.mockImplementation(async (input) => {

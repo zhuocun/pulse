@@ -5,10 +5,12 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
+import { message as messageApi } from "antd";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
 import { DEFAULT_LOCALE, setActiveLocale } from "../../i18n";
 import zhCN from "../../i18n/locales/zh-CN";
 import { store } from "../../store";
@@ -199,6 +201,10 @@ describe("ProjectModal", () => {
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
             store.dispatch(aiLedgerActions.clearAiLedger());
+            // The Undo toast lives in a global AntD message container that
+            // outlives unmount (10 s window); tear it down so a leaked
+            // "Undo" button never bleeds into a sibling test's queries.
+            messageApi.destroy();
         });
     });
 
@@ -326,6 +332,48 @@ describe("ProjectModal", () => {
         expect(postCall).toBeDefined();
         const postBody = JSON.parse(postCall![1]!.body as string);
         expect(postBody).not.toHaveProperty("managerId");
+    });
+
+    it("surfaces an Undo toast after create and re-DELETEs the project on click", async () => {
+        // §2.A.4 — a create is reversible, so it surfaces a transient Undo
+        // toast alongside the activity feed. Clicking Undo replays the
+        // inverse mutation: a DELETE that removes the just-created project.
+        renderProjectModal({ type: "open" });
+
+        expect(
+            await screen.findByRole("dialog", { name: "Create project" })
+        ).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText("Project name"), {
+            target: { value: "Billing" }
+        });
+        fireEvent.change(screen.getByLabelText("Organization"), {
+            target: { value: "Finance" }
+        });
+        fireEvent.mouseDown(screen.getByRole("combobox"));
+        fireEvent.click(await screen.findByText("Alice"));
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole("button", { name: "Create project" })
+            );
+        });
+
+        expect(
+            await screen.findByText(microcopy.feedback.projectCreated)
+        ).toBeInTheDocument();
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        await waitFor(() => {
+            const deleteCall = fetchMock.mock.calls.find(
+                ([, init]) =>
+                    (init as RequestInit | undefined)?.method === "DELETE"
+            );
+            expect(deleteCall).toBeDefined();
+            expect(String(deleteCall?.[0])).toContain("/api/v1/projects");
+            expect(String(deleteCall?.[0])).toContain("projectId=project-2");
+        });
     });
 
     it("surfaces a create error and keeps the modal open when POST fails", async () => {

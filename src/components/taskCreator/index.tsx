@@ -17,6 +17,7 @@ import useAiDraftModal from "../../utils/hooks/useAiDraftModal";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAuth from "../../utils/hooks/useAuth";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiSparkleIcon from "../aiSparkleIcon";
@@ -130,6 +131,7 @@ const TaskCreator: React.FC<{
         () => {}
     );
     const { record: recordActivity } = useActivityFeed();
+    const { show: showUndoToast } = useUndoToast();
     const submit = async () => {
         const trimmed = taskName.trim();
         if (!trimmed) {
@@ -172,6 +174,19 @@ const TaskCreator: React.FC<{
                   }
                 : undefined
         });
+        // Transient Undo toast — the immediate recovery path alongside the
+        // longer-lived activity-feed entry (same inverse: DELETE the
+        // just-created task by id). Skipped when the response carried no
+        // id so we never render an Undo the closure can't honor.
+        if (createdId) {
+            showUndoToast({
+                description: microcopy.feedback.taskCreated,
+                analyticsTag: "task.create",
+                undo: async () => {
+                    await undoCreate({ taskId: createdId });
+                }
+            });
+        }
     };
     const toggle = () => {
         setInputMode(!inputMode);

@@ -15,6 +15,7 @@ import {
 } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useReactMutation from "../../utils/hooks/useReactMutation";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
 
@@ -127,6 +128,7 @@ const ColumnCreator: React.FC = () => {
         () => {}
     );
     const { record: recordActivity } = useActivityFeed();
+    const { show: showUndoToast } = useUndoToast();
 
     const collapse = useCallback(() => {
         setEditing(false);
@@ -171,6 +173,19 @@ const ColumnCreator: React.FC = () => {
                   }
                 : undefined
         });
+        // Transient Undo toast — the immediate recovery path alongside the
+        // activity-feed entry (same inverse: DELETE the just-created column
+        // by id). Skipped when the response carried no id so we never
+        // render an Undo the closure can't honor.
+        if (createdId) {
+            showUndoToast({
+                description: microcopy.feedback.columnCreated,
+                analyticsTag: "column.create",
+                undo: async () => {
+                    await undoCreate({ columnId: createdId });
+                }
+            });
+        }
     };
 
     useEffect(() => {
