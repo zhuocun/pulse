@@ -458,8 +458,8 @@ This table maps the principles above to the current implementation state for tra
 | Agentic write safety        | MutationProposalCard default-on with rollback flag     | P1-7, §9.4 above                  |
 | Accessibility               | jest-axe suite added (2026-05-04)                     | §8 above; test plan in opt plan   |
 | Observability               | Sinks + call sites wired (Phase 3)                    | §12 above; P2-5 resolved          |
-| Entry point consolidation   | Fragmented — Phase 4 target                           | P1-6, §10.1 above                 |
-| Right-rail Copilot shell    | Planned (Phase 4)                                     | §10.2 above                       |
+| Entry point consolidation   | Shipped — single `CopilotMenu` entry (`copilotMenu`)  | P1-6 resolved; §10.1 above        |
+| Right-rail Copilot shell    | Shipped — tabbed `CopilotDock` (`copilotDock`)        | §10.2 above                       |
 
 ---
 
