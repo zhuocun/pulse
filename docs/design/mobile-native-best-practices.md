@@ -1,5 +1,9 @@
 # Mobile Native-Feel: Best Practices and Red Flags
 
+> **See also:** [`mobile-ux-best-practices.md`](mobile-ux-best-practices.md) —
+> the platform-agnostic mobile UX principles and checklists layer above this
+> doc. This file is the Pulse-specific mechanics catalog and red-flag list.
+
 This document captures the research that informed the mobile responsive-design pass on this codebase (PRs #46 and #47). Treat it as a checklist for new work — every item below is either a pattern this app already uses, a red flag this app deliberately avoids, or a known gap with a tracked fix.
 
 The mental model is simple. A web page feels "native" on mobile when three perceptions hold:

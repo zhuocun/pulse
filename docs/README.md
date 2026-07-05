@@ -90,8 +90,17 @@ the whole backlog without folder-hopping.
 - [`design/ai-ux-best-practices.md`](design/ai-ux-best-practices.md)
   — research reference (Google PAIR, Microsoft HAX, NN/g, NIST AI
   RMF, etc.).
+- [`design/desktop-ux-best-practices.md`](design/desktop-ux-best-practices.md)
+  — comprehensive desktop web UX principles and actionable checklists
+  for PM / kanban / collaboration SaaS (keyboard, multi-pane, tables,
+  hover, bulk actions).
+- [`design/mobile-ux-best-practices.md`](design/mobile-ux-best-practices.md)
+  — comprehensive mobile / responsive-web UX principles and checklists
+  (PWA, touch, safe areas, virtual keyboard, thumb reach).
 - [`design/mobile-native-best-practices.md`](design/mobile-native-best-practices.md)
-  — mobile responsive patterns and red flags.
+  — Pulse-specific mobile mechanics and red flags (viewport meta,
+  service worker, implementation status); complements
+  `mobile-ux-best-practices.md`.
 - [`design/modal-routing-policy.md`](design/modal-routing-policy.md) —
   adopted policy: new detail surfaces are routed (URL-addressable) by
   default; AntD `Modal` is reserved for ephemeral yes/no/cancel prompts.
