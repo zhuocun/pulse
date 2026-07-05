@@ -7,6 +7,7 @@ import {
     StopOutlined,
     WarningFilled
 } from "@ant-design/icons";
+import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import {
     Badge,
@@ -34,9 +35,11 @@ import {
     brand,
     breakpoints,
     columnMinWidthRem,
+    easing,
     fontSize,
     fontWeight,
     letterSpacing,
+    motion,
     radius,
     shadow,
     space,
@@ -206,6 +209,26 @@ const TaskContainer = styled.div`
     }
 `;
 
+/*
+ * Optimistic-insert reveal. A freshly created task lands in the column as
+ * an optimistic placeholder card BEFORE the server confirms it; a plain
+ * instant insert reads as a jump. This slide-and-fade eases the new card
+ * in so the create flow feels connected to the click. It runs once on
+ * mount (the shell only carries `data-optimistic` while the id is a
+ * placeholder), and is gated behind `prefers-reduced-motion: no-preference`
+ * so reduced-motion users get the instant insert with no transform.
+ */
+const cardInsert = keyframes`
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+
 const TaskRowDragShell = styled.div`
     width: 100%;
 
@@ -214,6 +237,13 @@ const TaskRowDragShell = styled.div`
             border-color 120ms ease-out,
             box-shadow 120ms ease-out,
             transform 120ms ease-out;
+    }
+
+    &[data-optimistic="true"] {
+        @media (prefers-reduced-motion: no-preference) {
+            animation: ${cardInsert} ${motion.medium}ms ${easing.decelerate}
+                both;
+        }
     }
 
     &[data-dragging="true"] .task-card-lift-surface {
@@ -2037,7 +2067,13 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                          * draggable props to the real DOM node;
                                          * the tooltip only wraps the inner card.
                                          */}
-                                        <TaskRowDragShell>
+                                        <TaskRowDragShell
+                                            data-optimistic={
+                                                hasPersistedTaskId
+                                                    ? undefined
+                                                    : "true"
+                                            }
+                                        >
                                             {showFilterPausedHint ? (
                                                 <Tooltip
                                                     title={

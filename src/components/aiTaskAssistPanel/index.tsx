@@ -1,4 +1,6 @@
 import { ReloadOutlined } from "@ant-design/icons";
+import { keyframes } from "@emotion/react";
+import styled from "@emotion/styled";
 import {
     Alert,
     Button,
@@ -18,8 +20,10 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import {
     accent,
+    easing,
     fontSize,
     fontWeight,
+    motion,
     radius,
     space
 } from "../../theme/tokens";
@@ -53,6 +57,33 @@ import {
     TASK_ASSIST_DEBOUNCE_MS,
     TASK_ASSIST_DELAYED_SPINNER_MS
 } from "./aiTaskAssistContext";
+
+/*
+ * Suggestion cross-fade. When an estimate resolves, the loading skeleton
+ * gives way to the result block; a hard swap reads as a flash. This subtle
+ * fade + upward drift eases the resolved suggestion in so the transition
+ * from "thinking" to "answer" feels continuous. It plays once whenever the
+ * result block mounts (i.e. each time a fresh suggestion arrives, including
+ * after Regenerate), and is gated behind `prefers-reduced-motion:
+ * no-preference` so reduced-motion users see the instant swap.
+ */
+const suggestionReveal = keyframes`
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+
+const SuggestionReveal = styled.div`
+    @media (prefers-reduced-motion: no-preference) {
+        animation: ${suggestionReveal} ${motion.medium}ms ${easing.decelerate}
+            both;
+    }
+`;
 
 // Stable fallbacks: avoid producing a new `[]` reference on every render, which
 // otherwise re-fires the suggestion effect endlessly when the cache is empty.
@@ -774,7 +805,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                 />
                             )}
                             {estimateData && (
-                                <div>
+                                <SuggestionReveal data-testid="ai-suggestion-reveal">
                                     {/*
                                      * Load-bearing estimate block. Pulled into its
                                      * own tinted, rounded container so the number +
@@ -991,7 +1022,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                             </ul>
                                         </section>
                                     )}
-                                </div>
+                                </SuggestionReveal>
                             )}
                         </div>
 

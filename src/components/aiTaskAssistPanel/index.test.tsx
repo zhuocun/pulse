@@ -13,6 +13,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import { store } from "../../store";
+import { mediaRuleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import AiTaskAssistPanel from ".";
 
 const installAntdMocks = () => {
@@ -189,6 +190,23 @@ describe("AiTaskAssistPanel", () => {
         );
         fireEvent.click(apply);
         expect(onApplyStoryPoints).toHaveBeenCalledTimes(1);
+    });
+
+    it("cross-fades the resolved estimate behind prefers-reduced-motion", async () => {
+        mountPanel();
+        await waitFor(() =>
+            expect(jest.getTimerCount()).toBeGreaterThanOrEqual(1)
+        );
+        advanceBy(1000);
+        const reveal = await screen.findByTestId("ai-suggestion-reveal");
+        const cls = styledClassFor(reveal);
+        expect(cls).toBeTruthy();
+        // The reveal only animates under no-preference, so reduced-motion
+        // users get the instant skeleton→content swap with no drift.
+        const revealRules = mediaRuleTextsFor(cls ?? "", "no-preference").join(
+            "\n"
+        );
+        expect(revealRules).toContain("animation");
     });
 
     it("applies a readiness suggestion to the bound field", async () => {

@@ -8,6 +8,7 @@ import { microcopy } from "../../constants/microcopy";
 import {
     fontSize,
     fontWeight,
+    lineHeight,
     radius,
     space,
     touchTargetCoarse
@@ -48,6 +49,22 @@ const Wrap = styled(GlassPanel)`
 const Body = styled.div`
     flex: 1 1 auto;
     min-width: 0;
+`;
+
+/**
+ * Centres the decorative sparkle against the banner title's first
+ * line-box. The banner's `Wrap` uses `align-items: flex-start` (the body
+ * is a multi-line block), so without a line-height-matched slot the
+ * 24 px sparkle would pin to the top edge and sit above the 16 px title
+ * cap. Sizing the slot to the title line-box (`fontSize.md × lineHeight`)
+ * lets flexbox centring do the alignment — no magic per-pixel offset,
+ * matching the auto-spaced sparkle used at every AntD `Button icon=` site.
+ */
+const IconSlot = styled.span`
+    align-items: center;
+    display: inline-flex;
+    flex-shrink: 0;
+    min-height: ${fontSize.md * lineHeight.normal}px;
 `;
 
 const BannerActions = styled(Space)`
@@ -135,7 +152,9 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
             role="region"
             tone="accent"
         >
-            <AiSparkleIcon size="lg" aria-hidden style={{ marginTop: 2 }} />
+            <IconSlot>
+                <AiSparkleIcon size="lg" aria-hidden />
+            </IconSlot>
             <Body>
                 <Typography.Text
                     style={{
