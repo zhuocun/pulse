@@ -16,18 +16,24 @@ does **not** re-derive the underlying mechanics.
 - [`mobile-native-best-practices.md`](mobile-native-best-practices.md) is the
   **mechanics + red-flag catalog** — the source of truth for *how* (viewport
   meta, `env(safe-area-inset-*)`, `inputmode`, service-worker cache
-  strategies, the Core Web Vitals thresholds, and the exhaustive red-flag
-  lists). This doc sits **above** it: where a subsection needs a concrete
-  technique or a "never do this" list, it **summarizes in one line and links
-  down** rather than restating the catalog. If you are hunting for the exact
-  meta tags or the layout-shift red-flag list, go there.
+  strategies, the engagement APIs — share, badging, shortcuts — the offline
+  mutation queue, the Core Web Vitals thresholds, and the exhaustive
+  red-flag lists). This doc sits **above** it: where a subsection needs a
+  concrete technique or a "never do this" list, it **summarizes in one line
+  and links down** rather than restating the catalog. The domains added in
+  this revision — OS integration (§3), entry & auth (§4), long-press /
+  pull-to-refresh / undo (§5), reorder without drag (§6), attachments (§7),
+  push priming (§10), offline conflicts (§15), and tablet/foldable layout
+  (§2) — follow the same contract. If you are hunting for the exact meta
+  tags or the layout-shift red-flag list, go there.
 - [`desktop-ux-best-practices.md`](desktop-ux-best-practices.md) is the
   **desktop sibling**. The two docs share the same section order for most
   shared domains (navigation, boards, tasks, notifications, collaboration,
   AI, the empty/loading/error triad, performance, accessibility); forms and
   search are adjacent but may swap order. Each doc describes only its
   platform delta. Where desktop and mobile diverge, this doc owns the phone
-  answer and links across.
+  answer and links across. Tablet widths are the meeting point: §2 says
+  where the phone answer hands over to the desktop one.
 - [`ai-ux-best-practices.md`](ai-ux-best-practices.md) is the **AI source of
   truth**. This doc defers *all* AI principles (trust, streaming, citations,
   agentic write safety) there and covers **only mobile placement** of the
@@ -35,7 +41,9 @@ does **not** re-derive the underlying mechanics.
 - [`modal-routing-policy.md`](modal-routing-policy.md) owns the **routed
   detail surface vs. ephemeral confirm** decision. Any surface that deserves
   a URL (task detail, inbox item, settings sheet) follows that policy; this
-  doc links to it rather than restating the six reasons.
+  doc links to it rather than restating the six reasons. The deep-link and
+  share-target additions in §3–§4 lean on it: an OS share or a pasted URL
+  can only land somewhere that is routed.
 - [`../design-tokens.md`](../design-tokens.md) owns the **spacing, type,
   motion, and color scales** plus the coarse-pointer lift. Reference token
   names (`space`, `fontSize`, `touchTargetCoarse`, `motion`); never hardcode
@@ -125,6 +133,51 @@ are mechanical — see `mobile-native-best-practices.md §1` (boilerplate) and
       literals.
 - [ ] No content sits below the 14 px mobile body-copy floor.
 
+### Tablet, landscape & foldables
+
+The stretch between phone and desktop is a third context, not an
+interpolation. A tablet is coarse-pointer but wide; a landscape phone is
+wide but starved for height; a foldable changes shape mid-session. The
+principles:
+
+- **Tablet earns back the second pane.** At tablet widths a routed detail
+  surface can sit beside the board instead of over it — the shell shape
+  follows the width, the route stays the same. Hand the multi-pane rules to
+  the desktop sibling (`desktop-ux-best-practices.md §2.5`) once width and
+  hover allow; do not stretch a phone column across an iPad.
+- **Coarse pointer ≠ small screen.** The 44 px target lift keys off
+  `pointer: coarse`, never off viewport width — a tablet keeps the touch
+  ladder even in a desktop-shaped layout.
+- **Landscape trades height, not legitimacy.** In landscape the keyboard
+  plus sticky chrome can consume most of the viewport: collapse or shrink
+  sticky bars, keep the focused field visible, and apply safe-area insets on
+  all four edges — the notch sits on a *side* in landscape.
+- **Foldables fold through your layout.** Keep critical controls off the
+  hinge line; when the posture is book-like, the two segments are a natural
+  two-pane split (board | detail), not one pane awkwardly bridging the
+  crease. Feature-detect posture; degrade to the plain tablet layout.
+- **Rotation and posture changes preserve state.** Rotating or unfolding
+  must not lose scroll position, in-progress form input, or an open routed
+  surface. The URL already carries the surface (§4); the layout re-shells
+  around it.
+
+> `Example (Pulse)`: the routed task detail keeps one URL across shells —
+> the `Drawer` flips `placement="bottom"` on phones to `placement="right"`
+> on tablets+ (see the phone-first shells note in
+> [`modal-routing-policy.md`](modal-routing-policy.md)). Rotation re-shells;
+> the route survives.
+
+**Checklist**
+
+- [ ] Tablet widths show board + routed detail side by side, not a stretched
+      phone column.
+- [ ] Touch-target and type lifts key off `pointer: coarse`, never width.
+- [ ] Landscape collapses sticky chrome and applies safe-area insets on all
+      four edges.
+- [ ] No critical control sits on a foldable's hinge; book posture maps to a
+      two-pane split where detectable.
+- [ ] Rotation/unfolding preserves scroll, input, and open routed surfaces.
+
 ---
 
 ## 3. PWA & installability
@@ -167,6 +220,47 @@ how* you surface installability are:
 - [ ] External links do not break the user out of standalone unexpectedly.
 - [ ] Push / badge / share features are feature-detected and degrade cleanly.
 
+### OS integration — share target, app shortcuts, badging, widgets
+
+Installation is the entry ticket; *participation* in the OS is what makes
+the app feel resident. Four surfaces, in descending order of leverage
+(sending-side share, badging, and shortcuts mechanics live in
+`mobile-native-best-practices.md §2.G`):
+
+- **Share target turns the OS share sheet into an intake flow.** Registering
+  as a share target means a link, text snippet, or screenshot shared *from
+  another app* opens yours with a prefilled draft — the difference between
+  "copy, switch, paste" and one tap. The receiving route must be a real
+  routed surface, must handle unauthenticated arrivals (login, then resume
+  with the shared payload intact), and must not transmit shared data
+  anywhere before the user confirms the draft.
+- **App shortcuts make long-press useful.** Three or four launcher shortcuts
+  (new task, last board, the Copilot) — each a deep link into a routed
+  surface (§4) that works from a cold start. More than four dilutes all of
+  them.
+- **Badging mirrors the inbox, never markets.** The icon badge shows the
+  same count as the in-app inbox, obeys the same budget rules (§10 —
+  dedup, expiry), and clears when items are read. A badge that can't be
+  cleared by acting in the app trains users to ignore it.
+- **Widgets are an enhancement, not a surface.** Home-screen/OS widgets are
+  platform-gated and niche; if shipped, they are read-mostly glances that
+  deep-link in — never a primary path, never a thing the app requires.
+
+> `Example (Pulse)`: the 2026-05 PWA review's Web Share Target ambition is
+> the target shape — share a Slack link or screenshot → Pulse opens with
+> the task draft prefilled (`name=<title>`, note carrying text + URL), with
+> a login-and-resume guard for unauthenticated shares.
+
+**Checklist**
+
+- [ ] Share-target arrivals land on a prefilled draft in a routed surface;
+      unauthenticated shares survive login and resume.
+- [ ] No shared payload leaves the device before the user confirms.
+- [ ] Launcher shortcuts (3–4) deep-link to routed surfaces and work cold.
+- [ ] Icon badge mirrors the inbox count and clears on read.
+- [ ] Every OS-integration API is feature-detected and degrades to the
+      in-app equivalent.
+
 ---
 
 ## 4. Navigation
@@ -203,6 +297,56 @@ mobile delta is **bottom tabs + system back**.
 | Put a bottom tab bar with 3–5 destinations. | Bury primary nav in a top-left hamburger. |
 | Pad the tab bar with `safe-area-inset-bottom`. | Let the home indicator overlap tab targets. |
 | Place primary actions in the thumb zone. | Park destructive actions in the top corners. |
+
+### Entry, auth & deep links
+
+The front door is part of mobile navigation: typing an eight-character
+password on a phone keyboard is the worst form the product ships, and a
+deep link that dumps the user on a generic list wastes the one thing mobile
+sharing is good at. Desktop session expiry, multi-tab broadcast, and
+long-lived-tab behavior are owned by the desktop sibling — see
+[`desktop-ux-best-practices.md §3.3`](desktop-ux-best-practices.md).
+
+- **Passkey/biometric first for returning users.** A registered passkey
+  turns sign-in into Face ID / fingerprint — surfaced conditionally when
+  the user taps the identifier field, so the first paint shows no form wall
+  and pops no keyboard. Password is the collapsed fallback ("Sign in with
+  password instead"), not the default posture.
+- **Credential autofill is declared, never fought.** `autocomplete` tokens
+  for username, password, and one-time codes let the OS password manager
+  and SMS OTP autofill do the typing (token mechanics:
+  `mobile-native-best-practices.md §2.D`). Never make a user hand-copy a
+  six-digit code the OS could paste.
+- **Magic links are the no-passkey fallback — plan the context switch.** The
+  email link opens in the default browser, which may not be the installed
+  PWA or even the browser that requested it. Respond to the request
+  immediately ("check your email"), and offer a short-code entry path so
+  the session can land back in the context the user started in.
+- **Every shareable resource deep-links.** A pasted task URL opens the
+  routed task detail (per [`modal-routing-policy.md`](modal-routing-policy.md))
+  with the board mounted beneath — not the project list, not a login
+  dead-end. Push notifications, OS shares (§3), and inbox items all reuse
+  this same contract.
+- **Auth-gated deep links preserve their destination.** Hitting a protected
+  URL while signed out routes through login and then *resumes to the
+  original destination*. Losing the destination is losing the share.
+- **Unknown routes recover.** A dead deep link lands on a not-found state
+  with a next action (§13), never a blank page or a silent redirect.
+
+> `Example (Pulse)`: the routed task detail at
+> `/projects/:projectId/board/task/:taskId` is the deep-link target for
+> board shares; the 2026-05 auth review names passkey-first with
+> magic-link fallback (and password collapsed beneath) as the ranked
+> direction for the phone entry flow.
+
+**Do / Don't**
+
+| Do | Don't |
+| --- | --- |
+| Offer passkey/biometric first; collapse password behind a fallback link. | Lead with an email+password wall and a keyboard pop on first paint. |
+| Declare autofill tokens so the OS fills credentials and OTP codes. | Force manual transcription of codes the OS could paste. |
+| Preserve a deep link's destination through the login flow. | Drop an authenticated user on a generic list after login. |
+| Offer a code-entry fallback for magic links. | Assume the magic link opens in the context that requested it. |
 
 ---
 
@@ -246,6 +390,76 @@ duration bands, View-Transition baseline, and haptics rules are catalogued in
 - [ ] Route changes use view transitions; no full reloads.
 - [ ] Haptics (where used) are paired with visual feedback and never spammed.
 
+### Long-press & pull-to-refresh
+
+Two gestures the platform half-owns; both reward restraint.
+
+- **Long-press is touch's right-click.** It opens a contextual shortcut menu
+  (move, archive, assign) the same way hover/right-click does on desktop —
+  and like every gesture, it is never the only path: everything on a
+  long-press menu also lives in a visible menu or the detail surface.
+- **Long-press must not fight the platform.** On the web it collides with
+  text selection and the OS callout/context menu. A surface that claims it
+  must suppress those on the pressed element *only*, hold a deliberate
+  ~500 ms threshold, and give immediate feedback on trigger (lift, menu, or
+  haptic) so the user knows the press landed.
+- **Long-press is the honest drag starter.** A deliberate press-to-drag (or
+  a drag handle) is how reorder coexists with scroll — the board case is
+  §6's problem; the gesture contract is here.
+- **A live product should not need pull-to-refresh.** Data arrives through
+  the real-time layer; relying on a manual refresh to see teammates' changes
+  is a red flag (`mobile-native-best-practices.md §3`). Where a surface does
+  offer refresh, keep the *platform's* pull-to-refresh — or fully disable
+  overscroll on inner scroll containers so a scroll bounce never triggers a
+  full SPA reload and drops board state. A half-custom pull-to-refresh is
+  worse than either choice.
+
+**Checklist**
+
+- [ ] Everything reachable by long-press has a visible tappable path too.
+- [ ] Long-press suppresses selection/callout only on the pressed element
+      and gives immediate feedback at the ~500 ms threshold.
+- [ ] Inner scroll containers contain overscroll; a bounce never reloads the
+      app.
+- [ ] Pull-to-refresh (if present) is the platform default, not a hybrid.
+- [ ] Fresh data arrives via the real-time layer; refresh is a fallback.
+
+### Undo-first destructive actions
+
+On touch, mis-taps are routine — and a confirm dialog taxes every correct
+tap to guard against the rare wrong one. Flip the default:
+
+- **Act immediately, offer undo.** For reversible actions (archive,
+  complete, move, dismiss), commit at once and surface an undo window. The
+  interaction cost lands only on the user who actually erred.
+- **The undo affordance is real.** A toast with an actual button that meets
+  the 44 px bar, a window long enough to read and react (≥ 5 s), a countdown
+  that pauses on interaction, and a live-region announcement so screen-reader
+  users get the same escape hatch.
+- **Confirms are reserved for the irreversible.** Delete-project and
+  delete-task stay ephemeral confirm dialogs per
+  [`modal-routing-policy.md`](modal-routing-policy.md) — and in a stacked
+  phone footer the destructive verb never sits adjacent to Save/Cancel.
+- **Swipes follow the same rule.** Swipe-to-archive commits with undo; a
+  swipe should never land the user in a confirm dialog.
+- **AI writes inherit the contract.** Approval and undo behavior for
+  agent-applied mutations is owned by
+  [`ai-ux-best-practices.md`](ai-ux-best-practices.md) — same posture,
+  defined there.
+
+> `Example (Pulse)`: the Undo toast renders a real `<button>` (not
+> `<a role="button">`) so Enter/Space activation and the focus ring come
+> for free — the shape every undo affordance here should match.
+
+**Do / Don't**
+
+| Do | Don't |
+| --- | --- |
+| Commit reversible actions immediately and offer undo. | Interrupt every archive with "Are you sure?" |
+| Give undo a 44 px button, a ≥ 5 s window, and a live-region announcement. | Ship a 2-second toast no thumb can catch. |
+| Reserve confirm dialogs for costly, irreversible deletes. | Confirm-dialog everything and train users to click through. |
+| Separate destructive verbs from dismiss in stacked footers. | Stack Delete directly under Save/Cancel. |
+
 ---
 
 ## 6. Boards & kanban on small screens
@@ -282,6 +496,42 @@ Depth requirements live in
       scroll; mutations are optimistic with visible rollback.
 - [ ] Add-card / column actions are thumb-reachable.
 
+### Reorder without drag
+
+Drag-and-drop excludes people: screen-reader and switch-access users, users
+with tremor, and anyone whose drag keeps losing to the scroll gesture on a
+crowded phone board. Drag is the fast path — it is never the only path.
+
+- **Every drag outcome has a menu equivalent.** "Move to…" in the card's
+  overflow menu opens a column picker (a sheet with 44 px rows); moving
+  between swimlanes and reassigning follow the same shape.
+- **Within-column order is editable without drag.** Move up / move down /
+  move to top actions on the card menu — or an explicit position control in
+  the detail surface — cover precise reordering.
+- **The detail surface is the universal fallback.** Column/status is a field
+  on the routed task detail (§7); any move a drag can make, an edit there
+  can make too.
+- **The non-drag path is the AT path.** It must be discoverable and operable
+  with VoiceOver/TalkBack end-to-end; parity here is a release gate, not
+  polish.
+- **Both paths share one mutation.** Optimistic apply and visible rollback
+  (§15) behave identically whether the move came from a drag or a menu.
+
+> `Example (Pulse)`: task-card drags start from a deliberate press
+> (`disableInteractiveElementBlocking` on the `<Drag>` — see AGENTS.md's
+> drag-and-drop note), and reorder flows through the shared optimistic
+> mutation in `src/utils/optimisticUpdate/reorder.ts` — the same mutation a
+> menu-driven move should call.
+
+**Checklist**
+
+- [ ] Every drag outcome (move column, reorder, reassign) has a menu/sheet
+      path with 44 px rows.
+- [ ] Column/status is editable from the routed detail surface.
+- [ ] The non-drag path works end-to-end with VoiceOver/TalkBack.
+- [ ] Drag and non-drag moves share the same optimistic mutation and
+      rollback UX.
+
 ---
 
 ## 7. Tasks & detail surfaces
@@ -317,6 +567,43 @@ is a bottom sheet that back closes.)*
 | Keep delete / discard as `Modal.confirm`. | Give a yes/no confirm its own URL. |
 | Float the sheet above the keyboard. | Let the keyboard cover the focused field or Save. |
 | Lead with phone-critical fields. | Dump every field into one long scroll. |
+
+### Attachments & camera capture
+
+The phone is the only device that is *at the scene*: the whiteboard photo,
+the broken build on a colleague's screen, the screenshot of the bug. Capture
+is a mobile superpower, and the detail surface is where it lands.
+
+- **One tap into the OS-native picker.** Attaching offers camera, photo
+  library, and files through the platform's own picker — not a desktop
+  dropzone squeezed onto a phone. The camera path matters most: it is the
+  reason the attachment exists at all.
+- **Upload UX is progressive.** Pick → immediate thumbnail with progress →
+  retry on failure. The composer or form stays usable while uploads run;
+  a photo never blocks the comment it illustrates.
+- **Right-size before the network.** Camera output is multi-MB and the
+  network is cellular; downscale/compress client-side before upload, and
+  keep the original only when the user asks for it.
+- **Reserve thumbnail dimensions.** Arriving attachments must not shift the
+  layout (CLS) — same rule as card media (§6).
+- **Offline capture queues visibly.** An attachment taken offline joins the
+  mutation queue (§15) with a pending state and survives reconnect; a failed
+  upload never silently loses the photo.
+
+> `Example (Pulse)`: attachments are a tracked gap — the 2026-05 review
+> defers the upload surface to the routed task panel as its host, which is
+> the right call: the routed detail sheet (not the legacy modal) is where
+> capture belongs when it lands.
+
+**Checklist**
+
+- [ ] Attach opens the OS-native picker with camera, library, and files as
+      sources.
+- [ ] Uploads show thumbnail + progress + retry; the surface stays usable
+      meanwhile.
+- [ ] Images are downscaled client-side before cellular upload.
+- [ ] Thumbnails have reserved dimensions; no layout shift on arrival.
+- [ ] Offline attachments queue visibly and survive reconnect (§15).
 
 ---
 
@@ -425,6 +712,40 @@ mentions, and inbox depth live in
 | Ask for push after a value moment. | Prompt for push on first launch. |
 | Batch/dedup/expire nudges. | Buzz once per raw event. |
 | Deep-link every notification to its resource. | Drop the user on a generic inbox. |
+
+### Push-permission priming & quiet hours
+
+The browser permission prompt is a one-shot resource: a denial is
+near-permanent, recoverable only through buried browser/OS settings. Treat
+it accordingly.
+
+- **Prime before you prompt.** The real permission dialog fires only after
+  the user says yes to an *in-product* ask tied to a concrete moment —
+  "Alice mentioned you. Want a push next time?" with explicit yes/not-now.
+  A cold prompt converts a curious user into a permanent denial.
+- **"Not now" is an answer.** Record the soft decline; re-ask only after
+  another genuine value moment, and cap the number of re-asks. A user who
+  declines twice has answered.
+- **Permission is not preference.** Granting push subscribes the user to the
+  category they were primed for (mentions), not everything. Per-category
+  toggles (mentions, nudges, digests) live in settings, and the notification
+  budget above applies per category.
+- **Quiet hours are respected server-side.** Non-urgent pushes hold during
+  the user's configured quiet window and arrive as a digest after it ends.
+  Delivery-time logic lives on the server — a queued buzz at 3 a.m. is the
+  product's fault, not the OS's.
+- **The badge survives the silence.** During quiet hours the inbox badge
+  (§3) still updates; the user who opens the app sees everything without
+  having been buzzed.
+
+**Do / Don't**
+
+| Do | Don't |
+| --- | --- |
+| Prime with an in-product ask at a mention/value moment. | Fire the browser permission prompt cold on first run. |
+| Remember "not now" and cap re-asks. | Re-prompt every session until the user relents. |
+| Subscribe only the primed category; expose per-category toggles. | Treat one grant as consent to every notification type. |
+| Hold non-urgent pushes in quiet hours and digest them after. | Buzz overnight for a low-priority nudge. |
 
 ---
 
@@ -578,8 +899,8 @@ registry pins LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
   with explicit dimensions, and no render-blocking head JS. The bundle and
   layout-shift red-flag lists live in the mechanics doc — don't restate them.
 - **Offline is a feature, not a fallback.** A service worker precaches the app
-  shell (NetworkFirst for HTML, CacheFirst for hashed assets,
-  StaleWhileRevalidate for icons/avatars) so return visits open instantly and
+  shell (strategy-per-asset mapping:
+  `mobile-native-best-practices.md §2.F`) so return visits open instantly and
   a flaky network doesn't blank the app.
 - **Optimistic UI with honest rollback.** Mutations (create/edit/reorder,
   comments, status changes) apply immediately and **visibly** roll back on
@@ -598,6 +919,52 @@ registry pins LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
 - [ ] Mutations are optimistic with visible rollback; offline mutations queue
       and replay.
 - [ ] Async work respects `AbortController` / unmount.
+
+### Offline queue & conflict UX
+
+Queue-and-replay mechanics (Background Sync on Chromium, IndexedDB with
+foreground replay on iOS) live in `mobile-native-best-practices.md §2.F`;
+desktop graceful degradation (connectivity indicator, queue-where-safe)
+is owned by the desktop sibling — see
+[`desktop-ux-best-practices.md §11.3`](desktop-ux-best-practices.md).
+What the mechanics doc can't decide is how the queue *feels*. Principles:
+
+- **The queue is visible, not magic.** A mutation made offline shows a
+  pending state (a subtle sync glyph on the card, "Saving…" on the form),
+  and an unobtrusive connection indicator explains why. Silent queues make
+  the eventual conflicts inexplicable.
+- **Replay is ordered and idempotent.** Queued mutations replay in the order
+  they were made; the runtime's idempotency gate ensures a retried replay
+  never double-applies. Partial replay failures surface per-item, not as
+  one opaque "sync failed."
+- **Conflicts get UX, not silent policy.** Last-write-wins is acceptable
+  only for trivially re-editable single fields (status, assignee). For
+  content edits (comments, descriptions), a write that collides with a
+  teammate's offline-window change surfaces a resolution choice — "Alice
+  edited this while you were offline: keep mine / take theirs" — and the
+  user's text is never destroyed without a copy to recover.
+- **Stale entries expire honestly.** A queued mutation that outlives its
+  usefulness fails *visibly* with a re-apply affordance; it never just
+  vanishes from the queue.
+- **Reads degrade with a timestamp.** Cached board views render offline
+  marked with data age ("as of 09:14"); queued-but-unsynced edits are
+  visually distinct from synced state.
+
+> `Example (Pulse)`: optimistic mutations are wired via `useReactMutation`;
+> a persisted offline queue is not yet implemented — when it lands (per
+> `mobile-native-best-practices.md §2.F`), the conflict and visibility
+> rules here are its acceptance criteria.
+
+**Checklist**
+
+- [ ] Queued mutations show a pending state; connection status is
+      discoverable at a glance.
+- [ ] Replay is ordered and idempotent; per-item failures surface
+      individually.
+- [ ] Conflicting content edits offer keep-mine / take-theirs; no user text
+      is destroyed without recovery.
+- [ ] Expired queue entries fail visibly with a retry path.
+- [ ] Offline reads show data age; unsynced edits are visually distinct.
 
 ---
 
@@ -654,13 +1021,14 @@ read as one system.
 | Label | Source | Primary use here |
 | --- | --- | --- |
 | **NN/g** | [Nielsen Norman Group](https://www.nngroup.com/) — incl. [Skeleton Screens 101](https://www.nngroup.com/articles/skeleton-screens/), the 10 usability heuristics | Empty states, skeleton-vs-spinner, mental models, the triad. |
-| **WCAG 2.2** | [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — esp. [SC 2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), SC 2.4.11 Focus Appearance, SC 2.3.3 Motion from Interactions | Target size, focus visibility, reduced motion. |
+| **WCAG 2.2** | [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — esp. [SC 2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), SC 2.4.11 Focus Appearance, SC 2.3.3 Motion from Interactions | Target size, focus visibility, reduced motion, drag alternatives (§6). |
 | **W3C ARIA** | [WAI-ARIA — Live Regions](https://www.w3.org/TR/wai-aria/#aria-live) | Accessible live regions for streamed/async content. |
-| **Material 3** | [Material Design 3](https://m3.material.io/) ([M2 touch-target](https://m2.material.io/develop/web/supporting/touch-target)) | 48 dp touch target, density guidance. |
-| **Apple HIG** | [Apple Human Interface Guidelines — Layout](https://developer.apple.com/design/human-interface-guidelines/layout) | 44 pt hit target, thumb reach, safe areas. |
+| **Material 3** | [Material Design 3](https://m3.material.io/) ([M2 touch-target](https://m2.material.io/develop/web/supporting/touch-target)) | 48 dp touch target, density guidance, adaptive/large-screen layout (§2). |
+| **Apple HIG** | [Apple Human Interface Guidelines — Layout](https://developer.apple.com/design/human-interface-guidelines/layout) | 44 pt hit target, thumb reach, safe areas, undo conventions (§5). |
 | **Atlassian Design System** | [Atlassian Design System](https://atlassian.design/) | Kanban/board patterns, issue-detail conventions, empty states. |
 | **Linear / Jira / Asana patterns** | [Linear](https://linear.app/features), Jira, Asana | Command palette, board/list parity, saved views. |
-| **web.dev / Core Web Vitals** | [web.dev](https://web.dev/) — [INP](https://web.dev/articles/inp), [LCP](https://web.dev/articles/lcp), [CLS](https://web.dev/articles/optimize-cls), [2025 Web Almanac](https://almanac.httparchive.org/en/2025/performance) | Mobile performance budgets and thresholds. |
+| **web.dev / Core Web Vitals** | [web.dev](https://web.dev/) — [INP](https://web.dev/articles/inp), [LCP](https://web.dev/articles/lcp), [CLS](https://web.dev/articles/optimize-cls), [2025 Web Almanac](https://almanac.httparchive.org/en/2025/performance) | Mobile performance budgets and thresholds; push-permission UX patterns (§10); PWA OS-integration guidance (§3). |
+| **FIDO / passkeys** | [FIDO Alliance UX guidelines](https://fidoalliance.org/ux-guidelines/), [web.dev — Passkeys](https://web.dev/articles/passkey-registration) | Passkey-first entry, conditional UI, fallback ordering (§4). |
 
 The AI-specific source stack (Google PAIR, Microsoft HAX, NIST AI RMF, IBM
 Design for AI, Anthropic, Apple ML Privacy) is **not** duplicated here — it
