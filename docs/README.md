@@ -93,10 +93,12 @@ the whole backlog without folder-hopping.
 - [`design/desktop-ux-best-practices.md`](design/desktop-ux-best-practices.md)
   — comprehensive desktop web UX principles and actionable checklists
   for PM / kanban / collaboration SaaS (keyboard, multi-pane, tables,
-  hover, bulk actions).
+  hover, bulk actions, keyboard-accessible DnD, auth/session,
+  context menus, undo model).
 - [`design/mobile-ux-best-practices.md`](design/mobile-ux-best-practices.md)
   — comprehensive mobile / responsive-web UX principles and checklists
-  (PWA, touch, safe areas, virtual keyboard, thumb reach).
+  (PWA, touch, safe areas, virtual keyboard, thumb reach, passkeys,
+  deep links, pull-to-refresh, offline conflict UX).
 - [`design/mobile-native-best-practices.md`](design/mobile-native-best-practices.md)
   — Pulse-specific mobile mechanics and red flags (viewport meta,
   service worker, implementation status); complements
