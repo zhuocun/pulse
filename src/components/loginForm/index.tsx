@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
-import { lineHeight } from "../../theme/tokens";
+import { lineHeight, touchTargetCoarse } from "../../theme/tokens";
 import useApi from "../../utils/hooks/useApi";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -38,6 +38,14 @@ const ForgotPasswordRow = styled.div`
 
 const ForgotPasswordLink = styled(Link)`
     font-size: 0.875rem;
+
+    /* WCAG 2.5.8 — a bare text link reads ~20px tall; pad the hit area
+     * to the 44px floor on touch without shifting the text baseline. */
+    @media (pointer: coarse) {
+        align-items: center;
+        display: inline-flex;
+        min-height: ${touchTargetCoarse}px;
+    }
 `;
 
 /**

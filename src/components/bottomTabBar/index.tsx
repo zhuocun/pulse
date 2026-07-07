@@ -352,8 +352,10 @@ const ActiveIndicator = styled.span`
      * (achromatic) so it reads as a "selection slot" rather than a
      * colored badge — the brand-orange typographic cue on the active
      * label is the colour callout; the indicator is the geometry
-     * callout. */
-    background: rgba(15, 23, 42, 0.05);
+     * callout. Theme-aware fill: AntD's fill-tertiary flips per mode
+     * (light ink wash on light, white wash on dark) — the previous
+     * hardcoded slate rgba was invisible on the dark capsule. */
+    background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.05));
     border-radius: ${radiusConcentric(radius.pill, INNER_PADDING)}px;
     bottom: ${INNER_PADDING}px;
     display: block;

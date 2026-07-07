@@ -65,6 +65,17 @@ const narrowSort = (
         ? (value as ProjectListSort)
         : fallback;
 
+/*
+ * One/other plural resolution (the codebase-wide pattern — see
+ * `projectList` / `commandPalette`): pick the key off the count,
+ * interpolate `{count}`. No ICU formatter exists in this codebase.
+ */
+const pluralCount = (
+    pair: { one: string; other: string },
+    count: number
+): string =>
+    (count === 1 ? pair.one : pair.other).replace("{count}", String(count));
+
 const PageHeader = styled.header`
     align-items: flex-end;
     display: flex;
@@ -493,9 +504,24 @@ const ProjectPage = () => {
     const statsAnnouncement = statsBusy
         ? microcopy.projectsPage.loadingStats
         : microcopy.projectsPage.statsAnnouncement
-              .replace("{total}", String(stats.total))
-              .replace("{organizations}", String(stats.organizations))
-              .replace("{members}", String(members?.length ?? 0));
+              .replace(
+                  "{projects}",
+                  pluralCount(microcopy.projectsPage.statsProjects, stats.total)
+              )
+              .replace(
+                  "{organizations}",
+                  pluralCount(
+                      microcopy.projectsPage.statsOrganizations,
+                      stats.organizations
+                  )
+              )
+              .replace(
+                  "{members}",
+                  pluralCount(
+                      microcopy.projectsPage.statsMembers,
+                      members?.length ?? 0
+                  )
+              );
 
     const filteredProjects = useMemo(() => {
         const semanticPool = param.semanticIds

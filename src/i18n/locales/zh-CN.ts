@@ -910,8 +910,21 @@ const zhCN: Dictionary = {
         organizations: "组织数",
         teamMembers: "团队成员",
         loadingStats: "正在加载项目统计",
-        statsAnnouncement:
-            "{total} 个项目,涵盖 {organizations} 家组织,{members} 名团队成员。",
+        // 中文不区分单复数——one/other 两个键取同一文案,仅为与
+        // en.ts 的结构契约保持一致。
+        statsAnnouncement: "{projects},涵盖 {organizations},{members}。",
+        statsProjects: {
+            one: "{count} 个项目",
+            other: "{count} 个项目"
+        },
+        statsOrganizations: {
+            one: "{count} 家组织",
+            other: "{count} 家组织"
+        },
+        statsMembers: {
+            one: "{count} 名团队成员",
+            other: "{count} 名团队成员"
+        },
         filtersToggleAria: "筛选和排序项目"
     },
     pageTitle: {

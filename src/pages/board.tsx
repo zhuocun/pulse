@@ -1,7 +1,9 @@
 import {
     CloseOutlined,
     DeleteOutlined,
+    FileTextOutlined,
     InboxOutlined,
+    MessageOutlined,
     MoreOutlined,
     ReloadOutlined,
     SettingOutlined,
@@ -868,6 +870,43 @@ const BoardPage = () => {
                             <Dropdown
                                 menu={{
                                     items: [
+                                        /*
+                                         * Copilot Ask / Brief — the phone
+                                         * capsule has no desktop bottom-tier
+                                         * CopilotMenu slot, so the overflow
+                                         * menu is the phone's launcher. Same
+                                         * gate (copilotLaunchersOn) and same
+                                         * drawer callbacks as the desktop
+                                         * split control.
+                                         */
+                                        ...(copilotLaunchersOn
+                                            ? [
+                                                  {
+                                                      key: "copilot-ask",
+                                                      label: microcopy.board
+                                                          .copilotMenuAsk,
+                                                      icon: (
+                                                          <MessageOutlined
+                                                              aria-hidden
+                                                          />
+                                                      ),
+                                                      onClick: () =>
+                                                          openChatDrawer()
+                                                  },
+                                                  {
+                                                      key: "copilot-brief",
+                                                      label: microcopy.board
+                                                          .copilotMenuBrief,
+                                                      icon: (
+                                                          <FileTextOutlined
+                                                              aria-hidden
+                                                          />
+                                                      ),
+                                                      onClick: () =>
+                                                          openBriefDrawer()
+                                                  }
+                                              ]
+                                            : []),
                                         ...(aiEnabled
                                             ? [
                                                   {
