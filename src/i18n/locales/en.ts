@@ -1116,8 +1116,23 @@ export const enSource = {
         organizations: "Organizations",
         teamMembers: "Team members",
         loadingStats: "Loading project stats",
-        statsAnnouncement:
-            "{total} projects across {organizations} organizations, {members} team members.",
+        // Each fragment is a one/other plural pair (the codebase-wide
+        // pattern — no ICU formatter, the consumer picks the key off
+        // the count and interpolates {count}); statsAnnouncement then
+        // composes the three resolved fragments.
+        statsAnnouncement: "{projects} across {organizations}, {members}.",
+        statsProjects: {
+            one: "{count} project",
+            other: "{count} projects"
+        },
+        statsOrganizations: {
+            one: "{count} organization",
+            other: "{count} organizations"
+        },
+        statsMembers: {
+            one: "{count} team member",
+            other: "{count} team members"
+        },
         filtersToggleAria: "Filter and sort projects"
     },
     /**

@@ -110,10 +110,18 @@ const Footer = styled.div`
 const rowLayout = `
     align-items: center;
     display: flex;
+    /* Wide trailing controls (the Theme / Language Segmented pickers)
+     * drop to their own line on narrow phones instead of crushing the
+     * leading icon + label — Trailing never shrinks (flex: 0 0 auto),
+     * so without wrap the only give in the row was the Leading slot. */
+    flex-wrap: wrap;
     gap: ${space.sm}px;
     justify-content: space-between;
     min-height: ${touchTargetCoarse}px;
-    padding: 0 ${space.md}px;
+    /* Block padding only matters once a row wraps to two lines (the
+     * 44px min-height dominates single-line rows); it keeps a wrapped
+     * control from kissing the hairline divider. */
+    padding: ${space.xxs}px ${space.md}px;
     position: relative;
     width: 100%;
 `;
@@ -176,6 +184,17 @@ const Leading = styled.span`
     min-width: 0;
 `;
 
+/*
+ * The icon never shrinks. Leading is the row's only shrinkable slot
+ * (min-width: 0), and without this guard a wide trailing control
+ * squeezed the icon glyph before the label ellipsized.
+ */
+const IconSlot = styled.span`
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+`;
+
 const Trailing = styled.span`
     align-items: center;
     color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
@@ -235,7 +254,7 @@ export const SettingsRow = ({
 
     const leading = (
         <Leading>
-            {icon}
+            {icon ? <IconSlot>{icon}</IconSlot> : null}
             {label}
         </Leading>
     );

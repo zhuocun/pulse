@@ -109,6 +109,12 @@ const REQUIRED_LIGHT_VARS = [
     // drowns out the 6% inks of shadow.lg; softer in dark because
     // the dark glass already pops against the dark page).
     "--ant-shadow-glass-lifted",
+    // Link colour pair — antdTheme.ts pins colorLink/-Hover to the
+    // light-page palette steps for BOTH modes, so the dark block must
+    // override them (auth links otherwise fail AA on the dark page).
+    // The light block mirrors antdTheme's output for parity.
+    "--ant-color-link",
+    "--ant-color-link-hover",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -504,6 +510,69 @@ describe("paletteToCss", () => {
             const css = paletteToCss(orangePalette);
             expect(css).toMatch(
                 /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
+            );
+        });
+    });
+
+    /*
+     * Dark-mode link contrast. antdTheme.ts sets `colorLink` to
+     * `primaryHover` and `colorLinkHover` to `primaryActive` for both
+     * modes — AA on the light page but ~3:1 (or worse) on the dark
+     * page, so auth links (Forgot password, Terms) failed contrast in
+     * dark mode. The BASE dark block must override both vars, not
+     * only the `prefers-contrast: more` media block.
+     */
+    describe("dark-mode link contrast overrides", () => {
+        /*
+         * Slice the BASE dark block only — it ends where the
+         * glass-intensity override selectors begin. `darkBlockOf`
+         * captures everything after the dark selector including the
+         * `prefers-contrast` media block, which declares its own
+         * `--ant-color-link` and would mask a regression here.
+         */
+        const baseDarkBlockOf = (css: string): string => {
+            const darkStart = css.indexOf('html[data-color-scheme="dark"]');
+            const glassStart = css.indexOf(
+                'html[data-glass-intensity="clear"]'
+            );
+            if (darkStart < 0 || glassStart < 0 || glassStart < darkStart) {
+                throw new Error("rendered CSS missing dark or glass block");
+            }
+            return css.slice(darkStart, glassStart);
+        };
+
+        it("declares --ant-color-link from brand.primaryDark in the base dark block", () => {
+            const css = paletteToCss(orangePalette);
+            expect(baseDarkBlockOf(css)).toContain(
+                `--ant-color-link: ${orangePalette.brand.primaryDark};`
+            );
+        });
+
+        it("declares --ant-color-link-hover from aurora.mid in the base dark block (primaryActive would fail on dark)", () => {
+            const css = paletteToCss(orangePalette);
+            expect(baseDarkBlockOf(css)).toContain(
+                `--ant-color-link-hover: ${orangePalette.aurora.mid};`
+            );
+        });
+
+        it("mirrors antdTheme's light link pair in the light block (both-modes parity contract)", () => {
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            expect(light).toContain(
+                `--ant-color-link: ${orangePalette.brand.primaryHover};`
+            );
+            expect(light).toContain(
+                `--ant-color-link-hover: ${orangePalette.brand.primaryActive};`
+            );
+        });
+
+        it("follows the active palette (emerald)", () => {
+            const css = paletteToCss(emeraldPalette);
+            expect(baseDarkBlockOf(css)).toContain(
+                `--ant-color-link: ${emeraldPalette.brand.primaryDark};`
+            );
+            expect(baseDarkBlockOf(css)).toContain(
+                `--ant-color-link-hover: ${emeraldPalette.aurora.mid};`
             );
         });
     });

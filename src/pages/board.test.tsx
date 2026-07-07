@@ -757,6 +757,48 @@ describe("BoardPage", () => {
             expect(moreActions).toHaveFocus();
         });
 
+        // W2-03 — phone has no bottom-tier CopilotMenu slot, so the
+        // overflow menu doubles as the Copilot launcher: Ask / Brief
+        // entries wire the same drawer callbacks as the desktop split
+        // control and flip the same overlays flags.
+        it("surfaces Copilot Ask and Brief in the phone overflow menu, wired to the drawer overlays", async () => {
+            mockedUseIsPhoneChrome.mockReturnValue(true);
+            renderBoard();
+            await screen.findByTestId("phone-board-title");
+
+            fireEvent.click(screen.getByTestId("board-more-actions"));
+
+            const ask = await screen.findByText("Ask Copilot");
+            expect(screen.getByText("Board brief")).toBeInTheDocument();
+
+            fireEvent.click(ask);
+            expect(store.getState().overlays.chatDrawer.open).toBe(true);
+
+            // Reopen the menu (an item click dismisses the dropdown)
+            // and fire the Brief entry.
+            fireEvent.click(screen.getByTestId("board-more-actions"));
+            fireEvent.click(await screen.findByText("Board brief"));
+            expect(store.getState().overlays.boardBriefOpen).toBe(true);
+        });
+
+        it("omits the Copilot entries from the phone overflow menu when Project AI is off", async () => {
+            localStorage.setItem(
+                "boardCopilot:disabledProjectIds",
+                JSON.stringify(["project-1"])
+            );
+            mockedUseIsPhoneChrome.mockReturnValue(true);
+            renderBoard();
+            await screen.findByTestId("phone-board-title");
+
+            fireEvent.click(screen.getByTestId("board-more-actions"));
+
+            // The menu is open (trash entry present) but carries no
+            // Copilot launchers — same gate as the desktop CopilotMenu.
+            await screen.findByText(/open trash/i);
+            expect(screen.queryByText("Ask Copilot")).not.toBeInTheDocument();
+            expect(screen.queryByText("Board brief")).not.toBeInTheDocument();
+        });
+
         it("renders the toolbar controls in the plain BoardActions row on desktop (no capsule)", async () => {
             mockedUseIsPhoneChrome.mockReturnValue(false);
             renderBoard();

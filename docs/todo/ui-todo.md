@@ -609,3 +609,16 @@ This is the explicit answer to "does the plan embody UI/UX best practice?". Each
 | Inclusive Components — accessible drag-and-drop      | 3.4, 2.A.9                                  |
 | Core Web Vitals (LCP / INP / CLS)                    | 2.A.7, 6                                    |
 | Storybook + visual regression governance             | 2.C                                         |
+
+---
+
+## 8. 2026-07 UX sweep — logged findings (tracked, not fixed)
+
+Findings from the 2026-07 headless-capture sweep that were logged rather than fixed in that pass. IDs are the sweep's finding IDs.
+
+- **W1-05 — Auth CTA white-on-orange contrast 3.56:1 in light mode.** The orange-palette CTA fill fails AA for normal text; the `src/theme/palettes/orange.ts` doc comment claims the white-on-orange contrast "is high", which is wrong. This is an intentional brand trade-off — either correct the comment to document the AA-large-only rating, or darken the CTA fill (e.g. toward `primaryHover` #C2410C).
+- **W1-06 — `/auth/terms` from register only offers "Back to log in".** `src/pages/terms/index.tsx` hard-links its `BackLink` to `/login`, so a user who opens the ToS mid-registration returns to the wrong form and loses their register form state (WCAG 3.3.7 adjacent). Needs a return-target aware back link (or open ToS without leaving the form).
+- **W2-05 — Task sheet close button shows a focus ring immediately on touch open.** Focus moves to the close control when the `<Sheet>` opens via touch, painting a `:focus-visible` ring the user never asked for. P4 polish.
+- **W2-02 / W3-03 — Playwright `fullPage` capture flips `pointer: coarse`.** The capture path changes the emulated pointer media feature mid-run, so coarse-pointer styling (44 px touch targets etc.) is unreliable in fullPage shots. Harness fix needed before the next sweep; not a product bug.
+- **W2-04 / W3-01 — Copilot dock never captured.** The harness selector never matched the dock trigger, so the entire Copilot dock surface has zero screenshot coverage. Harness selector fix needed before the next sweep.
+- **Coverage gaps — capture matrix misses routes.** `members`, `milestones`, `labels`, and `reports` routes are absent from the capture matrix; add them so future sweeps see those surfaces.

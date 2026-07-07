@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import {
     Navigate,
     Outlet,
@@ -223,7 +223,17 @@ const BoardRouteShell = () => (
         >
             <BoardPage />
         </div>
-        <Outlet />
+        {/*
+         * Own Suspense boundary for the task-panel outlet. Without it,
+         * a deep link to `task/:taskId` suspends the WHOLE shell while
+         * the lazy TaskDetailPanel chunk fetches — the layout-level
+         * fallback replaces the board and a slow/wedged chunk blanks
+         * the page. With the boundary, the board paints immediately
+         * and only the panel slot waits.
+         */}
+        <Suspense fallback={null}>
+            <Outlet />
+        </Suspense>
     </div>
 );
 

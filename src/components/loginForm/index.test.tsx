@@ -594,4 +594,68 @@ describe("LoginForm", () => {
             expect(screen.getByTestId("probe").textContent).toBe("/projects");
         });
     });
+
+    // WCAG 2.5.8 (Target Size, Minimum). The forgot-password text link
+    // renders ~20 px tall by default — below the 44 px floor — so it
+    // lifts to `min-height: 44px` under `@media (pointer: coarse)`.
+    // Walk the rendered stylesheet (same approach as
+    // `filterChips/index.test.tsx`) so a refactor that drops the link
+    // below 44 px must fail CI.
+    it("declares a touch-target height of at least 44 px on the forgot-password link (WCAG 2.5.8)", () => {
+        renderLoginForm();
+
+        const isEmotionToken = (tok: string) =>
+            /^css-[a-z0-9]{4,}$/i.test(tok) &&
+            !tok.startsWith("css-var-") &&
+            !tok.startsWith("css-dev-only-");
+        const styledClassFor = (el: HTMLElement): string | undefined => {
+            let node: HTMLElement | null = el;
+            while (node) {
+                const tok = node.className
+                    ?.toString()
+                    .split(/\s+/)
+                    .find(isEmotionToken);
+                if (tok) return tok;
+                node = node.parentElement;
+            }
+            return undefined;
+        };
+
+        const heightsFor = (styledCls: string): number[] => {
+            const heights: number[] = [];
+            const visit = (rule: CSSRule) => {
+                if (rule instanceof CSSStyleRule) {
+                    if (!rule.selectorText.includes(styledCls)) return;
+                    const re =
+                        /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
+                    let m: RegExpExecArray | null = re.exec(rule.cssText);
+                    while (m !== null) {
+                        heights.push(parseFloat(m[1] ?? "0"));
+                        m = re.exec(rule.cssText);
+                    }
+                } else if ("cssRules" in rule) {
+                    for (const child of Array.from(
+                        (rule as CSSGroupingRule).cssRules
+                    )) {
+                        visit(child);
+                    }
+                }
+            };
+            Array.from(document.styleSheets).forEach((sheet) => {
+                let rules: CSSRuleList;
+                try {
+                    rules = sheet.cssRules;
+                } catch {
+                    return;
+                }
+                for (const rule of Array.from(rules)) visit(rule);
+            });
+            return heights;
+        };
+
+        const link = screen.getByRole("link", { name: /forgot password/i });
+        const linkCls = styledClassFor(link);
+        expect(linkCls).toBeTruthy();
+        expect(heightsFor(linkCls as string)).toContain(44);
+    });
 });

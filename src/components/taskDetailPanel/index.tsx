@@ -309,6 +309,20 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      */
     const asideRef = useRef<HTMLElement | null>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    /*
+     * Deep-link hydration guard (W2-01). On the very first render —
+     * before effects run — the phone chassis forces Sheet's static
+     * AntD Drawer fallback instead of the framer-motion animated
+     * branch. A deep-linked (or freshly-hydrated) mount otherwise
+     * kicks off the enter animation while the surrounding lazy chunk
+     * is still settling, which can wedge the sheet mid-transition.
+     * After mount the animated branch takes over for every subsequent
+     * render (detent drags, sibling swipes, etc.).
+     */
+    const [hasMounted, setHasMounted] = useState(false);
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
     const [formTick, setFormTick] = useState(0);
     const [saveError, setSaveError] = useState<Error | null>(null);
     const [appliedFieldOrigin, setAppliedFieldOrigin] = useState<
@@ -1651,6 +1665,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 desktopPlacement="right"
                 desktopSize="large"
                 footer={footerNode}
+                forceDrawerFallback={!hasMounted}
                 mask
                 maskClosable
                 onClose={requestClose}

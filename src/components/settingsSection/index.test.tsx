@@ -211,6 +211,34 @@ describe("SettingsSection", () => {
         expect(button.querySelector(".anticon")).toBeNull();
     });
 
+    // W1-02 — a wide trailing control (the Theme / Language Segmented
+    // pickers on phone) must wrap onto its own line instead of crushing
+    // the leading icon: the row declares flex-wrap and the icon rides a
+    // non-shrinking slot.
+    it("wraps wide trailing controls instead of crushing the leading icon", () => {
+        render(
+            <SettingsSection>
+                <SettingsRow
+                    control={<input aria-label="theme control" />}
+                    data-testid="settings-row-theme"
+                    icon={<span data-testid="theme-icon" />}
+                    label="Theme"
+                />
+            </SettingsSection>
+        );
+
+        const row = screen.getByTestId("settings-row-theme");
+        expect(row).toHaveStyle({ flexWrap: "wrap" });
+
+        const iconSlot = screen.getByTestId("theme-icon")
+            .parentElement as HTMLElement;
+        expect(iconSlot).toHaveStyle({
+            flexGrow: "0",
+            flexShrink: "0",
+            flexBasis: "auto"
+        });
+    });
+
     it("passes data-testid through on the row element", () => {
         render(
             <SettingsSection>

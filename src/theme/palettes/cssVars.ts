@@ -179,6 +179,17 @@ html[data-color-scheme="light"] {
     --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
     --pulse-brand-primary-dark: ${p.brand.primaryDark};
 
+    /*
+     * Link colour pair. antdTheme.ts sets colorLink / colorLinkHover
+     * from the same palette steps for every mode, which is AA on the
+     * light page but fails on the dark page — the dark block below
+     * overrides both. The light values here mirror antdTheme's output
+     * exactly (no visual change) so the "every var defined for one
+     * mode is defined for both" contract holds.
+     */
+    --ant-color-link: ${p.brand.primaryHover};
+    --ant-color-link-hover: ${p.brand.primaryActive};
+
     --pulse-accent-start: ${p.accent.start};
     --pulse-accent-end: ${p.accent.end};
     --pulse-accent-bg-strong: rgba(${p.accent.rgb}, 0.32);
@@ -282,6 +293,20 @@ html[data-color-scheme="dark"] {
     --pulse-brand-primary-bg: ${p.brand.primaryBg};
     --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
     --pulse-brand-primary-dark: ${p.brand.primaryDark};
+
+    /*
+     * Dark-mode link pair. antdTheme.ts pins colorLink to primaryHover
+     * for BOTH modes — AA on the light page but ~3:1 on the dark page,
+     * so auth links (Forgot password, Terms) failed contrast. Override
+     * to the bright dark-mode brand step (primaryDark — the same step
+     * the prefers-contrast block uses). Hover steps to the mid brand
+     * shade (aurora.mid) rather than primaryActive: primaryActive is
+     * the DARKEST brand step and reads ≤2.6:1 on the dark page, which
+     * would re-introduce the failure on hover. aurora.mid stays AA
+     * (≥5:1 on each palette's bgDark) across all three palettes.
+     */
+    --ant-color-link: ${p.brand.primaryDark};
+    --ant-color-link-hover: ${p.aurora.mid};
 
     --pulse-accent-start: ${p.accent.start};
     --pulse-accent-end: ${p.accent.end};

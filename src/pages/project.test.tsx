@@ -314,6 +314,33 @@ describe("ProjectPage", () => {
         });
     });
 
+    // W1-03 — the stats line composes one/other plural fragments per
+    // count (the codebase-wide plural pattern), so a single project /
+    // organization / member reads grammatically instead of "1 projects".
+    it("uses singular forms in the stats line when each count is 1", async () => {
+        fetchMock.mockImplementation((input) => {
+            const url = String(input);
+            if (url.includes("users/members")) {
+                return Promise.resolve(response([member()]));
+            }
+            if (url.includes("projects")) {
+                return Promise.resolve(response([project()]));
+            }
+            return Promise.resolve(response({}));
+        });
+
+        renderPage();
+
+        await waitFor(() => {
+            expect(
+                screen.getAllByText(
+                    /1 project across 1 organization, 1 team member\./i
+                ).length
+            ).toBeGreaterThan(0);
+        });
+        expect(screen.queryByText(/1 projects/i)).not.toBeInTheDocument();
+    });
+
     it("hides the visual stat rail for small workspaces but keeps the compact summary", async () => {
         fetchMock.mockImplementation((input) => {
             const url = String(input);

@@ -705,6 +705,19 @@ describe("BottomTabBar", () => {
             expect(css).toMatch(/view-transition-name:\s*pulse-tab-indicator/);
         });
 
+        it("fills the morph indicator with the theme-aware fill-tertiary var (visible in dark mode)", () => {
+            renderBar();
+            const css = sheetText();
+            // The indicator fill must ride AntD's mode-flipping
+            // --ant-color-fill-tertiary (light ink wash in light mode,
+            // white wash in dark) with the slate literal only as the
+            // no-theme fallback. A bare `background: rgba(15, 23, 42,
+            // 0.05)` is invisible against the dark capsule.
+            expect(css).toMatch(
+                /background:\s*var\(--ant-color-fill-tertiary,\s*rgba\(15,\s*23,\s*42,\s*0\.05\)\)/
+            );
+        });
+
         it("tags each tab (route links AND the Search button) with a per-tab view-transition-name so the indicator can morph between them", () => {
             renderBar();
             // Walk every interactive tab — including the Search action
