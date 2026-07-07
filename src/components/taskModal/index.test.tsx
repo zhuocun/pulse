@@ -567,6 +567,36 @@ describe("TaskModal", () => {
         );
     });
 
+    it("surfaces an Undo toast after a save and re-PUTs the before-state on click", async () => {
+        // §2.A.4 — a task update is reversible, so a successful save shows
+        // a transient Undo toast; clicking Undo replays the inverse PUT
+        // with the captured before-state (the pre-edit name).
+        renderModal();
+        const taskNameInput = await screen.findByDisplayValue("Build task");
+
+        fireEvent.change(taskNameInput, {
+            target: { value: "Build task edited" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        expect(
+            await screen.findByText(microcopy.feedback.taskSaved)
+        ).toBeInTheDocument();
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        // Undo issues a second PUT restoring the pre-edit name.
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        const undoPut = fetchMock.mock.calls[1];
+        expect((undoPut?.[1] as RequestInit)?.method).toBe("PUT");
+        expect(
+            JSON.parse((undoPut?.[1] as RequestInit)?.body as string)
+        ).toEqual(expect.objectContaining({ taskName: "Build task" }));
+    });
+
     it("surfaces an error toast (and still closes the modal) when the delete fails", async () => {
         fetchMock.mockResolvedValue(
             response({ error: "Delete failed on server" }, false)

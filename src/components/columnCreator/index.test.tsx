@@ -6,9 +6,11 @@ import {
     waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { message } from "antd";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
@@ -73,6 +75,10 @@ describe("ColumnCreator", () => {
     afterEach(() => {
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
+            // The Undo toast lives in a global AntD message container that
+            // outlives unmount (10 s window); tear it down so a leaked
+            // "Undo" button never bleeds into a sibling test's queries.
+            message.destroy();
         });
     });
 
@@ -349,6 +355,56 @@ describe("ColumnCreator", () => {
             expect(events[0].action).toBe("create");
             expect(events[0].summary).toContain("QA");
         });
+    });
+
+    /*
+     * §2.A.4 — a create is reversible, so it surfaces a transient Undo
+     * toast alongside the activity feed. Clicking Undo replays the inverse
+     * mutation: a DELETE that removes the just-created column by id.
+     */
+    it("surfaces an Undo toast after create and re-DELETEs the column on click", async () => {
+        fetchMock.mockReset();
+        fetchMock.mockImplementation((_input, init) => {
+            const method = (init as RequestInit | undefined)?.method ?? "GET";
+            if (method === "POST") {
+                return Promise.resolve(
+                    response({ _id: "server-column-id", columnName: "QA" })
+                );
+            }
+            return Promise.resolve(response({ ok: true }));
+        });
+
+        renderCreator();
+        const input = await expandIntoInput();
+        fireEvent.change(input, { target: { value: "QA" } });
+        fireEvent.keyDown(input, {
+            charCode: 13,
+            code: "Enter",
+            key: "Enter"
+        });
+
+        await waitFor(() =>
+            expect(
+                fetchMock.mock.calls.some(
+                    ([, init]) =>
+                        (init as RequestInit | undefined)?.method === "POST"
+                )
+            ).toBe(true)
+        );
+        expect(
+            await screen.findByText(microcopy.feedback.columnCreated)
+        ).toBeInTheDocument();
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        const deleteCall = fetchMock.mock.calls.find(
+            ([, init]) => (init as RequestInit | undefined)?.method === "DELETE"
+        );
+        expect(deleteCall).toBeDefined();
+        expect(String(deleteCall?.[0])).toContain("/api/v1/boards");
+        expect(String(deleteCall?.[0])).toContain("columnId=server-column-id");
     });
 
     it("does not submit a named column just because the input blurs", async () => {

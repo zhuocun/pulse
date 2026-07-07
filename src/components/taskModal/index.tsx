@@ -567,7 +567,19 @@ const TaskModal: React.FC<{
             // `undoUpdate(beforeState …)` cast below).
             await update(merged as unknown as Record<string, unknown>);
             setSaveError(null);
-            message.success(microcopy.feedback.taskSaved);
+            // §2.A.4 — a task update is reversible, so surface a transient
+            // Undo toast (the immediate recovery path) instead of a plain
+            // success message. Clicking Undo PUTs the captured before-state
+            // back through the same mutation.
+            showUndoToast({
+                description: microcopy.feedback.taskSaved,
+                analyticsTag: "task.update",
+                undo: async () => {
+                    await undoUpdate(
+                        beforeState as unknown as Record<string, unknown>
+                    );
+                }
+            });
             // Phase 4.3 — record the update into the activity feed only
             // after the server confirms. Undo PUTs the captured
             // before-state through the same react-query mutation so the

@@ -134,7 +134,7 @@ In this repo:
 - **Font-size ≥ 16 px** on inputs (iOS auto-zooms otherwise). Never `user-scalable=no` (WCAG violation).
 - **Keyboard handling**: `interactive-widget=resizes-content` + `env(keyboard-inset-height)` for fixed footers above the keyboard. The VirtualKeyboard API (`navigator.virtualKeyboard.overlaysContent = true`) for chat composers.
 
-In this repo: login/registration already had `inputMode` + `enterKeyHint`. The first audit added them to `taskCreator`, `columnCreator`, and `projectSearchPanel`. The mobile-optimization follow-up extended the same attributes to `projectModal`, `taskModal` (name / epic / note), `commandPalette`, `aiSearchInput`, and the `aiChatDrawer` composer (`enterKeyHint="send"` so the iOS return key reads "send"). Search inputs that don't already render their own clear affordance use `type="search"`; the palette and AI search keep AntD's `allowClear` prefix instead of stacking two clear buttons.
+In this repo: login/registration already had `inputMode` + `enterKeyHint`. The first audit added them to `taskCreator`, `columnCreator`, and `projectSearchPanel`. The mobile-optimization follow-up extended the same attributes to `projectModal`, `taskModal` (name / epic / note), `commandPalette`, `aiSearchInput`, and the Copilot chat composer (`copilotDock/ChatTabBody`, `enterKeyHint="send"` so the iOS return key reads "send"). Search inputs that don't already render their own clear affordance use `type="search"`; the palette and AI search keep AntD's `allowClear` prefix instead of stacking two clear buttons.
 
 ### E. Visual polish
 
@@ -156,7 +156,7 @@ In this repo:
 - **Background Sync** queues mutations on Chromium; on iOS queue in IndexedDB and replay on foreground (no Background Sync support).
 - **Optimistic UI**: React 19's `useOptimistic` is canonical. Always show rollbacks — silent reverts erode trust.
 
-In this repo: optimistic updates exist via `useReactMutation` (`src/utils/hooks/useReactMutation.ts:40–47`) for create/update/delete flows including drag-and-drop. **Gap:** no service worker yet; that is the next big "feels native" win for return visits.
+In this repo: optimistic updates exist via `useReactMutation` (`src/utils/hooks/useReactMutation.ts:40–47`) for create/update/delete flows including drag-and-drop. A service worker ships in `public/sw.js` — NetworkFirst for HTML (3 s timeout, cache fallback), CacheFirst for hashed assets and font binaries, StaleWhileRevalidate for icons/avatars/font stylesheets, with versioned caches (`pulse-v4`) evicted on `activate`. `src/index.tsx` registers it on `load` and, when an update parks in `waiting`, mounts a "New version available" reload toast (`src/components/swUpdateToast`) that posts `{type: "SKIP_WAITING"}` on accept rather than dropping in-flight state. **Gap:** no PWA install-prompt UI yet — `beforeinstallprompt` is not captured, so add-to-home-screen still relies on the browser's own affordance.
 
 ### G. Engagement APIs
 

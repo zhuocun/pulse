@@ -356,6 +356,17 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         undefined,
         ["parentTaskId", "startDate", "dueDate"]
     );
+    // Re-update mutation used only as the Undo closure for a successful
+    // save: it PUTs the captured before-state back through the same
+    // react-query cache key so the cache and the server move back in
+    // lockstep. Errors are swallowed — the user deliberately clicked Undo.
+    const { mutateAsync: undoUpdate } = useReactMutation(
+        "tasks",
+        "PUT",
+        ["tasks", { projectId }],
+        undefined,
+        () => {}
+    );
     // Name of the task currently being deleted, captured so the DELETE
     // failure toast reads the right label. The error toast MUST fire from
     // the mutation-level onError (below) rather than a per-`mutate`-call
@@ -587,10 +598,30 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             closePanel();
             return;
         }
+        // Capture the before-state for the Undo closure BEFORE the PUT
+        // lands — once the cache flips to the updated payload the original
+        // values would be lost.
+        const beforeState: ITask = { ...editingTask };
         try {
             await update(merged as unknown as Record<string, unknown>);
             setSaveError(null);
-            message.success(microcopy.feedback.taskSaved);
+            // §2.A.4 — a task update is reversible, so surface a transient
+            // Undo toast instead of a plain success message. The panel
+            // navigates to the board on `closePanel()` below, so it unmounts
+            // on this same action; keep the toast alive past unmount
+            // (`dismissOnUnmount: false`) so the user still gets their Undo
+            // window. The inverse PUT runs through the persistent
+            // react-query client.
+            showUndoToast({
+                description: microcopy.feedback.taskSaved,
+                analyticsTag: "task.update",
+                dismissOnUnmount: false,
+                undo: async () => {
+                    await undoUpdate(
+                        beforeState as unknown as Record<string, unknown>
+                    );
+                }
+            });
             closePanel();
         } catch {
             // ErrorBox surfaces the message via the onError callback

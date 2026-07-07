@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
+import { mediaRuleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import { BulkSelectionProvider } from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
@@ -174,6 +175,7 @@ const defaultParam: TaskSearchParam = {
 const removeColumn = jest.fn();
 const recreateColumn = jest.fn().mockResolvedValue(undefined);
 const editColumn = jest.fn();
+const undoEditColumn = jest.fn().mockResolvedValue(undefined);
 const updateTask = jest.fn();
 const startEditing = jest.fn();
 const openTask = jest.fn();
@@ -242,12 +244,13 @@ const renderColumn = ({
     milestones?: IMilestone[];
     selection?: boolean;
 } = {}) => {
-    // The component calls `useReactMutation` four times: the column
+    // The component calls `useReactMutation` several times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
-    // used by the Undo toast (endpoint="boards", method="POST"), the
-    // column edit (endpoint="boards", method="PUT"), and the inline task
-    // rename (endpoint="tasks"). Route by the first two args so the
-    // mutations don't collide in test assertions.
+    // used by the delete Undo toast (endpoint="boards", method="POST"),
+    // the column edit + its Undo companion (endpoint="boards",
+    // method="PUT" — `mutate` for the save, `mutateAsync` for the Undo),
+    // and the inline task rename (endpoint="tasks"). Route by the first
+    // two args so the mutations don't collide in test assertions.
     mockedUseReactMutation.mockImplementation(
         (endPoint: string, method: string) => {
             if (endPoint === "tasks") {
@@ -257,7 +260,13 @@ const renderColumn = ({
                 return { mutateAsync: recreateColumn, isLoading: false };
             }
             if (method === "PUT") {
-                return { mutate: editColumn, isLoading: false };
+                // Two PUT mutations share this branch: the edit save (uses
+                // `mutate`) and the Undo companion (uses `mutateAsync`).
+                return {
+                    mutate: editColumn,
+                    mutateAsync: undoEditColumn,
+                    isLoading: false
+                };
             }
             return { mutate: removeColumn, isLoading: false };
         }
@@ -460,6 +469,28 @@ describe("Column", () => {
             screen.getByRole("button", { name: /open task lifted task/i })
                 .className
         ).toContain("task-card-lift-surface");
+    });
+
+    it("flags only the optimistic placeholder card's shell for the insert reveal", () => {
+        renderColumn();
+
+        // The default render seeds two persisted tasks plus one optimistic
+        // placeholder (`_id: "mock"`). Only the placeholder shell should
+        // carry the data-attr that drives the mount slide-and-fade.
+        const optimisticShells = document.querySelectorAll(
+            '[data-optimistic="true"]'
+        );
+        expect(optimisticShells).toHaveLength(1);
+
+        const cls = styledClassFor(optimisticShells[0]);
+        expect(cls).toBeTruthy();
+        // The reveal is guarded so reduced-motion users get an instant
+        // insert: the animation only lives inside the no-preference block.
+        const revealRules = mediaRuleTextsFor(cls ?? "", "no-preference");
+        const insertRule = revealRules.find((text) =>
+            text.includes('[data-optimistic="true"]')
+        );
+        expect(insertRule).toContain("animation");
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {
@@ -763,6 +794,36 @@ describe("Column", () => {
             columnName: "Doing",
             category: "todo",
             wipLimit: 4
+        });
+    });
+
+    it("surfaces an Undo toast after a column edit and re-PUTs the prior settings on click", async () => {
+        // §2.A.4 — a column edit is reversible, so a successful save shows
+        // a transient Undo toast whose inverse PUTs the captured prior
+        // settings back.
+        renderColumn({ boardColumn: column({ wipLimit: 0 }) });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^edit column todo$/i })
+        );
+        const nameInput = await screen.findByLabelText("New column name");
+        fireEvent.change(nameInput, { target: { value: "Doing" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(
+            await screen.findByText(microcopy.feedback.columnUpdated)
+        ).toBeInTheDocument();
+        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await act(async () => {
+            fireEvent.click(undoButton);
+        });
+
+        // Undo replays the inverse PUT with the column's pre-edit settings.
+        expect(undoEditColumn).toHaveBeenCalledWith({
+            _id: "column-1",
+            columnName: "Todo",
+            category: "todo",
+            wipLimit: 0
         });
     });
 
