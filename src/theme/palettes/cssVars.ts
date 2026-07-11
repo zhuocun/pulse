@@ -198,6 +198,41 @@ html[data-color-scheme="light"] {
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
     --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
 
+    /*
+     * App-owned equivalents of AntD's --ant-color-* semantic surface
+     * tokens (text ramp, neutral fills, borders, solid surfaces, text-
+     * button overlays). The text/fill/border/bg tokens in tokens.ts
+     * reference these. Light values are the slate-900 ink the page
+     * already uses; the dark block flips fills/overlays to a light ink so
+     * they stay visible on the dark page. Opacities mirror AntD's
+     * light/dark algorithm output so a page repointed off --ant-color-*
+     * lands pixel-for-pixel. Palette-independent (the neutral ink is the
+     * same across every brand palette).
+     */
+    --pulse-text-secondary: rgba(15, 23, 42, 0.65);
+    --pulse-text-tertiary: rgba(15, 23, 42, 0.45);
+    --pulse-fill: rgba(15, 23, 42, 0.15);
+    --pulse-fill-secondary: rgba(15, 23, 42, 0.06);
+    --pulse-fill-tertiary: rgba(15, 23, 42, 0.04);
+    --pulse-fill-quaternary: rgba(15, 23, 42, 0.02);
+    --pulse-border: rgba(15, 23, 42, 0.12);
+    --pulse-border-secondary: rgba(15, 23, 42, 0.06);
+    --pulse-bg-container: #ffffff;
+    --pulse-bg-elevated: #ffffff;
+    --pulse-bg-text-hover: rgba(15, 23, 42, 0.06);
+    --pulse-bg-text-active: rgba(15, 23, 42, 0.15);
+
+    /*
+     * Link + status colours, app-owned equivalents of --ant-color-link /
+     * --ant-color-error / --ant-color-warning. Link tracks the palette
+     * (primaryHover is AA on the light page); the dark block flips it to
+     * primaryDark. Status seeds match AntD's light algorithm; the dark
+     * block steps them to AntD's dark output.
+     */
+    --pulse-link: ${p.brand.primaryHover};
+    --pulse-error: #EF4444;
+    --pulse-warning: #F59E0B;
+
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};
     --pulse-aurora-light: ${p.aurora.light};
@@ -315,6 +350,30 @@ html[data-color-scheme="dark"] {
     --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
     --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
+
+    /*
+     * Dark-mode counterpart of the AntD --ant-color-* equivalents. The
+     * text ramp keeps the gray-200 ink --pulse-text-base uses in dark;
+     * fills, overlays and borders flip to a white ink so they read on the
+     * dark page. Opacities and the solid-surface hexes mirror AntD's dark
+     * algorithm output.
+     */
+    --pulse-text-secondary: rgba(229, 231, 235, 0.65);
+    --pulse-text-tertiary: rgba(229, 231, 235, 0.45);
+    --pulse-fill: rgba(255, 255, 255, 0.18);
+    --pulse-fill-secondary: rgba(255, 255, 255, 0.12);
+    --pulse-fill-tertiary: rgba(255, 255, 255, 0.08);
+    --pulse-fill-quaternary: rgba(255, 255, 255, 0.04);
+    --pulse-border: rgba(255, 255, 255, 0.14);
+    --pulse-border-secondary: rgba(255, 255, 255, 0.08);
+    --pulse-bg-container: #141414;
+    --pulse-bg-elevated: #1f1f1f;
+    --pulse-bg-text-hover: rgba(255, 255, 255, 0.12);
+    --pulse-bg-text-active: rgba(255, 255, 255, 0.18);
+
+    --pulse-link: ${p.brand.primaryDark};
+    --pulse-error: #CE3D3D;
+    --pulse-warning: #D3890C;
 
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};

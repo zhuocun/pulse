@@ -45,6 +45,26 @@ const REQUIRED_LIGHT_VARS = [
     "--pulse-accent-bg-medium",
     "--pulse-accent-bg-subtle",
     "--pulse-accent-bg-hover",
+    // S8.5a — app-owned equivalents of AntD's `--ant-color-*` semantic
+    // surface tokens the emotion-styled pages/layouts read. The contract
+    // pins every one present in BOTH blocks so a page repointed off the
+    // `--ant-color-*` namespace keeps flipping light/dark and survives
+    // AntD's removal.
+    "--pulse-text-secondary",
+    "--pulse-text-tertiary",
+    "--pulse-fill",
+    "--pulse-fill-secondary",
+    "--pulse-fill-tertiary",
+    "--pulse-fill-quaternary",
+    "--pulse-border",
+    "--pulse-border-secondary",
+    "--pulse-bg-container",
+    "--pulse-bg-elevated",
+    "--pulse-bg-text-hover",
+    "--pulse-bg-text-active",
+    "--pulse-link",
+    "--pulse-error",
+    "--pulse-warning",
     "--pulse-aurora-deep",
     "--pulse-aurora-mid",
     "--pulse-aurora-light",
@@ -685,6 +705,144 @@ describe("paletteToCss", () => {
                 expect(lightMatch).not.toBeNull();
                 expect(darkMatch).not.toBeNull();
                 expect(lightMatch![1].trim()).toBe(darkMatch![1].trim());
+            }
+        });
+    });
+
+    /*
+     * S8.5a — app-owned equivalents of the AntD `--ant-color-*` semantic
+     * surface tokens the emotion-styled pages/layouts consume. These let
+     * subsequent workers repoint pages off the `--ant-color-*` namespace
+     * without racing on the token module; the values must flip light/dark
+     * and (for the neutral ramps) stay identical across palettes.
+     */
+    describe("S8.5a AntD --ant-color-* equivalents", () => {
+        it("light neutral ramps use the slate-900 ink at AntD's opacity ladder", () => {
+            const light = lightBlockOf(paletteToCss(orangePalette));
+            expect(light).toContain(
+                "--pulse-text-secondary: rgba(15, 23, 42, 0.65);"
+            );
+            expect(light).toContain(
+                "--pulse-text-tertiary: rgba(15, 23, 42, 0.45);"
+            );
+            expect(light).toContain("--pulse-fill: rgba(15, 23, 42, 0.15);");
+            expect(light).toContain(
+                "--pulse-fill-secondary: rgba(15, 23, 42, 0.06);"
+            );
+            expect(light).toContain(
+                "--pulse-fill-tertiary: rgba(15, 23, 42, 0.04);"
+            );
+            expect(light).toContain(
+                "--pulse-fill-quaternary: rgba(15, 23, 42, 0.02);"
+            );
+            expect(light).toContain("--pulse-border: rgba(15, 23, 42, 0.12);");
+            expect(light).toContain(
+                "--pulse-border-secondary: rgba(15, 23, 42, 0.06);"
+            );
+            expect(light).toContain(
+                "--pulse-bg-text-hover: rgba(15, 23, 42, 0.06);"
+            );
+            expect(light).toContain(
+                "--pulse-bg-text-active: rgba(15, 23, 42, 0.15);"
+            );
+        });
+
+        it("dark flips fills/overlays/borders to a white ink and text to gray-200", () => {
+            const dark = darkBlockOf(paletteToCss(orangePalette));
+            expect(dark).toContain(
+                "--pulse-text-secondary: rgba(229, 231, 235, 0.65);"
+            );
+            expect(dark).toContain(
+                "--pulse-text-tertiary: rgba(229, 231, 235, 0.45);"
+            );
+            expect(dark).toContain("--pulse-fill: rgba(255, 255, 255, 0.18);");
+            expect(dark).toContain(
+                "--pulse-fill-secondary: rgba(255, 255, 255, 0.12);"
+            );
+            expect(dark).toContain(
+                "--pulse-fill-tertiary: rgba(255, 255, 255, 0.08);"
+            );
+            expect(dark).toContain(
+                "--pulse-fill-quaternary: rgba(255, 255, 255, 0.04);"
+            );
+            expect(dark).toContain(
+                "--pulse-border: rgba(255, 255, 255, 0.14);"
+            );
+            expect(dark).toContain(
+                "--pulse-border-secondary: rgba(255, 255, 255, 0.08);"
+            );
+            expect(dark).toContain(
+                "--pulse-bg-text-hover: rgba(255, 255, 255, 0.12);"
+            );
+            expect(dark).toContain(
+                "--pulse-bg-text-active: rgba(255, 255, 255, 0.18);"
+            );
+        });
+
+        it("solid surfaces are white in light and neutral near-black in dark", () => {
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const dark = darkBlockOf(css);
+            expect(light).toContain("--pulse-bg-container: #ffffff;");
+            expect(light).toContain("--pulse-bg-elevated: #ffffff;");
+            expect(dark).toContain("--pulse-bg-container: #141414;");
+            expect(dark).toContain("--pulse-bg-elevated: #1f1f1f;");
+        });
+
+        it("--pulse-link tracks the palette (primaryHover light / primaryDark dark)", () => {
+            const css = paletteToCss(orangePalette);
+            expect(lightBlockOf(css)).toContain(
+                `--pulse-link: ${orangePalette.brand.primaryHover};`
+            );
+            expect(darkBlockOf(css)).toContain(
+                `--pulse-link: ${orangePalette.brand.primaryDark};`
+            );
+            const emerald = paletteToCss(emeraldPalette);
+            expect(lightBlockOf(emerald)).toContain(
+                `--pulse-link: ${emeraldPalette.brand.primaryHover};`
+            );
+            expect(darkBlockOf(emerald)).toContain(
+                `--pulse-link: ${emeraldPalette.brand.primaryDark};`
+            );
+        });
+
+        it("status colours step from the light seed to AntD's dark output", () => {
+            const css = paletteToCss(orangePalette);
+            const light = lightBlockOf(css);
+            const dark = darkBlockOf(css);
+            expect(light).toContain("--pulse-error: #EF4444;");
+            expect(light).toContain("--pulse-warning: #F59E0B;");
+            expect(dark).toContain("--pulse-error: #CE3D3D;");
+            expect(dark).toContain("--pulse-warning: #D3890C;");
+        });
+
+        it("neutral ramps are palette-independent (orange === emerald)", () => {
+            // The neutral ink is the same across every brand palette, so a
+            // regression that accidentally derived one of these from the
+            // active palette would silently diverge between brand swaps.
+            const orange = paletteToCss(orangePalette);
+            const emerald = paletteToCss(emeraldPalette);
+            const neutrals = [
+                "--pulse-text-secondary",
+                "--pulse-text-tertiary",
+                "--pulse-fill",
+                "--pulse-fill-secondary",
+                "--pulse-fill-tertiary",
+                "--pulse-fill-quaternary",
+                "--pulse-border",
+                "--pulse-border-secondary",
+                "--pulse-bg-container",
+                "--pulse-bg-elevated",
+                "--pulse-bg-text-hover",
+                "--pulse-bg-text-active",
+                "--pulse-error",
+                "--pulse-warning"
+            ];
+            for (const name of neutrals) {
+                const re = new RegExp(`${name}:\\s*([^;]+);`);
+                expect(lightBlockOf(orange).match(re)?.[1]).toBe(
+                    lightBlockOf(emerald).match(re)?.[1]
+                );
             }
         });
     });

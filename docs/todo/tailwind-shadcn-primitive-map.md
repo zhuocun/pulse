@@ -116,6 +116,63 @@ message.success(microcopy.feedback.saved);
 - `useUndoToast` (the interactive Undo toast) is a separate feature hook and is
   **out of scope** here; migrate it when its route migrates.
 
+## S8.5a — `--ant-color-*` → app-owned token map (page/layout migration)
+
+The emotion-styled pages/layouts read AntD's `--ant-*` custom properties
+directly. S8.5a lands app-owned equivalents so S8.5/S8.6 workers can repoint
+pages off the `--ant-*` namespace without racing on the token modules and so
+the surfaces survive AntD's removal.
+
+**Where they live.** The typed source of truth is `src/theme/tokens.ts`
+(`text` / `fill` / `border` / `bg` / `status` exports + `brand.link`), each a
+`var(--pulse-*, <light fallback>)` reference. The runtime CSS vars are emitted
+by `src/theme/palettes/cssVars.ts` in **both** the light and dark
+`html[data-color-scheme]` blocks, so they flip on the same
+`useColorScheme` switch and re-color per palette (`usePaletteTheme`) exactly
+like the rest of the `--pulse-*` surface. Do **not** add new `--ant-*` names.
+
+**Faithfulness.** The pre-existing page fallbacks (e.g. `rgba(15, 23, 42, 0.6)`)
+were approximations that never fired — AntD always defined the var, so the
+pixel the user saw was AntD's algorithm output. The `--pulse-*` values below
+mirror AntD's actual light/dark output at the opacities the chrome renders, so
+a repointed page lands pixel-for-pixel. The one intentional shift:
+`--ant-color-text` → `--pulse-text-base` adopts the design's canonical slate
+ink (`rgba(15, 23, 42, 0.92)`, already the `body` text colour) instead of
+AntD's `rgba(0, 0, 0, 0.88)`.
+
+| `--ant-*` (read by pages/layouts) | app-owned var (`cssVars.ts`) | `tokens.ts` accessor | light value | dark value |
+| --- | --- | --- | --- | --- |
+| `--ant-color-text` | `--pulse-text-base` *(pre-existing)* | `text.base` | `rgba(15, 23, 42, 0.92)` | `rgba(229, 231, 235, 0.92)` |
+| `--ant-color-text-secondary` | `--pulse-text-secondary` | `text.secondary` | `rgba(15, 23, 42, 0.65)` | `rgba(229, 231, 235, 0.65)` |
+| `--ant-color-text-tertiary` | `--pulse-text-tertiary` | `text.tertiary` | `rgba(15, 23, 42, 0.45)` | `rgba(229, 231, 235, 0.45)` |
+| `--ant-color-fill` | `--pulse-fill` | `fill.base` | `rgba(15, 23, 42, 0.15)` | `rgba(255, 255, 255, 0.18)` |
+| `--ant-color-fill-secondary` | `--pulse-fill-secondary` | `fill.secondary` | `rgba(15, 23, 42, 0.06)` | `rgba(255, 255, 255, 0.12)` |
+| `--ant-color-fill-tertiary` | `--pulse-fill-tertiary` | `fill.tertiary` | `rgba(15, 23, 42, 0.04)` | `rgba(255, 255, 255, 0.08)` |
+| `--ant-color-fill-quaternary` | `--pulse-fill-quaternary` | `fill.quaternary` | `rgba(15, 23, 42, 0.02)` | `rgba(255, 255, 255, 0.04)` |
+| `--ant-color-border` | `--pulse-border` | `border.base` | `rgba(15, 23, 42, 0.12)` | `rgba(255, 255, 255, 0.14)` |
+| `--ant-color-border-secondary` | `--pulse-border-secondary` | `border.secondary` | `rgba(15, 23, 42, 0.06)` | `rgba(255, 255, 255, 0.08)` |
+| `--ant-color-bg-container` | `--pulse-bg-container` | `bg.container` | `#ffffff` | `#141414` |
+| `--ant-color-bg-elevated` | `--pulse-bg-elevated` | `bg.elevated` | `#ffffff` | `#1f1f1f` |
+| `--ant-color-bg-text-hover` | `--pulse-bg-text-hover` | `bg.textHover` | `rgba(15, 23, 42, 0.06)` | `rgba(255, 255, 255, 0.12)` |
+| `--ant-color-bg-text-active` | `--pulse-bg-text-active` | `bg.textActive` | `rgba(15, 23, 42, 0.15)` | `rgba(255, 255, 255, 0.18)` |
+| `--ant-color-primary` | `--pulse-brand-primary` *(pre-existing)* | `brand.primary` | `palette.brand.primary` | `palette.brand.primary` |
+| `--ant-color-primary-hover` | `--pulse-brand-primary-hover` *(pre-existing)* | `brand.primaryHover` | `palette.brand.primaryHover` | `palette.brand.primaryHover` |
+| `--ant-color-primary-active` | `--pulse-brand-primary-active` *(pre-existing)* | `brand.primaryActive` | `palette.brand.primaryActive` | `palette.brand.primaryActive` |
+| `--ant-color-primary-bg` | `--pulse-brand-primary-bg` *(pre-existing)* | `brand.primaryBg` | `palette.brand.primaryBg` | `palette.brand.primaryBg` |
+| `--ant-color-link` | `--pulse-link` | `brand.link` | `palette.brand.primaryHover` | `palette.brand.primaryDark` |
+| `--ant-color-info` | `--pulse-brand-primary` *(AntD defines `colorInfo` as the brand primary)* | `brand.primary` | `palette.brand.primary` | `palette.brand.primary` |
+| `--ant-color-error` | `--pulse-error` | `status.error` | `#EF4444` | `#CE3D3D` |
+| `--ant-color-warning` | `--pulse-warning` | `status.warning` | `#F59E0B` | `#D3890C` |
+
+**Already app-owned (no new equivalent needed).** These `--ant-*` names are
+emitted by `cssVars.ts` itself — they are app-owned despite the `--ant-`
+prefix and survive AntD's removal, so pages may keep reading them as-is:
+`--ant-backdrop-filter-glass`, `--ant-backdrop-filter-glass-subtle`,
+`--ant-backdrop-filter-glass-strong`, `--ant-motion-tab-bar-minimize`,
+`--ant-motion-detent-snap`, `--ant-easing-detent`, `--ant-shadow-glass-lifted`,
+`--ant-color-link` (kept alongside the new `--pulse-link`),
+`--ant-chrome-inset-mobile`, and the `--ant-detent-*` ladder.
+
 ## Deliberate deviations from stock shadcn
 
 - Hover/selected item surfaces in `Select` / `DropdownMenu` use the neutral
